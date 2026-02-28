@@ -6,7 +6,8 @@
   (:require
    [babashka.process :as proc]
    [clojure.java.io :as io]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [psi.agent-session.tool-path :as tool-path]))
 
 ;; ============================================================
 ;; Tool schemas (for agent registration)
@@ -64,13 +65,11 @@
 ;; ============================================================
 
 (defn- resolve-path
-  "Resolve a path against an optional cwd. When cwd is provided and path
-   is relative, returns the resolved file. Otherwise returns the path as-is."
+  "Resolve a path against an optional cwd. Delegates to tool-path for
+   normalization (strip @, unicode spaces, tilde expansion) and cwd resolution."
   ^java.io.File [cwd path]
-  (let [f (io/file (str path))]
-    (if (and cwd (not (.isAbsolute f)))
-      (io/file cwd (str path))
-      f)))
+  (let [expanded (tool-path/expand-path (str path))]
+    (tool-path/resolve-to-cwd cwd expanded)))
 
 (defn- slurp-file
   ([path] (slurp-file nil path))
