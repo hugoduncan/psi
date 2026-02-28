@@ -150,7 +150,7 @@
           (is (= (:output-bytes call) (:context-bytes-added call)))
           (is (= (:context-bytes-added call)
                  (get-in stats [:aggregates :total-context-bytes])))
-          (is (= 1 (get-in stats [:aggregates :limit-hits-by-tool "bash"]))))))))
+          (is (= 1 (get-in stats [:aggregates :limit-hits-by-tool "bash"])))))))
 
   (testing "context-bytes-added reflects shaped content"
     (let [agent-ctx   (setup-agent-ctx!)
@@ -167,4 +167,37 @@
         (let [call (first (:calls @(:tool-output-stats-atom session-ctx)))]
           (is (= (count (.getBytes shaped "UTF-8"))
                  (:context-bytes-added call)))
-          (is (= (:context-bytes-added call) (:output-bytes call)))))))
+          (is (= (:context-bytes-added call) (:output-bytes call))))))))
+
+(deftest run-tool-call-content-shaping-test
+  (testing "passes through vector content blocks unchanged"
+    (let [agent-ctx       (setup-agent-ctx!)
+          session-ctx     (setup-session-ctx! agent-ctx)
+          tc              {:id "call-v" :name "read" :arguments "{}"}
+          vector-content  [{:type :text :text "Found image"}
+                           {:type :image :source {:type :base64 :media-type "image/png" :data "abc123"}}]
+          result          (with-redefs [psi.agent-session.executor/execute-tool-with-registry
+                                        (fn [_ _ _]
+                                          {:content vector-content
+                                           :is-error false
+                                           :details {:truncation {:truncated false :truncated-by :none}}})]
+                            (#'psi.agent-session.executor/run-tool-call! session-ctx tc nil))
+          recorded-result (last (:messages (agent/get-data-in agent-ctx)))]
+      (is (= vector-content (:content result)))
+      (is (= vector-content (:content recorded-result)))))
+
+  (testing "wraps string content as a single text block"
+    (let [agent-ctx       (setup-agent-ctx!)
+          session-ctx     (setup-session-ctx! agent-ctx)
+          tc              {:id "call-s" :name "bash" :arguments "{}"}
+          string-content  "trimmed"
+          expected-blocks [{:type :text :text string-content}]
+          result          (with-redefs [psi.agent-session.executor/execute-tool-with-registry
+                                        (fn [_ _ _]
+                                          {:content string-content
+                                           :is-error false
+                                           :details {:truncation {:truncated false :truncated-by :none}}})]
+                            (#'psi.agent-session.executor/run-tool-call! session-ctx tc nil))
+          recorded-result (last (:messages (agent/get-data-in agent-ctx)))]
+      (is (= expected-blocks (:content result)))
+      (is (= expected-blocks (:content recorded-result))))))
