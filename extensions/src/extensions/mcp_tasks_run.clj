@@ -1223,6 +1223,7 @@
                (some-> data (get-in [:_event :data :status]))
                :error)))
 
+(defn- result-running? [_ data] (= :running (ev-status data)))
 (defn- result-done? [_ data] (= :done (ev-status data)))
 (defn- result-paused? [_ data] (= :paused (ev-status data)))
 (defn- result-cancelled? [_ data] (= :cancelled (ev-status data)))
@@ -1351,6 +1352,10 @@
                            :type   :future
                            :params invoke-params
                            :src    run-loop-job})
+              (ele/transition {:event :done.invoke.runner
+                               :target :running
+                               :cond   result-running?}
+                              (ele/script {:expr apply-result-script}))
               (ele/transition {:event :done.invoke.runner
                                :target :done
                                :cond   result-done?}
