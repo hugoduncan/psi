@@ -378,6 +378,32 @@
                     "/tmp")]
         (is (nil? result))))))
 
+(deftest build-step-request-subagent-constraint-test
+  (testing "build-step-request instructs subagents to use confirmation marker for material questions"
+    (let [result (#'sut/build-step-request
+                  {:step-name "execute-task"
+                   :prompt-body "Do the thing"
+                   :task-id 42
+                   :entity-type :task
+                   :project-dir "/tmp"
+                   :worktree-dir "/tmp/wt"
+                   :task {:id 42 :category "medium"}
+                   :children []
+                   :state :refined
+                   :category-prompt nil})]
+      (is (re-find #"MCP_TASKS_RUN_USER_CONFIRMATION" result)
+          "should instruct subagent to use the confirmation marker")
+      (is (not (re-find #"choose a deterministic" result))
+          "old instruction should be removed")
+      (is (re-find #"(?i)trivial" result)
+          "should mention trivial/mechanical questions")
+      (is (re-find #"(?i)material" result)
+          "should mention material questions")
+      (is (re-find #":question" result)
+          "should mention :question field")
+      (is (re-find #"safe default" result)
+          "should instruct choosing safe defaults for trivial questions"))))
+
 (deftest resolve-category-for-step-non-matching-step-test
   (testing "resolve-category-for-step returns nil for non-matching step names"
     (with-redefs [sut/load-mcp-prompt! (fn [_dir _cat]
