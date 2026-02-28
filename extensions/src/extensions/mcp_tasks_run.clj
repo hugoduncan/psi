@@ -664,11 +664,11 @@
 (defn- run-step-subagent!
   [{:keys [run-id step-name prompt-body task-id entity-type
            project-dir worktree-dir task children state
-           user-confirmation user-answer]}]
+           user-confirmation user-answer get-api-key-fn]}]
   (let [started (now-ms)
         model   (resolve-active-model)
-        api-key (when-let [f (some-> @state :api :get-api-key)]
-                  (f (:provider model)))
+        api-key (when (fn? get-api-key-fn)
+                  (get-api-key-fn (:provider model)))
         req     (build-step-request {:step-name step-name
                                      :prompt-body prompt-body
                                      :task-id task-id
@@ -895,7 +895,8 @@
 
 (defn- run-loop-job
   [{:keys [run-id task-id project-dir worktree-dir control max-steps
-           current-state steps history user-confirmation user-answer]}]
+           current-state steps history user-confirmation user-answer
+           get-api-key-fn]}]
   (let [started-ms (now-ms)
         max-steps* (long (or max-steps max-steps-default))
         steps      (long (or steps 0))
@@ -1047,7 +1048,8 @@
                                        :children children
                                        :state step-state
                                        :user-confirmation user-confirmation
-                                       :user-answer user-answer})
+                                       :user-answer user-answer
+                                       :get-api-key-fn get-api-key-fn})
                         step-elapsed (- (now-ms) step-start)
                         base-entry   {:state      step-state
                                       :step       prompt-name
@@ -1216,7 +1218,8 @@
    :steps          (:run/steps-completed data)
    :history        (:run/history data)
    :user-confirmation (:run/user-confirmation data)
-   :user-answer    (:run/user-answer data)})
+   :user-answer    (:run/user-answer data)
+   :get-api-key-fn (:run/get-api-key-fn data)})
 
 (defn- ev-status [data]
   (keyword (or (some-> data (get-in [:_event :data :status]) name)
@@ -1403,6 +1406,7 @@
                                           :run/task-id        (long (:task-id input))
                                           :run/project-dir    (:project-dir input)
                                           :run/worktree-dir   (:worktree-dir input)
+                                          :run/get-api-key-fn (some-> @state :api :get-api-key)
                                           :run/entity-type    nil
                                           :run/current-state  :idle
                                           :run/pause-reason   nil
