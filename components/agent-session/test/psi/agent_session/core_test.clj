@@ -352,6 +352,62 @@
         (is (= ["foo"] (:psi.tool/names summary)))
         (is (= "foo" (get-in summary [:psi.tool/summary :tools 0 :name]))))))
 
+(deftest tool-output-eql-introspection-test
+  (testing "query-in resolves tool-output policy defaults and overrides"
+    (let [ctx (session/create-context {:initial-session
+                                       {:tool-output-overrides
+                                        {"bash" {:max-lines 77 :max-bytes 2048}}}})
+          result (session/query-in ctx [:psi.tool-output/default-max-lines
+                                        :psi.tool-output/default-max-bytes
+                                        :psi.tool-output/overrides])]
+      (is (= 1000 (:psi.tool-output/default-max-lines result)))
+      (is (= 25600 (:psi.tool-output/default-max-bytes result)))
+      (is (= {"bash" {:max-lines 77 :max-bytes 2048}}
+             (:psi.tool-output/overrides result)))))
+
+  (testing "query-in resolves tool-output calls and aggregate stats"
+    (let [ctx (session/create-context)]
+      (swap! (:tool-output-stats-atom ctx)
+             (fn [_]
+               {:calls [{:tool-call-id "call-1"
+                         :tool-name "bash"
+                         :timestamp (java.time.Instant/now)
+                         :limit-hit true
+                         :truncated-by :bytes
+                         :effective-max-lines 1000
+                         :effective-max-bytes 25600
+                         :output-bytes 120
+                         :context-bytes-added 64}]
+                :aggregates {:total-context-bytes 64
+                             :by-tool {"bash" 64}
+                             :limit-hits-by-tool {"bash" 1}}}))
+      (let [result (session/query-in ctx [{:psi.tool-output/calls
+                                           [:psi.tool-output.call/tool-call-id
+                                            :psi.tool-output.call/tool-name
+                                            :psi.tool-output.call/limit-hit?
+                                            :psi.tool-output.call/truncated-by
+                                            :psi.tool-output.call/effective-max-lines
+                                            :psi.tool-output.call/effective-max-bytes
+                                            :psi.tool-output.call/output-bytes
+                                            :psi.tool-output.call/context-bytes-added]}
+                                          :psi.tool-output/stats])
+            calls  (:psi.tool-output/calls result)
+            first-call (first calls)
+            stats  (:psi.tool-output/stats result)]
+        (is (= 1 (count calls)))
+        (is (= "call-1" (:psi.tool-output.call/tool-call-id first-call)))
+        (is (= "bash" (:psi.tool-output.call/tool-name first-call)))
+        (is (true? (:psi.tool-output.call/limit-hit? first-call)))
+        (is (= :bytes (:psi.tool-output.call/truncated-by first-call)))
+        (is (= 1000 (:psi.tool-output.call/effective-max-lines first-call)))
+        (is (= 25600 (:psi.tool-output.call/effective-max-bytes first-call)))
+        (is (= 120 (:psi.tool-output.call/output-bytes first-call)))
+        (is (= 64 (:psi.tool-output.call/context-bytes-added first-call)))
+        (is (= {:total-context-bytes 64
+                :by-tool {"bash" 64}
+                :limit-hits-by-tool {"bash" 1}}
+               stats))))))
+
 ;; ── API error diagnostics (hierarchical EQL) ────────────────────────────────
 
 (defn- inject-messages!

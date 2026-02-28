@@ -4,6 +4,66 @@ Accumulated discoveries from ψ evolution.
 
 ---
 
+## 2026-02-28 - Tool Output Delta
+
+### λ Tool-output EQL introspection contract (stable attrs)
+
+Tool-output policy and telemetry are queryable via these stable attrs:
+
+- `:psi.tool-output/default-max-lines`
+- `:psi.tool-output/default-max-bytes`
+- `:psi.tool-output/overrides`
+- `:psi.tool-output/calls`
+- `:psi.tool-output/stats`
+
+Per-call entities use `:psi.tool-output.call/*` attrs:
+
+- `:psi.tool-output.call/tool-call-id`
+- `:psi.tool-output.call/tool-name`
+- `:psi.tool-output.call/timestamp`
+- `:psi.tool-output.call/limit-hit?`
+- `:psi.tool-output.call/truncated-by`
+- `:psi.tool-output.call/effective-max-lines`
+- `:psi.tool-output.call/effective-max-bytes`
+- `:psi.tool-output.call/output-bytes`
+- `:psi.tool-output.call/context-bytes-added`
+
+### λ Policy + truncation semantics
+
+- Default tool output policy: `max-lines=1000`, `max-bytes=25600`.
+- Per-tool overrides are read from session data `:tool-output-overrides`.
+- `read`, `eql_query`, `ls`, `find`, `grep` use head-style truncation.
+- `bash` uses tail-style truncation.
+- Truncated `bash`/`eql_query` responses include `:details {:full-output-path ...}`.
+
+### λ Context-bytes-added semantics
+
+`contextBytesAdded` is measured from the shaped tool result content that is
+actually recorded in the tool result message (post-truncation / post-formatting),
+not raw underlying command/file output bytes.
+
+### λ Temp artifact lifecycle
+
+- Truncated full-output artifacts are persisted under one process temp root.
+- `tool-output/cleanup-temp-store!` is invoked on orderly teardown paths.
+- Cleanup failures are warning-only and do not block shutdown.
+
+### λ EQL query pattern for telemetry
+
+Example query shape:
+
+```clojure
+[:psi.tool-output/stats
+ {:psi.tool-output/calls
+  [:psi.tool-output.call/tool-name
+   :psi.tool-output.call/limit-hit?
+   :psi.tool-output.call/output-bytes
+   :psi.tool-output.call/context-bytes-added]}]
+```
+
+Use this after one or more tool calls to inspect per-call limit hits plus session
+aggregates (`:total-context-bytes`, `:by-tool`, `:limit-hits-by-tool`).
+
 ## 2026-02-27 - mcp-tasks-run Orchestration + Tool Scoping
 
 ### λ mcp-tasks CLI Is CWD-Sensitive

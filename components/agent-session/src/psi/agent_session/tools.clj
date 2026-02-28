@@ -58,6 +58,39 @@
                                       :content {:type "string" :description "Content to write"}}
                          :required   ["path" "content"]})})
 
+(def ls-tool
+  {:name        "ls"
+   :label       "List"
+   :description "List directory contents with optional entry limit."
+   :parameters  (pr-str {:type       "object"
+                         :properties {:path  {:type "string" :description "Directory path to list (defaults to .)"}
+                                      :limit {:type "integer" :description "Maximum number of entries to return (default 500)"}}
+                         :required   []})})
+
+(def find-tool
+  {:name        "find"
+   :label       "Find"
+   :description "Find files by glob pattern."
+   :parameters  (pr-str {:type       "object"
+                         :properties {:pattern {:type "string" :description "Glob pattern, e.g. *.clj"}
+                                      :path    {:type "string" :description "Search root path (defaults to .)"}
+                                      :limit   {:type "integer" :description "Maximum results (default 1000)"}}
+                         :required   ["pattern"]})})
+
+(def grep-tool
+  {:name        "grep"
+   :label       "Grep"
+   :description "Search file contents for matches."
+   :parameters  (pr-str {:type       "object"
+                         :properties {:pattern    {:type "string" :description "Search pattern"}
+                                      :path       {:type "string" :description "Search root path (defaults to .)"}
+                                      :glob       {:type "string" :description "Optional glob filter"}
+                                      :ignoreCase {:type "boolean" :description "Case-insensitive search"}
+                                      :literal    {:type "boolean" :description "Treat pattern as literal text"}
+                                      :context    {:type "integer" :description "Context lines around matches"}
+                                      :limit      {:type "integer" :description "Maximum matches (default 100)"}}
+                         :required   ["pattern"]})})
+
 (def eql-query-tool
   {:name        "eql_query"
    :label       "EQL Query"
@@ -67,7 +100,7 @@
                          :required   ["query"]})})
 
 (def all-tool-schemas
-  [read-tool bash-tool edit-tool write-tool eql-query-tool])
+  [read-tool bash-tool edit-tool write-tool ls-tool find-tool grep-tool eql-query-tool])
 
 ;; ============================================================
 ;; Tool implementations
@@ -326,70 +359,389 @@
          :else
          (read-text-file f offset limit opts))))))
 
+(defonce ^:private bash-process-atom
+  (atom nil))
+
+(defn abort-bash!
+  "Abort the currently running bash process, if any.
+   Returns true if a process was aborted, false otherwise."
+  []
+  (when-let [p @bash-process-atom]
+    (try
+      (.destroyForcibly ^Process (:proc p))
+      true
+      (catch Exception _
+        false))))
+
 (defn execute-bash
   "Run a shell command via babashka.process, returning combined stdout+stderr.
-   Stdin is bound to /dev/null so tools like rg don't misdetect a readable
-   pipe and search stdin instead of the working directory.
-   Accepts optional :cwd in opts to set the working directory."
+
+   Spec-compliant behavior:
+   - Stdin bound to /dev/null
+   - Tail truncation via effective output policy for \"bash\"
+   - Full-output spill file when truncated (fullOutputPath in details)
+   - Timeout with process destruction (default 30s)
+   - Non-zero exit prefixed with exit code
+   - Command prefix support
+   - Streaming on-update callback
+
+   Accepts optional opts map:
+   - :cwd           — working directory
+   - :overrides     — output policy overrides map
+   - :command-prefix — prepended to command with newline separator
+   - :on-update     — (fn [{:content s :details d}]) called during execution
+   - :tool-call-id  — identifier for temp artifact naming"
   ([args] (execute-bash args nil))
-  ([{:strs [command]} {:keys [cwd]}]
-   (let [result (proc/shell (cond-> {:out      :string
-                                     :err      :string
-                                     :continue true
-                                     :in       (java.io.File. "/dev/null")}
-                              cwd (assoc :dir cwd))
-                            "bash" "-c" command)
-         out    (str (:out result) (:err result))]
-     {:content  (if (str/blank? out) "[no output]" out)
-      :is-error (not= 0 (:exit result))})))
+  ([{:strs [command timeout]} {:keys [cwd overrides command-prefix on-update tool-call-id]}]
+   (let [timeout-secs  (or timeout 30)
+         resolved-cmd  (if command-prefix
+                         (str command-prefix "\n" command)
+                         command)
+         policy        (tool-output/effective-policy (or overrides {}) "bash")
+         proc-opts     (cond-> {:out      :string
+                                :err      :string
+                                :in       (java.io.File. "/dev/null")}
+                         cwd (assoc :dir cwd))]
+     (try
+       (let [p      (proc/process proc-opts "bash" "-c" resolved-cmd)
+             _      (reset! bash-process-atom {:proc (:proc p)})
+             ;; Wait with timeout — IBlockingDeref returns timeout-value on timeout
+             result (deref p (* timeout-secs 1000) ::timeout)]
+         (reset! bash-process-atom nil)
+         (when (= result ::timeout)
+           (.destroyForcibly ^Process (:proc p)))
+         (if (= result ::timeout)
+           ;; Timeout result
+           {:content  (str "Command timed out after " timeout-secs " seconds")
+            :is-error true
+            :details  nil}
+           ;; Normal completion
+           (let [merged    (str (:out result) (:err result))
+                 exit-code (:exit result)
+                 non-zero? (not= 0 exit-code)
+                 trunc     (tool-output/tail-truncate merged policy)
+                 truncated? (:truncated trunc)
+                 base-text (if (str/blank? (:content trunc))
+                             "(no output)"
+                             (:content trunc))
+                 ;; Persist full output if truncated
+                 spill-path (when truncated?
+                              (tool-output/persist-truncated-output!
+                               "bash"
+                               (or tool-call-id (str (java.util.UUID/randomUUID)))
+                               merged))
+                 ;; Build content
+                 content   (cond-> ""
+                             non-zero?
+                             (str "Command exited with code " exit-code "\n")
+
+                             true
+                             (str base-text)
+
+                             truncated?
+                             (str "\n\n... [truncated, " (:total-lines trunc)
+                                  " total lines] Full output: " spill-path))]
+             {:content  content
+              :is-error non-zero?
+              :details  (when truncated?
+                          {:truncation       trunc
+                           :full-output-path spill-path})})))
+       (catch Exception e
+         (reset! bash-process-atom nil)
+         {:content  (str "Command execution error: " (ex-message e))
+          :is-error true
+          :details  nil})))))
+
+(defn- normalize-line-endings
+  [s]
+  (str/replace (or s "") #"\r\n" "\n"))
+
+(defn- detect-line-ending
+  [s]
+  (if (str/includes? (or s "") "\r\n") "\r\n" "\n"))
+
+(defn- trim-trailing-ws
+  [s]
+  (str/replace s #"[ \t]+$" ""))
+
+(defn- normalize-smart-punctuation
+  [s]
+  (-> s
+      (str/replace "\u2018" "'")
+      (str/replace "\u2019" "'")
+      (str/replace "\u201C" "\"")
+      (str/replace "\u201D" "\"")
+      (str/replace "\u2013" "-")
+      (str/replace "\u2014" "-")))
+
+(defn- fuzzy-line
+  [s]
+  (-> (or s "")
+      normalize-smart-punctuation
+      trim-trailing-ws))
+
+(defn- split-lines-preserve
+  [s]
+  (vec (str/split (or s "") #"\n" -1)))
+
+(defn- find-fuzzy-window
+  [content old-text]
+  (let [content-lines (split-lines-preserve content)
+        old-lines     (split-lines-preserve old-text)
+        clen          (count content-lines)
+        olen          (count old-lines)]
+    (when (pos? olen)
+      (->> (range 0 (inc (- clen olen)))
+           (filter (fn [start]
+                     (every?
+                      true?
+                      (for [i (range olen)]
+                        (= (fuzzy-line (nth content-lines (+ start i)))
+                           (fuzzy-line (nth old-lines i)))))))
+           vec))))
+
+(defn- first-changed-line
+  [before after]
+  (let [before-lines (split-lines-preserve (normalize-line-endings before))
+        after-lines  (split-lines-preserve (normalize-line-endings after))
+        max-len      (max (count before-lines) (count after-lines))]
+    (some (fn [i]
+            (when (not= (nth before-lines i nil) (nth after-lines i nil))
+              (inc i)))
+          (range max-len))))
+
+(defn- simple-diff
+  [before after]
+  (let [line (or (first-changed-line before after) 1)]
+    (str "--- original\n"
+         "+++ updated\n"
+         "@@ first-changed-line " line " @@\n")))
 
 (defn execute-edit
   "Replace oldText with newText in a file.
-   Accepts optional :cwd in opts to resolve relative paths."
+   Accepts optional :cwd in opts to resolve relative paths.
+   Preserves BOM and dominant line endings.
+   If exact match fails, tries fuzzy matching (smart punctuation + trailing ws)."
   ([args] (execute-edit args nil))
   ([{:strs [path oldText newText]} {:keys [cwd]}]
-   (let [f       (resolve-path cwd path)
-         fpath   (.getPath f)
-         content (slurp-file cwd path)]
-     (when-not (str/includes? content oldText)
-       (throw (ex-info "oldText not found in file"
-                       {:path fpath :oldText (subs oldText 0 (min 80 (count oldText)))})))
-     (let [updated (str/replace-first content oldText newText)]
-       (spit f updated)
-       {:content  (str "Edited " fpath)
-        :is-error false}))))
+   (let [f             (resolve-path cwd path)
+         fpath         (.getPath f)
+         raw-content   (slurp-file cwd path)
+         has-bom?      (str/starts-with? raw-content "\uFEFF")
+         no-bom        (if has-bom? (subs raw-content 1) raw-content)
+         line-ending   (detect-line-ending no-bom)
+         content-norm  (normalize-line-endings no-bom)
+         old-norm      (normalize-line-endings oldText)
+         new-norm      (normalize-line-endings newText)
+         exact-index   (str/index-of content-norm old-norm)]
+     (let [updated-norm
+           (if (some? exact-index)
+             (str/replace-first content-norm old-norm new-norm)
+             (let [matches (find-fuzzy-window content-norm old-norm)]
+               (cond
+                 (empty? matches)
+                 (throw (ex-info "oldText not found in file"
+                                 {:path fpath :oldText (subs oldText 0 (min 80 (count oldText)))}))
+
+                 (> (count matches) 1)
+                 (throw (ex-info "Fuzzy match is ambiguous"
+                                 {:path fpath :match-count (count matches)}))
+
+                 :else
+                 (let [start        (first matches)
+                       content-lines (split-lines-preserve content-norm)
+                       old-lines     (split-lines-preserve old-norm)
+                       new-lines     (split-lines-preserve new-norm)
+                       prefix       (subvec content-lines 0 start)
+                       suffix       (subvec content-lines (+ start (count old-lines)))
+                       replaced     (concat prefix new-lines suffix)]
+                   (str/join "\n" replaced)))))
+           updated-out   (-> updated-norm
+                             (str/replace "\n" line-ending)
+                             (#(if has-bom? (str "\uFEFF" %) %)))
+           diff          (simple-diff raw-content updated-out)
+           changed-line  (or (first-changed-line raw-content updated-out) 1)]
+       (spit f updated-out)
+       {:content  (str "Successfully replaced text in " fpath ".")
+        :is-error false
+        :details  {:diff diff
+                   :first-changed-line changed-line}}))))
 
 (defn execute-write
   "Write content to a file (creates parent dirs if needed).
    Accepts optional :cwd in opts to resolve relative paths."
   ([args] (execute-write args nil))
   ([{:strs [path content]} {:keys [cwd]}]
-   (let [f     (resolve-path cwd path)
-         fpath (.getPath f)]
+   (let [f      (resolve-path cwd path)
+         fpath  (.getPath f)
+         bytes  (count (.getBytes (or content "") "UTF-8"))]
      (io/make-parents f)
      (spit f content)
-     {:content  (str "Wrote " fpath)
+     {:content  (str "Successfully wrote " bytes " bytes to " fpath)
       :is-error false})))
+
+(def ^:private max-safe-lines 9007199254740991)
+
+(defn- append-limit-notice
+  [content notices]
+  (if (seq notices)
+    (str content "\n\n[limit reached: " (str/join "; " notices) "]")
+    content))
+
+(defn execute-ls
+  "List directory contents with semantic entry limit then byte truncation."
+  ([args] (execute-ls args nil))
+  ([{:strs [path limit]} {:keys [cwd overrides]}]
+   (let [dir       (resolve-path cwd (or path "."))
+         dir-path  (.getPath dir)]
+     (when-not (.exists dir)
+       (throw (ex-info (str "Path not found: " dir-path) {:path dir-path})))
+     (when-not (.isDirectory dir)
+       (throw (ex-info (str "Not a directory: " dir-path) {:path dir-path})))
+     (let [entries        (->> (or (.listFiles dir) (into-array File []))
+                               (map (fn [^File f]
+                                      (let [n (.getName f)]
+                                        (if (.isDirectory f) (str n "/") n))))
+                               (sort-by str/lower-case)
+                               vec)
+           entry-limit    (max 1 (or limit 500))
+           primary        (vec (take entry-limit entries))
+           joined         (if (seq primary) (str/join "\n" primary) "")
+           base-policy    (tool-output/effective-policy (or overrides {}) "ls")
+           truncation     (tool-output/head-truncate joined (assoc base-policy :max-lines max-safe-lines))
+           entry-hit?     (> (count entries) entry-limit)
+           notices        (cond-> []
+                            entry-hit? (conj (str "entry limit " entry-limit))
+                            (:truncated truncation) (conj (str "byte limit " (:max-bytes truncation))))
+           base-content   (if (zero? (count entries)) "(empty directory)" (:content truncation))]
+       {:content  (append-limit-notice base-content notices)
+        :is-error false
+        :details  (cond-> {}
+                    (:truncated truncation) (assoc :truncation truncation)
+                    entry-hit? (assoc :entry-limit-reached entry-limit))}))))
+
+(defn execute-find
+  "Find files by glob pattern with semantic result limit then byte truncation."
+  ([args] (execute-find args nil))
+  ([{:strs [pattern path limit]} {:keys [cwd overrides]}]
+   (let [search-root (resolve-path cwd (or path "."))
+         root-path   (.getPath search-root)]
+     (when-not (.exists search-root)
+       (throw (ex-info (str "Path not found: " root-path) {:path root-path})))
+     (let [result-limit (max 1 (or limit 1000))
+           root-nio     (.toPath search-root)
+           matcher      (.getPathMatcher (java.nio.file.FileSystems/getDefault)
+                                         (str "glob:" (or pattern "*")))
+           matched      (->> (file-seq search-root)
+                             (filter #(.isFile ^File %))
+                             (map (fn [^File f]
+                                    (.normalize (.relativize root-nio (.toPath f)))))
+                             (filter #(.matches matcher %))
+                             (map str)
+                             sort
+                             vec)
+           primary      (vec (take result-limit matched))
+           joined       (if (seq primary) (str/join "\n" primary) "")
+           base-policy  (tool-output/effective-policy (or overrides {}) "find")
+           truncation   (tool-output/head-truncate joined (assoc base-policy :max-lines max-safe-lines))
+           result-hit?  (> (count matched) result-limit)
+           notices      (cond-> []
+                          result-hit? (conj (str "result limit " result-limit))
+                          (:truncated truncation) (conj (str "byte limit " (:max-bytes truncation))))
+           base-content (if (empty? matched) "No files found matching pattern" (:content truncation))]
+       {:content  (append-limit-notice base-content notices)
+        :is-error false
+        :details  (cond-> {}
+                    (:truncated truncation) (assoc :truncation truncation)
+                    result-hit? (assoc :result-limit-reached result-limit))}))))
+
+(defn execute-grep
+  "Search file contents with semantic match limit then byte truncation."
+  ([args] (execute-grep args nil))
+  ([{:strs [pattern path glob ignoreCase literal context limit]} {:keys [cwd overrides]}]
+   (let [search-root  (resolve-path cwd (or path "."))
+         root-path    (.getPath search-root)
+         match-limit  (max 1 (or limit 100))
+         context-n    (max 0 (or context 0))
+         args         (cond-> ["rg" "--line-number" "--no-heading" "-m" (str match-limit)]
+                        literal (conj "--fixed-strings")
+                        ignoreCase (conj "--ignore-case")
+                        (some? glob) (conj "--glob" glob)
+                        (pos? context-n) (conj "-C" (str context-n))
+                        :always (conj pattern root-path))
+         proc-result  (apply proc/shell (cond-> {:out :string :err :string :continue true :in (java.io.File. "/dev/null")}
+                                          cwd (assoc :dir cwd)) args)
+         raw-lines    (->> (str/split-lines (str (:out proc-result)))
+                           (remove str/blank?)
+                           vec)
+         [rendered lines-truncated?]
+         (reduce (fn [[acc hit?] line]
+                   (if (> (count line) 500)
+                     [(conj acc (str (subs line 0 500) "... [truncated]")) true]
+                     [(conj acc line) hit?]))
+                 [[] false]
+                 raw-lines)
+         joined       (str/join "\n" rendered)
+         base-policy  (tool-output/effective-policy (or overrides {}) "grep")
+         truncation   (tool-output/head-truncate joined (assoc base-policy :max-lines max-safe-lines))
+         found-count  (count raw-lines)
+         match-hit?   (and (pos? found-count) (>= found-count match-limit))
+         notices      (cond-> []
+                        match-hit? (conj (str "match limit " match-limit))
+                        lines-truncated? (conj "long lines truncated")
+                        (:truncated truncation) (conj (str "byte limit " (:max-bytes truncation))))
+         base-content (if (zero? found-count) "No matches found" (:content truncation))]
+     {:content  (append-limit-notice base-content notices)
+      :is-error false
+      :details  (cond-> {}
+                  (:truncated truncation) (assoc :truncation truncation)
+                  match-hit? (assoc :match-limit-reached match-limit)
+                  lines-truncated? (assoc :lines-truncated true))})))
 
 (defn make-eql-query-tool
   "Create an eql_query tool with an :execute fn that closes over `query-fn`.
    `query-fn` should be (fn [eql-query-vec] -> result-map), typically
-   `(partial resolvers/query-in ctx)` or `(fn [q] (session/query-in ctx q))`."
-  [query-fn]
-  (assoc eql-query-tool
-         :execute
-         (fn [{:strs [query]}]
-           (try
-             (let [q (binding [*read-eval* false]
-                       (read-string query))]
-               (when-not (vector? q)
-                 (throw (ex-info "Query must be an EDN vector" {:input query})))
-               (let [result (query-fn q)]
-                 {:content  (pr-str result)
-                  :is-error false}))
-             (catch Exception e
-               {:content  (str "EQL query error: " (ex-message e))
-                :is-error true})))))
+   `(partial resolvers/query-in ctx)` or `(fn [q] (session/query-in ctx q))`.
+
+   Optional opts:
+   - :overrides   output-policy overrides map
+   - :tool-call-id identifier for temp artifact naming when output is truncated"
+  ([query-fn]
+   (make-eql-query-tool query-fn nil))
+  ([query-fn {:keys [overrides tool-call-id]}]
+   (assoc eql-query-tool
+          :execute
+          (fn [{:strs [query]}]
+            (try
+              (let [q (binding [*read-eval* false]
+                        (read-string query))]
+                (when-not (vector? q)
+                  (throw (ex-info "Query must be an EDN vector" {:input query})))
+                (let [result      (query-fn q)
+                      output      (pr-str result)
+                      policy      (tool-output/effective-policy (or overrides {}) "eql_query")
+                      truncation  (tool-output/head-truncate output policy)
+                      truncated?  (:truncated truncation)
+                      spill-path  (when truncated?
+                                    (tool-output/persist-truncated-output!
+                                     "eql_query"
+                                     (or tool-call-id (str (java.util.UUID/randomUUID)))
+                                     output))]
+                  (if truncated?
+                    {:content  (str "Output truncated ("
+                                    (:total-lines truncation) " lines / "
+                                    (:total-bytes truncation) " bytes). Full output: " spill-path
+                                    ". Use a narrower query to reduce output size.\n\n"
+                                    (:content truncation))
+                     :is-error false
+                     :details  {:truncation       truncation
+                                :full-output-path spill-path}}
+                    {:content  (:content truncation)
+                     :is-error false
+                     :details  nil})))
+              (catch Exception e
+                {:content  (str "EQL query error: " (ex-message e))
+                 :is-error true}))))))
 
 (def all-tools
   "Built-in tool definitions including execution fns.
@@ -415,7 +767,22 @@
     :label       (:label write-tool)
     :description (:description write-tool)
     :parameters  (:parameters write-tool)
-    :execute     execute-write}])
+    :execute     execute-write}
+   {:name        (:name ls-tool)
+    :label       (:label ls-tool)
+    :description (:description ls-tool)
+    :parameters  (:parameters ls-tool)
+    :execute     execute-ls}
+   {:name        (:name find-tool)
+    :label       (:label find-tool)
+    :description (:description find-tool)
+    :parameters  (:parameters find-tool)
+    :execute     execute-find}
+   {:name        (:name grep-tool)
+    :label       (:label grep-tool)
+    :description (:description grep-tool)
+    :parameters  (:parameters grep-tool)
+    :execute     execute-grep}])
 
 ;; ============================================================
 ;; CWD-scoped tools
@@ -450,9 +817,38 @@
       :parameters  (:parameters write-tool)
       :execute     (fn [args] (execute-write args opts))}]))
 
+(defn make-read-only-tools-with-cwd
+  "Return read-only/search tools scoped to cwd in canonical order:
+   [read, grep, find, ls]."
+  [cwd]
+  (let [opts {:cwd cwd}]
+    [{:name        (:name read-tool)
+      :label       (:label read-tool)
+      :description (:description read-tool)
+      :parameters  (:parameters read-tool)
+      :execute     (fn [args] (execute-read args opts))}
+     {:name        (:name grep-tool)
+      :label       (:label grep-tool)
+      :description (:description grep-tool)
+      :parameters  (:parameters grep-tool)
+      :execute     (fn [args] (execute-grep args opts))}
+     {:name        (:name find-tool)
+      :label       (:label find-tool)
+      :description (:description find-tool)
+      :parameters  (:parameters find-tool)
+      :execute     (fn [args] (execute-find args opts))}
+     {:name        (:name ls-tool)
+      :label       (:label ls-tool)
+      :description (:description ls-tool)
+      :parameters  (:parameters ls-tool)
+      :execute     (fn [args] (execute-ls args opts))}]))
+
 ;; ============================================================
 ;; Dispatch
 ;; ============================================================
+
+(def built-in-dispatch-tools
+  #{"read" "bash" "edit" "write" "ls" "find" "grep"})
 
 (defn execute-tool
   "Dispatch a tool call by name. Returns {:content string :is-error boolean}.
@@ -465,4 +861,7 @@
     "bash"  (execute-bash args-map)
     "edit"  (execute-edit args-map)
     "write" (execute-write args-map)
+    "ls"    (execute-ls args-map)
+    "find"  (execute-find args-map)
+    "grep"  (execute-grep args-map)
     (throw (ex-info (str "Unknown tool: " tool-name) {:tool tool-name}))))

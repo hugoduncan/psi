@@ -38,6 +38,26 @@
    :psi.agent-session/tool-call-history   — [{:psi.tool-call/*}], nested tool call entities
    :psi.agent-session/tool-call-history-count — number of tool calls
 
+   Tool-output policy and telemetry
+   ────────────────────────────────
+   :psi.tool-output/default-max-lines
+   :psi.tool-output/default-max-bytes
+   :psi.tool-output/overrides
+   :psi.tool-output/calls            — [{:psi.tool-output.call/*}]
+   :psi.tool-output/stats            — {:total-context-bytes :by-tool :limit-hits-by-tool}
+
+   Tool-output call entities (nested under :psi.tool-output/calls)
+   ──────────────────────────────────────────────────────────────
+   :psi.tool-output.call/tool-call-id
+   :psi.tool-output.call/tool-name
+   :psi.tool-output.call/timestamp
+   :psi.tool-output.call/limit-hit?
+   :psi.tool-output.call/truncated-by
+   :psi.tool-output.call/effective-max-lines
+   :psi.tool-output.call/effective-max-bytes
+   :psi.tool-output.call/output-bytes
+   :psi.tool-output.call/context-bytes-added
+
    Session entry entities (nested under session-entries)
    ──────────────────────────────────────────────────────
    :psi.session-entry/id
@@ -185,6 +205,7 @@
    [com.wsscode.pathom3.interface.eql :as p.eql]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session :as session]
+   [psi.agent-session.tool-output :as tool-output]
    [psi.agent-session.prompt-templates :as pt]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.extensions :as ext]
@@ -481,6 +502,62 @@
     {:psi.agent-session/context-tokens   (:context-tokens sd)
      :psi.agent-session/context-window   (:context-window sd)
      :psi.agent-session/context-fraction (session/context-fraction-used sd)}))
+
+;; ── Tool-output policy and telemetry ───────────────────
+
+(defn- tool-output-call->eql
+  [call]
+  {:psi.tool-output.call/tool-call-id        (:tool-call-id call)
+   :psi.tool-output.call/tool-name           (:tool-name call)
+   :psi.tool-output.call/timestamp           (:timestamp call)
+   :psi.tool-output.call/limit-hit?          (:limit-hit call)
+   :psi.tool-output.call/truncated-by        (:truncated-by call)
+   :psi.tool-output.call/effective-max-lines (:effective-max-lines call)
+   :psi.tool-output.call/effective-max-bytes (:effective-max-bytes call)
+   :psi.tool-output.call/output-bytes        (:output-bytes call)
+   :psi.tool-output.call/context-bytes-added (:context-bytes-added call)})
+
+(pco/defresolver tool-output-policy
+  "Resolve tool-output defaults and per-tool overrides."
+  [{:keys [psi/agent-session-ctx]}]
+  {::pco/input  [:psi/agent-session-ctx]
+   ::pco/output [:psi.tool-output/default-max-lines
+                 :psi.tool-output/default-max-bytes
+                 :psi.tool-output/overrides]}
+  {:psi.tool-output/default-max-lines tool-output/default-max-lines
+   :psi.tool-output/default-max-bytes tool-output/default-max-bytes
+   :psi.tool-output/overrides         (or (:tool-output-overrides
+                                           @(:session-data-atom agent-session-ctx))
+                                          {})})
+
+(pco/defresolver tool-output-calls
+  "Resolve per-call tool-output telemetry records."
+  [{:keys [psi/agent-session-ctx]}]
+  {::pco/input  [:psi/agent-session-ctx]
+   ::pco/output [{:psi.tool-output/calls
+                  [:psi.tool-output.call/tool-call-id
+                   :psi.tool-output.call/tool-name
+                   :psi.tool-output.call/timestamp
+                   :psi.tool-output.call/limit-hit?
+                   :psi.tool-output.call/truncated-by
+                   :psi.tool-output.call/effective-max-lines
+                   :psi.tool-output.call/effective-max-bytes
+                   :psi.tool-output.call/output-bytes
+                   :psi.tool-output.call/context-bytes-added]}]}
+  {:psi.tool-output/calls
+   (mapv tool-output-call->eql
+         (or (:calls @(:tool-output-stats-atom agent-session-ctx)) []))})
+
+(pco/defresolver tool-output-stats
+  "Resolve aggregate tool-output telemetry."
+  [{:keys [psi/agent-session-ctx]}]
+  {::pco/input  [:psi/agent-session-ctx]
+   ::pco/output [:psi.tool-output/stats]}
+  {:psi.tool-output/stats
+   (let [aggregates (:aggregates @(:tool-output-stats-atom agent-session-ctx))]
+     {:total-context-bytes (or (:total-context-bytes aggregates) 0)
+      :by-tool             (or (:by-tool aggregates) {})
+      :limit-hits-by-tool  (or (:limit-hits-by-tool aggregates) {})})})
 
 ;; ── Journal ─────────────────────────────────────────────
 
@@ -1202,6 +1279,9 @@
    agent-session-resources
    agent-session-extensions
    agent-session-context-usage
+   tool-output-policy
+   tool-output-calls
+   tool-output-stats
    agent-session-journal
    agent-session-stats
    ;; Session-derived usage/git attrs
