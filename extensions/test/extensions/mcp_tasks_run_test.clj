@@ -404,6 +404,73 @@
       (is (re-find #"safe default" result)
           "should instruct choosing safe defaults for trivial questions"))))
 
+(deftest widget-lines-shows-question-on-user-confirmation-test
+  ;; Tests that widget-lines includes the question text when paused for user confirmation
+  (testing "widget-lines includes question line when paused at :wait-user-confirmation"
+    (let [wf {:psi.extension.workflow/id "run-1"
+              :psi.extension.workflow/phase :paused
+              :psi.extension.workflow/running? false
+              :psi.extension.workflow/data
+              {:run/task-id 42
+               :run/entity-type :task
+               :run/current-state :wait-user-confirmation
+               :run/last-step "execute-task"
+               :run/pause-reason :wait-user-confirmation
+               :run/user-confirmation {:question "Should we proceed with the destructive migration?"}}}
+          lines (#'sut/widget-lines wf)]
+      (is (some #(re-find #"❓.*Should we proceed with the destructive migration?" %) lines)
+          "should contain the question line with ❓ prefix")))
+
+  (testing "widget-lines omits question line when no user-confirmation data"
+    (let [wf {:psi.extension.workflow/id "run-1"
+              :psi.extension.workflow/phase :paused
+              :psi.extension.workflow/running? false
+              :psi.extension.workflow/data
+              {:run/task-id 42
+               :run/entity-type :task
+               :run/current-state :wait-user-confirmation
+               :run/last-step "execute-task"
+               :run/pause-reason :wait-user-confirmation}}
+          lines (#'sut/widget-lines wf)]
+      (is (not (some #(re-find #"❓" %) lines))
+          "should not contain a question line")))
+
+  (testing "widget-lines truncates long question text to 200 chars"
+    (let [long-q (apply str (repeat 300 "x"))
+          wf {:psi.extension.workflow/id "run-1"
+              :psi.extension.workflow/phase :paused
+              :psi.extension.workflow/running? false
+              :psi.extension.workflow/data
+              {:run/task-id 42
+               :run/entity-type :task
+               :run/current-state :wait-user-confirmation
+               :run/last-step "execute-task"
+               :run/pause-reason :wait-user-confirmation
+               :run/user-confirmation {:question long-q}}}
+          lines (#'sut/widget-lines wf)
+          q-line (some #(when (re-find #"❓" %) %) lines)]
+      (is (some? q-line) "should have a question line")
+      (is (<= (count q-line) 210) "question line should be truncated"))))
+
+(deftest list-runs-shows-question-on-user-confirmation-test
+  ;; Tests that list-runs! includes the question text in output
+  (testing "list-runs! prints question line when paused at :wait-user-confirmation"
+    (let [wf {:psi.extension.workflow/id "run-1"
+              :psi.extension.workflow/phase :paused
+              :psi.extension.workflow/running? false
+              :psi.extension.workflow/data
+              {:run/task-id 42
+               :run/entity-type :task
+               :run/current-state :wait-user-confirmation
+               :run/last-step "execute-task"
+               :run/pause-reason :wait-user-confirmation
+               :run/user-confirmation {:question "Should we use approach A or B?"}}}]
+      (with-redefs [sut/mcp-run-workflows (fn [] [wf])
+                    sut/elapsed-seconds (fn [_] 10)]
+        (let [output (with-out-str (#'sut/list-runs!))]
+          (is (re-find #"❓.*Should we use approach A or B\?" output)
+              "should print the question text"))))))
+
 (deftest resolve-category-for-step-non-matching-step-test
   (testing "resolve-category-for-step returns nil for non-matching step names"
     (with-redefs [sut/load-mcp-prompt! (fn [_dir _cat]

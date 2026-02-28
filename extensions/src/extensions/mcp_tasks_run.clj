@@ -879,6 +879,10 @@
                        " · " elapsed "s")
         detail    (when (seq (str/trim (str message)))
                     (str "  " (task-preview (str/trim (str message)) 100)))
+        question  (when (= pause-rsn :wait-user-confirmation)
+                    (when-let [q (:question (:run/user-confirmation data))]
+                      (when (seq (str/trim q))
+                        (str "  ❓ " (task-preview (str/trim q) 200)))))
         actions   (cond
                     (= phase :running)
                     (str "  /mcp-tasks-run pause " id " · /mcp-tasks-run cancel " id)
@@ -899,8 +903,9 @@
 
                     :else nil)]
     (cond-> [top]
-      (seq detail)  (conj detail)
-      (seq actions) (conj actions))))
+      (seq detail)   (conj detail)
+      (seq question) (conj question)
+      (seq actions)  (conj actions))))
 
 (defn- refresh-widgets!
   []
@@ -1555,7 +1560,11 @@
                 (when reason
                   (str " · reason " (name reason)))))
           (when (seq (str/trim (str msg)))
-            (println (str "   " (task-preview (str/trim (str msg)) 120)))))))))
+            (println (str "   " (task-preview (str/trim (str msg)) 120))))
+          (when (= reason :wait-user-confirmation)
+            (when-let [q (:question (:run/user-confirmation data))]
+              (when (seq (str/trim q))
+                (println (str "   ❓ " (task-preview (str/trim q) 200)))))))))))
 
 (defn- pause-run!
   [run-id]
