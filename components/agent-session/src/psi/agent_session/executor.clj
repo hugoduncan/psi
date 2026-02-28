@@ -36,6 +36,7 @@
    [psi.ai.core :as ai]
    [psi.ai.conversation :as conv]
    [psi.agent-core.core :as agent]
+   [psi.agent-session.tool-output :as tool-output]
    [psi.agent-session.tools :as tools]
    [psi.agent-session.turn-statechart :as turn-sc]))
 
@@ -321,6 +322,41 @@
   [assistant-msg]
   (filter #(= :tool-call (:type %)) (:content assistant-msg)))
 
+(defn- effective-tool-output-policy
+  [agent-session-ctx tool-name]
+  (tool-output/effective-policy
+   (or (:tool-output-overrides @(:session-data-atom agent-session-ctx)) {})
+   tool-name))
+
+(defn- utf8-bytes
+  [s]
+  (count (.getBytes (str (or s "")) "UTF-8")))
+
+(defn- record-tool-output-stat!
+  [agent-session-ctx {:keys [tool-call-id tool-name content details effective-policy]}]
+  (let [truncation          (:truncation details)
+        limit-hit?          (boolean (:truncated truncation))
+        truncated-by        (or (:truncated-by truncation) :none)
+        output-bytes        (utf8-bytes content)
+        context-bytes-added output-bytes
+        stat                {:tool-call-id         tool-call-id
+                             :tool-name            tool-name
+                             :timestamp            (java.time.Instant/now)
+                             :limit-hit            limit-hit?
+                             :truncated-by         truncated-by
+                             :effective-max-lines  (:max-lines effective-policy)
+                             :effective-max-bytes  (:max-bytes effective-policy)
+                             :output-bytes         output-bytes
+                             :context-bytes-added  context-bytes-added}]
+    (swap! (:tool-output-stats-atom agent-session-ctx)
+           (fn [state]
+             (-> state
+                 (update :calls (fnil conj []) stat)
+                 (update-in [:aggregates :total-context-bytes] (fnil + 0) context-bytes-added)
+                 (update-in [:aggregates :by-tool tool-name] (fnil + 0) context-bytes-added)
+                 (update-in [:aggregates :limit-hits-by-tool tool-name] (fnil + 0)
+                            (if limit-hit? 1 0)))))))
+
 (defn- execute-tool-with-registry
   "Execute a tool by name, preferring an :execute fn from the current
    agent tool registry when present. Falls back to built-in tools.
@@ -335,8 +371,9 @@
 
 (defn- run-tool-call!
   "Execute one tool call, record the result in agent-core, return the result map."
-  [agent-ctx tool-call progress-queue]
-  (let [call-id  (:id tool-call)
+  [agent-session-ctx tool-call progress-queue]
+  (let [agent-ctx (:agent-ctx agent-session-ctx)
+        call-id  (:id tool-call)
         name     (:name tool-call)
         args     (parse-args (:arguments tool-call))]
     (agent/emit-tool-start-in! agent-ctx tool-call)
@@ -345,17 +382,19 @@
                      :tool-id     call-id
                      :tool-name   name
                      :parsed-args args})
-    (let [{:keys [content is-error]}
+    (let [{:keys [content is-error details] :as tool-result}
           (try
             (execute-tool-with-registry agent-ctx name args)
             (catch Exception e
               {:content  (str "Error: " (ex-message e))
                :is-error true}))
+          policy     (effective-tool-output-policy agent-session-ctx name)
           result-msg {:role         "toolResult"
                       :tool-call-id call-id
                       :tool-name    name
                       :content      [{:type :text :text content}]
                       :is-error     is-error
+                      :details      details
                       :timestamp    (java.time.Instant/now)}]
       (emit-progress! progress-queue
                       {:event-kind  :tool-result
@@ -363,7 +402,14 @@
                        :tool-name   name
                        :result-text content
                        :is-error    is-error})
-      (agent/emit-tool-end-in! agent-ctx tool-call {:content content} is-error)
+      (record-tool-output-stat!
+       agent-session-ctx
+       {:tool-call-id    call-id
+        :tool-name       name
+        :content         content
+        :details         details
+        :effective-policy policy})
+      (agent/emit-tool-end-in! agent-ctx tool-call tool-result is-error)
       (agent/record-tool-result-in! agent-ctx result-msg)
       result-msg)))
 
@@ -376,6 +422,7 @@
      stream → check tools → execute tools → stream again (recursive).
 
    `ai-ctx`            — ai component context (has :provider-registry)
+   `agent-session-ctx` — agent session context
    `agent-ctx`         — agent-core context
    `ai-model`          — ai.schemas.Model map
    `turn-ctx-atom`     — optional atom, stores current turn context for introspection
@@ -384,13 +431,13 @@
 
    Returns the final (non-tool) assistant message map.
    Emits agent-core events throughout."
-  ([ai-ctx agent-ctx ai-model]
-   (run-turn! ai-ctx agent-ctx ai-model nil nil nil))
-  ([ai-ctx agent-ctx ai-model turn-ctx-atom]
-   (run-turn! ai-ctx agent-ctx ai-model turn-ctx-atom nil nil))
-  ([ai-ctx agent-ctx ai-model turn-ctx-atom extra-ai-options]
-   (run-turn! ai-ctx agent-ctx ai-model turn-ctx-atom extra-ai-options nil))
-  ([ai-ctx agent-ctx ai-model turn-ctx-atom extra-ai-options progress-queue]
+  ([ai-ctx agent-session-ctx agent-ctx ai-model]
+   (run-turn! ai-ctx agent-session-ctx agent-ctx ai-model nil nil nil))
+  ([ai-ctx agent-session-ctx agent-ctx ai-model turn-ctx-atom]
+   (run-turn! ai-ctx agent-session-ctx agent-ctx ai-model turn-ctx-atom nil nil))
+  ([ai-ctx agent-session-ctx agent-ctx ai-model turn-ctx-atom extra-ai-options]
+   (run-turn! ai-ctx agent-session-ctx agent-ctx ai-model turn-ctx-atom extra-ai-options nil))
+  ([ai-ctx agent-session-ctx agent-ctx ai-model turn-ctx-atom extra-ai-options progress-queue]
    (agent/emit-in! agent-ctx {:type :turn-start})
    (let [assistant-msg (stream-turn! ai-ctx agent-ctx ai-model turn-ctx-atom
                                      extra-ai-options progress-queue)
@@ -400,8 +447,8 @@
        ;; Tool calls requested — execute them all then recurse
        (do
          (doseq [tc tool-calls]
-           (run-tool-call! agent-ctx tc progress-queue))
-         (run-turn! ai-ctx agent-ctx ai-model turn-ctx-atom
+           (run-tool-call! agent-session-ctx tc progress-queue))
+         (run-turn! ai-ctx agent-session-ctx agent-ctx ai-model turn-ctx-atom
                     extra-ai-options progress-queue))
        ;; No tool calls (or error) — we're done
        assistant-msg))))
@@ -419,13 +466,13 @@
      :progress-queue — LinkedBlockingQueue for TUI progress events
 
    Returns the final assistant message."
-  ([ai-ctx agent-ctx ai-model new-messages]
-   (run-agent-loop! ai-ctx agent-ctx ai-model new-messages nil))
-  ([ai-ctx agent-ctx ai-model new-messages {:keys [turn-ctx-atom api-key progress-queue]}]
+  ([ai-ctx agent-session-ctx agent-ctx ai-model new-messages]
+   (run-agent-loop! ai-ctx agent-session-ctx agent-ctx ai-model new-messages nil))
+  ([ai-ctx agent-session-ctx agent-ctx ai-model new-messages {:keys [turn-ctx-atom api-key progress-queue]}]
    (agent/start-loop-in! agent-ctx new-messages)
    (let [extra-ai-options (when api-key {:api-key api-key})
          result (try
-                  (run-turn! ai-ctx agent-ctx ai-model turn-ctx-atom
+                  (run-turn! ai-ctx agent-session-ctx agent-ctx ai-model turn-ctx-atom
                              extra-ai-options progress-queue)
                   (catch Exception e
                     (cond-> {:role "assistant" :content []

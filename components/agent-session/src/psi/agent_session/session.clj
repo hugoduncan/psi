@@ -117,7 +117,10 @@
       [:extension-errors [:vector [:map [:path :string] [:error :string]]]]
       [:mutations [:vector qualified-symbol?]]]]]
    [:context-tokens {:optional true} [:maybe :int]]
-   [:context-window {:optional true} [:maybe :int]]])
+   [:context-window {:optional true} [:maybe :int]]
+   [:tool-output-overrides {:optional true} [:map-of :string [:map
+                                                              [:max-lines {:optional true} [:maybe :int]]
+                                                              [:max-bytes {:optional true} [:maybe :int]]]]]])
 
 ;; ============================================================
 ;; Validation
@@ -168,7 +171,8 @@
      :extensions              {}
      :session-entries         []
      :context-tokens          nil
-     :context-window          nil}
+     :context-window          nil
+     :tool-output-overrides   {}}
     overrides)))
 
 ;; ============================================================

@@ -253,23 +253,27 @@
          ui-state-atom     (ext-ui/create-ui-state)
          merged-config     (merge session/default-config (or config {}))
          ;; Build ctx without actions-fn so we can close over it
-         ctx               {:sc-env             sc-env
-                            :sc-session-id      sc-session-id
-                            :session-data-atom  session-data-atom
-                            :agent-ctx          agent-ctx
-                            :extension-registry ext-reg
-                            :workflow-registry  wf-reg
-                            :journal-atom       journal-atom
-                            :flush-state-atom   flush-state-atom
-                            :turn-ctx-atom      (atom nil)
-                            :ui-state-atom      ui-state-atom
-                            :event-queue        event-queue
-                            :cwd                resolved-cwd
-                            :persist?           persist?
-                            :oauth-ctx          oauth-ctx
-                            :compaction-fn      (or compaction-fn compaction/stub-compaction-fn)
-                            :branch-summary-fn  (or branch-summary-fn compaction/stub-branch-summary-fn)
-                            :config             merged-config}
+         ctx               {:sc-env                sc-env
+                            :sc-session-id         sc-session-id
+                            :session-data-atom     session-data-atom
+                            :tool-output-stats-atom (atom {:calls []
+                                                            :aggregates {:total-context-bytes 0
+                                                                         :by-tool {}
+                                                                         :limit-hits-by-tool {}}})
+                            :agent-ctx             agent-ctx
+                            :extension-registry    ext-reg
+                            :workflow-registry     wf-reg
+                            :journal-atom          journal-atom
+                            :flush-state-atom      flush-state-atom
+                            :turn-ctx-atom         (atom nil)
+                            :ui-state-atom         ui-state-atom
+                            :event-queue           event-queue
+                            :cwd                   resolved-cwd
+                            :persist?              persist?
+                            :oauth-ctx             oauth-ctx
+                            :compaction-fn         (or compaction-fn compaction/stub-compaction-fn)
+                            :branch-summary-fn     (or branch-summary-fn compaction/stub-branch-summary-fn)
+                            :config                merged-config}
          actions-fn        (make-actions-fn ctx)]
 
      ;; Watch agent-core events atom — forward new events to session statechart

@@ -301,7 +301,7 @@
                   :timestamp (java.time.Instant/now)}
         _        (session/journal-append-in! ctx (persist/message-entry user-msg))
         api-key  (resolve-api-key oauth-ctx ai-model)
-        result   (executor/run-agent-loop! ai-ctx (:agent-ctx ctx) ai-model [user-msg]
+        result   (executor/run-agent-loop! ai-ctx ctx (:agent-ctx ctx) ai-model [user-msg]
                                            {:turn-ctx-atom (:turn-ctx-atom ctx)
                                             :api-key       api-key})]
     (update-context-usage-from-result! ctx ai-model result)
@@ -550,7 +550,7 @@
                                                 ctx (persist/message-entry user-msg))
                                       api-key  (resolve-api-key oauth-ctx ai-model)
                                       result   (executor/run-agent-loop!
-                                                ai-ctx (:agent-ctx ctx)
+                                                ai-ctx ctx (:agent-ctx ctx)
                                                 ai-model [user-msg]
                                                 {:turn-ctx-atom  (:turn-ctx-atom ctx)
                                                  :api-key        api-key
