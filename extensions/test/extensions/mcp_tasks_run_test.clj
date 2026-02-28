@@ -72,3 +72,168 @@
 
         (let [out-list (with-out-str (handler "list"))]
           (is (re-find #"run-1" out-list)))))))
+
+(deftest workflow-native-step-progression-test
+  (testing "run-loop-job advances a single orchestration unit per invocation"
+    (let [ctrl            (atom {:pause? false :cancel? false :merge? false})
+          derived-states  (atom [:refined :done :done :terminated])]
+      (with-redefs [sut/ensure-worktree! (fn [_project-dir _task-id]
+                                           {:worktree-dir "/tmp/wt"})
+                    sut/derive-current! (fn [_project-dir _worktree-dir _task-id]
+                                          (let [s (or (first @derived-states) :terminated)]
+                                            (swap! derived-states #(if (seq %) (vec (rest %)) %))
+                                            {:task {:id 42 :type :task}
+                                             :children []
+                                             :entity-type :task
+                                             :state s
+                                             :completed-count nil}))
+                    sut/resolve-step-prompt (fn [_project-dir _prompt-name] "prompt")
+                    sut/run-step-subagent! (fn [_] {:ok? true :text "ok"})]
+        (let [step-1 (#'sut/run-loop-job {:run-id "run-1"
+                                          :task-id 42
+                                          :project-dir "/tmp"
+                                          :worktree-dir nil
+                                          :control ctrl
+                                          :current-state :ensure-worktree
+                                          :steps 0
+                                          :history []
+                                          :max-steps 10})
+              step-2 (#'sut/run-loop-job {:run-id "run-1"
+                                          :task-id 42
+                                          :project-dir "/tmp"
+                                          :worktree-dir (:worktree-dir step-1)
+                                          :control ctrl
+                                          :current-state (:current-state step-1)
+                                          :steps (:steps-completed step-1)
+                                          :history (:history step-1)
+                                          :max-steps 10})
+              step-3 (#'sut/run-loop-job {:run-id "run-1"
+                                          :task-id 42
+                                          :project-dir "/tmp"
+                                          :worktree-dir (:worktree-dir step-2)
+                                          :control ctrl
+                                          :current-state (:current-state step-2)
+                                          :steps (:steps-completed step-2)
+                                          :history (:history step-2)
+                                          :max-steps 10})]
+          (is (= :running (:status step-1)))
+          (is (= :derive-state (:current-state step-1)))
+          (is (= :running (:status step-2)))
+          (is (= :derive-state (:current-state step-2)))
+          (is (= 1 (:steps-completed step-2)))
+          (is (= 1 (count (:history step-2))))
+          (is (= :running (:status step-3)))
+          (is (= :derive-state (:current-state step-3)))
+          (is (= 2 (:steps-completed step-3))))))))
+
+(deftest workflow-native-wait-pr-merge-test
+  (testing "run-loop-job pauses explicitly at wait-pr-merge without merge authorization"
+    (let [ctrl (atom {:pause? false :cancel? false :merge? false})]
+      (with-redefs [sut/derive-current! (fn [_project-dir _worktree-dir _task-id]
+                                          {:task {:id 42 :type :task}
+                                           :children []
+                                           :entity-type :task
+                                           :state :wait-pr-merge
+                                           :completed-count nil})]
+        (let [res (#'sut/run-loop-job {:run-id "run-1"
+                                       :task-id 42
+                                       :project-dir "/tmp"
+                                       :worktree-dir "/tmp/wt"
+                                       :control ctrl
+                                       :current-state :derive-state
+                                       :steps 0
+                                       :history []
+                                       :max-steps 10})]
+          (is (= :paused (:status res)))
+          (is (= :wait-pr-merge (:current-state res)))
+          (is (= :wait-pr-merge (:pause-reason res))))))))
+
+(deftest workflow-merge-gate-guard-test
+  (testing "merge resume guard only matches when merge intent is outside wait-pr-merge gate"
+    (is (true? (#'sut/merge-resume-outside-gate?
+                nil
+                {:_event {:data {:merge? true}}
+                 :run/pause-reason :user-paused})))
+    (is (false? (#'sut/merge-resume-outside-gate?
+                 nil
+                 {:_event {:data {:merge? true}}
+                  :run/pause-reason :wait-pr-merge})))
+    (is (false? (#'sut/merge-resume-outside-gate?
+                 nil
+                 {:_event {:data {:merge? false}}
+                  :run/pause-reason :user-paused}))))
+
+  (testing "reject script writes explicit merge authorization failure context"
+    (let [ctrl (atom {:pause? false :cancel? false :merge? true})
+          ops  (#'sut/reject-merge-resume-script
+                nil
+                {:run/control ctrl
+                 :run/id "run-1"})]
+      (is (= false (:merge? @ctrl)))
+      (is (= [{:op :assign
+               :data {:run/pause-reason :merge-not-authorized
+                      :run/last-output "Merge authorization is only valid at :wait-pr-merge gate. Resume without merge until gate is reached."
+                      :workflow/error-message nil}}]
+             ops)))))
+
+(deftest user-confirmation-parsing-test
+  (testing "parse-user-confirmation reads sentinel payload"
+    (is (= {:question "Proceed with destructive change?"
+            :context {:task-id 18}
+            :expected :yes-no
+            :raw {:question "Proceed with destructive change?"
+                  :context {:task-id 18}
+                  :expected-answer :yes-no}}
+           (#'sut/parse-user-confirmation
+            "text before\nMCP_TASKS_RUN_USER_CONFIRMATION: {:question \"Proceed with destructive change?\" :context {:task-id 18} :expected-answer :yes-no}\ntext after"))))
+
+  (testing "parse-user-confirmation returns nil when sentinel missing"
+    (is (nil? (#'sut/parse-user-confirmation "no confirmation marker")))))
+
+(deftest workflow-user-confirmation-wait-and-resume-test
+  (testing "run-loop-job pauses explicitly on user confirmation marker"
+    (let [ctrl (atom {:pause? false :cancel? false :merge? false :answer nil})]
+      (with-redefs [sut/derive-current! (fn [_project-dir _worktree-dir _task-id]
+                                          {:task {:id 42 :type :task}
+                                           :children []
+                                           :entity-type :task
+                                           :state :refined
+                                           :completed-count nil})
+                    sut/resolve-step-prompt (fn [_project-dir _prompt-name] "prompt")
+                    sut/run-step-subagent! (fn [_]
+                                             {:ok? true
+                                              :text "MCP_TASKS_RUN_USER_CONFIRMATION: {:question \"Continue?\" :expected-answer :yes-no}"})]
+        (let [res (#'sut/run-loop-job {:run-id "run-1"
+                                       :task-id 42
+                                       :project-dir "/tmp"
+                                       :worktree-dir "/tmp/wt"
+                                       :control ctrl
+                                       :current-state :derive-state
+                                       :steps 0
+                                       :history []
+                                       :user-confirmation nil
+                                       :user-answer nil
+                                       :max-steps 10})]
+          (is (= :paused (:status res)))
+          (is (= :wait-user-confirmation (:current-state res)))
+          (is (= :wait-user-confirmation (:pause-reason res)))
+          (is (= "Continue?" (get-in res [:user-confirmation :question]))))))))
+
+(deftest workflow-user-confirmation-requires-answer-test
+  (testing "run-loop-job remains paused when confirmation answer is missing"
+    (let [ctrl (atom {:pause? false :cancel? false :merge? false :answer nil})
+          res  (#'sut/run-loop-job {:run-id "run-1"
+                                    :task-id 42
+                                    :project-dir "/tmp"
+                                    :worktree-dir "/tmp/wt"
+                                    :control ctrl
+                                    :current-state :wait-user-confirmation
+                                    :steps 1
+                                    :history []
+                                    :user-confirmation {:question "Continue?"}
+                                    :user-answer nil
+                                    :max-steps 10})]
+      (is (= :paused (:status res)))
+      (is (= :wait-user-confirmation (:current-state res)))
+      (is (= :wait-user-confirmation (:pause-reason res)))
+      (is (re-find #"requires explicit answer" (:error-message res))))))
