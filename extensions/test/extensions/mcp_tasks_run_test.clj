@@ -220,8 +220,7 @@
           (is (= "Continue?" (get-in res [:user-confirmation :question]))))))))
 
 (deftest active-running-excludes-paused-test
-  ;; Paused workflows should not block starting, resuming, or retrying runs.
-  ;; active-running-workflow must only match phase :running, not :paused.
+  ;; active-running-workflow only gates start-run!; resume/retry check own phase.
   (testing "active-running-workflow"
     (testing "does not match a paused workflow"
       (let [{:keys [api state]} (nullable/create-nullable-extension-api
@@ -237,7 +236,37 @@
           ;; Starting a second run should succeed, not be blocked
           (let [out (with-out-str (handler "99"))]
             (is (re-find #"Started mcp-tasks run run-2" out)
-                "paused run should not block starting a new run")))))))
+                "paused run should not block starting a new run"))))))
+
+  (testing "resume checks only its own run phase"
+    (testing "allows resuming a paused run"
+      (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/mcp_tasks_run.clj"})]
+        (sut/init api)
+        (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+          (with-out-str (handler "42"))
+          (swap! state update-in [:workflows "run-1"]
+                 assoc
+                 :psi.extension.workflow/running? true
+                 :psi.extension.workflow/phase :paused
+                 :psi.extension.workflow/data {:run/pause-reason :wait-pr-merge})
+          (let [out (with-out-str (handler "resume run-1 merge"))]
+            (is (not (re-find #"already running" out))
+                "paused run should be resumable")))))
+
+    (testing "rejects resuming an already running run"
+      (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/mcp_tasks_run.clj"})]
+        (sut/init api)
+        (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+          (with-out-str (handler "42"))
+          (swap! state update-in [:workflows "run-1"]
+                 assoc
+                 :psi.extension.workflow/running? true
+                 :psi.extension.workflow/phase :running)
+          (let [out (with-out-str (handler "resume run-1"))]
+            (is (re-find #"already running" out)
+                "running run should not be resumable")))))))
 
 (deftest workflow-user-confirmation-requires-answer-test
   (testing "run-loop-job remains paused when confirmation answer is missing"

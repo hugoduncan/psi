@@ -1516,12 +1516,12 @@
 
 (defn- resume-run!
   [run-id merge? answer]
-  (if (active-running-workflow)
-    (println "Another run is currently running. Pause/cancel it before resuming another.")
-    (if-let [wf (workflow-by-id run-id)]
-      (let [phase      (phase-of wf)
-            data       (or (:psi.extension.workflow/data wf) {})
-            pause-rsn  (:run/pause-reason data)]
+  (if-let [wf (workflow-by-id run-id)]
+    (let [phase      (phase-of wf)
+          data       (or (:psi.extension.workflow/data wf) {})
+          pause-rsn  (:run/pause-reason data)]
+      (if (= phase :running)
+        (println (str run-id " is already running."))
         (if (not= phase :paused)
           (println (str run-id " is not paused."))
           (cond
@@ -1550,8 +1550,8 @@
                                 "."))
                   (refresh-widgets-later!))
                 (println (str "Failed to resume " run-id ": "
-                              (or (:psi.extension.workflow/error r) "unknown error"))))))))
-      (println (str "Run not found: " run-id)))))
+                              (or (:psi.extension.workflow/error r) "unknown error")))))))))
+    (println (str "Run not found: " run-id))))
 
 (defn- cancel-run!
   [run-id]
@@ -1583,22 +1583,26 @@
 
 (defn- retry-run!
   [run-id]
-  (if (active-running-workflow)
-    (println "Another run is currently running. Pause/cancel it before retrying another.")
-    (if-let [wf (workflow-by-id run-id)]
-      (if (not= :error (phase-of wf))
-        (println (str run-id " is not in error phase."))
-        (let [r (mutate! 'psi.extension.workflow/send-event
-                         {:id    (str run-id)
-                          :event :run/retry
-                          :data  {}})]
-          (if (:psi.extension.workflow/event-accepted? r)
-            (do
-              (println (str "Retrying " run-id " from current derived state."))
-              (refresh-widgets-later!))
-            (println (str "Failed to retry " run-id ": "
-                          (or (:psi.extension.workflow/error r) "unknown error"))))))
-      (println (str "Run not found: " run-id)))))
+  (if-let [wf (workflow-by-id run-id)]
+    (cond
+      (= :running (phase-of wf))
+      (println (str run-id " is already running."))
+
+      (not= :error (phase-of wf))
+      (println (str run-id " is not in error phase."))
+
+      :else
+      (let [r (mutate! 'psi.extension.workflow/send-event
+                       {:id    (str run-id)
+                        :event :run/retry
+                        :data  {}})]
+        (if (:psi.extension.workflow/event-accepted? r)
+          (do
+            (println (str "Retrying " run-id " from current derived state."))
+            (refresh-widgets-later!))
+          (println (str "Failed to retry " run-id ": "
+                        (or (:psi.extension.workflow/error r) "unknown error"))))))
+    (println (str "Run not found: " run-id))))
 
 (defn- remove-run-workflows!
   []
