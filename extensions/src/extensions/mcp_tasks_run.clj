@@ -28,7 +28,8 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.executor :as executor]
    [psi.agent-session.tools :as session-tools]
-   [psi.ai.models :as models]))
+   [psi.ai.models :as models]
+   [taoensso.timbre :as timbre]))
 
 (def ^:private run-workflow-type :mcp-tasks-run)
 (def ^:private max-steps-default 50)
@@ -531,6 +532,34 @@
       (load-mcp-prompt! project-dir prompt-name)
       (str "Run workflow step: " prompt-name)))
 
+(defn- open-unblocked?
+  [child]
+  (and (#{:open "open"} (:status child))
+       (not (:is-blocked child))))
+
+(defn- resolve-category-for-step
+  "Pre-resolve the category workflow prompt for execute-task/execute-story-child.
+   Returns the category prompt content string, or nil on any failure."
+  [step-name task children _entity-type project-dir]
+  (let [category (case step-name
+                   "execute-task"
+                   (:category task)
+
+                   "execute-story-child"
+                   (:category (first (filter open-unblocked? children)))
+
+                   nil)]
+    (if-not category
+      (do
+        (when (#{"execute-task" "execute-story-child"} step-name)
+          (timbre/warn "No category found for step" step-name))
+        nil)
+      (try
+        (load-mcp-prompt! project-dir (str category))
+        (catch Exception e
+          (timbre/warn "Failed to load category prompt for" category ":" (ex-message e))
+          nil)))))
+
 (defn- interpolate-arguments
   [prompt-text task-id]
   (str/replace (or prompt-text "") "$ARGUMENTS" (str task-id)))
@@ -607,7 +636,7 @@
 (defn- build-step-request
   [{:keys [step-name prompt-body task-id entity-type
            project-dir worktree-dir task children state
-           user-confirmation user-answer]}]
+           user-confirmation user-answer category-prompt]}]
   (let [prompt* (interpolate-arguments prompt-body task-id)]
     (str
      "You are executing ONE mcp-tasks workflow step as a sub-agent.\n\n"
@@ -637,6 +666,12 @@
      prompt* "\n"
      "-----\n\n"
 
+     (when category-prompt
+       (str "Pre-resolved category instructions (referenced by workflow prompt above):\n"
+            "-----\n"
+            category-prompt "\n"
+            "-----\n\n"))
+
      "Current task snapshot (EDN):\n"
      (pr-str task) "\n\n"
 
@@ -664,7 +699,8 @@
 (defn- run-step-subagent!
   [{:keys [run-id step-name prompt-body task-id entity-type
            project-dir worktree-dir task children state
-           user-confirmation user-answer get-api-key-fn]}]
+           user-confirmation user-answer get-api-key-fn
+           category-prompt]}]
   (let [started (now-ms)
         model   (resolve-active-model)
         api-key (when (fn? get-api-key-fn)
@@ -679,7 +715,8 @@
                                      :children children
                                      :state state
                                      :user-confirmation user-confirmation
-                                     :user-answer user-answer})
+                                     :user-answer user-answer
+                                     :category-prompt category-prompt})
         user-msg {:role      "user"
                   :content   [{:type :text :text req}]
                   :timestamp (java.time.Instant/now)}]
@@ -1034,22 +1071,25 @@
 
                 :else
                 (if-let [prompt-name (step-prompt-name entity-type step-state)]
-                  (let [prompt-body  (resolve-step-prompt project-dir prompt-name)
-                        step-start   (now-ms)
-                        step-result  (run-step-subagent!
-                                      {:run-id run-id
-                                       :step-name prompt-name
-                                       :prompt-body prompt-body
-                                       :task-id task-id
-                                       :entity-type entity-type
-                                       :project-dir project-dir
-                                       :worktree-dir worktree-dir
-                                       :task task
-                                       :children children
-                                       :state step-state
-                                       :user-confirmation user-confirmation
-                                       :user-answer user-answer
-                                       :get-api-key-fn get-api-key-fn})
+                  (let [prompt-body    (resolve-step-prompt project-dir prompt-name)
+                        cat-prompt     (resolve-category-for-step
+                                        prompt-name task children entity-type project-dir)
+                        step-start     (now-ms)
+                        step-result    (run-step-subagent!
+                                        {:run-id run-id
+                                         :step-name prompt-name
+                                         :prompt-body prompt-body
+                                         :task-id task-id
+                                         :entity-type entity-type
+                                         :project-dir project-dir
+                                         :worktree-dir worktree-dir
+                                         :task task
+                                         :children children
+                                         :state step-state
+                                         :user-confirmation user-confirmation
+                                         :user-answer user-answer
+                                         :get-api-key-fn get-api-key-fn
+                                         :category-prompt cat-prompt})
                         step-elapsed (- (now-ms) step-start)
                         base-entry   {:state      step-state
                                       :step       prompt-name

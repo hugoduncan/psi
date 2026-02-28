@@ -286,3 +286,111 @@
       (is (= :wait-user-confirmation (:current-state res)))
       (is (= :wait-user-confirmation (:pause-reason res)))
       (is (re-find #"requires explicit answer" (:error-message res))))))
+
+;;; Category prompt pre-resolution tests
+
+(deftest build-step-request-with-category-prompt-test
+  (testing "build-step-request includes category prompt section when provided"
+    (let [result (#'sut/build-step-request
+                  {:step-name "execute-task"
+                   :prompt-body "Do the thing"
+                   :task-id 42
+                   :entity-type :task
+                   :project-dir "/tmp"
+                   :worktree-dir "/tmp/wt"
+                   :task {:id 42 :category "simple"}
+                   :children []
+                   :state :refined
+                   :category-prompt "Do the simple thing"})]
+      (is (re-find #"Pre-resolved category instructions" result))
+      (is (re-find #"Do the simple thing" result))
+      ;; Category section should appear between prompt body and task snapshot
+      (let [cat-idx  (.indexOf result "Pre-resolved category instructions")
+            body-idx (.indexOf result "-----\nDo the thing")
+            task-idx (.indexOf result "Current task snapshot")]
+        (is (< body-idx cat-idx))
+        (is (< cat-idx task-idx))))))
+
+(deftest build-step-request-without-category-prompt-test
+  (testing "build-step-request omits category section when nil"
+    (let [result (#'sut/build-step-request
+                  {:step-name "execute-task"
+                   :prompt-body "Do the thing"
+                   :task-id 42
+                   :entity-type :task
+                   :project-dir "/tmp"
+                   :worktree-dir "/tmp/wt"
+                   :task {:id 42}
+                   :children []
+                   :state :refined
+                   :category-prompt nil})]
+      (is (not (re-find #"Pre-resolved category instructions" result))))))
+
+(deftest resolve-category-for-step-execute-task-test
+  (testing "resolve-category-for-step extracts category from task for execute-task"
+    (with-redefs [sut/load-mcp-prompt! (fn [_dir cat]
+                                         (when (= "simple" cat)
+                                           "Simple category instructions"))]
+      (let [result (#'sut/resolve-category-for-step
+                    "execute-task"
+                    {:id 42 :category "simple"}
+                    []
+                    :task
+                    "/tmp")]
+        (is (= "Simple category instructions" result))))))
+
+(deftest resolve-category-for-step-story-child-test
+  (testing "resolve-category-for-step picks first open unblocked child for execute-story-child"
+    (with-redefs [sut/load-mcp-prompt! (fn [_dir cat]
+                                         (str cat " instructions"))]
+      (let [children [{:status "open" :is-blocked true :category "large"}
+                      {:status "open" :is-blocked false :category "medium"}
+                      {:status "open" :is-blocked false :category "simple"}]
+            result   (#'sut/resolve-category-for-step
+                      "execute-story-child"
+                      {:id 20 :type "story"}
+                      children
+                      :story
+                      "/tmp")]
+        (is (= "medium instructions" result)))))
+
+  (testing "resolve-category-for-step handles keyword status for children"
+    (with-redefs [sut/load-mcp-prompt! (fn [_dir cat]
+                                         (str cat " instructions"))]
+      (let [children [{:status :open :is-blocked false :category "medium"}]
+            result   (#'sut/resolve-category-for-step
+                      "execute-story-child"
+                      {:id 20 :type "story"}
+                      children
+                      :story
+                      "/tmp")]
+        (is (= "medium instructions" result))))))
+
+(deftest resolve-category-for-step-missing-category-test
+  (testing "resolve-category-for-step returns nil when task has no category"
+    (with-redefs [sut/load-mcp-prompt! (fn [_dir _cat]
+                                         (throw (ex-info "should not be called" {})))]
+      (let [result (#'sut/resolve-category-for-step
+                    "execute-task"
+                    {:id 42}
+                    []
+                    :task
+                    "/tmp")]
+        (is (nil? result))))))
+
+(deftest resolve-category-for-step-non-matching-step-test
+  (testing "resolve-category-for-step returns nil for non-matching step names"
+    (with-redefs [sut/load-mcp-prompt! (fn [_dir _cat]
+                                         (throw (ex-info "should not be called" {})))]
+      (is (nil? (#'sut/resolve-category-for-step
+                 "refine-task"
+                 {:id 42 :category "simple"}
+                 []
+                 :task
+                 "/tmp")))
+      (is (nil? (#'sut/resolve-category-for-step
+                 "create-story-tasks"
+                 {:id 42 :category "simple"}
+                 []
+                 :task
+                 "/tmp"))))))
