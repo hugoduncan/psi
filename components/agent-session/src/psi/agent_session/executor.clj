@@ -388,14 +388,17 @@
             (catch Exception e
               {:content  (str "Error: " (ex-message e))
                :is-error true}))
-          policy     (effective-tool-output-policy agent-session-ctx name)
-          result-msg {:role         "toolResult"
-                      :tool-call-id call-id
-                      :tool-name    name
-                      :content      [{:type :text :text content}]
-                      :is-error     is-error
-                      :details      details
-                      :timestamp    (java.time.Instant/now)}]
+          policy         (effective-tool-output-policy agent-session-ctx name)
+          content-blocks (if (vector? content)
+                           content
+                           [{:type :text :text content}])
+          result-msg     {:role         "toolResult"
+                          :tool-call-id call-id
+                          :tool-name    name
+                          :content      content-blocks
+                          :is-error     is-error
+                          :details      details
+                          :timestamp    (java.time.Instant/now)}]
       (emit-progress! progress-queue
                       {:event-kind  :tool-result
                        :tool-id     call-id
