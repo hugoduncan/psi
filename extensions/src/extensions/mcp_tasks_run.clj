@@ -189,7 +189,7 @@
     (some #(when (= sid (:psi.extension.workflow/id %)) %) (mcp-run-workflows))))
 
 (defn- active-running-workflow []
-  (first (filter :psi.extension.workflow/running? (mcp-run-workflows))))
+  (first (filter #(= :running (phase-of %)) (mcp-run-workflows))))
 
 (defn- run-id->n [run-id]
   (some->> (re-find #"run-(\\d+)$" (str run-id)) second parse-int))

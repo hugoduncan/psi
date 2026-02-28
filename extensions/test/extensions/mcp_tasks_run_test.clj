@@ -219,6 +219,26 @@
           (is (= :wait-user-confirmation (:pause-reason res)))
           (is (= "Continue?" (get-in res [:user-confirmation :question]))))))))
 
+(deftest active-running-excludes-paused-test
+  ;; Paused workflows should not block starting, resuming, or retrying runs.
+  ;; active-running-workflow must only match phase :running, not :paused.
+  (testing "active-running-workflow"
+    (testing "does not match a paused workflow"
+      (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/mcp_tasks_run.clj"})]
+        (sut/init api)
+        (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+          ;; Start a run, then mark it paused (running? true, phase :paused)
+          (with-out-str (handler "42"))
+          (swap! state update-in [:workflows "run-1"]
+                 assoc
+                 :psi.extension.workflow/running? true
+                 :psi.extension.workflow/phase :paused)
+          ;; Starting a second run should succeed, not be blocked
+          (let [out (with-out-str (handler "99"))]
+            (is (re-find #"Started mcp-tasks run run-2" out)
+                "paused run should not block starting a new run")))))))
+
 (deftest workflow-user-confirmation-requires-answer-test
   (testing "run-loop-job remains paused when confirmation answer is missing"
     (let [ctrl (atom {:pause? false :cancel? false :merge? false :answer nil})
