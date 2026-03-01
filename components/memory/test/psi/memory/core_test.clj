@@ -100,3 +100,52 @@
     (is (false? (:has-git-history? result)))
     (is (= :error (:status state)))
     (is (false? (:memory-ready sys)))))
+
+(deftest remember-in-success-persists-record-and-index-stats
+  (let [memory-ctx (memory/create-context)
+        before     (memory/get-state-in memory-ctx)
+        result     (memory/remember-in! memory-ctx
+                                        {:content-type :note
+                                         :content "Persist this"
+                                         :tags [:step10 :memory]
+                                         :provenance {:source :session}})
+        after      (memory/get-state-in memory-ctx)
+        record     (:record result)]
+    (is (true? (:ok? result)))
+    (is (= 0 (count (:records before))))
+    (is (= 1 (count (:records after))))
+    (is (= :note (:content-type record)))
+    (is (= "Persist this" (:content record)))
+    (is (= [:step10 :memory] (:tags record)))
+    (is (= 1 (get-in after [:index-stats :entry-count])))
+    (is (= 1 (get-in after [:index-stats :by-type :note])))
+    (is (= 1 (get-in after [:index-stats :by-source :session])))
+    (is (= 1 (get-in after [:index-stats :by-tag :step10])))
+    (is (= 1 (get-in after [:index-stats :by-tag :memory])))))
+
+(deftest remember-in-missing-provenance-is-rejected-and-side-effect-free
+  (let [memory-ctx (memory/create-context {:require-provenance-on-write? true})
+        before     (memory/get-state-in memory-ctx)
+        result     (memory/remember-in! memory-ctx
+                                        {:content-type :note
+                                         :content "No provenance"
+                                         :tags [:invalid]})
+        after      (memory/get-state-in memory-ctx)]
+    (is (false? (:ok? result)))
+    (is (= :missing-provenance (:error result)))
+    (is (= (:records before) (:records after)))
+    (is (= (:index-stats before) (:index-stats after)))))
+
+(deftest remember-in-augments-provenance-from-capability-graph
+  (let [memory-ctx (memory/create-context)
+        result     (memory/remember-in! memory-ctx
+                                        {:content-type :learning
+                                         :content "Linked to graph"
+                                         :tags [:graph]
+                                         :provenance {:source :session}
+                                         :capability-graph {:fingerprint "fp-123"
+                                                            :capability-ids [:cap/a :cap/b]}})
+        record     (:record result)]
+    (is (true? (:ok? result)))
+    (is (= "fp-123" (get-in record [:provenance :graphFingerprint])))
+    (is (= [:cap/a :cap/b] (get-in record [:provenance :capabilityIds])))))

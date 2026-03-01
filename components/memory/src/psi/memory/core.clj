@@ -156,6 +156,105 @@
   [{:keys [query-ctx] :as opts}]
   (activate-in! (global-context) (assoc opts :query-ctx query-ctx)))
 
+(defn- resolve-content-type
+  [remember-input]
+  (or (:content-type remember-input)
+      (:contentType remember-input)))
+
+(defn- resolve-timestamp
+  [remember-input]
+  (or (:timestamp remember-input)
+      (java.time.Instant/now)))
+
+(defn- normalize-tags
+  [tags]
+  (->> (or tags [])
+       (remove nil?)
+       (distinct)
+       (vec)))
+
+(defn- enrich-provenance-with-graph
+  [provenance capability-graph]
+  (let [graph-fingerprint (or (:fingerprint capability-graph)
+                              (:graph-fingerprint capability-graph)
+                              (:graphFingerprint capability-graph))
+        capability-ids    (or (:relevant-capability-ids capability-graph)
+                              (:capability-ids capability-graph)
+                              (:capabilityIds capability-graph)
+                              (some->> (:capabilities capability-graph)
+                                       (keep :id)
+                                       vec))]
+    (cond-> (or provenance {})
+      graph-fingerprint (assoc :graphFingerprint graph-fingerprint)
+      (seq capability-ids) (assoc :capabilityIds (vec capability-ids)))))
+
+(defn- remember-validation-error
+  [ctx remember-input]
+  (let [content-type          (resolve-content-type remember-input)
+        content               (:content remember-input)
+        require-provenance?   (true? (get-in ctx [:config :require-provenance-on-write?]))
+        has-provenance?       (some? (:provenance remember-input))]
+    (cond
+      (nil? content-type) :missing-content-type
+      (nil? content) :missing-content
+      (and require-provenance? (not has-provenance?)) :missing-provenance
+      :else nil)))
+
+(defn- update-index-stats
+  [index-stats {:keys [content-type tags provenance]}]
+  (let [source (or (:source provenance)
+                   (:source-type provenance)
+                   :unknown)]
+    (-> index-stats
+        (update :entry-count (fnil inc 0))
+        (update-in [:by-type content-type] (fnil inc 0))
+        (update-in [:by-source source] (fnil inc 0))
+        ((fn [stats]
+           (reduce (fn [acc tag]
+                     (update-in acc [:by-tag tag] (fnil inc 0)))
+                   stats
+                   tags))))))
+
+(defn remember-in!
+  "Remember a record in isolated `ctx`.
+
+   Required inputs:
+   - :content-type (or :contentType)
+   - :content
+   - :tags
+   - :provenance (required when :require-provenance-on-write? is true)
+
+   Optional inputs:
+   - :timestamp (defaults to now)
+   - :capability-graph to enrich provenance with graph fingerprint and capability ids"
+  [ctx {:keys [content tags provenance capability-graph] :as remember-input}]
+  (if-let [error (remember-validation-error ctx remember-input)]
+    {:ok? false
+     :error error}
+    (let [content-type       (resolve-content-type remember-input)
+          normalized-tags    (normalize-tags tags)
+          record-timestamp   (resolve-timestamp remember-input)
+          full-provenance    (enrich-provenance-with-graph provenance capability-graph)
+          memory-record      {:record-id (str (random-uuid))
+                              :content-type content-type
+                              :content content
+                              :tags normalized-tags
+                              :timestamp record-timestamp
+                              :provenance full-provenance}]
+      (swap-state-in! ctx
+                      (fn [state]
+                        (-> state
+                            (update :records (fnil conj []) memory-record)
+                            (update :index-stats update-index-stats memory-record))))
+      {:ok? true
+       :record memory-record
+       :entry-count (get-in (get-state-in ctx) [:index-stats :entry-count])})))
+
+(defn remember!
+  "Global wrapper for `remember-in!`."
+  [remember-input]
+  (remember-in! (global-context) remember-input))
+
 (defn register-resolvers-in!
   "Register memory resolvers into isolated query context `qctx`.
    Rebuilds query env by default."
