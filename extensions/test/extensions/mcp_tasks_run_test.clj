@@ -446,6 +446,91 @@
             (is (re-find #"already running" out)
                 "running run should not be resumable")))))))
 
+(deftest run-controls-remain-run-id-scoped-with-concurrency-test
+  (testing "pause updates only targeted run control"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/mcp_tasks_run.clj"})]
+      (sut/init api)
+      (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+        (with-out-str (handler "42"))
+        (with-out-str (handler "99"))
+        (#'sut/ensure-control! "run-1")
+        (#'sut/ensure-control! "run-2")
+        (swap! state update-in [:workflows "run-1"]
+               assoc
+               :psi.extension.workflow/running? true
+               :psi.extension.workflow/phase :running)
+        (swap! state update-in [:workflows "run-2"]
+               assoc
+               :psi.extension.workflow/running? true
+               :psi.extension.workflow/phase :running)
+        (with-out-str (handler "pause run-1"))
+        (is (= true (:pause? @(#'sut/control-for "run-1"))))
+        (is (= false (:pause? @(#'sut/control-for "run-2")))))))
+
+  (testing "cancel updates only targeted running run control"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/mcp_tasks_run.clj"})]
+      (sut/init api)
+      (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+        (with-out-str (handler "42"))
+        (with-out-str (handler "99"))
+        (#'sut/ensure-control! "run-1")
+        (#'sut/ensure-control! "run-2")
+        (swap! state update-in [:workflows "run-1"]
+               assoc
+               :psi.extension.workflow/running? true
+               :psi.extension.workflow/phase :running)
+        (swap! state update-in [:workflows "run-2"]
+               assoc
+               :psi.extension.workflow/running? true
+               :psi.extension.workflow/phase :running)
+        (with-out-str (handler "cancel run-1"))
+        (is (= true (:cancel? @(#'sut/control-for "run-1"))))
+        (is (= false (:cancel? @(#'sut/control-for "run-2")))))))
+
+  (testing "resume and retry send events only for targeted run-id"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/mcp_tasks_run.clj"})
+          send-events (fn []
+                        (->> (:mutations @state)
+                             (filter #(= 'psi.extension.workflow/send-event (:op %)))
+                             vec))]
+      (sut/init api)
+      (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+        (with-out-str (handler "42"))
+        (with-out-str (handler "99"))
+
+        (swap! state update-in [:workflows "run-1"]
+               assoc
+               :psi.extension.workflow/running? false
+               :psi.extension.workflow/phase :paused
+               :psi.extension.workflow/data {:run/pause-reason :wait-user-confirmation})
+        (swap! state update-in [:workflows "run-2"]
+               assoc
+               :psi.extension.workflow/running? false
+               :psi.extension.workflow/phase :paused
+               :psi.extension.workflow/data {:run/pause-reason :wait-user-confirmation})
+        (let [before (count (send-events))]
+          (with-out-str (handler "resume run-1 yes"))
+          (let [events (drop before (send-events))]
+            (is (= 1 (count events)))
+            (is (= "run-1" (get-in (first events) [:params :id])))))
+
+        (swap! state update-in [:workflows "run-1"]
+               assoc
+               :psi.extension.workflow/running? false
+               :psi.extension.workflow/phase :error)
+        (swap! state update-in [:workflows "run-2"]
+               assoc
+               :psi.extension.workflow/running? false
+               :psi.extension.workflow/phase :error)
+        (let [before (count (send-events))]
+          (with-out-str (handler "retry run-1"))
+          (let [events (drop before (send-events))]
+            (is (= 1 (count events)))
+            (is (= "run-1" (get-in (first events) [:params :id])))))))))
+
 (deftest workflow-user-confirmation-requires-answer-test
   (testing "run-loop-job remains paused when confirmation answer is missing"
     (let [ctrl (atom {:pause? false :cancel? false :merge? false :answer nil})
