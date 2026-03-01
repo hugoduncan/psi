@@ -38,8 +38,9 @@
         (is (= [] (:hooks state)))
         (is (= [] (:cycles state))))
 
-      (testing "no paused reason or error"
+      (testing "no paused reason/checkpoint or error"
         (is (nil? (:paused-reason state)))
+        (is (nil? (:paused-checkpoint state)))
         (is (nil? (:last-error state)))))))
 
 (deftest create-context-with-overrides
@@ -1287,8 +1288,9 @@
       (testing "controller returns to idle"
         (is (= :idle (:status state))))
 
-      (testing "paused-reason is cleared"
-        (is (nil? (:paused-reason state)))))))
+      (testing "paused pause metadata is cleared"
+        (is (nil? (:paused-reason state)))
+        (is (nil? (:paused-checkpoint state)))))))
 
 (deftest finalize-cycle-failed-test
   ;; AC #13: Failed cycle finalization
@@ -1312,16 +1314,20 @@
         (is (inst? (:ended-at cycle)))))))
 
 (deftest finalize-clears-paused-reason-test
-  ;; AC #13: Finalize clears paused-reason
-  (testing "finalize clears paused-reason even if it was set"
+  ;; AC #13: Finalize clears pause metadata
+  (testing "finalize clears paused-reason and paused-checkpoint"
     (let [[ctx cycle-id memory-ctx] (setup-verified-cycle)
           _ (core/learn-in! ctx cycle-id memory-ctx)
           _ (core/update-future-state-from-outcome-in! ctx cycle-id)
-          ;; Manually set a paused-reason
-          _ (core/swap-state-in! ctx assoc :paused-reason "some-reason")
+          ;; Manually set pause metadata
+          _ (core/swap-state-in! ctx assoc
+                                 :paused-reason "some-reason"
+                                 :paused-checkpoint {:status :planning
+                                                     :at (java.time.Instant/now)})
           _ (core/finalize-cycle-in! ctx cycle-id)
           state (core/get-state-in ctx)]
-      (is (nil? (:paused-reason state))))))
+      (is (nil? (:paused-reason state)))
+      (is (nil? (:paused-checkpoint state))))))
 
 (deftest finalize-rejects-no-outcome-test
   (testing "finalize rejects when no outcome"

@@ -234,8 +234,10 @@
                                             {:psi/recursion-ctx rctx}
                                             [:psi.recursion/status
                                              :psi.recursion/paused?])
+          raw-state-after-pause (core/get-state-in rctx)
           _ (is (= :paused (:psi.recursion/status state-after-pause)))
           _ (is (true? (:psi.recursion/paused? state-after-pause)))
+          _ (is (= :idle (get-in raw-state-after-pause [:paused-checkpoint :status])))
 
           ;; Resume
           resume-result (query/query-in qctx
@@ -250,9 +252,11 @@
           state-after-resume (query/query-in qctx
                                              {:psi/recursion-ctx rctx}
                                              [:psi.recursion/status
-                                              :psi.recursion/paused?])]
+                                              :psi.recursion/paused?])
+          raw-state-after-resume (core/get-state-in rctx)]
       (is (= :idle (:psi.recursion/status state-after-resume)))
-      (is (false? (:psi.recursion/paused? state-after-resume))))))
+      (is (false? (:psi.recursion/paused? state-after-resume)))
+      (is (nil? (:paused-checkpoint raw-state-after-resume))))))
 
 (deftest resume-from-non-paused-returns-false
   ;; Resume when not paused should return false
@@ -265,7 +269,27 @@
                                          {:psi/recursion-ctx rctx})
                                    [:psi.recursion/resumed?]}])]
       (is (false? (get-in result ['psi.recursion/resume!
-                                  :psi.recursion/resumed?]))))))
+                                  :psi.recursion/resumed?])))))
+
+  (testing "resume from paused state restores checkpoint status"
+    (let [rctx (core/create-context)
+          qctx (recursion-query-ctx)
+          _ (core/swap-state-in! rctx assoc
+                                 :status :paused
+                                 :paused-reason "checkpoint-test"
+                                 :paused-checkpoint {:status :planning
+                                                     :at (java.time.Instant/now)})
+          result (query/query-in qctx
+                                 {:psi/recursion-ctx rctx}
+                                 [{(list 'psi.recursion/resume!
+                                         {:psi/recursion-ctx rctx})
+                                   [:psi.recursion/resumed?]}])
+          state (core/get-state-in rctx)]
+      (is (true? (get-in result ['psi.recursion/resume!
+                                 :psi.recursion/resumed?])))
+      (is (= :planning (:status state)))
+      (is (nil? (:paused-reason state)))
+      (is (nil? (:paused-checkpoint state))))))
 
 (deftest current-future-state-after-planning
   ;; After planning, current-future-state should be non-nil

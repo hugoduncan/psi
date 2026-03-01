@@ -109,7 +109,9 @@
                              (fn [s]
                                (-> s
                                    (assoc :status :paused)
-                                   (assoc :paused-reason (or reason "operator-pause")))))
+                                   (assoc :paused-reason (or reason "operator-pause"))
+                                   (assoc :paused-checkpoint {:status (:status s)
+                                                              :at (java.time.Instant/now)}))))
         {:psi.recursion/paused? true}))))
 
 (pco/defmutation resume!
@@ -126,9 +128,11 @@
       (do
         (core/swap-state-in! recursion-ctx
                              (fn [s]
-                               (-> s
-                                   (assoc :status :idle)
-                                   (assoc :paused-reason nil))))
+                               (let [resume-status (or (get-in s [:paused-checkpoint :status]) :idle)]
+                                 (-> s
+                                     (assoc :status resume-status)
+                                     (assoc :paused-reason nil)
+                                     (assoc :paused-checkpoint nil)))))
         {:psi.recursion/resumed? true})
       {:psi.recursion/resumed? false})))
 

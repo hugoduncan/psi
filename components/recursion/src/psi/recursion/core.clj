@@ -21,6 +21,7 @@
    :hooks []
    :cycles []
    :paused-reason nil
+   :paused-checkpoint nil
    :last-error nil})
 
 (defn create-context
@@ -881,6 +882,7 @@
                           (-> s
                               (assoc :status :idle)
                               (assoc :paused-reason nil)
+                              (assoc :paused-checkpoint nil)
                               (update :cycles update-cycle cycle-id
                                       #(-> %
                                            (assoc :status final-status)
