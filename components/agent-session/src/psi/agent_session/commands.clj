@@ -162,46 +162,66 @@
    :introspection-ready true
    :memory-ready true})
 
-(defn- readiness-from-session
-  "Derive recursion readiness from live session query + memory state.
-   Falls back to default all-ready values when attrs are unavailable."
+(defn- runtime-feed-forward-inputs
+  "Derive live runtime readiness + observe snapshots from session query state.
+   Falls back to safe defaults when attrs are unavailable."
   [ctx]
   (let [snapshot (session/query-in ctx
                                    [:psi.graph/nodes
                                     :psi.graph/edges
-                                    :psi.memory/status])
-        memory-ready? (= :ready (:psi.memory/status snapshot))
-        graph-ready? (and (seq (:psi.graph/nodes snapshot))
-                          (seq (:psi.graph/edges snapshot)))]
-    (merge default-feed-forward-readiness
-           {:graph-ready graph-ready?
-            :memory-ready memory-ready?})))
+                                    :psi.memory/status
+                                    :psi.memory/entry-count])
+        node-count (count (:psi.graph/nodes snapshot))
+        edge-count (count (:psi.graph/edges snapshot))
+        memory-status (:psi.memory/status snapshot)
+        memory-entry-count (or (:psi.memory/entry-count snapshot) 0)
+        memory-ready? (= :ready memory-status)
+        graph-ready? (and (pos? node-count)
+                          (pos? edge-count))
+        readiness (merge default-feed-forward-readiness
+                         {:graph-ready graph-ready?
+                          :memory-ready memory-ready?})
+        graph-state {:node-count node-count
+                     :capability-count edge-count
+                     :status (if graph-ready? :stable :emerging)}
+        memory-state {:entry-count memory-entry-count
+                      :status (if memory-ready? :ready :initializing)
+                      :recovery-count 0}]
+    {:readiness readiness
+     :graph-state graph-state
+     :memory-state memory-state}))
 
 (defn- feed-forward-trigger-signal
   [reason]
   (recursion/manual-trigger-signal reason {:source :runtime-command}))
 
 (defn- format-feed-forward-trigger-result
-  [result]
-  (case (:result result)
-    :accepted
-    (str "✓ Feed-forward trigger accepted"
-         "\n  cycle-id: " (:cycle-id result)
-         "\n  prompt: " recursion/feed-forward-manual-trigger-prompt-name)
+  [trigger-result orchestration]
+  (let [phase (:phase orchestration)]
+    (case (:result trigger-result)
+      :accepted
+      (str "✓ Feed-forward trigger accepted"
+           "\n  cycle-id: " (:cycle-id trigger-result)
+           "\n  prompt: " recursion/feed-forward-manual-trigger-prompt-name
+           (case phase
+             :awaiting-approval "\n  status: awaiting approval"
+             :completed "\n  status: cycle completed"
+             :trigger "\n  status: trigger accepted"
+             (str "\n  phase: " (name phase))))
 
-    :blocked
-    (str "‖ Feed-forward trigger blocked"
-         "\n  cycle-id: " (:cycle-id result)
-         "\n  reason: recursion_prerequisites_not_ready")
+      :blocked
+      (str "‖ Feed-forward trigger blocked"
+           "\n  cycle-id: " (:cycle-id trigger-result)
+           "\n  reason: recursion_prerequisites_not_ready")
 
-    :ignored
-    "… Feed-forward trigger ignored (manual hook disabled)."
+      :ignored
+      "… Feed-forward trigger ignored (manual hook disabled)."
 
-    :rejected
-    (str "✗ Feed-forward trigger rejected"
-         "\n  reason: " (name (:reason result)))
+      :rejected
+      (str "✗ Feed-forward trigger rejected"
+           "\n  reason: " (name (:reason trigger-result)))
 
-    (str result)))
+      (str trigger-result))))
 
 ;; ============================================================
 ;; Login provider selection (pure — returns data)
@@ -294,12 +314,19 @@
         (let [reason (-> (str/replace trimmed #"^/feed-forward\s*" "")
                          (str/trim)
                          (not-empty))
-              readiness (readiness-from-session ctx)
-              result (recursion/handle-trigger-in! recursion-ctx
-                                                   (feed-forward-trigger-signal reason)
-                                                   readiness)]
+              {:keys [readiness graph-state memory-state]}
+              (runtime-feed-forward-inputs ctx)
+              orchestration
+              (recursion/orchestrate-manual-trigger-in!
+               recursion-ctx
+               (feed-forward-trigger-signal reason)
+               {:system-state readiness
+                :graph-state graph-state
+                :memory-state memory-state
+                :memory-ctx (:memory-ctx ctx)})
+              trigger-result (:trigger-result orchestration)]
           {:type :text
-           :message (format-feed-forward-trigger-result result)})
+           :message (format-feed-forward-trigger-result trigger-result orchestration)})
         {:type :text
          :message "✗ Feed-forward recursion context not configured."})
 

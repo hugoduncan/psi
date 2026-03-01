@@ -191,7 +191,7 @@
 ;;; --- Mutation tests ---
 
 (deftest trigger-mutation-creates-cycle
-  ;; Trigger mutation should create a new cycle
+  ;; Trigger mutation should create a new cycle via orchestration and stop at awaiting approval
   (testing "trigger mutation creates a cycle"
     (let [rctx (core/create-context)
           _ (core/register-hooks-in! rctx)
@@ -201,14 +201,20 @@
                                  [{(list 'psi.recursion/trigger!
                                          {:psi/recursion-ctx rctx
                                           :reason "mutation-test"
-                                          :system-state (all-readiness-true)})
-                                   [:psi.recursion/trigger-result]}])
+                                          :system-state (all-readiness-true)
+                                          :graph-state {:node-count 5 :capability-count 3 :status :stable}
+                                          :memory-state {:entry-count 2 :status :ready :recovery-count 0}})
+                                   [:psi.recursion/trigger-result
+                                    :psi.recursion/orchestration-result]}])
           trigger-result (get-in result ['psi.recursion/trigger!
                                          :psi.recursion/trigger-result])
+          orchestration (get-in result ['psi.recursion/trigger!
+                                        :psi.recursion/orchestration-result])
           cycle-id (:cycle-id trigger-result)
           state (core/get-state-in rctx)
           cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
       (is (= :accepted (:result trigger-result)))
+      (is (= :awaiting-approval (:phase orchestration)))
       (is (= core/feed-forward-manual-trigger-prompt-name
              (get-in cycle [:trigger :payload :prompt-name])))
       (is (= :eql-mutation (get-in cycle [:trigger :payload :source]))))))

@@ -112,7 +112,8 @@
     (is (= :text (:type result)))
     (is (str/includes? (:message result) "trigger accepted"))
     (is (str/includes? (:message result) "feed-forward-manual-trigger"))
-    (is (str/includes? (:message result) "cycle-id:"))))
+    (is (str/includes? (:message result) "cycle-id:"))
+    (is (str/includes? (:message result) "awaiting approval"))))
 
 (deftest dispatch-feed-forward-busy-test
   (let [ctx  (-> (make-test-ctx)

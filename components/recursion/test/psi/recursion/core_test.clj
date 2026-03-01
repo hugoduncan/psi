@@ -313,6 +313,81 @@
       (is (= :rejected (:result result)))
       (is (= :controller-busy (:reason result))))))
 
+(deftest orchestrate-manual-trigger-awaits-explicit-approval-test
+  (testing "orchestration stops at awaiting-approval without explicit decision"
+    (let [ctx (core/create-context)
+          _ (core/register-hooks-in! ctx)
+          trigger (core/manual-trigger-signal "manual run" {:source :test})
+          result (core/orchestrate-manual-trigger-in!
+                  ctx
+                  trigger
+                  {:system-state all-ready
+                   :graph-state {:node-count 5 :capability-count 3 :status :stable}
+                   :memory-state {:entry-count 2 :status :ready :recovery-count 0}})
+          state (core/get-state-in ctx)
+          cycle (some->> (:cycles state) last)]
+      (is (true? (:ok? result)))
+      (is (= :awaiting-approval (:phase result)))
+      (is (= :accepted (get-in result [:trigger-result :result])))
+      (is (= :awaiting-approval (:status state)))
+      (is (= :awaiting-approval (:status cycle)))
+      (is (= :manual (get-in result [:gate-result :gate]))))))
+
+(deftest orchestrate-manual-trigger-approve-completes-test
+  (testing "orchestration with explicit :approve runs full cycle to finalize"
+    (let [ctx (core/create-context)
+          _ (core/register-hooks-in! ctx)
+          mem-ctx (memory/create-context
+                   {:state-overrides {:status :ready}
+                    :require-provenance-on-write? false})
+          trigger (core/manual-trigger-signal "manual approve" {:source :test})
+          result (core/orchestrate-manual-trigger-in!
+                  ctx
+                  trigger
+                  {:system-state all-ready
+                   :graph-state {:node-count 5 :capability-count 3 :status :stable}
+                   :memory-state {:entry-count 2 :status :ready :recovery-count 0}
+                   :memory-ctx mem-ctx
+                   :approval-decision :approve
+                   :approver "reviewer"
+                   :approval-notes "ship it"})
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= (:cycle-id result) (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+      (is (= :completed (:phase result)))
+      (is (= :idle (:status state)))
+      (is (= :completed (:status cycle)))
+      (is (= true (get-in cycle [:proposal :approved])))
+      (is (= :success (get-in cycle [:outcome :status]))))))
+
+(deftest orchestrate-manual-trigger-reject-completes-with-aborted-outcome-test
+  (testing "orchestration with explicit :reject skips execution and finalizes failed"
+    (let [ctx (core/create-context)
+          _ (core/register-hooks-in! ctx)
+          mem-ctx (memory/create-context
+                   {:state-overrides {:status :ready}
+                    :require-provenance-on-write? false})
+          trigger (core/manual-trigger-signal "manual reject" {:source :test})
+          result (core/orchestrate-manual-trigger-in!
+                  ctx
+                  trigger
+                  {:system-state all-ready
+                   :graph-state {:node-count 5 :capability-count 3 :status :stable}
+                   :memory-state {:entry-count 2 :status :ready :recovery-count 0}
+                   :memory-ctx mem-ctx
+                   :approval-decision :reject
+                   :approver "reviewer"
+                   :approval-notes "not safe"})
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= (:cycle-id result) (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+      (is (= :completed (:phase result)))
+      (is (= :idle (:status state)))
+      (is (= :failed (:status cycle)))
+      (is (= false (get-in cycle [:proposal :approved])))
+      (is (= :aborted (get-in cycle [:outcome :status])))
+      (is (empty? (:execution-attempts cycle))))))
+
 ;;; --- Observation tests ---
 
 (def ^:private sample-graph-state

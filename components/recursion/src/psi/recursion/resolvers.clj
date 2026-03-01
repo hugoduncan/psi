@@ -71,25 +71,44 @@
 ;;; --- Mutations ---
 
 (pco/defmutation trigger!
-  "Fire a manual trigger on the recursion controller.
+  "Fire a manual trigger on the recursion controller via the production
+   orchestration entrypoint.
 
    Params:
-     :psi/recursion-ctx — recursion context
-     :reason            — trigger reason string (default: \"manual-trigger\")
-     :system-state      — readiness map with :query-ready, :graph-ready,
-                          :introspection-ready, :memory-ready keys"
-  [_ {:keys [psi/recursion-ctx reason system-state]}]
+     :psi/recursion-ctx  — recursion context
+     :reason             — trigger reason string (default: \"manual-trigger\")
+     :system-state       — readiness map with :query-ready, :graph-ready,
+                           :introspection-ready, :memory-ready keys
+     :graph-state        — optional graph snapshot map for observe phase
+     :memory-state       — optional memory snapshot map for observe phase
+     :psi/memory-ctx     — optional memory context for learn phase
+     :approval-decision  — nil | :approve | :reject (or string equivalent)
+     :approver           — approver/reviewer identity
+     :approval-notes     — approval/rejection notes"
+  [_ {:keys [psi/recursion-ctx reason system-state graph-state memory-state
+             psi/memory-ctx approval-decision approver approval-notes]}]
   {::pco/op-name 'psi.recursion/trigger!
-   ::pco/params  [:psi/recursion-ctx :reason :system-state]
-   ::pco/output  [:psi.recursion/trigger-result]}
+   ::pco/params  [:psi/recursion-ctx :reason :system-state :graph-state :memory-state
+                  :psi/memory-ctx :approval-decision :approver :approval-notes]
+   ::pco/output  [:psi.recursion/trigger-result
+                  :psi.recursion/orchestration-result]}
   (let [trigger-signal (core/manual-trigger-signal reason {:source :eql-mutation})
-        result (core/handle-trigger-in! recursion-ctx trigger-signal
-                                        (or system-state
-                                            {:query-ready true
-                                             :graph-ready true
-                                             :introspection-ready true
-                                             :memory-ready true}))]
-    {:psi.recursion/trigger-result result}))
+        orchestration (core/orchestrate-manual-trigger-in!
+                       recursion-ctx
+                       trigger-signal
+                       {:system-state (or system-state
+                                          {:query-ready true
+                                           :graph-ready true
+                                           :introspection-ready true
+                                           :memory-ready true})
+                        :graph-state graph-state
+                        :memory-state memory-state
+                        :memory-ctx memory-ctx
+                        :approval-decision approval-decision
+                        :approver approver
+                        :approval-notes approval-notes})]
+    {:psi.recursion/trigger-result (:trigger-result orchestration)
+     :psi.recursion/orchestration-result orchestration}))
 
 (pco/defmutation pause!
   "Pause the recursion controller with a reason.
