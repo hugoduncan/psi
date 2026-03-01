@@ -345,7 +345,12 @@
 
 (deftest workflow-user-confirmation-wait-and-resume-test
   (testing "run-loop-job pauses explicitly on user confirmation marker"
-    (let [ctrl (atom {:pause? false :cancel? false :merge? false :answer nil})]
+    (let [pending-session {:agent-ctx :ctx
+                           :session-ctx :session
+                           :model {:id "test"}
+                           :step-name "review-story-implementation"
+                           :step-state :done}
+          ctrl (atom {:pause? false :cancel? false :merge? false :answer nil})]
       (with-redefs [sut/derive-current! (fn [_project-dir _worktree-dir _task-id]
                                           {:task {:id 42 :type :task}
                                            :children []
@@ -355,6 +360,7 @@
                     sut/resolve-step-prompt (fn [_project-dir _prompt-name] "prompt")
                     sut/run-step-subagent! (fn [_]
                                              {:ok? true
+                                              :step-session pending-session
                                               :text "MCP_TASKS_RUN_USER_CONFIRMATION: {:question \"Continue?\" :expected-answer :yes-no}"})]
         (let [res (#'sut/run-loop-job {:run-id "run-1"
                                        :task-id 42
@@ -370,7 +376,61 @@
           (is (= :paused (:status res)))
           (is (= :wait-user-confirmation (:current-state res)))
           (is (= :wait-user-confirmation (:pause-reason res)))
-          (is (= "Continue?" (get-in res [:user-confirmation :question]))))))))
+          (is (= "Continue?" (get-in res [:user-confirmation :question])))
+          (is (= pending-session (:pending-step-session @ctrl))))))))
+
+(deftest workflow-user-confirmation-resume-routes-to-asking-session-test
+  (testing "resume answer is sent back to the session that asked"
+    (let [pending-session {:agent-ctx :ctx
+                           :session-ctx :session
+                           :model {:id "test"}
+                           :step-name "review-story-implementation"
+                           :step-state :done}
+          ctrl            (atom {:pause? false
+                                 :cancel? false
+                                 :merge? false
+                                 :answer "create follow-up tasks"
+                                 :pending-step-session pending-session})
+          captured        (atom nil)
+          derived-states  (atom [{:task {:id 42 :type :story :status :open :meta {:refined "true"}}
+                                  :children [{:id 1 :status :done :meta {:refined "true"}}]
+                                  :entity-type :story
+                                  :state :done
+                                  :completed-count 1}
+                                 {:task {:id 42 :type :story :status :open :meta {:refined "true"}}
+                                  :children [{:id 1 :status :done :meta {:refined "true"}}
+                                             {:id 2 :status :open :meta {}}]
+                                  :entity-type :story
+                                  :state :has-tasks
+                                  :completed-count 1}])]
+      (with-redefs [sut/derive-current! (fn [_project-dir _worktree-dir _task-id]
+                                          (let [entry (first @derived-states)]
+                                            (swap! derived-states #(if (seq %) (vec (rest %)) %))
+                                            entry))
+                    sut/resolve-step-prompt (fn [_project-dir _prompt-name] "prompt")
+                    sut/run-step-subagent! (fn [args]
+                                             (reset! captured args)
+                                             {:ok? true
+                                              :step-session pending-session
+                                              :text "Processed answer and created new story tasks."})]
+        (let [res (#'sut/run-loop-job {:run-id "run-1"
+                                       :task-id 42
+                                       :project-dir "/tmp"
+                                       :worktree-dir "/tmp/wt"
+                                       :control ctrl
+                                       :current-state :wait-user-confirmation
+                                       :steps 1
+                                       :history []
+                                       :user-confirmation {:question "Which review items should be added?"}
+                                       :user-answer nil
+                                       :max-steps 10})]
+          (is (= :running (:status res)))
+          (is (= :derive-state (:current-state res)))
+          (is (= pending-session (:resume-step-session @captured)))
+          (is (= "create follow-up tasks" (:user-answer @captured)))
+          (is (= "review-story-implementation" (:step-name @captured)))
+          (is (nil? (:pending-step-session @ctrl)))
+          (is (nil? (:answer @ctrl))))))))
 
 (deftest start-run-admission-policy-test
   (testing "allows concurrent runs for distinct task IDs"
@@ -512,10 +572,12 @@
                :psi.extension.workflow/phase :paused
                :psi.extension.workflow/data {:run/pause-reason :wait-user-confirmation})
         (let [before (count (send-events))]
-          (with-out-str (handler "resume run-1 yes"))
+          (with-out-str (handler "resume run-1 add review-item-1 and review-item-2"))
           (let [events (drop before (send-events))]
             (is (= 1 (count events)))
-            (is (= "run-1" (get-in (first events) [:params :id])))))
+            (is (= "run-1" (get-in (first events) [:params :id])))
+            (is (= "add review-item-1 and review-item-2"
+                   (get-in (first events) [:params :data :answer])))))
 
         (swap! state update-in [:workflows "run-1"]
                assoc
@@ -843,3 +905,51 @@
           (is (= fake-model (nth @captured 3)))
           (is (= "user" (get-in (nth @captured 4) [0 :role])))
           (is (= {:turn-ctx-atom nil} (nth @captured 5))))))))
+
+(deftest run-step-subagent-resume-session-test
+  (testing "run-step-subagent reuses the pending asking session on resume"
+    (let [captured         (atom nil)
+          fake-agent-ctx   {:fake :agent-ctx}
+          fake-session-ctx {:agent-ctx fake-agent-ctx
+                            :session-data-atom (atom {:tool-output-overrides {}})
+                            :tool-output-stats-atom (atom {:calls []
+                                                           :aggregates {:total-context-bytes 0
+                                                                        :by-tool {}
+                                                                        :limit-hits-by-tool {}}})}
+          fake-model       {:provider "anthropic" :id "sonnet"}
+          resume-session   {:agent-ctx fake-agent-ctx
+                            :session-ctx fake-session-ctx
+                            :model fake-model
+                            :step-name "review-story-implementation"
+                            :step-state :done}]
+      (with-redefs [sut/set-live-progress! (fn [& _])
+                    sut/create-step-agent-ctx (fn [_]
+                                                (throw (ex-info "should not create a new agent ctx" {})))
+                    sut/create-step-session-ctx (fn [_]
+                                                  (throw (ex-info "should not create a new session ctx" {})))
+                    executor/run-agent-loop! (fn [& args]
+                                               (reset! captured args)
+                                               {:role "assistant"
+                                                :stop-reason :stop
+                                                :content [{:type :text :text "ok"}]})]
+        (let [result (#'sut/run-step-subagent!
+                      {:run-id "run-1"
+                       :step-name "review-story-implementation"
+                       :prompt-body "prompt"
+                       :task-id 42
+                       :entity-type :story
+                       :project-dir "/tmp"
+                       :worktree-dir "/tmp/wt"
+                       :task {:id 42 :type :story}
+                       :children [{:id 1 :status :done}]
+                       :state :done
+                       :user-answer "Create two follow-up tasks first."
+                       :resume-step-session resume-session})]
+          (is (:ok? result))
+          (is (= 6 (count @captured)))
+          (is (= fake-session-ctx (nth @captured 1)))
+          (is (= fake-agent-ctx (nth @captured 2)))
+          (is (= fake-model (nth @captured 3)))
+          (is (= "Create two follow-up tasks first."
+                 (get-in (nth @captured 4) [0 :content 0 :text])))
+          (is (= resume-session (:step-session result))))))))
