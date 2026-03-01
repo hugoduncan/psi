@@ -3,7 +3,8 @@
 
    Establishes an isolated RecursionContext (Nullable pattern), global wrappers,
    the initial controller state shape, trigger intake, readiness gating,
-   observation, FUTURE_STATE synthesis, and plan proposal generation."
+   observation, FUTURE_STATE synthesis, plan proposal generation,
+   approval gates, execution, verification, learning, and cycle finalization."
   (:require
    [psi.recursion.future-state :as future-state]
    [psi.recursion.policy :as policy]))
@@ -698,3 +699,168 @@
    (verify-in! (global-context) cycle-id))
   ([cycle-id check-runner]
    (verify-in! (global-context) cycle-id check-runner)))
+
+;;; --- Learn phase + memory writeback ---
+
+(defn- build-success-outcome
+  "Build a success outcome from the cycle's proposal actions and future-state goals."
+  [cycle future-state]
+  (let [action-titles (into #{} (map :title) (get-in cycle [:proposal :actions]))
+        changed-goals (into #{} (map :id) (:goals future-state))]
+    {:status :success
+     :summary "cycle_completed_successfully"
+     :evidence action-titles
+     :changed-goals changed-goals}))
+
+(defn- build-memory-content
+  "Build the memory content string for a cycle outcome."
+  [cycle-id outcome cycle]
+  (let [action-titles (mapv :title (get-in cycle [:proposal :actions]))]
+    (str "Feed-forward cycle " cycle-id ": "
+         (name (:status outcome)) ". "
+         (:summary outcome) ". "
+         "Actions: " (pr-str action-titles) ".")))
+
+(defn learn-in!
+  "Learn phase: write cycle outcome to memory and store resulting memory IDs.
+
+   Takes `ctx`, `cycle-id`, and `memory-ctx` (a `psi.memory.core/MemoryContext`).
+   Requires cycle status `:learning`.
+
+   If cycle has no outcome yet (successful verification path), sets outcome to
+   success with action titles and changed goal IDs.
+
+   Calls `psi.memory.core/remember-in!` with tags #{\"feed-forward\" \"cycle\" \"step-11\"}
+   and provenance linking to this cycle.
+
+   Returns {:ok? true, :memory-ids #{record-id}} on success."
+  [ctx cycle-id memory-ctx]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (not= :learning (:status cycle))
+      {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+      :else
+      (let [;; If no outcome yet, this is the success path
+            outcome (or (:outcome cycle)
+                        (build-success-outcome cycle (:current-future-state state)))
+            ;; Set the outcome on the cycle if it wasn't already set
+            _ (when (nil? (:outcome cycle))
+                (swap-state-in! ctx
+                                (fn [s]
+                                  (update s :cycles update-cycle cycle-id
+                                          #(assoc % :outcome outcome)))))
+            ;; Build memory content
+            content (build-memory-content cycle-id outcome cycle)
+            trigger-type (get-in cycle [:trigger :type])
+            ;; Write to memory using remember-in!
+            ;; We need to call the memory module's remember-in!
+            remember-fn (requiring-resolve 'psi.memory.core/remember-in!)
+            mem-result (remember-fn memory-ctx
+                                    {:content-type :discovery
+                                     :content content
+                                     :tags ["feed-forward" "cycle" "step-11"]
+                                     :provenance {:source :feed-forward
+                                                  :cycle-id cycle-id
+                                                  :trigger-type trigger-type
+                                                  :outcome-status (:status outcome)}})
+            record-id (get-in mem-result [:record :record-id])]
+        (if (:ok? mem-result)
+          (do
+            ;; Store memory record ID on the cycle
+            (swap-state-in! ctx
+                            (fn [s]
+                              (update s :cycles update-cycle cycle-id
+                                      #(update % :learning-memory-ids conj record-id))))
+            {:ok? true, :memory-ids #{record-id}})
+          {:ok? false, :error :memory-write-failed, :details mem-result})))))
+
+(defn learn!
+  "Global wrapper for `learn-in!`."
+  [cycle-id memory-ctx]
+  (learn-in! (global-context) cycle-id memory-ctx))
+
+;;; --- FUTURE_STATE updates from outcome ---
+
+(defn update-future-state-from-outcome-in!
+  "Update FUTURE_STATE based on cycle outcome.
+
+   - Success: advance goals referenced in outcome's changed-goals to :complete.
+   - Failed/blocked/aborted: add blockers from outcome evidence.
+
+   Returns {:ok? true, :future-state updated-fs}."
+  [ctx cycle-id]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (nil? (:outcome cycle))
+      {:ok? false, :error :no-outcome}
+
+      :else
+      (let [outcome (:outcome cycle)
+            current-fs (or (:current-future-state state)
+                           (future-state/initial-future-state))
+            updated-fs (case (:status outcome)
+                         :success
+                         (future-state/advance-goals current-fs (:changed-goals outcome))
+
+                         (:failed :blocked :aborted)
+                         (future-state/add-blockers current-fs (:evidence outcome))
+
+                         ;; Fallback: no change, just increment version
+                         (future-state/next-version current-fs))]
+        (swap-state-in! ctx assoc :current-future-state updated-fs)
+        {:ok? true, :future-state updated-fs}))))
+
+(defn update-future-state-from-outcome!
+  "Global wrapper for `update-future-state-from-outcome-in!`."
+  [cycle-id]
+  (update-future-state-from-outcome-in! (global-context) cycle-id))
+
+;;; --- Cycle finalization ---
+
+(defn finalize-cycle-in!
+  "Finalize a cycle: set ended-at, terminal status, return controller to idle.
+
+   If outcome status is :success, cycle status becomes :completed.
+   Otherwise cycle status becomes :failed.
+   Controller status returns to :idle, paused-reason is cleared.
+
+   Returns {:ok? true, :final-status :completed|:failed}."
+  [ctx cycle-id]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (nil? (:outcome cycle))
+      {:ok? false, :error :no-outcome}
+
+      :else
+      (let [outcome (:outcome cycle)
+            final-status (if (= :success (:status outcome))
+                           :completed
+                           :failed)]
+        (swap-state-in! ctx
+                        (fn [s]
+                          (-> s
+                              (assoc :status :idle)
+                              (assoc :paused-reason nil)
+                              (update :cycles update-cycle cycle-id
+                                      #(-> %
+                                           (assoc :status final-status)
+                                           (assoc :ended-at (java.time.Instant/now)))))))
+        {:ok? true, :final-status final-status}))))
+
+(defn finalize-cycle!
+  "Global wrapper for `finalize-cycle-in!`."
+  [cycle-id]
+  (finalize-cycle-in! (global-context) cycle-id))
