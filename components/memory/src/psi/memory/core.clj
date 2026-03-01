@@ -8,12 +8,19 @@
    Lifecycle, remember/recover logic, and graph history tracking are added in
    follow-up tasks."
   (:require
+   [psi.engine.core :as engine]
+   [psi.history.git :as git]
    [psi.memory.graph-history :as graph-history]
    [psi.memory.ranking :as ranking]
    [psi.memory.resolvers :as resolvers]
    [psi.query.core :as query]))
 
 (defrecord MemoryContext [state-atom config])
+
+(defn- graph-status-ready?
+  "Step 10 gate: capability graph status is acceptable when stable or expanding."
+  [graph-status]
+  (contains? #{:stable :expanding} graph-status))
 
 (defn- initial-index-stats
   []
@@ -87,6 +94,67 @@
   "Global wrapper for `swap-state-in!`."
   [f & args]
   (apply swap-state-in! (global-context) f args))
+
+(defn activation-gates-in
+  "Compute Step 10 activation gates.
+
+   Required gates:
+   - query env built
+   - git repository has history
+   - capability graph status in #{:stable :expanding}"
+  [ctx {:keys [query-ctx git-ctx capability-graph-status]
+        :or   {git-ctx (git/create-context)}}]
+  (let [query-summary   (query/graph-summary-in query-ctx)
+        commits         (try
+                          (git/log git-ctx {:n 1})
+                          (catch Exception _
+                            []))
+        has-git-history (pos? (count commits))
+        env-built?      (true? (:env-built? query-summary))
+        graph-ready?    (graph-status-ready? capability-graph-status)]
+    {:query-env-built? env-built?
+     :has-git-history? has-git-history
+     :graph-status capability-graph-status
+     :graph-status-ready? graph-ready?
+     :ready? (and env-built? has-git-history graph-ready?)}))
+
+(defn activate-in!
+  "Run Step 10 activation lifecycle for isolated `ctx`.
+
+   On success:
+   - memory status => :ready
+   - engine readiness flags => history/knowledge/memory true
+
+   On failure:
+   - memory status => :error
+   - memory-ready false
+   - do not force unrelated readiness flags true"
+  [ctx {:keys [engine-ctx query-ctx git-ctx capability-graph-status]
+        :or   {capability-graph-status :stable}
+        :as   opts}]
+  (let [gates (activation-gates-in ctx {:query-ctx query-ctx
+                                        :git-ctx git-ctx
+                                        :capability-graph-status capability-graph-status})
+        ready? (:ready? gates)]
+    (swap-state-in! ctx assoc :status (if ready? :ready :error))
+    (when engine-ctx
+      (if ready?
+        (do
+          (engine/update-system-component-in! engine-ctx :history-ready true)
+          (engine/update-system-component-in! engine-ctx :knowledge-ready true)
+          (engine/update-system-component-in! engine-ctx :memory-ready true))
+        (engine/update-system-component-in! engine-ctx :memory-ready false)))
+    (assoc gates
+           :memory-status (:status (get-state-in ctx))
+           :options (select-keys opts [:capability-graph-status]))))
+
+(defn activate!
+  "Global wrapper for `activate-in!`.
+
+   Requires :query-ctx. Optionally accepts :engine-ctx, :git-ctx,
+   and :capability-graph-status."
+  [{:keys [query-ctx] :as opts}]
+  (activate-in! (global-context) (assoc opts :query-ctx query-ctx)))
 
 (defn register-resolvers-in!
   "Register memory resolvers into isolated query context `qctx`.
