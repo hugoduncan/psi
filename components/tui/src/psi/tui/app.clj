@@ -470,7 +470,8 @@
            ;; Live turn progress
            :stream-text           nil
            :tool-calls            {}
-           :tool-order            []}
+           :tool-order            []
+           :tools-expanded?       false}
           (poll-cmd queue)])))))
 
 ;; ── Update helpers ──────────────────────────────────────────
@@ -628,9 +629,7 @@
                 :error         nil
                 :input         (charm/text-input-reset (:input state))
                 :spinner-frame 0
-                :stream-text   nil
-                :tool-calls    {}
-                :tool-order    []))
+                :stream-text   nil))
      (poll-cmd queue)]))
 
 (defn- submit-input
@@ -699,11 +698,12 @@
 
       :tool-start
       (let [id   (:tool-id event)
-            tc   {:name   (:tool-name event)
-                  :args   ""
-                  :status :pending
-                  :result nil
-                  :is-error false}]
+            tc   {:name      (:tool-name event)
+                  :args      ""
+                  :status    :pending
+                  :result    nil
+                  :is-error  false
+                  :expanded? (boolean (:tools-expanded? state))}]
         [(-> state
              (assoc-in [:tool-calls id] tc)
              (update :tool-order conj id))
@@ -721,14 +721,39 @@
                      (:parsed-args event)))
        nil]
 
+      :tool-execution-update
+      [(-> state
+           (assoc-in [:tool-calls (:tool-id event) :status] :running)
+           (assoc-in [:tool-calls (:tool-id event) :content] (:content event))
+           (assoc-in [:tool-calls (:tool-id event) :details] (:details event))
+           (assoc-in [:tool-calls (:tool-id event) :result]
+                     (or (:result-text event)
+                         (some->> (:content event)
+                                  (keep (fn [block]
+                                          (when (= :text (:type block))
+                                            (:text block))))
+                                  (str/join "\n"))))
+           (assoc-in [:tool-calls (:tool-id event) :is-error]
+                     (boolean (:is-error event))))
+       nil]
+
       :tool-result
       [(-> state
            (assoc-in [:tool-calls (:tool-id event) :status]
                      (if (:is-error event) :error :success))
+           (assoc-in [:tool-calls (:tool-id event) :content] (:content event))
+           (assoc-in [:tool-calls (:tool-id event) :details] (:details event))
            (assoc-in [:tool-calls (:tool-id event) :result]
-                     (:result-text event))
+                     (or (:result-text event)
+                         (some->> (:content event)
+                                  (keep (fn [block]
+                                          (when (= :text (:type block))
+                                            (:text block))))
+                                  (str/join "\n"))))
            (assoc-in [:tool-calls (:tool-id event) :is-error]
-                     (:is-error event)))
+                     (boolean (:is-error event)))
+           (assoc-in [:tool-calls (:tool-id event) :expanded?]
+                     (boolean (:tools-expanded? state))))
        nil]
 
       ;; unknown event-kind — ignore
@@ -748,9 +773,7 @@
          (update :messages conj {:role :assistant :text display})
          (assoc :phase       :idle
                 :error       error
-                :stream-text nil
-                :tool-calls  {}
-                :tool-order  []))
+                :stream-text nil))
      (poll-cmd (:queue state))]))
 
 (defn- handle-agent-poll
@@ -833,9 +856,7 @@
         [(-> state
              (assoc :phase       :idle
                     :error       (:error m)
-                    :stream-text nil
-                    :tool-calls  {}
-                    :tool-order  []))
+                    :stream-text nil))
          (poll-cmd (:queue state))]
 
       ;; Agent poll timeout → keep polling (and animate spinner while streaming)
@@ -847,6 +868,11 @@
       ;; Session selector active — route all key input to selector handler
         (= :selecting-session (:phase state))
         (handle-selector-key state m)
+
+      ;; Ctrl+O toggles global tool expansion state.
+        (and (= :idle (:phase state))
+             (msg/key-match? m "ctrl+o"))
+        [(update state :tools-expanded? not) nil]
 
       ;; Alt/Meta+Backspace delete previous word.
       ;; (Explicit handling to avoid charm's binding-order issue.)
@@ -1384,7 +1410,13 @@
 
 ;; ── Tool progress rendering ──────────────────────────────────
 
-(def ^:private tool-result-preview-lines 5)
+(def ^:private default-preview-lines 5)
+(def ^:private read-preview-lines 10)
+(def ^:private write-preview-lines 10)
+(def ^:private ls-preview-lines 20)
+(def ^:private find-preview-lines 20)
+(def ^:private grep-preview-lines 15)
+(def ^:private bash-preview-lines 5)
 
 (defn- tool-header
   "Format tool name and key argument for display."
@@ -1409,18 +1441,6 @@
     :error   (charm/render tool-err-style "✗")
     ""))
 
-(defn- truncate-result
-  "Truncate tool result to N lines."
-  [text max-lines]
-  (when (and text (not (str/blank? text)))
-    (let [lines (str/split-lines text)
-          n     (count lines)]
-      (if (<= n max-lines)
-        text
-        (str (str/join "\n" (take max-lines lines))
-             "\n" (charm/render dim-style
-                                (str "… (" (- n max-lines) " more lines)")))))))
-
 (defn- wrap-tool-result-line
   "Wrap a single tool result line to fit within `avail`
    visible columns. Returns a seq of wrapped strings."
@@ -1429,10 +1449,107 @@
     [line]
     (ansi/word-wrap-ansi line avail)))
 
+(defn- tool-expanded?
+  [tools-expanded? _tc]
+  (boolean tools-expanded?))
+
+(defn- content-block->text
+  [block]
+  (let [t (:type block)
+        t-label (cond
+                  (keyword? t) (name t)
+                  (string? t)  t
+                  :else        "unknown")]
+    (case t
+      :text  (:text block)
+      :image (str "[image " (or (:mime-type block) "unknown") "]")
+      (str "[unsupported content block: " t-label "]"))))
+
+(defn- tool-content->text
+  [content]
+  (when (seq content)
+    (str/join "\n" (map content-block->text content))))
+
+(defn- preview-lines-for-tool
+  [tool-name]
+  (case tool-name
+    "read" read-preview-lines
+    "write" write-preview-lines
+    "ls" ls-preview-lines
+    "find" find-preview-lines
+    "grep" grep-preview-lines
+    "bash" bash-preview-lines
+    default-preview-lines))
+
+(defn- tool-preview
+  [tool-name text expanded?]
+  (when (and text (not (str/blank? text)))
+    (let [lines (str/split-lines text)
+          total (count lines)]
+      (if expanded?
+        {:lines lines :hidden? false :bash-tail? false :hidden-count 0}
+        (let [limit (preview-lines-for-tool tool-name)]
+          (if (<= total limit)
+            {:lines lines :hidden? false :bash-tail? false :hidden-count 0}
+            (if (= "bash" tool-name)
+              {:lines (vec (take-last limit lines))
+               :hidden? true
+               :bash-tail? true
+               :hidden-count (- total limit)}
+              {:lines (vec (take limit lines))
+               :hidden? true
+               :bash-tail? false
+               :hidden-count (- total limit)})))))))
+
+(defn- detail-warning-lines
+  [details]
+  (let [truncation (or (:truncation details)
+                       (get details "truncation"))
+        full-output-path (or (:full-output-path details)
+                             (:fullOutputPath details)
+                             (get details "full-output-path")
+                             (get details "fullOutputPath"))
+        entry-limit (or (:entry-limit-reached details)
+                        (:entryLimitReached details)
+                        (get details "entry-limit-reached")
+                        (get details "entryLimitReached"))
+        result-limit (or (:result-limit-reached details)
+                         (:resultLimitReached details)
+                         (get details "result-limit-reached")
+                         (get details "resultLimitReached"))
+        match-limit (or (:match-limit-reached details)
+                        (:matchLimitReached details)
+                        (get details "match-limit-reached")
+                        (get details "matchLimitReached"))
+        lines-truncated? (boolean (or (:lines-truncated details)
+                                      (:linesTruncated details)
+                                      (get details "lines-truncated")
+                                      (get details "linesTruncated")))]
+    (cond-> []
+      (and (map? truncation) (:truncated truncation))
+      (conj (str "Truncated output"
+                 (when-let [by (:truncated-by truncation)]
+                   (str " (" by ")"))))
+
+      full-output-path
+      (conj (str "Full output: " full-output-path))
+
+      entry-limit
+      (conj (str "Entry limit reached: " entry-limit))
+
+      result-limit
+      (conj (str "Result limit reached: " result-limit))
+
+      match-limit
+      (conj (str "Match limit reached: " match-limit))
+
+      lines-truncated?
+      (conj "Long lines truncated"))))
+
 (defn- render-tool-calls
   "Render all tool calls for the current turn.
    `width` is the terminal column count."
-  [tool-calls tool-order spinner-char width]
+  [tool-calls tool-order spinner-char width tools-expanded?]
   (when (seq tool-order)
     (let [;; "  ✓ " prefix = 4 visible cols for header
           header-avail (when (and width (> width 4))
@@ -1445,35 +1562,50 @@
        (for [id tool-order
              :let [tc (get tool-calls id)]
              :when tc]
-         (let [status-icon (tool-status-indicator
-                            (:status tc) spinner-char)
-               header      (tool-header (:name tc)
-                                        (:parsed-args tc)
-                                        (:args tc))
-               header      (if header-avail
-                             (ansi/truncate-to-width
-                              header header-avail)
-                             header)
-               result      (truncate-result
-                            (:result tc)
-                            tool-result-preview-lines)
-               result-style (if (:is-error tc)
-                              tool-err-style
-                              tool-dim-style)]
+         (let [status-icon   (tool-status-indicator
+                              (:status tc) spinner-char)
+               header        (tool-header (:name tc)
+                                          (:parsed-args tc)
+                                          (:args tc))
+               header        (if header-avail
+                               (ansi/truncate-to-width
+                                header header-avail)
+                               header)
+               expanded?     (tool-expanded? tools-expanded? tc)
+               raw-result    (or (:result tc)
+                                 (tool-content->text (:content tc)))
+               {:keys [lines hidden? bash-tail? hidden-count]}
+               (or (tool-preview (:name tc) raw-result expanded?)
+                   {:lines [] :hidden? false :bash-tail? false :hidden-count 0})
+               hint-line      (when hidden?
+                                (if bash-tail?
+                                  (str "… (" hidden-count " earlier lines hidden, ctrl+o to expand)")
+                                  (str "… (" hidden-count " more lines, ctrl+o to expand)")))
+               warning-lines  (into [] (concat (detail-warning-lines (:details tc))
+                                               (when hint-line [hint-line])))
+               result-style   (if (:is-error tc)
+                                tool-err-style
+                                tool-dim-style)]
            (str "  " status-icon " " header
-                (when result
+                (when (or (seq lines) (seq warning-lines))
                   (str "\n"
                        (str/join
                         "\n"
-                        (mapcat
-                         (fn [line]
-                           (let [wrapped (wrap-tool-result-line
-                                          line result-avail)]
-                             (map #(str "    "
-                                        (charm/render
-                                         result-style %))
-                                  wrapped)))
-                         (str/split-lines result))))))))))))
+                        (concat
+                         (mapcat
+                          (fn [line]
+                            (let [wrapped (wrap-tool-result-line line result-avail)]
+                              (map #(str "    "
+                                         (charm/render result-style %))
+                                   wrapped)))
+                          lines)
+                         (mapcat
+                          (fn [line]
+                            (let [wrapped (wrap-tool-result-line line result-avail)]
+                              (map #(str "    "
+                                         (charm/render dim-style %))
+                                   wrapped)))
+                          warning-lines))))))))))))
 
 (defn- render-stream-text
   "Render accumulated streaming text from the LLM
@@ -1495,7 +1627,7 @@
   [state]
   (let [{:keys [messages phase error input spinner-frame model-name
                 prompt-templates skills extension-summary ui-state-atom
-                stream-text tool-calls tool-order
+                stream-text tool-calls tool-order tools-expanded?
                 session-selector current-session-file width force-clear?]} state
         spinner-char   (nth spinner-frames (mod spinner-frame (count spinner-frames)))
         dialog-active? (has-active-dialog? state)
@@ -1528,7 +1660,7 @@
             (when (= :streaming phase)
               (if has-progress?
                 (str (render-stream-text stream-text term-width)
-                     (render-tool-calls tool-calls tool-order spinner-char term-width)
+                     (render-tool-calls tool-calls tool-order spinner-char term-width tools-expanded?)
                      "\n")
                 (str "\n" (charm/render assist-style "ψ: ")
                      spinner-char " thinking…\n")))

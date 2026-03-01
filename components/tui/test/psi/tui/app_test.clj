@@ -425,6 +425,136 @@ clojure-lsp"}]})
       (is (str/includes? out "(waiting for response…)"))
       (is (not (str/includes? out "⠋ waiting for response…"))))))
 
+(deftest ctrl-o-toggles-tools-expanded-test
+  (testing "ctrl+o toggles global tools-expanded state"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state)
+          [s1 _]    (update-fn state (msg/key-press "o" :ctrl true))
+          [s2 _]    (update-fn s1 (msg/key-press "o" :ctrl true))]
+      (is (false? (:tools-expanded? state)))
+      (is (true? (:tools-expanded? s1)))
+      (is (false? (:tools-expanded? s2))))))
+
+(deftest tool-start-inherits-tools-expanded-test
+  (testing "new tool rows inherit current tools-expanded setting"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :tools-expanded? true)
+          [s1 _]    (update-fn state {:type :agent-event
+                                      :event-kind :tool-start
+                                      :tool-id "t1"
+                                      :tool-name "bash"})]
+      (is (true? (get-in s1 [:tool-calls "t1" :expanded?]))))))
+
+(deftest completed-tool-rows-are-retained-after-result-test
+  (testing "tool rows remain after final agent result"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (-> (init-state)
+                        (assoc :phase :streaming
+                               :tool-order ["t1"]
+                               :tool-calls {"t1" {:name "bash"
+                                                  :args "{\"command\":\"echo hi\"}"
+                                                  :status :success
+                                                  :result "ok"
+                                                  :is-error false}}))
+          result    {:role "assistant" :content [{:type :text :text "done"}]}
+          [s1 _]    (update-fn state {:type :agent-result :result result})]
+      (is (= :idle (:phase s1)))
+      (is (= ["t1"] (:tool-order s1)))
+      (is (= "ok" (get-in s1 [:tool-calls "t1" :result]))))))
+
+(deftest collapsed-tool-render-truncates-and-expanded-renders-full-test
+  (testing "tool rendering honors collapsed vs expanded modes"
+    (let [base-state (-> (init-state)
+                         (assoc :phase :streaming
+                                :stream-text ""
+                                :tool-order ["t1"]
+                                :tool-calls {"t1" {:name "read"
+                                                   :args "{\"path\":\"foo.txt\"}"
+                                                   :status :success
+                                                   :result (str/join "\n" (map str (range 1 13)))
+                                                   :is-error false
+                                                   :expanded? false}}))
+          collapsed (app/view base-state)
+          expanded  (app/view (assoc base-state :tools-expanded? true))]
+      (is (str/includes? collapsed "… (2 more lines, ctrl+o to expand)"))
+      (is (not (str/includes? expanded "ctrl+o to expand")))
+      (is (str/includes? expanded "12")))))
+
+(deftest bash-collapsed-renders-tail-preview-test
+  (testing "bash collapsed mode shows tail with earlier-lines hint"
+    (let [state (-> (init-state)
+                    (assoc :phase :streaming
+                           :stream-text ""
+                           :tool-order ["t1"]
+                           :tool-calls {"t1" {:name "bash"
+                                              :args "{\"command\":\"echo hi\"}"
+                                              :status :success
+                                              :result "1\n2\n3\n4\n5\n6\n7"
+                                              :is-error false}}))
+          out   (app/view state)]
+      (is (str/includes? out "7"))
+      (is (nil? (re-find #"(?m)^\s+1$" out)))
+      (is (str/includes? out "earlier lines hidden, ctrl+o to expand")))))
+
+(deftest tool-details-warnings-are-rendered-test
+  (testing "tool details metadata appears in warning lines"
+    (let [state (-> (init-state)
+                    (assoc :phase :streaming
+                           :stream-text ""
+                           :tool-order ["t1"]
+                           :tool-calls {"t1" {:name "grep"
+                                              :args "{\"pattern\":\"foo\"}"
+                                              :status :success
+                                              :result "a.clj:1:foo"
+                                              :details {:truncation {:truncated true :truncated-by :bytes}
+                                                        :full-output-path "/tmp/full.log"
+                                                        :match-limit-reached 100
+                                                        :lines-truncated true}
+                                              :is-error false}}))
+          out   (app/view state)]
+      (is (str/includes? out "Truncated output"))
+      (is (str/includes? out "Full output: /tmp/full.log"))
+      (is (str/includes? out "Match limit reached: 100"))
+      (is (str/includes? out "Long lines truncated")))))
+
+(deftest tool-result-event-preserves-content-and-details-test
+  (testing "tool-result event stores structured content/details for rendering"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          base      (-> (init-state)
+                        (assoc :phase :streaming)
+                        (assoc :tool-order ["t1"]
+                               :tool-calls {"t1" {:name "bash" :status :running}}))
+          event     {:type :agent-event
+                     :event-kind :tool-result
+                     :tool-id "t1"
+                     :content [{:type :text :text "ok"}
+                               {:type :image :mime-type "image/png" :data "abc"}]
+                     :details {:full-output-path "/tmp/all.log"}
+                     :is-error false}
+          [s1 _]    (update-fn base event)]
+      (is (= "ok" (get-in s1 [:tool-calls "t1" :result])))
+      (is (= [{:type :text :text "ok"}
+              {:type :image :mime-type "image/png" :data "abc"}]
+             (get-in s1 [:tool-calls "t1" :content])))
+      (is (= {:full-output-path "/tmp/all.log"}
+             (get-in s1 [:tool-calls "t1" :details]))))))
+
+(deftest non-text-content-fallback-is-safe-test
+  (testing "non-text/unknown content blocks render safe fallback"
+    (let [state (-> (init-state)
+                    (assoc :phase :streaming
+                           :stream-text ""
+                           :tool-order ["t1"]
+                           :tool-calls {"t1" {:name "write"
+                                              :args "{\"path\":\"/tmp/x\"}"
+                                              :status :success
+                                              :content [{:type :image :mime-type "image/png" :data "abc"}
+                                                        {:type :custom :payload "x"}]
+                                              :is-error false}}))
+          out   (app/view state)]
+      (is (str/includes? out "[image image/png]"))
+      (is (str/includes? out "[unsupported content block: custom]")))))
+
 (deftest view-shows-error-test
   (testing "view shows error message"
     (let [state (assoc (init-state) :error "something broke")]
