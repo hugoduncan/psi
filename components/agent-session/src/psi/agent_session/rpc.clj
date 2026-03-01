@@ -8,7 +8,11 @@
    - protocol-only stdout (handler diagnostics are rebound to stderr)"
   (:require
    [clojure.edn :as edn]
-   [clojure.string :as str]))
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [psi.agent-core.core :as agent]
+   [psi.agent-session.core :as session]
+   [psi.ai.models :as ai-models]))
 
 (def protocol-version "1.0")
 (def ^:private default-max-pending-requests 64)
@@ -19,6 +23,31 @@
 (def ^:private response-allowed-keys [:id :kind :op :ok :data])
 (def ^:private error-allowed-keys    [:kind :id :op :error-code :error-message :retryable :data])
 (def ^:private event-allowed-keys    [:kind :event :data :id :seq :ts])
+
+(def ^:private supported-rpc-ops
+  ["handshake"
+   "ping"
+   "query_eql"
+   "prompt"
+   "steer"
+   "follow_up"
+   "abort"
+   "new_session"
+   "switch_session"
+   "fork"
+   "set_session_name"
+   "set_model"
+   "cycle_model"
+   "set_thinking_level"
+   "cycle_thinking_level"
+   "compact"
+   "set_auto_compaction"
+   "set_auto_retry"
+   "get_state"
+   "get_messages"
+   "get_session_stats"
+   "subscribe"
+   "unsubscribe"])
 
 (defn response-frame
   ([id op ok]
@@ -110,7 +139,8 @@
       (error-frame {:id            (:id request)
                     :op            (:op request)
                     :error-code    "request/op-not-supported"
-                    :error-message (str "unsupported op: " op)}))))
+                    :error-message (str "unsupported op: " op)
+                    :data          {:supported-ops supported-rpc-ops}}))))
 
 (defn- valid-request-id? [id]
   (and (string? id) (not (str/blank? id))))
@@ -160,14 +190,17 @@
                      (str "unsupported protocol major: " (or major "unknown")))
 
       :else
-      (do
+      (let [server-info-fn (or (:handshake-server-info-fn @state)
+                               (fn [] {:protocol-version protocol-version}))
+            server-info    (merge {:protocol-version protocol-version}
+                                  (or (server-info-fn) {}))]
         (swap! state assoc
                :ready? true
                :negotiated-protocol-version protocol-version)
         (response-frame (:id request)
                         "handshake"
                         true
-                        {:server-info {:protocol-version protocol-version}})))))
+                        {:server-info server-info})))))
 
 (defn- accept-request!
   "Register a request as pending when valid and capacity allows.
@@ -240,6 +273,238 @@
                                          :error-message (or (ex-message t)
                                                             "unhandled runtime exception")}))))))))
 
+(defn- params-map
+  [request]
+  (let [params (:params request)]
+    (when-not (or (nil? params) (map? params))
+      (throw (ex-info "request :params must be a map"
+                      {:error-code "request/invalid-params"})))
+    (or params {})))
+
+(defn- req-arg!
+  [request params k pred desc]
+  (let [v (get params k)]
+    (when-not (pred v)
+      (throw (ex-info (str "invalid request parameter " k ": " desc)
+                      {:error-code "request/invalid-params"})))
+    v))
+
+(defn- parse-query-edn!
+  [query-str]
+  (let [q (try
+            (binding [*read-eval* false]
+              (edn/read-string query-str))
+            (catch Throwable _
+              (throw (ex-info "query must be valid EDN"
+                              {:error-code "request/invalid-query"}))))]
+    (when-not (vector? q)
+      (throw (ex-info "query must be an EDN vector"
+                      {:error-code "request/invalid-query"})))
+    q))
+
+(defn- normalize-provider [provider]
+  (cond
+    (keyword? provider) provider
+    (string? provider)  (keyword provider)
+    :else               nil))
+
+(defn- resolve-model
+  [provider model-id]
+  (let [provider* (normalize-provider provider)]
+    (some (fn [[_ model]]
+            (when (and (= provider* (:provider model))
+                       (= model-id (:id model)))
+              model))
+          ai-models/all-models)))
+
+(defn session->handshake-server-info
+  [ctx]
+  (let [sd (session/get-session-data-in ctx)]
+    {:protocol-version protocol-version
+     :features         #{"eql-graph" "eql-memory"}
+     :session-id       (:session-id sd)
+     :model-id         (get-in sd [:model :id])
+     :thinking-level   (some-> (:thinking-level sd) name)}))
+
+(defn- exception->error-frame
+  [request e]
+  (let [code    (or (:error-code (ex-data e))
+                    (when (= "Session is not idle" (ex-message e))
+                      "request/session-not-idle")
+                    "runtime/failed")
+        message (or (ex-message e) "runtime request failed")]
+    (error-frame {:id            (:id request)
+                  :op            (:op request)
+                  :error-code    code
+                  :error-message message})))
+
+(defn make-session-request-handler
+  "Create a canonical op router bound to an agent-session context.
+
+   Returned fn signature matches `run-stdio-loop!` request-handler:
+   (fn [request emit-frame! state] -> frame | [frame*] | nil)
+
+   Runtime state mutations used by this handler:
+   - :subscribed-topics (set of topic strings)"
+  [ctx]
+  (fn [request _emit! state]
+    (try
+      (let [op     (:op request)
+            params (params-map request)]
+        (case op
+          "ping"
+          (response-frame (:id request) "ping" true {:pong true :protocol-version protocol-version})
+
+          "query_eql"
+          (let [query-str (req-arg! request params :query #(and (string? %) (not (str/blank? %))) "non-empty EDN string")
+                q         (parse-query-edn! query-str)
+                result    (try
+                            (session/query-in ctx q)
+                            (catch Throwable e
+                              (throw (ex-info (or (ex-message e) "query execution failed")
+                                              {:error-code "runtime/query-failed"}
+                                              e))))]
+            (response-frame (:id request) op true {:result result}))
+
+          "prompt"
+          (let [message (req-arg! request params :message #(and (string? %) (not (str/blank? %))) "non-empty string")
+                images  (:images params)]
+            (if (seq images)
+              (session/prompt-in! ctx message images)
+              (session/prompt-in! ctx message))
+            (response-frame (:id request) op true {:accepted true}))
+
+          "steer"
+          (let [message (req-arg! request params :message #(and (string? %) (not (str/blank? %))) "non-empty string")]
+            (session/steer-in! ctx message)
+            (response-frame (:id request) op true {:accepted true}))
+
+          "follow_up"
+          (let [message (req-arg! request params :message #(and (string? %) (not (str/blank? %))) "non-empty string")]
+            (session/follow-up-in! ctx message)
+            (response-frame (:id request) op true {:accepted true}))
+
+          "abort"
+          (do
+            (session/abort-in! ctx)
+            (response-frame (:id request) op true {:accepted true}))
+
+          "new_session"
+          (let [sd (session/new-session-in! ctx)]
+            (response-frame (:id request) op true {:session-id (:session-id sd)
+                                                   :session-file (:session-file sd)}))
+
+          "switch_session"
+          (let [session-path (req-arg! request params :session-path #(and (string? %) (not (str/blank? %))) "non-empty path string")]
+            (when-not (.exists (io/file session-path))
+              (throw (ex-info "session file not found"
+                              {:error-code "request/not-found"})))
+            (let [sd (session/resume-session-in! ctx session-path)]
+              (response-frame (:id request) op true {:session-id (:session-id sd)
+                                                     :session-file (:session-file sd)})))
+
+          "fork"
+          (let [entry-id (req-arg! request params :entry-id #(and (string? %) (not (str/blank? %))) "non-empty entry id")
+                sd       (session/fork-session-in! ctx entry-id)]
+            (response-frame (:id request) op true {:session-id (:session-id sd)
+                                                   :session-file (:session-file sd)}))
+
+          "set_session_name"
+          (let [name (req-arg! request params :name #(and (string? %) (not (str/blank? %))) "non-empty string")
+                sd   (session/set-session-name-in! ctx name)]
+            (response-frame (:id request) op true {:session-name (:session-name sd)}))
+
+          "set_model"
+          (let [provider (req-arg! request params :provider #(or (keyword? %) (string? %)) "string or keyword")
+                model-id (req-arg! request params :model-id #(and (string? %) (not (str/blank? %))) "non-empty string")
+                resolved (resolve-model provider model-id)]
+            (when-not resolved
+              (throw (ex-info "unknown model"
+                              {:error-code "request/unknown-model"})))
+            (let [provider-str (name (:provider resolved))
+                  model       {:provider provider-str
+                               :id (:id resolved)
+                               :reasoning (:supports-reasoning resolved)}
+                  sd          (session/set-model-in! ctx model)]
+              (response-frame (:id request) op true {:model {:provider (:provider (:model sd))
+                                                             :id (:id (:model sd))}})))
+
+          "cycle_model"
+          (let [direction (case (:direction params)
+                            "prev" :backward
+                            "next" :forward
+                            :backward :backward
+                            :forward :forward
+                            :forward)
+                sd        (session/cycle-model-in! ctx direction)]
+            (response-frame (:id request) op true {:model (some-> (:model sd)
+                                                                  (select-keys [:provider :id]))}))
+
+          "set_thinking_level"
+          (let [level (req-arg! request params :level some? "keyword, string, or integer")
+                level* (cond
+                         (keyword? level) level
+                         (string? level)  (keyword level)
+                         :else            level)
+                sd    (session/set-thinking-level-in! ctx level*)]
+            (response-frame (:id request) op true {:thinking-level (:thinking-level sd)}))
+
+          "cycle_thinking_level"
+          (let [sd (session/cycle-thinking-level-in! ctx)]
+            (response-frame (:id request) op true {:thinking-level (:thinking-level sd)}))
+
+          "compact"
+          (let [result (session/manual-compact-in! ctx (:custom-instructions params))]
+            (response-frame (:id request) op true {:compacted (boolean result)
+                                                   :summary   result}))
+
+          "set_auto_compaction"
+          (let [enabled (req-arg! request params :enabled boolean? "boolean")
+                sd      (session/set-auto-compaction-in! ctx enabled)]
+            (response-frame (:id request) op true {:enabled (:auto-compaction-enabled sd)}))
+
+          "set_auto_retry"
+          (let [enabled (req-arg! request params :enabled boolean? "boolean")
+                sd      (session/set-auto-retry-in! ctx enabled)]
+            (response-frame (:id request) op true {:enabled (:auto-retry-enabled sd)}))
+
+          "get_state"
+          (response-frame (:id request) op true {:state (session/get-session-data-in ctx)})
+
+          "get_messages"
+          (response-frame (:id request) op true {:messages (:messages (agent/get-data-in (:agent-ctx ctx)))})
+
+          "get_session_stats"
+          (response-frame (:id request) op true {:stats (session/diagnostics-in ctx)})
+
+          "subscribe"
+          (let [topics  (or (:topics params) [])
+                _       (when-not (sequential? topics)
+                          (throw (ex-info "subscribe :topics must be sequential"
+                                          {:error-code "request/invalid-params"})))
+                topics* (->> topics (filter string?) set)]
+            (swap! state update :subscribed-topics (fnil into #{}) topics*)
+            (response-frame (:id request) op true {:subscribed (->> (:subscribed-topics @state) sort vec)}))
+
+          "unsubscribe"
+          (let [topics  (or (:topics params) [])
+                _       (when-not (sequential? topics)
+                          (throw (ex-info "unsubscribe :topics must be sequential"
+                                          {:error-code "request/invalid-params"})))
+                topics* (->> topics (filter string?) set)]
+            (if (seq topics*)
+              (swap! state update :subscribed-topics (fn [s] (apply disj (or s #{}) topics*)))
+              (swap! state assoc :subscribed-topics #{}))
+            (response-frame (:id request) op true {:subscribed (->> (:subscribed-topics @state) sort vec)}))
+
+          (error-frame {:id            (:id request)
+                        :op            op
+                        :error-code    "request/op-not-supported"
+                        :error-message (str "unsupported op: " op)
+                        :data          {:supported-ops supported-rpc-ops}})))
+      (catch Throwable e
+        (exception->error-frame request e)))))
+
 (defn run-stdio-loop!
   "Run an EDN-lines RPC loop.
 
@@ -265,7 +530,8 @@
         emit-frame! (make-frame-writer out)]
     (swap! state #(merge {:ready? false
                           :pending {}
-                          :max-pending-requests default-max-pending-requests}
+                          :max-pending-requests default-max-pending-requests
+                          :subscribed-topics #{}}
                          %
                          {:err err}))
     (let [emit-tracked! (make-tracked-emitter emit-frame! state)

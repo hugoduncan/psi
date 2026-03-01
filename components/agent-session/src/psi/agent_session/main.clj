@@ -698,6 +698,17 @@
 ;; -main
 ;; ============================================================
 
+(defn- run-rpc-edn-session!
+  "Run RPC EDN transport bound to a live AgentSession context."
+  []
+  (let [ctx (session/create-context)
+        state (atom {:handshake-server-info-fn (fn [] (rpc/session->handshake-server-info ctx))
+                     :subscribed-topics #{}})
+        request-handler (rpc/make-session-request-handler ctx)]
+    (reset! session-state {:ctx ctx})
+    (rpc/run-stdio-loop! {:request-handler request-handler
+                          :state state})))
+
 (defn -main
   "Entry point. Accepts optional --model <key>, --log-level <LEVEL>, --tui, --rpc-edn, --nrepl [port]."
   [& args]
@@ -711,7 +722,7 @@
     (try
       (cond
         rpc-edn?
-        (rpc/run-stdio-loop! {})
+        (run-rpc-edn-session!)
 
         tui?
         (run-tui-session model-key)

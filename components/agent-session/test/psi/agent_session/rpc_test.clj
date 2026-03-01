@@ -3,20 +3,25 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.core :as session]
    [psi.agent-session.rpc :as rpc]))
 
 (defn- run-loop
-  [input handler]
-  (let [out (java.io.StringWriter.)
-        err (java.io.StringWriter.)]
-    (rpc/run-stdio-loop! {:in              (java.io.StringReader. input)
-                          :out             out
-                          :err             err
-                          :request-handler handler})
-    {:out-lines (->> (str/split-lines (str out))
-                     (remove str/blank?)
-                     vec)
-     :err-text  (str err)}))
+  ([input handler]
+   (run-loop input handler (atom {})))
+  ([input handler state]
+   (let [out (java.io.StringWriter.)
+         err (java.io.StringWriter.)]
+     (rpc/run-stdio-loop! {:in              (java.io.StringReader. input)
+                           :out             out
+                           :err             err
+                           :state           state
+                           :request-handler handler})
+     {:out-lines (->> (str/split-lines (str out))
+                      (remove str/blank?)
+                      vec)
+      :err-text  (str err)
+      :state     @state})))
 
 (defn- parse-frames [lines]
   (mapv edn/read-string lines))
@@ -109,50 +114,121 @@
 
 (deftest run-stdio-loop-pending-lifecycle-test
   (testing "accepted request adds pending and terminal response clears it"
-    (let [state (atom {:max-pending-requests 2})
-          out   (java.io.StringWriter.)
-          err   (java.io.StringWriter.)]
-      (rpc/run-stdio-loop!
-       {:in (java.io.StringReader.
-             (str "{:id \"h\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                  "{:id \"r1\" :kind :request :op \"echo\"}\n"))
-        :out out
-        :err err
-        :state state
-        :request-handler
-        (fn [request _emit _state]
-          (if (= "echo" (:op request))
-            (rpc/response-frame (:id request) "echo" true {:ok true})
-            (rpc/response-frame (:id request) (:op request) true {})))})
+    (let [state (atom {:max-pending-requests 2})]
+      (run-loop (str "{:id \"h\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                     "{:id \"r1\" :kind :request :op \"echo\"}\n")
+                (fn [request _emit _state]
+                  (if (= "echo" (:op request))
+                    (rpc/response-frame (:id request) "echo" true {:ok true})
+                    (rpc/response-frame (:id request) (:op request) true {})))
+                state)
       (is (= {} (:pending @state)))
       (is (= true (:ready? @state)))))
 
   (testing "max pending guard returns canonical error"
     (let [state (atom {:max-pending-requests 1 :ready? true :pending {"existing" "op"}})
-          out   (java.io.StringWriter.)
-          err   (java.io.StringWriter.)]
-      (rpc/run-stdio-loop!
-       {:in (java.io.StringReader. "{:id \"r2\" :kind :request :op \"echo\"}\n")
-        :out out
-        :err err
-        :state state
-        :request-handler (fn [_ _ _] nil)})
-      (let [frame (-> out str str/split-lines first edn/read-string)]
-        (is (= :error (:kind frame)))
-        (is (= "transport/max-pending-exceeded" (:error-code frame)))
-        (is (= "r2" (:id frame))))))
+          {:keys [out-lines]} (run-loop "{:id \"r2\" :kind :request :op \"echo\"}\n"
+                                        (fn [_ _ _] nil)
+                                        state)
+          frame (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "transport/max-pending-exceeded" (:error-code frame)))
+      (is (= "r2" (:id frame)))))
 
   (testing "duplicate request id is rejected with request/invalid-id"
     (let [state (atom {:ready? true :pending {"dup" "existing-op"}})
-          out   (java.io.StringWriter.)
-          err   (java.io.StringWriter.)]
-      (rpc/run-stdio-loop!
-       {:in (java.io.StringReader. "{:id \"dup\" :kind :request :op \"echo\"}\n")
-        :out out
-        :err err
-        :state state
-        :request-handler (fn [_ _ _] nil)})
-      (let [frame (-> out str str/split-lines first edn/read-string)]
-        (is (= :error (:kind frame)))
-        (is (= "request/invalid-id" (:error-code frame)))
-        (is (= "dup" (:id frame)))))))
+          {:keys [out-lines]} (run-loop "{:id \"dup\" :kind :request :op \"echo\"}\n"
+                                        (fn [_ _ _] nil)
+                                        state)
+          frame (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "request/invalid-id" (:error-code frame)))
+      (is (= "dup" (:id frame))))))
+
+(deftest session-request-handler-query-eql-and-op-mapping-test
+  (testing "query_eql routes to session/query-in and returns canonical result envelope"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"q1\" :kind :request :op \"query_eql\" :params {:query \"[:psi.graph/domain-coverage :psi.memory/status]\"}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :response (:kind frame)))
+      (is (= "query_eql" (:op frame)))
+      (is (= true (:ok frame)))
+      (is (map? (get-in frame [:data :result])))
+      (is (contains? (get-in frame [:data :result]) :psi.graph/domain-coverage))
+      (is (contains? (get-in frame [:data :result]) :psi.memory/status))))
+
+  (testing "query_eql invalid query EDN returns request/invalid-query"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"q2\" :kind :request :op \"query_eql\" :params {:query \"not-edn\"}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "query_eql" (:op frame)))
+      (is (= "request/invalid-query" (:error-code frame)))))
+
+  (testing "query_eql non-vector query returns request/invalid-query"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"q3\" :kind :request :op \"query_eql\" :params {:query \"{:a 1}\"}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "request/invalid-query" (:error-code frame)))))
+
+  (testing "unknown op returns request/op-not-supported with supported ops"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"u1\" :kind :request :op \"nope\"}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "request/op-not-supported" (:error-code frame)))
+      (is (vector? (get-in frame [:data :supported-ops])))))
+
+  (testing "subscribe/unsubscribe update shared state and return subscribed topics"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {} :subscribed-topics #{}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines state]}
+          (run-loop (str "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/delta\" \"tool/start\"]}}\n"
+                         "{:id \"s2\" :kind :request :op \"unsubscribe\" :params {:topics [\"tool/start\"]}}\n")
+                    handler
+                    state)
+          [f1 f2] (parse-frames out-lines)]
+      (is (= :response (:kind f1)))
+      (is (= ["assistant/delta" "tool/start"] (get-in f1 [:data :subscribed])))
+      (is (= :response (:kind f2)))
+      (is (= ["assistant/delta"] (get-in f2 [:data :subscribed])))
+      (is (= #{"assistant/delta"} (:subscribed-topics state))))))
+
+(deftest rpc-handshake-server-info-test
+  (testing "handshake emits server-info with protocol/session metadata"
+    (let [ctx     (session/create-context)
+          state   (atom {:handshake-server-info-fn (fn [] (rpc/session->handshake-server-info ctx))})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)
+          info    (get-in frame [:data :server-info])]
+      (is (= :response (:kind frame)))
+      (is (= "handshake" (:op frame)))
+      (is (= "1.0" (:protocol-version info)))
+      (is (contains? info :session-id))
+      (is (= #{"eql-graph" "eql-memory"} (:features info))))))
