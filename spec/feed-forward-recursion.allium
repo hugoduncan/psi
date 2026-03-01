@@ -250,6 +250,11 @@ config {
         "manual", "session_end", "graph_changed", "memory_updated", "verification_failed"
     }
 
+    -- Internal manual-trigger prompt definition (spec-owned, not external).
+    internal_manual_trigger_prompt_name: String = "feed-forward-manual-trigger"
+    internal_manual_trigger_prompt: String =
+        "Trigger a manual feed-forward cycle. Capture operator reason and current readiness context."
+
     required_recursion_eql_attrs: Set<String> = {
         ":psi.recursion/status",
         ":psi.recursion/paused?",
@@ -600,7 +605,26 @@ surface FeedForwardControlApi {
         graph/CapabilityGraphApi(ActiveCapabilityGraph())
 }
 
+surface FeedForwardManualTriggerApi {
+    -- Explicit manual-trigger surface for operator-initiated feed-forward cycles.
+    for operator: FeedForwardOperator
+
+    context controller: FeedForwardController
+
+    provides:
+        TriggerFeedForward(operator, reason)
+            when controller.canStartCycle
+            when "manual" in config.enabled_trigger_hooks
+
+    guidance:
+        -- Emits TriggerSignal.type = manual.
+        -- Prompt name: config.internal_manual_trigger_prompt_name
+        -- Prompt body: config.internal_manual_trigger_prompt
+        -- This prompt is internally defined by this spec (not an external /template).
+}
+
 -- Resolved: Step 11 uses explicit/manual + event-driven hooks (no periodic cadence).
 -- Hook activation is controlled by config.enabled_trigger_hooks.
 -- Resolved: manual approval remains default; low-risk auto-approval is opt-in
 -- via trusted_local_mode_enabled + auto_approve_low_risk_in_trusted_local_mode.
+-- Manual-trigger prompt note: internal prompt "feed-forward-manual-trigger" (spec-defined).
