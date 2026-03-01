@@ -431,7 +431,8 @@
    `opts` map:
      :cwd                  — working directory string (for /resume)
      :current-session-file — current session file path (highlighted in selector)
-     :resume-fn!           — (fn [session-path]) called when user selects a session
+     :resume-fn!           — (fn [session-path]) called when user selects a session;
+                              returns {:messages [...], :tool-calls {...}, :tool-order [...]}
      :dispatch-fn          — (fn [text]) → command result map or nil; central command dispatch
      :event-queue          — shared LinkedBlockingQueue for agent + extension events"
   ([model-name] (make-init model-name nil))
@@ -595,19 +596,24 @@
       (let [filtered (selector-filtered sel)
             chosen   (nth filtered (:selected sel) nil)]
         (if chosen
-          (let [path      (:path chosen)
-                resume-fn (:resume-fn! state)
-                ;; resume-fn! returns [{:role :user/:assistant :text "..."}...]
-                ;; or nil if it fails
-                restored  (when resume-fn (resume-fn path))
-                new-state (-> state
-                              (assoc :phase            :idle
-                                     :session-selector nil
-                                     :current-session-file path
-                                     :messages         (or restored [])
-                                     :stream-text      nil
-                                     :tool-calls       {}
-                                     :tool-order       []))]
+          (let [path         (:path chosen)
+                resume-fn    (:resume-fn! state)
+                ;; resume-fn! returns {:messages [...]
+                ;;                      :tool-calls {...}
+                ;;                      :tool-order [...]}.
+                ;; Fallback keeps older callback shape ([{:role ... :text ...} ...]).
+                restored     (when resume-fn (resume-fn path))
+                restored-msgs (if (map? restored) (:messages restored) restored)
+                restored-tool-calls (if (map? restored) (:tool-calls restored) nil)
+                restored-tool-order (if (map? restored) (:tool-order restored) nil)
+                new-state    (-> state
+                                 (assoc :phase            :idle
+                                        :session-selector nil
+                                        :current-session-file path
+                                        :messages         (or restored-msgs [])
+                                        :stream-text      nil
+                                        :tool-calls       (or restored-tool-calls {})
+                                        :tool-order       (or restored-tool-order [])))]
             [new-state nil])
           ;; Nothing selected — just close
           [(assoc state :phase :idle :session-selector nil) nil]))
@@ -1748,7 +1754,10 @@
                        :ui-state-atom       — extension UI state atom
                        :cwd                 — working directory for /resume filtering
                        :current-session-file — current session file path for highlight
-                       :resume-fn!          — (fn [session-path]) => [{:role :user/:assistant :text ...}]
+                       :resume-fn!          — (fn [session-path]) =>
+                                              {:messages [...]
+                                               :tool-calls {...}
+                                               :tool-order [...]}
                        :alt-screen          — true/false (default true)"
   ([model-name run-agent-fn!]
    (start! model-name run-agent-fn! {}))

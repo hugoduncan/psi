@@ -186,8 +186,15 @@
 (deftest resume-selection-restores-messages-test
   (testing "selecting a session calls resume-fn! and loads returned messages"
     (let [selected-path (atom nil)
-          restored      [{:role :user :text "restored user"}
-                         {:role :assistant :text "restored assistant"}]]
+          restored      {:messages [{:role :user :text "restored user"}
+                                    {:role :assistant :text "restored assistant"}]
+                         :tool-calls {"t1" {:name "read"
+                                             :args "{\"path\":\"foo.txt\"}"
+                                             :status :success
+                                             :result "ok"
+                                             :is-error false
+                                             :expanded? false}}
+                         :tool-order ["t1"]}]
       (with-redefs [persist/session-dir-for (fn [_cwd] "/tmp/psi-test")
                     persist/list-sessions
                     (fn [_dir]
@@ -207,7 +214,9 @@
               [s1 _]    (update-fn typed (msg/key-press :enter))
               [s2 _]    (update-fn s1 (msg/key-press :enter))]
           (is (= :idle (:phase s2)))
-          (is (= restored (:messages s2)))
+          (is (= (:messages restored) (:messages s2)))
+          (is (= (:tool-order restored) (:tool-order s2)))
+          (is (= "ok" (get-in s2 [:tool-calls "t1" :result])))
           (is (= "/tmp/psi-test/a.ndedn" @selected-path))
           (is (= "/tmp/psi-test/a.ndedn" (:current-session-file s2))))))))
 

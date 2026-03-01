@@ -10,6 +10,7 @@
    [psi.agent-session.prompt-templates :as pt]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.system-prompt :as sys-prompt]
+   [psi.agent-session.executor :as executor]
    [psi.tui.app :as tui-app]))
 
 (deftest select-login-provider-test
@@ -107,3 +108,32 @@
         (is (fn? (:dispatch-fn @captured))))
       (finally
         (reset! main/session-state orig-state)))))
+
+(deftest agent-messages->tui-resume-state-rehydrates-tool-rows-test
+  (let [messages [{:role "user"
+                   :content [{:type :text :text "read file"}]}
+                  {:role "assistant"
+                   :content [{:type :text :text "Sure"}
+                             {:type :tool-call :id "call-1" :name "read"
+                              :arguments "{\"path\":\"a.txt\"}"}]}
+                  {:role "toolResult"
+                   :tool-call-id "call-1"
+                   :tool-name "read"
+                   :content [{:type :text :text "hello"}
+                             {:type :image :mime-type "image/png" :data "<base64>"}]
+                   :details {:full-output-path "/tmp/all.log"}
+                   :is-error false}
+                  {:role "assistant"
+                   :content [{:type :text :text "done"}]}]
+        {:keys [messages tool-calls tool-order]}
+        (#'main/agent-messages->tui-resume-state messages)]
+    (is (= [{:role :user :text "read file"}
+            {:role :assistant :text "Sure"}
+            {:role :assistant :text "done"}]
+           messages))
+    (is (= ["call-1"] tool-order))
+    (is (= "read" (get-in tool-calls ["call-1" :name])))
+    (is (= :success (get-in tool-calls ["call-1" :status])))
+    (is (= "hello" (get-in tool-calls ["call-1" :result])))
+    (is (= {:full-output-path "/tmp/all.log"}
+           (get-in tool-calls ["call-1" :details])))))

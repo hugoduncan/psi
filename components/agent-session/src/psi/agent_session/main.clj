@@ -222,22 +222,81 @@
       :else
       "")))
 
-(defn- agent-messages->tui-messages
-  "Convert agent-core history to TUI display messages.
-   Keeps user/assistant roles, skips toolResult messages."
+(defn- tool-result->display-text
+  "Best-effort display text for a toolResult message content vector."
+  [msg]
+  (let [text (message->display-text msg)]
+    (when-not (str/blank? text)
+      text)))
+
+(defn- agent-messages->tui-resume-state
+  "Convert agent-core history to TUI resume state.
+   Returns {:messages [...], :tool-calls {...}, :tool-order [...]}.
+   Tool rows are reconstructed by correlating assistant tool-call blocks
+   with toolResult messages by tool-call-id."
   [messages]
-  (->> messages
-       (keep (fn [msg]
-               (when-let [role (case (:role msg)
-                                 "user"      :user
-                                 "assistant" :assistant
-                                 nil)]
-                 (let [text (message->display-text msg)]
-                   {:role role
-                    :text (if (str/blank? text)
-                            (str "[" (:role msg) "]")
-                            text)}))))
-       vec))
+  (reduce
+   (fn [{:keys [messages tool-calls tool-order] :as acc} msg]
+     (case (:role msg)
+       "user"
+       (let [text (message->display-text msg)]
+         (update acc :messages conj {:role :user
+                                     :text (if (str/blank? text) "[user]" text)}))
+
+       "assistant"
+       (let [text (message->display-text msg)
+             content (:content msg)
+             tool-blocks (filter #(= :tool-call (:type %)) content)
+             acc' (if (str/blank? text)
+                    acc
+                    (update acc :messages conj {:role :assistant :text text}))]
+         (reduce
+          (fn [a block]
+            (let [id (:id block)
+                  tc {:name      (:name block)
+                      :args      (or (:arguments block) "")
+                      :status    :pending
+                      :result    nil
+                      :is-error  false
+                      :expanded? false}]
+              (-> a
+                  (update :tool-calls #(if (contains? % id) % (assoc % id tc)))
+                  (update :tool-order #(if (some #{id} %) % (conj % id))))))
+          acc'
+          tool-blocks))
+
+       "toolResult"
+       (let [id      (:tool-call-id msg)
+             text    (tool-result->display-text msg)
+             content (:content msg)
+             details (:details msg)
+             err?    (boolean (:is-error msg))
+             fallback {:name      (:tool-name msg)
+                       :args      ""
+                       :status    (if err? :error :success)
+                       :result    text
+                       :content   content
+                       :details   details
+                       :is-error  err?
+                       :expanded? false}]
+         (-> acc
+             (update :tool-calls
+                     (fn [m]
+                       (if-let [tc (get m id)]
+                         (assoc m id
+                                (-> tc
+                                    (assoc :status (if err? :error :success)
+                                           :content content
+                                           :details details
+                                           :is-error err?)
+                                    (cond-> text (assoc :result text))))
+                         (assoc m id fallback))))
+             (update :tool-order #(if (some #{id} %) % (conj % id)))))
+
+       ;; unknown roles — ignore
+       acc))
+   {:messages [] :tool-calls {} :tool-order []}
+   messages))
 
 ;; select-login-provider moved to psi.agent-session.commands
 
@@ -500,16 +559,18 @@
                                           :content [{:type :text :text text}]}}))
 
         ;; Resume callback used by the TUI /resume selector.
-        ;; Returns TUI message maps to display immediately after loading.
+        ;; Returns TUI resume state maps to display immediately after loading.
         resume-fn! (fn [session-path]
                      (try
                        (session/resume-session-in! ctx session-path)
                        (let [messages (:messages (agent/get-data-in (:agent-ctx ctx)))]
-                         (agent-messages->tui-messages messages))
+                         (agent-messages->tui-resume-state messages))
                        (catch Exception e
                          (timbre/error e "Resume failed:" session-path)
-                         [{:role :assistant
-                           :text (str "✗ Resume failed: " (ex-message e))}])))
+                         {:messages [{:role :assistant
+                                      :text (str "✗ Resume failed: " (ex-message e))}]
+                          :tool-calls {}
+                          :tool-order []})))
 
         cmd-opts  {:oauth-ctx oauth-ctx :ai-model ai-model}
 
