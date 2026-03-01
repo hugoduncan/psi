@@ -332,12 +332,44 @@
   [s]
   (count (.getBytes (str (or s "")) "UTF-8")))
 
+(defn- tool-content->text
+  [content]
+  (cond
+    (string? content)
+    content
+
+    (sequential? content)
+    (->> content
+         (keep (fn [block]
+                 (when (= :text (:type block))
+                   (:text block))))
+         (str/join "\n"))
+
+    :else
+    (str (or content ""))))
+
+(defn- normalize-tool-content
+  [content]
+  (cond
+    (sequential? content)
+    (vec content)
+
+    (string? content)
+    [{:type :text :text content}]
+
+    (nil? content)
+    [{:type :text :text ""}]
+
+    :else
+    [{:type :text :text (str content)}]))
+
 (defn- record-tool-output-stat!
   [agent-session-ctx {:keys [tool-call-id tool-name content details effective-policy]}]
   (let [truncation          (:truncation details)
         limit-hit?          (boolean (:truncated truncation))
         truncated-by        (or (:truncated-by truncation) :none)
-        output-bytes        (utf8-bytes content)
+        content-text        (tool-content->text content)
+        output-bytes        (utf8-bytes content-text)
         context-bytes-added output-bytes
         stat                {:tool-call-id         tool-call-id
                              :tool-name            tool-name
@@ -361,13 +393,18 @@
   "Execute a tool by name, preferring an :execute fn from the current
    agent tool registry when present. Falls back to built-in tools.
 
-   Tool contract: (fn [args-map] -> {:content string :is-error boolean})"
-  [agent-ctx tool-name args]
-  (let [tool-def (some #(when (= tool-name (:name %)) %) (:tools (agent/get-data-in agent-ctx)))
+   Tool contract:
+   - preferred: (fn [args-map opts-map] -> {:content string|blocks :is-error boolean})
+   - legacy:    (fn [args-map] -> {:content string|blocks :is-error boolean})"
+  [agent-ctx tool-name args opts]
+  (let [tool-def   (some #(when (= tool-name (:name %)) %) (:tools (agent/get-data-in agent-ctx)))
         execute-fn (:execute tool-def)]
     (if (fn? execute-fn)
-      (execute-fn args)
-      (tools/execute-tool tool-name args))))
+      (try
+        (execute-fn args opts)
+        (catch clojure.lang.ArityException _
+          (execute-fn args)))
+      (tools/execute-tool tool-name args opts))))
 
 (defn- run-tool-call!
   "Execute one tool call, record the result in agent-core, return the result map."
@@ -375,7 +412,21 @@
   (let [agent-ctx (:agent-ctx agent-session-ctx)
         call-id  (:id tool-call)
         name     (:name tool-call)
-        args     (parse-args (:arguments tool-call))]
+        args     (parse-args (:arguments tool-call))
+        opts     {:cwd         (:cwd agent-session-ctx)
+                  :overrides   (:tool-output-overrides @(:session-data-atom agent-session-ctx))
+                  :tool-call-id call-id
+                  :on-update   (fn [{:keys [content details is-error]}]
+                                 (let [content-blocks (normalize-tool-content content)
+                                       text-fallback  (tool-content->text content)]
+                                   (emit-progress! progress-queue
+                                                   {:event-kind   :tool-execution-update
+                                                    :tool-id      call-id
+                                                    :tool-name    name
+                                                    :content      content-blocks
+                                                    :result-text  text-fallback
+                                                    :details      details
+                                                    :is-error     (boolean is-error)})))}]
     (agent/emit-tool-start-in! agent-ctx tool-call)
     (emit-progress! progress-queue
                     {:event-kind  :tool-executing
@@ -384,33 +435,35 @@
                      :parsed-args args})
     (let [{:keys [content is-error details] :as tool-result}
           (try
-            (execute-tool-with-registry agent-ctx name args)
+            (execute-tool-with-registry agent-ctx name args opts)
             (catch Exception e
               {:content  (str "Error: " (ex-message e))
                :is-error true}))
+          content-blocks (normalize-tool-content content)
+          text-fallback  (tool-content->text content)
           policy         (effective-tool-output-policy agent-session-ctx name)
-          content-blocks (if (vector? content)
-                           content
-                           [{:type :text :text content}])
           result-msg     {:role         "toolResult"
                           :tool-call-id call-id
                           :tool-name    name
                           :content      content-blocks
                           :is-error     is-error
                           :details      details
+                          :result-text  text-fallback
                           :timestamp    (java.time.Instant/now)}]
       (emit-progress! progress-queue
                       {:event-kind  :tool-result
                        :tool-id     call-id
                        :tool-name   name
-                       :result-text content
+                       :content     content-blocks
+                       :result-text text-fallback
+                       :details     details
                        :is-error    is-error})
       (record-tool-output-stat!
        agent-session-ctx
-       {:tool-call-id    call-id
-        :tool-name       name
-        :content         content
-        :details         details
+       {:tool-call-id     call-id
+        :tool-name        name
+        :content          content
+        :details          details
         :effective-policy policy})
       (agent/emit-tool-end-in! agent-ctx tool-call tool-result is-error)
       (agent/record-tool-result-in! agent-ctx result-msg)

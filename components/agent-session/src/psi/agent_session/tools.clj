@@ -441,11 +441,16 @@
                              truncated?
                              (str "\n\n... [truncated, " (:total-lines trunc)
                                   " total lines] Full output: " spill-path))]
-             {:content  content
-              :is-error non-zero?
-              :details  (when truncated?
-                          {:truncation       trunc
-                           :full-output-path spill-path})})))
+             (let [result {:content  content
+                           :is-error non-zero?
+                           :details  (when truncated?
+                                       {:truncation       trunc
+                                        :full-output-path spill-path})}]
+               (when on-update
+                 (try
+                   (on-update result)
+                   (catch Exception _ nil)))
+               result))))
        (catch Exception e
          (reset! bash-process-atom nil)
          {:content  (str "Command execution error: " (ex-message e))
@@ -851,17 +856,19 @@
   #{"read" "bash" "edit" "write" "ls" "find" "grep"})
 
 (defn execute-tool
-  "Dispatch a tool call by name. Returns {:content string :is-error boolean}.
+  "Dispatch a tool call by name. Returns {:content string|blocks :is-error boolean}.
   Throws ex-info for unknown tools.
   Note: eql_query is not dispatched here — it requires a session context
   and is handled via the tool registry's :execute fn."
-  [tool-name args-map]
-  (case tool-name
-    "read"  (execute-read args-map)
-    "bash"  (execute-bash args-map)
-    "edit"  (execute-edit args-map)
-    "write" (execute-write args-map)
-    "ls"    (execute-ls args-map)
-    "find"  (execute-find args-map)
-    "grep"  (execute-grep args-map)
-    (throw (ex-info (str "Unknown tool: " tool-name) {:tool tool-name}))))
+  ([tool-name args-map]
+   (execute-tool tool-name args-map nil))
+  ([tool-name args-map opts]
+   (case tool-name
+     "read"  (execute-read args-map opts)
+     "bash"  (execute-bash args-map opts)
+     "edit"  (execute-edit args-map opts)
+     "write" (execute-write args-map opts)
+     "ls"    (execute-ls args-map opts)
+     "find"  (execute-find args-map opts)
+     "grep"  (execute-grep args-map opts)
+     (throw (ex-info (str "Unknown tool: " tool-name) {:tool tool-name})))))

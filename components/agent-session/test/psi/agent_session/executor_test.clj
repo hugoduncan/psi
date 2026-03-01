@@ -7,7 +7,9 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
    [psi.agent-session.executor :as executor]
-   [psi.agent-session.turn-statechart :as turn-sc]))
+   [psi.agent-session.turn-statechart :as turn-sc])
+  (:import
+   [java.util.concurrent LinkedBlockingQueue TimeUnit]))
 
 (defn- stub-text-stream
   [text]
@@ -134,7 +136,7 @@
           session-ctx (setup-session-ctx! agent-ctx)
           tc          {:id "call-1" :name "bash" :arguments "{}"}]
       (with-redefs [psi.agent-session.executor/execute-tool-with-registry
-                    (fn [_ _ _]
+                    (fn [_ _ _ _]
                       {:content "trimmed"
                        :is-error false
                        :details {:truncation {:truncated true :truncated-by :bytes}}})]
@@ -159,7 +161,7 @@
           raw         (apply str (repeat 1000 "x"))
           shaped      (subs raw 0 20)]
       (with-redefs [psi.agent-session.executor/execute-tool-with-registry
-                    (fn [_ _ _]
+                    (fn [_ _ _ _]
                       {:content shaped
                        :is-error false
                        :details {:truncation {:truncated true :truncated-by :bytes}}})]
@@ -167,37 +169,36 @@
         (let [call (first (:calls @(:tool-output-stats-atom session-ctx)))]
           (is (= (count (.getBytes shaped "UTF-8"))
                  (:context-bytes-added call)))
-          (is (= (:context-bytes-added call) (:output-bytes call))))))))
+          (is (= (:context-bytes-added call) (:output-bytes call)))))))
 
-(deftest run-tool-call-content-shaping-test
-  (testing "passes through vector content blocks unchanged"
-    (let [agent-ctx       (setup-agent-ctx!)
-          session-ctx     (setup-session-ctx! agent-ctx)
-          tc              {:id "call-v" :name "read" :arguments "{}"}
-          vector-content  [{:type :text :text "Found image"}
-                           {:type :image :source {:type :base64 :media-type "image/png" :data "abc123"}}]
-          result          (with-redefs [psi.agent-session.executor/execute-tool-with-registry
-                                        (fn [_ _ _]
-                                          {:content vector-content
-                                           :is-error false
-                                           :details {:truncation {:truncated false :truncated-by :none}}})]
-                            (#'psi.agent-session.executor/run-tool-call! session-ctx tc nil))
-          recorded-result (last (:messages (agent/get-data-in agent-ctx)))]
-      (is (= vector-content (:content result)))
-      (is (= vector-content (:content recorded-result)))))
-
-  (testing "wraps string content as a single text block"
-    (let [agent-ctx       (setup-agent-ctx!)
-          session-ctx     (setup-session-ctx! agent-ctx)
-          tc              {:id "call-s" :name "bash" :arguments "{}"}
-          string-content  "trimmed"
-          expected-blocks [{:type :text :text string-content}]
-          result          (with-redefs [psi.agent-session.executor/execute-tool-with-registry
-                                        (fn [_ _ _]
-                                          {:content string-content
-                                           :is-error false
-                                           :details {:truncation {:truncated false :truncated-by :none}}})]
-                            (#'psi.agent-session.executor/run-tool-call! session-ctx tc nil))
-          recorded-result (last (:messages (agent/get-data-in agent-ctx)))]
-      (is (= expected-blocks (:content result)))
-      (is (= expected-blocks (:content recorded-result))))))
+  (testing "structured content blocks are preserved and progress events include rich payload"
+    (let [agent-ctx   (setup-agent-ctx!)
+          session-ctx (setup-session-ctx! agent-ctx)
+          tc          {:id "call-3" :name "read" :arguments "{}"}
+          q           (LinkedBlockingQueue.)
+          blocks      [{:type :text :text "hello"}
+                       {:type :image :mime-type "image/png" :data "<base64>"}]
+          results     (atom nil)]
+      (with-redefs [psi.agent-session.executor/execute-tool-with-registry
+                    (fn [_ _ _ opts]
+                      ((:on-update opts) {:content "partial" :details {:phase :running}})
+                      {:content blocks
+                       :is-error false
+                       :details {:truncation {:truncated false}}})
+                    agent/record-tool-result-in!
+                    (fn [_ msg]
+                      (reset! results msg)
+                      nil)]
+        (#'psi.agent-session.executor/run-tool-call! session-ctx tc q)
+        (let [events   (loop [acc []]
+                         (if-let [e (.poll q 5 TimeUnit/MILLISECONDS)]
+                           (recur (conj acc e))
+                           acc))
+              update-e (some #(when (= :tool-execution-update (:event-kind %)) %) events)
+              result-e (some #(when (= :tool-result (:event-kind %)) %) events)]
+          (is (= blocks (:content @results)))
+          (is (= "hello" (:result-text @results)))
+          (is (= [{:type :text :text "partial"}] (:content update-e)))
+          (is (= "partial" (:result-text update-e)))
+          (is (= blocks (:content result-e)))
+          (is (= "hello" (:result-text result-e))))))))
