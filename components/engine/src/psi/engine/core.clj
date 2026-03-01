@@ -270,6 +270,22 @@
       (swap! ss assoc component-key ready?)
       @ss)))
 
+(defn set-evolution-stage-in!
+  "Set system evolution stage in `ctx`.
+   Stage must satisfy `evolution-stage-schema`."
+  [ctx stage]
+  (when-not (m/validate evolution-stage-schema stage)
+    (throw (ex-info "Invalid evolution stage"
+                    {:stage stage
+                     :validation-errors (explain-validation-error
+                                         evolution-stage-schema stage)})))
+  (let [ss (:system-state ctx)]
+    (when @ss
+      (swap! ss assoc
+             :evolution-stage stage
+             :last-updated (java.time.Instant/now))
+      @ss)))
+
 (defn system-has-interface-in?
   "Check if system in `ctx` has complete interface (engine + query ready)."
   [ctx]

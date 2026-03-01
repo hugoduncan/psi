@@ -38,9 +38,11 @@
      query-engine-detail-in        — single-engine diagnostics (ctx)
      query-agent-session-in        — EQL query over :psi.agent-session/* (ctx, q)"
   (:require
+   [psi.introspection.graph :as graph]
    [psi.introspection.resolvers :as resolvers]
    [psi.engine.core :as engine]
    [psi.query.core :as query]
+   [psi.query.registry :as registry]
    [psi.ai.core :as ai]
    [psi.history.resolvers :as history-resolvers]
    [psi.agent-session.core :as agent-session]
@@ -109,6 +111,35 @@
 ;; Context-aware helpers
 ;; ─────────────────────────────────────────────────────────────────────────────
 
+(defn reconcile-graph-readiness-in!
+  "Derive Step 7 graph readiness from computed graph shape and update engine state.
+
+   Ready gate:
+   - node-count > 0
+   - edge-count > 0
+
+   Stage semantics:
+   - ready => :integrating
+   - not ready => :developing"
+  [ctx]
+  (let [qctx    (:query-ctx ctx)
+        ectx    (:engine-ctx ctx)
+        cgraph  (graph/derive-capability-graph
+                 {:resolver-ops (mapv #(graph/operation->metadata :resolver %)
+                                      (registry/all-resolvers-in (:reg qctx)))
+                  :mutation-ops (mapv #(graph/operation->metadata :mutation %)
+                                      (registry/all-mutations-in (:reg qctx)))})
+        ready?  (and (pos? (count (:nodes cgraph)))
+                     (pos? (count (:edges cgraph))))
+        stage   (if ready? :integrating :developing)]
+    (engine/update-system-component-in! ectx :query-ready true)
+    (engine/update-system-component-in! ectx :graph-ready ready?)
+    (engine/set-evolution-stage-in! ectx stage)
+    {:graph-ready ready?
+     :evolution-stage stage
+     :node-count (count (:nodes cgraph))
+     :edge-count (count (:edges cgraph))}))
+
 (defn register-resolvers-in!
   "Register Step 7 startup domains into `ctx`'s query context and rebuild once.
 
@@ -120,7 +151,11 @@
 
    If `ctx` carries an :agent-session-ctx, agent-session resolvers + mutations
    are also registered so :psi.agent-session/* and mutation-backed workflows are
-   queryable/executable."
+   queryable/executable.
+
+   Also derives and applies runtime Step 7 readiness:
+   - :graph-ready true when graph has nodes and edges, else false
+   - :evolution-stage set to :integrating when ready, else :developing"
   [ctx]
   (let [qctx (:query-ctx ctx)]
     ;; AI resolvers
@@ -141,7 +176,8 @@
       (agent-session/register-mutations-in! qctx false))
 
     ;; Single env rebuild after all operations are registered.
-    (query/rebuild-env-in! qctx)))
+    (query/rebuild-env-in! qctx)
+    (reconcile-graph-readiness-in! ctx)))
 
 (defn query-system-state-in
   "Return system state + derived properties via EQL using `ctx`."
