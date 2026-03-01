@@ -45,6 +45,8 @@
    [psi.query.registry :as registry]
    [psi.ai.core :as ai]
    [psi.history.resolvers :as history-resolvers]
+   [psi.memory.core :as memory]
+   [psi.memory.resolvers :as memory-resolvers]
    [psi.agent-session.core :as agent-session]
    [psi.agent-session.resolvers :as as-resolvers]))
 
@@ -53,12 +55,13 @@
 ;; ─────────────────────────────────────────────────────────────────────────────
 
 (defn register-resolvers!
-  "Register Step 7 startup domains into the global query graph and rebuild once.
+  "Register startup domains into the global query graph and rebuild once.
 
    Domains:
    - AI resolvers
    - History resolvers
    - Introspection resolvers
+   - Memory resolvers
    - Agent-session resolvers + mutations"
   []
   ;; AI resolvers (register directly to avoid per-domain env rebuilds)
@@ -67,10 +70,12 @@
   (query/register-resolver! ai/ai-provider-models-resolver)
   (query/register-resolver! ai/ai-provider-registry-resolver)
 
-  ;; History + Introspection + Agent-session resolvers
+  ;; History + Introspection + Memory + Agent-session resolvers
   (doseq [r history-resolvers/all-resolvers]
     (query/register-resolver! r))
   (doseq [r resolvers/all-resolvers]
+    (query/register-resolver! r))
+  (doseq [r memory-resolvers/all-resolvers]
     (query/register-resolver! r))
   (doseq [r as-resolvers/all-resolvers]
     (query/register-resolver! r))
@@ -86,7 +91,7 @@
 ;; Isolated introspection context (Nullable pattern)
 ;; ─────────────────────────────────────────────────────────────────────────────
 
-(defrecord IntrospectionContext [engine-ctx query-ctx agent-session-ctx])
+(defrecord IntrospectionContext [engine-ctx query-ctx memory-ctx agent-session-ctx])
 
 (defn create-context
   "Create an isolated introspection context with its own engine and query atoms.
@@ -97,14 +102,17 @@
                           (default: fresh from engine/create-context)
      :query-ctx         — an isolated query context
                           (default: fresh from query/create-query-context)
+     :memory-ctx        — a memory context to expose via EQL
+                          (default: fresh from memory/create-context)
      :agent-session-ctx — an agent-session context to expose via EQL
                           (default: nil — agent-session resolvers not registered)"
   ([]
    (create-context {}))
-  ([{:keys [engine-ctx query-ctx agent-session-ctx]}]
+  ([{:keys [engine-ctx query-ctx memory-ctx agent-session-ctx]}]
    (->IntrospectionContext
     (or engine-ctx (engine/create-context))
     (or query-ctx (query/create-query-context))
+    (or memory-ctx (memory/create-context))
     agent-session-ctx)))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
@@ -141,12 +149,13 @@
      :edge-count (count (:edges cgraph))}))
 
 (defn register-resolvers-in!
-  "Register Step 7 startup domains into `ctx`'s query context and rebuild once.
+  "Register startup domains into `ctx`'s query context and rebuild once.
 
    Domains:
    - AI resolvers
    - History resolvers
    - Introspection resolvers
+   - Memory resolvers
    - Agent-session resolvers + mutations (when :agent-session-ctx is present)
 
    If `ctx` carries an :agent-session-ctx, agent-session resolvers + mutations
@@ -164,11 +173,12 @@
     (query/register-resolver-in! qctx ai/ai-provider-models-resolver)
     (query/register-resolver-in! qctx ai/ai-provider-registry-resolver)
 
-    ;; History + Introspection resolvers
+    ;; History + Introspection + Memory resolvers
     (doseq [r history-resolvers/all-resolvers]
       (query/register-resolver-in! qctx r))
     (doseq [r resolvers/all-resolvers]
       (query/register-resolver-in! qctx r))
+    (memory/register-resolvers-in! qctx false)
 
     (when (:agent-session-ctx ctx)
       ;; Pass rebuild?=false — we rebuild once below after all operations are in.
@@ -242,10 +252,13 @@
                      :psi.engine/diagnostics])))
 
 (defn query-agent-session-in
-  "Run EQL query `q` over the :psi.agent-session/* graph using `ctx`.
-   Requires ctx to have been created with an :agent-session-ctx option."
+  "Run EQL query `q` over the live graph using `ctx`.
+   Requires ctx to have been created with an :agent-session-ctx option.
+   Also seeds :psi/memory-ctx so :psi.memory/* attrs are queryable in-session."
   [ctx q]
-  (let [{:keys [agent-session-ctx query-ctx]} ctx]
+  (let [{:keys [agent-session-ctx memory-ctx query-ctx]} ctx]
     (when-not agent-session-ctx
       (throw (ex-info "No :agent-session-ctx in introspection context" {})))
-    (query/query-in query-ctx {:psi/agent-session-ctx agent-session-ctx} q)))
+    (query/query-in query-ctx {:psi/agent-session-ctx agent-session-ctx
+                               :psi/memory-ctx memory-ctx}
+                    q)))

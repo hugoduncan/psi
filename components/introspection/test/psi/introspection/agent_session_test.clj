@@ -88,6 +88,12 @@
                   ctx [:psi.agent-session/session-id])]
       (is (string? (:psi.agent-session/session-id result)))))
 
+  (testing "query-agent-session-in also resolves :psi.memory/status"
+    (let [ctx    (session-introspection-ctx)
+          result (introspection/query-agent-session-in
+                  ctx [:psi.memory/status])]
+      (is (= :initializing (:psi.memory/status result)))))
+
   (testing "query-agent-session-in resolves phase and idle flag"
     (let [ctx    (session-introspection-ctx)
           result (introspection/query-agent-session-in

@@ -167,14 +167,16 @@
       (testing ":psi.graph/env-built is true"
         (is (true? (:psi.graph/env-built result))))
 
-      (testing "Step 7 startup domains are registered in same graph"
+      (testing "startup domains are registered in same graph"
         (let [syms (:psi.graph/resolver-syms result)]
           (is (contains? syms 'psi.ai.core/ai-model-list-resolver)
               "AI resolver should be present")
           (is (contains? syms 'psi.history.resolvers/git-repo-status)
               "History resolver should be present")
           (is (contains? syms 'psi.introspection.resolvers/query-graph-summary)
-              "Introspection resolver should be present")))
+              "Introspection resolver should be present")
+          (is (contains? syms 'psi.memory.resolvers/memory-state)
+              "Memory resolver should be present")))
 
       (testing ":psi.graph/mutation-count is a non-negative integer"
         (is (nat-int? (:psi.graph/mutation-count result))))

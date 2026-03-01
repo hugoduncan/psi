@@ -21,11 +21,13 @@
                                    [:psi.memory/status
                                     :psi.memory/entry-count
                                     :psi.memory/entries
+                                    :psi.memory/search-results
                                     :psi.memory/recovery-count
                                     :psi.memory/recoveries
                                     :psi.memory/graph-snapshots
                                     :psi.memory/graph-deltas
                                     :psi.memory/by-tag
+                                    :psi.memory/capability-history
                                     :psi.memory/index-stats])]
     (testing "status and counters are present"
       (is (= :initializing (:psi.memory/status result)))
@@ -34,8 +36,10 @@
 
     (testing "structured values are returned"
       (is (vector? (:psi.memory/entries result)))
+      (is (vector? (:psi.memory/search-results result)))
       (is (vector? (:psi.memory/recoveries result)))
       (is (vector? (:psi.memory/graph-snapshots result)))
       (is (vector? (:psi.memory/graph-deltas result)))
+      (is (vector? (:psi.memory/capability-history result)))
       (is (map? (:psi.memory/by-tag result)))
       (is (map? (:psi.memory/index-stats result))))))
