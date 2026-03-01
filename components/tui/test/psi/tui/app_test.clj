@@ -3,6 +3,7 @@
    Exercises init/update/view as pure functions — no terminal needed.
    Includes a JLine integration smoke test for terminal + keymap creation."
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [charm.components.text-input :as text-input]
@@ -73,7 +74,24 @@
       (is (some? cmd))
       (is (empty? (:messages state)))
       (is (nil? (:error state)))
-      (is (= "test-model" (:model-name state))))))
+      (is (= "test-model" (:model-name state)))))
+
+  (testing "init includes explicit prompt-input state shape"
+    (let [[state _] ((app/make-init "test-model"))
+          input-state (:prompt-input-state state)]
+      (is (= {:prefix ""
+              :candidates []
+              :selected-index 0
+              :context nil
+              :trigger-mode nil}
+             (:autocomplete input-state)))
+      (is (= {:entries []
+              :browse-index nil
+              :max-entries 100}
+             (:history input-state)))
+      (is (= {:last-ctrl-c-ms nil
+              :last-escape-ms nil}
+             (:timing input-state))))))
 
 ;;;; Update — key input
 
@@ -324,6 +342,97 @@
           streaming (assoc (init-state) :phase :streaming)
           [_s cmd]  (update-fn streaming (msg/key-press "c" :ctrl true))]
       (is (some? cmd)))))
+
+(deftest autocomplete-slash-opens-on-leading-slash-test
+  (testing "typing leading / opens slash autocomplete with slash context"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state)
+          [s1 _]    (update-fn state (msg/key-press "/"))
+          ac        (get-in s1 [:prompt-input-state :autocomplete])]
+      (is (= :slash_command (:context ac)))
+      (is (= :auto (:trigger-mode ac)))
+      (is (seq (:candidates ac)))
+      (is (some #(= "/help" (:value %)) (:candidates ac))))))
+
+(deftest autocomplete-accept-on-enter-submits-slash-test
+  (testing "enter accepts selected slash suggestion and submits"
+    (let [submitted (atom nil)
+          agent-fn  (fn [text _queue] (reset! submitted text))
+          update-fn (app/make-update agent-fn)
+          state     (init-state)
+          state     (assoc state :prompt-templates [{:name "deploy"}])
+          [s1 _]    (update-fn state (msg/key-press "/"))
+          [s2 _]    (update-fn s1 (msg/key-press "d"))
+          [s3 _]    (update-fn s2 (msg/key-press :enter))]
+      (is (= :streaming (:phase s3)))
+      (is (= "/deploy" @submitted))
+      (is (empty? (get-in s3 [:prompt-input-state :autocomplete :candidates]))))))
+
+(deftest autocomplete-escape-closes-menu-not-quit-test
+  (testing "escape closes open autocomplete without quitting"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          [s1 _]    (update-fn (init-state) (msg/key-press "/"))
+          [s2 cmd]  (update-fn s1 (msg/key-press :escape))]
+      (is (= :idle (:phase s2)))
+      (is (nil? cmd))
+      (is (empty? (get-in s2 [:prompt-input-state :autocomplete :candidates]))))))
+
+(deftest autocomplete-tab-opens-path-and-single-auto-applies-test
+  (testing "tab opens path completion and single match auto-applies"
+    (let [tmp-dir (java.nio.file.Files/createTempDirectory "psi-ac" (make-array java.nio.file.attribute.FileAttribute 0))
+          root    (.toFile tmp-dir)
+          _       (spit (io/file root "alpha.txt") "x")
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :cwd (.getAbsolutePath root))
+          state     (assoc state :input (charm/text-input-set-value (:input state) "alp"))
+          [s1 _]    (update-fn state (msg/key-press :tab))]
+      (is (= "alpha.txt" (text-input/value (:input s1))))
+      (is (empty? (get-in s1 [:prompt-input-state :autocomplete :candidates]))))))
+
+(deftest autocomplete-file-reference-filters-git-and-adds-space-test
+  (testing "@ completion excludes .git entries and appends trailing space for files"
+    (let [tmp-dir  (java.nio.file.Files/createTempDirectory "psi-fr" (make-array java.nio.file.attribute.FileAttribute 0))
+          root     (.toFile tmp-dir)
+          _        (.mkdir (io/file root ".git"))
+          _        (spit (io/file root ".git" "ignored.txt") "x")
+          _        (spit (io/file root ".hidden") "x")
+          _        (spit (io/file root "file.txt") "x")
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :cwd (.getAbsolutePath root))
+          [s1 _]    (update-fn state (msg/key-press "@"))
+          cands     (get-in s1 [:prompt-input-state :autocomplete :candidates])
+          cand-vals (set (map :value cands))
+          _         (is (contains? cand-vals ".hidden"))
+          _         (is (contains? cand-vals "file.txt"))
+          _         (is (not-any? #(str/starts-with? % ".git") cand-vals))
+          ;; choose file.txt explicitly
+          s2        (assoc-in s1 [:prompt-input-state :autocomplete :selected-index]
+                              (or (first (keep-indexed (fn [idx c]
+                                                         (when (= "file.txt" (:value c)) idx))
+                                                       cands))
+                                  0))
+          [s3 _]    (update-fn s2 (msg/key-press :tab))]
+      (is (= "@file.txt " (text-input/value (:input s3)))))))
+
+(deftest autocomplete-quoted-acceptance-avoids-duplicate-closing-quote-test
+  (testing "accepting quoted completion does not duplicate closing quote"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (-> (init-state)
+                        (assoc :input (charm/text-input-set-value (:input (init-state)) "@\"foo\""))
+                        (assoc-in [:prompt-input-state :autocomplete]
+                                  {:prefix "@\"f"
+                                   :candidates [{:value "\"foo\""
+                                                 :label "\"foo\""
+                                                 :description nil
+                                                 :kind :file_reference
+                                                 :is-directory false}]
+                                   :selected-index 0
+                                   :context :file_reference
+                                   :trigger-mode :auto
+                                   :token-start 0
+                                   :token-end 5}))
+          [s1 _]    (update-fn state (msg/key-press :tab))]
+      (is (= "@\"foo\" " (text-input/value (:input s1)))))))
 
 (deftest keys-ignored-during-streaming-test
   (testing "printable keys are ignored while streaming"
