@@ -1,0 +1,4 @@
+{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        metosin/malli       {:mvn/version "0.16.4"}
+        com.wsscode/pathom3 {:mvn/version "2025.01.16-alpha"}
+        psi/query           {:local/root "../query"}}}

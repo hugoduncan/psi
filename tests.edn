@@ -2,10 +2,10 @@
 {:tests
  [{:id :unit
    :test-paths ["test" "components/ai/test" "components/engine/test" "components/query/test" "components/history/test"
-               "components/introspection/test" "components/tui/test" "components/agent-core/test"
+               "components/introspection/test" "components/memory/test" "components/tui/test" "components/agent-core/test"
                "components/agent-session/test"]
    :source-paths ["src" "components/ai/src" "components/engine/src" "components/query/src" "components/history/src"
-                 "components/introspection/src" "components/tui/src" "components/agent-core/src"
+                 "components/introspection/src" "components/memory/src" "components/tui/src" "components/agent-core/src"
                  "components/agent-session/src"]
    :ns-patterns [".*-test$"]}]
  
