@@ -701,9 +701,14 @@
 (defn- run-rpc-edn-session!
   "Run RPC EDN transport bound to a live AgentSession context."
   []
-  (let [ctx (session/create-context)
-        state (atom {:handshake-server-info-fn (fn [] (rpc/session->handshake-server-info ctx))
-                     :subscribed-topics #{}})
+  (let [ai-model (resolve-model default-model-key)
+        ctx      (session/create-context
+                  {:initial-session {:model {:provider (name (:provider ai-model))
+                                             :id (:id ai-model)
+                                             :reasoning (:supports-reasoning ai-model)}}})
+        state    (atom {:handshake-server-info-fn (fn [] (rpc/session->handshake-server-info ctx))
+                        :subscribed-topics #{}
+                        :rpc-ai-model ai-model})
         request-handler (rpc/make-session-request-handler ctx)]
     (reset! session-state {:ctx ctx})
     (rpc/run-stdio-loop! {:request-handler request-handler

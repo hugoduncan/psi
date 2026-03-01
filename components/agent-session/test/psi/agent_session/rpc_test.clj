@@ -4,12 +4,15 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.rpc :as rpc]))
+   [psi.agent-session.rpc :as rpc]
+   [psi.tui.extension-ui :as ext-ui]))
 
 (defn- run-loop
   ([input handler]
-   (run-loop input handler (atom {})))
+   (run-loop input handler (atom {}) 0))
   ([input handler state]
+   (run-loop input handler state 0))
+  ([input handler state wait-ms]
    (let [out (java.io.StringWriter.)
          err (java.io.StringWriter.)]
      (rpc/run-stdio-loop! {:in              (java.io.StringReader. input)
@@ -17,6 +20,8 @@
                            :err             err
                            :state           state
                            :request-handler handler})
+     (when (pos? wait-ms)
+       (Thread/sleep wait-ms))
      {:out-lines (->> (str/split-lines (str out))
                       (remove str/blank?)
                       vec)
@@ -232,3 +237,109 @@
       (is (= "1.0" (:protocol-version info)))
       (is (contains? info :session-id))
       (is (= #{"eql-graph" "eql-memory"} (:features info))))))
+
+(deftest rpc-prompt-streams-events-and-interleaves-test
+  (testing "prompt emits canonical events that interleave with accepted response"
+    (let [ctx (session/create-context)
+          _   (ext-ui/set-status! (:ui-state-atom ctx) "ext.demo" "ready")
+          state (atom {:ready? true
+                       :pending {}
+                       :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
+                       :run-agent-loop-fn (fn [_ai-ctx _ctx _agent-ctx _ai-model _new-messages {:keys [progress-queue]}]
+                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                    {:event-kind :text-delta :text "Hello" :type :agent-event})
+                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                    {:event-kind :tool-start :tool-id "tc-1" :tool-name "read" :type :agent-event})
+                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                    {:event-kind :tool-result
+                                                     :tool-id "tc-1"
+                                                     :tool-name "read"
+                                                     :content [{:type :text :text "done"}]
+                                                     :result-text "done"
+                                                     :details nil
+                                                     :is-error false
+                                                     :type :agent-event})
+                                            {:role "assistant"
+                                             :content [{:type :text :text "Hello final"}]
+                                             :stop-reason :stop
+                                             :usage {:total-tokens 3}})})
+          handler (rpc/make-session-request-handler ctx)
+          input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                       "{:id \"p1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/delta\" \"assistant/message\" \"tool/start\" \"tool/result\" \"session/updated\" \"footer/updated\"]}}\n"
+                       "{:id \"r1\" :kind :request :op \"prompt\" :params {:message \"hi\"}}\n")
+          {:keys [out-lines]} (run-loop input handler state 250)
+          frames (->> out-lines
+                      (keep (fn [line]
+                              (try
+                                (edn/read-string line)
+                                (catch Throwable _ nil))))
+                      vec)
+          response-index (first (keep-indexed (fn [i f] (when (and (= :response (:kind f)) (= "prompt" (:op f))) i)) frames))
+          event-indexes  (keep-indexed (fn [i f] (when (= :event (:kind f)) i)) frames)
+          seqs           (->> frames (filter #(= :event (:kind %))) (map :seq) (remove nil?))
+          topics         (->> frames (filter #(= :event (:kind %))) (map :event) set)]
+      (is (number? response-index))
+      (is (seq event-indexes))
+      (is (some #(< response-index %) event-indexes))
+      (is (contains? topics "assistant/delta"))
+      (is (contains? topics "assistant/message"))
+      (is (contains? topics "tool/start"))
+      (is (contains? topics "tool/result"))
+      (is (contains? topics "session/updated"))
+      (is (contains? topics "footer/updated"))
+      (is (= seqs (sort seqs)))
+      (is (every? #(contains? % :data) (filter #(= :event (:kind %)) frames)))
+      (is (contains? #{:response :event} (:kind (last frames)))))))
+
+(deftest rpc-session-resume-and-rehydrate-events-test
+  (testing "new_session emits session/resumed and session/rehydrated canonical events"
+    (let [ctx (session/create-context)
+          state (atom {:ready? true
+                       :pending {}
+                       :subscribed-topics #{"session/resumed" "session/rehydrated"}})
+          handler (rpc/make-session-request-handler ctx)
+          input (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                     "{:id \"n1\" :kind :request :op \"new_session\"}\n")
+          {:keys [out-lines]} (run-loop input handler state)
+          frames (parse-frames out-lines)
+          events (filter #(= :event (:kind %)) frames)
+          event-topics (set (map :event events))]
+      (is (contains? event-topics "session/resumed"))
+      (is (contains? event-topics "session/rehydrated"))
+      (is (some #(contains? (:data %) :session-id) events))
+      (is (some #(contains? (:data %) :messages) events)))))
+
+(deftest rpc-e2e-handshake-query-and-streaming-test
+  (testing "handshake -> query_eql -> prompt with interleaved events"
+    (let [ctx (session/create-context)
+          state (atom {:ready? true
+                       :pending {}
+                       :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
+                       :run-agent-loop-fn (fn [_ai-ctx _ctx _agent-ctx _ai-model _new-messages {:keys [progress-queue]}]
+                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                    {:event-kind :text-delta :text "Hello" :type :agent-event})
+                                            {:role "assistant"
+                                             :content [{:type :text :text "Hello final"}]
+                                             :stop-reason :stop
+                                             :usage {:total-tokens 2}})})
+          handler (rpc/make-session-request-handler ctx)
+          input (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                     "{:id \"q1\" :kind :request :op \"query_eql\" :params {:query \"[:psi.graph/domain-coverage :psi.memory/status]\"}}\n"
+                     "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/delta\" \"assistant/message\" \"session/updated\" \"footer/updated\"]}}\n"
+                     "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"hi\"}}\n")
+          {:keys [out-lines]} (run-loop input handler state 250)
+          frames (parse-frames out-lines)
+          handshake-frame (some #(when (and (= :response (:kind %)) (= "handshake" (:op %))) %) frames)
+          query-frame (some #(when (and (= :response (:kind %)) (= "query_eql" (:op %))) %) frames)
+          prompt-response-index (first (keep-indexed (fn [i f] (when (and (= :response (:kind f)) (= "prompt" (:op f))) i)) frames))
+          event-indexes (vec (keep-indexed (fn [i f] (when (= :event (:kind f)) i)) frames))]
+      (is handshake-frame)
+      (is (= true (:ok handshake-frame)))
+      (is query-frame)
+      (is (= true (:ok query-frame)))
+      (is (contains? (get-in query-frame [:data :result]) :psi.graph/domain-coverage))
+      (is (contains? (get-in query-frame [:data :result]) :psi.memory/status))
+      (is (number? prompt-response-index))
+      (is (seq event-indexes))
+      (is (some #(< prompt-response-index %) event-indexes))
+      (is (some #(= "assistant/delta" (:event %)) (filter #(= :event (:kind %)) frames))))))
