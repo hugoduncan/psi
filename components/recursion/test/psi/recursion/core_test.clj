@@ -751,6 +751,32 @@
       (is (true? (get-in cycle [:proposal :approved])))
       (is (false? (get-in cycle [:proposal :requires-approval]))))))
 
+(deftest apply-approval-gate-rejects-invalid-state-test
+  ;; Verification hardening for transition guard behavior around approval gate.
+  (testing "apply-approval-gate rejects unknown cycle-id"
+    (let [ctx (core/create-context)
+          result (core/apply-approval-gate-in! ctx "nonexistent")]
+      (is (false? (:ok? result)))
+      (is (= :cycle-not-found (:error result)))))
+
+  (testing "apply-approval-gate rejects wrong cycle status"
+    (let [ctx (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; cycle is still :observing
+          result (core/apply-approval-gate-in! ctx cycle-id)]
+      (is (false? (:ok? result)))
+      (is (= :wrong-cycle-status (:error result)))
+      (is (= :observing (:status result)))))
+
+  (testing "apply-approval-gate rejects planning cycle missing proposal"
+    (let [ctx (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          _ (core/observe-in! ctx cycle-id all-ready sample-graph-state sample-memory-state)
+          ;; cycle now in :planning, but no proposal attached
+          result (core/apply-approval-gate-in! ctx cycle-id)]
+      (is (false? (:ok? result)))
+      (is (= :no-proposal (:error result))))))
+
 (deftest approve-proposal-in-test
   ;; Approve transitions to executing
   (testing "approve transitions to executing"
