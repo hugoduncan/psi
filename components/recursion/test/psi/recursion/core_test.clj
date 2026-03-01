@@ -815,7 +815,18 @@
       (is (= :learning (:status cycle)))
       (is (false? (get-in cycle [:proposal :approved])))
       (is (= "user@test" (get-in cycle [:proposal :approval-by])))
-      (is (= "too risky" (get-in cycle [:proposal :approval-notes])))))
+      (is (= "too risky" (get-in cycle [:proposal :approval-notes])))
+      (is (= :aborted (get-in cycle [:outcome :status])))
+      (is (= "proposal_rejected" (get-in cycle [:outcome :summary])))
+      (is (= #{"too risky"} (get-in cycle [:outcome :evidence])))))
+
+  (testing "reject sets default rejection evidence when notes are blank"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          _ (core/apply-approval-gate-in! ctx cycle-id)
+          _ (core/reject-proposal-in! ctx cycle-id "user@test" "")
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (= #{"proposal_rejected"} (get-in cycle [:outcome :evidence])))))
 
   (testing "reject rejects wrong cycle status"
     (let [[ctx cycle-id] (setup-planned-cycle)
@@ -1189,6 +1200,22 @@
               record (first (:records mem-state))
               prov (:provenance record)]
           (is (= :failed (:outcome-status prov))))))))
+
+(deftest learn-in-preserves-aborted-outcome-test
+  (testing "learn preserves rejected/aborted outcome"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          memory-ctx (memory/create-context
+                      {:state-overrides {:status :ready}
+                       :require-provenance-on-write? false})
+          _ (core/apply-approval-gate-in! ctx cycle-id)
+          _ (core/reject-proposal-in! ctx cycle-id "reviewer" "too risky")
+          result (core/learn-in! ctx cycle-id memory-ctx)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))
+          record (first (:records (memory/get-state-in memory-ctx)))]
+      (is (true? (:ok? result)))
+      (is (= :aborted (get-in cycle [:outcome :status])))
+      (is (= :aborted (get-in record [:provenance :outcome-status]))))))
 
 (deftest learn-in-rejects-wrong-status-test
   (testing "learn rejects wrong cycle status"

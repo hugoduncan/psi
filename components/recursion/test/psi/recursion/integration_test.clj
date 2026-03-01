@@ -229,18 +229,22 @@
         (is (empty? (:execution-attempts cycle))))
 
       (testing "cycle outcome reflects rejection"
-        ;; learn-in! sets a success outcome when none exists (since rejection
-        ;; doesn't set an outcome in the reject flow). The cycle still completes
-        ;; because learn creates the outcome.
-        (is (some? (:outcome cycle))))
+        (is (= :aborted (get-in cycle [:outcome :status])))
+        (is (= "proposal_rejected" (get-in cycle [:outcome :summary])))
+        (is (= #{"too risky for now"} (get-in cycle [:outcome :evidence]))))
+
+      (testing "cycle status is failed after finalize for non-success outcome"
+        (is (= :failed (:status cycle))))
 
       (testing "controller returns to idle"
         (is (= :idle (:status state))))
 
-      (testing "memory record was written"
+      (testing "memory record was written with aborted outcome provenance"
         (let [mem-state (memory/get-state-in mem-ctx)
-              records (:records mem-state)]
-          (is (= 1 (count records))))))))
+              records (:records mem-state)
+              record (first records)]
+          (is (= 1 (count records)))
+          (is (= :aborted (get-in record [:provenance :outcome-status]))))))))
 
 (deftest integration-failed-verification-rollback-test
   ;; AC #8, #10: trusted-local auto-approve → execute → verify fail → rollback.

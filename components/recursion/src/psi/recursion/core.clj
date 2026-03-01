@@ -510,7 +510,8 @@
 
 (defn reject-proposal-in!
   "Reject a proposal that is awaiting approval.
-   Sets approved=false, approval-by, approval-notes.
+   Sets approved=false, approval-by, approval-notes, and an explicit
+   aborted outcome so learn/finalize preserve rejection semantics.
    Transitions cycle+controller to :learning (skip execution).
 
    Returns {:ok? true} on success."
@@ -525,7 +526,11 @@
       {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
 
       :else
-      (do
+      (let [rejection-reason (if (seq notes) notes "proposal_rejected")
+            outcome {:status :aborted
+                     :summary "proposal_rejected"
+                     :evidence #{rejection-reason}
+                     :changed-goals #{}}]
         (swap-state-in! ctx
                         (fn [s]
                           (-> s
@@ -533,6 +538,7 @@
                               (update :cycles update-cycle cycle-id
                                       #(-> %
                                            (assoc :status :learning)
+                                           (assoc :outcome outcome)
                                            (assoc-in [:proposal :approved] false)
                                            (assoc-in [:proposal :approval-by] approver)
                                            (assoc-in [:proposal :approval-notes] notes))))))
