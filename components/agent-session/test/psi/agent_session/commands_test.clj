@@ -6,6 +6,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
    [psi.agent-core.core :as agent]
+   [psi.memory.core :as memory]
    [psi.recursion.core :as recursion]))
 
 ;; ── Test helper ─────────────────────────────────────────────
@@ -33,6 +34,11 @@
   (let [rctx (recursion/create-context)]
     (recursion/register-hooks-in! rctx)
     (assoc ctx :recursion-ctx rctx)))
+
+(defn- with-ready-memory-ctx
+  [ctx]
+  (assoc ctx :memory-ctx
+         (memory/create-context {:state-overrides {:status :ready}})))
 
 ;; ── dispatch tests ──────────────────────────────────────────
 
@@ -99,7 +105,9 @@
     (is (str/includes? (:message result) "not configured"))))
 
 (deftest dispatch-feed-forward-accepted-test
-  (let [ctx    (with-recursion-ctx (make-test-ctx))
+  (let [ctx    (-> (make-test-ctx)
+                   with-recursion-ctx
+                   with-ready-memory-ctx)
         result (commands/dispatch ctx "/feed-forward verify runtime" cmd-opts)]
     (is (= :text (:type result)))
     (is (str/includes? (:message result) "trigger accepted"))
@@ -107,12 +115,21 @@
     (is (str/includes? (:message result) "cycle-id:"))))
 
 (deftest dispatch-feed-forward-busy-test
-  (let [ctx  (with-recursion-ctx (make-test-ctx))
+  (let [ctx  (-> (make-test-ctx)
+                 with-recursion-ctx
+                 with-ready-memory-ctx)
         _    (commands/dispatch ctx "/feed-forward first" cmd-opts)
         busy (commands/dispatch ctx "/feed-forward second" cmd-opts)]
     (is (= :text (:type busy)))
     (is (str/includes? (:message busy) "trigger rejected"))
     (is (str/includes? (:message busy) "controller-busy"))))
+
+(deftest dispatch-feed-forward-blocked-when-live-readiness-fails-test
+  (let [ctx    (with-recursion-ctx (make-test-ctx))
+        result (commands/dispatch ctx "/feed-forward check live readiness" cmd-opts)]
+    (is (= :text (:type result)))
+    (is (str/includes? (:message result) "trigger blocked"))
+    (is (str/includes? (:message result) "recursion_prerequisites_not_ready"))))
 
 (deftest dispatch-not-a-command-test
   (testing "plain text returns nil"

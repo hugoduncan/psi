@@ -210,6 +210,7 @@
    [psi.memory.core :as memory]
    [psi.memory.resolvers :as memory-resolvers]
    [psi.query.registry :as registry]
+   [psi.recursion.resolvers :as recursion-resolvers]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session :as session]
    [psi.agent-session.tool-output :as tool-output]
@@ -1379,10 +1380,14 @@
 
 (defn build-env
   "Build a Pathom3 environment for querying an agent-session context.
-   Includes memory resolvers locally so :psi.memory/* attrs are queryable via
-   agent-session/query-in."
+   Includes memory + recursion resolvers locally so :psi.memory/* and
+   :psi.recursion/* attrs are queryable via agent-session/query-in."
   []
-  (pci/register (into (vec all-resolvers) memory-resolvers/all-resolvers)))
+  (->> (concat all-resolvers
+               memory-resolvers/all-resolvers
+               recursion-resolvers/all-resolvers)
+       vec
+       pci/register))
 
 (def ^:private query-env (atom nil))
 
@@ -1390,10 +1395,12 @@
   (or @query-env (reset! query-env (build-env))))
 
 (defn query-in
-  "Run EQL `q` against `ctx` using this component's Pathom graph."
+  "Run EQL `q` against `ctx` using this component's Pathom graph.
+   Seeds memory + recursion contexts from the session when available."
   [ctx q]
   (p.eql/process (ensure-query-env!)
                  {:psi/agent-session-ctx ctx
                   :psi/memory-ctx        (or (:memory-ctx ctx)
-                                             (memory/global-context))}
+                                             (memory/global-context))
+                  :psi/recursion-ctx     (:recursion-ctx ctx)}
                  q))

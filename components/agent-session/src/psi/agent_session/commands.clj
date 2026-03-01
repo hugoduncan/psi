@@ -162,6 +162,21 @@
    :introspection-ready true
    :memory-ready true})
 
+(defn- readiness-from-session
+  "Derive recursion readiness from live session query + memory state.
+   Falls back to default all-ready values when attrs are unavailable."
+  [ctx]
+  (let [snapshot (session/query-in ctx
+                                   [:psi.graph/nodes
+                                    :psi.graph/edges
+                                    :psi.memory/status])
+        memory-ready? (= :ready (:psi.memory/status snapshot))
+        graph-ready? (and (seq (:psi.graph/nodes snapshot))
+                          (seq (:psi.graph/edges snapshot)))]
+    (merge default-feed-forward-readiness
+           {:graph-ready graph-ready?
+            :memory-ready memory-ready?})))
+
 (defn- feed-forward-trigger-signal
   [reason]
   (recursion/manual-trigger-signal reason {:source :runtime-command}))
@@ -279,9 +294,10 @@
         (let [reason (-> (str/replace trimmed #"^/feed-forward\s*" "")
                          (str/trim)
                          (not-empty))
+              readiness (readiness-from-session ctx)
               result (recursion/handle-trigger-in! recursion-ctx
                                                    (feed-forward-trigger-signal reason)
-                                                   default-feed-forward-readiness)]
+                                                   readiness)]
           {:type :text
            :message (format-feed-forward-trigger-result result)})
         {:type :text

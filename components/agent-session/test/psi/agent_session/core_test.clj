@@ -12,7 +12,8 @@
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
-   [psi.query.core :as query])
+   [psi.query.core :as query]
+   [psi.recursion.core :as recursion])
   (:import
    (java.io File)))
 
@@ -606,6 +607,22 @@
                                     :psi.agent-session/phase])]
         (is (string? (:psi.agent-session/session-id result)))
         (is (= :idle (:psi.agent-session/phase result)))))))
+
+(deftest session-query-in-exposes-recursion-attrs-test
+  (testing "session/query-in can read recursion attrs from live session recursion-ctx"
+    (let [rctx (recursion/create-context)
+          _    (recursion/register-hooks-in! rctx)
+          ctx  (session/create-context {:recursion-ctx rctx})
+          result (session/query-in ctx
+                                   [:psi.recursion/status
+                                    :psi.recursion/paused?
+                                    :psi.recursion/current-cycle
+                                    :psi.recursion/hooks])]
+      (is (= :idle (:psi.recursion/status result)))
+      (is (false? (:psi.recursion/paused? result)))
+      (is (nil? (:psi.recursion/current-cycle result)))
+      (is (vector? (:psi.recursion/hooks result)))
+      (is (pos? (count (:psi.recursion/hooks result)))))))
 
 (deftest workflow-mutations-and-resolvers-test
   (testing "workflow mutation ops and resolver attrs are wired"
