@@ -11,6 +11,7 @@
    [clojure.string :as str]))
 
 (def protocol-version "1.0")
+(def ^:private default-max-pending-requests 64)
 
 (def ^:private request-required-keys #{:id :kind :op})
 (def ^:private request-allowed-keys  #{:id :kind :op :params})
@@ -103,10 +104,6 @@
   [request]
   (let [op (:op request)]
     (case op
-      "handshake"
-      (response-frame (:id request) "handshake" true
-                      {:server-info {:protocol-version protocol-version}})
-
       "ping"
       (response-frame (:id request) "ping" true {:pong true :protocol-version protocol-version})
 
@@ -114,6 +111,134 @@
                     :op            (:op request)
                     :error-code    "request/op-not-supported"
                     :error-message (str "unsupported op: " op)}))))
+
+(defn- valid-request-id? [id]
+  (and (string? id) (not (str/blank? id))))
+
+(defn- valid-request-op? [op]
+  (and (string? op) (not (str/blank? op))))
+
+(defn- terminal-frame? [frame]
+  (contains? #{:response :error} (normalize-kind (:kind frame))))
+
+(defn- clear-pending-if-terminal! [state frame]
+  (when-let [id (:id frame)]
+    (when (and (string? id) (terminal-frame? frame))
+      (swap! state update :pending dissoc id))))
+
+(defn- make-tracked-emitter [emit-frame! state]
+  (fn emit-tracked! [frame]
+    (emit-frame! frame)
+    (clear-pending-if-terminal! state frame)))
+
+(defn- request-error
+  [request error-code error-message]
+  (error-frame {:id            (:id request)
+                :op            (:op request)
+                :error-code    error-code
+                :error-message error-message}))
+
+(defn- protocol-major [version]
+  (when (string? version)
+    (some->> (re-find #"^(\d+)(?:\..*)?$" version)
+             second
+             Integer/parseInt)))
+
+(defn- handle-handshake! [request state]
+  (let [version (or (get-in request [:params :client-info :protocol-version])
+                    (get-in request [:params :protocol-version]))
+        major   (protocol-major version)]
+    (cond
+      (not (string? version))
+      (request-error request
+                     "request/invalid-params"
+                     "handshake requires :params :client-info :protocol-version string")
+
+      (not= 1 major)
+      (request-error request
+                     "protocol/unsupported-version"
+                     (str "unsupported protocol major: " (or major "unknown")))
+
+      :else
+      (do
+        (swap! state assoc
+               :ready? true
+               :negotiated-protocol-version protocol-version)
+        (response-frame (:id request)
+                        "handshake"
+                        true
+                        {:server-info {:protocol-version protocol-version}})))))
+
+(defn- accept-request!
+  "Register a request as pending when valid and capacity allows.
+   Returns {:ok true} or {:error <canonical-error-frame>}"
+  [request state]
+  (let [id      (:id request)
+        op      (:op request)
+        pending (:pending @state)
+        max-p   (long (or (:max-pending-requests @state)
+                          default-max-pending-requests))]
+    (cond
+      (not (valid-request-id? id))
+      {:error (request-error request "request/invalid-id" "request :id must be a non-empty string")}
+
+      (not (valid-request-op? op))
+      {:error (request-error request "request/invalid-op" "request :op must be a non-empty string")}
+
+      (contains? pending id)
+      {:error (request-error request "request/invalid-id" "duplicate request :id")}
+
+      (>= (count pending) max-p)
+      {:error (request-error request "transport/max-pending-exceeded" "maximum pending requests exceeded")}
+
+      :else
+      (do
+        (swap! state update :pending assoc id op)
+        {:ok true}))))
+
+(defn- process-request!
+  [request {:keys [state request-handler emit-tracked!]}]
+  (let [op (:op request)
+        ready? (:ready? @state)]
+    (cond
+      (and (not ready?) (not= "handshake" op))
+      (emit-tracked! (request-error request
+                                    "transport/not-ready"
+                                    "handshake must complete before non-handshake requests"))
+
+      (= "handshake" op)
+      (if-let [error (:error (accept-request! request state))]
+        (emit-tracked! error)
+        (emit-tracked! (handle-handshake! request state)))
+
+      :else
+      (if-let [error (:error (accept-request! request state))]
+        (emit-tracked! error)
+        (try
+          (let [result (binding [*out* (:err @state)]
+                         (request-handler request emit-tracked! state))]
+            (cond
+              (nil? result)
+              nil
+
+              (map? result)
+              (emit-tracked! result)
+
+              (sequential? result)
+              (doseq [frame result]
+                (emit-tracked! frame))
+
+              :else
+              (emit-tracked! (error-frame {:id            (:id request)
+                                           :op            (:op request)
+                                           :error-code    "runtime/failed"
+                                           :error-message "request handler returned unsupported result type"}))))
+          (catch Throwable t
+            (emit-tracked! (error-frame {:id            (:id request)
+                                         :op            (:op request)
+                                         :error-code    "runtime/failed"
+                                         :error-message (or (ex-message t)
+                                                            "unhandled runtime exception")}))))))))
 
 (defn run-stdio-loop!
   "Run an EDN-lines RPC loop.
@@ -123,7 +248,12 @@
    - :out              java.io.Writer (default *out*)
    - :err              java.io.Writer (default *err*)
    - :request-handler  (fn [request emit-frame! state] -> frame | [frame*] | nil)
-   - :state            mutable transport state passed to request-handler"
+   - :state            mutable transport state passed to request-handler
+
+   State keys:
+   - :ready?                   handshake readiness gate (default false)
+   - :pending                  map of request-id -> op for in-flight requests
+   - :max-pending-requests     guard limit (default 64)"
   [{:keys [in out err request-handler state]
     :or   {in *in*
            out *out*
@@ -132,38 +262,22 @@
                              (default-request-handler request))
            state (atom {})}}]
   (let [reader      (java.io.BufferedReader. in)
-        emit-frame! (make-frame-writer out)
-        emit-error! (fn [error-code error-message]
-                      (emit-frame! (error-frame {:error-code error-code
-                                                 :error-message error-message})))]
-    (doseq [line (line-seq reader)]
-      (if (str/blank? line)
-        (emit-error! "transport/invalid-frame" "empty frame")
-        (let [{:keys [ok error]} (parse-request-line line)]
-          (if error
-            (emit-frame! error)
-            (try
-              (let [result (binding [*out* err]
-                             (request-handler ok emit-frame! state))]
-                (cond
-                  (nil? result)
-                  nil
-
-                  (map? result)
-                  (emit-frame! result)
-
-                  (sequential? result)
-                  (doseq [frame result]
-                    (emit-frame! frame))
-
-                  :else
-                  (emit-frame! (error-frame {:id            (:id ok)
-                                             :op            (:op ok)
-                                             :error-code    "runtime/failed"
-                                             :error-message "request handler returned unsupported result type"}))))
-              (catch Throwable t
-                (emit-frame! (error-frame {:id            (:id ok)
-                                           :op            (:op ok)
-                                           :error-code    "runtime/failed"
-                                           :error-message (or (ex-message t)
-                                                              "unhandled runtime exception")}))))))))))
+        emit-frame! (make-frame-writer out)]
+    (swap! state #(merge {:ready? false
+                          :pending {}
+                          :max-pending-requests default-max-pending-requests}
+                         %
+                         {:err err}))
+    (let [emit-tracked! (make-tracked-emitter emit-frame! state)
+          emit-error!   (fn [error-code error-message]
+                          (emit-frame! (error-frame {:error-code error-code
+                                                     :error-message error-message})))]
+      (doseq [line (line-seq reader)]
+        (if (str/blank? line)
+          (emit-error! "transport/invalid-frame" "empty frame")
+          (let [{:keys [ok error]} (parse-request-line line)]
+            (if error
+              (emit-frame! error)
+              (process-request! ok {:state           state
+                                    :request-handler request-handler
+                                    :emit-tracked!   emit-tracked!}))))))))
