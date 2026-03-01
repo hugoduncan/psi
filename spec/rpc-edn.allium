@@ -648,11 +648,20 @@ surface RpcTransportApi {
         --   {:id "42" :kind :request :op "prompt" :params {:message "Summarize this ns"}}
         -- Example response frame:
         --   {:id "42" :kind :response :op "prompt" :ok true :data {:message-id "msg_9"}}
+        -- Example query_eql request frame:
+        --   {:id "43" :kind :request :op "query_eql"
+        --    :params {:query "[:psi.graph/domain-coverage :psi.memory/status]"}}
+        -- Example query_eql response frame:
+        --   {:id "43" :kind :response :op "query_eql" :ok true
+        --    :data {:result {:psi.graph/domain-coverage [...]
+        --                    :psi.memory/status :ready}}}
         -- Example event frame:
         --   {:kind :event :event "tool/start" :seq 18 :data {:tool-id "tc_1" :tool-name "read"}}
         -- Example error frame:
         --   {:kind :error :id "42" :op "prompt" :error-code "transport/not-ready"
         --    :error-message "handshake required" :retryable true}
+        -- Handshake feature strings are implementation-defined; deployments MAY
+        -- advertise discovery hints such as "eql-graph" and "eql-memory".
         -- Keep stdout protocol-only; write logs/diagnostics to stderr.
 }
 

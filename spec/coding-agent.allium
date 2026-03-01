@@ -642,6 +642,8 @@ surface RpcApi {
         -- Commands, responses, events, and errors use canonical EDN envelopes over stdio.
         -- Events are interleaved with responses; callers match by :id where present.
         -- The RpcClient may integrate as a library or over stdio.
+        -- query_eql is the discovery path for live graph + memory surfaces
+        -- (for example :psi.graph/* and :psi.memory/* attributes).
         -- Canonical frame shapes, event payload catalog, and MUST/SHOULD compatibility/versioning policy are specified in rpc-edn.allium.
         -- Emacs-specific parity behavior is specified in emacs-frontend.allium.
 }

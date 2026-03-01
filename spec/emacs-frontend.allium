@@ -236,6 +236,8 @@ surface EmacsSessionApi {
         -- behavior values for prompt_while_streaming: queue | steer | follow_up | reject.
         -- Emacs mode is not headless fallback: extension UI operations are active.
         -- /resume parity requires list_sessions + resume_session with rehydrated tool rows.
+        -- query_eql should expose runtime graph + memory attrs when available,
+        -- e.g. :psi.graph/domain-coverage and :psi.memory/status.
         -- Wire protocol details (canonical envelopes, event payloads, versioning policy)
         -- are defined in rpc-edn.allium.
 }
