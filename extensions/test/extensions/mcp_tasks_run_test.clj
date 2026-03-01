@@ -72,7 +72,41 @@
           (is (contains? (:workflows @state) "run-1")))
 
         (let [out-list (with-out-str (handler "list"))]
-          (is (re-find #"run-1" out-list)))))))
+          (is (re-find #"run-1" out-list))))))
+
+  (testing "widget status aggregates mixed phases across multiple runs"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/mcp_tasks_run.clj"})]
+      (sut/init api)
+      (let [wf-running {:psi.extension.workflow/id "run-1"
+                        :psi.extension.workflow/phase :running
+                        :psi.extension.workflow/running? true
+                        :psi.extension.workflow/error? false
+                        :psi.extension.workflow/data {:run/task-id 42
+                                                      :run/entity-type :task
+                                                      :run/current-state :refined
+                                                      :run/last-step "execute-task"}}
+            wf-paused {:psi.extension.workflow/id "run-2"
+                       :psi.extension.workflow/phase :paused
+                       :psi.extension.workflow/running? false
+                       :psi.extension.workflow/error? false
+                       :psi.extension.workflow/data {:run/task-id 99
+                                                     :run/entity-type :story
+                                                     :run/current-state :wait-user-confirmation
+                                                     :run/last-step "execute-story-child"
+                                                     :run/pause-reason :wait-user-confirmation}}
+            wf-error {:psi.extension.workflow/id "run-3"
+                      :psi.extension.workflow/phase :error
+                      :psi.extension.workflow/running? false
+                      :psi.extension.workflow/error? true
+                      :psi.extension.workflow/data {:run/task-id 100
+                                                    :run/entity-type :task
+                                                    :run/current-state :derive-state
+                                                    :run/last-step "execute-task"}}]
+        (with-redefs [sut/mcp-run-workflows (fn [] [wf-running wf-paused wf-error])]
+          (#'sut/refresh-widgets!))
+        (is (= "mcp-tasks-run: 3 run(s) · 1 running · 1 paused · 1 error"
+               (last (:status-lines @state))))))))
 
 (deftest workflow-native-step-progression-test
   (testing "run-loop-job advances a single orchestration unit per invocation"
@@ -338,25 +372,50 @@
           (is (= :wait-user-confirmation (:pause-reason res)))
           (is (= "Continue?" (get-in res [:user-confirmation :question]))))))))
 
-(deftest active-running-excludes-paused-test
-  ;; active-running-workflow only gates start-run!; resume/retry check own phase.
-  (testing "active-running-workflow"
-    (testing "does not match a paused workflow"
-      (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                                 {:path "/test/mcp_tasks_run.clj"})]
-        (sut/init api)
-        (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
-          ;; Start a run, then mark it paused (running? true, phase :paused)
-          (with-out-str (handler "42"))
-          (swap! state update-in [:workflows "run-1"]
-                 assoc
-                 :psi.extension.workflow/running? true
-                 :psi.extension.workflow/phase :paused)
-          ;; Starting a second run should succeed, not be blocked
-          (let [out (with-out-str (handler "99"))]
-            (is (re-find #"Started mcp-tasks run run-2" out)
-                "paused run should not block starting a new run"))))))
+(deftest start-run-admission-policy-test
+  (testing "allows concurrent runs for distinct task IDs"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/mcp_tasks_run.clj"})]
+      (sut/init api)
+      (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+        (let [out-1 (with-out-str (handler "42"))
+              out-2 (with-out-str (handler "99"))]
+          (is (re-find #"Started mcp-tasks run run-1" out-1))
+          (is (re-find #"Started mcp-tasks run run-2" out-2))
+          (is (contains? (:workflows @state) "run-1"))
+          (is (contains? (:workflows @state) "run-2"))))))
 
+  (testing "rejects duplicate active run for same task when existing run is running"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/mcp_tasks_run.clj"})]
+      (sut/init api)
+      (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+        (with-out-str (handler "42"))
+        (swap! state update-in [:workflows "run-1"]
+               assoc
+               :psi.extension.workflow/running? true
+               :psi.extension.workflow/phase :running)
+        (let [out (with-out-str (handler "42"))]
+          (is (re-find #"Task #42 already has active run run-1 \(running\)\." out))
+          (is (= #{"run-1"}
+                 (set (keys (:workflows @state)))))))))
+
+  (testing "rejects duplicate active run for same task when existing run is paused"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/mcp_tasks_run.clj"})]
+      (sut/init api)
+      (let [handler (get-in @state [:commands "mcp-tasks-run" :handler])]
+        (with-out-str (handler "42"))
+        (swap! state update-in [:workflows "run-1"]
+               assoc
+               :psi.extension.workflow/running? false
+               :psi.extension.workflow/phase :paused)
+        (let [out (with-out-str (handler "42"))]
+          (is (re-find #"Task #42 already has active run run-1 \(paused\)\." out))
+          (is (= #{"run-1"}
+                 (set (keys (:workflows @state))))))))))
+
+(deftest resume-run-phase-guard-test
   (testing "resume checks only its own run phase"
     (testing "allows resuming a paused run"
       (let [{:keys [api state]} (nullable/create-nullable-extension-api
@@ -617,7 +676,29 @@
           (is (re-find #"A\) fast path" output)
               "should print second question line")
           (is (re-find #"B\) safe path" output)
-              "should print third question line"))))))
+              "should print third question line")))))
+
+  (testing "list-runs! prints multiple runs with task IDs and phases"
+    (let [wf-running {:psi.extension.workflow/id "run-1"
+                      :psi.extension.workflow/phase :running
+                      :psi.extension.workflow/running? true
+                      :psi.extension.workflow/data {:run/task-id 42
+                                                    :run/entity-type :task
+                                                    :run/current-state :refined
+                                                    :run/last-step "execute-task"}}
+          wf-paused {:psi.extension.workflow/id "run-2"
+                     :psi.extension.workflow/phase :paused
+                     :psi.extension.workflow/running? false
+                     :psi.extension.workflow/data {:run/task-id 99
+                                                   :run/entity-type :story
+                                                   :run/current-state :wait-user-confirmation
+                                                   :run/last-step "execute-story-child"
+                                                   :run/pause-reason :wait-user-confirmation}}]
+      (with-redefs [sut/mcp-run-workflows (fn [] [wf-running wf-paused])
+                    sut/elapsed-seconds (fn [_] 10)]
+        (let [output (with-out-str (#'sut/list-runs!))]
+          (is (re-find #"run-1 \[RUNNING\] task #42" output))
+          (is (re-find #"run-2 \[PAUSED\] story #99" output)))))))
 
 (deftest resolve-category-for-step-non-matching-step-test
   (testing "resolve-category-for-step returns nil for non-matching step names"

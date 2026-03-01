@@ -202,8 +202,22 @@
   (let [sid (str id)]
     (some #(when (= sid (:psi.extension.workflow/id %)) %) (mcp-run-workflows))))
 
-(defn- active-running-workflow []
-  (first (filter #(= :running (phase-of %)) (mcp-run-workflows))))
+(defn- workflow-task-id
+  [wf]
+  (let [data (:psi.extension.workflow/data wf)]
+    (or (parse-int (:run/task-id data))
+        (parse-int (get-in wf [:psi.extension.workflow/input :task-id]))
+        (parse-int (get-in wf [:psi.extension.workflow/meta :task-id])))))
+
+(defn- active-workflow-for-task
+  [task-id]
+  (let [task-id* (parse-int task-id)]
+    (some (fn [wf]
+            (let [phase (phase-of wf)]
+              (when (and (= task-id* (workflow-task-id wf))
+                         (#{:running :paused} phase))
+                wf)))
+          (mcp-run-workflows))))
 
 (defn- run-id->n [run-id]
   (some->> (re-find #"run-(\\d+)$" (str run-id)) second parse-int))
@@ -1012,9 +1026,10 @@
           current-ids (into #{} (map #(str "mcp-run-" (:psi.extension.workflow/id %)) wfs))
           old-ids     (:widget-ids @state)
           removed     (set/difference old-ids current-ids)
-          running     (count (filter :psi.extension.workflow/running? wfs))
-          paused      (count (filter #(= :paused (phase-of %)) wfs))
-          errors      (count (filter :psi.extension.workflow/error? wfs))]
+          phases      (map phase-of wfs)
+          running     (count (filter #{:running} phases))
+          paused      (count (filter #{:paused} phases))
+          errors      (count (filter #{:error} phases))]
       (doseq [wid removed]
         ((:clear-widget ui) wid))
       (doseq [wf wfs]
@@ -1648,24 +1663,27 @@
 
 (defn- start-run!
   [task-id]
-  (if (active-running-workflow)
-    (println "A run is already in progress. Pause/cancel it first.")
-    (let [run-id      (next-run-id!)
-          project-dir (System/getProperty "user.dir")
-          created     (mutate! 'psi.extension.workflow/create
-                               {:type  run-workflow-type
-                                :id    run-id
-                                :meta  {:task-id task-id}
-                                :input {:run-id run-id
-                                        :task-id task-id
-                                        :project-dir project-dir
-                                        :max-steps max-steps-default}})]
-      (if (:psi.extension.workflow/created? created)
-        (do
-          (println (str "Started mcp-tasks run " run-id " for task #" task-id "."))
-          (refresh-widgets-later!))
-        (println (str "Failed to start run: "
-                      (or (:psi.extension.workflow/error created) "unknown error")))))))
+  (let [task-id* (parse-int task-id)]
+    (if-let [existing (active-workflow-for-task task-id*)]
+      (println (str "Task #" task-id* " already has active run "
+                    (:psi.extension.workflow/id existing)
+                    " (" (name (phase-of existing)) ")."))
+      (let [run-id      (next-run-id!)
+            project-dir (System/getProperty "user.dir")
+            created     (mutate! 'psi.extension.workflow/create
+                                 {:type  run-workflow-type
+                                  :id    run-id
+                                  :meta  {:task-id task-id*}
+                                  :input {:run-id run-id
+                                          :task-id task-id*
+                                          :project-dir project-dir
+                                          :max-steps max-steps-default}})]
+        (if (:psi.extension.workflow/created? created)
+          (do
+            (println (str "Started mcp-tasks run " run-id " for task #" task-id* "."))
+            (refresh-widgets-later!))
+          (println (str "Failed to start run: "
+                        (or (:psi.extension.workflow/error created) "unknown error"))))))))
 
 (defn- list-runs!
   []
