@@ -676,6 +676,14 @@
                      :ui-state-atom        (:ui-state-atom ctx)
                      :dispatch-fn          dispatch-fn
                      :on-interrupt-fn!     on-interrupt-fn!
+                     :on-queue-input-fn!   (fn [text _state]
+                                              (if (= :streaming (session/sc-phase-in ctx))
+                                                (do
+                                                  (session/steer-in! ctx text)
+                                                  {:message "Queued steering message."})
+                                                (do
+                                                  (session/follow-up-in! ctx text)
+                                                  {:message "Queued follow-up message."})))
                      :double-press-window-ms 500
                      :double-escape-action :none
                      :cwd                  cwd

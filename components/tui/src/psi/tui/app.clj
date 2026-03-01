@@ -854,6 +854,8 @@
                               returns {:messages [...], :tool-calls {...}, :tool-order [...]}
      :dispatch-fn          — (fn [text]) → command result map or nil; central command dispatch
      :on-interrupt-fn!     — (fn [state]) -> {:queued-text str? :message str?} | nil
+     :on-queue-input-fn!   — (fn [text state]) -> {:message str?} | nil
+                              called when Enter is pressed while streaming
      :double-press-window-ms — ctrl+c / escape timing window (default 500)
      :double-escape-action — :tree | :fork | :none (default :none)
      :event-queue          — shared LinkedBlockingQueue for agent + extension events"
@@ -885,6 +887,7 @@
            :ui-state-atom         ui-state-atom
            :dispatch-fn           (:dispatch-fn opts)
            :on-interrupt-fn!      (:on-interrupt-fn! opts)
+           :on-queue-input-fn!    (:on-queue-input-fn! opts)
            :double-press-window-ms (or (:double-press-window-ms opts) 500)
            :double-escape-action  (or (:double-escape-action opts) :none)
            :cwd                   (or (:cwd opts) (System/getProperty "user.dir"))
@@ -1289,6 +1292,32 @@
       [next-state (poll-cmd (:queue state))])
     [(append-assistant-status state "Interrupt unavailable in this runtime.") nil]))
 
+(defn- handle-streaming-submit
+  "Queue draft input as steering/follow-up while the agent is streaming."
+  [state]
+  (let [text     (str/trim (input-value state))
+        queue-fn (:on-queue-input-fn! state)]
+    (cond
+      (str/blank? text)
+      [state (poll-cmd (:queue state))]
+
+      queue-fn
+      (let [result  (try
+                      (queue-fn text state)
+                      (catch Exception e
+                        {:message (str "Failed to queue input: " (ex-message e))}))
+            message (or (:message result)
+                        "Queued for next turn.")]
+        [(-> state
+             (set-input-value "")
+             (clear-autocomplete)
+             (append-assistant-status message))
+         (poll-cmd (:queue state))])
+
+      :else
+      [(append-assistant-status state "Queueing input is unavailable in this runtime.")
+       (poll-cmd (:queue state))])))
+
 ;; ── Update ──────────────────────────────────────────────────
 
 (defn make-update
@@ -1488,6 +1517,29 @@
         (and (= :idle (:phase state))
              (msg/key-match? m "enter"))
         (submit-input state run-agent-fn!)
+
+      ;; Enter while streaming queues steering/follow-up input.
+        (and (= :streaming (:phase state))
+             (msg/key-match? m "enter"))
+        (handle-streaming-submit state)
+
+      ;; Backspace edits text while streaming.
+        (and (= :streaming (:phase state))
+             (msg/key-match? m "backspace"))
+        (let [[new-input cmd] (charm/text-input-update (:input state) m)]
+          [(set-input-model state new-input) cmd])
+
+      ;; Space may arrive as keyword :space while streaming.
+        (and (= :streaming (:phase state))
+             (msg/key-match? m "space"))
+        (let [[new-input cmd] (charm/text-input-update (:input state) (msg/key-press " "))]
+          [(set-input-model state new-input) cmd])
+
+      ;; Text input remains editable while streaming.
+        (and (= :streaming (:phase state))
+             (msg/key-press? m))
+        (let [[new-input cmd] (charm/text-input-update (:input state) m)]
+          [(set-input-model state new-input) cmd])
 
       ;; Backspace edits text then refreshes open autocomplete.
         (and (= :idle (:phase state))
@@ -2315,12 +2367,14 @@
             ;; Dialog replaces editor when active
             (if dialog-active?
               (render-dialog ui-state-atom)
-              (if (= :idle phase)
-                (wrap-text-input-view input term-width)
-                (charm/render dim-style
-                              (if progress-spinner-visible?
-                                "(waiting for response…)"
-                                (str spinner-char " waiting for response…")))))
+              (str (wrap-text-input-view input term-width)
+                   (when (= :streaming phase)
+                     (str "\n"
+                          (charm/render dim-style
+                                        (if progress-spinner-visible?
+                                          "(Enter queues input • Esc interrupts)"
+                                          (str spinner-char " waiting for response…")))
+                          clear-line-end-seq))))
             "\n"
             (render-separator) "\n"
             ;; Widgets below editor
@@ -2350,6 +2404,7 @@
                                                :tool-calls {...}
                                                :tool-order [...]}
                        :on-interrupt-fn!    — (fn [state]) -> {:queued-text str? :message str?}
+                       :on-queue-input-fn!  — (fn [text state]) -> {:message str?}
                        :double-press-window-ms — ctrl+c / escape timing window (default 500)
                        :double-escape-action — :tree | :fork | :none (default :none)
                        :alt-screen          — true/false (default true)"

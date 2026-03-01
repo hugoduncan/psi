@@ -384,6 +384,33 @@
       (is (= "Interrupted active work."
              (:text (last (:messages s1))))))))
 
+(deftest streaming-enter-queues-input-test
+  (testing "enter during streaming queues draft text via callback and keeps streaming"
+    (let [queued    (atom nil)
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state "test-model"
+                                       {:on-queue-input-fn! (fn [text _]
+                                                              (reset! queued text)
+                                                              {:message "Queued steering message."})})
+                           :phase :streaming
+                           :input (charm/text-input-set-value (:input (init-state)) "steer this"))
+          [s1 _cmd] (update-fn state (msg/key-press :enter))]
+      (is (= :streaming (:phase s1)))
+      (is (= "steer this" @queued))
+      (is (= "" (text-input/value (:input s1))))
+      (is (= "Queued steering message." (:text (last (:messages s1))))))))
+
+(deftest streaming-input-remains-editable-test
+  (testing "printable input and backspace mutate editor while streaming"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state)
+                           :phase :streaming
+                           :input (charm/text-input-set-value (:input (init-state)) "ab"))
+          [s1 _]    (update-fn state (msg/key-press "c"))
+          [s2 _]    (update-fn s1 (msg/key-press :backspace))]
+      (is (= "abc" (text-input/value (:input s1))))
+      (is (= "ab" (text-input/value (:input s2)))))))
+
 (deftest double-escape-unsupported-action-is-safe-no-op-with-status-test
   (testing "unsupported double-escape action does not crash and emits status"
     (let [update-fn (app/make-update (stub-agent-fn ""))
@@ -547,12 +574,15 @@
           [s1 _]    (update-fn state (msg/key-press :tab))]
       (is (= "@\"foo\" " (text-input/value (:input s1)))))))
 
-(deftest keys-ignored-during-streaming-test
-  (testing "printable keys are ignored while streaming"
+(deftest keys-edit-input-during-streaming-test
+  (testing "printable keys edit draft input while streaming"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          streaming (assoc (init-state) :phase :streaming)
+          streaming (-> (init-state)
+                        (assoc :phase :streaming)
+                        (assoc :input (charm/text-input-set-value (:input (init-state)) "")))
           [s1 cmd]  (update-fn streaming (msg/key-press "x"))]
       (is (= :streaming (:phase s1)))
+      (is (= "x" (text-input/value (:input s1))))
       (is (nil? cmd)))))
 
 ;;;; View
@@ -624,7 +654,7 @@ clojure-lsp"}]})
     (let [state (assoc (init-state) :phase :streaming)
           out   (app/view state)]
       (is (str/includes? out "thinking"))
-      (is (str/includes? out "(waiting for response…)"))
+      (is (str/includes? out "Enter queues input"))
       (is (not (str/includes? out "⠋ waiting for response…"))))))
 
 (deftest view-shows-spinner-in-waiting-indicator-with-tool-history-test
@@ -644,7 +674,7 @@ clojure-lsp"}]})
       (is (not (str/includes? out "(waiting for response…)"))))))
 
 (deftest view-hides-waiting-spinner-when-tool-spinner-visible-test
-  (testing "waiting indicator stays static when tool list already shows spinner"
+  (testing "streaming hint remains static when tool list already shows spinner"
     (let [state (-> (init-state)
                     (assoc :phase :streaming
                            :spinner-frame 0
@@ -656,7 +686,7 @@ clojure-lsp"}]})
                                               :result nil
                                               :is-error false}}))
           out   (app/view state)]
-      (is (str/includes? out "(waiting for response…)"))
+      (is (str/includes? out "Enter queues input"))
       (is (not (str/includes? out "⠋ waiting for response…"))))))
 
 (deftest ctrl-o-toggles-tools-expanded-test
