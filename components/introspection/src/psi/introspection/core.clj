@@ -173,7 +173,7 @@
                     [:psi.engine/recent-transitions])))
 
 (defn query-graph-summary-in
-  "Return query graph statistics via EQL using `ctx`."
+  "Return query graph statistics and Step 7 capability graph attrs via EQL using `ctx`."
   [ctx]
   (let [{:keys [query-ctx]} ctx]
     (query/query-in query-ctx {:psi/query-ctx query-ctx}
@@ -181,7 +181,11 @@
                      :psi.graph/mutation-count
                      :psi.graph/resolver-syms
                      :psi.graph/mutation-syms
-                     :psi.graph/env-built])))
+                     :psi.graph/env-built
+                     :psi.graph/nodes
+                     :psi.graph/edges
+                     :psi.graph/capabilities
+                     :psi.graph/domain-coverage])))
 
 (defn query-all-engines-in
   "Return all registered engines and count via EQL using `ctx`."

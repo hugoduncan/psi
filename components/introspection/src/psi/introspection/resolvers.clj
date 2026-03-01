@@ -49,7 +49,9 @@
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.engine.core :as engine]
-   [psi.query.core :as query]))
+   [psi.introspection.graph :as graph]
+   [psi.query.core :as query]
+   [psi.query.registry :as registry]))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; Engine / System resolvers
@@ -119,21 +121,43 @@
 ;; Query graph resolvers
 ;; ─────────────────────────────────────────────────────────────────────────────
 
+(defn- operation-metadata-in
+  "Collect normalized resolver/mutation metadata for the current query registry."
+  [query-ctx]
+  {:resolver-ops (mapv #(graph/operation->metadata :resolver %)
+                       (registry/all-resolvers-in (:reg query-ctx)))
+   :mutation-ops (mapv #(graph/operation->metadata :mutation %)
+                       (registry/all-mutations-in (:reg query-ctx)))})
+
+(defn- capability-graph-in
+  "Derive Step 7 capability graph entities from current query registry."
+  [query-ctx]
+  (graph/derive-capability-graph (operation-metadata-in query-ctx)))
+
 (pco/defresolver query-graph-summary
-  "Resolve query graph statistics from a :psi/query-ctx."
+  "Resolve query graph statistics and Step 7 capability graph attrs from :psi/query-ctx."
   [{:keys [psi/query-ctx]}]
   {::pco/input  [:psi/query-ctx]
    ::pco/output [:psi.graph/resolver-count
                  :psi.graph/mutation-count
                  :psi.graph/resolver-syms
                  :psi.graph/mutation-syms
-                 :psi.graph/env-built]}
-  (let [summary (query/graph-summary-in query-ctx)]
+                 :psi.graph/env-built
+                 :psi.graph/nodes
+                 :psi.graph/edges
+                 :psi.graph/capabilities
+                 :psi.graph/domain-coverage]}
+  (let [summary (query/graph-summary-in query-ctx)
+        cgraph  (capability-graph-in query-ctx)]
     {:psi.graph/resolver-count (:resolver-count summary)
      :psi.graph/mutation-count (:mutation-count summary)
      :psi.graph/resolver-syms  (:resolvers summary)
      :psi.graph/mutation-syms  (:mutations summary)
-     :psi.graph/env-built      (:env-built? summary)}))
+     :psi.graph/env-built      (:env-built? summary)
+     :psi.graph/nodes          (:nodes cgraph)
+     :psi.graph/edges          (:edges cgraph)
+     :psi.graph/capabilities   (:capabilities cgraph)
+     :psi.graph/domain-coverage (:domain-coverage cgraph)}))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; All resolvers

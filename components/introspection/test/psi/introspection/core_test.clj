@@ -149,8 +149,9 @@
 
 (deftest query-graph-summary-test
   (testing "Query graph statistics are queryable"
-    (let [ctx    (bootstrapped-ctx)
-          result (introspection/query-graph-summary-in ctx)]
+    (let [ctx     (bootstrapped-ctx)
+          result  (introspection/query-graph-summary-in ctx)
+          result2 (introspection/query-graph-summary-in ctx)]
 
       (testing ":psi.graph/resolver-count includes introspection resolvers"
         (is (pos? (:psi.graph/resolver-count result))))
@@ -173,7 +174,26 @@
               "Introspection resolver should be present")))
 
       (testing ":psi.graph/mutation-count is a non-negative integer"
-        (is (nat-int? (:psi.graph/mutation-count result)))))))
+        (is (nat-int? (:psi.graph/mutation-count result))))
+
+      (testing "Step 7 capability graph attrs are exposed"
+        (is (vector? (:psi.graph/nodes result)))
+        (is (vector? (:psi.graph/edges result)))
+        (is (vector? (:psi.graph/capabilities result)))
+        (is (vector? (:psi.graph/domain-coverage result))))
+
+      (testing "domain coverage includes required domains"
+        (let [domains (set (map :domain (:psi.graph/domain-coverage result)))]
+          (is (contains? domains :ai))
+          (is (contains? domains :history))
+          (is (contains? domains :agent-session))
+          (is (contains? domains :introspection))))
+
+      (testing "repeated queries are deterministic for graph attrs"
+        (is (= (:psi.graph/nodes result) (:psi.graph/nodes result2)))
+        (is (= (:psi.graph/edges result) (:psi.graph/edges result2)))
+        (is (= (:psi.graph/capabilities result) (:psi.graph/capabilities result2)))
+        (is (= (:psi.graph/domain-coverage result) (:psi.graph/domain-coverage result2)))))))
 
 (deftest graph-self-describes-test
   (testing "Introspection resolvers appear in the graph summary"
