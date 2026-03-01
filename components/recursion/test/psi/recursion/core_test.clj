@@ -307,3 +307,320 @@
           result (core/handle-trigger-in! ctx (make-trigger :manual) all-ready)]
       (is (= :rejected (:result result)))
       (is (= :controller-busy (:reason result))))))
+
+;;; --- Observation tests ---
+
+(def ^:private sample-graph-state
+  {:node-count 12
+   :capability-count 5
+   :status :stable})
+
+(def ^:private sample-memory-state
+  {:entry-count 3
+   :status :ready
+   :recovery-count 1})
+
+(defn- trigger-and-get-cycle-id
+  "Helper: fire a manual trigger and return the accepted cycle-id."
+  [ctx]
+  (core/register-hooks-in! ctx)
+  (:cycle-id (core/handle-trigger-in! ctx (make-trigger :manual) all-ready)))
+
+(deftest observe-in-test
+  ;; Tests observation capture, signal extraction, and phase transition
+  (testing "observation captures correct readiness map and signals"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          result   (core/observe-in! ctx cycle-id all-ready sample-graph-state sample-memory-state)]
+      (is (true? (:ok? result)))
+      (let [obs (:observation result)]
+        (is (inst? (:captured-at obs)))
+
+        (testing "readiness map"
+          (is (= {:query true :graph true :introspection true :memory true}
+                 (:readiness obs))))
+
+        (testing "graph signals extracted"
+          (is (contains? (:graph-signals obs) "node-count=12"))
+          (is (contains? (:graph-signals obs) "capability-count=5"))
+          (is (contains? (:graph-signals obs) "status=stable")))
+
+        (testing "memory signals extracted"
+          (is (contains? (:memory-signals obs) "entry-count=3"))
+          (is (contains? (:memory-signals obs) "status=ready"))
+          (is (contains? (:memory-signals obs) "recovery-count=1")))
+
+        (testing "opportunities include system ready"
+          (is (some #(= "system ready for evolution" %) (:opportunities obs))))
+
+        (testing "opportunities include stable graph"
+          (is (some #(= "stable graph available" %) (:opportunities obs))))
+
+        (testing "opportunities include memory available"
+          (is (some #(= "memory entries available for learning" %) (:opportunities obs))))
+
+        (testing "no gaps when all ready with good counts"
+          (is (empty? (:gaps obs)))))))
+
+  (testing "observation detects gaps"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; Graph with low capability count, memory with zero entries
+          result   (core/observe-in! ctx cycle-id all-ready
+                                     {:capability-count 1 :status :initializing}
+                                     {:entry-count 0 :status :ready})]
+      (is (true? (:ok? result)))
+      (let [obs (:observation result)]
+        (is (some #(= "low capability count" %) (:gaps obs)))
+        (is (some #(= "no memory entries" %) (:gaps obs))))))
+
+  (testing "observation transitions cycle and controller to planning"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          _        (core/observe-in! ctx cycle-id all-ready sample-graph-state sample-memory-state)
+          state    (core/get-state-in ctx)
+          cycle    (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (= :planning (:status state)) "controller should be planning")
+      (is (= :planning (:status cycle)) "cycle should be planning")
+      (is (some? (:observation cycle)) "observation should be attached")))
+
+  (testing "observe rejects wrong cycle status"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; Observe once to move to planning
+          _        (core/observe-in! ctx cycle-id all-ready sample-graph-state sample-memory-state)
+          ;; Try to observe again
+          result   (core/observe-in! ctx cycle-id all-ready sample-graph-state sample-memory-state)]
+      (is (false? (:ok? result)))
+      (is (= :wrong-cycle-status (:error result)))))
+
+  (testing "observe rejects unknown cycle-id"
+    (let [ctx    (core/create-context)
+          result (core/observe-in! ctx "nonexistent" all-ready sample-graph-state sample-memory-state)]
+      (is (false? (:ok? result)))
+      (is (= :cycle-not-found (:error result))))))
+
+;;; --- FUTURE_STATE synthesis tests ---
+
+(deftest synthesize-future-state-test
+  ;; Tests FUTURE_STATE synthesis from observation
+  (testing "version increments from nil (→1)"
+    (let [obs {:captured-at (java.time.Instant/now)
+               :readiness {:query true :graph true :introspection true :memory true}
+               :graph-signals #{"node-count=10"}
+               :memory-signals #{"entry-count=5"}
+               :gaps []
+               :opportunities ["system ready for evolution"]}
+          fs (future-state/synthesize-future-state nil obs)]
+      (is (= 1 (:version fs)))
+      (is (inst? (:generated-at fs)))
+      (is (true? (future-state/valid? fs)))))
+
+  (testing "version increments from existing (→N+1)"
+    (let [existing (future-state/initial-future-state)
+          obs {:captured-at (java.time.Instant/now)
+               :readiness {:query true :graph true :introspection true :memory true}
+               :graph-signals #{}
+               :memory-signals #{}
+               :gaps []
+               :opportunities []}
+          fs (future-state/synthesize-future-state existing obs)]
+      (is (= 1 (:version fs)) "0→1")))
+
+  (testing "goals generated from gaps (high priority)"
+    (let [obs {:captured-at (java.time.Instant/now)
+               :readiness {:query true :graph true :introspection true :memory true}
+               :graph-signals #{}
+               :memory-signals #{}
+               :gaps ["query not ready" "low capability count"]
+               :opportunities []}
+          fs (future-state/synthesize-future-state nil obs)]
+      (is (= 2 (count (:goals fs))))
+      (is (every? #(= :high (:priority %)) (:goals fs)))
+      (is (every? #(= :proposed (:status %)) (:goals fs)))))
+
+  (testing "goals generated from opportunities (medium priority)"
+    (let [obs {:captured-at (java.time.Instant/now)
+               :readiness {:query true :graph true :introspection true :memory true}
+               :graph-signals #{}
+               :memory-signals #{}
+               :gaps []
+               :opportunities ["system ready for evolution" "stable graph available"]}
+          fs (future-state/synthesize-future-state nil obs)]
+      (is (= 2 (count (:goals fs))))
+      (is (every? #(= :medium (:priority %)) (:goals fs)))
+      (is (every? #(= :proposed (:status %)) (:goals fs)))))
+
+  (testing "mixed gaps and opportunities produce correctly prioritized goals"
+    (let [obs {:captured-at (java.time.Instant/now)
+               :readiness {:query true :graph true :introspection true :memory true}
+               :graph-signals #{}
+               :memory-signals #{}
+               :gaps ["a gap"]
+               :opportunities ["an opportunity"]}
+          fs (future-state/synthesize-future-state nil obs)
+          gap-goal (first (filter #(= :high (:priority %)) (:goals fs)))
+          opp-goal (first (filter #(= :medium (:priority %)) (:goals fs)))]
+      (is (= 2 (count (:goals fs))))
+      (is (some? gap-goal))
+      (is (some? opp-goal))))
+
+  (testing "assumptions derived from readiness"
+    (let [obs {:captured-at (java.time.Instant/now)
+               :readiness {:query true :graph false :introspection true :memory true}
+               :graph-signals #{}
+               :memory-signals #{}
+               :gaps []
+               :opportunities []}
+          fs (future-state/synthesize-future-state nil obs)]
+      (is (contains? (:assumptions fs) "graph=false"))
+      (is (contains? (:assumptions fs) "query=true"))))
+
+  (testing "deterministic goal IDs"
+    (let [obs {:captured-at (java.time.Instant/now)
+               :readiness {:query true :graph true :introspection true :memory true}
+               :graph-signals #{}
+               :memory-signals #{}
+               :gaps ["same gap"]
+               :opportunities []}
+          fs1 (future-state/synthesize-future-state nil obs)
+          fs2 (future-state/synthesize-future-state nil obs)]
+      (is (= (map :id (:goals fs1))
+             (map :id (:goals fs2)))))))
+
+;;; --- Plan proposal generation tests ---
+
+(deftest plan-in-test
+  ;; Tests plan proposal generation with policy constraints
+  (testing "proposal bounded by max-actions-per-cycle=1"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     sample-graph-state sample-memory-state)
+          result   (core/plan-in! ctx cycle-id)]
+      (is (true? (:ok? result)))
+      (let [proposal (:proposal result)]
+        (is (<= (count (:actions proposal)) 1)
+            "should respect max-actions-per-cycle=1")
+        (is (inst? (:generated-at proposal)))
+        (is (true? (:requires-approval proposal))
+            "default policy requires human approval")
+        (is (nil? (:approved proposal)))
+        (is (nil? (:approval-by proposal))))))
+
+  (testing "proposal risk is aggregate of action risks"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; Create observation with a gap (high priority → high risk action)
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     {:capability-count 1 :status :initializing}
+                                     {:entry-count 0 :status :ready})
+          result   (core/plan-in! ctx cycle-id)
+          proposal (:proposal result)]
+      (is (= :high (:risk proposal))
+          "gap goals have high priority → high risk action")))
+
+  (testing "proposal with no gaps has lower risk"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; All ready, good counts → only opportunities (medium priority)
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     sample-graph-state sample-memory-state)
+          result   (core/plan-in! ctx cycle-id)
+          proposal (:proposal result)]
+      (is (= :medium (:risk proposal))
+          "opportunity goals have medium priority → medium risk")))
+
+  (testing "atomic-only policy enforced on generated actions"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     sample-graph-state sample-memory-state)
+          result   (core/plan-in! ctx cycle-id)
+          proposal (:proposal result)]
+      (is (every? :atomic (:actions proposal))
+          "all actions must be atomic when atomic-only=true")))
+
+  (testing "FUTURE_STATE attached to controller after planning"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     sample-graph-state sample-memory-state)
+          _        (core/plan-in! ctx cycle-id)
+          state    (core/get-state-in ctx)]
+      (is (some? (:current-future-state state)))
+      (is (= 1 (:version (:current-future-state state))))
+      (is (true? (future-state/valid? (:current-future-state state))))))
+
+  (testing "proposal attached to cycle"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     sample-graph-state sample-memory-state)
+          _        (core/plan-in! ctx cycle-id)
+          state    (core/get-state-in ctx)
+          cycle    (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (some? (:proposal cycle)))))
+
+  (testing "plan with higher max-actions generates more actions"
+    (let [ctx      (core/create-context
+                    {:state-overrides {:policy (assoc (policy/default-policy)
+                                                      :max-actions-per-cycle 5)}})
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; Create observation with multiple gaps + opportunities
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     {:capability-count 1 :status :initializing}
+                                     {:entry-count 0 :status :ready})
+          result   (core/plan-in! ctx cycle-id)
+          proposal (:proposal result)]
+      ;; Should have more than 1 action (gaps + opportunities)
+      (is (pos? (count (:actions proposal))))
+      (is (<= (count (:actions proposal)) 5))))
+
+  (testing "plan rejects wrong cycle status"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; Cycle is in :observing, not :planning
+          result   (core/plan-in! ctx cycle-id)]
+      (is (false? (:ok? result)))
+      (is (= :wrong-cycle-status (:error result)))))
+
+  (testing "plan rejects if no observation"
+    (let [ctx (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)]
+      ;; Manually set cycle to planning without observation
+      (core/swap-state-in! ctx
+                           (fn [s]
+                             (update s :cycles
+                                     (fn [cs]
+                                       (mapv #(if (= cycle-id (:cycle-id %))
+                                                (assoc % :status :planning)
+                                                %)
+                                             cs)))))
+      (let [result (core/plan-in! ctx cycle-id)]
+        (is (false? (:ok? result)))
+        (is (= :no-observation (:error result))))))
+
+  (testing "empty proposal when no goals"
+    (let [ctx      (core/create-context)
+          cycle-id (trigger-and-get-cycle-id ctx)
+          ;; Manually attach an observation with no gaps and no opportunities
+          _        (core/observe-in! ctx cycle-id all-ready
+                                     sample-graph-state sample-memory-state)
+          ;; Override the observation to have empty gaps and opportunities
+          _        (core/swap-state-in!
+                    ctx
+                    (fn [s]
+                      (update s :cycles
+                              (fn [cs]
+                                (mapv #(if (= cycle-id (:cycle-id %))
+                                         (assoc-in % [:observation :gaps] [])
+                                         %)
+                                      (mapv #(if (= cycle-id (:cycle-id %))
+                                               (assoc-in % [:observation :opportunities] [])
+                                               %)
+                                            cs))))))
+          result   (core/plan-in! ctx cycle-id)
+          proposal (:proposal result)]
+      (is (= :low (:risk proposal)) "empty actions → low risk")
+      (is (empty? (:actions proposal))))))

@@ -2,8 +2,10 @@
   "Feed-forward recursion controller.
 
    Establishes an isolated RecursionContext (Nullable pattern), global wrappers,
-   the initial controller state shape, trigger intake, and readiness gating."
+   the initial controller state shape, trigger intake, readiness gating,
+   observation, FUTURE_STATE synthesis, and plan proposal generation."
   (:require
+   [psi.recursion.future-state :as future-state]
    [psi.recursion.policy :as policy]))
 
 (defrecord RecursionContext [state-atom config])
@@ -183,3 +185,205 @@
   "Global wrapper for `handle-trigger-in!`."
   [trigger-signal system-state]
   (handle-trigger-in! (global-context) trigger-signal system-state))
+
+;;; --- Observation ---
+
+(defn- find-cycle
+  "Find a cycle by id in the cycles vector."
+  [cycles cycle-id]
+  (first (filter #(= cycle-id (:cycle-id %)) cycles)))
+
+(defn- update-cycle
+  "Update the cycle matching `cycle-id` with `f`."
+  [cycles cycle-id f]
+  (mapv (fn [c]
+          (if (= cycle-id (:cycle-id c))
+            (f c)
+            c))
+        cycles))
+
+(defn- extract-graph-signals
+  "Extract signal strings from graph-state map."
+  [graph-state]
+  (let [signals (transient #{})]
+    (when-let [nc (:node-count graph-state)]
+      (conj! signals (str "node-count=" nc)))
+    (when-let [cc (:capability-count graph-state)]
+      (conj! signals (str "capability-count=" cc)))
+    (when-let [s (:status graph-state)]
+      (conj! signals (str "status=" (name s))))
+    (persistent! signals)))
+
+(defn- extract-memory-signals
+  "Extract signal strings from memory-state map."
+  [memory-state]
+  (let [signals (transient #{})]
+    (when-let [ec (:entry-count memory-state)]
+      (conj! signals (str "entry-count=" ec)))
+    (when-let [s (:status memory-state)]
+      (conj! signals (str "status=" (name s))))
+    (when-let [rc (:recovery-count memory-state)]
+      (conj! signals (str "recovery-count=" rc)))
+    (persistent! signals)))
+
+(defn- extract-gaps
+  "Identify gaps from readiness and capability data."
+  [readiness graph-state memory-state]
+  (let [gaps (transient [])]
+    (when-not (:query-ready readiness)
+      (conj! gaps "query not ready"))
+    (when-not (:graph-ready readiness)
+      (conj! gaps "graph not ready"))
+    (when-not (:introspection-ready readiness)
+      (conj! gaps "introspection not ready"))
+    (when-not (:memory-ready readiness)
+      (conj! gaps "memory not ready"))
+    (when (and (:capability-count graph-state)
+               (< (:capability-count graph-state) 3))
+      (conj! gaps "low capability count"))
+    (when (and (:entry-count memory-state)
+               (zero? (:entry-count memory-state)))
+      (conj! gaps "no memory entries"))
+    (persistent! gaps)))
+
+(defn- extract-opportunities
+  "Identify opportunities from system state."
+  [readiness graph-state memory-state]
+  (let [opps (transient [])]
+    (when (and (:query-ready readiness)
+               (:graph-ready readiness)
+               (:introspection-ready readiness)
+               (:memory-ready readiness))
+      (conj! opps "system ready for evolution"))
+    (when (and (:status graph-state) (= :stable (:status graph-state)))
+      (conj! opps "stable graph available"))
+    (when (and (:entry-count memory-state)
+               (pos? (:entry-count memory-state)))
+      (conj! opps "memory entries available for learning"))
+    (persistent! opps)))
+
+(defn observe-in!
+  "Observe phase: capture system, graph, and memory signals and attach
+   observation to the cycle. Transitions cycle and controller to :planning.
+
+   Returns {:ok? true, :observation obs} on success,
+   or {:ok? false, :error ...} if cycle not found or wrong status."
+  [ctx cycle-id system-state graph-state memory-state]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (not= :observing (:status cycle))
+      {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+      :else
+      (let [readiness {:query (boolean (:query-ready system-state))
+                       :graph (boolean (:graph-ready system-state))
+                       :introspection (boolean (:introspection-ready system-state))
+                       :memory (boolean (:memory-ready system-state))}
+            observation {:captured-at (java.time.Instant/now)
+                         :readiness readiness
+                         :graph-signals (extract-graph-signals graph-state)
+                         :memory-signals (extract-memory-signals memory-state)
+                         :gaps (extract-gaps system-state graph-state memory-state)
+                         :opportunities (extract-opportunities system-state graph-state memory-state)}]
+        (swap-state-in! ctx
+                        (fn [s]
+                          (-> s
+                              (assoc :status :planning)
+                              (update :cycles update-cycle cycle-id
+                                      #(-> %
+                                           (assoc :observation observation)
+                                           (assoc :status :planning))))))
+        {:ok? true, :observation observation}))))
+
+(defn observe!
+  "Global wrapper for `observe-in!`."
+  [cycle-id system-state graph-state memory-state]
+  (observe-in! (global-context) cycle-id system-state graph-state memory-state))
+
+;;; --- Plan proposal generation ---
+
+(def ^:private risk-order
+  "Risk level ordering for aggregation (highest wins)."
+  {:low 0, :medium 1, :high 2})
+
+(defn- aggregate-risk
+  "Return the highest risk level among actions. Defaults to :low."
+  [actions]
+  (if (empty? actions)
+    :low
+    (let [max-idx (apply max (map #(get risk-order (:risk %) 0) actions))]
+      (first (keep (fn [[k v]] (when (= v max-idx) k)) risk-order)))))
+
+(defn- goal->action
+  "Convert a FutureGoal to a ProposedAction.
+   All generated actions are atomic by design."
+  [goal]
+  {:id (str "action-" (:id goal))
+   :title (str "Address: " (:title goal))
+   :description (:description goal)
+   :domain :planning
+   :risk (:priority goal)
+   :atomic true
+   :expected-impact #{(:title goal)}
+   :verification-hints #{"tests" "lint"}})
+
+(defn plan-in!
+  "Plan phase: synthesize FUTURE_STATE and generate a bounded PlanProposal
+   from the top goal(s). Attaches proposal and updated future-state to cycle.
+   Controller stays in :planning (approval gate is next step).
+
+   Returns {:ok? true, :proposal proposal, :future-state fs} on success."
+  [ctx cycle-id]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (not= :planning (:status cycle))
+      {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+      (nil? (:observation cycle))
+      {:ok? false, :error :no-observation}
+
+      :else
+      (let [policy (:policy state)
+            max-actions (:max-actions-per-cycle policy)
+            current-fs (:current-future-state state)
+            new-fs (future-state/synthesize-future-state current-fs (:observation cycle))
+            ;; Sort goals: high priority first, then medium
+            sorted-goals (sort-by (fn [g]
+                                    (case (:priority g)
+                                      :high 0
+                                      :medium 1
+                                      :low 2
+                                      3))
+                                  (:goals new-fs))
+            ;; Generate actions bounded by max-actions-per-cycle
+            actions (->> sorted-goals
+                         (map goal->action)
+                         (take max-actions)
+                         vec)
+            proposal {:actions actions
+                      :risk (aggregate-risk actions)
+                      :requires-approval (:require-human-approval policy)
+                      :approved nil
+                      :approval-by nil
+                      :approval-notes nil
+                      :generated-at (java.time.Instant/now)}]
+        (swap-state-in! ctx
+                        (fn [s]
+                          (-> s
+                              (assoc :current-future-state new-fs)
+                              (update :cycles update-cycle cycle-id
+                                      #(assoc % :proposal proposal)))))
+        {:ok? true, :proposal proposal, :future-state new-fs}))))
+
+(defn plan!
+  "Global wrapper for `plan-in!`."
+  [cycle-id]
+  (plan-in! (global-context) cycle-id))
