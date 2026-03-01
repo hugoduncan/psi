@@ -41,6 +41,8 @@
    [psi.introspection.resolvers :as resolvers]
    [psi.engine.core :as engine]
    [psi.query.core :as query]
+   [psi.ai.core :as ai]
+   [psi.history.resolvers :as history-resolvers]
    [psi.agent-session.core :as agent-session]
    [psi.agent-session.resolvers :as as-resolvers]))
 
@@ -49,15 +51,33 @@
 ;; ─────────────────────────────────────────────────────────────────────────────
 
 (defn register-resolvers!
-  "Register all introspection + agent-session resolvers, plus agent-session
-   mutations, into the global query graph. Rebuilds env once at the end."
+  "Register Step 7 startup domains into the global query graph and rebuild once.
+
+   Domains:
+   - AI resolvers
+   - History resolvers
+   - Introspection resolvers
+   - Agent-session resolvers + mutations"
   []
+  ;; AI resolvers (register directly to avoid per-domain env rebuilds)
+  (query/register-resolver! ai/ai-model-resolver)
+  (query/register-resolver! ai/ai-model-list-resolver)
+  (query/register-resolver! ai/ai-provider-models-resolver)
+  (query/register-resolver! ai/ai-provider-registry-resolver)
+
+  ;; History + Introspection + Agent-session resolvers
+  (doseq [r history-resolvers/all-resolvers]
+    (query/register-resolver! r))
   (doseq [r resolvers/all-resolvers]
     (query/register-resolver! r))
   (doseq [r as-resolvers/all-resolvers]
     (query/register-resolver! r))
+
+  ;; Agent-session mutations
   (doseq [m agent-session/all-mutations]
     (query/register-mutation! m))
+
+  ;; Single env rebuild after all operations are registered.
   (query/rebuild-env!))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
@@ -90,20 +110,37 @@
 ;; ─────────────────────────────────────────────────────────────────────────────
 
 (defn register-resolvers-in!
-  "Register introspection resolvers (and optionally agent-session operations)
-   into `ctx`'s query context, then rebuild env once.
+  "Register Step 7 startup domains into `ctx`'s query context and rebuild once.
+
+   Domains:
+   - AI resolvers
+   - History resolvers
+   - Introspection resolvers
+   - Agent-session resolvers + mutations (when :agent-session-ctx is present)
 
    If `ctx` carries an :agent-session-ctx, agent-session resolvers + mutations
    are also registered so :psi.agent-session/* and mutation-backed workflows are
    queryable/executable."
   [ctx]
   (let [qctx (:query-ctx ctx)]
+    ;; AI resolvers
+    (query/register-resolver-in! qctx ai/ai-model-resolver)
+    (query/register-resolver-in! qctx ai/ai-model-list-resolver)
+    (query/register-resolver-in! qctx ai/ai-provider-models-resolver)
+    (query/register-resolver-in! qctx ai/ai-provider-registry-resolver)
+
+    ;; History + Introspection resolvers
+    (doseq [r history-resolvers/all-resolvers]
+      (query/register-resolver-in! qctx r))
     (doseq [r resolvers/all-resolvers]
       (query/register-resolver-in! qctx r))
+
     (when (:agent-session-ctx ctx)
       ;; Pass rebuild?=false — we rebuild once below after all operations are in.
       (agent-session/register-resolvers-in! qctx false)
       (agent-session/register-mutations-in! qctx false))
+
+    ;; Single env rebuild after all operations are registered.
     (query/rebuild-env-in! qctx)))
 
 (defn query-system-state-in

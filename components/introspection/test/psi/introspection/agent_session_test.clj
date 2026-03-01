@@ -56,6 +56,12 @@
       (let [result  (introspection/query-graph-summary-in ctx)
             r-syms  (:psi.graph/resolver-syms result)
             m-syms  (:psi.graph/mutation-syms result)]
+        (is (true? (:psi.graph/env-built result))
+            "graph env should be built after registration")
+        (is (contains? r-syms 'psi.ai.core/ai-model-list-resolver)
+            "AI resolver should appear in graph summary")
+        (is (contains? r-syms 'psi.history.resolvers/git-repo-status)
+            "History resolver should appear in graph summary")
         (is (contains? r-syms 'psi.agent-session.resolvers/agent-session-identity)
             "identity resolver should appear in graph summary")
         (is (contains? r-syms 'psi.agent-session.resolvers/agent-session-phase)
