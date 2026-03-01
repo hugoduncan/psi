@@ -14,7 +14,8 @@
         psi/memory                                    {:local/root "components/memory"}
         psi/tui                                       {:local/root "components/tui"}
         psi/agent-core                                {:local/root "components/agent-core"}
-        psi/agent-session                             {:local/root "components/agent-session"}}
+        psi/agent-session                             {:local/root "components/agent-session"}
+        psi/recursion                                 {:local/root "components/recursion"}}
  :aliases
  {:dev   {:extra-paths ["dev"]}
   :run   {:extra-paths ["components/agent-session/src"
@@ -27,10 +28,10 @@
           :main-opts   ["-m" "psi.agent-session.main"]}
   :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.5.1"}}}
   :test  {:extra-paths ["test" "components/ai/test" "components/query/test" "components/history/test"
-                        "components/introspection/test" "components/memory/test" "components/tui/test" "components/agent-core/test"
+                        "components/introspection/test" "components/memory/test" "components/recursion/test" "components/tui/test" "components/agent-core/test"
                         "components/agent-session/test"
                         "components/ai/src" "components/engine/src" "components/query/src" "components/history/src"
-                        "components/introspection/src" "components/memory/src" "components/tui/src" "components/agent-core/src"
+                        "components/introspection/src" "components/memory/src" "components/recursion/src" "components/tui/src" "components/agent-core/src"
                         "components/agent-session/src"]
           :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
           :main-opts   ["-m" "kaocha.runner"]}}}
