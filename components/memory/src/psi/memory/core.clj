@@ -8,6 +8,8 @@
    Lifecycle, remember/recover logic, and graph history tracking are added in
    follow-up tasks."
   (:require
+   [clojure.set :as set]
+   [clojure.string :as str]
    [psi.engine.core :as engine]
    [psi.history.git :as git]
    [psi.memory.graph-history :as graph-history]
@@ -254,6 +256,254 @@
   "Global wrapper for `remember-in!`."
   [remember-input]
   (remember-in! (global-context) remember-input))
+
+(defn- normalize-sources
+  [sources]
+  (let [normalized (->> (or sources [:session :history :graph])
+                        (map keyword)
+                        vec)]
+    (if (seq normalized)
+      normalized
+      [:session :history :graph])))
+
+(defn- source->record
+  [record]
+  (or (:source (:provenance record))
+      (:source-type (:provenance record))
+      :session))
+
+(defn- normalize-query-text
+  [query-text]
+  (some-> query-text str str/lower-case str/trim))
+
+(defn- text-relevance-score
+  [query-text record]
+  (let [q (normalize-query-text query-text)]
+    (if (str/blank? q)
+      0.0
+      (let [haystack (str/lower-case (str (:content record) " " (or (:content-type record) "") " " (str/join " " (:tags record))))]
+        (if (str/includes? haystack q) 1.0 0.0)))))
+
+(defn- recency-score
+  [now timestamp]
+  (if (instance? java.time.Instant timestamp)
+    (let [hours (Math/abs (double (.toHours (java.time.Duration/between timestamp now))))]
+      (/ 1.0 (+ 1.0 hours)))
+    0.0))
+
+(defn- capability-proximity
+  [requested-capability-ids record]
+  (let [requested (set (map keyword (or requested-capability-ids [])))
+        record-caps (set (map keyword (or (get-in record [:provenance :capabilityIds]) [])))]
+    (if (or (empty? requested) (empty? record-caps))
+      0.0
+      (/ (double (count (set/intersection requested record-caps)))
+         (double (count requested))))))
+
+(defn- score-record
+  [{:keys [query-text now capability-ids ranking-weights]} record]
+  (let [{text-weight :text-relevance
+         recency-weight :recency
+         capability-weight :capability-proximity} ranking-weights
+        tr (text-relevance-score query-text record)
+        rs (recency-score now (:timestamp record))
+        cp (capability-proximity capability-ids record)]
+    (+ (* (/ text-weight 100.0) tr)
+       (* (/ recency-weight 100.0) rs)
+       (* (/ capability-weight 100.0) cp))))
+
+(defn- dedupe-records
+  [records]
+  (vals
+   (reduce (fn [acc record]
+             (let [k (or (:record-id record)
+                         [(:content-type record)
+                          (:content record)
+                          (:timestamp record)])]
+               (if (contains? acc k)
+                 acc
+                 (assoc acc k record))))
+           {}
+           records)))
+
+(defn- filter-record?
+  [{:keys [tags capability-ids content-types since query-text]} record]
+  (let [record-tags (set (:tags record))
+        requested-tags (set (or tags []))
+        record-caps (set (or (get-in record [:provenance :capabilityIds]) []))
+        requested-caps (set (or capability-ids []))
+        requested-types (set (or content-types []))
+        timestamp (:timestamp record)
+        text-q (normalize-query-text query-text)]
+    (and
+     (or (empty? requested-tags)
+         (not-empty (set/intersection requested-tags record-tags)))
+     (or (empty? requested-caps)
+         (not-empty (set/intersection requested-caps record-caps)))
+     (or (empty? requested-types)
+         (contains? requested-types (:content-type record)))
+     (or (nil? since)
+         (and (instance? java.time.Instant timestamp)
+              (not (neg? (compare timestamp since)))))
+     (or (str/blank? text-q)
+         (pos? (text-relevance-score text-q record))))))
+
+(defn recover-in!
+  "Recover memory records using required Step 10 source composition, filters, ranking and limit.
+
+   Defaults:
+   - required sources composed: :session, :history, :graph
+   - limit: 50
+   - ranking weights: 50/25/25 (must sum to 100)
+
+   Returns map with :ok?, :results, :result-count, :resultsTruncated, :sources and :weights."
+  [ctx {:keys [sources limit tags capability-ids content-types since query-text ranking-weights now]
+        :or   {limit 50
+               now (java.time.Instant/now)}}]
+  (let [weights (or ranking-weights ranking/default-weights)]
+    (if-not (ranking/weights-valid? weights)
+      {:ok? false
+       :error :invalid-ranking-weights
+       :weights weights}
+      (let [state             (get-state-in ctx)
+            requested-sources (normalize-sources sources)]
+        (if-not (= #{:session :history :graph} (set requested-sources))
+          {:ok? false
+           :error :required-sources-missing
+           :sources requested-sources}
+          (let [records           (:records state)
+                session-records   (filter #(= :session (source->record %)) records)
+                history-records   (filter #(contains? #{:history :git} (source->record %)) records)
+                graph-records     (mapv (fn [snapshot]
+                                          {:record-id (or (:snapshot-id snapshot)
+                                                          (str (random-uuid)))
+                                           :content-type :graph-snapshot
+                                           :content (str "capability graph snapshot " (:fingerprint snapshot))
+                                           :tags [:graph :snapshot]
+                                           :timestamp (:timestamp snapshot)
+                                           :provenance {:source :graph
+                                                        :graphFingerprint (:fingerprint snapshot)
+                                                        :capabilityIds (vec (or (:capability-ids snapshot) []))}
+                                           :graph-snapshot snapshot})
+                                        (:graph-snapshots state))
+                records-by-source {:session session-records
+                                   :history history-records
+                                   :graph graph-records}
+                merged            (->> requested-sources
+                                       (mapcat #(get records-by-source % []))
+                                       dedupe-records)
+                filtered          (filter (partial filter-record? {:tags tags
+                                                                   :capability-ids capability-ids
+                                                                   :content-types content-types
+                                                                   :since since
+                                                                   :query-text query-text})
+                                          merged)
+                scored            (->> filtered
+                                       (map (fn [record]
+                                              (assoc record :recovery/score
+                                                     (score-record {:query-text query-text
+                                                                    :now now
+                                                                    :capability-ids capability-ids
+                                                                    :ranking-weights weights}
+                                                                   record))))
+                                       (sort-by :recovery/score >)
+                                       vec)
+                enforced-limit    (max 0 (or limit 50))
+                total-count       (count scored)
+                results           (vec (take enforced-limit scored))
+                truncated?        (> total-count enforced-limit)
+                recovery          {:recovery-id (str (random-uuid))
+                                   :timestamp now
+                                   :sources requested-sources
+                                   :filters {:tags (vec (or tags []))
+                                             :capability-ids (vec (or capability-ids []))
+                                             :content-types (vec (or content-types []))
+                                             :since since
+                                             :query-text query-text}
+                                   :weights weights
+                                   :limit enforced-limit
+                                   :result-count (count results)
+                                   :resultsTruncated truncated?
+                                   :results results}]
+            (swap-state-in! ctx
+                            (fn [s]
+                              (-> s
+                                  (assoc :search-results results)
+                                  (update :recoveries (fnil conj []) recovery))))
+            {:ok? true
+             :sources requested-sources
+             :weights weights
+             :result-count (count results)
+             :resultsTruncated truncated?
+             :results results
+             :recovery recovery}))))))
+
+(defn recover!
+  "Global wrapper for `recover-in!`."
+  [recover-input]
+  (recover-in! (global-context) recover-input))
+
+(defn capture-graph-change-in!
+  "Capture graph snapshot/delta into isolated `ctx` when fingerprint changes.
+
+   Behavior:
+   - no-op when fingerprint is missing
+   - no-op when fingerprint matches latest snapshot
+   - append snapshot on change
+   - append delta when prior snapshot exists
+   - enforce fixed-window retention (200 snapshots, 1000 deltas)
+   - does not produce summary entities"
+  ([ctx capability-graph]
+   (capture-graph-change-in! ctx capability-graph (java.time.Instant/now)))
+  ([ctx capability-graph timestamp]
+   (if-let [snapshot (graph-history/make-snapshot capability-graph timestamp)]
+     (let [state           (get-state-in ctx)
+           latest-snapshot (last (:graph-snapshots state))
+           duplicate?      (= (:fingerprint latest-snapshot)
+                              (:fingerprint snapshot))]
+       (if duplicate?
+         {:ok? true
+          :changed? false
+          :reason :unchanged-fingerprint
+          :snapshot-added? false
+          :delta-added? false
+          :snapshot-count (count (:graph-snapshots state))
+          :delta-count (count (:graph-deltas state))}
+         (let [delta (when latest-snapshot
+                       (graph-history/make-delta latest-snapshot snapshot timestamp))]
+           (swap-state-in! ctx
+                           (fn [s]
+                             (let [with-snapshot (update s :graph-snapshots
+                                                         (fn [entries]
+                                                           (graph-history/trim-window
+                                                            (conj (vec (or entries [])) snapshot)
+                                                            graph-history/snapshot-retention-limit)))]
+                               (if delta
+                                 (update with-snapshot :graph-deltas
+                                         (fn [entries]
+                                           (graph-history/trim-window
+                                            (conj (vec (or entries [])) delta)
+                                            graph-history/delta-retention-limit)))
+                                 with-snapshot))))
+           (let [updated (get-state-in ctx)]
+             {:ok? true
+              :changed? true
+              :snapshot-added? true
+              :delta-added? (some? delta)
+              :snapshot snapshot
+              :delta delta
+              :snapshot-count (count (:graph-snapshots updated))
+              :delta-count (count (:graph-deltas updated))}))))
+     {:ok? false
+      :changed? false
+      :error :missing-fingerprint})))
+
+(defn capture-graph-change!
+  "Global wrapper for `capture-graph-change-in!`."
+  ([capability-graph]
+   (capture-graph-change-in! (global-context) capability-graph))
+  ([capability-graph timestamp]
+   (capture-graph-change-in! (global-context) capability-graph timestamp)))
 
 (defn register-resolvers-in!
   "Register memory resolvers into isolated query context `qctx`.
