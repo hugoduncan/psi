@@ -217,6 +217,92 @@
   [state s]
   (assoc state :input (charm/text-input-set-value (:input state) s)))
 
+(defn- clear-history-browse
+  [state]
+  (assoc-in state [:prompt-input-state :history :browse-index] nil))
+
+(defn- set-input-model
+  [state input]
+  (-> state
+      (assoc :input input)
+      clear-history-browse))
+
+(defn- history-entries
+  [state]
+  (vec (get-in state [:prompt-input-state :history :entries] [])))
+
+(defn- history-max-entries
+  [state]
+  (or (get-in state [:prompt-input-state :history :max-entries])
+      prompt-history-max-entries))
+
+(defn- record-history-entry
+  [state text]
+  (let [entry (str/trim (or text ""))]
+    (if (str/blank? entry)
+      state
+      (let [entries      (history-entries state)
+            last-entry   (peek entries)
+            max-entries  (history-max-entries state)
+            next-entries (if (= last-entry entry)
+                           entries
+                           (let [appended (conj entries entry)
+                                 extra    (max 0 (- (count appended) max-entries))]
+                             (if (pos? extra)
+                               (vec (subvec appended extra))
+                               appended)))]
+        (-> state
+            (assoc-in [:prompt-input-state :history :entries] next-entries)
+            (assoc-in [:prompt-input-state :history :browse-index] nil))))))
+
+(defn- history-current-entry
+  [state idx]
+  (let [entries (history-entries state)]
+    (when (and (some? idx)
+               (<= 0 idx)
+               (< idx (count entries)))
+      (nth entries idx))))
+
+(defn- browse-history
+  [state direction]
+  (let [entries (history-entries state)
+        n       (count entries)
+        idx     (get-in state [:prompt-input-state :history :browse-index])
+        input   (input-value state)]
+    (if (zero? n)
+      state
+      (case direction
+        :up
+        (cond
+          (and (nil? idx) (str/blank? input))
+          (let [new-idx (dec n)]
+            (-> state
+                (assoc-in [:prompt-input-state :history :browse-index] new-idx)
+                (set-input-value (history-current-entry state new-idx))))
+
+          (some? idx)
+          (let [new-idx (max 0 (dec idx))]
+            (-> state
+                (assoc-in [:prompt-input-state :history :browse-index] new-idx)
+                (set-input-value (history-current-entry state new-idx))))
+
+          :else
+          state)
+
+        :down
+        (if (some? idx)
+          (if (>= idx (dec n))
+            (-> state
+                (assoc-in [:prompt-input-state :history :browse-index] nil)
+                (set-input-value ""))
+            (let [new-idx (min (dec n) (inc idx))]
+              (-> state
+                  (assoc-in [:prompt-input-state :history :browse-index] new-idx)
+                  (set-input-value (history-current-entry state new-idx)))))
+          state)
+
+        state))))
+
 (defn- whitespace-char?
   [^Character c]
   (Character/isWhitespace c))
@@ -784,10 +870,10 @@
   "Enter session-selector phase."
   [state]
   (let [sel (session-selector-init (:cwd state) (:current-session-file state))]
-    [(assoc state
-            :phase            :selecting-session
-            :session-selector sel
-            :input            (charm/text-input-reset (:input state)))
+    [(-> state
+         (assoc :phase :selecting-session
+                :session-selector sel)
+         (set-input-model (charm/text-input-reset (:input state))))
      nil]))
 
 (defn- handle-dispatch-result
@@ -806,20 +892,20 @@
       [(-> state
            (assoc :messages []
                   :error    nil
-                  :input    (charm/text-input-reset (:input state))
                   :force-clear? true)
+           (set-input-model (charm/text-input-reset (:input state)))
            (update :messages conj {:role :assistant :text (:message result)}))
        nil]
 
       :text
       [(-> state
-           (assoc :input (charm/text-input-reset (:input state)))
+           (set-input-model (charm/text-input-reset (:input state)))
            (update :messages conj {:role :assistant :text (:message result)}))
        nil]
 
       (:login-error :logout)
       [(-> state
-           (assoc :input (charm/text-input-reset (:input state)))
+           (set-input-model (charm/text-input-reset (:input state)))
            (update :messages conj {:role :assistant :text (:message result)}))
        nil]
 
@@ -832,7 +918,7 @@
                      (catch Exception e
                        (timbre/warn "Extension command error:" (ex-message e))
                        (str "[command error: " (ex-message e) "]")))]
-        [(cond-> (assoc state :input (charm/text-input-reset (:input state)))
+        [(cond-> (set-input-model state (charm/text-input-reset (:input state)))
            output (update :messages conj {:role :assistant :text output}))
          nil])
 
@@ -841,7 +927,7 @@
       ;; providers, the next input will be treated as the auth code.
       :login-start
       [(-> state
-           (assoc :input (charm/text-input-reset (:input state)))
+           (set-input-model (charm/text-input-reset (:input state)))
            (update :messages conj
                    {:role :assistant
                     :text (str "🔑 Login to " (get-in result [:provider :name])
@@ -853,7 +939,7 @@
 
       ;; Fallback — treat as text
       [(-> state
-           (assoc :input (charm/text-input-reset (:input state)))
+           (set-input-model (charm/text-input-reset (:input state)))
            (update :messages conj {:role :assistant :text (str result)}))
        nil])))
 
@@ -936,9 +1022,9 @@
          (update :messages conj {:role :user :text text})
          (assoc :phase         :streaming
                 :error         nil
-                :input         (charm/text-input-reset (:input state))
                 :spinner-frame 0
-                :stream-text   nil))
+                :stream-text   nil)
+         (set-input-model (charm/text-input-reset (:input state))))
      (poll-cmd queue)]))
 
 (defn- submit-input
@@ -953,7 +1039,8 @@
 
       ;; Dispatch commands via central dispatcher
       :else
-      (let [dispatch-fn (:dispatch-fn state)
+      (let [state       (record-history-entry state text)
+            dispatch-fn (:dispatch-fn state)
             result      (when dispatch-fn (dispatch-fn text))]
         (if result
           (handle-dispatch-result state result)
@@ -970,7 +1057,7 @@
                       (subs value 0 (dec (count value)))
                       value)
         next-input  (charm/text-input-set-value (:input state) (str value' "\n"))]
-    [(assoc state :input next-input) nil]))
+    [(set-input-model state next-input) nil]))
 
 (defn- delete-prev-word
   "Delete previous word from charm text input state.
@@ -1220,6 +1307,17 @@
              (msg/key-match? m "down"))
         [(move-autocomplete-selection state 1) nil]
 
+      ;; Up/Down browse prompt history when autocomplete is closed.
+        (and (= :idle (:phase state))
+             (not (autocomplete-open? state))
+             (msg/key-match? m "up"))
+        [(browse-history state :up) nil]
+
+        (and (= :idle (:phase state))
+             (not (autocomplete-open? state))
+             (msg/key-match? m "down"))
+        [(browse-history state :down) nil]
+
       ;; Tab accepts selected autocomplete suggestion.
         (and (= :idle (:phase state))
              (autocomplete-open? state)
@@ -1262,7 +1360,7 @@
         (and (= :idle (:phase state))
              (msg/key-match? m "backspace"))
         (let [[new-input cmd] (charm/text-input-update (:input state) m)
-              next-state      (assoc state :input new-input)
+              next-state      (set-input-model state new-input)
               next-state      (if (autocomplete-open? state)
                                 (refresh-autocomplete next-state (get-in state [:prompt-input-state :autocomplete :trigger-mode]))
                                 next-state)]
@@ -1273,7 +1371,7 @@
         (and (= :idle (:phase state))
              (msg/key-match? m "space"))
         (let [[new-input cmd] (charm/text-input-update (:input state) (msg/key-press " "))
-              next-state      (assoc state :input new-input)
+              next-state      (set-input-model state new-input)
               next-state      (if (autocomplete-open? state)
                                 (refresh-autocomplete next-state (get-in state [:prompt-input-state :autocomplete :trigger-mode]))
                                 (maybe-auto-open-autocomplete next-state :space))]
@@ -1284,7 +1382,7 @@
              (msg/key-press? m))
         (let [key-token       (:key m)
               [new-input cmd] (charm/text-input-update (:input state) m)
-              next-state      (assoc state :input new-input)
+              next-state      (set-input-model state new-input)
               next-state      (if (autocomplete-open? state)
                                 (refresh-autocomplete next-state (get-in state [:prompt-input-state :autocomplete :trigger-mode]))
                                 (maybe-auto-open-autocomplete next-state key-token))]
