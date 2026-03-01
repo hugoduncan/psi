@@ -10,7 +10,8 @@
    [charm.input.keymap :as keymap]
    [charm.message :as msg]
    [psi.agent-session.persistence :as persist]
-   [psi.tui.app :as app])
+   [psi.tui.app :as app]
+   [psi.tui.extension-ui :as ext-ui])
   (:import
    [java.util.concurrent LinkedBlockingQueue]))
 
@@ -33,9 +34,11 @@
   ([] (init-state "test-model" {}))
   ([model-name] (init-state model-name {}))
   ([model-name opts]
-   (let [init-fn (app/make-init model-name nil nil
-                                (merge {:dispatch-fn default-dispatch-fn} opts))
-         [state _cmd] (init-fn)]
+   (let [ui-state-atom (:ui-state-atom opts)
+         opts'         (dissoc opts :ui-state-atom)
+         init-fn       (app/make-init model-name nil ui-state-atom
+                                      (merge {:dispatch-fn default-dispatch-fn} opts'))
+         [state _cmd]  (init-fn)]
      state)))
 
 (defn- type-text
@@ -435,6 +438,27 @@ clojure-lsp"}]})
       (is (true? (:tools-expanded? s1)))
       (is (false? (:tools-expanded? s2))))))
 
+(deftest ctrl-o-updates-extension-tools-expanded-state-test
+  (testing "ctrl+o updates extension ui tools-expanded state"
+    (let [ui        (ext-ui/create-ui-state)
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state "test-model" {:ui-state-atom ui})
+          [s1 _]    (update-fn state (msg/key-press "o" :ctrl true))]
+      (is (true? (:tools-expanded? s1)))
+      (is (true? (ext-ui/get-tools-expanded ui)))
+      (let [[s2 _] (update-fn s1 (msg/key-press "o" :ctrl true))]
+        (is (false? (:tools-expanded? s2)))
+        (is (false? (ext-ui/get-tools-expanded ui)))))))
+
+(deftest app-syncs-tools-expanded-from-extension-ui-state-test
+  (testing "update loop syncs tools-expanded from extension ui state"
+    (let [ui       (ext-ui/create-ui-state)
+          update-fn (app/make-update (stub-agent-fn ""))
+          state    (init-state "test-model" {:ui-state-atom ui})]
+      (ext-ui/set-tools-expanded! ui true)
+      (let [[s1 _] (update-fn state {:type :agent-poll})]
+        (is (true? (:tools-expanded? s1)))))))
+
 (deftest tool-start-inherits-tools-expanded-test
   (testing "new tool rows inherit current tools-expanded setting"
     (let [update-fn (app/make-update (stub-agent-fn ""))
@@ -554,6 +578,49 @@ clojure-lsp"}]})
           out   (app/view state)]
       (is (str/includes? out "[image image/png]"))
       (is (str/includes? out "[unsupported content block: custom]")))))
+
+(deftest extension-tool-renderers-override-builtins-test
+  (testing "registered extension renderer output is used for call + result"
+    (let [ui (ext-ui/create-ui-state)]
+      (ext-ui/register-tool-renderer! ui
+                                      "read"
+                                      "ext-a"
+                                      (fn [_args] "EXT call render")
+                                      (fn [_tc _opts] "EXT result render"))
+      (let [state (-> (init-state "test-model" {:ui-state-atom ui})
+                      (assoc :phase :streaming
+                             :stream-text ""
+                             :tool-order ["t1"]
+                             :tool-calls {"t1" {:name "read"
+                                                :args "{\"path\":\"foo.txt\"}"
+                                                :status :success
+                                                :result "ignored builtin"
+                                                :is-error false}}))
+            out   (app/view state)]
+        (is (str/includes? out "EXT call render"))
+        (is (str/includes? out "EXT result render"))
+        (is (not (str/includes? out "foo.txt")))))))
+
+(deftest extension-tool-renderer-exception-falls-back-to-builtin-test
+  (testing "renderer exceptions fall back to built-in tool rendering"
+    (let [ui (ext-ui/create-ui-state)]
+      (ext-ui/register-tool-renderer! ui
+                                      "read"
+                                      "ext-a"
+                                      (fn [_args] (throw (ex-info "boom-call" {})))
+                                      (fn [_tc _opts] (throw (ex-info "boom-result" {}))))
+      (let [state (-> (init-state "test-model" {:ui-state-atom ui})
+                      (assoc :phase :streaming
+                             :stream-text ""
+                             :tool-order ["t1"]
+                             :tool-calls {"t1" {:name "read"
+                                                :args "{\"path\":\"foo.txt\"}"
+                                                :status :success
+                                                :result "line-1"
+                                                :is-error false}}))
+            out   (app/view state)]
+        (is (str/includes? out "foo.txt"))
+        (is (str/includes? out "line-1"))))))
 
 (deftest view-shows-error-test
   (testing "view shows error message"

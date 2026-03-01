@@ -31,14 +31,16 @@
      :statuses       {ext-id StatusEntry ...}
      :notifications  [Notification ...]
      :tool-renderers {tool-name {:render-call-fn f :render-result-fn f :extension-path s}}
-     :message-renderers {custom-type {:render-fn f :extension-path s}}"
+     :message-renderers {custom-type {:render-fn f :extension-path s}}
+     :tools-expanded? boolean"
   []
   (atom {:dialog-queue      {:pending [] :active nil}
          :widgets           {}
          :statuses          {}
          :notifications     []
          :tool-renderers    {}
-         :message-renderers {}}))
+         :message-renderers {}
+         :tools-expanded?   false}))
 
 ;; ============================================================
 ;; Dialog data
@@ -357,6 +359,21 @@
   (when ui-state-atom
     (vec (vals (:message-renderers @ui-state-atom)))))
 
+(defn get-tools-expanded
+  "Return global tools-expanded flag.
+   Headless fallback: false."
+  [ui-state-atom]
+  (if ui-state-atom
+    (boolean (:tools-expanded? @ui-state-atom))
+    false))
+
+(defn set-tools-expanded!
+  "Set global tools-expanded flag.
+   No-op when ui-state-atom is nil (headless)."
+  [ui-state-atom expanded?]
+  (when ui-state-atom
+    (swap! ui-state-atom assoc :tools-expanded? (boolean expanded?))))
+
 ;; ============================================================
 ;; Clear all (for extension reload)
 ;; ============================================================
@@ -377,7 +394,8 @@
                :statuses          {}
                :notifications     []
                :tool-renderers    {}
-               :message-renderers {}})
+               :message-renderers {}
+               :tools-expanded?   false})
       ;; Deliver nil to all dialog promises
       (when active (deliver (:promise active) nil))
       (doseq [d pending]
@@ -401,7 +419,9 @@
      :clear-status (fn [])
      :notify      (fn [message level])
      :register-tool-renderer    (fn [tool-name render-call-fn render-result-fn])
-     :register-message-renderer (fn [custom-type render-fn])"
+     :register-message-renderer (fn [custom-type render-fn])
+     :get-tools-expanded (fn [] → boolean)
+     :set-tools-expanded (fn [expanded?])"
   [ui-state-atom ext-id]
   (when ui-state-atom
     {:confirm
@@ -443,7 +463,15 @@
 
      :register-message-renderer
      (fn [custom-type render-fn]
-       (register-message-renderer! ui-state-atom custom-type ext-id render-fn))}))
+       (register-message-renderer! ui-state-atom custom-type ext-id render-fn))
+
+     :get-tools-expanded
+     (fn []
+       (get-tools-expanded ui-state-atom))
+
+     :set-tools-expanded
+     (fn [expanded?]
+       (set-tools-expanded! ui-state-atom expanded?))}))
 
 ;; ============================================================
 ;; EQL snapshot (for resolvers — excludes fns and promises)

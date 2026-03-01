@@ -14,7 +14,8 @@
       (is (= {} (:statuses s)))
       (is (= [] (:notifications s)))
       (is (= {} (:tool-renderers s)))
-      (is (= {} (:message-renderers s))))))
+      (is (= {} (:message-renderers s)))
+      (is (false? (:tools-expanded? s))))))
 
 ;; ── Widgets ─────────────────────────────────────────────────
 
@@ -243,6 +244,25 @@
     (let [ui (ui/create-ui-state)]
       (is (nil? (ui/get-tool-renderer ui "nope"))))))
 
+(deftest tools-expanded-api-test
+  (testing "headless access uses safe defaults"
+    (is (false? (ui/get-tools-expanded nil)))
+    (is (nil? (ui/set-tools-expanded! nil true))))
+
+  (testing "get/set tools-expanded toggles state"
+    (let [ui (ui/create-ui-state)]
+      (is (false? (ui/get-tools-expanded ui)))
+      (ui/set-tools-expanded! ui true)
+      (is (true? (ui/get-tools-expanded ui)))
+      (ui/set-tools-expanded! ui false)
+      (is (false? (ui/get-tools-expanded ui)))))
+
+  (testing "clear-all resets tools-expanded to false"
+    (let [ui (ui/create-ui-state)]
+      (ui/set-tools-expanded! ui true)
+      (ui/clear-all! ui)
+      (is (false? (ui/get-tools-expanded ui))))))
+
 (deftest message-renderer-test
   (testing "register and retrieve message renderer"
     (let [ui    (ui/create-ui-state)
@@ -310,7 +330,9 @@
       (is (fn? (:clear-status ctx)))
       (is (fn? (:notify ctx)))
       (is (fn? (:register-tool-renderer ctx)))
-      (is (fn? (:register-message-renderer ctx)))))
+      (is (fn? (:register-message-renderer ctx)))
+      (is (fn? (:get-tools-expanded ctx)))
+      (is (fn? (:set-tools-expanded ctx)))))
 
   (testing "context methods delegate to ui-state"
     (let [ui  (ui/create-ui-state)
@@ -333,7 +355,14 @@
       (is (some? (ui/get-tool-renderer ui "my-tool")))
 
       ((:register-message-renderer ctx) "my-type" identity)
-      (is (some? (ui/get-message-renderer ui "my-type"))))))
+      (is (some? (ui/get-message-renderer ui "my-type")))
+
+      ;; Tools-expanded API
+      (is (false? ((:get-tools-expanded ctx))))
+      ((:set-tools-expanded ctx) true)
+      (is (true? ((:get-tools-expanded ctx))))
+      ((:set-tools-expanded ctx) false)
+      (is (false? ((:get-tools-expanded ctx)))))))
 
 ;; ── Snapshot ────────────────────────────────────────────────
 

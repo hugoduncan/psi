@@ -471,7 +471,7 @@
            :stream-text           nil
            :tool-calls            {}
            :tool-order            []
-           :tools-expanded?       false}
+           :tools-expanded?       (ext-ui/get-tools-expanded ui-state-atom)}
           (poll-cmd queue)])))))
 
 ;; ── Update helpers ──────────────────────────────────────────
@@ -796,6 +796,10 @@
     ;; One-shot render flag used by view for explicit full-screen clears.
     (let [state (if (:force-clear? state)
                   (assoc state :force-clear? false)
+                  state)
+          ;; Keep app state in sync with extension-controlled tools-expanded state.
+          state (if-let [ui-atom (:ui-state-atom state)]
+                  (assoc state :tools-expanded? (ext-ui/get-tools-expanded ui-atom))
                   state)]
       ;; Dismiss expired notifications on every tick
       (when-let [ui-atom (:ui-state-atom state)]
@@ -872,7 +876,10 @@
       ;; Ctrl+O toggles global tool expansion state.
         (and (= :idle (:phase state))
              (msg/key-match? m "ctrl+o"))
-        [(update state :tools-expanded? not) nil]
+        (let [new-expanded? (not (:tools-expanded? state))]
+          (when-let [ui-atom (:ui-state-atom state)]
+            (ext-ui/set-tools-expanded! ui-atom new-expanded?))
+          [(assoc state :tools-expanded? new-expanded?) nil])
 
       ;; Alt/Meta+Backspace delete previous word.
       ;; (Explicit handling to avoid charm's binding-order issue.)
@@ -1418,12 +1425,16 @@
 (def ^:private grep-preview-lines 15)
 (def ^:private bash-preview-lines 5)
 
+(defn- parse-tool-args
+  [parsed-args args-str]
+  (or parsed-args
+      (try (json/parse-string args-str)
+           (catch Exception _ nil))))
+
 (defn- tool-header
   "Format tool name and key argument for display."
   [tool-name parsed-args args-str]
-  (let [args (or parsed-args
-                 (try (json/parse-string args-str)
-                      (catch Exception _ nil)))]
+  (let [args (parse-tool-args parsed-args args-str)]
     (case tool-name
       "read"  (str (charm/render tool-style "read")  " " (get args "path" "…"))
       "bash"  (str (charm/render tool-style "$")      " " (get args "command" "…"))
@@ -1546,10 +1557,30 @@
       lines-truncated?
       (conj "Long lines truncated"))))
 
+(defn- extension-call-render
+  [ui-state-atom tc]
+  (when-let [render-fn (some-> (ext-ui/get-tool-renderer ui-state-atom (:name tc))
+                               :render-call-fn)]
+    (try
+      (some-> (render-fn (parse-tool-args (:parsed-args tc) (:args tc))) str)
+      (catch Exception e
+        (timbre/warn "Tool call renderer failed for" (:name tc) "- falling back:" (ex-message e))
+        nil))))
+
+(defn- extension-result-render
+  [ui-state-atom tc opts]
+  (when-let [render-fn (some-> (ext-ui/get-tool-renderer ui-state-atom (:name tc))
+                               :render-result-fn)]
+    (try
+      (some-> (render-fn tc opts) str)
+      (catch Exception e
+        (timbre/warn "Tool result renderer failed for" (:name tc) "- falling back:" (ex-message e))
+        nil))))
+
 (defn- render-tool-calls
   "Render all tool calls for the current turn.
    `width` is the terminal column count."
-  [tool-calls tool-order spinner-char width tools-expanded?]
+  [tool-calls tool-order spinner-char width tools-expanded? ui-state-atom]
   (when (seq tool-order)
     (let [;; "  ✓ " prefix = 4 visible cols for header
           header-avail (when (and width (> width 4))
@@ -1564,9 +1595,12 @@
              :when tc]
          (let [status-icon   (tool-status-indicator
                               (:status tc) spinner-char)
-               header        (tool-header (:name tc)
-                                          (:parsed-args tc)
-                                          (:args tc))
+               call-render   (extension-call-render ui-state-atom tc)
+               header        (if (seq call-render)
+                               call-render
+                               (tool-header (:name tc)
+                                            (:parsed-args tc)
+                                            (:args tc)))
                header        (if header-avail
                                (ansi/truncate-to-width
                                 header header-avail)
@@ -1583,11 +1617,22 @@
                                   (str "… (" hidden-count " more lines, ctrl+o to expand)")))
                warning-lines  (into [] (concat (detail-warning-lines (:details tc))
                                                (when hint-line [hint-line])))
+               result-render  (extension-result-render ui-state-atom tc
+                                                      {:expanded? expanded?
+                                                       :width width
+                                                       :tool-id id
+                                                       :tool-name (:name tc)})
+               result-lines   (if (seq result-render)
+                                (str/split-lines result-render)
+                                lines)
+               warning-lines  (if (seq result-render)
+                                []
+                                warning-lines)
                result-style   (if (:is-error tc)
                                 tool-err-style
                                 tool-dim-style)]
            (str "  " status-icon " " header
-                (when (or (seq lines) (seq warning-lines))
+                (when (or (seq result-lines) (seq warning-lines))
                   (str "\n"
                        (str/join
                         "\n"
@@ -1598,7 +1643,7 @@
                               (map #(str "    "
                                          (charm/render result-style %))
                                    wrapped)))
-                          lines)
+                          result-lines)
                          (mapcat
                           (fn [line]
                             (let [wrapped (wrap-tool-result-line line result-avail)]
@@ -1660,7 +1705,7 @@
             (when (= :streaming phase)
               (if has-progress?
                 (str (render-stream-text stream-text term-width)
-                     (render-tool-calls tool-calls tool-order spinner-char term-width tools-expanded?)
+                     (render-tool-calls tool-calls tool-order spinner-char term-width tools-expanded? ui-state-atom)
                      "\n")
                 (str "\n" (charm/render assist-style "ψ: ")
                      spinner-char " thinking…\n")))
