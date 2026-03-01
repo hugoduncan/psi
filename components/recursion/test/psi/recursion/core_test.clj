@@ -169,3 +169,141 @@
     (doseq [s [:idle :observing :planning :awaiting-approval
                :executing :verifying :learning :paused :error]]
       (is (m/validate policy/ControllerStatus s) (str s " should be valid")))))
+
+;;; --- Trigger intake and readiness gating tests ---
+
+(def ^:private all-ready
+  "System state with all readiness flags true."
+  {:query-ready true
+   :graph-ready true
+   :introspection-ready true
+   :memory-ready true})
+
+(defn- make-trigger
+  "Create a trigger signal of given type."
+  ([ttype]
+   (make-trigger ttype "test trigger"))
+  ([ttype reason]
+   {:type      ttype
+    :reason    reason
+    :payload   {}
+    :timestamp (java.time.Instant/now)}))
+
+(deftest register-hooks-in-test
+  (testing "register-hooks-in! populates hooks from config"
+    (let [ctx   (core/create-context)
+          hooks (core/register-hooks-in! ctx)
+          state (core/get-state-in ctx)]
+      (is (= 5 (count hooks)) "should have one hook per accepted trigger type")
+      (is (= 5 (count (:hooks state))))
+      (is (every? :enabled hooks) "all hooks enabled by default config")
+      (is (every? #(string? (:id %)) hooks))
+      (is (every? #(keyword? (:trigger-type %)) hooks))))
+
+  (testing "register-hooks-in! respects enabled subset"
+    (let [ctx   (core/create-context {:config-overrides {:enabled-trigger-hooks #{:manual}}})
+          hooks (core/register-hooks-in! ctx)]
+      (is (= 1 (count (filter :enabled hooks))) "only :manual should be enabled")
+      (is (= 4 (count (remove :enabled hooks)))))))
+
+(deftest handle-trigger-accepted-test
+  ;; AC #1: accepted trigger creates cycle in observing, controller becomes observing
+  (testing "accepted trigger with all readiness"
+    (let [ctx    (core/create-context)
+          _      (core/register-hooks-in! ctx)
+          result (core/handle-trigger-in! ctx (make-trigger :manual) all-ready)
+          state  (core/get-state-in ctx)]
+      (is (= :accepted (:result result)))
+      (is (string? (:cycle-id result)))
+      (is (= :observing (:status state)) "controller should be observing")
+      (is (= 1 (count (:cycles state))))
+      (let [cycle (first (:cycles state))]
+        (is (= :observing (:status cycle)) "cycle should be observing")
+        (is (= (:cycle-id result) (:cycle-id cycle)))
+        (is (= :manual (get-in cycle [:trigger :type])))
+        (is (inst? (:started-at cycle)))
+        (is (nil? (:ended-at cycle)))
+        (is (nil? (:observation cycle)))
+        (is (nil? (:proposal cycle)))
+        (is (= [] (:execution-attempts cycle)))
+        (is (nil? (:verification cycle)))
+        (is (nil? (:outcome cycle)))
+        (is (= #{} (:learning-memory-ids cycle)))))))
+
+(deftest handle-trigger-ignored-test
+  ;; AC #2: disabled trigger type returns ignored, no state change, no cycle
+  (testing "disabled trigger type is ignored"
+    (let [ctx    (core/create-context
+                  {:config-overrides {:enabled-trigger-hooks #{:manual}}})
+          _      (core/register-hooks-in! ctx)
+          result (core/handle-trigger-in! ctx (make-trigger :graph-changed) all-ready)
+          state  (core/get-state-in ctx)]
+      (is (= :ignored (:result result)))
+      (is (nil? (:cycle-id result)))
+      (is (= :idle (:status state)) "controller state unchanged")
+      (is (= [] (:cycles state)) "no cycle created"))))
+
+(deftest handle-trigger-blocked-test
+  ;; AC #3: readiness fails → controller paused, blocked cycle created
+  (testing "blocked when memory not ready"
+    (let [ctx    (core/create-context)
+          _      (core/register-hooks-in! ctx)
+          result (core/handle-trigger-in! ctx (make-trigger :manual)
+                                          (assoc all-ready :memory-ready false))
+          state  (core/get-state-in ctx)]
+      (is (= :blocked (:result result)))
+      (is (string? (:cycle-id result)))
+      (is (= :paused (:status state)) "controller should be paused")
+      (is (= "recursion_prerequisites_not_ready" (:paused-reason state)))
+      (let [cycle (first (:cycles state))]
+        (is (= :blocked (:status cycle))))))
+
+  (testing "blocked when query not ready"
+    (let [ctx    (core/create-context)
+          result (core/handle-trigger-in! ctx (make-trigger :manual)
+                                          (assoc all-ready :query-ready false))
+          state  (core/get-state-in ctx)]
+      (is (= :blocked (:result result)))
+      (is (= :paused (:status state)))))
+
+  (testing "blocked when introspection not ready"
+    (let [ctx    (core/create-context)
+          result (core/handle-trigger-in! ctx (make-trigger :manual)
+                                          (assoc all-ready :introspection-ready false))]
+      (is (= :blocked (:result result)))))
+
+  (testing "blocked when graph not ready"
+    (let [ctx    (core/create-context)
+          result (core/handle-trigger-in! ctx (make-trigger :manual)
+                                          (assoc all-ready :graph-ready false))]
+      (is (= :blocked (:result result))))))
+
+(deftest handle-trigger-rejected-unknown-test
+  ;; Unknown trigger type is rejected
+  (testing "unknown trigger type rejected"
+    (let [ctx    (core/create-context)
+          result (core/handle-trigger-in! ctx (make-trigger :unknown-type) all-ready)
+          state  (core/get-state-in ctx)]
+      (is (= :rejected (:result result)))
+      (is (= :unknown-trigger-type (:reason result)))
+      (is (= :idle (:status state)) "controller state unchanged")
+      (is (= [] (:cycles state)) "no cycle created"))))
+
+(deftest handle-trigger-rejected-busy-test
+  ;; Controller busy (not idle) is rejected
+  (testing "rejected when controller not idle"
+    (let [ctx    (core/create-context {:state-overrides {:status :observing}})
+          result (core/handle-trigger-in! ctx (make-trigger :manual) all-ready)
+          state  (core/get-state-in ctx)]
+      (is (= :rejected (:result result)))
+      (is (= :controller-busy (:reason result)))
+      (is (= :observing (:status state)) "status unchanged")))
+
+  (testing "rejected when active cycle exists"
+    (let [ctx    (core/create-context)
+          ;; First trigger succeeds
+          _      (core/handle-trigger-in! ctx (make-trigger :manual) all-ready)
+          ;; Second trigger while first is active
+          result (core/handle-trigger-in! ctx (make-trigger :manual) all-ready)]
+      (is (= :rejected (:result result)))
+      (is (= :controller-busy (:reason result))))))
