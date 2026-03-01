@@ -17,7 +17,8 @@
      4. Optionally starts an nREPL server for live introspection
      5. Drops into a REPL-style prompt loop — type a message, get a response
         OR (with --tui) renders an interactive TUI session
-     6. /quit or EOF exits (plain mode); Escape or Ctrl+C exits (TUI mode)
+     6. /quit or EOF exits (plain mode); TUI uses Escape interrupt/cancel,
+        Ctrl+C clear-then-quit, Ctrl+D exit-when-empty
 
    Environment variables:
      ANTHROPIC_API_KEY   — required for Anthropic models
@@ -505,7 +506,7 @@
 
 (defn run-tui-session
   "Create a session and run it as a full-screen TUI via charm.clj.
-  Blocks until the user exits (Escape or Ctrl+C while idle)."
+  Blocks until the user exits (Ctrl+C second press or Ctrl+D on empty input)."
   [model-key]
   (let [ai-model  (resolve-model model-key)
         ai-ctx    nil
@@ -596,6 +597,14 @@
                                       :login-state   (:login-state result)})))
                           result)))
 
+        ;; Called by TUI Escape during active work.
+        ;; Aborts current run and returns queued steering/follow-up text
+        ;; so input can be restored in the editor.
+        on-interrupt-fn! (fn [_state]
+                           (session/abort-in! ctx)
+                           {:queued-text (session/consume-queued-input-text-in! ctx)
+                            :message "Interrupted active work."})
+
         ;; run-agent-fn! — called by the TUI for non-command input.
         ;; Handles pending-login step 2 and agent execution.
         run-agent-fn! (fn [text ^java.util.concurrent.LinkedBlockingQueue queue]
@@ -640,6 +649,9 @@
                     {:query-fn             (fn [q] (session/query-in ctx q))
                      :ui-state-atom        (:ui-state-atom ctx)
                      :dispatch-fn          dispatch-fn
+                     :on-interrupt-fn!     on-interrupt-fn!
+                     :double-press-window-ms 500
+                     :double-escape-action :none
                      :cwd                  cwd
                      :current-session-file (:session-file (session/get-session-data-in ctx))
                      :resume-fn!           resume-fn!

@@ -105,7 +105,8 @@
                                      :ok)]
         (is (= :ok (main/run-tui-session :ignored)))
         (is (string? (:current-session-file @captured)))
-        (is (fn? (:dispatch-fn @captured))))
+        (is (fn? (:dispatch-fn @captured)))
+        (is (fn? (:on-interrupt-fn! @captured))))
       (finally
         (reset! main/session-state orig-state)))))
 

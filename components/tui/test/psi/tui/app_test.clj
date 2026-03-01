@@ -217,11 +217,11 @@
           restored      {:messages [{:role :user :text "restored user"}
                                     {:role :assistant :text "restored assistant"}]
                          :tool-calls {"t1" {:name "read"
-                                             :args "{\"path\":\"foo.txt\"}"
-                                             :status :success
-                                             :result "ok"
-                                             :is-error false
-                                             :expanded? false}}
+                                            :args "{\"path\":\"foo.txt\"}"
+                                            :status :success
+                                            :result "ok"
+                                            :is-error false
+                                            :expanded? false}}
                          :tool-order ["t1"]}]
       (with-redefs [persist/session-dir-for (fn [_cwd] "/tmp/psi-test")
                     persist/list-sessions
@@ -336,22 +336,64 @@
       (is (= 1 (:spinner-frame s1)))
       (is (some? cmd)))))
 
-;;;; Update — quit
+;;;; Update — interrupt / clear / exit semantics
 
-(deftest escape-quits-when-idle-test
-  (testing "escape when idle returns quit-cmd"
+(deftest escape-idle-does-not-quit-by-default-test
+  (testing "escape when idle and no menu does not quit"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (init-state)
-          [_s cmd]  (update-fn state (msg/key-press :escape))]
-      ;; quit-cmd is a charm command map
-      (is (some? cmd)))))
+          [s1 cmd]  (update-fn state (msg/key-press :escape))]
+      (is (= :idle (:phase s1)))
+      (is (nil? cmd)))))
 
-(deftest ctrl-c-always-quits-test
-  (testing "ctrl+c quits even during streaming"
+(deftest ctrl-c-clears-first-then-quits-within-window-test
+  (testing "first ctrl+c clears input; second ctrl+c within window quits"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          streaming (assoc (init-state) :phase :streaming)
-          [_s cmd]  (update-fn streaming (msg/key-press "c" :ctrl true))]
-      (is (some? cmd)))))
+          state     (assoc (init-state)
+                           :input (charm/text-input-set-value (:input (init-state)) "hello"))
+          [s1 cmd1] (update-fn state (msg/key-press "c" :ctrl true))
+          [_s2 cmd2] (update-fn s1 (msg/key-press "c" :ctrl true))]
+      (is (= "" (text-input/value (:input s1))))
+      (is (nil? cmd1))
+      (is (some? cmd2)))))
+
+(deftest ctrl-d-exits-only-when-input-empty-test
+  (testing "ctrl+d exits when input empty and is ignored when input non-empty"
+    (let [update-fn   (app/make-update (stub-agent-fn ""))
+          non-empty   (assoc (init-state)
+                             :input (charm/text-input-set-value (:input (init-state)) "x"))
+          [_s1 cmd1]  (update-fn non-empty (msg/key-press "d" :ctrl true))
+          empty-state (assoc (init-state)
+                             :input (charm/text-input-set-value (:input (init-state)) ""))
+          [_s2 cmd2]  (update-fn empty-state (msg/key-press "d" :ctrl true))]
+      (is (nil? cmd1))
+      (is (some? cmd2)))))
+
+(deftest escape-streaming-interrupts-and-restores-queued-text-test
+  (testing "escape during streaming calls interrupt hook and restores queued input"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state "test-model"
+                                       {:on-interrupt-fn! (fn [_]
+                                                            {:queued-text "queued one\nqueued two"
+                                                             :message "Interrupted active work."})})
+                           :phase :streaming
+                           :input (charm/text-input-set-value (:input (init-state)) "draft"))
+          [s1 _cmd] (update-fn state (msg/key-press :escape))]
+      (is (= :idle (:phase s1)))
+      (is (= "queued one\nqueued two\ndraft" (text-input/value (:input s1))))
+      (is (= "Interrupted active work."
+             (:text (last (:messages s1))))))))
+
+(deftest double-escape-unsupported-action-is-safe-no-op-with-status-test
+  (testing "unsupported double-escape action does not crash and emits status"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state "test-model" {:double-escape-action :tree})
+                           :input (charm/text-input-set-value (:input (init-state)) ""))
+          [s1 cmd1] (update-fn state (msg/key-press :escape))
+          [s2 cmd2] (update-fn s1 (msg/key-press :escape))]
+      (is (nil? cmd1))
+      (is (nil? cmd2))
+      (is (str/includes? (:text (last (:messages s2))) "not available")))))
 
 (deftest history-records-trimmed-non-empty-and-skips-consecutive-duplicates-test
   (testing "submitted prompts are trimmed, blank ignored, and consecutive duplicates skipped"
@@ -382,7 +424,7 @@
                                  (submit-text update-fn (init-state) "alpha")
                                  "beta")
           state     (assoc base :phase :idle
-                                :input (charm/text-input-set-value (:input base) ""))
+                           :input (charm/text-input-set-value (:input base) ""))
           [s1 _]    (update-fn state (msg/key-press :up))]
       (is (= "beta" (text-input/value (:input s1))))
       (is (= 1 (get-in s1 [:prompt-input-state :history :browse-index]))))))
@@ -394,7 +436,7 @@
                                  (submit-text update-fn (init-state) "alpha")
                                  "beta")
           state     (assoc base :phase :idle
-                                :input (charm/text-input-set-value (:input base) ""))
+                           :input (charm/text-input-set-value (:input base) ""))
           [s1 _]    (update-fn state (msg/key-press :up))
           [s2 _]    (update-fn s1 (msg/key-press :down))]
       (is (= "" (text-input/value (:input s2))))
@@ -407,7 +449,7 @@
                                  (submit-text update-fn (init-state) "alpha")
                                  "beta")
           state     (assoc base :phase :idle
-                                :input (charm/text-input-set-value (:input base) ""))
+                           :input (charm/text-input-set-value (:input base) ""))
           [s1 _]    (update-fn state (msg/key-press :up))
           [s2 _]    (update-fn s1 (msg/key-press "x"))
           [s3 _]    (update-fn s2 (msg/key-press :enter))]

@@ -227,6 +227,33 @@
       (assoc :input input)
       clear-history-browse))
 
+(defn- now-ms [] (System/currentTimeMillis))
+
+(defn- double-press-window-ms
+  [state]
+  (or (:double-press-window-ms state) 500))
+
+(defn- within-double-press-window?
+  [last-ms now-ms window-ms]
+  (and (some? last-ms)
+       (<= (- now-ms last-ms) window-ms)))
+
+(defn- append-assistant-status
+  [state text]
+  (if (str/blank? text)
+    state
+    (update state :messages conj {:role :assistant :text text})))
+
+(defn- merge-queued-and-draft
+  [queued-text draft-text]
+  (let [queued (str/trim (or queued-text ""))
+        draft  (str/trim (or draft-text ""))]
+    (cond
+      (and (str/blank? queued) (str/blank? draft)) ""
+      (str/blank? queued) draft
+      (str/blank? draft) queued
+      :else (str queued "\n" draft))))
+
 (defn- history-entries
   [state]
   (vec (get-in state [:prompt-input-state :history :entries] [])))
@@ -318,8 +345,8 @@
         token-start (or (some->> (keep-indexed (fn [i ch]
                                                  (when (whitespace-char? ch) i))
                                                before)
-                                  last
-                                  inc)
+                                 last
+                                 inc)
                         0)
         token       (subs before token-start)
         context     (cond
@@ -770,11 +797,12 @@
 (defn poll-cmd
   "Command that polls the shared event queue with a short timeout.
    Returns :agent-result, :agent-error, :agent-event, :external-message,
-   or :agent-poll.
+   :agent-aborted, or :agent-poll.
 
    Queue payloads accepted:
    - {:kind :done  :result ...}
    - {:kind :error :message ...}
+   - {:kind :aborted :message ... :queued-text ...}
    - {:type :agent-event ...}       ; progress events
    - {:type :external-message ...}  ; async extension transcript message
    "
@@ -788,6 +816,11 @@
 
          (= :error (:kind event))
          {:type :agent-error :error (:message event)}
+
+         (= :aborted (:kind event))
+         {:type :agent-aborted
+          :message (:message event)
+          :queued-text (:queued-text event)}
 
          (= :agent-event (:type event))
          event
@@ -820,6 +853,9 @@
      :resume-fn!           — (fn [session-path]) called when user selects a session;
                               returns {:messages [...], :tool-calls {...}, :tool-order [...]}
      :dispatch-fn          — (fn [text]) → command result map or nil; central command dispatch
+     :on-interrupt-fn!     — (fn [state]) -> {:queued-text str? :message str?} | nil
+     :double-press-window-ms — ctrl+c / escape timing window (default 500)
+     :double-escape-action — :tree | :fork | :none (default :none)
      :event-queue          — shared LinkedBlockingQueue for agent + extension events"
   ([model-name] (make-init model-name nil))
   ([model-name query-fn] (make-init model-name query-fn nil))
@@ -848,6 +884,9 @@
            :query-fn              query-fn
            :ui-state-atom         ui-state-atom
            :dispatch-fn           (:dispatch-fn opts)
+           :on-interrupt-fn!      (:on-interrupt-fn! opts)
+           :double-press-window-ms (or (:double-press-window-ms opts) 500)
+           :double-escape-action  (or (:double-escape-action opts) :none)
            :cwd                   (or (:cwd opts) (System/getProperty "user.dir"))
            :current-session-file  (or (:current-session-file opts)
                                       (:psi.agent-session/session-file introspected))
@@ -1179,6 +1218,77 @@
     [(update state :spinner-frame #(mod (inc %) n))
      (poll-cmd (:queue state))]))
 
+(defn- handle-ctrl-c
+  [state]
+  (let [now          (now-ms)
+        window-ms    (double-press-window-ms state)
+        last-clear   (get-in state [:prompt-input-state :timing :last-ctrl-c-ms])]
+    (if (within-double-press-window? last-clear now window-ms)
+      [(assoc-in state [:prompt-input-state :timing :last-ctrl-c-ms] nil)
+       charm/quit-cmd]
+      [(-> state
+           (set-input-value "")
+           (assoc-in [:prompt-input-state :timing :last-ctrl-c-ms] now))
+       nil])))
+
+(defn- handle-ctrl-d
+  [state]
+  (if (str/blank? (input-value state))
+    [state charm/quit-cmd]
+    [state nil]))
+
+(defn- handle-idle-escape
+  [state]
+  (let [current-text   (input-value state)
+        now            (now-ms)
+        window-ms      (double-press-window-ms state)
+        action         (:double-escape-action state :none)
+        last-escape    (get-in state [:prompt-input-state :timing :last-escape-ms])
+        second-escape? (within-double-press-window? last-escape now window-ms)]
+    (cond
+      (not (str/blank? current-text))
+      [state nil]
+
+      (= action :none)
+      [state nil]
+
+      second-escape?
+      (case action
+        :tree
+        [(-> state
+             (assoc-in [:prompt-input-state :timing :last-escape-ms] nil)
+             (append-assistant-status "Double Escape action '/tree' is not available in this runtime."))
+         nil]
+
+        :fork
+        [(-> state
+             (assoc-in [:prompt-input-state :timing :last-escape-ms] nil)
+             (append-assistant-status "Double Escape action '/fork' is not available in this runtime."))
+         nil]
+
+        [(-> state
+             (assoc-in [:prompt-input-state :timing :last-escape-ms] nil)
+             (append-assistant-status (str "Unsupported double Escape action: " (pr-str action))))
+         nil])
+
+      :else
+      [(assoc-in state [:prompt-input-state :timing :last-escape-ms] now) nil])))
+
+(defn- handle-streaming-escape
+  [state]
+  (if-let [interrupt-fn (:on-interrupt-fn! state)]
+    (let [{:keys [queued-text message]} (or (interrupt-fn state) {})
+          merged-text (merge-queued-and-draft queued-text (input-value state))
+          next-state  (-> state
+                          (set-input-value merged-text)
+                          (assoc :phase :idle
+                                 :stream-text nil)
+                          (clear-autocomplete)
+                          (assoc-in [:prompt-input-state :timing :last-escape-ms] (now-ms))
+                          (append-assistant-status (or message "Interrupted.")))]
+      [next-state (poll-cmd (:queue state))])
+    [(append-assistant-status state "Interrupt unavailable in this runtime.") nil]))
+
 ;; ── Update ──────────────────────────────────────────────────
 
 (defn make-update
@@ -1209,9 +1319,14 @@
                       " shift=" (boolean (:shift m)))))
 
       (cond
-      ;; Quit: ctrl+c always (legacy; interrupt semantics handled in later task)
+      ;; Ctrl+C — clear first, then quit on second press within window.
         (msg/key-match? m "ctrl+c")
-        [state charm/quit-cmd]
+        (handle-ctrl-c state)
+
+      ;; Ctrl+D — exit only when input is empty.
+        (and (= :idle (:phase state))
+             (msg/key-match? m "ctrl+d"))
+        (handle-ctrl-d state)
 
       ;; Escape closes autocomplete first.
         (and (= :idle (:phase state))
@@ -1219,10 +1334,16 @@
              (msg/key-match? m "escape"))
         [(clear-autocomplete state) nil]
 
+      ;; Escape in streaming interrupts active work.
+        (and (= :streaming (:phase state))
+             (msg/key-match? m "escape"))
+        (handle-streaming-escape state)
+
+      ;; Escape while idle delegates to interrupt/double-escape behavior.
         (and (= :idle (:phase state))
              (not (has-active-dialog? state))
              (msg/key-match? m "escape"))
-        [state charm/quit-cmd]
+        (handle-idle-escape state)
 
       ;; Window resize
         (msg/window-size? m)
@@ -1264,6 +1385,18 @@
                     :error       (:error m)
                     :stream-text nil))
          (poll-cmd (:queue state))]
+
+      ;; Agent aborted via interrupt
+        (= :agent-aborted (:type m))
+        (let [queued-text (:queued-text m)
+              merged-text (merge-queued-and-draft queued-text (input-value state))
+              status-msg  (or (:message m) "Interrupted.")]
+          [(-> state
+               (set-input-value merged-text)
+               (assoc :phase :idle
+                      :stream-text nil)
+               (append-assistant-status status-msg))
+           (poll-cmd (:queue state))])
 
       ;; Agent poll timeout → keep polling (and animate spinner while streaming)
         (agent-poll? m)
@@ -1413,7 +1546,7 @@
            (str (charm/render dim-style
                               (str "  Exts: " ext-count " loaded"))
                 "\n"))
-         (charm/render dim-style "  ESC to quit") "\n")))
+         (charm/render dim-style "  ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty") "\n")))
 
 (def ^:private subagent-title-style (charm/style :fg charm/yellow :bold true))
 (def ^:private subagent-head-style (charm/style :fg charm/cyan :bold true))
@@ -2082,10 +2215,10 @@
                warning-lines  (into [] (concat (detail-warning-lines (:details tc))
                                                (when hint-line [hint-line])))
                result-render  (extension-result-render ui-state-atom tc
-                                                      {:expanded? expanded?
-                                                       :width width
-                                                       :tool-id id
-                                                       :tool-name (:name tc)})
+                                                       {:expanded? expanded?
+                                                        :width width
+                                                        :tool-id id
+                                                        :tool-name (:name tc)})
                result-lines   (if (seq result-render)
                                 (str/split-lines result-render)
                                 lines)
@@ -2216,6 +2349,9 @@
                                               {:messages [...]
                                                :tool-calls {...}
                                                :tool-order [...]}
+                       :on-interrupt-fn!    — (fn [state]) -> {:queued-text str? :message str?}
+                       :double-press-window-ms — ctrl+c / escape timing window (default 500)
+                       :double-escape-action — :tree | :fork | :none (default :none)
                        :alt-screen          — true/false (default true)"
   ([model-name run-agent-fn!]
    (start! model-name run-agent-fn! {}))

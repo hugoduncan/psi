@@ -53,6 +53,7 @@
    use `register-resolvers-in!` with a QueryContext from psi.query.core."
   (:require
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-core.core :as agent]
    [psi.agent-session.compaction :as compaction]
@@ -257,9 +258,9 @@
                             :sc-session-id         sc-session-id
                             :session-data-atom     session-data-atom
                             :tool-output-stats-atom (atom {:calls []
-                                                            :aggregates {:total-context-bytes 0
-                                                                         :by-tool {}
-                                                                         :limit-hits-by-tool {}}})
+                                                           :aggregates {:total-context-bytes 0
+                                                                        :by-tool {}
+                                                                        :limit-hits-by-tool {}}})
                             :agent-ctx             agent-ctx
                             :extension-registry    ext-reg
                             :workflow-registry     wf-reg
@@ -522,6 +523,32 @@
   "Abort the current agent run."
   [ctx]
   (sc/send-event! (:sc-env ctx) (:sc-session-id ctx) :session/abort))
+
+(defn consume-queued-input-text-in!
+  "Return queued steering/follow-up text (joined by newlines) and clear queues.
+   This is used by TUI interrupt flows to restore deferred input into the editor."
+  [ctx]
+  (let [agent-data       (agent/get-data-in (:agent-ctx ctx))
+        queued-agent-msgs (concat (:steering-queue agent-data)
+                                  (:follow-up-queue agent-data))
+        queued-agent-texts (keep (fn [msg]
+                                   (some (fn [block]
+                                           (when (= :text (:type block))
+                                             (:text block)))
+                                         (:content msg)))
+                                 queued-agent-msgs)
+        sd               (get-session-data-in ctx)
+        queued-session-texts (concat (:steering-messages sd)
+                                     (:follow-up-messages sd))
+        all-texts        (->> (concat queued-agent-texts queued-session-texts)
+                              (keep #(when (string? %) (str/trim %)))
+                              (remove str/blank?)
+                              distinct)
+        merged           (str/join "\n" all-texts)]
+    (swap-session! ctx assoc :steering-messages [] :follow-up-messages [])
+    (agent/clear-steering-queue-in! (:agent-ctx ctx))
+    (agent/clear-follow-up-queue-in! (:agent-ctx ctx))
+    merged))
 
 ;; ============================================================
 ;; Model and thinking level
