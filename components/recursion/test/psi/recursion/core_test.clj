@@ -868,3 +868,179 @@
           result (core/execute-in! ctx cycle-id)]
       (is (false? (:ok? result)))
       (is (= :wrong-cycle-status (:error result))))))
+
+;;; --- Verification and rollback tests ---
+
+(defn- setup-executed-cycle
+  "Helper: create a context, trigger, observe, plan, approve, and execute a cycle.
+   Returns [ctx cycle-id]. Optionally accepts config-overrides and hook-executor."
+  ([]
+   (setup-executed-cycle {}))
+  ([{:keys [config-overrides state-overrides hook-executor]
+     :or {config-overrides {}
+          state-overrides {}
+          hook-executor (fn [_action] {:status :success :output-summary "test-ok"})}}]
+   (let [ctx (core/create-context {:config-overrides config-overrides
+                                   :state-overrides state-overrides})
+         cycle-id (trigger-and-get-cycle-id ctx)
+         _ (core/observe-in! ctx cycle-id all-ready sample-graph-state sample-memory-state)
+         _ (core/plan-in! ctx cycle-id)
+         _ (core/apply-approval-gate-in! ctx cycle-id)
+         _ (core/approve-proposal-in! ctx cycle-id "user" "approved")
+         _ (core/execute-in! ctx cycle-id hook-executor)]
+     [ctx cycle-id])))
+
+(deftest verify-in-all-pass-test
+  ;; AC #10: All checks pass → verification report has passed-all=true,
+  ;; cycle transitions to learning, no rollback
+  (testing "all checks pass → learning, no rollback, no outcome set"
+    (let [[ctx cycle-id] (setup-executed-cycle)
+          check-runner (fn [_check-name]
+                         {:passed true :details "all good"})
+          result (core/verify-in! ctx cycle-id check-runner)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+
+      (testing "report structure"
+        (let [report (:report result)]
+          (is (true? (:passed-all report)))
+          (is (inst? (:completed-at report)))
+          (is (= 3 (count (:checks report))) "should have 3 required checks")
+          (is (every? :passed (:checks report)))))
+
+      (testing "cycle transitions to learning"
+        (is (= :learning (:status state)))
+        (is (= :learning (:status cycle))))
+
+      (testing "verification report attached to cycle"
+        (is (some? (:verification cycle)))
+        (is (true? (get-in cycle [:verification :passed-all]))))
+
+      (testing "no outcome set yet (success outcome set by learn phase)"
+        (is (nil? (:outcome cycle))))
+
+      (testing "no rollback evidence"
+        (is (not-any? #(= :rollback (:type %)) (:execution-attempts cycle)))))))
+
+(deftest verify-in-fail-with-rollback-test
+  ;; AC #10: One check fails with rollback enabled → outcome is failed with
+  ;; "verification_failed_rolled_back", rollback evidence recorded
+  (testing "check fails with rollback-on-verification-failure=true"
+    (let [[ctx cycle-id] (setup-executed-cycle)
+          check-runner (fn [check-name]
+                         (if (= check-name "tests")
+                           {:passed false :details "2 failures"}
+                           {:passed true :details "ok"}))
+          result (core/verify-in! ctx cycle-id check-runner)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+
+      (testing "report shows not all passed"
+        (is (false? (get-in result [:report :passed-all]))))
+
+      (testing "cycle transitions to learning"
+        (is (= :learning (:status state)))
+        (is (= :learning (:status cycle))))
+
+      (testing "outcome is failed with rollback summary"
+        (let [outcome (:outcome cycle)]
+          (is (= :failed (:status outcome)))
+          (is (= "verification_failed_rolled_back" (:summary outcome)))
+          (is (contains? (:evidence outcome) "tests"))
+          (is (= #{} (:changed-goals outcome)))))
+
+      (testing "rollback evidence recorded in execution-attempts"
+        (let [rollback-records (filter #(= :rollback (:type %))
+                                       (:execution-attempts cycle))]
+          (is (= 1 (count rollback-records)))
+          (let [rb (first rollback-records)]
+            (is (= cycle-id (:cycle-id rb)))
+            (is (inst? (:timestamp rb)))
+            (is (= "verification-failure" (:reason rb))))))
+
+      (testing "verification report attached to cycle"
+        (is (some? (:verification cycle)))
+        (is (= 3 (count (get-in cycle [:verification :checks]))))))))
+
+(deftest verify-in-fail-without-rollback-test
+  ;; Check fails with rollback disabled → outcome is failed, no rollback
+  (testing "check fails with rollback-on-verification-failure=false"
+    (let [[ctx cycle-id] (setup-executed-cycle
+                          {:state-overrides
+                           {:policy (assoc (policy/default-policy)
+                                           :rollback-on-verification-failure false)}})
+          check-runner (fn [check-name]
+                         (if (= check-name "lint")
+                           {:passed false :details "lint errors"}
+                           {:passed true :details "ok"}))
+          result (core/verify-in! ctx cycle-id check-runner)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+
+      (testing "cycle transitions to learning"
+        (is (= :learning (:status state)))
+        (is (= :learning (:status cycle))))
+
+      (testing "outcome is failed without rollback"
+        (let [outcome (:outcome cycle)]
+          (is (= :failed (:status outcome)))
+          (is (= "verification_failed" (:summary outcome)))
+          (is (contains? (:evidence outcome) "lint"))))
+
+      (testing "no rollback evidence"
+        (is (not-any? #(= :rollback (:type %)) (:execution-attempts cycle)))))))
+
+(deftest verify-in-report-contains-all-checks-test
+  ;; Verification report contains all required check names
+  (testing "report contains all required check names from config"
+    (let [[ctx cycle-id] (setup-executed-cycle)
+          check-runner (fn [check-name]
+                         {:passed true :details (str check-name " ok")})
+          result (core/verify-in! ctx cycle-id check-runner)
+          check-names (set (map :name (get-in result [:report :checks])))]
+      (is (= #{"tests" "lint" "eql-health"} check-names)))))
+
+(deftest verify-in-multiple-failures-test
+  ;; Multiple checks fail — all failed names in evidence
+  (testing "multiple check failures captured in evidence"
+    (let [[ctx cycle-id] (setup-executed-cycle)
+          check-runner (fn [check-name]
+                         (if (= check-name "lint")
+                           {:passed true :details "ok"}
+                           {:passed false :details "failed"}))
+          _ (core/verify-in! ctx cycle-id check-runner)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))
+          outcome (:outcome cycle)]
+      (is (= :failed (:status outcome)))
+      (is (contains? (:evidence outcome) "tests"))
+      (is (contains? (:evidence outcome) "eql-health"))
+      (is (not (contains? (:evidence outcome) "lint"))))))
+
+(deftest verify-in-default-check-runner-test
+  ;; Default check-runner passes all checks
+  (testing "default check-runner passes all checks"
+    (let [[ctx cycle-id] (setup-executed-cycle)
+          result (core/verify-in! ctx cycle-id)
+          state (core/get-state-in ctx)]
+      (is (true? (:ok? result)))
+      (is (true? (get-in result [:report :passed-all])))
+      (is (= :learning (:status state))))))
+
+(deftest verify-in-rejects-wrong-status-test
+  ;; Verify rejects if cycle is not in :verifying status
+  (testing "verify rejects wrong cycle status"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          ;; Cycle is in :planning, not :verifying
+          result (core/verify-in! ctx cycle-id)]
+      (is (false? (:ok? result)))
+      (is (= :wrong-cycle-status (:error result)))))
+
+  (testing "verify rejects unknown cycle-id"
+    (let [ctx (core/create-context)
+          result (core/verify-in! ctx "nonexistent")]
+      (is (false? (:ok? result)))
+      (is (= :cycle-not-found (:error result))))))

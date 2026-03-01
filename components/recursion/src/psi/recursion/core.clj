@@ -574,3 +574,127 @@
    (execute-in! (global-context) cycle-id))
   ([cycle-id hook-executor]
    (execute-in! (global-context) cycle-id hook-executor)))
+
+;;; --- Verification and rollback ---
+
+(defn- default-check-runner
+  "Default no-op check runner. Returns passing for each check."
+  [_check-name]
+  {:passed true, :details "check-not-implemented"})
+
+(defn- failed-check-names
+  "Return set of check names that did not pass."
+  [checks]
+  (into #{} (comp (remove :passed) (map :name)) checks))
+
+(defn rollback-in!
+  "Record a rollback action on the cycle.
+
+   In Step 11 scaffold, this is a recorded action (stores rollback evidence
+   on the cycle) rather than actual git reset. Appends a rollback record to
+   the cycle's execution-attempts.
+
+   Returns {:ok? true}."
+  [ctx cycle-id]
+  (swap-state-in! ctx
+                  (fn [s]
+                    (update s :cycles update-cycle cycle-id
+                            #(update % :execution-attempts conj
+                                     {:type :rollback
+                                      :cycle-id cycle-id
+                                      :timestamp (java.time.Instant/now)
+                                      :reason "verification-failure"}))))
+  {:ok? true})
+
+(defn rollback!
+  "Global wrapper for `rollback-in!`."
+  [cycle-id]
+  (rollback-in! (global-context) cycle-id))
+
+(defn verify-in!
+  "Verification phase: run required checks and produce a VerificationReport.
+
+   Takes `ctx`, `cycle-id`, and an optional `check-runner` function
+   `(fn [check-name] {:passed bool, :details str?})`.
+
+   Requires cycle status `:verifying`. Runs each check in
+   `config.required-verification-checks`.
+
+   After verification:
+   - If all checks pass: transitions cycle+controller to `:learning`.
+   - If any check fails AND rollback-on-verification-failure=true:
+     calls `rollback-in!`, sets cycle outcome to failed with rollback evidence,
+     transitions to `:learning`.
+   - If any check fails AND rollback-on-verification-failure=false:
+     sets cycle outcome to failed, transitions to `:learning`.
+
+   Returns {:ok? true, :report report} on success."
+  ([ctx cycle-id]
+   (verify-in! ctx cycle-id default-check-runner))
+  ([ctx cycle-id check-runner]
+   (let [state (get-state-in ctx)
+         cycle (find-cycle (:cycles state) cycle-id)]
+     (cond
+       (nil? cycle)
+       {:ok? false, :error :cycle-not-found}
+
+       (not= :verifying (:status cycle))
+       {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+       :else
+       (let [config (:config state)
+             policy (:policy state)
+             required-checks (:required-verification-checks config)
+             checks (mapv (fn [check-name]
+                            (let [result (check-runner check-name)]
+                              {:name check-name
+                               :passed (:passed result)
+                               :details (:details result)}))
+                          (sort required-checks))
+             passed-all (every? :passed checks)
+             report {:checks checks
+                     :passed-all passed-all
+                     :completed-at (java.time.Instant/now)}]
+         (if passed-all
+           ;; All checks pass — transition to learning, no outcome set yet
+           (do
+             (swap-state-in! ctx
+                             (fn [s]
+                               (-> s
+                                   (assoc :status :learning)
+                                   (update :cycles update-cycle cycle-id
+                                           #(-> %
+                                                (assoc :status :learning)
+                                                (assoc :verification report))))))
+             {:ok? true, :report report})
+           ;; Some checks failed
+           (let [failed (failed-check-names checks)
+                 rollback? (:rollback-on-verification-failure policy)
+                 summary (if rollback?
+                           "verification_failed_rolled_back"
+                           "verification_failed")
+                 outcome {:status :failed
+                          :summary summary
+                          :evidence failed
+                          :changed-goals #{}}]
+             ;; Record rollback if policy says so
+             (when rollback?
+               (rollback-in! ctx cycle-id))
+             ;; Set outcome and transition to learning
+             (swap-state-in! ctx
+                             (fn [s]
+                               (-> s
+                                   (assoc :status :learning)
+                                   (update :cycles update-cycle cycle-id
+                                           #(-> %
+                                                (assoc :status :learning)
+                                                (assoc :verification report)
+                                                (assoc :outcome outcome))))))
+             {:ok? true, :report report})))))))
+
+(defn verify!
+  "Global wrapper for `verify-in!`."
+  ([cycle-id]
+   (verify-in! (global-context) cycle-id))
+  ([cycle-id check-runner]
+   (verify-in! (global-context) cycle-id check-runner)))
