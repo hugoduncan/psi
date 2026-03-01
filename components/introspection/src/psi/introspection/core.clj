@@ -48,6 +48,8 @@
    [psi.history.resolvers :as history-resolvers]
    [psi.memory.core :as memory]
    [psi.memory.resolvers :as memory-resolvers]
+   [psi.recursion.core :as recursion]
+   [psi.recursion.resolvers :as recursion-resolvers]
    [psi.agent-session.core :as agent-session]
    [psi.agent-session.resolvers :as as-resolvers]))
 
@@ -85,15 +87,21 @@
     (register-resolver-if-missing! ai/ai-provider-models-resolver)
     (register-resolver-if-missing! ai/ai-provider-registry-resolver)
 
-    ;; History + Introspection + Memory + Agent-session resolvers
+    ;; History + Introspection + Memory + Recursion + Agent-session resolvers
     (doseq [r history-resolvers/all-resolvers]
       (register-resolver-if-missing! r))
     (doseq [r resolvers/all-resolvers]
       (register-resolver-if-missing! r))
     (doseq [r memory-resolvers/all-resolvers]
       (register-resolver-if-missing! r))
+    (doseq [r recursion-resolvers/all-resolvers]
+      (register-resolver-if-missing! r))
     (doseq [r as-resolvers/all-resolvers]
       (register-resolver-if-missing! r))
+
+    ;; Recursion mutations
+    (doseq [m recursion-resolvers/all-mutations]
+      (register-mutation-if-missing! m))
 
     ;; Agent-session mutations
     (doseq [m agent-session/all-mutations]
@@ -106,7 +114,7 @@
 ;; Isolated introspection context (Nullable pattern)
 ;; ─────────────────────────────────────────────────────────────────────────────
 
-(defrecord IntrospectionContext [engine-ctx query-ctx memory-ctx agent-session-ctx])
+(defrecord IntrospectionContext [engine-ctx query-ctx memory-ctx recursion-ctx agent-session-ctx])
 
 (defn create-context
   "Create an isolated introspection context with its own engine and query atoms.
@@ -119,15 +127,19 @@
                           (default: fresh from query/create-query-context)
      :memory-ctx        — a memory context to expose via EQL
                           (default: fresh from memory/create-context)
+     :recursion-ctx     — a recursion context to expose via EQL
+                          (default: nil — recursion resolvers still registered
+                          but queries require seeding :psi/recursion-ctx)
      :agent-session-ctx — an agent-session context to expose via EQL
                           (default: nil — agent-session resolvers not registered)"
   ([]
    (create-context {}))
-  ([{:keys [engine-ctx query-ctx memory-ctx agent-session-ctx]}]
+  ([{:keys [engine-ctx query-ctx memory-ctx recursion-ctx agent-session-ctx]}]
    (->IntrospectionContext
     (or engine-ctx (engine/create-context))
     (or query-ctx (query/create-query-context))
     (or memory-ctx (memory/create-context))
+    recursion-ctx
     agent-session-ctx)))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
@@ -171,6 +183,7 @@
    - History resolvers
    - Introspection resolvers
    - Memory resolvers
+   - Recursion resolvers + mutations
    - Agent-session resolvers + mutations (when :agent-session-ctx is present)
 
    If `ctx` carries an :agent-session-ctx, agent-session resolvers + mutations
@@ -194,6 +207,10 @@
     (doseq [r resolvers/all-resolvers]
       (query/register-resolver-in! qctx r))
     (memory/register-resolvers-in! qctx false)
+
+    ;; Recursion resolvers + mutations
+    (recursion/register-resolvers-in! qctx false)
+    (recursion/register-mutations-in! qctx false)
 
     (when (:agent-session-ctx ctx)
       ;; Pass rebuild?=false — we rebuild once below after all operations are in.

@@ -864,3 +864,50 @@
   "Global wrapper for `finalize-cycle-in!`."
   [cycle-id]
   (finalize-cycle-in! (global-context) cycle-id))
+
+;;; --- EQL resolver registration ---
+
+(defn register-resolvers-in!
+  "Register recursion resolvers into isolated query context `qctx`.
+   Rebuilds query env by default."
+  ([qctx]
+   (register-resolvers-in! qctx true))
+  ([qctx rebuild?]
+   (let [resolvers (requiring-resolve 'psi.recursion.resolvers/all-resolvers)
+         register-fn (requiring-resolve 'psi.query.core/register-resolver-in!)
+         rebuild-fn (requiring-resolve 'psi.query.core/rebuild-env-in!)]
+     (doseq [r @resolvers]
+       (register-fn qctx r))
+     (when rebuild?
+       (rebuild-fn qctx))
+     :ok)))
+
+(defn register-mutations-in!
+  "Register recursion mutations into isolated query context `qctx`.
+   Rebuilds query env by default."
+  ([qctx]
+   (register-mutations-in! qctx true))
+  ([qctx rebuild?]
+   (let [mutations (requiring-resolve 'psi.recursion.resolvers/all-mutations)
+         register-fn (requiring-resolve 'psi.query.core/register-mutation-in!)
+         rebuild-fn (requiring-resolve 'psi.query.core/rebuild-env-in!)]
+     (doseq [m @mutations]
+       (register-fn qctx m))
+     (when rebuild?
+       (rebuild-fn qctx))
+     :ok)))
+
+(defn register-resolvers!
+  "Register recursion resolvers and mutations into global query context."
+  []
+  (let [resolvers (requiring-resolve 'psi.recursion.resolvers/all-resolvers)
+        mutations (requiring-resolve 'psi.recursion.resolvers/all-mutations)
+        register-resolver-fn (requiring-resolve 'psi.query.core/register-resolver!)
+        register-mutation-fn (requiring-resolve 'psi.query.core/register-mutation!)
+        rebuild-fn (requiring-resolve 'psi.query.core/rebuild-env!)]
+    (doseq [r @resolvers]
+      (register-resolver-fn r))
+    (doseq [m @mutations]
+      (register-mutation-fn m))
+    (rebuild-fn)
+    :ok))

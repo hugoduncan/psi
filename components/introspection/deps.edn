@@ -3,4 +3,5 @@
         com.wsscode/pathom3         {:mvn/version "2025.01.16-alpha"}
         psi/engine                  {:local/root "../../components/engine"}
         psi/query                   {:local/root "../../components/query"}
-        psi/agent-session           {:local/root "../../components/agent-session"}}}
+        psi/agent-session           {:local/root "../../components/agent-session"}
+        psi/recursion               {:local/root "../../components/recursion"}}}
