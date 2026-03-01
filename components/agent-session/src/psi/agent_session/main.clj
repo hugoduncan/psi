@@ -6,6 +6,7 @@
      clojure -M:run --model sonnet-4.6
      clojure -M:run --log-level DEBUG
      clojure -M:run --tui
+     clojure -M:run --rpc-edn         # EDN-lines RPC on stdin/stdout
      clojure -M:run --nrepl            # random port
      clojure -M:run --nrepl 7888       # specific port
      clojure -M:run --tui --nrepl      # TUI + nREPL
@@ -46,6 +47,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.prompt-templates :as pt]
+   [psi.agent-session.rpc :as rpc]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.system-prompt :as sys-prompt]
    [psi.agent-session.tools :as tools]
@@ -697,16 +699,24 @@
 ;; ============================================================
 
 (defn -main
-  "Entry point. Accepts optional --model <key>, --log-level <LEVEL>, --tui, --nrepl [port]."
+  "Entry point. Accepts optional --model <key>, --log-level <LEVEL>, --tui, --rpc-edn, --nrepl [port]."
   [& args]
   (set-log-level! (log-level-from-args args))
   (let [model-key  (model-key-from-args args)
         tui?       (some #(= "--tui" %) args)
+        rpc-edn?   (some #(= "--rpc-edn" %) args)
         nrepl-port (nrepl-port-from-args args)
-        nrepl-srv  (when nrepl-port (start-nrepl! nrepl-port))]
+        nrepl-srv  (when (and nrepl-port (not rpc-edn?))
+                     (start-nrepl! nrepl-port))]
     (try
-      (if tui?
+      (cond
+        rpc-edn?
+        (rpc/run-stdio-loop! {})
+
+        tui?
         (run-tui-session model-key)
+
+        :else
         (run-session model-key))
       (finally
         (stop-nrepl! nrepl-srv)))

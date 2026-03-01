@@ -18,6 +18,9 @@ clojure -M:run --model claude-3-5-sonnet
 # Terminal UI
 clojure -M:run --tui
 
+# EDN-lines RPC mode (protocol frames on stdout)
+clojure -M:run --rpc-edn
+
 # OpenAI
 clojure -M:run --model gpt-4o --tui
 
