@@ -624,3 +624,247 @@
           proposal (:proposal result)]
       (is (= :low (:risk proposal)) "empty actions → low risk")
       (is (empty? (:actions proposal))))))
+
+;;; --- Approval policy tests ---
+
+(defn- setup-planned-cycle
+  "Helper: create a context, trigger, observe, and plan a cycle.
+   Returns [ctx cycle-id]."
+  ([]
+   (setup-planned-cycle {}))
+  ([{:keys [config-overrides state-overrides graph-state memory-state]
+     :or {config-overrides {}
+          state-overrides {}
+          graph-state sample-graph-state
+          memory-state sample-memory-state}}]
+   (let [ctx (core/create-context {:config-overrides config-overrides
+                                   :state-overrides state-overrides})
+         cycle-id (trigger-and-get-cycle-id ctx)
+         _ (core/observe-in! ctx cycle-id all-ready graph-state memory-state)
+         _ (core/plan-in! ctx cycle-id)]
+     [ctx cycle-id])))
+
+(deftest requires-manual-approval-test
+  ;; Test the pure approval policy function
+  (let [default-config (policy/default-config)]
+
+    (testing "medium-risk proposal requires manual approval regardless of trusted-local"
+      (is (true? (policy/requires-manual-approval?
+                  {:risk :medium} default-config)))
+      (is (true? (policy/requires-manual-approval?
+                  {:risk :medium}
+                  (assoc default-config
+                         :trusted-local-mode-enabled true
+                         :auto-approve-low-risk-in-trusted-local-mode true)))))
+
+    (testing "high-risk proposal requires manual approval"
+      (is (true? (policy/requires-manual-approval?
+                  {:risk :high} default-config)))
+      (is (true? (policy/requires-manual-approval?
+                  {:risk :high}
+                  (assoc default-config :trusted-local-mode-enabled true)))))
+
+    (testing "low-risk with default config (trusted-local=false) requires manual approval"
+      (is (true? (policy/requires-manual-approval?
+                  {:risk :low :requires-approval true} default-config))))
+
+    (testing "low-risk with trusted-local=true AND auto-approve=true auto-approves (AC #8)"
+      (is (false? (policy/requires-manual-approval?
+                   {:risk :low :requires-approval true}
+                   (assoc default-config
+                          :trusted-local-mode-enabled true
+                          :auto-approve-low-risk-in-trusted-local-mode true)))))
+
+    (testing "low-risk with trusted-local=true AND auto-approve=false requires manual"
+      (is (true? (policy/requires-manual-approval?
+                  {:risk :low :requires-approval true}
+                  (assoc default-config
+                         :trusted-local-mode-enabled true
+                         :auto-approve-low-risk-in-trusted-local-mode false)))))
+
+    (testing "auto-approve? is inverse of requires-manual-approval?"
+      (is (true? (policy/auto-approve?
+                  {:risk :low}
+                  (assoc default-config
+                         :trusted-local-mode-enabled true
+                         :auto-approve-low-risk-in-trusted-local-mode true))))
+      (is (false? (policy/auto-approve?
+                   {:risk :high} default-config))))))
+
+(deftest apply-approval-gate-manual-test
+  ;; AC #7: medium/high risk enters awaiting-approval
+  (testing "medium-risk proposal gets manual gate"
+    (let [[ctx cycle-id] (setup-planned-cycle
+                          {:graph-state {:capability-count 1 :status :initializing}
+                           :memory-state {:entry-count 0 :status :ready}})
+          ;; The gap-based observation produces high-risk actions
+          result (core/apply-approval-gate-in! ctx cycle-id)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (= :manual (:gate result)))
+      (is (= :awaiting-approval (:status state)))
+      (is (= :awaiting-approval (:status cycle)))))
+
+  (testing "default config (trusted-local=false) with any risk gets manual gate"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          result (core/apply-approval-gate-in! ctx cycle-id)
+          state (core/get-state-in ctx)]
+      (is (= :manual (:gate result)))
+      (is (= :awaiting-approval (:status state))))))
+
+(deftest apply-approval-gate-auto-approve-test
+  ;; AC #8: trusted-local low-risk auto-approve
+  (testing "low-risk with trusted-local auto-approve gets auto-approved"
+    (let [;; Create context with trusted-local mode and an observation that produces
+          ;; only opportunities (medium priority → medium risk... but we need low risk)
+          ;; We need to produce a low-risk proposal. Empty actions → low risk.
+          ctx (core/create-context
+               {:config-overrides {:trusted-local-mode-enabled true
+                                   :auto-approve-low-risk-in-trusted-local-mode true}})
+          cycle-id (trigger-and-get-cycle-id ctx)
+          _ (core/observe-in! ctx cycle-id all-ready sample-graph-state sample-memory-state)
+          ;; Override observation to have no gaps/opportunities → empty actions → low risk
+          _ (core/swap-state-in!
+             ctx
+             (fn [s]
+               (update s :cycles
+                       (fn [cs]
+                         (mapv #(if (= cycle-id (:cycle-id %))
+                                  (-> %
+                                      (assoc-in [:observation :gaps] [])
+                                      (assoc-in [:observation :opportunities] []))
+                                  %)
+                               cs)))))
+          _ (core/plan-in! ctx cycle-id)
+          ;; Verify proposal is low risk
+          state-before (core/get-state-in ctx)
+          cycle-before (first (filter #(= cycle-id (:cycle-id %)) (:cycles state-before)))
+          _ (assert (= :low (:risk (:proposal cycle-before))) "precondition: low risk")
+          result (core/apply-approval-gate-in! ctx cycle-id)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (= :auto-approved (:gate result)))
+      (is (= :executing (:status state)))
+      (is (= :executing (:status cycle)))
+      (is (true? (get-in cycle [:proposal :approved])))
+      (is (false? (get-in cycle [:proposal :requires-approval]))))))
+
+(deftest approve-proposal-in-test
+  ;; Approve transitions to executing
+  (testing "approve transitions to executing"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          _ (core/apply-approval-gate-in! ctx cycle-id)
+          result (core/approve-proposal-in! ctx cycle-id "user@test" "looks good")
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+      (is (= :executing (:status state)))
+      (is (= :executing (:status cycle)))
+      (is (true? (get-in cycle [:proposal :approved])))
+      (is (= "user@test" (get-in cycle [:proposal :approval-by])))
+      (is (= "looks good" (get-in cycle [:proposal :approval-notes])))))
+
+  (testing "approve rejects wrong cycle status"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          ;; Cycle is in :planning, not :awaiting-approval
+          result (core/approve-proposal-in! ctx cycle-id "user" "notes")]
+      (is (false? (:ok? result)))
+      (is (= :wrong-cycle-status (:error result))))))
+
+(deftest reject-proposal-in-test
+  ;; Reject transitions to learning
+  (testing "reject transitions to learning"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          _ (core/apply-approval-gate-in! ctx cycle-id)
+          result (core/reject-proposal-in! ctx cycle-id "user@test" "too risky")
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+      (is (= :learning (:status state)))
+      (is (= :learning (:status cycle)))
+      (is (false? (get-in cycle [:proposal :approved])))
+      (is (= "user@test" (get-in cycle [:proposal :approval-by])))
+      (is (= "too risky" (get-in cycle [:proposal :approval-notes])))))
+
+  (testing "reject rejects wrong cycle status"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          result (core/reject-proposal-in! ctx cycle-id "user" "notes")]
+      (is (false? (:ok? result)))
+      (is (= :wrong-cycle-status (:error result))))))
+
+;;; --- Execution tests ---
+
+(deftest execute-in-test
+  ;; Execute creates attempt records and transitions to verifying
+  (testing "execute creates attempt records and transitions to verifying"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          _ (core/apply-approval-gate-in! ctx cycle-id)
+          _ (core/approve-proposal-in! ctx cycle-id "user" "approved")
+          executor (fn [action]
+                     {:status :success
+                      :output-summary (str "executed " (:id action))})
+          result (core/execute-in! ctx cycle-id executor)
+          state (core/get-state-in ctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (true? (:ok? result)))
+      (is (vector? (:attempts result)))
+      (is (= :verifying (:status state)))
+      (is (= :verifying (:status cycle)))
+      ;; Check attempt records
+      (let [attempts (:execution-attempts cycle)]
+        (is (pos? (count attempts)))
+        (doseq [attempt attempts]
+          (is (string? (:action-id attempt)))
+          (is (inst? (:started-at attempt)))
+          (is (inst? (:ended-at attempt)))
+          (is (= :success (:status attempt)))
+          (is (string? (:output-summary attempt)))))))
+
+  (testing "execute with default hook-executor"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          _ (core/apply-approval-gate-in! ctx cycle-id)
+          _ (core/approve-proposal-in! ctx cycle-id "user" "ok")
+          result (core/execute-in! ctx cycle-id)
+          state (core/get-state-in ctx)]
+      (is (true? (:ok? result)))
+      (is (= :verifying (:status state)))
+      (doseq [attempt (:attempts result)]
+        (is (= :success (:status attempt)))
+        (is (= "hook-not-implemented" (:output-summary attempt))))))
+
+  (testing "execute with failed hook"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          _ (core/apply-approval-gate-in! ctx cycle-id)
+          _ (core/approve-proposal-in! ctx cycle-id "user" "ok")
+          executor (fn [_action]
+                     {:status :failed
+                      :output-summary "hook error"})
+          result (core/execute-in! ctx cycle-id executor)]
+      (is (true? (:ok? result)))
+      (doseq [attempt (:attempts result)]
+        (is (= :failed (:status attempt))))))
+
+  (testing "execute rejects if proposal not approved"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          ;; Manually set cycle to executing without approval
+          _ (core/swap-state-in!
+             ctx
+             (fn [s]
+               (-> s
+                   (assoc :status :executing)
+                   (update :cycles
+                           (fn [cs]
+                             (mapv #(if (= cycle-id (:cycle-id %))
+                                      (assoc % :status :executing)
+                                      %)
+                                   cs))))))
+          result (core/execute-in! ctx cycle-id)]
+      (is (false? (:ok? result)))
+      (is (= :proposal-not-approved (:error result)))))
+
+  (testing "execute rejects wrong cycle status"
+    (let [[ctx cycle-id] (setup-planned-cycle)
+          ;; Cycle is in :planning
+          result (core/execute-in! ctx cycle-id)]
+      (is (false? (:ok? result)))
+      (is (= :wrong-cycle-status (:error result))))))

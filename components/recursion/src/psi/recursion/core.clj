@@ -387,3 +387,190 @@
   "Global wrapper for `plan-in!`."
   [cycle-id]
   (plan-in! (global-context) cycle-id))
+
+;;; --- Approval gate ---
+
+(defn apply-approval-gate-in!
+  "Apply the approval gate to the cycle's proposal.
+
+   If manual approval is required: transitions cycle+controller to :awaiting-approval.
+   If auto-approve: sets proposal.approved=true, proposal.requires-approval=false,
+   transitions cycle+controller to :executing.
+
+   Returns {:gate :manual} or {:gate :auto-approved}."
+  [ctx cycle-id]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (not= :planning (:status cycle))
+      {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+      (nil? (:proposal cycle))
+      {:ok? false, :error :no-proposal}
+
+      :else
+      (let [config (:config state)
+            proposal (:proposal cycle)]
+        (if (policy/requires-manual-approval? proposal config)
+          ;; Manual approval required
+          (do
+            (swap-state-in! ctx
+                            (fn [s]
+                              (-> s
+                                  (assoc :status :awaiting-approval)
+                                  (update :cycles update-cycle cycle-id
+                                          #(assoc % :status :awaiting-approval)))))
+            {:gate :manual})
+          ;; Auto-approve
+          (do
+            (swap-state-in! ctx
+                            (fn [s]
+                              (-> s
+                                  (assoc :status :executing)
+                                  (update :cycles update-cycle cycle-id
+                                          #(-> %
+                                               (assoc :status :executing)
+                                               (assoc-in [:proposal :approved] true)
+                                               (assoc-in [:proposal :requires-approval] false))))))
+            {:gate :auto-approved}))))))
+
+(defn apply-approval-gate!
+  "Global wrapper for `apply-approval-gate-in!`."
+  [cycle-id]
+  (apply-approval-gate-in! (global-context) cycle-id))
+
+;;; --- Approve / Reject proposals ---
+
+(defn approve-proposal-in!
+  "Approve a proposal that is awaiting approval.
+   Sets approved=true, approval-by, approval-notes.
+   Transitions cycle+controller to :executing.
+
+   Returns {:ok? true} on success."
+  [ctx cycle-id approver notes]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (not= :awaiting-approval (:status cycle))
+      {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+      :else
+      (do
+        (swap-state-in! ctx
+                        (fn [s]
+                          (-> s
+                              (assoc :status :executing)
+                              (update :cycles update-cycle cycle-id
+                                      #(-> %
+                                           (assoc :status :executing)
+                                           (assoc-in [:proposal :approved] true)
+                                           (assoc-in [:proposal :approval-by] approver)
+                                           (assoc-in [:proposal :approval-notes] notes))))))
+        {:ok? true}))))
+
+(defn approve-proposal!
+  "Global wrapper for `approve-proposal-in!`."
+  [cycle-id approver notes]
+  (approve-proposal-in! (global-context) cycle-id approver notes))
+
+(defn reject-proposal-in!
+  "Reject a proposal that is awaiting approval.
+   Sets approved=false, approval-by, approval-notes.
+   Transitions cycle+controller to :learning (skip execution).
+
+   Returns {:ok? true} on success."
+  [ctx cycle-id approver notes]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false, :error :cycle-not-found}
+
+      (not= :awaiting-approval (:status cycle))
+      {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+      :else
+      (do
+        (swap-state-in! ctx
+                        (fn [s]
+                          (-> s
+                              (assoc :status :learning)
+                              (update :cycles update-cycle cycle-id
+                                      #(-> %
+                                           (assoc :status :learning)
+                                           (assoc-in [:proposal :approved] false)
+                                           (assoc-in [:proposal :approval-by] approver)
+                                           (assoc-in [:proposal :approval-notes] notes))))))
+        {:ok? true}))))
+
+(defn reject-proposal!
+  "Global wrapper for `reject-proposal-in!`."
+  [cycle-id approver notes]
+  (reject-proposal-in! (global-context) cycle-id approver notes))
+
+;;; --- Execution ---
+
+(defn- default-hook-executor
+  "Default no-op hook executor. Returns success with a placeholder message."
+  [_action]
+  {:status :success, :output-summary "hook-not-implemented"})
+
+(defn execute-in!
+  "Execute approved proposal actions via hook-executor.
+
+   Takes `ctx`, `cycle-id`, and an optional `hook-executor` function
+   `(fn [action] {:status :success|:failed, :output-summary str})`.
+
+   Creates an ExecutionAttempt record per action. Appends attempts to cycle.
+   Transitions cycle+controller to :verifying.
+
+   Returns {:ok? true, :attempts [...]} on success."
+  ([ctx cycle-id]
+   (execute-in! ctx cycle-id default-hook-executor))
+  ([ctx cycle-id hook-executor]
+   (let [state (get-state-in ctx)
+         cycle (find-cycle (:cycles state) cycle-id)]
+     (cond
+       (nil? cycle)
+       {:ok? false, :error :cycle-not-found}
+
+       (not= :executing (:status cycle))
+       {:ok? false, :error :wrong-cycle-status, :status (:status cycle)}
+
+       (not (get-in cycle [:proposal :approved]))
+       {:ok? false, :error :proposal-not-approved}
+
+       :else
+       (let [actions (get-in cycle [:proposal :actions])
+             attempts (mapv (fn [action]
+                              (let [started (java.time.Instant/now)
+                                    result  (hook-executor action)
+                                    ended   (java.time.Instant/now)]
+                                {:action-id      (:id action)
+                                 :started-at     started
+                                 :ended-at       ended
+                                 :status         (:status result)
+                                 :output-summary (:output-summary result)}))
+                            actions)]
+         (swap-state-in! ctx
+                         (fn [s]
+                           (-> s
+                               (assoc :status :verifying)
+                               (update :cycles update-cycle cycle-id
+                                       #(-> %
+                                            (assoc :status :verifying)
+                                            (update :execution-attempts into attempts))))))
+         {:ok? true, :attempts attempts})))))
+
+(defn execute!
+  "Global wrapper for `execute-in!`."
+  ([cycle-id]
+   (execute-in! (global-context) cycle-id))
+  ([cycle-id hook-executor]
+   (execute-in! (global-context) cycle-id hook-executor)))

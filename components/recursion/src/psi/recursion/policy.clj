@@ -119,6 +119,43 @@
    :trusted-local-mode-enabled false
    :auto-approve-low-risk-in-trusted-local-mode true})
 
+(def ExecutionAttempt
+  [:map
+   [:action-id :string]
+   [:started-at inst?]
+   [:ended-at {:optional true} [:maybe inst?]]
+   [:status [:enum :success :failed :aborted]]
+   [:output-summary {:optional true} [:maybe :string]]])
+
+(defn requires-manual-approval?
+  "Pure function: returns true if manual approval is required for `proposal`
+   given `config`.
+
+   Logic per spec:
+   - Medium or high risk → always requires manual approval.
+   - Low risk with trusted-local-mode-enabled AND auto-approve-low-risk → auto-approve.
+   - Otherwise → manual approval required."
+  [proposal config]
+  (let [risk (:risk proposal)]
+    (cond
+      ;; Medium/high risk always requires manual approval
+      (contains? #{:medium :high} risk)
+      true
+
+      ;; Low risk: auto-approve only when both trusted-local flags are true
+      (= :low risk)
+      (not (and (:trusted-local-mode-enabled config)
+                (:auto-approve-low-risk-in-trusted-local-mode config)))
+
+      ;; Default: require approval
+      :else
+      true)))
+
+(defn auto-approve?
+  "Convenience inverse of `requires-manual-approval?`."
+  [proposal config]
+  (not (requires-manual-approval? proposal config)))
+
 (defn valid-policy?
   "Check if `policy` conforms to the GuardrailPolicy schema."
   [policy]
