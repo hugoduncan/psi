@@ -26,10 +26,7 @@
 
 (defn- manual-trigger
   []
-  {:type :manual
-   :reason "test-trigger"
-   :payload {}
-   :timestamp (java.time.Instant/now)})
+  (core/manual-trigger-signal "test-trigger" {:source :test}))
 
 ;;; --- Resolver tests ---
 
@@ -205,11 +202,16 @@
                                          {:psi/recursion-ctx rctx
                                           :reason "mutation-test"
                                           :system-state (all-readiness-true)})
-                                   [:psi.recursion/trigger-result]}])]
-      (is (= :accepted
-             (get-in result ['psi.recursion/trigger!
-                             :psi.recursion/trigger-result
-                             :result]))))))
+                                   [:psi.recursion/trigger-result]}])
+          trigger-result (get-in result ['psi.recursion/trigger!
+                                         :psi.recursion/trigger-result])
+          cycle-id (:cycle-id trigger-result)
+          state (core/get-state-in rctx)
+          cycle (first (filter #(= cycle-id (:cycle-id %)) (:cycles state)))]
+      (is (= :accepted (:result trigger-result)))
+      (is (= core/feed-forward-manual-trigger-prompt-name
+             (get-in cycle [:trigger :payload :prompt-name])))
+      (is (= :eql-mutation (get-in cycle [:trigger :payload :source]))))))
 
 (deftest pause-resume-mutations-toggle-state
   ;; Pause and resume mutations should toggle controller state

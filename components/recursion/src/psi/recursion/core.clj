@@ -108,6 +108,33 @@
 
 ;;; --- Trigger intake and readiness gating ---
 
+(def feed-forward-manual-trigger-prompt-name
+  "feed-forward-manual-trigger")
+
+(def feed-forward-manual-trigger-prompt
+  "Trigger a manual feed-forward cycle. Capture operator reason and current readiness context.")
+
+(defn manual-trigger-signal
+  "Build a canonical manual TriggerSignal payload shared by runtime command
+   and EQL mutation entrypoints.
+
+   Optional opts:
+   - :actor   operator/actor identity string (default: operator)
+   - :source  invocation source keyword (e.g. :runtime-command, :eql-mutation)
+   - :extra-payload map merged into payload"
+  ([reason]
+   (manual-trigger-signal reason {}))
+  ([reason {:keys [actor source extra-payload]
+            :or {actor "operator" source :unknown extra-payload {}}}]
+   {:type :manual
+    :reason (or reason "manual-trigger")
+    :payload (merge {:prompt-name feed-forward-manual-trigger-prompt-name
+                     :prompt-body feed-forward-manual-trigger-prompt
+                     :actor actor
+                     :source source}
+                    extra-payload)
+    :timestamp (java.time.Instant/now)}))
+
 (defn- new-cycle
   "Create a new cycle record for `trigger-signal` with the given initial `status`."
   [trigger-signal status]

@@ -21,7 +21,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.prompt-templates :as pt]
    [psi.agent-session.oauth.core :as oauth]
-   [psi.agent-core.core :as agent]))
+   [psi.agent-core.core :as agent]
+   [psi.recursion.core :as recursion]))
 
 ;; ============================================================
 ;; Formatting helpers (pure — return strings, no side effects)
@@ -84,6 +85,7 @@
          "  /resume  — resume a previous session\n"
          "  /login [provider] — login with an OAuth provider\n"
          "  /logout  — logout from an OAuth provider\n"
+         "  /feed-forward [reason] — trigger a manual feed-forward cycle\n"
          "  /help    — show this help\n"
          "  /skill:name — invoke a skill (loads full content)"
          (when (seq templates)
@@ -153,6 +155,38 @@
   {:anthropic "ANTHROPIC_API_KEY"
    :openai    "OPENAI_API_KEY"
    :google    "GOOGLE_API_KEY"})
+
+(def ^:private default-feed-forward-readiness
+  {:query-ready true
+   :graph-ready true
+   :introspection-ready true
+   :memory-ready true})
+
+(defn- feed-forward-trigger-signal
+  [reason]
+  (recursion/manual-trigger-signal reason {:source :runtime-command}))
+
+(defn- format-feed-forward-trigger-result
+  [result]
+  (case (:result result)
+    :accepted
+    (str "✓ Feed-forward trigger accepted"
+         "\n  cycle-id: " (:cycle-id result)
+         "\n  prompt: " recursion/feed-forward-manual-trigger-prompt-name)
+
+    :blocked
+    (str "‖ Feed-forward trigger blocked"
+         "\n  cycle-id: " (:cycle-id result)
+         "\n  reason: recursion_prerequisites_not_ready")
+
+    :ignored
+    "… Feed-forward trigger ignored (manual hook disabled)."
+
+    :rejected
+    (str "✗ Feed-forward trigger rejected"
+         "\n  reason: " (name (:reason result)))
+
+    (str result)))
 
 ;; ============================================================
 ;; Login provider selection (pure — returns data)
@@ -237,6 +271,21 @@
       ;; Skills
       (= trimmed "/skills")
       {:type :text :message (format-skills ctx)}
+
+      ;; Feed-forward manual trigger
+      (or (= trimmed "/feed-forward")
+          (str/starts-with? trimmed "/feed-forward "))
+      (if-let [recursion-ctx (:recursion-ctx ctx)]
+        (let [reason (-> (str/replace trimmed #"^/feed-forward\s*" "")
+                         (str/trim)
+                         (not-empty))
+              result (recursion/handle-trigger-in! recursion-ctx
+                                                   (feed-forward-trigger-signal reason)
+                                                   default-feed-forward-readiness)]
+          {:type :text
+           :message (format-feed-forward-trigger-result result)})
+        {:type :text
+         :message "✗ Feed-forward recursion context not configured."})
 
       ;; Login
       (or (= trimmed "/login")

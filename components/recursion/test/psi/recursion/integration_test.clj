@@ -29,10 +29,12 @@
   ([]
    (make-trigger :manual))
   ([ttype]
-   {:type ttype
-    :reason "integration-test"
-    :payload {}
-    :timestamp (java.time.Instant/now)}))
+   (if (= :manual ttype)
+     (core/manual-trigger-signal "integration-test" {:source :test})
+     {:type ttype
+      :reason "integration-test"
+      :payload {}
+      :timestamp (java.time.Instant/now)})))
 
 (defn- success-executor
   [_action]

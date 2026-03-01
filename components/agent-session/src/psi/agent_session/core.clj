@@ -241,7 +241,7 @@
     :persist?          — if false, disable all disk I/O (default: true)
     :oauth-ctx         — optional OAuth context for extension auth helpers"
   ([] (create-context {}))
-  ([{:keys [initial-session compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx]
+  ([{:keys [initial-session compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx recursion-ctx]
      :or   {persist? true}}]
    (let [sc-env            (sc/create-sc-env)
          sc-session-id     (java.util.UUID/randomUUID)
@@ -273,6 +273,7 @@
                             :cwd                   resolved-cwd
                             :persist?              persist?
                             :oauth-ctx             oauth-ctx
+                            :recursion-ctx         recursion-ctx
                             :compaction-fn         (or compaction-fn compaction/stub-compaction-fn)
                             :branch-summary-fn     (or branch-summary-fn compaction/stub-branch-summary-fn)
                             :config                merged-config}

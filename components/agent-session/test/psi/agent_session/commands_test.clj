@@ -5,7 +5,8 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-core.core :as agent]))
+   [psi.agent-core.core :as agent]
+   [psi.recursion.core :as recursion]))
 
 ;; ── Test helper ─────────────────────────────────────────────
 
@@ -26,6 +27,12 @@
 
 (def ^:private cmd-opts
   {:oauth-ctx nil :ai-model test-ai-model})
+
+(defn- with-recursion-ctx
+  [ctx]
+  (let [rctx (recursion/create-context)]
+    (recursion/register-hooks-in! rctx)
+    (assoc ctx :recursion-ctx rctx)))
 
 ;; ── dispatch tests ──────────────────────────────────────────
 
@@ -84,6 +91,28 @@
         result (commands/dispatch ctx "/skills" cmd-opts)]
     (is (= :text (:type result)))
     (is (str/includes? (:message result) "Skills"))))
+
+(deftest dispatch-feed-forward-without-recursion-ctx-test
+  (let [ctx    (make-test-ctx)
+        result (commands/dispatch ctx "/feed-forward" cmd-opts)]
+    (is (= :text (:type result)))
+    (is (str/includes? (:message result) "not configured"))))
+
+(deftest dispatch-feed-forward-accepted-test
+  (let [ctx    (with-recursion-ctx (make-test-ctx))
+        result (commands/dispatch ctx "/feed-forward verify runtime" cmd-opts)]
+    (is (= :text (:type result)))
+    (is (str/includes? (:message result) "trigger accepted"))
+    (is (str/includes? (:message result) "feed-forward-manual-trigger"))
+    (is (str/includes? (:message result) "cycle-id:"))))
+
+(deftest dispatch-feed-forward-busy-test
+  (let [ctx  (with-recursion-ctx (make-test-ctx))
+        _    (commands/dispatch ctx "/feed-forward first" cmd-opts)
+        busy (commands/dispatch ctx "/feed-forward second" cmd-opts)]
+    (is (= :text (:type busy)))
+    (is (str/includes? (:message busy) "trigger rejected"))
+    (is (str/includes? (:message busy) "controller-busy"))))
 
 (deftest dispatch-not-a-command-test
   (testing "plain text returns nil"
@@ -149,7 +178,7 @@
   (let [ctx (make-test-ctx)
         s   (commands/format-help ctx)]
     (doseq [cmd ["/quit" "/status" "/history" "/new" "/resume"
-                 "/login" "/logout" "/help" "/prompts" "/skills"]]
+                 "/login" "/logout" "/feed-forward" "/help" "/prompts" "/skills"]]
       (is (str/includes? s cmd) (str "help should mention " cmd)))))
 
 (deftest format-prompts-none-test

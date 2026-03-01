@@ -53,6 +53,7 @@
    [psi.ai.models :as models]
    [psi.introspection.core :as introspection]
    [psi.memory.runtime :as memory-runtime]
+   [psi.recursion.core :as recursion]
    [psi.tui.app :as tui-app])
   (:gen-class))
 
@@ -424,12 +425,15 @@
                         :skills        skills})
         developer-prompt (developer-prompt-from-env)
         ;; session context — agent-core + statechart + extension registry
+        recursion-ctx (recursion/create-context)
+        _         (recursion/register-hooks-in! recursion-ctx)
         ctx      (session/create-context
                   {:initial-session {:model {:provider (name (:provider ai-model))
                                              :id       (:id ai-model)
                                              :reasoning (:supports-reasoning ai-model)}
                                      :system-prompt   system-prompt}
-                   :oauth-ctx oauth-ctx})
+                   :oauth-ctx oauth-ctx
+                   :recursion-ctx recursion-ctx})
         ext-paths (ext/discover-extension-paths [] cwd)]
     ;; Reusable bootstrap: session file, query graph, base tools, system prompt,
     ;; mutation-driven startup loading, extension tool merge.
@@ -545,13 +549,16 @@
                         :context-files ctx-files
                         :skills        skills})
         developer-prompt (developer-prompt-from-env)
+        recursion-ctx (recursion/create-context)
+        _         (recursion/register-hooks-in! recursion-ctx)
         ctx       (session/create-context
                    {:initial-session {:model {:provider (name (:provider ai-model))
                                               :id       (:id ai-model)
                                               :reasoning (:supports-reasoning ai-model)}
                                       :system-prompt   system-prompt}
                     :event-queue event-queue
-                    :oauth-ctx oauth-ctx})
+                    :oauth-ctx oauth-ctx
+                    :recursion-ctx recursion-ctx})
         ext-paths (ext/discover-extension-paths [] cwd)
         ;; Reusable bootstrap: session file, query graph, base tools, system prompt,
         ;; mutation-driven startup loading, extension tool merge.

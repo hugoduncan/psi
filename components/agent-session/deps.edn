@@ -7,4 +7,5 @@
         psi/agent-core              {:local/root "../agent-core"}
         psi/ai                      {:local/root "../ai"}
         psi/query                   {:local/root "../query"}
+        psi/recursion               {:local/root "../recursion"}
         psi/tui                     {:local/root "../tui"}}}

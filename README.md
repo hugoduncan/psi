@@ -34,8 +34,11 @@ clojure -M:run --tui --nrepl 8888
 
 ### In-session commands
 
-`/status` `/history` `/new` `/help` `/quit` `/skills` `/prompts`
+`/status` `/history` `/new` `/help` `/quit` `/skills` `/prompts` `/feed-forward [reason]`
 `/skill:<name>` plus any extension commands
+
+`/feed-forward` triggers a manual recursion cycle from the runtime command surface.
+It is bound to the internal spec prompt name `feed-forward-manual-trigger`.
 
 ---
 

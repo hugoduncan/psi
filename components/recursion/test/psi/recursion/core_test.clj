@@ -186,10 +186,12 @@
   ([ttype]
    (make-trigger ttype "test trigger"))
   ([ttype reason]
-   {:type      ttype
-    :reason    reason
-    :payload   {}
-    :timestamp (java.time.Instant/now)}))
+   (if (= :manual ttype)
+     (core/manual-trigger-signal reason {:source :test})
+     {:type      ttype
+      :reason    reason
+      :payload   {}
+      :timestamp (java.time.Instant/now)})))
 
 (deftest register-hooks-in-test
   (testing "register-hooks-in! populates hooks from config"

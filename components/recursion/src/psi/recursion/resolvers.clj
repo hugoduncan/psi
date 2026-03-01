@@ -82,10 +82,7 @@
   {::pco/op-name 'psi.recursion/trigger!
    ::pco/params  [:psi/recursion-ctx :reason :system-state]
    ::pco/output  [:psi.recursion/trigger-result]}
-  (let [trigger-signal {:type :manual
-                        :reason (or reason "manual-trigger")
-                        :payload {}
-                        :timestamp (java.time.Instant/now)}
+  (let [trigger-signal (core/manual-trigger-signal reason {:source :eql-mutation})
         result (core/handle-trigger-in! recursion-ctx trigger-signal
                                         (or system-state
                                             {:query-ready true
