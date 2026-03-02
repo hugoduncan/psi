@@ -54,7 +54,6 @@
             (should psi-emacs--owned-process)
             (should (process-live-p psi-emacs--owned-process))
             (should (psi-emacs-state-p psi-emacs--state))
-            (should (hash-table-p (psi-emacs-state-pending-requests psi-emacs--state)))
             (should (hash-table-p (psi-emacs-state-tool-rows psi-emacs--state)))
             (should (markerp (psi-emacs-state-draft-anchor psi-emacs--state))))
           (should (psi-emacs-state-for-buffer buffer)))

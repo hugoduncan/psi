@@ -30,7 +30,6 @@
   process
   process-state
   transport-state
-  pending-requests
   assistant-in-progress
   assistant-range
   tool-rows
@@ -75,7 +74,6 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :process process
    :process-state (if (and process (process-live-p process)) 'running 'starting)
    :transport-state 'disconnected
-   :pending-requests (make-hash-table :test #'equal)
    :assistant-in-progress nil
    :assistant-range nil
    :tool-rows (make-hash-table :test #'equal)
@@ -194,13 +192,6 @@ COMMAND is a list suitable for `make-process'."
 (defun psi-emacs--install-buffer-lifecycle-hooks ()
   "Install local lifecycle hooks for dedicated psi buffer."
   (add-hook 'kill-buffer-hook #'psi-emacs--teardown-buffer nil t))
-
-(defun psi-emacs--ensure-owned-process ()
-  "Ensure current dedicated buffer has exactly one owned subprocess."
-  (unless (process-live-p psi-emacs--owned-process)
-    (setq psi-emacs--owned-process
-          (funcall psi-emacs--spawn-process-function psi-emacs-command)))
-  psi-emacs--owned-process)
 
 (defun psi-emacs--streaming-p ()
   "Return non-nil when the frontend is in streaming mode."
