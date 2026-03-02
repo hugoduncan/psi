@@ -111,13 +111,13 @@ receives an API map with:
 
 ## Emacs MVP frontend (rpc-edn)
 
-The repository includes an Emacs MVP frontend at `clients/emacs/` that runs
+The repository includes an Emacs MVP frontend at `components/emacs-ui/` that runs
 psi in a dedicated process buffer over rpc-edn.
 
 ### Start
 
 1. Ensure this repository is available locally.
-2. In Emacs, add `clients/emacs` to `load-path` and load `psi.el`.
+2. In Emacs, add `components/emacs-ui` to `load-path` and load `psi.el`.
 3. Run `M-x psi-emacs-start`.
 
 This opens `*psi*` (configurable via `psi-emacs-buffer-name`) and starts one

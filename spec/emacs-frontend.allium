@@ -6,8 +6,8 @@
 -- Includes:
 --   MVP process-buffer UX (single subprocess, single dedicated chat buffer)
 --   Auto-connect lifecycle (start -> handshake -> subscribe)
---   Keybinding-driven prompting/queueing/abort/reconnect behavior
---   Assistant and tool streaming rendering behavior
+--   Keybinding-driven prompting/queueing/abort/reconnect/tool-view-toggle behavior
+--   Assistant and tool streaming rendering behavior (global collapsed/expanded tool view)
 --   Header-line status behavior
 --   Manual reconnect supervision policy
 --   Phase progression from MVP to parity capabilities
@@ -47,12 +47,14 @@ value EmacsKeymap {
     queue: String
     abort: String
     reconnect: String
+    toggleToolOutput: String
     queuePrefix: String
 }
 
 value HeaderLineView {
     transport: disconnected | connecting | ready
     runState: idle | streaming | reconnecting | error
+    toolOutputView: collapsed | expanded
     modelLabel: String?
 }
 
@@ -76,7 +78,7 @@ entity ToolRow {
     streamedOutput: String
     ansiFacesApplied: Boolean
 
-    -- MVP keeps rows always expanded; collapsibility is parity-phase work.
+    -- Per-row collapsibility is disabled; MVP uses one global view toggle.
     collapsible: Boolean
 }
 
@@ -112,6 +114,8 @@ entity EmacsFrontend {
     headerLine: HeaderLineView
     keymap: EmacsKeymap
 
+    toolOutputView: collapsed | expanded
+
     autoConnect: Boolean
     singleSubprocess: Boolean
     reconnectPolicy: manual | auto
@@ -143,7 +147,10 @@ config {
     queue_key: String = "C-c C-q"
     abort_key: String = "C-c C-k"
     reconnect_key: String = "C-c C-r"
+    toggle_tool_output_key: String = "C-c C-t"
     queue_prefix: String = "C-u"
+
+    default_tool_output_view: collapsed | expanded = collapsed
 
     mvp_topics: Set<String> = {
         "assistant/delta",
@@ -174,6 +181,7 @@ rule MvpProfileIsDefault {
 
     ensures: frontend.buffer.transcriptEditable = true
     ensures: frontend.buffer.draftAnchor = end_of_buffer
+    ensures: frontend.toolOutputView = config.default_tool_output_view
 
     ensures: frontend.reportRpcErrorsInMinibufferOnly = true
 
@@ -288,12 +296,14 @@ rule CanonicalMvpKeybindingsAreInstalled {
     ensures: frontend.keymap.queue = config.queue_key
     ensures: frontend.keymap.abort = config.abort_key
     ensures: frontend.keymap.reconnect = config.reconnect_key
+    ensures: frontend.keymap.toggleToolOutput = config.toggle_tool_output_key
     ensures: frontend.keymap.queuePrefix = config.queue_prefix
 
     ensures: KeyBound(frontend.buffer, config.send_key, "send_from_buffer")
     ensures: KeyBound(frontend.buffer, config.queue_key, "queue_from_buffer")
     ensures: KeyBound(frontend.buffer, config.abort_key, "abort")
     ensures: KeyBound(frontend.buffer, config.reconnect_key, "reconnect")
+    ensures: KeyBound(frontend.buffer, config.toggle_tool_output_key, "toggle_tool_output_view")
 }
 
 rule ReturnInsertsNewline {
@@ -384,6 +394,34 @@ rule AbortKeySendsAbort {
     ensures: AbortForwarded(frontend.session)
 }
 
+rule GlobalToolOutputToggleFlipsView {
+    when: ToolOutputToggleRequested(frontend, source)
+
+    requires: source in [config.toggle_tool_output_key, "toggle_tool_output_view"]
+
+    ensures: frontend.toolOutputView =
+        if frontend.toolOutputView = collapsed then expanded
+        else collapsed
+
+    ensures: ExistingToolRowsUseGlobalView(frontend, frontend.toolOutputView)
+    ensures: FutureToolRowsUseGlobalView(frontend, frontend.toolOutputView)
+}
+
+rule GlobalToolOutputToggleAppliesEvenWithoutRows {
+    when: ToolOutputToggleRequested(frontend, source)
+
+    requires: source in [config.toggle_tool_output_key, "toggle_tool_output_view"]
+    requires: frontend.toolRows = []
+
+    ensures: FutureToolRowsUseGlobalView(frontend, frontend.toolOutputView)
+}
+
+rule NewSessionKeepsCurrentToolOutputView {
+    when: NewSessionRequested(frontend, parentSession?)
+
+    ensures: ToolOutputViewUnchanged(frontend)
+}
+
 ------------------------------------------------------------
 -- Streaming Rendering Rules
 ------------------------------------------------------------
@@ -443,12 +481,56 @@ rule ToolResultFinalizesRow {
     ensures: ToolRowOutput(frontend, payload.toolCallId) = FinalToolOutput(payload)
 }
 
-rule MvpToolRowsRemainExpanded {
+rule MvpToolRowsUseGlobalViewMode {
     when: ToolRowRenderRequested(frontend, toolCallId)
 
     requires: frontend.phase = mvp
 
     ensures: ToolRowCollapsible(frontend, toolCallId) = false
+    ensures: ToolRowBodyVisibility(frontend, toolCallId) = frontend.toolOutputView
+}
+
+rule CollapsedToolRowsRenderHeaderOnly {
+    when: ToolRowRenderRequested(frontend, toolCallId)
+
+    requires: frontend.phase = mvp
+    requires: frontend.toolOutputView = collapsed
+
+    ensures: ToolRowHeaderVisible(frontend, toolCallId)
+    ensures: ToolRowHeaderIncludes(frontend, toolCallId, fields: [tool_name, tool_call_id, status])
+    ensures: ToolRowBodyHidden(frontend, toolCallId)
+}
+
+rule CollapsedToolRowsTrackLiveStatus {
+    when: RpcEventReceived(frontend.rpc, eventName, payload)
+
+    requires: frontend.phase = mvp
+    requires: frontend.toolOutputView = collapsed
+    requires: eventName in ["tool/start", "tool/executing", "tool/result"]
+
+    ensures: ToolRowHeaderStatus(frontend, payload.toolCallId) = ToolRowStatus(frontend, payload.toolCallId)
+}
+
+rule CollapsedToolRowsKeepAccumulatingOutput {
+    when: RpcEventReceived(frontend.rpc, "tool/delta", payload)
+
+    requires: frontend.phase = mvp
+    requires: frontend.toolOutputView = collapsed
+
+    ensures: ToolRowOutput(frontend, payload.toolCallId) =
+        AppendToolDelta(ToolRowOutput(frontend, payload.toolCallId), payload.delta)
+    ensures: ToolRowBodyHidden(frontend, payload.toolCallId)
+}
+
+rule ErrorRowsStayCollapsedWhileGlobalViewIsCollapsed {
+    when: RpcEventReceived(frontend.rpc, "tool/result", payload)
+
+    requires: frontend.phase = mvp
+    requires: frontend.toolOutputView = collapsed
+    requires: payload.isError
+
+    ensures: ToolRowStatus(frontend, payload.toolCallId) = error
+    ensures: ToolRowBodyHidden(frontend, payload.toolCallId)
 }
 
 ------------------------------------------------------------
@@ -468,6 +550,8 @@ rule MvpHeaderLineShowsMinimalStatus {
     ensures: frontend.headerLine.runState =
         if frontend.session.isStreaming then streaming
         else idle
+
+    ensures: frontend.headerLine.toolOutputView = frontend.toolOutputView
 }
 
 rule RpcErrorsAreShownInMinibufferOnly {
@@ -524,6 +608,7 @@ rule ReconnectStartsFreshSessionAndClearsBuffer {
     ensures: frontend.assistant.inProgressText = null
     ensures: frontend.assistant.completedBlocks = []
     ensures: frontend.toolRows = []
+    ensures: frontend.toolOutputView = config.default_tool_output_view
 
     ensures: frontend.rpc.processState in [starting, running]
     ensures: frontend.rpc.transportState in [handshaking, ready]
@@ -605,6 +690,7 @@ surface EmacsSessionApi {
         frontend.session.isStreaming
         frontend.session.isCompacting
         frontend.headerLine
+        frontend.toolOutputView
         frontend.parity
 
     provides:
@@ -617,6 +703,7 @@ surface EmacsSessionApi {
         queue_from_buffer()
         abort_from_buffer()
         reconnect_frontend(confirm?)
+        toggle_tool_output_view()
 
         -- RPC transport/session operations available in MVP
         prompt(message, images?)
@@ -683,6 +770,7 @@ surface EmacsSessionApi {
         --   C-c C-q      queue while streaming; falls back to normal send when idle
         --   C-c C-k      abort
         --   C-c C-r      reconnect (confirm before clearing edited buffer)
+        --   C-c C-t      toggle global tool output view (collapsed <-> expanded)
         --   RET          newline only (never send)
         --
         -- Compose-source model:
@@ -699,7 +787,11 @@ surface EmacsSessionApi {
         -- Tool rendering:
         --   tool/start|delta|executing|update|result are rendered inline,
         --   with ANSI->face rendering enabled in MVP.
-        --   Collapsible tool sections are deferred to parity phase.
+        --   Global tool output view defaults to collapsed in MVP:
+        --     - collapsed: single-line tool header (name/id/status), body hidden
+        --     - expanded: full tool body visible
+        --   C-c C-t or M-x toggle_tool_output_view flips the global mode for
+        --   both existing rows and future rows.
         --
         -- Error UX:
         --   RPC errors are surfaced in minibuffer only during MVP.
@@ -712,6 +804,5 @@ surface EmacsSessionApi {
 -- Open Questions (Parity Phase)
 ------------------------------------------------------------
 
-open_question "Parity phase: should collapsible tool output be global-toggle, per-row toggle, or both?"
 open_question "Parity phase: should reconnect optionally offer resume/session-picker before clearing buffer?"
 open_question "Image UX in markdown buffers: inline image display first, or file-link fallback?"
