@@ -317,6 +317,15 @@
       (is (contains? (:psi.agent-session/stats result) :session-id))))
 
   (testing "query-in resolves canonical telemetry attrs directly"
+    (let [ctx (session/create-context)]
+      (doseq [attr [:psi.agent-session/messages-count
+                    :psi.agent-session/tool-call-count
+                    :psi.agent-session/start-time
+                    :psi.agent-session/current-time]]
+        (let [result (session/query-in ctx [attr])]
+          (is (contains? result attr))
+          (is (not (contains? result :com.wsscode.pathom3.connect.runner/attribute-errors))))))
+
     (let [ctx    (session/create-context)
           result (session/query-in ctx [:psi.agent-session/messages-count
                                         :psi.agent-session/tool-call-count
