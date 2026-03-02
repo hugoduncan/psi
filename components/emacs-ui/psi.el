@@ -34,7 +34,8 @@
   assistant-range
   tool-rows
   draft-anchor
-  rpc-client)
+  rpc-client
+  tool-output-view-mode)
 
 (defvar psi-emacs--spawn-process-function #'psi-emacs--default-spawn-process
   "Function used to spawn a psi subprocess.
@@ -78,7 +79,8 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :assistant-range nil
    :tool-rows (make-hash-table :test #'equal)
    :draft-anchor nil
-   :rpc-client nil))
+   :rpc-client nil
+   :tool-output-view-mode 'collapsed))
 
 (defun psi-emacs--status-string (state)
   "Return minimal status string for STATE."
