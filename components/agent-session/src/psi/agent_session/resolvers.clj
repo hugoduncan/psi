@@ -37,6 +37,10 @@
    :psi.agent-session/context-tokens
    :psi.agent-session/context-window
    :psi.agent-session/context-fraction    — nil or 0.0–1.0
+   :psi.agent-session/messages-count
+   :psi.agent-session/tool-call-count
+   :psi.agent-session/start-time
+   :psi.agent-session/current-time
    :psi.agent-session/stats               — SessionStats snapshot
    :psi.agent-session/tool-call-history   — [{:psi.tool-call/*}], nested tool call entities
    :psi.agent-session/tool-call-history-count — number of tool calls
@@ -607,24 +611,53 @@
 
 ;; ── Stats snapshot ──────────────────────────────────────
 
+(defn- stats-snapshot
+  "Build canonical session telemetry stats from current session/journal state."
+  [agent-session-ctx]
+  (let [sd      @(:session-data-atom agent-session-ctx)
+        journal @(:journal-atom agent-session-ctx)
+        msgs    (keep #(when (= :message (:kind %)) (get-in % [:data :message])) journal)]
+    {:session-id         (:session-id sd)
+     :session-file       (:session-file sd)
+     :user-messages      (count (filter #(= "user" (:role %)) msgs))
+     :assistant-messages (count (filter #(= "assistant" (:role %)) msgs))
+     :tool-calls         (count (filter #(= "toolResult" (:role %)) msgs))
+     :total-messages     (count msgs)
+     :entry-count        (count journal)
+     :context-tokens     (:context-tokens sd)
+     :context-window     (:context-window sd)}))
+
+(defn- canonical-start-time
+  [agent-session-ctx]
+  (let [sd      @(:session-data-atom agent-session-ctx)
+        startup (:startup-bootstrap sd)
+        journal @(:journal-atom agent-session-ctx)
+        first-ts (:timestamp (first journal))]
+    (or (:timestamp startup)
+        first-ts
+        (java.time.Instant/now))))
+
+(pco/defresolver agent-session-canonical-telemetry
+  "Resolve canonical top-level telemetry attrs from the same source as :psi.agent-session/stats.
+   Time attrs intentionally return java.time.Instant for stable in-process representation."
+  [{:keys [psi/agent-session-ctx]}]
+  {::pco/input  [:psi/agent-session-ctx]
+   ::pco/output [:psi.agent-session/messages-count
+                 :psi.agent-session/tool-call-count
+                 :psi.agent-session/start-time
+                 :psi.agent-session/current-time]}
+  (let [stats (stats-snapshot agent-session-ctx)]
+    {:psi.agent-session/messages-count  (:total-messages stats)
+     :psi.agent-session/tool-call-count (:tool-calls stats)
+     :psi.agent-session/start-time      (canonical-start-time agent-session-ctx)
+     :psi.agent-session/current-time    (java.time.Instant/now)}))
+
 (pco/defresolver agent-session-stats
   "Resolve a SessionStats snapshot."
   [{:keys [psi/agent-session-ctx]}]
   {::pco/input  [:psi/agent-session-ctx]
    ::pco/output [:psi.agent-session/stats]}
-  (let [sd      @(:session-data-atom agent-session-ctx)
-        journal @(:journal-atom agent-session-ctx)
-        msgs    (keep #(when (= :message (:kind %)) (get-in % [:data :message])) journal)]
-    {:psi.agent-session/stats
-     {:session-id        (:session-id sd)
-      :session-file      (:session-file sd)
-      :user-messages     (count (filter #(= "user" (:role %)) msgs))
-      :assistant-messages (count (filter #(= "assistant" (:role %)) msgs))
-      :tool-calls        (count (filter #(= "toolResult" (:role %)) msgs))
-      :total-messages    (count msgs)
-      :entry-count       (count journal)
-      :context-tokens    (:context-tokens sd)
-      :context-window    (:context-window sd)}}))
+  {:psi.agent-session/stats (stats-snapshot agent-session-ctx)})
 
 ;; ── Tool call history ───────────────────────────────────
 ;;
@@ -1331,6 +1364,7 @@
    tool-output-calls
    tool-output-stats
    agent-session-journal
+   agent-session-canonical-telemetry
    agent-session-stats
    ;; Session-derived usage/git attrs
    agent-session-cwd

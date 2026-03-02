@@ -73,7 +73,7 @@
   (testing "resume-session-in! keeps current model when resumed journal has no model entry"
     (let [initial-model {:provider "openai" :id "gpt-5.3-codex" :reasoning true}
           ctx           (session/create-context {:initial-session {:model initial-model
-                                                                  :thinking-level :high}})
+                                                                   :thinking-level :high}})
           f             (File/createTempFile "psi-resume-no-model" ".ndedn")
           entries       [(persist/thinking-level-entry :minimal)
                          (persist/message-entry {:role "user"
@@ -316,6 +316,19 @@
       (is (map? (:psi.agent-session/stats result)))
       (is (contains? (:psi.agent-session/stats result) :session-id))))
 
+  (testing "query-in resolves canonical telemetry attrs directly"
+    (let [ctx    (session/create-context)
+          result (session/query-in ctx [:psi.agent-session/messages-count
+                                        :psi.agent-session/tool-call-count
+                                        :psi.agent-session/start-time
+                                        :psi.agent-session/current-time])]
+      (is (int? (:psi.agent-session/messages-count result)))
+      (is (int? (:psi.agent-session/tool-call-count result)))
+      (is (instance? java.time.Instant (:psi.agent-session/start-time result)))
+      (is (instance? java.time.Instant (:psi.agent-session/current-time result)))
+      (is (<= 0 (:psi.agent-session/messages-count result)))
+      (is (<= 0 (:psi.agent-session/tool-call-count result)))))
+
   (testing "query-in resolves usage aggregates from journal assistant usage"
     (let [ctx (session/create-context)
           assistant-1 {:role "assistant"
@@ -348,7 +361,7 @@
         (is (= 50 (:psi.agent-session/usage-cache-read result)))
         (is (= 10 (:psi.agent-session/usage-cache-write result)))
         (is (< (Math/abs (- 0.173 (double (:psi.agent-session/usage-cost-total result))))
-               1.0e-9))))))
+               1.0e-9)))))
 
   (testing "query-in resolves model provider/id/reasoning attrs"
     (let [ctx (session/create-context)
@@ -372,7 +385,7 @@
       (let [summary (session/query-in ctx [:psi.tool/count :psi.tool/names :psi.tool/summary])]
         (is (= 1 (:psi.tool/count summary)))
         (is (= ["foo"] (:psi.tool/names summary)))
-        (is (= "foo" (get-in summary [:psi.tool/summary :tools 0 :name]))))))
+        (is (= "foo" (get-in summary [:psi.tool/summary :tools 0 :name])))))))
 
 (deftest tool-output-eql-introspection-test
   (testing "query-in resolves tool-output policy defaults and overrides"
@@ -629,14 +642,14 @@
     (let [ctx    (session/create-context)
           qctx   (query/create-query-context)
           chart  (chart/statechart {:id :wf-test}
-                   (ele/state {:id :idle}
-                     (ele/transition {:event :workflow/start :target :running}))
-                   (ele/state {:id :running}
-                     (ele/transition {:event :workflow/finish :target :done}
-                       (ele/script {:expr (fn [_ data]
-                                            [{:op :assign
-                                              :data {:result (get-in data [:_event :data :result])}}])})))
-                   (ele/final {:id :done}))
+                                   (ele/state {:id :idle}
+                                              (ele/transition {:event :workflow/start :target :running}))
+                                   (ele/state {:id :running}
+                                              (ele/transition {:event :workflow/finish :target :done}
+                                                              (ele/script {:expr (fn [_ data]
+                                                                                   [{:op :assign
+                                                                                     :data {:result (get-in data [:_event :data :result])}}])})))
+                                   (ele/final {:id :done}))
           mutate (fn [op params]
                    (get (query/query-in qctx
                                         {:psi/agent-session-ctx ctx}
