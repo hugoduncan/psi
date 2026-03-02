@@ -233,12 +233,50 @@ COMMAND is a list suitable for `make-process'."
   (when psi-emacs--state
     (funcall psi-emacs--send-request-function psi-emacs--state op params callback)))
 
-(defun psi-emacs--default-handle-idle-slash-command (_state _message)
+(defun psi-emacs--request-frontend-exit ()
+  "Request frontend exit for current psi buffer."
+  (when (buffer-live-p (current-buffer))
+    (kill-buffer (current-buffer))))
+
+(defun psi-emacs--append-assistant-message (text)
+  "Append assistant TEXT as a finalized transcript line."
+  (psi-emacs--assistant-finalize text))
+
+(defun psi-emacs--idle-slash-help-text ()
+  "Return deterministic help text for supported idle slash commands."
+  (string-join
+   '("Supported slash commands:"
+     "/quit, /exit  Exit this psi buffer"
+     "/resume       Resume selector unavailable in Emacs MVP"
+     "/new          Start a fresh backend session"
+     "/status       Show frontend diagnostics"
+     "/help, /?     Show this help")
+   "\n"))
+
+(defun psi-emacs--default-handle-idle-slash-command (state message)
   "Default idle slash handler.
 
 Return non-nil when MESSAGE is handled and should not fall through to
 normal prompt dispatch."
-  nil)
+  (let* ((trimmed (string-trim (or message "")))
+         (command (car (split-string trimmed "[ \t\n\r]+" t))))
+    (pcase command
+      ((or "/quit" "/exit")
+       (psi-emacs--request-frontend-exit)
+       t)
+      ("/resume"
+       (psi-emacs--append-assistant-message
+        "Resume selector unavailable in this frontend.")
+       t)
+      ("/status"
+       (psi-emacs--append-assistant-message
+        (psi-emacs--status-string state))
+       t)
+      ((or "/help" "/?")
+       (psi-emacs--append-assistant-message
+        (psi-emacs--idle-slash-help-text))
+       t)
+      (_ nil))))
 
 (defun psi-emacs--slash-command-candidate-p (message)
   "Return non-nil when MESSAGE is a slash command candidate."
