@@ -1,6 +1,6 @@
 # Plan
 
-Ordered steps toward AI COMPLETE.
+Ordered steps toward PSI COMPLETE.
 
 ---
 
@@ -100,11 +100,20 @@ Ordered steps toward AI COMPLETE.
     - Partial impl: `recursion/` component (1682 lines src, 73 tests)
     - Complete: FUTURE_STATE synthesis, plan proposal, approval gate, execution, verification, learning cycle
 
-11. Step 11 — HTTP API
+11. AI COMPLETE
+
+12 step 12 - Emacs UI
+    - Spec: `spec/emacs-frontend.allium`
+    - partial impl: emacs-ui components
+
+13 step 13 - Terminal UI
+    - Spec: `spec/tui.allium`
+    - partial impl: tui components
+
+14. Step 14 — HTTP API
     - openapi spec + martian client, surface via Pathom mutations
     - Deferred from Step 8 — depends on RPC, memory, and feed-forward being stable
 
-12. AI COMPLETE
 
 ### Deferred (agent-session)
 - `TreeNavigated` branch tree navigation

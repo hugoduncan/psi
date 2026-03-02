@@ -15,6 +15,7 @@ Current truth about the Psi system.
 | `history`       | ✓      | Git log resolvers, nullable git context                    |
 | `introspection` | ✓      | Bridges engine + query, self-describing graph              |
 | `tui`           | ✓      | charm.clj Elm Architecture, JLine3, extension UI state     |
+| `emacs-ui       | ✓      | emacs mode for psi                                         |
 | `agent-session` | ✓      | Session ✓, extensions ✓, extension UI ✓, main REPL ✓, TUI ✓, OAuth ✓ |
 
 ## Architecture Progress
@@ -40,8 +41,8 @@ Current truth about the Psi system.
 - ✗ /login and /logout commands
 - ✗ Session resolvers wired into global query graph
 - ✗ Graph emergence from domain resolvers
-- ✗ RPC / HTTP API surface
 - ✗ AI COMPLETE
+- ✗ RPC / HTTP API surface
 
 ## Runnable
 
