@@ -48,6 +48,12 @@ an Emacs process object.")
 
 Called as (STATE OP PARAMS CALLBACK).")
 
+(defvar psi-emacs--idle-slash-command-handler-function #'psi-emacs--default-handle-idle-slash-command
+  "Function used to handle idle slash command input.
+
+Called as (STATE MESSAGE). Return non-nil when MESSAGE was handled and should
+not fall through to normal prompt dispatch.")
+
 (defvar psi-emacs--state-by-buffer (make-hash-table :test #'eq)
   "Map dedicated buffers to their `psi-emacs-state'.")
 
@@ -227,12 +233,40 @@ COMMAND is a list suitable for `make-process'."
   (when psi-emacs--state
     (funcall psi-emacs--send-request-function psi-emacs--state op params callback)))
 
+(defun psi-emacs--default-handle-idle-slash-command (_state _message)
+  "Default idle slash handler.
+
+Return non-nil when MESSAGE is handled and should not fall through to
+normal prompt dispatch."
+  nil)
+
+(defun psi-emacs--slash-command-candidate-p (message)
+  "Return non-nil when MESSAGE is a slash command candidate."
+  (let ((trimmed (string-trim (or message ""))))
+    (and (not (string-empty-p trimmed))
+         (string-prefix-p "/" trimmed))))
+
+(defun psi-emacs--dispatch-idle-compose-message (message)
+  "Dispatch idle compose MESSAGE through slash interception and fallback.
+
+When MESSAGE is a slash command candidate, run
+`psi-emacs--idle-slash-command-handler-function'. If not handled, fall through
+to normal prompt dispatch."
+  (let ((handled (and psi-emacs--state
+                      (psi-emacs--slash-command-candidate-p message)
+                      (funcall psi-emacs--idle-slash-command-handler-function
+                               psi-emacs--state
+                               message))))
+    (unless handled
+      (psi-emacs--dispatch-request "prompt" `((:message . ,message))))
+    handled))
+
 (defun psi-emacs-send-from-buffer (prefix)
   "Send composed text using canonical send semantics.
 
 With PREFIX while streaming, queue override is used.
 Without PREFIX while streaming, steer is used.
-When idle, sends as normal prompt."
+When idle, routes through slash interception then normal prompt fallback."
   (interactive "P")
   (let ((message (psi-emacs--composed-text)))
     (if (psi-emacs--streaming-p)
@@ -240,10 +274,10 @@ When idle, sends as normal prompt."
          "prompt_while_streaming"
          `((:message . ,message)
            (:behavior . ,(if prefix "queue" "steer"))))
-      (psi-emacs--dispatch-request "prompt" `((:message . ,message))))))
+      (psi-emacs--dispatch-idle-compose-message message))))
 
 (defun psi-emacs-queue-from-buffer ()
-  "Queue composed text while streaming; fallback to normal send when idle."
+  "Queue composed text while streaming; use idle slash dispatch when idle."
   (interactive)
   (let ((message (psi-emacs--composed-text)))
     (if (psi-emacs--streaming-p)
@@ -251,7 +285,7 @@ When idle, sends as normal prompt."
          "prompt_while_streaming"
          `((:message . ,message)
            (:behavior . "queue")))
-      (psi-emacs--dispatch-request "prompt" `((:message . ,message))))))
+      (psi-emacs--dispatch-idle-compose-message message))))
 
 (defun psi-emacs-abort ()
   "Abort active streaming request via RPC and transition to non-streaming UI state."
