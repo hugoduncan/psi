@@ -136,6 +136,7 @@ In `psi-emacs-mode`:
 - `C-c C-q` queue while streaming; fallback to normal send when idle
 - `C-c C-k` abort active streaming (`abort`)
 - `C-c C-r` reconnect (prompts before clearing edited buffer)
+- `C-c C-t` toggle tool-output view mode (collapsed ↔ expanded); also available as `M-x psi-emacs-toggle-tool-output-view`
 
 Compose source rules:
 
@@ -151,8 +152,17 @@ Compose source rules:
 - Tool lifecycle rows render inline for
   `tool/start|delta|executing|update|result`.
 - ANSI tool output is rendered with faces (no raw escape noise).
-- Header line shows minimal transport + process state.
+- Header line shows minimal transport + process state and current tool-output mode (`tools:collapsed` or `tools:expanded`).
 - RPC errors are surfaced in minibuffer only.
+
+### Tool output view mode
+
+Tool rows have two rendering modes:
+
+- **collapsed** (default): each tool row shows a single header line `Tool[<id>] <stage>` with live status updates as the tool progresses. Full output is accumulated in state but hidden.
+- **expanded**: each tool row shows the full body output.
+
+Toggle between modes with `C-c C-t` (or `M-x psi-emacs-toggle-tool-output-view`). The toggle applies immediately to all existing rows and to future rows. Reconnect (`C-c C-r`) always resets the mode to the default collapsed. Starting a new session without reconnecting preserves the current mode.
 
 ### Reconnect semantics (MVP)
 

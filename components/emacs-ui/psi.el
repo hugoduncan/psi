@@ -470,7 +470,10 @@ Renders according to the current global tool-output-view-mode."
       (yes-or-no-p "Buffer has unsaved edits. Reconnect and clear buffer? ")))
 
 (defun psi-emacs--reset-transcript-state ()
-  "Clear transcript buffer and reset in-buffer rendering state."  
+  "Clear transcript buffer and reset in-buffer rendering state.
+
+Resets tool-output-view-mode to default `collapsed' so that after a
+reconnect the user starts with the default collapsed view."
   (let ((inhibit-read-only t))
     (erase-buffer))
   (when psi-emacs--state
@@ -478,7 +481,9 @@ Renders according to the current global tool-output-view-mode."
     (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
     (clrhash (psi-emacs-state-tool-rows psi-emacs--state))
     (setf (psi-emacs-state-draft-anchor psi-emacs--state)
-          (copy-marker (point-max) nil)))
+          (copy-marker (point-max) nil))
+    (setf (psi-emacs-state-tool-output-view-mode psi-emacs--state) 'collapsed)
+    (psi-emacs--refresh-header-line))
   (set-buffer-modified-p nil))
 
 (defun psi-emacs-toggle-tool-output-view ()
