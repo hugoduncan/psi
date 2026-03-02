@@ -84,9 +84,10 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
 
 (defun psi-emacs--status-string (state)
   "Return minimal status string for STATE."
-  (format "psi [%s/%s]"
+  (format "psi [%s/%s] tools:%s"
           (or (psi-emacs-state-transport-state state) 'unknown)
-          (or (psi-emacs-state-process-state state) 'unknown)))
+          (or (psi-emacs-state-process-state state) 'unknown)
+          (or (psi-emacs-state-tool-output-view-mode state) 'collapsed)))
 
 (defun psi-emacs--refresh-header-line ()
   "Refresh minimal header-line status for current psi buffer."
@@ -480,6 +481,39 @@ Renders according to the current global tool-output-view-mode."
           (copy-marker (point-max) nil)))
   (set-buffer-modified-p nil))
 
+(defun psi-emacs-toggle-tool-output-view ()
+  "Toggle global tool-output view mode between collapsed and expanded.
+
+In collapsed mode only the header line of each tool row is shown.
+In expanded mode the full body output of each tool row is shown.
+The toggle applies to all existing tool rows and future tool rows.
+This command is valid even when no tool rows exist."
+  (interactive)
+  (when psi-emacs--state
+    (let* ((current (psi-emacs-state-tool-output-view-mode psi-emacs--state))
+           (new-mode (if (eq current 'collapsed) 'expanded 'collapsed))
+           (rows (psi-emacs-state-tool-rows psi-emacs--state)))
+      (setf (psi-emacs-state-tool-output-view-mode psi-emacs--state) new-mode)
+      ;; Re-render all existing tool rows with the new mode
+      (maphash (lambda (tool-id row)
+                 (let ((stage (plist-get row :stage))
+                       (accumulated (plist-get row :accumulated-text))
+                       (start (plist-get row :start))
+                       (end (plist-get row :end)))
+                   (when (and (markerp start)
+                              (markerp end)
+                              (marker-buffer start)
+                              (marker-buffer end))
+                     (let ((rendered (psi-emacs--render-tool-row
+                                      tool-id stage accumulated new-mode)))
+                       (save-excursion
+                         (goto-char start)
+                         (delete-region start end)
+                         (insert rendered)
+                         (set-marker end (point)))))))
+               rows)
+      (psi-emacs--refresh-header-line))))
+
 (defun psi-emacs-reconnect ()
   "Manually reconnect by clearing transcript and starting a fresh rpc session."
   (interactive)
@@ -508,7 +542,8 @@ The transcript remains editable in MVP."
   (define-key map (kbd "C-c RET") #'psi-emacs-send-from-buffer)
   (define-key map (kbd "C-c C-q") #'psi-emacs-queue-from-buffer)
   (define-key map (kbd "C-c C-k") #'psi-emacs-abort)
-  (define-key map (kbd "C-c C-r") #'psi-emacs-reconnect))
+  (define-key map (kbd "C-c C-r") #'psi-emacs-reconnect)
+  (define-key map (kbd "C-c C-t") #'psi-emacs-toggle-tool-output-view))
 
 (defun psi-emacs-open-buffer (&optional buffer-name)
   "Open and initialize dedicated psi chat buffer BUFFER-NAME.

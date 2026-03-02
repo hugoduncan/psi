@@ -299,10 +299,10 @@
     (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
     (let ((client (psi-rpc-make-client :process-state 'running :transport-state 'handshaking)))
       (psi-emacs--on-rpc-state-change (current-buffer) client)
-      (should (string= "psi [handshaking/running]" header-line-format))
+      (should (string= "psi [handshaking/running] tools:collapsed" header-line-format))
       (setf (psi-rpc-client-transport-state client) 'ready)
       (psi-emacs--on-rpc-state-change (current-buffer) client)
-      (should (string= "psi [ready/running]" header-line-format)))))
+      (should (string= "psi [ready/running] tools:collapsed" header-line-format)))))
 
 (ert-deftest psi-rpc-error-event-goes-to-minibuffer-not-transcript ()
   (with-temp-buffer
@@ -399,7 +399,7 @@
           (psi-emacs--on-rpc-state-change (current-buffer) client)
           (setf (psi-rpc-client-transport-state client) 'ready)
           (psi-emacs--on-rpc-state-change (current-buffer) client)
-          (should (string= "psi [ready/running]" header-line-format)))
+          (should (string= "psi [ready/running] tools:collapsed" header-line-format)))
 
         (insert "hello from smoke")
         (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-min) nil))
