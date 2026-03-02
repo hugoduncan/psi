@@ -179,6 +179,12 @@ Maps become (psi-map ...), vectors become (psi-vec ...)."
           (pcase ch
             (?\" (setq in-string t)
                  (push "\"" chunks))
+            (?# (if (and (< (1+ i) len)
+                         (eq (aref line (1+ i)) ?{))
+                    (progn
+                      (push "(psi-set " chunks)
+                      (setq i (1+ i)))
+                  (push "#" chunks)))
             (?{ (push "(psi-map " chunks))
             (?} (push ")" chunks))
             (?\[ (push "(psi-vec " chunks))
@@ -215,6 +221,8 @@ Booleans map as true=>t and false=>nil."
                             out)
                   xs (cdr rest)))))
       (nreverse out)))
+   ((and (listp v) (eq (car v) 'psi-set))
+    (mapcar #'psi-rpc--from-edn-value (cdr v)))
    ((listp v)
     (mapcar #'psi-rpc--from-edn-value v))
    (t v)))
@@ -286,6 +294,13 @@ Booleans map as true=>t and false=>nil."
             (`(:error ,message)
              (psi-rpc--signal-error client "transport/invalid-frame" message nil))))))))
 
+(defun psi-rpc--cleanup-process-stderr-buffer (process)
+  "Kill PROCESS-owned stderr buffer (if any)."
+  (when-let ((stderr-buffer (and process (process-get process 'psi-rpc-stderr-buffer))))
+    (when (buffer-live-p stderr-buffer)
+      (kill-buffer stderr-buffer))
+    (process-put process 'psi-rpc-stderr-buffer nil)))
+
 (defun psi-rpc-process-sentinel (process event)
   "Process sentinel for rpc-edn PROCESS with EVENT text."
   (ignore event)
@@ -294,6 +309,7 @@ Booleans map as true=>t and false=>nil."
     (if (process-live-p process)
         (psi-rpc--set-state client 'running (psi-rpc-client-transport-state client))
       (let ((status (process-status process)))
+        (psi-rpc--cleanup-process-stderr-buffer process)
         (psi-rpc--set-state client
                             (if (eq status 'exit) 'stopped 'crashed)
                             'disconnected)))))
@@ -357,7 +373,8 @@ SPAWN-PROCESS-FN receives COMMAND and returns an Emacs process object."
   "Stop CLIENT process if live and clear transport state."
   (let ((process (psi-rpc-client-process client)))
     (when (process-live-p process)
-      (delete-process process)))
+      (delete-process process))
+    (psi-rpc--cleanup-process-stderr-buffer process))
   (clrhash (psi-rpc-client-pending-callbacks client))
   (psi-rpc--set-state client 'stopped 'disconnected))
 

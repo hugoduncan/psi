@@ -151,12 +151,16 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
   "Spawn psi subprocess from COMMAND.
 
 COMMAND is a list suitable for `make-process'."
-  (make-process
-   :name "psi-rpc-edn"
-   :command command
-   :buffer nil
-   :noquery t
-   :connection-type 'pipe))
+  (let* ((stderr-buffer (generate-new-buffer " *psi-rpc-stderr*"))
+         (process (make-process
+                   :name "psi-rpc-edn"
+                   :command command
+                   :buffer nil
+                   :stderr stderr-buffer
+                   :noquery t
+                   :connection-type 'pipe)))
+    (process-put process 'psi-rpc-stderr-buffer stderr-buffer)
+    process))
 
 (defun psi-emacs--default-send-request (state op params &optional callback)
   "Send OP with PARAMS using STATE rpc client, if available."

@@ -32,6 +32,18 @@
      (should (stringp message)))
     (_ (ert-fail "expected parse error"))))
 
+(ert-deftest psi-rpc-parse-line-edn-set-supported ()
+  (pcase (psi-rpc--parse-line
+          "{:id \"1\" :kind :response :op \"handshake\" :ok true :data {:server-info {:features #{\"a\" \"b\"}}}}")
+    (`(:ok ,frame)
+     (let* ((data (alist-get :data frame))
+            (server-info (alist-get :server-info data))
+            (features (alist-get :features server-info)))
+       (should (listp features))
+       (should (member "a" features))
+       (should (member "b" features))))
+    (_ (ert-fail "expected successful parse"))))
+
 (ert-deftest psi-rpc-process-filter-split-chunk-frame-dispatches-once ()
   (let* ((events nil)
          (errors nil)

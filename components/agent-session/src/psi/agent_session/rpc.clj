@@ -331,7 +331,7 @@
   [ctx]
   (let [sd (session/get-session-data-in ctx)]
     {:protocol-version protocol-version
-     :features         #{"eql-graph" "eql-memory"}
+     :features         ["eql-graph" "eql-memory"]
      :session-id       (:session-id sd)
      :model-id         (get-in sd [:model :id])
      :thinking-level   (some-> (:thinking-level sd) name)}))

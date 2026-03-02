@@ -236,7 +236,7 @@
       (is (= "handshake" (:op frame)))
       (is (= "1.0" (:protocol-version info)))
       (is (contains? info :session-id))
-      (is (= #{"eql-graph" "eql-memory"} (:features info))))))
+      (is (= ["eql-graph" "eql-memory"] (:features info))))))
 
 (deftest rpc-prompt-streams-events-and-interleaves-test
   (testing "prompt emits canonical events that interleave with accepted response"
