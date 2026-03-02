@@ -29,6 +29,7 @@
       (str/starts-with? n "psi.history") :history
       (str/starts-with? n "psi.introspection") :introspection
       (str/starts-with? n "psi.memory") :memory
+      (str/starts-with? n "psi.recursion") :recursion
       (or (str/starts-with? n "psi.agent-session")
           (str/starts-with? n "psi.extension")) :agent-session
       :else :unknown)))
