@@ -32,6 +32,37 @@
      (should (stringp message)))
     (_ (ert-fail "expected parse error"))))
 
+(ert-deftest psi-rpc-process-filter-split-chunk-frame-dispatches-once ()
+  (let* ((events nil)
+         (errors nil)
+         (client (psi-rpc-make-client
+                  :on-event (lambda (frame)
+                              (push frame events))
+                  :on-rpc-error (lambda (code message frame)
+                                  (push (list code message frame) errors))))
+         (process (psi-rpc-test--spawn-cat '("cat")))
+         (frame-line "{:id \"evt-1\" :kind :event :event \"assistant/delta\" :data {:text \"hi\"}}\n")
+         (split-at 24)
+         (chunk-a (substring frame-line 0 split-at))
+         (chunk-b (substring frame-line split-at)))
+    (unwind-protect
+        (progn
+          (process-put process 'psi-rpc-client client)
+
+          (psi-rpc-process-filter process chunk-a)
+          (should (null events))
+          (should (null errors))
+
+          (psi-rpc-process-filter process chunk-b)
+          (should (= 1 (length events)))
+          (should (equal "evt-1" (alist-get :id (car events))))
+          (should (equal "assistant/delta" (alist-get :event (car events))))
+          (should (equal "hi" (alist-get :text (alist-get :data (car events)))))
+          (should (null errors))
+          (should (string-empty-p (psi-rpc-client-line-buffer client))))
+      (when (process-live-p process)
+        (delete-process process)))))
+
 (ert-deftest psi-rpc-request-correlation-success-and-error ()
   (let* ((client (psi-rpc-make-client))
          (hits nil)
