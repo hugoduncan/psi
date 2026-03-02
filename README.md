@@ -139,8 +139,10 @@ In `psi-emacs-mode`:
 
 Compose source rules:
 
-- Active region sends region text
-- Otherwise sends tail draft block from end-of-buffer compose area
+- Active region sends region text (for both `C-c RET` and `C-c C-q`).
+- Without a region, psi sends the tail draft block from the draft anchor marker to end-of-buffer.
+- Normal editing keeps the anchor at the start of the current draft tail, so transcript text above the anchor is not resent unless you explicitly select it as a region.
+- Reconnect clear (`C-c C-r` after confirmation) resets the buffer and repositions the draft anchor at the new buffer end; after reconnect, sends come only from text typed after that reset point.
 
 ### MVP rendering and status
 
