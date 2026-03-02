@@ -109,6 +109,65 @@ receives an API map with:
 
 ---
 
+## Emacs MVP frontend (rpc-edn)
+
+The repository includes an Emacs MVP frontend at `clients/emacs/` that runs
+psi in a dedicated process buffer over rpc-edn.
+
+### Start
+
+1. Ensure this repository is available locally.
+2. In Emacs, add `clients/emacs` to `load-path` and load `psi.el`.
+3. Run `M-x psi-emacs-start`.
+
+This opens `*psi*` (configurable via `psi-emacs-buffer-name`) and starts one
+owned subprocess per dedicated buffer using:
+
+- `clojure -M:run --rpc-edn`
+
+### Compose and keybindings
+
+In `psi-emacs-mode`:
+
+- `RET` inserts newline (never sends)
+- `C-c RET` send prompt
+  - while streaming: steer (`prompt_while_streaming` with `behavior=steer`)
+- `C-u C-c RET` queue override while streaming
+- `C-c C-q` queue while streaming; fallback to normal send when idle
+- `C-c C-k` abort active streaming (`abort`)
+- `C-c C-r` reconnect (prompts before clearing edited buffer)
+
+Compose source rules:
+
+- Active region sends region text
+- Otherwise sends tail draft block from end-of-buffer compose area
+
+### MVP rendering and status
+
+- Assistant streaming uses a single in-progress block updated by
+  `assistant/delta` and finalized by `assistant/message`.
+- Tool lifecycle rows render inline for
+  `tool/start|delta|executing|update|result`.
+- ANSI tool output is rendered with faces (no raw escape noise).
+- Header line shows minimal transport + process state.
+- RPC errors are surfaced in minibuffer only.
+
+### Reconnect semantics (MVP)
+
+- Reconnect is manual only (`C-c C-r`), no auto-restart.
+- Confirmed reconnect clears buffer and starts a fresh session.
+- No automatic resume/rehydrate occurs in MVP.
+
+### Explicitly deferred (parity phase)
+
+MVP intentionally does **not** include:
+
+- `ui/*` extension UI topic subscription/rendering
+- `footer/updated` parity rendering
+- model/session controls UI (set/cycle model, thinking)
+- multi-session resume/fork/tree controls
+- reconnect-time resume picker / auto-resume
+
 ## References
 
 - [pi-mono](https://github.com/badlogic/pi-mono) — inspiration

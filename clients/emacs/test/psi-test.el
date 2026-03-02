@@ -328,6 +328,57 @@
       (should-not (member "resume" ops))
       (should-not (member "session/resume" ops)))))
 
+(ert-deftest psi-mvp-smoke-start-handshake-send-stream-abort-reconnect ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-min) nil))
+    (let ((sent nil)
+          (stop-count 0)
+          (restart-count 0))
+      (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) sent)))
+                ((symbol-function 'psi-rpc-stop!)
+                 (lambda (_client)
+                   (setq stop-count (1+ stop-count))))
+                ((symbol-function 'psi-emacs--start-rpc-client)
+                 (lambda (_buffer)
+                   (setq restart-count (1+ restart-count)))))
+        (let ((client (psi-rpc-make-client :process-state 'running :transport-state 'handshaking)))
+          (psi-emacs--on-rpc-state-change (current-buffer) client)
+          (setf (psi-rpc-client-transport-state client) 'ready)
+          (psi-emacs--on-rpc-state-change (current-buffer) client)
+          (should (string= "psi [ready/running]" header-line-format)))
+
+        (insert "hello from smoke")
+        (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-min) nil))
+        (psi-emacs-send-from-buffer nil)
+
+        (psi-emacs--handle-rpc-event
+         '((:event . "assistant/delta") (:data . ((:text . "Hi")))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "tool/start") (:data . ((:toolCallId . "t-smoke") (:text . "start")))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "tool/result") (:data . ((:toolCallId . "t-smoke") (:text . "done")))))
+        (should (string-match-p "Assistant: Hi" (buffer-string)))
+        (should (string-match-p "Tool\\[t-smoke\\] result: done" (buffer-string)))
+
+        (psi-emacs-abort)
+        (should-not (psi-emacs-state-assistant-in-progress psi-emacs--state))
+
+        (setf (psi-emacs-state-rpc-client psi-emacs--state) (psi-rpc-make-client))
+        (set-buffer-modified-p nil)
+        (psi-emacs-reconnect)
+
+        (setq sent (nreverse sent))
+        (should (equal "prompt" (caar sent)))
+        (should (equal '((:message . "hello from smoke")) (cadar sent)))
+        (should (equal "abort" (caadr sent)))
+        (should (= 1 stop-count))
+        (should (= 1 restart-count))
+        (should (string= "" (buffer-string)))))))
+
 (provide 'psi-test)
 
 ;;; psi-test.el ends here
