@@ -9,6 +9,7 @@
 
 (require 'cl-lib)
 (require 'subr-x)
+(require 'ansi-color)
 (require 'psi-rpc)
 
 (defgroup psi-emacs nil
@@ -31,6 +32,7 @@
   transport-state
   pending-requests
   assistant-in-progress
+  assistant-range
   tool-rows
   draft-anchor
   rpc-client)
@@ -75,6 +77,7 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :transport-state 'disconnected
    :pending-requests (make-hash-table :test #'equal)
    :assistant-in-progress nil
+   :assistant-range nil
    :tool-rows (make-hash-table :test #'equal)
    :draft-anchor nil
    :rpc-client nil))
@@ -102,6 +105,17 @@ COMMAND is a list suitable for `make-process'."
   (when (and psi-emacs--state
              (markerp (psi-emacs-state-draft-anchor psi-emacs--state)))
     (set-marker (psi-emacs-state-draft-anchor psi-emacs--state) nil))
+  (when (and psi-emacs--state
+             (consp (psi-emacs-state-assistant-range psi-emacs--state)))
+    (set-marker (car (psi-emacs-state-assistant-range psi-emacs--state)) nil)
+    (set-marker (cdr (psi-emacs-state-assistant-range psi-emacs--state)) nil))
+  (when psi-emacs--state
+    (maphash (lambda (_ row)
+               (when (markerp (plist-get row :start))
+                 (set-marker (plist-get row :start) nil))
+               (when (markerp (plist-get row :end))
+                 (set-marker (plist-get row :end) nil)))
+             (psi-emacs-state-tool-rows psi-emacs--state)))
   (remhash (current-buffer) psi-emacs--state-by-buffer)
   (setq psi-emacs--owned-process nil)
   (setq psi-emacs--state nil))
@@ -175,7 +189,157 @@ When idle, sends as normal prompt."
   (interactive)
   (psi-emacs--dispatch-request "abort" nil)
   (when psi-emacs--state
-    (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)))
+    (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
+    (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)))
+
+(defun psi-emacs--ensure-newline-before-append ()
+  "Ensure appending at end starts on a new line if buffer has content."
+  (goto-char (point-max))
+  (unless (or (bobp)
+              (eq (char-before) ?\n))
+    (insert "\n")))
+
+(defun psi-emacs--string-has-face-p (text)
+  "Return non-nil if TEXT has any `face' property."
+  (let ((i 0)
+        (len (length text))
+        (hit nil))
+    (while (and (< i len) (not hit))
+      (setq hit (get-text-property i 'face text))
+      (setq i (1+ i)))
+    hit))
+
+(defun psi-emacs--ansi-to-face (text)
+  "Return TEXT with ANSI escapes converted to Emacs face properties."
+  (let* ((raw (or text ""))
+         (had-ansi (string-match-p "\x1b\\[[0-9;]*m" raw))
+         (converted (ansi-color-apply raw)))
+    (if (and had-ansi
+             (not (psi-emacs--string-has-face-p converted))
+             (not (string-empty-p converted)))
+        (propertize converted 'face 'ansi-color-red)
+      converted)))
+
+(defun psi-emacs--render-assistant-line (text)
+  "Render assistant TEXT in canonical MVP line format."
+  (concat "Assistant: " (or text "") "\n"))
+
+(defun psi-emacs--set-assistant-line (text)
+  "Create or update the single in-progress assistant line with TEXT."
+  (when psi-emacs--state
+    (let ((range (psi-emacs-state-assistant-range psi-emacs--state)))
+      (if (and (consp range)
+               (markerp (car range))
+               (markerp (cdr range))
+               (marker-buffer (car range))
+               (marker-buffer (cdr range)))
+          (save-excursion
+            (let ((start (car range))
+                  (end (cdr range)))
+              (goto-char start)
+              (delete-region start end)
+              (insert (psi-emacs--render-assistant-line text))
+              (set-marker end (point))))
+        (save-excursion
+          (psi-emacs--ensure-newline-before-append)
+          (let ((start (copy-marker (point) nil))
+                (end (copy-marker (point) t)))
+            (insert (psi-emacs--render-assistant-line text))
+            (set-marker end (point))
+            (setf (psi-emacs-state-assistant-range psi-emacs--state)
+                  (cons start end))))))))
+
+(defun psi-emacs--assistant-delta (text)
+  "Apply assistant delta TEXT to the in-progress assistant block."
+  (when psi-emacs--state
+    (let ((next (concat (or (psi-emacs-state-assistant-in-progress psi-emacs--state) "")
+                        (or text ""))))
+      (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) next)
+      (psi-emacs--set-assistant-line next))))
+
+(defun psi-emacs--assistant-finalize (text)
+  "Finalize assistant block with TEXT and clear in-progress state."
+  (when psi-emacs--state
+    (let ((final (or text (psi-emacs-state-assistant-in-progress psi-emacs--state) "")))
+      (psi-emacs--set-assistant-line final)
+      (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
+      (setf (psi-emacs-state-assistant-range psi-emacs--state) nil))))
+
+(defun psi-emacs--event-data-get (data keys)
+  "Return first non-nil value from DATA for KEYS.
+
+DATA is expected to be an alist map."
+  (catch 'hit
+    (dolist (k keys)
+      (let ((v (alist-get k data nil nil #'equal)))
+        (when v
+          (throw 'hit v))))
+    nil))
+
+(defun psi-emacs--tool-row-string (tool-id stage text)
+  "Build tool row string for TOOL-ID at STAGE with TEXT.
+
+ANSI sequences in TEXT are converted to Emacs faces."
+  (let ((prefix (format "Tool[%s] %s: " tool-id stage))
+        (body (psi-emacs--ansi-to-face text)))
+    (concat prefix body "\n")))
+
+(defun psi-emacs--upsert-tool-row (tool-id stage text)
+  "Create or update TOOL-ID row for lifecycle STAGE with TEXT."
+  (when (and psi-emacs--state tool-id)
+    (let* ((rows (psi-emacs-state-tool-rows psi-emacs--state))
+           (row (gethash tool-id rows))
+           (start (plist-get row :start))
+           (end (plist-get row :end))
+           (rendered (psi-emacs--tool-row-string tool-id stage (or text ""))))
+      (if (and (markerp start)
+               (markerp end)
+               (marker-buffer start)
+               (marker-buffer end))
+          (save-excursion
+            (goto-char start)
+            (delete-region start end)
+            (insert rendered)
+            (set-marker end (point))
+            (puthash tool-id (list :id tool-id
+                                   :stage stage
+                                   :text text
+                                   :start start
+                                   :end end)
+                     rows))
+        (save-excursion
+          (psi-emacs--ensure-newline-before-append)
+          (let ((new-start (copy-marker (point) nil))
+                (new-end (copy-marker (point) t)))
+            (insert rendered)
+            (set-marker new-end (point))
+            (puthash tool-id (list :id tool-id
+                                   :stage stage
+                                   :text text
+                                   :start new-start
+                                   :end new-end)
+                     rows)))))))
+
+(defun psi-emacs--handle-rpc-event (frame)
+  "Handle inbound rpc-edn event FRAME for transcript rendering."
+  (let* ((event (alist-get :event frame nil nil #'equal))
+         (data (or (alist-get :data frame nil nil #'equal) '())))
+    (pcase event
+      ("assistant/delta"
+       (psi-emacs--assistant-delta
+        (or (psi-emacs--event-data-get data '(:text text :delta delta)) "")))
+      ("assistant/message"
+       (psi-emacs--assistant-finalize
+        (or (psi-emacs--event-data-get data '(:text text :message message)) "")))
+      ((or "tool/start" "tool/delta" "tool/executing" "tool/update" "tool/result")
+       (let ((tool-id (psi-emacs--event-data-get data
+                                                 '(:toolCallId toolCallId :tool-call-id tool-call-id :id id)))
+             (text (or (psi-emacs--event-data-get data
+                                                  '(:text text :output output :delta delta :message message))
+                       ""))
+             (stage (replace-regexp-in-string "^tool/" "" event)))
+         (psi-emacs--upsert-tool-row tool-id stage text)))
+      (_ nil))))
 
 (defun psi-emacs-reconnect ()
   "Reconnect frontend (implemented in task #96)."

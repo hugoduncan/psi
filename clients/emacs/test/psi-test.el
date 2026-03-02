@@ -186,6 +186,63 @@
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-assistant-streaming-single-block-aggregates-and-finalizes ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/delta") (:data . ((:text . "Hel")))))
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/delta") (:data . ((:text . "lo")))))
+          (should (equal "Hello" (psi-emacs-state-assistant-in-progress psi-emacs--state)))
+          (should (equal "Assistant: Hello\n" (buffer-string)))
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/message") (:data . ((:text . "Hello world")))))
+          (should-not (psi-emacs-state-assistant-in-progress psi-emacs--state))
+          (should (equal "Assistant: Hello world\n" (buffer-string))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-tool-lifecycle-updates-single-inline-row-by-tool-id ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (psi-emacs--handle-rpc-event
+           '((:event . "tool/start") (:data . ((:toolCallId . "t-1") (:text . "start")))))
+          (psi-emacs--handle-rpc-event
+           '((:event . "tool/delta") (:data . ((:toolCallId . "t-1") (:text . "working")))))
+          (psi-emacs--handle-rpc-event
+           '((:event . "tool/result") (:data . ((:toolCallId . "t-1") (:text . "done")))))
+          (should (equal "Tool[t-1] result: done\n" (buffer-string)))
+          (let ((row (gethash "t-1" (psi-emacs-state-tool-rows psi-emacs--state))))
+            (should row)
+            (should (equal "result" (plist-get row :stage)))
+            (should (equal "done" (plist-get row :text)))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-tool-output-converts-ansi-to-face-and-removes-escapes ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (psi-emacs--handle-rpc-event
+           '((:event . "tool/result")
+             (:data . ((:toolCallId . "t-ansi") (:text . "\u001b[31mERR\u001b[0m")))))
+          (let ((text (buffer-substring-no-properties (point-min) (point-max))))
+            (should (equal "Tool[t-ansi] result: ERR\n" text)))
+          (goto-char (point-min))
+          (search-forward "ERR")
+          (let ((face (get-text-property (1- (point)) 'face)))
+            (should face)))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (provide 'psi-test)
 
 ;;; psi-test.el ends here
