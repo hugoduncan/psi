@@ -44,6 +44,29 @@
        (should (member "b" features))))
     (_ (ert-fail "expected successful parse"))))
 
+(ert-deftest psi-rpc-send-request-escapes-multiline-strings ()
+  (let* ((captured nil)
+         (process (psi-rpc-test--spawn-cat '("cat")))
+         (client (psi-rpc-make-client
+                  :process process
+                  :send-function (lambda (_proc payload)
+                                   (setq captured payload)))))
+    (unwind-protect
+        (progn
+          (psi-rpc-send-request! client "prompt" '((:message . "line-1\nline-2")))
+          (should (stringp captured))
+          (should (string-suffix-p "\n" captured))
+          (let ((body (string-trim-right captured)))
+            (should (string-match-p "\\\\n" body))
+            (should-not (string-match-p "\n" body))
+            (pcase (psi-rpc--parse-line body)
+              (`(:ok ,frame)
+               (should (equal "line-1\nline-2"
+                              (alist-get :message (alist-get :params frame)))))
+              (_ (ert-fail "expected successful parse")))))
+      (when (process-live-p process)
+        (delete-process process)))))
+
 (ert-deftest psi-rpc-process-filter-split-chunk-frame-dispatches-once ()
   (let* ((events nil)
          (errors nil)

@@ -326,7 +326,8 @@ When idle, sends as normal prompt."
 (defun psi-emacs--assistant-finalize (text)
   "Finalize assistant block with TEXT and clear in-progress state."
   (when psi-emacs--state
-    (let ((final (or text (psi-emacs-state-assistant-in-progress psi-emacs--state) "")))
+    (let* ((text* (if (and (stringp text) (string-empty-p text)) nil text))
+           (final (or text* (psi-emacs-state-assistant-in-progress psi-emacs--state) "")))
       (psi-emacs--set-assistant-line final)
       (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
       (setf (psi-emacs-state-assistant-range psi-emacs--state) nil))))
@@ -341,6 +342,27 @@ DATA is expected to be an alist map."
         (when v
           (throw 'hit v))))
     nil))
+
+(defun psi-emacs--assistant-content->text (content)
+  "Extract assistant display text from CONTENT blocks."
+  (let ((blocks (cond
+                 ((vectorp content) (append content nil))
+                 ((listp content) content)
+                 (t nil))))
+    (string-join
+     (delq nil
+           (mapcar (lambda (block)
+                     (when (listp block)
+                       (let ((type (psi-emacs--event-data-get block '(:type type))))
+                         (cond
+                          ((or (eq type :text) (equal type "text"))
+                           (psi-emacs--event-data-get block '(:text text :message message)))
+                          ((or (eq type :error) (equal type "error"))
+                           (when-let ((err (psi-emacs--event-data-get block
+                                                                      '(:text text :message message :error-message error-message))))
+                             (format "[error] %s" err)))))))
+                   blocks))
+     "")))
 
 (defun psi-emacs--tool-row-string (tool-id stage text)
   "Build tool row string for TOOL-ID at STAGE with TEXT.
@@ -396,12 +418,14 @@ ANSI sequences in TEXT are converted to Emacs faces."
         (or (psi-emacs--event-data-get data '(:text text :delta delta)) "")))
       ("assistant/message"
        (psi-emacs--assistant-finalize
-        (or (psi-emacs--event-data-get data '(:text text :message message)) "")))
+        (or (psi-emacs--event-data-get data '(:text text :message message))
+            (psi-emacs--assistant-content->text
+             (psi-emacs--event-data-get data '(:content content))))))
       ((or "tool/start" "tool/delta" "tool/executing" "tool/update" "tool/result")
        (let ((tool-id (psi-emacs--event-data-get data
-                                                 '(:toolCallId toolCallId :tool-call-id tool-call-id :id id)))
+                                                 '(:tool-id tool-id :toolCallId toolCallId :tool-call-id tool-call-id :id id)))
              (text (or (psi-emacs--event-data-get data
-                                                  '(:text text :output output :delta delta :message message))
+                                                  '(:text text :output output :delta delta :message message :result-text result-text))
                        ""))
              (stage (replace-regexp-in-string "^tool/" "" event)))
          (psi-emacs--upsert-tool-row tool-id stage text)))

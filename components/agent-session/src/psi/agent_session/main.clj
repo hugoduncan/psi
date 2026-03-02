@@ -707,8 +707,8 @@
 
 (defn- run-rpc-edn-session!
   "Run RPC EDN transport bound to a live AgentSession context."
-  []
-  (let [ai-model (resolve-model default-model-key)
+  [model-key]
+  (let [ai-model (resolve-model model-key)
         ctx      (session/create-context
                   {:initial-session {:model {:provider (name (:provider ai-model))
                                              :id (:id ai-model)
@@ -717,7 +717,7 @@
                         :subscribed-topics #{}
                         :rpc-ai-model ai-model})
         request-handler (rpc/make-session-request-handler ctx)]
-    (reset! session-state {:ctx ctx})
+    (reset! session-state {:ctx ctx :ai-model ai-model})
     (rpc/run-stdio-loop! {:request-handler request-handler
                           :state state})))
 
@@ -734,7 +734,7 @@
     (try
       (cond
         rpc-edn?
-        (run-rpc-edn-session!)
+        (run-rpc-edn-session! model-key)
 
         tui?
         (run-tui-session model-key)

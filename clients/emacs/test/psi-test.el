@@ -204,6 +204,36 @@
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-assistant-message-content-blocks-finalizes-text ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/message")
+             (:data . ((:role . "assistant")
+                       (:content . [((:type . :text) (:text . "Hello from content"))])))))
+          (should-not (psi-emacs-state-assistant-in-progress psi-emacs--state))
+          (should (equal "Assistant: Hello from content\n" (buffer-string))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-assistant-message-empty-does-not-clobber-streaming-text ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/delta") (:data . ((:text . "partial")))))
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/message") (:data . ((:role . "assistant") (:content . [])))))
+          (should-not (psi-emacs-state-assistant-in-progress psi-emacs--state))
+          (should (equal "Assistant: partial\n" (buffer-string))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-tool-lifecycle-updates-single-inline-row-by-tool-id ()
   (with-temp-buffer
     (psi-emacs-mode)
@@ -211,11 +241,11 @@
     (unwind-protect
         (progn
           (psi-emacs--handle-rpc-event
-           '((:event . "tool/start") (:data . ((:toolCallId . "t-1") (:text . "start")))))
+           '((:event . "tool/start") (:data . ((:tool-id . "t-1") (:text . "start")))))
           (psi-emacs--handle-rpc-event
-           '((:event . "tool/delta") (:data . ((:toolCallId . "t-1") (:text . "working")))))
+           '((:event . "tool/delta") (:data . ((:tool-id . "t-1") (:text . "working")))))
           (psi-emacs--handle-rpc-event
-           '((:event . "tool/result") (:data . ((:toolCallId . "t-1") (:text . "done")))))
+           '((:event . "tool/result") (:data . ((:tool-id . "t-1") (:result-text . "done")))))
           (should (equal "Tool[t-1] result: done\n" (buffer-string)))
           (let ((row (gethash "t-1" (psi-emacs-state-tool-rows psi-emacs--state))))
             (should row)
