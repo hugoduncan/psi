@@ -6,6 +6,7 @@
 (add-to-list 'load-path
              (expand-file-name "../" (file-name-directory (or load-file-name buffer-file-name))))
 (require 'psi)
+(require 'psi-rpc)
 
 (defun psi-test--spawn-long-lived-process (&optional command)
   "Spawn a long-lived process suitable for ownership/lifecycle tests."

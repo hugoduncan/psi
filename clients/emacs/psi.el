@@ -8,6 +8,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'psi-rpc)
 
 (defgroup psi-emacs nil
   "psi Emacs frontend."
