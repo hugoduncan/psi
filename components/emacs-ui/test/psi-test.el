@@ -262,11 +262,14 @@
            '((:event . "tool/delta") (:data . ((:tool-id . "t-1") (:text . "working")))))
           (psi-emacs--handle-rpc-event
            '((:event . "tool/result") (:data . ((:tool-id . "t-1") (:result-text . "done")))))
-          (should (equal "Tool[t-1] result: done\n" (buffer-string)))
+          ;; Default mode is collapsed: buffer shows header-only
+          (should (equal "Tool[t-1] result\n" (buffer-string)))
           (let ((row (gethash "t-1" (psi-emacs-state-tool-rows psi-emacs--state))))
             (should row)
             (should (equal "result" (plist-get row :stage)))
-            (should (equal "done" (plist-get row :text)))))
+            (should (equal "done" (plist-get row :text)))
+            ;; Accumulated text contains all deltas
+            (should (string-match-p "done" (plist-get row :accumulated-text)))))
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
@@ -274,6 +277,8 @@
   (with-temp-buffer
     (psi-emacs-mode)
     (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    ;; Use expanded mode so the body text (with ANSI) is rendered in the buffer
+    (setf (psi-emacs-state-tool-output-view-mode psi-emacs--state) 'expanded)
     (unwind-protect
         (progn
           (psi-emacs--handle-rpc-event
@@ -407,7 +412,8 @@
         (psi-emacs--handle-rpc-event
          '((:event . "tool/result") (:data . ((:toolCallId . "t-smoke") (:text . "done")))))
         (should (string-match-p "Assistant: Hi" (buffer-string)))
-        (should (string-match-p "Tool\\[t-smoke\\] result: done" (buffer-string)))
+        ;; Default mode is collapsed: header-only (no body text)
+        (should (string-match-p "Tool\\[t-smoke\\] result" (buffer-string)))
 
         (psi-emacs-abort)
         (should-not (psi-emacs-state-assistant-in-progress psi-emacs--state))

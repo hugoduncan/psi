@@ -367,6 +367,12 @@ DATA is expected to be an alist map."
                    blocks))
      "")))
 
+(defun psi-emacs--tool-row-header-string (tool-id stage)
+  "Build collapsed header string for TOOL-ID at STAGE.
+
+Returns a single-line string: \"Tool[<id>] <stage>\\n\"."
+  (format "Tool[%s] %s\n" tool-id stage))
+
 (defun psi-emacs--tool-row-string (tool-id stage text)
   "Build tool row string for TOOL-ID at STAGE with TEXT.
 
@@ -375,14 +381,31 @@ ANSI sequences in TEXT are converted to Emacs faces."
         (body (psi-emacs--ansi-to-face text)))
     (concat prefix body "\n")))
 
+(defun psi-emacs--render-tool-row (tool-id stage accumulated-text view-mode)
+  "Render tool row for TOOL-ID at STAGE with ACCUMULATED-TEXT using VIEW-MODE.
+
+VIEW-MODE is `collapsed' (header-only) or `expanded' (full body).
+ANSI sequences in ACCUMULATED-TEXT are converted to Emacs faces."
+  (if (eq view-mode 'collapsed)
+      (psi-emacs--tool-row-header-string tool-id stage)
+    (psi-emacs--tool-row-string tool-id stage (or accumulated-text ""))))
+
 (defun psi-emacs--upsert-tool-row (tool-id stage text)
-  "Create or update TOOL-ID row for lifecycle STAGE with TEXT."
+  "Create or update TOOL-ID row for lifecycle STAGE with TEXT.
+
+Always accumulates TEXT into :accumulated-text in the row state.
+Renders according to the current global tool-output-view-mode."
   (when (and psi-emacs--state tool-id)
     (let* ((rows (psi-emacs-state-tool-rows psi-emacs--state))
+           (view-mode (psi-emacs-state-tool-output-view-mode psi-emacs--state))
            (row (gethash tool-id rows))
            (start (plist-get row :start))
            (end (plist-get row :end))
-           (rendered (psi-emacs--tool-row-string tool-id stage (or text ""))))
+           (prev-accumulated (or (plist-get row :accumulated-text) ""))
+           (new-text (or text ""))
+           ;; Accumulate: append new text to existing accumulated text
+           (accumulated (concat prev-accumulated new-text))
+           (rendered (psi-emacs--render-tool-row tool-id stage accumulated view-mode)))
       (if (and (markerp start)
                (markerp end)
                (marker-buffer start)
@@ -395,6 +418,7 @@ ANSI sequences in TEXT are converted to Emacs faces."
             (puthash tool-id (list :id tool-id
                                    :stage stage
                                    :text text
+                                   :accumulated-text accumulated
                                    :start start
                                    :end end)
                      rows))
@@ -407,6 +431,7 @@ ANSI sequences in TEXT are converted to Emacs faces."
             (puthash tool-id (list :id tool-id
                                    :stage stage
                                    :text text
+                                   :accumulated-text accumulated
                                    :start new-start
                                    :end new-end)
                      rows)))))))
