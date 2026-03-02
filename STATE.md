@@ -34,6 +34,7 @@ Current truth about the Psi system.
 - ✓ Extension system (Clojure extensions, loader, API, tool wrapping, EQL introspection)
 - ✓ Extension UI (dialogs, widgets, status, notifications, render registry, EQL introspection)
 - ✓ OAuth module (PKCE, callback server, credential store, provider registry, Anthropic)
+- ✓ Session introspection hardening (Step 7a): messages-count, tool-call-count, start-time, current-time
 - ✗ OAuth wired into main.clj (replace env-var-only auth)
 - ✗ /login and /logout commands
 - ✗ Session resolvers wired into global query graph
@@ -137,7 +138,7 @@ Caught by `jline-terminal-keymap-test` smoke test.
 
 ## Test Status
 
-382 tests, 1593 assertions, 0 failures. 0 clj-kondo errors.
+619 tests, 2878 assertions, 0 failures. 0 clj-kondo errors.
 
 ## Specs
 
@@ -177,8 +178,25 @@ Caught by `jline-terminal-keymap-test` smoke test.
 - Active hooks are runtime-configured via `config.enabled_trigger_hooks`
 - Manual approval remains default; low-risk proposals can auto-approve only in opt-in trusted local mode (`trusted_local_mode_enabled` + `auto_approve_low_risk_in_trusted_local_mode`)
 
-## Open Questions
+## Canonical Telemetry Attrs (Step 7a)
 
+Top-level EQL attrs for session telemetry — all reliably queryable in-session:
+
+```clojure
+[:psi.agent-session/messages-count]    ;; integer — total messages in agent-core
+[:psi.agent-session/tool-call-count]   ;; integer — total tool calls made
+[:psi.agent-session/start-time]        ;; java.time.Instant — session context creation
+[:psi.agent-session/current-time]      ;; java.time.Instant — wall clock now
+```
+
+Combined query (mirrors the failing pattern, now fixed):
+```clojure
+[:psi.agent-session/phase :psi.agent-session/model :psi.agent-session/session-id
+ :psi.agent-session/messages-count :psi.agent-session/tool-call-count
+ :psi.agent-session/start-time :psi.agent-session/current-time]
+```
+
+## Open Questions
 - TUI: per-token streaming (currently shows spinner until agent done)
 - TUI: tool execution status display during agent loop
 - Extension UI: should dialogs support auto-dismiss timeout?

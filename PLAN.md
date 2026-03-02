@@ -76,12 +76,11 @@ Ordered steps toward AI COMPLETE.
   - Attribute links remain implicit on edges (`CapabilityEdge.attribute`), not first-class attribute nodes
   - Mutation side-effects are deferred (`DomainOperation.sideEffects = nil`), IO links only for now
 
-### Step 7a — Session introspection hardening
-- Add/repair canonical `:psi.agent-session/*` telemetry resolvers so direct EQL queries are reliable in-session
-- Target attrs: `:psi.agent-session/messages-count`, `:psi.agent-session/tool-call-count`, `:psi.agent-session/start-time`, `:psi.agent-session/current-time`
-- Define one obvious query path (top-level attrs and/or a stable stats map with aliases), document it in `STATE.md`
-- Add resolver tests that assert direct query success for each canonical attr
-- Verify via live `eql_query` in an interactive session
+### Step 7a — Session introspection hardening  ✓
+- Added `:psi.agent-session/messages-count`, `:psi.agent-session/tool-call-count`, `:psi.agent-session/start-time`, `:psi.agent-session/current-time` as top-level resolvers
+- `:started-at` captured at `create-context` time (Instant)
+- `resolvers_test.clj`: 6 tests, 17 assertions — direct EQL query success for each attr
+- Documented canonical query path in STATE.md
 
 8. Step 8 — HTTP API
    openapi spec + martian client, surface via Pathom mutations

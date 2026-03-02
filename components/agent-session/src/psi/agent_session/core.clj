@@ -259,6 +259,7 @@
          ;; Build ctx without actions-fn so we can close over it
          ctx               {:sc-env                sc-env
                             :sc-session-id         sc-session-id
+                            :started-at            (java.time.Instant/now)
                             :session-data-atom     session-data-atom
                             :tool-output-stats-atom (atom {:calls []
                                                            :aggregates {:total-context-bytes 0

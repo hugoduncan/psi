@@ -37,10 +37,10 @@
    :psi.agent-session/context-tokens
    :psi.agent-session/context-window
    :psi.agent-session/context-fraction    — nil or 0.0–1.0
-   :psi.agent-session/messages-count
-   :psi.agent-session/tool-call-count
-   :psi.agent-session/start-time
-   :psi.agent-session/current-time
+   :psi.agent-session/messages-count      — total message count in agent-core (user + assistant)
+   :psi.agent-session/tool-call-count     — total tool calls made in this session
+   :psi.agent-session/start-time          — Instant when session context was created
+   :psi.agent-session/current-time        — current wall-clock Instant
    :psi.agent-session/stats               — SessionStats snapshot
    :psi.agent-session/tool-call-history   — [{:psi.tool-call/*}], nested tool call entities
    :psi.agent-session/tool-call-history-count — number of tool calls
