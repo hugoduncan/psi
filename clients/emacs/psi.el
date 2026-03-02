@@ -329,6 +329,7 @@ When idle, sends as normal prompt."
     (let* ((text* (if (and (stringp text) (string-empty-p text)) nil text))
            (final (or text* (psi-emacs-state-assistant-in-progress psi-emacs--state) "")))
       (psi-emacs--set-assistant-line final)
+      (goto-char (point-max))
       (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
       (setf (psi-emacs-state-assistant-range psi-emacs--state) nil))))
 

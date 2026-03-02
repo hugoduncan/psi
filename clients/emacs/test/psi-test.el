@@ -234,6 +234,22 @@
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-assistant-finalize-moves-point-to-end ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (insert "draft\n")
+          (goto-char (point-min))
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/message")
+             (:data . ((:role . "assistant")
+                       (:content . [((:type . :text) (:text . "move me"))])))))
+          (should (equal (point-max) (point))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-tool-lifecycle-updates-single-inline-row-by-tool-id ()
   (with-temp-buffer
     (psi-emacs-mode)

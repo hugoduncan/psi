@@ -706,18 +706,61 @@
 ;; ============================================================
 
 (defn- run-rpc-edn-session!
-  "Run RPC EDN transport bound to a live AgentSession context."
+  "Run RPC EDN transport bound to a live AgentSession context.
+
+   Uses the same session bootstrap path as console/TUI so RPC prompts have
+   system prompt, tools, skills, templates, and extensions loaded." 
   [model-key]
-  (let [ai-model (resolve-model model-key)
-        ctx      (session/create-context
-                  {:initial-session {:model {:provider (name (:provider ai-model))
-                                             :id (:id ai-model)
-                                             :reasoning (:supports-reasoning ai-model)}}})
-        state    (atom {:handshake-server-info-fn (fn [] (rpc/session->handshake-server-info ctx))
-                        :subscribed-topics #{}
-                        :rpc-ai-model ai-model})
+  (let [ai-model  (resolve-model model-key)
+        boot      (binding [*out* *err*]
+                    (let [oauth-ctx (oauth/create-context)
+                          templates (pt/discover-templates)
+                          {:keys [skills diagnostics]} (skills/discover-skills)
+                          _         (doseq [d diagnostics]
+                                      (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))
+                          cwd       (System/getProperty "user.dir")
+                          ctx-files (sys-prompt/discover-context-files cwd)
+                          system-prompt (sys-prompt/build-system-prompt
+                                         {:cwd           cwd
+                                          :context-files ctx-files
+                                          :skills        skills})
+                          developer-prompt (developer-prompt-from-env)
+                          recursion-ctx (recursion/create-context)
+                          _         (recursion/register-hooks-in! recursion-ctx)
+                          ctx       (session/create-context
+                                     {:initial-session {:model {:provider (name (:provider ai-model))
+                                                                :id       (:id ai-model)
+                                                                :reasoning (:supports-reasoning ai-model)}
+                                                        :system-prompt   system-prompt}
+                                      :oauth-ctx oauth-ctx
+                                      :recursion-ctx recursion-ctx})
+                          ext-paths (ext/discover-extension-paths [] cwd)
+                          eql-tool  (tools/make-eql-query-tool (fn [q] (session/query-in ctx q)))
+                          summary   (session/bootstrap-session-in!
+                                     ctx {:register-global-query? false
+                                          :base-tools             (conj (vec tools/all-tools) eql-tool)
+                                          :system-prompt          system-prompt
+                                          :developer-prompt       developer-prompt
+                                          :developer-prompt-source (if developer-prompt :env :fallback)
+                                          :templates              templates
+                                          :skills                 skills
+                                          :extension-paths        ext-paths})
+                          _         (introspection/register-resolvers!)
+                          _         (memory-runtime/sync-memory-layer! {:cwd cwd})]
+                      (doseq [{:keys [path error]} (:extension-errors summary)]
+                        (timbre/warn "Extension error:" path error))
+                      (when (pos? (:extension-loaded-count summary))
+                        (timbre/debug "Extensions loaded:" (:extension-loaded-count summary)))
+                      {:ctx ctx
+                       :oauth-ctx oauth-ctx
+                       :cwd cwd}))
+        ctx       (:ctx boot)
+        oauth-ctx (:oauth-ctx boot)
+        state     (atom {:handshake-server-info-fn (fn [] (rpc/session->handshake-server-info ctx))
+                         :subscribed-topics #{}
+                         :rpc-ai-model ai-model})
         request-handler (rpc/make-session-request-handler ctx)]
-    (reset! session-state {:ctx ctx :ai-model ai-model})
+    (reset! session-state {:ctx ctx :ai-model ai-model :oauth-ctx oauth-ctx})
     (rpc/run-stdio-loop! {:request-handler request-handler
                           :state state})))
 
