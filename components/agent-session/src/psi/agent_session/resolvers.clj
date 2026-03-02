@@ -1334,17 +1334,41 @@
      :mutation-ops (mapv #(graph/operation->metadata :mutation %) (registry/all-mutations))}))
 
 (pco/defresolver query-graph-bridge
-  "Resolve :psi.graph/* attrs from :psi/agent-session-ctx so eql_query can access
-   graph capabilities without requiring a :psi/query-ctx seed."
+  "Resolve all :psi.graph/* attrs from :psi/agent-session-ctx so eql_query can access
+   the full Step 7 capability graph surface without requiring a :psi/query-ctx seed.
+
+   Exposes all 9 required Step 7 graph attrs:
+     :psi.graph/resolver-count   — number of registered resolvers
+     :psi.graph/mutation-count   — number of registered mutations
+     :psi.graph/resolver-syms    — set of registered resolver symbols
+     :psi.graph/mutation-syms    — set of registered mutation symbols
+     :psi.graph/env-built        — true when Pathom env has been compiled
+     :psi.graph/nodes            — capability graph nodes
+     :psi.graph/edges            — capability graph edges (with :attribute metadata)
+     :psi.graph/capabilities     — domain capability summaries
+     :psi.graph/domain-coverage  — per-domain operation counts"
   [{:keys [psi/agent-session-ctx]}]
   {::pco/input  [:psi/agent-session-ctx]
-   ::pco/output [:psi.graph/nodes
+   ::pco/output [:psi.graph/resolver-count
+                 :psi.graph/mutation-count
+                 :psi.graph/resolver-syms
+                 :psi.graph/mutation-syms
+                 :psi.graph/env-built
+                 :psi.graph/nodes
                  :psi.graph/edges
                  :psi.graph/capabilities
                  :psi.graph/domain-coverage]}
-  (let [_      agent-session-ctx
-        cgraph (graph/derive-capability-graph (operation-metadata))]
-    {:psi.graph/nodes           (:nodes cgraph)
+  (let [_              agent-session-ctx
+        op-meta        (operation-metadata)
+        cgraph         (graph/derive-capability-graph op-meta)
+        resolver-syms  (registry/registered-resolver-syms)
+        mutation-syms  (registry/registered-mutation-syms)]
+    {:psi.graph/resolver-count  (count resolver-syms)
+     :psi.graph/mutation-count  (count mutation-syms)
+     :psi.graph/resolver-syms   resolver-syms
+     :psi.graph/mutation-syms   mutation-syms
+     :psi.graph/env-built       (boolean (seq resolver-syms))
+     :psi.graph/nodes           (:nodes cgraph)
      :psi.graph/edges           (:edges cgraph)
      :psi.graph/capabilities    (:capabilities cgraph)
      :psi.graph/domain-coverage (:domain-coverage cgraph)}))

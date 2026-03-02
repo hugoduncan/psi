@@ -68,13 +68,15 @@ Ordered steps toward AI COMPLETE.
 
 ## Next
 
-### Step 7 — Graph emergence
+### Step 7 — Graph emergence  ✓
 - Spec: `spec/graph-emergence.allium`
-- Register domain resolvers/mutations (`ai`, `history`, `agent-session`, `introspection`) into one query graph
-- Surface capability graph via EQL (`:psi.graph/nodes`, `:psi.graph/edges`, `:psi.graph/capabilities`, `:psi.graph/domain-coverage`)
-- Step 7 decisions:
-  - Attribute links remain implicit on edges (`CapabilityEdge.attribute`), not first-class attribute nodes
-  - Mutation side-effects are deferred (`DomainOperation.sideEffects = nil`), IO links only for now
+- All 4 required domains registered: `ai`, `history`, `agent-session`, `introspection`
+- `query-graph-bridge` resolver extended to expose all 9 required Step 7 EQL attrs:
+  - `:psi.graph/resolver-count`, `:psi.graph/mutation-count`
+  - `:psi.graph/resolver-syms`, `:psi.graph/mutation-syms`, `:psi.graph/env-built`
+  - `:psi.graph/nodes`, `:psi.graph/edges`, `:psi.graph/capabilities`, `:psi.graph/domain-coverage`
+- `resolvers_test.clj`: 10 new graph bridge tests (16 total, 41 assertions)
+- 629 tests, 2924 assertions, 0 failures
 
 ### Step 7a — Session introspection hardening  ✓
 - Added `:psi.agent-session/messages-count`, `:psi.agent-session/tool-call-count`, `:psi.agent-session/start-time`, `:psi.agent-session/current-time` as top-level resolvers

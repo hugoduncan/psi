@@ -35,6 +35,7 @@ Current truth about the Psi system.
 - ✓ Extension UI (dialogs, widgets, status, notifications, render registry, EQL introspection)
 - ✓ OAuth module (PKCE, callback server, credential store, provider registry, Anthropic)
 - ✓ Session introspection hardening (Step 7a): messages-count, tool-call-count, start-time, current-time
+- ✓ Graph emergence (Step 7): all 9 :psi.graph/* attrs queryable via eql_query from agent-session-ctx
 - ✗ OAuth wired into main.clj (replace env-var-only auth)
 - ✗ /login and /logout commands
 - ✗ Session resolvers wired into global query graph
@@ -74,6 +75,29 @@ eql_query(query: "[:psi.agent-session/messages-count :psi.agent-session/tool-cal
 ```
 
 Live verification (2026-03-01): all 5 queries above return successfully with no resolver error; counts return integers and both time attrs return `java.time.Instant`.
+
+## Canonical Graph Attrs (Step 7)
+
+All 9 required Step 7 graph attrs are queryable via `eql_query` (seeded from `:psi/agent-session-ctx`):
+
+```clojure
+[:psi.graph/resolver-count]    ;; integer — resolvers in global registry
+[:psi.graph/mutation-count]    ;; integer — mutations in global registry
+[:psi.graph/resolver-syms]     ;; set of qualified symbols
+[:psi.graph/mutation-syms]     ;; set of qualified symbols
+[:psi.graph/env-built]         ;; boolean — Pathom env compiled
+[:psi.graph/nodes]             ;; vector of CapabilityNode maps
+[:psi.graph/edges]             ;; vector of CapabilityEdge maps (with :attribute)
+[:psi.graph/capabilities]      ;; vector of DomainCapability maps
+[:psi.graph/domain-coverage]   ;; vector of DomainCoverage maps (ai/history/agent-session/introspection)
+```
+
+Combined query (all 9):
+```clojure
+[:psi.graph/resolver-count :psi.graph/mutation-count
+ :psi.graph/resolver-syms :psi.graph/mutation-syms :psi.graph/env-built
+ :psi.graph/nodes :psi.graph/edges :psi.graph/capabilities :psi.graph/domain-coverage]
+```
 
 nREPL introspection (from connected REPL):
 ```clojure
@@ -138,7 +162,7 @@ Caught by `jline-terminal-keymap-test` smoke test.
 
 ## Test Status
 
-619 tests, 2878 assertions, 0 failures. 0 clj-kondo errors.
+629 tests, 2924 assertions, 0 failures. 0 clj-kondo errors.
 
 ## Specs
 

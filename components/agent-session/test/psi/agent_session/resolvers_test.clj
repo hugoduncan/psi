@@ -1,5 +1,5 @@
 (ns psi.agent-session.resolvers-test
-  "Tests for canonical telemetry resolvers (Step 7a).
+  "Tests for canonical telemetry resolvers (Step 7a) and graph bridge (Step 7).
 
    Each test asserts that a direct EQL query against a fresh session context
    returns a well-typed value for the target attribute — no resolver error."
@@ -90,3 +90,79 @@
       (is (integer? (:psi.agent-session/tool-call-count result)))
       (is (instance? java.time.Instant (:psi.agent-session/start-time result)))
       (is (instance? java.time.Instant (:psi.agent-session/current-time result))))))
+
+;; ── Step 7 graph bridge — :psi.graph/* ───────────────────
+
+(deftest graph-bridge-resolver-count-test
+  (testing "resolver-count is a non-negative integer"
+    (let [result (q [:psi.graph/resolver-count])]
+      (is (integer? (:psi.graph/resolver-count result)))
+      (is (nat-int? (:psi.graph/resolver-count result))))))
+
+(deftest graph-bridge-mutation-count-test
+  (testing "mutation-count is a non-negative integer"
+    (let [result (q [:psi.graph/mutation-count])]
+      (is (integer? (:psi.graph/mutation-count result)))
+      (is (nat-int? (:psi.graph/mutation-count result))))))
+
+(deftest graph-bridge-resolver-syms-test
+  (testing "resolver-syms is a set"
+    (let [result (q [:psi.graph/resolver-syms])]
+      (is (set? (:psi.graph/resolver-syms result))))))
+
+(deftest graph-bridge-mutation-syms-test
+  (testing "mutation-syms is a set"
+    (let [result (q [:psi.graph/mutation-syms])]
+      (is (set? (:psi.graph/mutation-syms result))))))
+
+(deftest graph-bridge-env-built-test
+  (testing "env-built is a boolean"
+    (let [result (q [:psi.graph/env-built])]
+      (is (boolean? (:psi.graph/env-built result))))))
+
+(deftest graph-bridge-nodes-test
+  (testing "nodes is a vector"
+    (let [result (q [:psi.graph/nodes])]
+      (is (vector? (:psi.graph/nodes result))))))
+
+(deftest graph-bridge-edges-test
+  (testing "edges is a vector"
+    (let [result (q [:psi.graph/edges])]
+      (is (vector? (:psi.graph/edges result))))))
+
+(deftest graph-bridge-capabilities-test
+  (testing "capabilities is a vector with at least one entry"
+    (let [result (q [:psi.graph/capabilities])]
+      (is (vector? (:psi.graph/capabilities result))))))
+
+(deftest graph-bridge-domain-coverage-test
+  (testing "domain-coverage includes required Step 7 domains"
+    (let [result   (q [:psi.graph/domain-coverage])
+          coverage (:psi.graph/domain-coverage result)
+          domains  (set (map :domain coverage))]
+      (is (vector? coverage))
+      (is (contains? domains :ai))
+      (is (contains? domains :history))
+      (is (contains? domains :agent-session))
+      (is (contains? domains :introspection)))))
+
+(deftest graph-bridge-all-nine-attrs-test
+  (testing "all 9 required Step 7 graph attrs succeed in one query"
+    (let [result (q [:psi.graph/resolver-count
+                     :psi.graph/mutation-count
+                     :psi.graph/resolver-syms
+                     :psi.graph/mutation-syms
+                     :psi.graph/env-built
+                     :psi.graph/nodes
+                     :psi.graph/edges
+                     :psi.graph/capabilities
+                     :psi.graph/domain-coverage])]
+      (is (integer? (:psi.graph/resolver-count result)))
+      (is (integer? (:psi.graph/mutation-count result)))
+      (is (set? (:psi.graph/resolver-syms result)))
+      (is (set? (:psi.graph/mutation-syms result)))
+      (is (boolean? (:psi.graph/env-built result)))
+      (is (vector? (:psi.graph/nodes result)))
+      (is (vector? (:psi.graph/edges result)))
+      (is (vector? (:psi.graph/capabilities result)))
+      (is (vector? (:psi.graph/domain-coverage result))))))
