@@ -63,6 +63,17 @@ eql_query(query: "[{:psi.agent-session/stats [:total-messages :context-tokens]}]
 eql_query(query: "[:psi.tool/names :psi.skill/names]")
 ```
 
+Canonical agent-session telemetry query path (direct top-level attrs):
+```
+eql_query(query: "[:psi.agent-session/messages-count]")
+eql_query(query: "[:psi.agent-session/tool-call-count]")
+eql_query(query: "[:psi.agent-session/start-time]")
+eql_query(query: "[:psi.agent-session/current-time]")
+eql_query(query: "[:psi.agent-session/messages-count :psi.agent-session/tool-call-count :psi.agent-session/start-time :psi.agent-session/current-time]")
+```
+
+Live verification (2026-03-01): all 5 queries above return successfully with no resolver error; counts return integers and both time attrs return `java.time.Instant`.
+
 nREPL introspection (from connected REPL):
 ```clojure
 @psi.agent-session.main/session-state   ;; → {:ctx ... :ai-model ...}
@@ -168,8 +179,6 @@ Caught by `jline-terminal-keymap-test` smoke test.
 
 ## Open Questions
 
-- Session introspection: some `:psi.agent-session/*` attrs are discoverable but not consistently resolvable via direct EQL queries (observed: `messages-count`, `tool-call-count`, `start-time`, `current-time` query errors in-session)
-- Session introspection: should canonical telemetry be exposed only as top-level attrs, or via a single stable stats map plus top-level aliases?
 - TUI: per-token streaming (currently shows spinner until agent done)
 - TUI: tool execution status display during agent loop
 - Extension UI: should dialogs support auto-dismiss timeout?
