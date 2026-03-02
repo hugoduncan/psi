@@ -253,6 +253,51 @@ COMMAND is a list suitable for `make-process'."
      "/help, /?     Show this help")
    "\n"))
 
+(defun psi-emacs--reset-transcript-for-new-session ()
+  "Clear transcript rendering state for a successful /new command."
+  (let ((inhibit-read-only t))
+    (erase-buffer))
+  (when psi-emacs--state
+    (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
+    (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
+    (clrhash (psi-emacs-state-tool-rows psi-emacs--state))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+          (copy-marker (point-max) nil))
+    (psi-emacs--refresh-header-line))
+  (set-buffer-modified-p nil))
+
+(defun psi-emacs--new-session-error-message (frame)
+  "Return deterministic /new error text derived from FRAME."
+  (let* ((data (alist-get :data frame nil nil #'equal))
+         (details (or (alist-get :error-message frame nil nil #'equal)
+                      (and (listp data)
+                           (or (alist-get :error-message data nil nil #'equal)
+                               (alist-get :message data nil nil #'equal))))))
+    (if (and (stringp details) (not (string-empty-p details)))
+        (format "Unable to start a fresh backend session: %s" details)
+      "Unable to start a fresh backend session.")))
+
+(defun psi-emacs--handle-new-session-response (frame)
+  "Apply /new callback FRAME effects to the current frontend buffer."
+  (if (and (eq (alist-get :kind frame) :response)
+           (eq (alist-get :ok frame) t))
+      (progn
+        (psi-emacs--reset-transcript-for-new-session)
+        (psi-emacs--append-assistant-message "Started a fresh backend session."))
+    (psi-emacs--append-assistant-message
+     (psi-emacs--new-session-error-message frame))))
+
+(defun psi-emacs--request-new-session ()
+  "Request a fresh backend session for /new and render deterministic feedback."
+  (let ((buffer (current-buffer)))
+    (psi-emacs--dispatch-request
+     "new_session"
+     nil
+     (lambda (frame)
+       (when (buffer-live-p buffer)
+         (with-current-buffer buffer
+           (psi-emacs--handle-new-session-response frame)))))))
+
 (defun psi-emacs--default-handle-idle-slash-command (state message)
   "Default idle slash handler.
 
@@ -267,6 +312,9 @@ normal prompt dispatch."
       ("/resume"
        (psi-emacs--append-assistant-message
         "Resume selector unavailable in this frontend.")
+       t)
+      ("/new"
+       (psi-emacs--request-new-session)
        t)
       ("/status"
        (psi-emacs--append-assistant-message

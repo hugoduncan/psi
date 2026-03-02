@@ -280,6 +280,57 @@
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-idle-new-slash-requests-new-session-and-resets-transcript ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (let ((rpc-calls nil))
+          (insert "old transcript\n/new")
+          (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+                (copy-marker (+ (length "old transcript\n") 1) nil))
+          (puthash "t1" (list :id "t1" :stage "result" :text "done")
+                   (psi-emacs-state-tool-rows psi-emacs--state))
+          (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                     (lambda (_state op params &optional callback)
+                       (push (list op params) rpc-calls)
+                       (when callback
+                         (funcall callback '((:kind . :response)
+                                             (:ok . t)
+                                             (:data . ((:session-id . "s-2")))))))))
+            (psi-emacs-send-from-buffer nil))
+          (setq rpc-calls (nreverse rpc-calls))
+          (should (equal '("new_session") (mapcar #'car rpc-calls)))
+          (should (equal '(nil) (mapcar #'cadr rpc-calls)))
+          (should (string= "Assistant: Started a fresh backend session.\n" (buffer-string)))
+          (should (zerop (hash-table-count (psi-emacs-state-tool-rows psi-emacs--state)))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-idle-new-slash-appends-deterministic-error-on-failure ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (let ((rpc-calls nil))
+          (insert "/new")
+          (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker 1 nil))
+          (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                     (lambda (_state op params &optional callback)
+                       (push (list op params) rpc-calls)
+                       (when callback
+                         (funcall callback '((:kind . :error)
+                                             (:error-message . "backend unavailable")))))))
+            (psi-emacs-send-from-buffer nil))
+          (setq rpc-calls (nreverse rpc-calls))
+          (should (equal '("new_session") (mapcar #'car rpc-calls)))
+          (should (equal '(nil) (mapcar #'cadr rpc-calls)))
+          (should (string-match-p
+                   "Unable to start a fresh backend session: backend unavailable"
+                   (buffer-string))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-idle-status-slash-appends-diagnostics-and-bypasses-prompt ()
   (with-temp-buffer
     (psi-emacs-mode)
