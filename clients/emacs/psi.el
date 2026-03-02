@@ -73,7 +73,7 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
   "Create initial frontend state for PROCESS ownership."
   (make-psi-emacs-state
    :process process
-   :process-state (if (process-live-p process) 'running 'starting)
+   :process-state (if (and process (process-live-p process)) 'running 'starting)
    :transport-state 'disconnected
    :pending-requests (make-hash-table :test #'equal)
    :assistant-in-progress nil
@@ -81,6 +81,73 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :tool-rows (make-hash-table :test #'equal)
    :draft-anchor nil
    :rpc-client nil))
+
+(defun psi-emacs--status-string (state)
+  "Return minimal status string for STATE."
+  (format "psi [%s/%s]"
+          (or (psi-emacs-state-transport-state state) 'unknown)
+          (or (psi-emacs-state-process-state state) 'unknown)))
+
+(defun psi-emacs--refresh-header-line ()
+  "Refresh minimal header-line status for current psi buffer."
+  (setq-local header-line-format
+              (when psi-emacs--state
+                (psi-emacs--status-string psi-emacs--state))))
+
+(defun psi-emacs--on-rpc-state-change (buffer client)
+  "Apply CLIENT state changes to BUFFER-local frontend state."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when psi-emacs--state
+        (setf (psi-emacs-state-process-state psi-emacs--state)
+              (psi-rpc-client-process-state client))
+        (setf (psi-emacs-state-transport-state psi-emacs--state)
+              (psi-rpc-client-transport-state client))
+        (setf (psi-emacs-state-process psi-emacs--state)
+              (psi-rpc-client-process client))
+        (setq psi-emacs--owned-process (psi-rpc-client-process client))
+        (psi-emacs--refresh-header-line)))))
+
+(defun psi-emacs--on-rpc-error (buffer code message-text frame)
+  "Surface RPC error in minibuffer only for BUFFER."
+  (ignore frame)
+  (when (buffer-live-p buffer)
+    (message "psi rpc error [%s]: %s" code message-text)))
+
+(defun psi-emacs--on-rpc-event (buffer frame)
+  "Handle rpc event FRAME for BUFFER, keeping errors out of transcript."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((event (alist-get :event frame nil nil #'equal))
+            (data (alist-get :data frame nil nil #'equal)))
+        (if (equal event "error")
+            (psi-emacs--on-rpc-error
+             buffer
+             (or (alist-get :code data nil nil #'equal)
+                 (alist-get :error-code data nil nil #'equal)
+                 "rpc/error")
+             (or (alist-get :message data nil nil #'equal)
+                 (alist-get :error-message data nil nil #'equal)
+                 "rpc error")
+             frame)
+          (psi-emacs--handle-rpc-event frame))))))
+
+(defun psi-emacs--start-rpc-client (buffer)
+  "Start rpc-edn client for BUFFER and wire callbacks."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((client (psi-rpc-make-client
+                     :on-state-change (lambda (rpc-client)
+                                        (psi-emacs--on-rpc-state-change buffer rpc-client))
+                     :on-event (lambda (frame)
+                                 (psi-emacs--on-rpc-event buffer frame))
+                     :on-rpc-error (lambda (code message-text frame)
+                                     (psi-emacs--on-rpc-error buffer code message-text frame)))))
+        (setf (psi-emacs-state-rpc-client psi-emacs--state) client)
+        (psi-rpc-start! client psi-emacs--spawn-process-function psi-emacs-command)
+        (setf (psi-emacs-state-process psi-emacs--state) (psi-rpc-client-process client))
+        (setq psi-emacs--owned-process (psi-rpc-client-process client))
+        (psi-emacs--refresh-header-line)))))
 
 (defun psi-emacs--default-spawn-process (command)
   "Spawn psi subprocess from COMMAND.
@@ -100,6 +167,9 @@ COMMAND is a list suitable for `make-process'."
 
 (defun psi-emacs--teardown-buffer ()
   "Stop owned subprocess and clear local/global frontend state for current buffer."
+  (when (and psi-emacs--state
+             (psi-rpc-client-p (psi-emacs-state-rpc-client psi-emacs--state)))
+    (psi-rpc-stop! (psi-emacs-state-rpc-client psi-emacs--state)))
   (when (process-live-p psi-emacs--owned-process)
     (delete-process psi-emacs--owned-process))
   (when (and psi-emacs--state
@@ -117,6 +187,7 @@ COMMAND is a list suitable for `make-process'."
                  (set-marker (plist-get row :end) nil)))
              (psi-emacs-state-tool-rows psi-emacs--state)))
   (remhash (current-buffer) psi-emacs--state-by-buffer)
+  (setq-local header-line-format nil)
   (setq psi-emacs--owned-process nil)
   (setq psi-emacs--state nil))
 
@@ -341,10 +412,43 @@ ANSI sequences in TEXT are converted to Emacs faces."
          (psi-emacs--upsert-tool-row tool-id stage text)))
       (_ nil))))
 
+(defun psi-emacs--buffer-modified-p ()
+  "Return non-nil when current buffer has pending user edits."
+  (buffer-modified-p))
+
+(defun psi-emacs--confirm-reconnect-p ()
+  "Return non-nil when reconnect should proceed."
+  (or (not (psi-emacs--buffer-modified-p))
+      (yes-or-no-p "Buffer has unsaved edits. Reconnect and clear buffer? ")))
+
+(defun psi-emacs--reset-transcript-state ()
+  "Clear transcript buffer and reset in-buffer rendering state."  
+  (let ((inhibit-read-only t))
+    (erase-buffer))
+  (when psi-emacs--state
+    (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
+    (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
+    (clrhash (psi-emacs-state-tool-rows psi-emacs--state))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+          (copy-marker (point-max) nil)))
+  (set-buffer-modified-p nil))
+
 (defun psi-emacs-reconnect ()
-  "Reconnect frontend (implemented in task #96)."
+  "Manually reconnect by clearing transcript and starting a fresh rpc session."
   (interactive)
-  (user-error "Reconnect flow not implemented yet"))
+  (if (not psi-emacs--state)
+      (user-error "psi buffer is not initialized")
+    (when (psi-emacs--confirm-reconnect-p)
+      (when (and (psi-emacs-state-rpc-client psi-emacs--state)
+                 (psi-rpc-client-p (psi-emacs-state-rpc-client psi-emacs--state)))
+        (psi-rpc-stop! (psi-emacs-state-rpc-client psi-emacs--state)))
+      (when (process-live-p psi-emacs--owned-process)
+        (delete-process psi-emacs--owned-process))
+      (psi-emacs--reset-transcript-state)
+      (setf (psi-emacs-state-transport-state psi-emacs--state) 'disconnected)
+      (setf (psi-emacs-state-process-state psi-emacs--state) 'starting)
+      (psi-emacs--refresh-header-line)
+      (psi-emacs--start-rpc-client (current-buffer)))))
 
 (define-derived-mode psi-emacs-mode text-mode "psi"
   "Major mode for dedicated psi chat buffer.
@@ -371,11 +475,13 @@ MVP frontend state boundaries."
       (unless (derived-mode-p 'psi-emacs-mode)
         (psi-emacs-mode))
       (psi-emacs--install-buffer-lifecycle-hooks)
-      (let ((process (psi-emacs--ensure-owned-process)))
-        (setq psi-emacs--state (psi-emacs--initialize-state process))
+      (unless psi-emacs--state
+        (setq psi-emacs--state (psi-emacs--initialize-state nil))
         (setf (psi-emacs-state-draft-anchor psi-emacs--state)
               (copy-marker (point-max) nil))
-        (puthash buffer psi-emacs--state psi-emacs--state-by-buffer)))
+        (puthash buffer psi-emacs--state psi-emacs--state-by-buffer)
+        (psi-emacs--refresh-header-line)
+        (psi-emacs--start-rpc-client buffer)))
     buffer))
 
 ;;;###autoload
