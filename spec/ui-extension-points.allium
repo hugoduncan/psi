@@ -1,18 +1,19 @@
 -- ui-extension-points.allium
 --
--- Scope: UI extension points — the bridge between the extension system
---        and the TUI layer, enabling extensions to show dialogs, contribute
---        widgets, display notifications, and register custom renderers.
+-- Scope: UI extension points — shared contract between the extension system
+--        and interactive frontends (TUI, Emacs), enabling extensions to show
+--        dialogs, contribute widgets, display notifications, and register
+--        custom renderers.
 --
 -- Design decisions:
---   1. Extension UI state lives in the charm app state atom (centralized Elm model)
---   2. Dialogs use a promise bridge: extension thread blocks, TUI resolves
+--   1. Extension UI state is owned by AgentSession and projected into each frontend
+--   2. Dialogs use a promise bridge: extension thread blocks, active frontend resolves
 --   3. Dialogs are queued FIFO, one active at a time
 --   4. Widgets placed above-editor or below-editor, keyed by extension id
 --   5. Status is a single-line widget variant in the footer
 --   6. Custom rendering via registered render fns keyed by tool-name or custom-type
---   7. Render fns return ANSI strings (matching charm.clj view model)
---   8. UI context (:ui key) present only when TUI is active
+--   7. Render fns return ANSI strings (shared renderer contract for TUI + Emacs)
+--   8. UI context (:ui key) present only when an interactive frontend is active
 --   9. All extension UI state is EQL-queryable (read-only)
 --  10. Screen takeover (custom components) deferred
 --
@@ -26,7 +27,7 @@
 --   EQL resolver surface for extension UI state
 --
 -- Excludes:
---   TUI rendering internals, component protocols, terminal I/O (see tui.allium)
+--   Frontend rendering internals (TUI/charm layout, Emacs process-buffer mechanics)
 --   Extension lifecycle, event dispatch, tool wrapping (see extension-system.allium)
 --   AgentSession orchestration (see coding-agent.allium)
 --   Screen takeover / custom component injection (deferred)
@@ -79,7 +80,7 @@ entity Dialog {
     extensionPath: String
     kind: ConfirmDialog | SelectDialog | InputDialog
     -- Promise bridge: the requesting extension thread blocks on this.
-    -- The TUI update loop resolves it when the user responds.
+    -- The active frontend event loop resolves it when the user responds.
     resolved: Boolean
 }
 
@@ -161,11 +162,11 @@ entity MessageRenderer {
     -- render-fn: (fn [message opts] → String)
 }
 
--- ── UI State (aggregate in charm app state) ────────────
+-- ── UI State (shared extension-ui aggregate) ───────────
 
 entity ExtensionUIState {
     -- Aggregate of all extension-contributed UI elements.
-    -- Lives inside the charm app state atom.
+    -- Owned by AgentSession and projected into each frontend model.
     dialogQueue: DialogQueue
     widgets: List<Widget>
     statuses: List<StatusEntry>
@@ -197,7 +198,7 @@ config {
 
 rule DialogRequested {
     -- Extension requests a dialog. It is queued and the extension
-    -- thread blocks on a promise until the TUI resolves it.
+    -- thread blocks on a promise until the active frontend resolves it.
     when: DialogRequested(session, dialog)
 
     requires: session.uiState.dialogQueue.pending.count < config.dialog_queue_max
@@ -380,8 +381,8 @@ rule MessageRendererRegistered {
 -- ── UI availability ────────────────────────────────────
 
 rule UIContextProvided {
-    -- When TUI is active, extension event handlers and tool execute fns
-    -- receive a :ui key in their context map.
+    -- When an interactive frontend is active (currently tracked by session.tui_active),
+    -- extension event handlers and tool execute fns receive a :ui key in context.
     -- When headless (REPL mode), :ui is nil.
     when: ExtensionHandlerInvoked(session, handler, event)
 
@@ -393,7 +394,7 @@ rule UIContextProvided {
 }
 
 rule HeadlessDialogFallback {
-    -- In headless mode, dialog methods return defaults immediately.
+    -- With no interactive frontend, dialog methods return defaults immediately.
     -- confirm → false, select → nil, input → nil.
     when: DialogRequested(session, dialog)
 
@@ -445,7 +446,7 @@ actor ExtensionModule {
 ------------------------------------------------------------
 
 surface ExtensionUI {
-    -- UI methods available to extensions when TUI is active.
+    -- UI methods available to extensions when an interactive frontend is active.
     -- Passed as the :ui key in extension handler and tool contexts.
     for ext: ExtensionModule
 
@@ -478,10 +479,10 @@ surface ExtensionUI {
 
     guidance:
         -- Dialog methods block the calling extension thread.
-        -- The TUI update loop shows the dialog and resolves the promise.
+        -- The active frontend update loop shows the dialog and resolves the promise.
         -- Only one dialog is active at a time; others queue FIFO.
         --
-        -- In headless mode (no TUI), all dialog methods return defaults:
+        -- In headless mode (no interactive frontend), all dialog methods return defaults:
         --   confirm → false, select → nil, input → nil.
         -- Fire-and-forget methods (notify, set_status, set_widget) are no-ops.
         --
