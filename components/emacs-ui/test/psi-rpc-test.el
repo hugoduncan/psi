@@ -21,6 +21,7 @@
       "session/updated"
       "error")
     psi-rpc-mvp-topics))
+  (should-not (member "footer/updated" psi-rpc-mvp-topics))
   (should
    (equal
     '("ui/dialog-requested"
@@ -29,8 +30,10 @@
       "ui/notification"
       "footer/updated")
     psi-rpc-parity-extension-ui-topics))
+  (should (member "footer/updated" psi-rpc-parity-extension-ui-topics))
   (should (equal (append psi-rpc-mvp-topics psi-rpc-parity-extension-ui-topics)
-                 psi-rpc-parity-topics)))
+                 psi-rpc-parity-topics))
+  (should (member "footer/updated" psi-rpc-parity-topics)))
 
 (defun psi-rpc-test--spawn-cat (_command)
   "Spawn a long-lived process used in rpc transport tests."
