@@ -173,7 +173,11 @@ surface EmacsFooterProjectionContract {
 }
 
 ------------------------------------------------------------
--- Open Questions
+-- Notes
 ------------------------------------------------------------
 
-open_question "Should Emacs keep the single-line `Footer: ...` projection, or move to a dedicated 2-3 line footer area in parity mode?"
+-- Assumption/trade-off (story D4/D5):
+-- Emacs parity keeps the single-line `Footer: ...` projection contract for
+-- deterministic process-buffer rendering and compatibility with existing
+-- transcript anchoring behavior. A dedicated multi-line footer area is
+-- explicitly deferred to future runtime/frontend work.
