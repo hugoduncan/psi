@@ -1004,6 +1004,76 @@ surface EmacsSessionApi {
 }
 
 ------------------------------------------------------------
+-- Extension UI Specification Integration
+------------------------------------------------------------
+
+-- Derived from ui-extension-points.allium for Emacs integration.
+-- Provides a consistent interface across TUI and Emacs UI.
+
+surface EmacsExtensionUI {
+    -- UI methods available to extensions when Emacs frontend is active.
+    for ext: ExtensionModule
+
+    context session: AgentSession
+
+    exposes:
+        session.uiState.dialogQueue.is_empty
+        session.uiState.visible_notifications
+
+    provides:
+        -- Dialogs (blocking — extension thread waits for user response)
+        confirm(title, message)                     → Boolean
+        select(title, options: List<DialogOption>)   → String?
+        input(title, placeholder?)                   → String?
+
+        -- Widgets (persistent until cleared)
+        set_widget(widgetId, placement, content: List<String>)
+        clear_widget(widgetId)
+
+        -- Status (single-line footer)
+        set_status(text)
+        clear_status()
+
+        -- Notifications (fire-and-forget)
+        notify(message, level)
+
+        -- Render registration
+        register_tool_renderer(toolName, renderCallFn, renderResultFn)
+        register_message_renderer(customType, renderFn)
+
+    guidance:
+        -- Dialog methods block the calling extension thread.
+        -- In Emacs, dialogs integrate with the process-buffer.
+        -- One dialog active at a time; others queue FIFO.
+        -- Widgets and status are ANSI-styled strings.
+        -- Extension to check (:ui ctx) before calling UI methods.
+        -- Derived from ui-extension-points.allium for TUI consistency.
+}
+
+surface EmacsExtensionUIQuery {
+    -- EQL query surface for extension UI state (read-only introspection).
+    for caller: ExtensionModule
+
+    context session: AgentSession
+
+    exposes:
+        :psi.ui/dialog-queue-empty?
+        :psi.ui/active-dialog
+        :psi.ui/pending-dialog-count
+        :psi.ui/widgets
+        :psi.ui/statuses
+        :psi.ui/visible-notifications
+        :psi.ui/tool-renderers
+        :psi.ui/message-renderers
+
+    guidance:
+        -- All attributes are read-only.
+        -- Query via (query-in ctx [:psi.ui/widgets :psi.ui/statuses])
+        -- or from nREPL for live introspection.
+}
+
+related: ui/ExtensionUI(frontend.session)
+------------------------------------------------------------
 -- Open Questions (Parity Phase)
 ------------------------------------------------------------
 
