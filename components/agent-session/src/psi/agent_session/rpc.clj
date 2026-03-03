@@ -610,6 +610,13 @@
                                                 (throw (ex-info "session model is not configured"
                                                                 {:error-code "request/invalid-params"})))
                                    oauth-ctx  (:oauth-ctx ctx)
+                                   user-msg   {:role      "user"
+                                               :content   (cond-> [{:type :text :text message}]
+                                                            (seq images) (into images))
+                                               :timestamp (java.time.Instant/now)}
+                                   ;; Journal the user message before dispatch so slash commands
+                                   ;; leave a trace in session history regardless of command match.
+                                   _          (session/journal-append-in! ctx (persist/message-entry user-msg))
                                    cmd-result (commands/dispatch ctx message {:oauth-ctx oauth-ctx
                                                                               :ai-model  ai-model})]
                                (if (some? cmd-result)
@@ -619,12 +626,7 @@
                                    (emit! "session/updated" (session-updated-payload ctx))
                                    (emit! "footer/updated" (footer-updated-payload ctx)))
                                  ;; Not a command — run normal agent loop
-                                 (let [user-msg {:role      "user"
-                                                 :content   (cond-> [{:type :text :text message}]
-                                                              (seq images) (into images))
-                                                 :timestamp (java.time.Instant/now)}
-                                       _        (session/journal-append-in! ctx (persist/message-entry user-msg))
-                                       _        (emit! "session/updated" (session-updated-payload ctx))
+                                 (let [_        (emit! "session/updated" (session-updated-payload ctx))
                                        _        (emit! "footer/updated" (footer-updated-payload ctx))
                                        result   (run-loop-fn nil ctx (:agent-ctx ctx) ai-model [user-msg]
                                                              {:turn-ctx-atom  (:turn-ctx-atom ctx)

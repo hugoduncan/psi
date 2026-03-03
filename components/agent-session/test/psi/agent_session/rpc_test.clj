@@ -531,3 +531,48 @@
           (is (some #(str/includes? (get % :text "") "not supported over RPC prompt")
                     (get-in msg-evt [:data :content]))
               "fallback text must appear in assistant/message content"))))))
+
+(deftest rpc-prompt-slash-command-journaled-test
+  (testing "slash command user message is journaled even when dispatch matches (not only on agent-loop path)"
+    (let [ctx    (session/create-context)
+          state  (atom {:ready? true
+                        :pending {}
+                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
+                        :run-agent-loop-fn (fn [& _] {:role "assistant" :content []})})
+          handler (rpc/make-session-request-handler ctx)
+          input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                       "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"/history\"}}\n")]
+      (with-redefs [commands/dispatch (fn [_ctx _text _opts]
+                                        {:type :text :message "history output"})]
+        (run-loop input handler state 250)
+        (let [journal-entries @(:journal-atom ctx)
+              msg-entries     (filterv #(= :message (:kind %)) journal-entries)
+              user-msg        (some #(when (= "user" (get-in % [:data :message :role])) %) msg-entries)]
+          (is (seq msg-entries)
+              "journal must contain at least one :message entry after slash command")
+          (is (some? user-msg)
+              "journal must contain the user message for the slash command submission")
+          (is (= "/history"
+                 (get-in user-msg [:data :message :content 0 :text]))
+              "journaled user message must contain the slash command text"))))))
+
+(deftest rpc-prompt-plain-text-journaled-test
+  (testing "plain text prompt user message is journaled on agent-loop path"
+    (let [ctx    (session/create-context)
+          state  (atom {:ready? true
+                        :pending {}
+                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
+                        :run-agent-loop-fn (fn [& _] {:role "assistant" :content [{:type :text :text "ok"}]})})
+          handler (rpc/make-session-request-handler ctx)
+          input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                       "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"tell me a joke\"}}\n")]
+      (with-redefs [commands/dispatch (fn [_ctx _text _opts] nil)]
+        (run-loop input handler state 250)
+        (let [journal-entries @(:journal-atom ctx)
+              msg-entries     (filterv #(= :message (:kind %)) journal-entries)
+              user-msg        (some #(when (= "user" (get-in % [:data :message :role])) %) msg-entries)]
+          (is (some? user-msg)
+              "journal must contain the user message for plain text prompt")
+          (is (= "tell me a joke"
+                 (get-in user-msg [:data :message :content 0 :text]))
+              "journaled user message must contain the prompt text"))))))
