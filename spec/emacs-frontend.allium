@@ -22,6 +22,7 @@
 --   Shared prompt autocomplete semantics (prompt-input-autocomplete.allium)
 --   Shared slash-command execution semantics (prompt-slash-commands.allium)
 --   TUI /resume selector behavior reference (tui-resume-selector.allium)
+--   Emacs footer parity projection contract (emacs-footer.allium)
 --
 -- Excludes:
 --   Canonical EDN frame envelopes and version negotiation (see rpc-edn.allium)
@@ -37,6 +38,7 @@ use "./tool-output-rendering.allium" as tool_render
 use "./prompt-input-autocomplete.allium" as prompt_autocomplete
 use "./prompt-slash-commands.allium" as slash_commands
 use "./tui-resume-selector.allium" as tui_resume
+use "./emacs-footer.allium" as emacs_footer
 
 ------------------------------------------------------------
 -- Value Types
@@ -129,6 +131,9 @@ entity EmacsFrontend {
 
     toolOutputView: collapsed | expanded
 
+    -- Flattened footer projection text rendered in parity mode.
+    footerProjection: String?
+
     runState: idle | streaming | reconnecting | error
     lastError: String?
 
@@ -200,6 +205,7 @@ rule MvpProfileIsDefault {
     ensures: frontend.buffer.transcriptEditable = true
     ensures: frontend.buffer.draftAnchor = end_of_buffer
     ensures: frontend.toolOutputView = config.default_tool_output_view
+    ensures: frontend.footerProjection = null
 
     ensures: frontend.runState = idle
     ensures: frontend.lastError = null
@@ -777,6 +783,7 @@ rule ReconnectStartsFreshSessionAndClearsBuffer {
     ensures: frontend.assistant.completedBlocks = []
     ensures: frontend.toolRows = []
     ensures: frontend.toolOutputView = config.default_tool_output_view
+    ensures: frontend.footerProjection = null
     ensures: frontend.lastError = null
     ensures: PersistentErrorLineCleared(frontend.buffer)
     ensures: StreamingWatchdogDisarmed(frontend)
@@ -847,6 +854,24 @@ rule ParityExtensionUiUsesSharedContract {
     ensures: ui/ExtensionUIQuery(frontend.session) governs extension UI state introspection
 }
 
+rule ParityFooterUsesSharedProjectionContract {
+    when: FrontendPhaseChanged(frontend, phase)
+
+    requires: phase = parity
+    requires: frontend.footerParityEnabled
+
+    ensures: emacs_footer/EmacsFooterProjectionContract governs footer/updated projection behavior
+}
+
+rule FooterUpdatedEventsRefreshProjectionText {
+    when: RpcEventReceived(frontend.rpc, "footer/updated", payload: rpc/FooterUpdatedPayload)
+
+    requires: frontend.phase = parity
+    requires: frontend.footerParityEnabled
+
+    ensures: frontend.footerProjection = emacs_footer/CanonicalFooterProjectionText(payload)
+}
+
 rule ParityPhaseEnablesSessionAndModelControls {
     when: FrontendPhaseChanged(frontend, phase)
 
@@ -882,6 +907,7 @@ surface EmacsSessionApi {
         frontend.session.isCompacting
         frontend.headerLine
         frontend.toolOutputView
+        frontend.footerProjection
         frontend.parity
 
     provides:
@@ -951,6 +977,7 @@ surface EmacsSessionApi {
         prompt_autocomplete/PromptAutocompleteContract
         slash_commands/PromptSlashCommandContract
         tui_resume/TuiResumeSelectorContract
+        emacs_footer/EmacsFooterProjectionContract
 
     guidance:
         -- MVP defaults:
@@ -1004,6 +1031,12 @@ surface EmacsSessionApi {
         --     - expanded: full tool body visible
         --   C-c C-t or M-x toggle_tool_output_view flips the global mode for
         --   both existing rows and future rows.
+        --
+        -- Footer parity rendering:
+        --   footer/updated payloads are interpreted via emacs-footer.allium.
+        --   Canonical path/stats/status lines are flattened to a deterministic
+        --   single projection line:
+        --     Footer: <path> | <stats> | <status?>
         --
         -- Error UX:
         --   RPC errors are surfaced in minibuffer and persisted in a single

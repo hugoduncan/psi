@@ -199,6 +199,9 @@ value UiNotificationPayload {
 }
 
 value FooterUpdatedPayload {
+    -- Canonical footer projection shape shared across frontends.
+    -- These fields correspond to footer/FooterView in default-footer.allium
+    -- and are flattened by emacs-footer.allium for process-buffer rendering.
     pathLine: String
     statsLine: String
     statusLine: String?

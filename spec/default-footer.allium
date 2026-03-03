@@ -1,24 +1,23 @@
 -- default-footer.allium
 --
--- Scope: Built-in interactive footer for the coding agent TUI.
+-- Scope: Built-in footer rendered in the interactive TUI.
 --
 -- Source distillation:
---   ~/src/pi-mono/packages/coding-agent/src/modes/interactive/components/footer.ts
---   ~/src/pi-mono/packages/coding-agent/src/core/footer-data-provider.ts
+--   - components/tui/src/psi/tui/app.clj
+--   - components/agent-session/src/psi/agent_session/resolvers.clj
+--   - components/tui/test/psi/tui/app_test.clj
 --
 -- Includes:
---   - 2-line base footer: location line + usage/model stats line
---   - Optional 3rd line for extension status texts
---   - Cumulative token/cache/cost display across whole session history
---   - Context usage display with unknown-after-compaction handling
---   - Model + thinking indicator on the right side
---   - Provider prefix when multiple providers are available
---   - Width-aware truncation and fallback layout rules
+--   - Query-driven footer snapshot (session + extension-ui attrs)
+--   - 2-line base footer: path line + usage/model stats line
+--   - Optional 3rd status line from extension statuses
+--   - Width-aware truncation/layout fallbacks
+--   - Context warning/error coloring thresholds
 --
 -- Excludes:
---   - Custom footer replacement via extension UI setFooter
---   - ANSI rendering internals and TUI diffing
---   - Git filesystem watch implementation details
+--   - Theme/style internals beyond severity levels
+--   - RPC event publication (see rpc-edn.allium)
+--   - Emacs projection formatting (see emacs-footer.allium)
 
 use "./session-management.allium" as session
 
@@ -26,12 +25,32 @@ use "./session-management.allium" as session
 -- Value Types
 ------------------------------------------------------------
 
-value FooterTotals {
-    input: Integer
-    output: Integer
-    cacheRead: Integer
-    cacheWrite: Integer
-    cost: Decimal
+value FooterStatus {
+    extensionId: String
+    text: String
+}
+
+value FooterInputs {
+    cwd: String
+    gitBranch: String?
+    sessionName: String?
+
+    usageInput: Integer
+    usageOutput: Integer
+    usageCacheRead: Integer
+    usageCacheWrite: Integer
+    usageCostTotal: Decimal
+
+    contextFraction: Decimal?
+    contextWindow: Integer?
+    autoCompactionEnabled: Boolean
+
+    modelProvider: String?
+    modelId: String?
+    modelReasoning: Boolean
+    thinkingLevel: String?
+
+    statuses: List<FooterStatus>
 }
 
 value FooterContextDisplay {
@@ -46,28 +65,16 @@ value FooterView {
 }
 
 ------------------------------------------------------------
--- Entities
+-- Entity
 ------------------------------------------------------------
-
-entity FooterStatus {
-    -- Status text contributed by an extension, keyed by extension id.
-    footer: DefaultFooter
-    key: String
-    text: String
-}
 
 entity DefaultFooter {
     session: session/AgentSession
 
-    -- Inputs supplied by footer data provider / interactive mode
-    gitBranch: String?                  -- null when not in git repo; detached literal allowed
-    availableProviderCount: Integer
-    autoCompactionEnabled: Boolean
+    -- Fallback cwd used when query attrs are unavailable.
+    cwdFallback: String
 
-    -- Extension statuses shown as an optional third line
-    statuses: FooterStatus for this footer
-
-    -- Last rendered footer content
+    -- Last rendered footer projection.
     view: FooterView?
 }
 
@@ -76,274 +83,284 @@ entity DefaultFooter {
 ------------------------------------------------------------
 
 config {
-    context_warning_threshold_pct: Decimal = 70
-    context_error_threshold_pct: Decimal = 90
     stats_min_padding: Integer = 2
+    context_warning_fraction: Decimal = 0.7
+    context_error_fraction: Decimal = 0.9
 }
 
 ------------------------------------------------------------
 -- Rules
 ------------------------------------------------------------
 
+rule FooterReadsCanonicalProjectionAttributes {
+    when: FooterRenderRequested(footer, _)
+
+    ensures: FooterQueryAttributes() = [
+        "psi.agent-session/cwd",
+        "psi.agent-session/git-branch",
+        "psi.agent-session/session-name",
+        "psi.agent-session/usage-input",
+        "psi.agent-session/usage-output",
+        "psi.agent-session/usage-cache-read",
+        "psi.agent-session/usage-cache-write",
+        "psi.agent-session/usage-cost-total",
+        "psi.agent-session/context-fraction",
+        "psi.agent-session/context-window",
+        "psi.agent-session/auto-compaction-enabled",
+        "psi.agent-session/model-provider",
+        "psi.agent-session/model-id",
+        "psi.agent-session/model-reasoning",
+        "psi.agent-session/thinking-level",
+        "psi.ui/statuses"
+    ]
+}
+
+rule FooterInputsUseSafeFallbacks {
+    -- Query failures are ignored; rendering proceeds with defaults.
+    when: FooterRenderRequested(footer, _)
+
+    ensures: FooterInputsFor(footer).cwd =
+        FirstNonNull(QueryValue("psi.agent-session/cwd"), footer.cwdFallback, "")
+
+    ensures: FooterInputsFor(footer).gitBranch = QueryValue("psi.agent-session/git-branch")
+    ensures: FooterInputsFor(footer).sessionName = QueryValue("psi.agent-session/session-name")
+
+    ensures: FooterInputsFor(footer).usageInput = QueryValueOrDefault("psi.agent-session/usage-input", 0)
+    ensures: FooterInputsFor(footer).usageOutput = QueryValueOrDefault("psi.agent-session/usage-output", 0)
+    ensures: FooterInputsFor(footer).usageCacheRead = QueryValueOrDefault("psi.agent-session/usage-cache-read", 0)
+    ensures: FooterInputsFor(footer).usageCacheWrite = QueryValueOrDefault("psi.agent-session/usage-cache-write", 0)
+    ensures: FooterInputsFor(footer).usageCostTotal = QueryValueOrDefault("psi.agent-session/usage-cost-total", 0.0)
+
+    ensures: FooterInputsFor(footer).contextFraction = QueryValue("psi.agent-session/context-fraction")
+    ensures: FooterInputsFor(footer).contextWindow = QueryValue("psi.agent-session/context-window")
+    ensures: FooterInputsFor(footer).autoCompactionEnabled =
+        Boolean(QueryValue("psi.agent-session/auto-compaction-enabled"))
+
+    ensures: FooterInputsFor(footer).modelProvider = QueryValue("psi.agent-session/model-provider")
+    ensures: FooterInputsFor(footer).modelId = QueryValue("psi.agent-session/model-id")
+    ensures: FooterInputsFor(footer).modelReasoning =
+        Boolean(QueryValue("psi.agent-session/model-reasoning"))
+    ensures: FooterInputsFor(footer).thinkingLevel = QueryValue("psi.agent-session/thinking-level")
+
+    ensures: FooterInputsFor(footer).statuses = QueryValueOrDefault("psi.ui/statuses", [])
+}
+
 rule FooterRendered {
-    -- Recompute all footer lines for the current terminal width.
     when: FooterRenderRequested(footer, width)
 
-    let totals = FooterTotalsForSession(footer.session)
-    let context = FooterContextFor(footer.session, footer.autoCompactionEnabled)
-    let pathLine = FooterPathLine(
-        cwd: CurrentWorkingDirectory(),
-        gitBranch: footer.gitBranch,
-        sessionName: footer.session.sessionName,
-        width: width
-    )
+    let inputs = FooterInputsFor(footer)
+    let context = FooterContextFor(inputs.contextFraction, inputs.contextWindow, inputs.autoCompactionEnabled)
+    let pathLine = FooterPathLine(inputs.cwd, inputs.gitBranch, inputs.sessionName, width)
 
-    let leftStats = LeftStatsLine(footer.session, totals, context)
-    let rightStats = RightStatsLine(
-        session: footer.session,
-        providerCount: footer.availableProviderCount,
-        left: leftStats,
-        width: width,
-        minPadding: config.stats_min_padding
-    )
+    let leftStats = LeftStatsLine(inputs, context)
+    let rightStats = RightStatsLine(inputs)
+    let statsLine = ComposeStatsLine(leftStats, rightStats, width, config.stats_min_padding)
 
-    let statsLine = ComposeStatsLine(
-        left: leftStats,
-        right: rightStats,
-        width: width,
-        minPadding: config.stats_min_padding
-    )
+    let statusLine = FooterStatusLine(inputs.statuses, width)
 
-    let statusLine =
-        if footer.statuses.count > 0:
-            FooterStatusLine(footer.statuses, width)
-        else:
+    ensures: footer.view.pathLine = pathLine
+    ensures: footer.view.statsLine = statsLine
+    ensures: footer.view.statusLine =
+        if statusLine = "":
             null
-
-    ensures: footer.view = {
-        pathLine: pathLine,
-        statsLine: statsLine,
-        statusLine: statusLine
-    }
+        else:
+            statusLine
 }
 
 rule PathLineComposition {
-    -- Path line format:
+    -- Format:
     --   <cwd-with-~-home> [(branch)] [• session-name]
-    -- then middle-truncated to terminal width.
-    when: FooterPathLineComputed(cwd, gitBranch, sessionName, width)
+    -- then middle-truncated to width.
+    when: FooterPathLineRequested(cwd, gitBranch, sessionName, width)
 
     let withHome = ReplaceHomePrefixWithTilde(cwd)
     let withBranch =
-        if gitBranch != null:
+        if gitBranch != null and gitBranch != "":
             withHome + " (" + gitBranch + ")"
         else:
             withHome
-
     let withSession =
-        if sessionName != null:
+        if sessionName != null and sessionName != "":
             withBranch + " • " + sessionName
         else:
             withBranch
 
-    ensures: FooterPathLine(cwd, gitBranch, sessionName, width) = MiddleTruncate(withSession, width)
+    ensures: FooterPathLine(cwd, gitBranch, sessionName, width) =
+        MiddleTruncate(withSession, max(1, width))
 }
 
-rule FooterTotalsAreCumulativeAcrossSessionHistory {
-    -- Totals are taken from assistant usage across all persisted session entries,
-    -- not only currently-expanded messages after compaction.
-    when: FooterTotalsRequested(agentSession)
+rule LeftStatsPartOrder {
+    -- Parts are shown in this order, skipping zero-valued usage counters:
+    --   ↑input ↓output Rcache-read Wcache-write $cost context
+    when: LeftStatsLineRequested(inputs, context)
 
-    let assistantMessages = AssistantMessagesFromAllEntries(agentSession)
-
-    ensures: FooterTotalsForSession(agentSession).input = Sum(assistantMessages.usage.input)
-    ensures: FooterTotalsForSession(agentSession).output = Sum(assistantMessages.usage.output)
-    ensures: FooterTotalsForSession(agentSession).cacheRead = Sum(assistantMessages.usage.cacheRead)
-    ensures: FooterTotalsForSession(agentSession).cacheWrite = Sum(assistantMessages.usage.cacheWrite)
-    ensures: FooterTotalsForSession(agentSession).cost = Sum(assistantMessages.usage.cost.total)
+    ensures: LeftStatsLine(inputs, context) = JoinWithSpaces([
+        OptionalPart(inputs.usageInput > 0, "↑" + FormatTokenCount(inputs.usageInput)),
+        OptionalPart(inputs.usageOutput > 0, "↓" + FormatTokenCount(inputs.usageOutput)),
+        OptionalPart(inputs.usageCacheRead > 0, "R" + FormatTokenCount(inputs.usageCacheRead)),
+        OptionalPart(inputs.usageCacheWrite > 0, "W" + FormatTokenCount(inputs.usageCacheWrite)),
+        OptionalPart(inputs.usageCostTotal > 0, "$" + RoundTo3Decimals(inputs.usageCostTotal)),
+        context.text
+    ])
 }
 
-rule LeftStatsParts {
-    -- Left side includes non-zero usage parts plus context usage (always shown).
-    -- Format examples:
-    --   ↑76k ↓3.6k R1.4M $0.434 17.6%/400k (auto)
-    --   ?/400k (auto)
-    when: LeftStatsRequested(agentSession, totals, context)
+rule ContextDisplayText {
+    when: FooterContextRequested(fraction, contextWindow, autoCompactionEnabled)
 
-    ensures:
-        LeftStatsLine(agentSession, totals, context) = JoinWithSpaces([
-            OptionalPart(totals.input > 0, "↑" + FormatTokenCount(totals.input)),
-            OptionalPart(totals.output > 0, "↓" + FormatTokenCount(totals.output)),
-            OptionalPart(totals.cacheRead > 0, "R" + FormatTokenCount(totals.cacheRead)),
-            OptionalPart(totals.cacheWrite > 0, "W" + FormatTokenCount(totals.cacheWrite)),
-            CostPart(agentSession, totals),
-            context.text
-        ])
-}
-
-rule CostPartIncludesSubscriptionMarker {
-    -- Cost is shown when any cost was incurred OR when provider billing is subscription-based.
-    when: CostPartRequested(agentSession, totals)
-
-    let usingSubscription = ModelUsesOAuthSubscription(agentSession.model)
-
-    ensures:
-        if totals.cost > 0 or usingSubscription:
-            CostPart(agentSession, totals) = "$" + RoundTo3Decimals(totals.cost) + (if usingSubscription: " (sub)" else: "")
-        else:
-            CostPart(agentSession, totals) = null
-}
-
-rule ContextDisplayKnownOrUnknown {
-    -- After compaction and before next assistant response, context tokens are unknown.
-    -- Display falls back to "?/contextWindow".
-    when: FooterContextRequested(agentSession, autoCompactionEnabled)
-
-    let usage = session/GetContextUsage(agentSession)
     let suffix = if autoCompactionEnabled: " (auto)" else: ""
+    let window = FormatTokenCount(if contextWindow != null: contextWindow else: 0)
 
     ensures:
-        if usage = null:
-            FooterContextFor(agentSession, autoCompactionEnabled).text = "?/0" + suffix
-        else if usage.percent = null:
-            FooterContextFor(agentSession, autoCompactionEnabled).text = "?/" + FormatTokenCount(usage.contextWindow) + suffix
+        if fraction = null:
+            FooterContextFor(fraction, contextWindow, autoCompactionEnabled).text = "?/" + window + suffix
         else:
-            FooterContextFor(agentSession, autoCompactionEnabled).text =
-                RoundTo1Decimal(usage.percent) + "%/" + FormatTokenCount(usage.contextWindow) + suffix
+            FooterContextFor(fraction, contextWindow, autoCompactionEnabled).text =
+                RoundTo1Decimal(fraction * 100) + "%/" + window + suffix
 }
 
-rule ContextSeverityThresholds {
-    when: FooterContextRequested(agentSession, autoCompactionEnabled)
-
-    let usage = session/GetContextUsage(agentSession)
+rule ContextDisplaySeverity {
+    when: FooterContextRequested(fraction, contextWindow, autoCompactionEnabled)
 
     ensures:
-        if usage = null or usage.percent = null:
-            FooterContextFor(agentSession, autoCompactionEnabled).severity = normal
-        else if usage.percent > config.context_error_threshold_pct:
-            FooterContextFor(agentSession, autoCompactionEnabled).severity = error
-        else if usage.percent > config.context_warning_threshold_pct:
-            FooterContextFor(agentSession, autoCompactionEnabled).severity = warning
+        if fraction = null:
+            FooterContextFor(fraction, contextWindow, autoCompactionEnabled).severity = normal
+        else if fraction > config.context_error_fraction:
+            FooterContextFor(fraction, contextWindow, autoCompactionEnabled).severity = error
+        else if fraction > config.context_warning_fraction:
+            FooterContextFor(fraction, contextWindow, autoCompactionEnabled).severity = warning
         else:
-            FooterContextFor(agentSession, autoCompactionEnabled).severity = normal
+            FooterContextFor(fraction, contextWindow, autoCompactionEnabled).severity = normal
 }
 
-rule RightSideModelAndThinking {
-    -- Right side base:
-    --   <model-id>
-    -- or for reasoning models:
-    --   <model-id> • thinking off
-    --   <model-id> • <thinking-level>
-    when: RightStatsRequested(agentSession)
-
-    let modelId = if agentSession.model != null: agentSession.model.id else: "no-model"
-
-    ensures:
-        if agentSession.model != null and agentSession.model.reasoning:
-            RightStatsBase(agentSession) =
-                if agentSession.thinkingLevel = off:
-                    modelId + " • thinking off"
-                else:
-                    modelId + " • " + agentSession.thinkingLevel
-        else:
-            RightStatsBase(agentSession) = modelId
-}
-
-rule ProviderPrefixShownWhenAmbiguousAndFits {
-    -- If multiple providers are available, prepend provider name when it fits:
+rule RightStatsAlwaysIncludesProvider {
+    -- Right side always starts with provider in parentheses.
+    -- Examples:
     --   (openai) gpt-5.3-codex • xhigh
-    when: RightStatsLineRequested(agentSession, providerCount, left, width, minPadding)
+    --   (anthropic) claude-3.7-sonnet
+    --   (no-provider) no-model
+    when: RightStatsLineRequested(inputs)
 
-    requires: providerCount > 1
-    requires: agentSession.model != null
+    let modelLabel = if inputs.modelId != null: inputs.modelId else: "no-model"
+    let providerLabel = if inputs.modelProvider != null: inputs.modelProvider else: "no-provider"
 
-    let withProvider = "(" + agentSession.model.provider + ") " + RightStatsBase(agentSession)
+    let normalizedThinking = NormalizeThinkingLevel(inputs.thinkingLevel)
+    let rightBase =
+        if inputs.modelReasoning:
+            if normalizedThinking = "off":
+                modelLabel + " • thinking off"
+            else:
+                modelLabel + " • " + normalizedThinking
+        else:
+            modelLabel
+
+    ensures: RightStatsLine(inputs) = "(" + providerLabel + ") " + rightBase
+}
+
+rule ThinkingLevelNormalization {
+    -- Query may surface thinking level as keyword or string.
+    -- Footer display always uses plain lowercase text.
+    when: ThinkingLevelNormalized(level)
 
     ensures:
-        if FitsWithPadding(left, withProvider, width, minPadding):
-            RightStatsLine(agentSession, providerCount, left, width, minPadding) = withProvider
+        if level = null:
+            NormalizeThinkingLevel(level) = "off"
         else:
-            RightStatsLine(agentSession, providerCount, left, width, minPadding) = RightStatsBase(agentSession)
+            NormalizeThinkingLevel(level) = Lowercase(KeywordNameOrString(level))
 }
 
-rule ProviderPrefixHiddenWhenSingleProvider {
-    when: RightStatsLineRequested(agentSession, providerCount, left, width, minPadding)
-    requires: providerCount <= 1 or agentSession.model = null
-    ensures: RightStatsLine(agentSession, providerCount, left, width, minPadding) = RightStatsBase(agentSession)
-}
-
-rule StatsLineWidthFallback {
+rule StatsLineLayoutFallback {
     -- Layout priority:
-    --   1) left + padding + right (right-aligned)
-    --   2) if too tight, truncate right
-    --   3) if still too tight, show only left
+    --   1) left + right with right-alignment and min padding
+    --   2) if too narrow, truncate right side
+    --   3) if still too narrow, left side only
     when: StatsLineRequested(left, right, width, minPadding)
 
-    ensures: StatsLineFitsWidth(ComposeStatsLine(left, right, width, minPadding), width)
-}
+    let safeLeft =
+        if VisibleWidth(left) > width:
+            TrimRightVisible(left, width)
+        else:
+            left
 
-rule StatusLineOrderingAndSanitization {
-    -- Status line is built from statuses sorted by key, displaying text only.
-    -- Sanitization: CR/LF/TAB -> space, collapse repeated spaces, trim.
-    when: FooterStatusLineRequested(statuses, width)
-
-    let sorted = SortBy(statuses, key)
-    let sanitized = sorted.map(s => SanitizeSingleLineText(s.text))
-    let joined = JoinWithSpaces(sanitized)
-
-    ensures: FooterStatusLine(statuses, width) = TruncateToWidth(joined, width)
-}
-
-rule ExtensionStatusSet {
-    when: FooterStatusSet(footer, key, text)
+    let leftWidth = VisibleWidth(safeLeft)
+    let rightWidth = VisibleWidth(right)
+    let availForRight = width - leftWidth - minPadding
+    let rightTruncated =
+        if availForRight > 3:
+            TrimRightVisible(right, availForRight)
+        else:
+            ""
 
     ensures:
-        let existing = FooterStatus{footer: footer, key: key}
-        if exists existing:
-            existing.text = text
+        if leftWidth + minPadding + rightWidth <= width:
+            ComposeStatsLine(left, right, width, minPadding) =
+                safeLeft + Spaces(width - leftWidth - rightWidth) + right
+        else if availForRight > 3:
+            ComposeStatsLine(left, right, width, minPadding) =
+                safeLeft
+                + Spaces(max(minPadding, width - leftWidth - VisibleWidth(rightTruncated)))
+                + rightTruncated
         else:
-            FooterStatus.created(footer: footer, key: key, text: text)
-    ensures: FooterRenderRequested(footer, CurrentTerminalWidth())
+            ComposeStatsLine(left, right, width, minPadding) = safeLeft
 }
 
-rule ExtensionStatusCleared {
-    when: FooterStatusCleared(footer, key)
+rule StatusLineOrderingSanitizationAndTruncation {
+    -- Statuses are sorted by extension id, sanitized to single-line text,
+    -- blank statuses dropped, then joined with spaces.
+    when: FooterStatusLineRequested(statuses, width)
 
-    let target = FooterStatus{footer: footer, key: key}
-    requires: exists target
+    let sorted = SortBy(statuses, extensionId)
+    let sanitized = sorted.map(s => SanitizeSingleLineText(s.text))
+    let nonBlank = sanitized.filter(t => t != "")
+    let joined = JoinWithSpaces(nonBlank)
 
-    ensures: not exists target
-    ensures: FooterRenderRequested(footer, CurrentTerminalWidth())
+    ensures:
+        if joined = "":
+            FooterStatusLine(statuses, width) = ""
+        else:
+            FooterStatusLine(statuses, width) = TruncateToWidth(joined, width)
 }
 
-rule FooterRenderOnBranchChange {
-    when: FooterGitBranchChanged(footer, branch)
-    ensures: footer.gitBranch = branch
-    ensures: FooterRenderRequested(footer, CurrentTerminalWidth())
-}
+rule StatusTextSanitization {
+    -- Sanitization:
+    --   CR/LF/TAB -> space
+    --   collapse repeated spaces
+    --   trim leading/trailing spaces
+    when: StatusTextSanitized(text)
 
-rule FooterRenderOnProviderCountChange {
-    when: FooterAvailableProviderCountSet(footer, count)
-    ensures: footer.availableProviderCount = count
-    ensures: FooterRenderRequested(footer, CurrentTerminalWidth())
+    ensures: SanitizeSingleLineText(text) =
+        Trim(CollapseSpaces(Replace(text, pattern: "[\\r\\n\\t]", replacement: " ")))
 }
 
 rule FooterTokenFormatting {
-    -- Token formatter used for input/output/cache/contextWindow displays.
+    -- Formatter for usage counters and context window display.
     when: FormatTokenCountCalled(count)
+
+    let safeCount = if count != null: count else: 0
 
     ensures:
         FormatTokenCount(count) =
-            if count < 1000:
-                count.to_string
-            else if count < 10000:
-                RoundTo1Decimal(count / 1000) + "k"
-            else if count < 1000000:
-                RoundToInteger(count / 1000) + "k"
-            else if count < 10000000:
-                RoundTo1Decimal(count / 1000000) + "M"
+            if safeCount < 1000:
+                safeCount.to_string
+            else if safeCount < 10000:
+                RoundTo1Decimal(safeCount / 1000) + "k"
+            else if safeCount < 1000000:
+                RoundToInteger(safeCount / 1000) + "k"
+            else if safeCount < 10000000:
+                RoundTo1Decimal(safeCount / 1000000) + "M"
             else:
-                RoundToInteger(count / 1000000) + "M"
+                RoundToInteger(safeCount / 1000000) + "M"
+}
+
+rule FooterRenderedLinesClearTrailingCharacters {
+    -- Each rendered footer row clears to end-of-line so shorter re-renders
+    -- do not leave stale trailing characters.
+    when: FooterRenderedForTerminal(footer, width)
+
+    ensures: FooterRowClearsToEnd(footer.view.pathLine)
+    ensures: FooterRowClearsToEnd(footer.view.statsLine)
+    ensures:
+        if footer.view.statusLine != null:
+            FooterRowClearsToEnd(footer.view.statusLine)
 }
 
 ------------------------------------------------------------
@@ -355,7 +372,7 @@ actor User {
 }
 
 ------------------------------------------------------------
--- Surfaces
+-- Surface
 ------------------------------------------------------------
 
 surface DefaultFooterView {
@@ -370,26 +387,24 @@ surface DefaultFooterView {
 
     provides:
         FooterRenderRequested(footer, width)
-        FooterStatusSet(footer, key, text)
-        FooterStatusCleared(footer, key)
-        FooterGitBranchChanged(footer, branch)
-        FooterAvailableProviderCountSet(footer, count)
+
+    guidance:
+        -- Built from EQL query attrs listed in FooterReadsCanonicalProjectionAttributes.
+        -- Path line is always present.
+        -- Stats line is always present.
+        -- Status line is optional (only when non-blank statuses exist).
 }
 
 ------------------------------------------------------------
 -- Deferred Specifications
 ------------------------------------------------------------
 
-deferred FooterRenderer.compose           -- ANSI styling and dim/warn/error coloring
-
-deferred FooterDataProvider.git_branch   -- git HEAD/worktree resolution and branch watch
-
-deferred FooterDataProvider.provider_count
-    -- Derived from currently-available model candidates.
+deferred FooterRenderer.ansi_styles        -- dim/warn/error styling choices
+deferred FooterQueryExecution.error_policy -- query-fn exception handling internals
 
 ------------------------------------------------------------
 -- Open Questions
 ------------------------------------------------------------
 
-open_question "Should context warning/error thresholds be user-configurable (settings) instead of fixed at 70/90?"
-open_question "Should the status line support multi-row wrapping instead of single-line truncation?"
+open_question "Should provider prefix remain always visible, or hide when only one provider is configured?"
+open_question "Should footer status line wrap to multiple rows instead of truncating at terminal width?"

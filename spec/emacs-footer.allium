@@ -1,0 +1,179 @@
+-- emacs-footer.allium
+--
+-- Scope: Emacs parity handling for `footer/updated` events.
+--
+-- Source distillation:
+--   - components/emacs-ui/psi.el
+--   - components/emacs-ui/test/psi-test.el
+--
+-- Includes:
+--   - Canonical `footer/updated` payload mapping (path-line, stats-line, status-line)
+--   - Projection text composition for process-buffer rendering
+--   - Backward-compatible fallback to legacy single-text payloads
+--   - Deterministic projection-block rendering and anchor preservation
+--
+-- Excludes:
+--   - Footer line generation itself (see default-footer.allium)
+--   - RPC transport framing/subscription rules (see rpc-edn.allium)
+--   - Header-line status rendering (see emacs-frontend.allium)
+
+use "./default-footer.allium" as footer
+use "./rpc-edn.allium" as rpc
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value EmacsFooterProjection {
+    pathLine: String?
+    statsLine: String?
+    statusLine: String?
+    text: String?
+}
+
+------------------------------------------------------------
+-- Entity
+------------------------------------------------------------
+
+entity EmacsFooterState {
+    projection: EmacsFooterProjection
+}
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    projection_separator: String = " | "
+    projection_prefix: String = "Footer: "
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+rule CanonicalFooterPayloadMapsToDefaultFooterView {
+    -- Link contract: canonical RPC payload is the same 3-line shape
+    -- exposed by footer/DefaultFooterView.
+    when: FooterUpdatedReceived(state, payload: rpc/FooterUpdatedPayload)
+
+    let view = footer/FooterView{
+        pathLine: payload.pathLine,
+        statsLine: payload.statsLine,
+        statusLine: payload.statusLine
+    }
+
+    ensures: state.projection.pathLine = view.pathLine
+    ensures: state.projection.statsLine = view.statsLine
+    ensures: state.projection.statusLine = view.statusLine
+}
+
+rule CanonicalFooterProjectionTextFunction {
+    -- Pure projection helper used by parity frontends.
+    when: CanonicalFooterProjectionTextRequested(payload: rpc/FooterUpdatedPayload)
+
+    let lines = NonEmptyStrings([payload.pathLine, payload.statsLine, payload.statusLine])
+
+    ensures:
+        if lines.count > 0:
+            CanonicalFooterProjectionText(payload) = Join(lines, config.projection_separator)
+        else:
+            CanonicalFooterProjectionText(payload) = null
+}
+
+rule CanonicalFooterProjectionTextAppliedToState {
+    -- Emacs flattens canonical footer lines into one deterministic line:
+    --   <path-line> | <stats-line> | <status-line?>
+    -- with empty lines removed.
+    when: FooterUpdatedReceived(state, payload: rpc/FooterUpdatedPayload)
+
+    ensures: state.projection.text = CanonicalFooterProjectionText(payload)
+}
+
+rule LegacyFooterPayloadFallback {
+    -- Backward compatibility for older payloads that only provide a single
+    -- text-ish field. Used only when canonical lines are absent/blank.
+    when: LegacyFooterUpdatedReceived(state, payload)
+
+    let canonicalLines = NonEmptyStrings([
+        PayloadValue(payload, keys: ["path-line", "pathLine", "path_line"]),
+        PayloadValue(payload, keys: ["stats-line", "statsLine", "stats_line"]),
+        PayloadValue(payload, keys: ["status-line", "statusLine", "status_line"])
+    ])
+
+    let fallback = FirstPresent(payload, keys: ["text", "message", "footer", "content"])
+
+    ensures:
+        if canonicalLines.count > 0:
+            state.projection.text = Join(canonicalLines, config.projection_separator)
+        else:
+            state.projection.text = CoerceStringOrNull(fallback)
+}
+
+rule FooterLineRenderedInProjectionBlock {
+    when: ProjectionBlockRenderRequested(state)
+
+    requires: state.projection.text != null
+    requires: Trim(state.projection.text) != ""
+
+    ensures: ProjectionBlockContainsLine(config.projection_prefix + state.projection.text)
+}
+
+rule FooterLineOmittedWhenProjectionBlank {
+    when: ProjectionBlockRenderRequested(state)
+
+    requires: state.projection.text = null or Trim(state.projection.text) = ""
+
+    ensures: ProjectionBlockOmitsPrefix(config.projection_prefix)
+}
+
+rule FooterProjectionUpsertPreservesTranscriptAndAnchor {
+    -- Updating the projection block must not clobber transcript content,
+    -- and the draft anchor stays at end-of-buffer when it was already there.
+    when: FooterProjectionUpserted(state)
+
+    ensures: TranscriptContentPreserved()
+    ensures: DraftAnchorAtEndPreservedWhenFollowing()
+}
+
+------------------------------------------------------------
+-- Surface
+------------------------------------------------------------
+
+surface EmacsFooterProjectionContract {
+    for client: rpc/RpcClient
+
+    context state: EmacsFooterState
+
+    exposes:
+        state.projection.pathLine
+        state.projection.statsLine
+        state.projection.statusLine
+        state.projection.text
+
+    provides:
+        FooterUpdatedReceived(state, payload: rpc/FooterUpdatedPayload)
+        LegacyFooterUpdatedReceived(state, payload)
+        CanonicalFooterProjectionTextRequested(payload: rpc/FooterUpdatedPayload)
+        ProjectionBlockRenderRequested(state)
+
+    related:
+        footer/DefaultFooterView
+        rpc/RpcEventStream
+
+    guidance:
+        -- Canonical parity path:
+        --   footer/updated payload (path-line, stats-line, status-line?)
+        --   -> flatten non-empty lines with " | "
+        --   -> render as one deterministic projection line:
+        --        Footer: <flattened-text>
+        --
+        -- Legacy path remains accepted for compatibility when only
+        -- text/message/footer/content is present.
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open_question "Should Emacs keep the single-line `Footer: ...` projection, or move to a dedicated 2-3 line footer area in parity mode?"
