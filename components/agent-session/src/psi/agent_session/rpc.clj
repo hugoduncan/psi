@@ -51,7 +51,9 @@
    "get_messages"
    "get_session_stats"
    "subscribe"
-   "unsubscribe"])
+   "unsubscribe"
+   "resolve_dialog"
+   "cancel_dialog"])
 
 (defn response-frame
   ([id op ok]
@@ -312,6 +314,52 @@
       (throw (ex-info "query must be an EDN vector"
                       {:error-code "request/invalid-query"})))
     q))
+
+(defn- dialog-result-valid?
+  [v]
+  (or (nil? v) (boolean? v) (string? v)))
+
+(defn- active-dialog-or-error!
+  [ctx]
+  (let [ui-state-atom (:ui-state-atom ctx)
+        active        (when ui-state-atom (ext-ui/active-dialog ui-state-atom))]
+    (when-not (map? active)
+      (throw (ex-info "no active dialog"
+                      {:error-code "request/no-active-dialog"})))
+    active))
+
+(defn- handle-resolve-dialog!
+  [ctx request params]
+  (let [dialog-id (req-arg! request params :dialog-id #(and (string? %) (not (str/blank? %))) "non-empty string")
+        result    (get params :result ::missing)
+        _         (when (= ::missing result)
+                    (throw (ex-info "invalid request parameter :result: boolean, string, or nil"
+                                    {:error-code "request/invalid-params"})))
+        _         (when-not (dialog-result-valid? result)
+                    (throw (ex-info "invalid request parameter :result: boolean, string, or nil"
+                                    {:error-code "request/invalid-params"})))
+        active    (active-dialog-or-error! ctx)
+        active-id (:id active)]
+    (when-not (= dialog-id active-id)
+      (throw (ex-info "dialog-id mismatch"
+                      {:error-code "request/dialog-id-mismatch"})))
+    (when-not (ext-ui/resolve-dialog! (:ui-state-atom ctx) dialog-id result)
+      (throw (ex-info "no active dialog"
+                      {:error-code "request/no-active-dialog"})))
+    (response-frame (:id request) "resolve_dialog" true {:accepted true})))
+
+(defn- handle-cancel-dialog!
+  [ctx request params]
+  (let [dialog-id (req-arg! request params :dialog-id #(and (string? %) (not (str/blank? %))) "non-empty string")
+        active    (active-dialog-or-error! ctx)
+        active-id (:id active)]
+    (when-not (= dialog-id active-id)
+      (throw (ex-info "dialog-id mismatch"
+                      {:error-code "request/dialog-id-mismatch"})))
+    (when-not (ext-ui/cancel-dialog! (:ui-state-atom ctx))
+      (throw (ex-info "no active dialog"
+                      {:error-code "request/no-active-dialog"})))
+    (response-frame (:id request) "cancel_dialog" true {:accepted true})))
 
 (defn- normalize-provider [provider]
   (cond
@@ -829,6 +877,12 @@
               (swap! state update :subscribed-topics (fn [s] (apply disj (or s #{}) topics*)))
               (swap! state assoc :subscribed-topics #{}))
             (response-frame (:id request) op true {:subscribed (->> (:subscribed-topics @state) sort vec)}))
+
+          "resolve_dialog"
+          (handle-resolve-dialog! ctx request params)
+
+          "cancel_dialog"
+          (handle-cancel-dialog! ctx request params)
 
           (error-frame {:id            (:id request)
                         :op            op

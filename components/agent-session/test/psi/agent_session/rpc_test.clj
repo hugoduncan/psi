@@ -201,10 +201,13 @@
           (run-loop "{:id \"u1\" :kind :request :op \"nope\"}\n"
                     handler
                     state)
-          frame   (-> out-lines first edn/read-string)]
+          frame   (-> out-lines first edn/read-string)
+          supported (get-in frame [:data :supported-ops])]
       (is (= :error (:kind frame)))
       (is (= "request/op-not-supported" (:error-code frame)))
-      (is (vector? (get-in frame [:data :supported-ops])))))
+      (is (vector? supported))
+      (is (some #(= "resolve_dialog" %) supported))
+      (is (some #(= "cancel_dialog" %) supported))))
 
   (testing "subscribe/unsubscribe update shared state and return subscribed topics"
     (let [ctx     (session/create-context)
@@ -238,6 +241,95 @@
       (is (= "1.0" (:protocol-version info)))
       (is (contains? info :session-id))
       (is (= ["eql-graph" "eql-memory"] (:features info))))))
+
+(deftest rpc-dialog-response-ops-test
+  (testing "resolve_dialog succeeds with active dialog and matching id"
+    (let [ctx     (session/create-context)
+          ui      (:ui-state-atom ctx)
+          _       (ext-ui/enqueue-dialog! ui {:id "d1" :kind :confirm :title "Confirm" :promise (promise)})
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"r1\" :kind :request :op \"resolve_dialog\" :params {:dialog-id \"d1\" :result true}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :response (:kind frame)))
+      (is (= "resolve_dialog" (:op frame)))
+      (is (= true (:ok frame)))
+      (is (= {:accepted true} (:data frame)))
+      (is (nil? (ext-ui/active-dialog ui)))))
+
+  (testing "cancel_dialog succeeds with active dialog and matching id"
+    (let [ctx     (session/create-context)
+          ui      (:ui-state-atom ctx)
+          _       (ext-ui/enqueue-dialog! ui {:id "d2" :kind :input :title "Input" :promise (promise)})
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"c1\" :kind :request :op \"cancel_dialog\" :params {:dialog-id \"d2\"}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :response (:kind frame)))
+      (is (= "cancel_dialog" (:op frame)))
+      (is (= true (:ok frame)))
+      (is (= {:accepted true} (:data frame)))
+      (is (nil? (ext-ui/active-dialog ui)))))
+
+  (testing "resolve_dialog invalid params are deterministic"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"r2\" :kind :request :op \"resolve_dialog\" :params {:dialog-id \"d1\" :result 42}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "resolve_dialog" (:op frame)))
+      (is (= "request/invalid-params" (:error-code frame)))))
+
+  (testing "resolve_dialog no active dialog returns deterministic error"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"r3\" :kind :request :op \"resolve_dialog\" :params {:dialog-id \"d1\" :result true}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "resolve_dialog" (:op frame)))
+      (is (= "request/no-active-dialog" (:error-code frame)))))
+
+  (testing "cancel_dialog no active dialog returns deterministic error"
+    (let [ctx     (session/create-context)
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"c2\" :kind :request :op \"cancel_dialog\" :params {:dialog-id \"d1\"}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "cancel_dialog" (:op frame)))
+      (is (= "request/no-active-dialog" (:error-code frame)))))
+
+  (testing "dialog-id mismatch returns deterministic error"
+    (let [ctx     (session/create-context)
+          ui      (:ui-state-atom ctx)
+          _       (ext-ui/enqueue-dialog! ui {:id "d-real" :kind :confirm :title "Confirm" :promise (promise)})
+          state   (atom {:ready? true :pending {}})
+          handler (rpc/make-session-request-handler ctx)
+          {:keys [out-lines]}
+          (run-loop "{:id \"r4\" :kind :request :op \"resolve_dialog\" :params {:dialog-id \"d-wrong\" :result true}}\n"
+                    handler
+                    state)
+          frame   (-> out-lines first edn/read-string)]
+      (is (= :error (:kind frame)))
+      (is (= "resolve_dialog" (:op frame)))
+      (is (= "request/dialog-id-mismatch" (:error-code frame))))))
 
 (deftest rpc-prompt-streams-events-and-interleaves-test
   (testing "prompt emits canonical events that interleave with accepted response"
