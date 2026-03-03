@@ -1332,6 +1332,25 @@
       (should (>= (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))
                   before-anchor)))))
 
+(ert-deftest psi-extension-ui-footer-updated-uses-canonical-payload-shape ()
+  (with-temp-buffer
+    (insert "Assistant: hello\n")
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-max) nil))
+    (let ((before-anchor (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))))
+      (psi-emacs--handle-rpc-event
+       '((:event . "footer/updated")
+         (:data . ((:path-line . "~/psi-main")
+                   (:stats-line . "latency 12ms")
+                   (:status-line . "connected")))))
+      (should (string-match-p "Assistant: hello" (buffer-string)))
+      (should (string-match-p "Footer: ~/psi-main | latency 12ms | connected" (buffer-string)))
+      (should-not (string-match-p "Footer: mode: parity" (buffer-string)))
+      (should (= (point-max) (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))))
+      (should (>= (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))
+                  before-anchor)))))
+
 (ert-deftest psi-extension-ui-dialog-requested-confirm-sends-resolve-boolean ()
   (with-temp-buffer
     (psi-emacs-mode)
