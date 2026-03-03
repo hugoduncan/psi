@@ -533,7 +533,7 @@
   "Map a commands/dispatch result to canonical RPC event emissions.
    Emits assistant/message (and session/updated + footer/updated via caller)
    for each command result type without invoking the agent loop."
-  [cmd-result _ctx _request-id emit!]
+  [cmd-result emit!]
   (let [result-type (:type cmd-result)]
     (case result-type
       (:text :logout :login-error :new-session)
@@ -622,7 +622,7 @@
                                (if (some? cmd-result)
                                  ;; Slash command matched — handle result, skip agent loop
                                  (do
-                                   (handle-command-result! cmd-result ctx request-id emit!)
+                                   (handle-command-result! cmd-result emit!)
                                    (emit! "session/updated" (session-updated-payload ctx))
                                    (emit! "footer/updated" (footer-updated-payload ctx)))
                                  ;; Not a command — run normal agent loop
