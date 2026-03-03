@@ -230,6 +230,19 @@ rule FooterUpdatedPayloadCanonicalAcrossFrontends {
     ensures: CanonicalFooterPayloadConsumer("emacs-footer") = FooterUpdatedPayload
 }
 
+rule FooterPayloadSpecConsistencyGuard {
+    -- Lightweight cross-spec guard so canonical footer payload fields stay aligned.
+    when: FooterSpecConsistencyCheckRequested()
+
+    ensures: FooterPayloadCanonicalFields() = ["pathLine", "statsLine", "statusLine?"]
+    ensures: EventTopicPayload("footer/updated") = FooterUpdatedPayload
+    ensures: EventPayloadRequiredKeysFor("footer/updated") = ["path-line", "stats-line"]
+
+    ensures: ContractFieldSet("default-footer", "FooterView") = FooterPayloadCanonicalFields()
+    ensures: ContractFieldSet("emacs-footer", "EmacsFooterProjection.canonical") = FooterPayloadCanonicalFields()
+    ensures: ContractUsesPayload("emacs-frontend", "footer/updated", FooterUpdatedPayload)
+}
+
 ------------------------------------------------------------
 -- Entity
 ------------------------------------------------------------
