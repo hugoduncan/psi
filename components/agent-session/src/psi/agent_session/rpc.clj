@@ -11,6 +11,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [psi.agent-core.core :as agent]
+   [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.executor :as executor]
    [psi.agent-session.persistence :as persist]
@@ -528,6 +529,55 @@
             events
             new-notes)))
 
+(defn- handle-command-result!
+  "Map a commands/dispatch result to canonical RPC event emissions.
+   Implemented fully in Task #118. Stub: emits assistant/message with
+   a deterministic fallback text for each result type."
+  [cmd-result _ctx _request-id emit!]
+  (let [result-type (:type cmd-result)]
+    (case result-type
+      (:text :logout :login-error :new-session)
+      (emit! "assistant/message"
+             {:role    "assistant"
+              :content [{:type :text :text (str (:message cmd-result))}]})
+
+      :login-start
+      (emit! "assistant/message"
+             {:role    "assistant"
+              :content [{:type :text
+                         :text (str "Login: " (get-in cmd-result [:provider :name])
+                                    " — open URL: " (:url cmd-result))}]})
+
+      :quit
+      (emit! "assistant/message"
+             {:role    "assistant"
+              :content [{:type :text
+                         :text "[/quit is not supported over RPC prompt — use the abort op or close the connection]"}]})
+
+      :resume
+      (emit! "assistant/message"
+             {:role    "assistant"
+              :content [{:type :text
+                         :text "[/resume is not supported over RPC prompt — use switch_session op]"}]})
+
+      :extension-cmd
+      (let [output (try
+                     (let [out (with-out-str
+                                 ((:handler cmd-result) {:args (:args cmd-result)}))]
+                       (if (str/blank? out)
+                         "[extension command returned no output]"
+                         out))
+                     (catch Throwable e
+                       (str "[extension command error: " (ex-message e) "]")))]
+        (emit! "assistant/message"
+               {:role    "assistant"
+                :content [{:type :text :text output}]}))
+
+      ;; Unknown result type — emit a fallback
+      (emit! "assistant/message"
+             {:role    "assistant"
+              :content [{:type :text :text (str "[command result: " result-type "]")}]}))))
+
 (defn- run-prompt-async!
   [ctx request emit-frame! state]
   (let [message      (get-in request [:params :message])
@@ -551,33 +601,43 @@
                                                (Thread/sleep 50)
                                                (recur current)))))]
                            (try
-                             (let [sd       (session/get-session-data-in ctx)
-                                   ai-model (or (when-let [provider (get-in sd [:model :provider])]
-                                                  (when-let [model-id (get-in sd [:model :id])]
-                                                    (resolve-model provider model-id)))
-                                                (:rpc-ai-model @state))
-                                   _        (when-not ai-model
-                                              (throw (ex-info "session model is not configured"
-                                                              {:error-code "request/invalid-params"})))
-                                   user-msg {:role      "user"
-                                             :content   (cond-> [{:type :text :text message}]
-                                                          (seq images) (into images))
-                                             :timestamp (java.time.Instant/now)}
-                                   _        (session/journal-append-in! ctx (persist/message-entry user-msg))
-                                   _        (emit! "session/updated" (session-updated-payload ctx))
-                                   _        (emit! "footer/updated" (footer-updated-payload ctx))
-                                   result   (run-loop-fn nil ctx (:agent-ctx ctx) ai-model [user-msg]
-                                                         {:turn-ctx-atom  (:turn-ctx-atom ctx)
-                                                          :progress-queue progress-q})]
-                               (emit-progress-queue! progress-q emit!)
-                               (emit! "assistant/message"
-                                      (cond-> {:role    (:role result)
-                                               :content (or (:content result) [])}
-                                        (contains? result :stop-reason)   (assoc :stop-reason (:stop-reason result))
-                                        (contains? result :error-message) (assoc :error-message (:error-message result))
-                                        (contains? result :usage)         (assoc :usage (:usage result))))
-                               (emit! "session/updated" (session-updated-payload ctx))
-                               (emit! "footer/updated" (footer-updated-payload ctx)))
+                             (let [sd         (session/get-session-data-in ctx)
+                                   ai-model   (or (when-let [provider (get-in sd [:model :provider])]
+                                                    (when-let [model-id (get-in sd [:model :id])]
+                                                      (resolve-model provider model-id)))
+                                                  (:rpc-ai-model @state))
+                                   _          (when-not ai-model
+                                                (throw (ex-info "session model is not configured"
+                                                                {:error-code "request/invalid-params"})))
+                                   oauth-ctx  (:oauth-ctx ctx)
+                                   cmd-result (commands/dispatch ctx message {:oauth-ctx oauth-ctx
+                                                                              :ai-model  ai-model})]
+                               (if (some? cmd-result)
+                                 ;; Slash command matched — handle result, skip agent loop
+                                 (do
+                                   (handle-command-result! cmd-result ctx request-id emit!)
+                                   (emit! "session/updated" (session-updated-payload ctx))
+                                   (emit! "footer/updated" (footer-updated-payload ctx)))
+                                 ;; Not a command — run normal agent loop
+                                 (let [user-msg {:role      "user"
+                                                 :content   (cond-> [{:type :text :text message}]
+                                                              (seq images) (into images))
+                                                 :timestamp (java.time.Instant/now)}
+                                       _        (session/journal-append-in! ctx (persist/message-entry user-msg))
+                                       _        (emit! "session/updated" (session-updated-payload ctx))
+                                       _        (emit! "footer/updated" (footer-updated-payload ctx))
+                                       result   (run-loop-fn nil ctx (:agent-ctx ctx) ai-model [user-msg]
+                                                             {:turn-ctx-atom  (:turn-ctx-atom ctx)
+                                                              :progress-queue progress-q})]
+                                   (emit-progress-queue! progress-q emit!)
+                                   (emit! "assistant/message"
+                                          (cond-> {:role    (:role result)
+                                                   :content (or (:content result) [])}
+                                            (contains? result :stop-reason)   (assoc :stop-reason (:stop-reason result))
+                                            (contains? result :error-message) (assoc :error-message (:error-message result))
+                                            (contains? result :usage)         (assoc :usage (:usage result))))
+                                   (emit! "session/updated" (session-updated-payload ctx))
+                                   (emit! "footer/updated" (footer-updated-payload ctx)))))
                              (catch Throwable t
                                (emit! "error" {:error-code "runtime/failed"
                                                :error-message (or (ex-message t) "prompt execution failed")
