@@ -1275,6 +1275,63 @@
         (psi-emacs--start-rpc-client (current-buffer)))
       (should (equal psi-rpc-parity-topics captured-topics)))))
 
+(ert-deftest psi-extension-ui-widgets-updated-replaces-and-sorts-projection ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--handle-rpc-event
+     '((:event . "ui/widgets-updated")
+       (:data . ((:widgets . [((:placement . "right") (:extension-id . "ext-b") (:widget-id . "w-2") (:text . "B"))
+                              ((:placement . "left") (:extension-id . "ext-b") (:widget-id . "w-1") (:text . "A"))
+                              ((:placement . "left") (:extension-id . "ext-a") (:widget-id . "w-3") (:text . "C"))])))))
+    (let ((buf (buffer-string)))
+      (should (string-match-p "Extension Widgets:" buf))
+      (should (< (string-match-p "\\[left/ext-a/w-3\\]" buf)
+                 (string-match-p "\\[left/ext-b/w-1\\]" buf)))
+      (should (< (string-match-p "\\[left/ext-b/w-1\\]" buf)
+                 (string-match-p "\\[right/ext-b/w-2\\]" buf))))
+    (psi-emacs--handle-rpc-event
+     '((:event . "ui/widgets-updated")
+       (:data . ((:widgets . [((:placement . "left") (:extension-id . "ext-c") (:widget-id . "w-1") (:text . "Only"))])))))
+    (let ((buf (buffer-string)))
+      (should (string-match-p "\\[left/ext-c/w-1\\] Only" buf))
+      (should-not (string-match-p "\\[left/ext-a/w-3\\] C" buf))
+      (should-not (string-match-p "\\[right/ext-b/w-2\\] B" buf)))))
+
+(ert-deftest psi-extension-ui-status-updated-replaces-and-sorts-by-extension-id ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--handle-rpc-event
+     '((:event . "ui/status-updated")
+       (:data . ((:statuses . [((:extension-id . "ext-z") (:text . "Zeta"))
+                               ((:extension-id . "ext-a") (:text . "Alpha"))])))))
+    (let ((buf (buffer-string)))
+      (should (string-match-p "Extension Statuses:" buf))
+      (should (< (string-match-p "\\[ext-a\\] Alpha" buf)
+                 (string-match-p "\\[ext-z\\] Zeta" buf))))
+    (psi-emacs--handle-rpc-event
+     '((:event . "ui/status-updated")
+       (:data . ((:statuses . [((:extension-id . "ext-b") (:text . "Only status"))])))))
+    (let ((buf (buffer-string)))
+      (should (string-match-p "\\[ext-b\\] Only status" buf))
+      (should-not (string-match-p "\\[ext-a\\] Alpha" buf)))))
+
+(ert-deftest psi-extension-ui-footer-updated-updates-projection-and-preserves-transcript ()
+  (with-temp-buffer
+    (insert "Assistant: hello\n")
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-max) nil))
+    (let ((before-anchor (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))))
+      (psi-emacs--handle-rpc-event
+       '((:event . "footer/updated") (:data . ((:text . "mode: parity")))))
+      (should (string-match-p "Assistant: hello" (buffer-string)))
+      (should (string-match-p "Footer: mode: parity" (buffer-string)))
+      (should (= (point-max) (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))))
+      (should (>= (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))
+                  before-anchor)))))
+
 (provide 'psi-test)
 
 ;;; psi-test.el ends here

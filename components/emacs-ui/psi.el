@@ -61,6 +61,10 @@ When non-nil, subscribe to `psi-rpc-parity-topics`."
   assistant-in-progress
   assistant-range
   tool-rows
+  projection-widgets
+  projection-statuses
+  projection-footer
+  projection-range
   draft-anchor
   rpc-client
   tool-output-view-mode)
@@ -117,6 +121,10 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :assistant-in-progress nil
    :assistant-range nil
    :tool-rows (make-hash-table :test #'equal)
+   :projection-widgets nil
+   :projection-statuses nil
+   :projection-footer nil
+   :projection-range nil
    :draft-anchor nil
    :rpc-client nil
    :tool-output-view-mode 'collapsed))
@@ -370,6 +378,10 @@ COMMAND is a list suitable for `make-process'."
              (consp (psi-emacs-state-assistant-range psi-emacs--state)))
     (set-marker (car (psi-emacs-state-assistant-range psi-emacs--state)) nil)
     (set-marker (cdr (psi-emacs-state-assistant-range psi-emacs--state)) nil))
+  (when (and psi-emacs--state
+             (consp (psi-emacs-state-projection-range psi-emacs--state)))
+    (set-marker (car (psi-emacs-state-projection-range psi-emacs--state)) nil)
+    (set-marker (cdr (psi-emacs-state-projection-range psi-emacs--state)) nil))
   (when psi-emacs--state
     (maphash (lambda (_ row)
                (when (markerp (plist-get row :start))
@@ -471,6 +483,13 @@ USED-REGION-P non-nil means compose came from region and anchor is untouched."
     (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
     (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
     (clrhash (psi-emacs-state-tool-rows psi-emacs--state))
+    (setf (psi-emacs-state-projection-widgets psi-emacs--state) nil)
+    (setf (psi-emacs-state-projection-statuses psi-emacs--state) nil)
+    (setf (psi-emacs-state-projection-footer psi-emacs--state) nil)
+    (when (consp (psi-emacs-state-projection-range psi-emacs--state))
+      (set-marker (car (psi-emacs-state-projection-range psi-emacs--state)) nil)
+      (set-marker (cdr (psi-emacs-state-projection-range psi-emacs--state)) nil))
+    (setf (psi-emacs-state-projection-range psi-emacs--state) nil)
     (setf (psi-emacs-state-draft-anchor psi-emacs--state)
           (copy-marker (point-max) nil))
     (psi-emacs--set-run-state psi-emacs--state 'idle)
@@ -1046,6 +1065,127 @@ Renders according to the current global tool-output-view-mode."
       (when follow-anchor
         (psi-emacs--set-draft-anchor-to-end)))))
 
+(defun psi-emacs--projection-seq (value)
+  "Normalize VALUE into a proper list sequence."
+  (cond
+   ((vectorp value) (append value nil))
+   ((listp value) value)
+   (t nil)))
+
+(defun psi-emacs--projection-item-key (item keys)
+  "Return deterministic sort/display key from ITEM over KEYS."
+  (let ((value (and (listp item)
+                    (psi-emacs--event-data-get item keys))))
+    (if (stringp value)
+        value
+      (format "%s" (or value "")))))
+
+(defun psi-emacs--projection-item-text (item)
+  "Return display text for projection ITEM."
+  (let ((value (and (listp item)
+                    (psi-emacs--event-data-get item
+                                               '(:text text :message message :value value :content content)))))
+    (cond
+     ((stringp value) value)
+     ((null value) "")
+     (t (format "%s" value)))))
+
+(defun psi-emacs--projection-sort-widgets (widgets)
+  "Return WIDGETS sorted by [placement, extension-id, widget-id]."
+  (sort (copy-sequence widgets)
+        (lambda (a b)
+          (let ((ap (psi-emacs--projection-item-key a '(:placement placement)))
+                (bp (psi-emacs--projection-item-key b '(:placement placement)))
+                (ae (psi-emacs--projection-item-key a '(:extension-id extension-id :extensionId extensionId)))
+                (be (psi-emacs--projection-item-key b '(:extension-id extension-id :extensionId extensionId)))
+                (aw (psi-emacs--projection-item-key a '(:widget-id widget-id :widgetId widgetId)))
+                (bw (psi-emacs--projection-item-key b '(:widget-id widget-id :widgetId widgetId))))
+            (cond
+             ((string< ap bp) t)
+             ((string< bp ap) nil)
+             ((string< ae be) t)
+             ((string< be ae) nil)
+             (t (string< aw bw)))))))
+
+(defun psi-emacs--projection-sort-statuses (statuses)
+  "Return STATUSES sorted by extension-id."
+  (sort (copy-sequence statuses)
+        (lambda (a b)
+          (string< (psi-emacs--projection-item-key a '(:extension-id extension-id :extensionId extensionId))
+                   (psi-emacs--projection-item-key b '(:extension-id extension-id :extensionId extensionId))))))
+
+(defun psi-emacs--projection-footer-text (data)
+  "Extract deterministic footer projection text from event DATA."
+  (let ((value (psi-emacs--event-data-get data
+                                          '(:text text :message message :footer footer :content content))))
+    (cond
+     ((stringp value) value)
+     ((null value) nil)
+     (t (format "%s" value)))))
+
+(defun psi-emacs--projection-render-block (state)
+  "Render deterministic projection block from STATE."
+  (let ((widgets (or (psi-emacs-state-projection-widgets state) '()))
+        (statuses (or (psi-emacs-state-projection-statuses state) '()))
+        (footer (psi-emacs-state-projection-footer state))
+        (lines nil))
+    (when widgets
+      (push "Extension Widgets:" lines)
+      (dolist (widget widgets)
+        (push (format "- [%s/%s/%s] %s"
+                      (psi-emacs--projection-item-key widget '(:placement placement))
+                      (psi-emacs--projection-item-key widget '(:extension-id extension-id :extensionId extensionId))
+                      (psi-emacs--projection-item-key widget '(:widget-id widget-id :widgetId widgetId))
+                      (psi-emacs--projection-item-text widget))
+              lines)))
+    (when statuses
+      (push "Extension Statuses:" lines)
+      (dolist (status statuses)
+        (push (format "- [%s] %s"
+                      (psi-emacs--projection-item-key status '(:extension-id extension-id :extensionId extensionId))
+                      (psi-emacs--projection-item-text status))
+              lines)))
+    (when (and (stringp footer)
+               (not (string-empty-p footer)))
+      (push (format "Footer: %s" footer) lines))
+    (if lines
+        (concat (string-join (nreverse lines) "\n") "\n")
+      "")))
+
+(defun psi-emacs--upsert-projection-block ()
+  "Upsert deterministic projection block from current state."
+  (when psi-emacs--state
+    (let* ((follow-anchor (psi-emacs--draft-anchor-at-end-p))
+           (range (psi-emacs-state-projection-range psi-emacs--state))
+           (start (and (consp range) (car range)))
+           (end (and (consp range) (cdr range)))
+           (rendered (psi-emacs--projection-render-block psi-emacs--state)))
+      (if (and (markerp start)
+               (markerp end)
+               (marker-buffer start)
+               (marker-buffer end))
+          (save-excursion
+            (goto-char start)
+            (delete-region start end)
+            (if (string-empty-p rendered)
+                (progn
+                  (set-marker start nil)
+                  (set-marker end nil)
+                  (setf (psi-emacs-state-projection-range psi-emacs--state) nil))
+              (insert rendered)
+              (set-marker end (point))))
+        (unless (string-empty-p rendered)
+          (save-excursion
+            (psi-emacs--ensure-newline-before-append)
+            (let ((new-start (copy-marker (point) nil))
+                  (new-end (copy-marker (point) t)))
+              (insert rendered)
+              (set-marker new-end (point))
+              (setf (psi-emacs-state-projection-range psi-emacs--state)
+                    (cons new-start new-end))))))
+      (when follow-anchor
+        (psi-emacs--set-draft-anchor-to-end)))))
+
 (defun psi-emacs--handle-rpc-event (frame)
   "Handle inbound rpc-edn event FRAME for transcript rendering."
   (let* ((event (alist-get :event frame nil nil #'equal))
@@ -1068,6 +1208,27 @@ Renders according to the current global tool-output-view-mode."
              (stage (replace-regexp-in-string "^tool/" "" event)))
          (psi-emacs--reset-stream-watchdog psi-emacs--state)
          (psi-emacs--upsert-tool-row tool-id stage text)))
+      ("ui/widgets-updated"
+       (when psi-emacs--state
+         (setf (psi-emacs-state-projection-widgets psi-emacs--state)
+               (psi-emacs--projection-sort-widgets
+                (psi-emacs--projection-seq
+                 (or (psi-emacs--event-data-get data '(:widgets widgets))
+                     (psi-emacs--event-data-get data '(:items items))))))
+         (psi-emacs--upsert-projection-block)))
+      ("ui/status-updated"
+       (when psi-emacs--state
+         (setf (psi-emacs-state-projection-statuses psi-emacs--state)
+               (psi-emacs--projection-sort-statuses
+                (psi-emacs--projection-seq
+                 (or (psi-emacs--event-data-get data '(:statuses statuses))
+                     (psi-emacs--event-data-get data '(:items items))))))
+         (psi-emacs--upsert-projection-block)))
+      ("footer/updated"
+       (when psi-emacs--state
+         (setf (psi-emacs-state-projection-footer psi-emacs--state)
+               (psi-emacs--projection-footer-text data))
+         (psi-emacs--upsert-projection-block)))
       (_ nil))))
 
 (defun psi-emacs--buffer-modified-p ()
@@ -1092,6 +1253,13 @@ reconnect the user starts with the default collapsed view."
     (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
     (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
     (clrhash (psi-emacs-state-tool-rows psi-emacs--state))
+    (setf (psi-emacs-state-projection-widgets psi-emacs--state) nil)
+    (setf (psi-emacs-state-projection-statuses psi-emacs--state) nil)
+    (setf (psi-emacs-state-projection-footer psi-emacs--state) nil)
+    (when (consp (psi-emacs-state-projection-range psi-emacs--state))
+      (set-marker (car (psi-emacs-state-projection-range psi-emacs--state)) nil)
+      (set-marker (cdr (psi-emacs-state-projection-range psi-emacs--state)) nil))
+    (setf (psi-emacs-state-projection-range psi-emacs--state) nil)
     (setf (psi-emacs-state-draft-anchor psi-emacs--state)
           (copy-marker (point-max) nil))
     (setf (psi-emacs-state-tool-output-view-mode psi-emacs--state) 'collapsed)
