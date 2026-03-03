@@ -1351,6 +1351,42 @@
       (should (>= (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))
                   before-anchor)))))
 
+(ert-deftest psi-extension-ui-footer-updated-blank-omits-footer-and-keeps-non-footer-projection ()
+  (with-temp-buffer
+    (insert "Assistant: hello\n")
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-max) nil))
+    (psi-emacs--handle-rpc-event
+     '((:event . "ui/widgets-updated")
+       (:data . ((:widgets . [((:placement . "left")
+                               (:extension-id . "ext-a")
+                               (:widget-id . "w-1")
+                               (:text . "Widget A"))])))))
+    (psi-emacs--handle-rpc-event
+     '((:event . "ui/status-updated")
+       (:data . ((:statuses . [((:extension-id . "ext-a")
+                                (:text . "Status A"))])))))
+    (psi-emacs--handle-rpc-event
+     '((:event . "footer/updated")
+       (:data . ((:path-line . "~/psi-main")
+                 (:stats-line . "latency 12ms")
+                 (:status-line . "connected")))))
+    (psi-emacs--handle-rpc-event
+     '((:event . "footer/updated")
+       (:data . ((:path-line . "  ")
+                 (:stats-line . "")
+                 (:status-line . "\t")
+                 (:text . "\n")))))
+    (let ((buf (buffer-string)))
+      (should (string-match-p "Assistant: hello" buf))
+      (should (string-match-p "Extension Widgets:" buf))
+      (should (string-match-p "\\[left/ext-a/w-1\\] Widget A" buf))
+      (should (string-match-p "Extension Statuses:" buf))
+      (should (string-match-p "\\[ext-a\\] Status A" buf))
+      (should-not (string-match-p "Footer:" buf))
+      (should (= (point-max) (marker-position (psi-emacs-state-draft-anchor psi-emacs--state)))))))
+
 (ert-deftest psi-projection-footer-text-uses-camelcase-canonical-aliases ()
   (should (equal "~/psi-main | latency 12ms | connected"
                  (psi-emacs--projection-footer-text
