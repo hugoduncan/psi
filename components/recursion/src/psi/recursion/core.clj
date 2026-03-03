@@ -1153,6 +1153,94 @@
   [cycle-id]
   (finalize-cycle-in! (global-context) cycle-id))
 
+;;; --- Continue / resume an approved cycle ---
+
+(defn continue-cycle-in!
+  "Continue a non-terminal cycle from its current status through completion.
+
+   Useful when a cycle is already in :executing/:verifying/:learning (e.g. after
+   manual approval) and needs to run the remaining phases with default hooks.
+
+   opts keys:
+   - :memory-ctx    memory context (optional; defaults to memory/global-context)
+   - :hook-executor execution hook fn
+   - :check-runner  verification check fn"
+  [ctx cycle-id {:keys [memory-ctx hook-executor check-runner]}]
+  (let [state (get-state-in ctx)
+        cycle (find-cycle (:cycles state) cycle-id)]
+    (cond
+      (nil? cycle)
+      {:ok? false :error :cycle-not-found}
+
+      (= :awaiting-approval (:status cycle))
+      {:ok? false :error :awaiting-approval}
+
+      (contains? #{:completed :failed :aborted :blocked} (:status cycle))
+      {:ok? true :phase :terminal :status (:status cycle)}
+
+      :else
+      (let [execute-result (when (= :executing (:status cycle))
+                             (if hook-executor
+                               (execute-in! ctx cycle-id hook-executor)
+                               (execute-in! ctx cycle-id)))
+            cycle-after-exec (find-cycle (:cycles (get-state-in ctx)) cycle-id)
+            verify-result (when (= :verifying (:status cycle-after-exec))
+                            (if check-runner
+                              (verify-in! ctx cycle-id check-runner)
+                              (verify-in! ctx cycle-id)))
+            cycle-after-verify (find-cycle (:cycles (get-state-in ctx)) cycle-id)
+            learn-result (when (= :learning (:status cycle-after-verify))
+                           (learn-in! ctx cycle-id (resolve-memory-ctx memory-ctx)))
+            future-state-result (when (:ok? learn-result)
+                                  (update-future-state-from-outcome-in! ctx cycle-id))
+            finalize-result (when (:ok? future-state-result)
+                              (finalize-cycle-in! ctx cycle-id))]
+        (cond
+          (and execute-result (not (:ok? execute-result)))
+          {:ok? false :phase :execute :execute-result execute-result}
+
+          (and verify-result (not (:ok? verify-result)))
+          {:ok? false :phase :verify
+           :execute-result execute-result
+           :verify-result verify-result}
+
+          (and learn-result (not (:ok? learn-result)))
+          {:ok? false :phase :learn
+           :execute-result execute-result
+           :verify-result verify-result
+           :learn-result learn-result}
+
+          (and future-state-result (not (:ok? future-state-result)))
+          {:ok? false :phase :future-state
+           :execute-result execute-result
+           :verify-result verify-result
+           :learn-result learn-result
+           :future-state-result future-state-result}
+
+          (and finalize-result (not (:ok? finalize-result)))
+          {:ok? false :phase :finalize
+           :execute-result execute-result
+           :verify-result verify-result
+           :learn-result learn-result
+           :future-state-result future-state-result
+           :finalize-result finalize-result}
+
+          :else
+          {:ok? true
+           :phase :completed
+           :execute-result execute-result
+           :verify-result verify-result
+           :learn-result learn-result
+           :future-state-result future-state-result
+           :finalize-result finalize-result})))))
+
+(defn continue-cycle!
+  "Global wrapper for `continue-cycle-in!`."
+  ([cycle-id]
+   (continue-cycle! cycle-id {}))
+  ([cycle-id opts]
+   (continue-cycle-in! (global-context) cycle-id opts)))
+
 ;;; --- EQL resolver registration ---
 
 (defn register-resolvers-in!

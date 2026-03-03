@@ -806,31 +806,33 @@
    - {:type :agent-event ...}       ; progress events
    - {:type :external-message ...}  ; async extension transcript message
    "
-  [^LinkedBlockingQueue queue]
-  (charm/cmd
-   (fn []
-     (if-let [event (.poll queue 120 TimeUnit/MILLISECONDS)]
-       (cond
-         (= :done (:kind event))
-         {:type :agent-result :result (:result event)}
+  ([^LinkedBlockingQueue queue]
+   (poll-cmd queue 120))
+  ([^LinkedBlockingQueue queue timeout-ms]
+   (charm/cmd
+    (fn []
+      (if-let [event (.poll queue timeout-ms TimeUnit/MILLISECONDS)]
+        (cond
+          (= :done (:kind event))
+          {:type :agent-result :result (:result event)}
 
-         (= :error (:kind event))
-         {:type :agent-error :error (:message event)}
+          (= :error (:kind event))
+          {:type :agent-error :error (:message event)}
 
-         (= :aborted (:kind event))
-         {:type :agent-aborted
-          :message (:message event)
-          :queued-text (:queued-text event)}
+          (= :aborted (:kind event))
+          {:type :agent-aborted
+           :message (:message event)
+           :queued-text (:queued-text event)}
 
-         (= :agent-event (:type event))
-         event
+          (= :agent-event (:type event))
+          event
 
-         (= :external-message (:type event))
-         event
+          (= :external-message (:type event))
+          event
 
-         :else
-         {:type :agent-poll})
-       {:type :agent-poll}))))
+          :else
+          {:type :agent-poll})
+        {:type :agent-poll})))))
 
 ;; ── Init ────────────────────────────────────────────────────
 
@@ -1215,11 +1217,13 @@
      (poll-cmd (:queue state))]))
 
 (defn- handle-agent-poll
-  "Agent still running — advance spinner, keep polling."
+  "Agent still running — advance spinner, keep polling.
+
+   Uses a slightly slower poll cadence to reduce idle CPU while streaming."
   [state]
   (let [n (count spinner-frames)]
     [(update state :spinner-frame #(mod (inc %) n))
-     (poll-cmd (:queue state))]))
+     (poll-cmd (:queue state) 300)]))
 
 (defn- handle-ctrl-c
   [state]
