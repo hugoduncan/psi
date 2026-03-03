@@ -1332,6 +1332,93 @@
       (should (>= (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))
                   before-anchor)))))
 
+(ert-deftest psi-extension-ui-dialog-requested-confirm-sends-resolve-boolean ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls nil))
+      (cl-letf (((symbol-function 'y-or-n-p)
+                 (lambda (&rest _args) t))
+                ((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) calls))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "ui/dialog-requested")
+           (:data . ((:dialog-id . "d-1") (:kind . "confirm") (:prompt . "Proceed?"))))))
+      (setq calls (nreverse calls))
+      (should (equal '(("resolve_dialog" ((:dialog-id . "d-1") (:result . t))))
+                     calls)))))
+
+(ert-deftest psi-extension-ui-dialog-requested-select-sends-selected-option-value ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls nil))
+      (cl-letf (((symbol-function 'completing-read)
+                 (lambda (&rest _args) "Beta"))
+                ((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) calls))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "ui/dialog-requested")
+           (:data . ((:dialog-id . "d-2")
+                     (:kind . "select")
+                     (:prompt . "Pick")
+                     (:options . [((:label . "Alpha") (:value . "a"))
+                                  ((:label . "Beta") (:value . "b"))]))))))
+      (setq calls (nreverse calls))
+      (should (equal '(("resolve_dialog" ((:dialog-id . "d-2") (:result . "b"))))
+                     calls)))))
+
+(ert-deftest psi-extension-ui-dialog-requested-input-sends-resolve-string ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls nil))
+      (cl-letf (((symbol-function 'read-string)
+                 (lambda (&rest _args) "typed value"))
+                ((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) calls))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "ui/dialog-requested")
+           (:data . ((:dialog-id . "d-3") (:kind . "input") (:prompt . "Enter"))))))
+      (setq calls (nreverse calls))
+      (should (equal '(("resolve_dialog" ((:dialog-id . "d-3") (:result . "typed value"))))
+                     calls)))))
+
+(ert-deftest psi-extension-ui-dialog-requested-cancel-on-quit-sends-cancel-dialog ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls nil))
+      (cl-letf (((symbol-function 'y-or-n-p)
+                 (lambda (&rest _args)
+                   (signal 'quit nil)))
+                ((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) calls))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "ui/dialog-requested")
+           (:data . ((:dialog-id . "d-4") (:kind . "confirm") (:prompt . "Proceed?"))))))
+      (setq calls (nreverse calls))
+      (should (equal '(("cancel_dialog" ((:dialog-id . "d-4"))))
+                     calls)))))
+
+(ert-deftest psi-extension-ui-dialog-requested-malformed-payload-no-rpc-response ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls nil))
+      (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) calls))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "ui/dialog-requested")
+           (:data . ((:kind . "input") (:prompt . "missing id"))))))
+      (should (equal '() calls))
+      (should (string-match-p "Ignored malformed ui/dialog-requested event" (buffer-string))))))
+
 (provide 'psi-test)
 
 ;;; psi-test.el ends here
