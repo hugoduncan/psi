@@ -1419,6 +1419,60 @@
       (should (equal '() calls))
       (should (string-match-p "Ignored malformed ui/dialog-requested event" (buffer-string))))))
 
+(ert-deftest psi-extension-ui-notification-adds-visible-entry-in-receive-order ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (&rest _args) nil)))
+      (psi-emacs--handle-rpc-event
+       '((:event . "ui/notification")
+         (:data . ((:extension-id . "ext-a") (:text . "First")))))
+      (psi-emacs--handle-rpc-event
+       '((:event . "ui/notification")
+         (:data . ((:extension-id . "ext-b") (:text . "Second"))))))
+    (let ((buf (buffer-string)))
+      (should (string-match-p "Extension Notifications:" buf))
+      (should (< (string-match-p "\\[ext-a\\] First" buf)
+                 (string-match-p "\\[ext-b\\] Second" buf))))))
+
+(ert-deftest psi-extension-ui-notification-enforces-max-visible-three ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (&rest _args) nil)))
+      (dotimes (i 4)
+        (psi-emacs--handle-rpc-event
+         `((:event . "ui/notification")
+           (:data . ((:extension-id . "ext") (:text . ,(format "N%s" (1+ i)))))))))
+    (let ((buf (buffer-string)))
+      (should-not (string-match-p "\\[ext\\] N1" buf))
+      (should (string-match-p "\\[ext\\] N2" buf))
+      (should (string-match-p "\\[ext\\] N3" buf))
+      (should (string-match-p "\\[ext\\] N4" buf)))))
+
+(ert-deftest psi-extension-ui-notification-auto-dismisses-after-timeout ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((scheduled-seconds nil)
+          (scheduled-callback nil)
+          (scheduled-args nil))
+      (cl-letf (((symbol-function 'run-at-time)
+                 (lambda (seconds _repeat fn &rest args)
+                   (setq scheduled-seconds seconds)
+                   (setq scheduled-callback fn)
+                   (setq scheduled-args args)
+                   nil)))
+        (psi-emacs--handle-rpc-event
+         '((:event . "ui/notification")
+           (:data . ((:extension-id . "ext-t") (:text . "Temp"))))))
+      (should (= psi-emacs-notification-timeout-seconds scheduled-seconds))
+      (should (string-match-p "\\[ext-t\\] Temp" (buffer-string)))
+      (apply scheduled-callback scheduled-args)
+      (should-not (string-match-p "\\[ext-t\\] Temp" (buffer-string))))))
+
 (provide 'psi-test)
 
 ;;; psi-test.el ends here

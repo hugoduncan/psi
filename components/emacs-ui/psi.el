@@ -49,6 +49,11 @@ When non-nil, subscribe to `psi-rpc-parity-topics`."
   :type 'boolean
   :group 'psi-emacs)
 
+(defcustom psi-emacs-notification-timeout-seconds 5
+  "Seconds before a projected extension notification auto-dismisses."
+  :type 'number
+  :group 'psi-emacs)
+
 (cl-defstruct psi-emacs-state
   process
   process-state
@@ -64,6 +69,9 @@ When non-nil, subscribe to `psi-rpc-parity-topics`."
   projection-widgets
   projection-statuses
   projection-footer
+  projection-notifications
+  projection-notification-seq
+  projection-notification-timers
   projection-range
   draft-anchor
   rpc-client
@@ -124,6 +132,9 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :projection-widgets nil
    :projection-statuses nil
    :projection-footer nil
+   :projection-notifications nil
+   :projection-notification-seq 0
+   :projection-notification-timers (make-hash-table :test #'equal)
    :projection-range nil
    :draft-anchor nil
    :rpc-client nil
@@ -382,6 +393,7 @@ COMMAND is a list suitable for `make-process'."
              (consp (psi-emacs-state-projection-range psi-emacs--state)))
     (set-marker (car (psi-emacs-state-projection-range psi-emacs--state)) nil)
     (set-marker (cdr (psi-emacs-state-projection-range psi-emacs--state)) nil))
+  (psi-emacs--clear-notification-lifecycle psi-emacs--state)
   (when psi-emacs--state
     (maphash (lambda (_ row)
                (when (markerp (plist-get row :start))
@@ -486,6 +498,7 @@ USED-REGION-P non-nil means compose came from region and anchor is untouched."
     (setf (psi-emacs-state-projection-widgets psi-emacs--state) nil)
     (setf (psi-emacs-state-projection-statuses psi-emacs--state) nil)
     (setf (psi-emacs-state-projection-footer psi-emacs--state) nil)
+    (psi-emacs--clear-notification-lifecycle psi-emacs--state)
     (when (consp (psi-emacs-state-projection-range psi-emacs--state))
       (set-marker (car (psi-emacs-state-projection-range psi-emacs--state)) nil)
       (set-marker (cdr (psi-emacs-state-projection-range psi-emacs--state)) nil))
@@ -1123,10 +1136,88 @@ Renders according to the current global tool-output-view-mode."
      ((null value) nil)
      (t (format "%s" value)))))
 
+(defun psi-emacs--cancel-notification-timer (state notification-id)
+  "Cancel notification timer for NOTIFICATION-ID in STATE, if present."
+  (when (and state notification-id)
+    (let* ((timers (psi-emacs-state-projection-notification-timers state))
+           (timer (and (hash-table-p timers)
+                       (gethash notification-id timers))))
+      (when (timerp timer)
+        (cancel-timer timer))
+      (when (hash-table-p timers)
+        (remhash notification-id timers)))))
+
+(defun psi-emacs--clear-notification-lifecycle (state)
+  "Clear projected notification state and cancel all lifecycle timers in STATE."
+  (when state
+    (let ((timers (psi-emacs-state-projection-notification-timers state)))
+      (when (hash-table-p timers)
+        (maphash (lambda (_id timer)
+                   (when (timerp timer)
+                     (cancel-timer timer)))
+                 timers)
+        (clrhash timers)))
+    (setf (psi-emacs-state-projection-notifications state) nil)
+    (setf (psi-emacs-state-projection-notification-seq state) 0)))
+
+(defun psi-emacs--projection-notification-line (notification)
+  "Render deterministic line for projected NOTIFICATION item."
+  (format "- [%s] %s"
+          (or (plist-get notification :extension-id) "")
+          (or (plist-get notification :text) "")))
+
+(defun psi-emacs--notification-remove-by-id (state notification-id)
+  "Remove projected notification by NOTIFICATION-ID from STATE and re-render."
+  (when (and state notification-id)
+    (let* ((notifications (or (psi-emacs-state-projection-notifications state) '()))
+           (next (cl-remove-if (lambda (item)
+                                 (equal (plist-get item :id) notification-id))
+                               notifications)))
+      (psi-emacs--cancel-notification-timer state notification-id)
+      (setf (psi-emacs-state-projection-notifications state) next)
+      (when (eq state psi-emacs--state)
+        (psi-emacs--upsert-projection-block)))))
+
+(defun psi-emacs--schedule-notification-dismiss (state notification-id)
+  "Schedule auto-dismiss timer for NOTIFICATION-ID in STATE."
+  (when (and state notification-id)
+    (psi-emacs--cancel-notification-timer state notification-id)
+    (let ((timer (run-at-time psi-emacs-notification-timeout-seconds nil
+                              (lambda (buffer st id)
+                                (when (and (buffer-live-p buffer) st)
+                                  (with-current-buffer buffer
+                                    (psi-emacs--notification-remove-by-id st id))))
+                              (current-buffer)
+                              state
+                              notification-id)))
+      (puthash notification-id timer
+               (psi-emacs-state-projection-notification-timers state)))))
+
+(defun psi-emacs--handle-notification-event (data)
+  "Apply `ui/notification` DATA to local projection lifecycle state."
+  (when psi-emacs--state
+    (let* ((seq (1+ (or (psi-emacs-state-projection-notification-seq psi-emacs--state) 0)))
+           (extension-id (psi-emacs--projection-item-key data '(:extension-id extension-id :extensionId extensionId)))
+           (text (psi-emacs--projection-item-text data))
+           (notification-id (format "n-%s" seq))
+           (entry (list :id notification-id :seq seq :extension-id extension-id :text text))
+           (existing (or (psi-emacs-state-projection-notifications psi-emacs--state) '()))
+           (next (append existing (list entry))))
+      (setf (psi-emacs-state-projection-notification-seq psi-emacs--state) seq)
+      ;; enforce max visible 3, keeping oldest->newest order
+      (while (> (length next) 3)
+        (let ((drop (car next)))
+          (setq next (cdr next))
+          (psi-emacs--cancel-notification-timer psi-emacs--state (plist-get drop :id))))
+      (setf (psi-emacs-state-projection-notifications psi-emacs--state) next)
+      (psi-emacs--schedule-notification-dismiss psi-emacs--state notification-id)
+      (psi-emacs--upsert-projection-block))))
+
 (defun psi-emacs--projection-render-block (state)
   "Render deterministic projection block from STATE."
   (let ((widgets (or (psi-emacs-state-projection-widgets state) '()))
         (statuses (or (psi-emacs-state-projection-statuses state) '()))
+        (notifications (or (psi-emacs-state-projection-notifications state) '()))
         (footer (psi-emacs-state-projection-footer state))
         (lines nil))
     (when widgets
@@ -1145,6 +1236,10 @@ Renders according to the current global tool-output-view-mode."
                       (psi-emacs--projection-item-key status '(:extension-id extension-id :extensionId extensionId))
                       (psi-emacs--projection-item-text status))
               lines)))
+    (when notifications
+      (push "Extension Notifications:" lines)
+      (dolist (notification notifications)
+        (push (psi-emacs--projection-notification-line notification) lines)))
     (when (and (stringp footer)
                (not (string-empty-p footer)))
       (push (format "Footer: %s" footer) lines))
@@ -1307,6 +1402,8 @@ Renders according to the current global tool-output-view-mode."
                  (or (psi-emacs--event-data-get data '(:statuses statuses))
                      (psi-emacs--event-data-get data '(:items items))))))
          (psi-emacs--upsert-projection-block)))
+      ("ui/notification"
+       (psi-emacs--handle-notification-event data))
       ("footer/updated"
        (when psi-emacs--state
          (setf (psi-emacs-state-projection-footer psi-emacs--state)
@@ -1339,6 +1436,7 @@ reconnect the user starts with the default collapsed view."
     (setf (psi-emacs-state-projection-widgets psi-emacs--state) nil)
     (setf (psi-emacs-state-projection-statuses psi-emacs--state) nil)
     (setf (psi-emacs-state-projection-footer psi-emacs--state) nil)
+    (psi-emacs--clear-notification-lifecycle psi-emacs--state)
     (when (consp (psi-emacs-state-projection-range psi-emacs--state))
       (set-marker (car (psi-emacs-state-projection-range psi-emacs--state)) nil)
       (set-marker (cdr (psi-emacs-state-projection-range psi-emacs--state)) nil))
