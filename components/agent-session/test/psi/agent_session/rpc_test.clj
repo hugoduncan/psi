@@ -530,7 +530,30 @@
           (is (some? msg-evt) "assistant/message must be emitted for quit")
           (is (some #(str/includes? (get % :text "") "not supported over RPC prompt")
                     (get-in msg-evt [:data :content]))
-              "fallback text must appear in assistant/message content"))))))
+              "fallback text must appear in assistant/message content"))))
+
+  (testing "resume-emits-fallback-text"
+    (let [ctx    (session/create-context)
+          state  (atom {:ready? true
+                        :pending {}
+                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
+                        :run-agent-loop-fn (fn [& _] {:role "assistant" :content []})})
+          handler (rpc/make-session-request-handler ctx)
+          input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                       "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\"]}}\n"
+                       "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"/resume\"}}\n")]
+      (with-redefs [commands/dispatch (fn [_ctx _text _opts]
+                                        {:type :resume})]
+        (let [{:keys [out-lines]} (run-loop input handler state 250)
+              frames  (->> out-lines
+                           (keep (fn [line] (try (edn/read-string line) (catch Throwable _ nil))))
+                           vec)
+              events  (filter #(= :event (:kind %)) frames)
+              msg-evt (some #(when (= "assistant/message" (:event %)) %) events)]
+          (is (some? msg-evt) "assistant/message must be emitted for resume")
+          (is (some #(str/includes? (get % :text "") "not supported over RPC prompt")
+                    (get-in msg-evt [:data :content]))
+              "fallback text must appear in assistant/message content")))))))
 
 (deftest rpc-prompt-slash-command-journaled-test
   (testing "slash command user message is journaled even when dispatch matches (not only on agent-loop path)"
