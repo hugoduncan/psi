@@ -33,11 +33,11 @@ Used to detect stalled streaming runs and transition to deterministic recovery."
   :type 'number
   :group 'psi-emacs)
 
-(defcustom psi-emacs-enable-resume-parity nil
+(defcustom psi-emacs-enable-resume-parity t
   "Enable parity-mode `/resume` routing in Emacs frontend.
 
-When nil (default), `/resume` always uses the MVP fallback message.
-When non-nil, `/resume` routes to parity entry points (implemented incrementally)."
+When non-nil (default), `/resume` routes to parity entry points.
+When nil, `/resume` uses the MVP fallback message."
   :type 'boolean
   :group 'psi-emacs)
 
@@ -438,12 +438,14 @@ USED-REGION-P non-nil means compose came from region and anchor is untouched."
 (defun psi-emacs--idle-slash-help-text ()
   "Return deterministic help text for supported idle slash commands."
   (string-join
-   '("Supported slash commands:"
-     "/quit, /exit  Exit this psi buffer"
-     "/resume       Resume selector unavailable in Emacs MVP"
-     "/new          Start a fresh backend session"
-     "/status       Show frontend diagnostics"
-     "/help, /?     Show this help")
+   (list "Supported slash commands:"
+         "/quit, /exit  Exit this psi buffer"
+         (if psi-emacs-enable-resume-parity
+             "/resume [path] Resume a prior session (selector when path omitted)"
+           "/resume       Resume selector unavailable in this frontend")
+         "/new          Start a fresh backend session"
+         "/status       Show frontend diagnostics"
+         "/help, /?     Show this help")
    "\n"))
 
 (defun psi-emacs--reset-transcript-for-new-session ()
@@ -537,14 +539,42 @@ Return nil for no argument. Otherwise return trimmed argument string."
      ((not (string-empty-p path)) (file-name-nondirectory path))
      (t "(unnamed session)"))))
 
+(defun psi-emacs--resume-session-modified-seconds (session)
+  "Return SESSION modified timestamp as seconds since epoch.
+
+Unreadable/missing timestamps normalize to 0."
+  (let ((modified (alist-get :psi.session-info/modified session nil nil #'equal)))
+    (cond
+     ((numberp modified) (float modified))
+     ((stringp modified)
+      (or (ignore-errors (float-time (date-to-time modified))) 0.0))
+     (t
+      (or (ignore-errors (float-time modified)) 0.0)))))
+
+(defun psi-emacs--resume-session-path (session)
+  "Return trimmed canonical session path for SESSION, or empty string."
+  (string-trim (or (alist-get :psi.session-info/path session nil nil #'equal) "")))
+
+(defun psi-emacs--sort-resume-sessions (sessions)
+  "Sort SESSIONS by modified desc (newest first), then path asc."
+  (sort (copy-sequence sessions)
+        (lambda (a b)
+          (let ((am (psi-emacs--resume-session-modified-seconds a))
+                (bm (psi-emacs--resume-session-modified-seconds b))
+                (ap (psi-emacs--resume-session-path a))
+                (bp (psi-emacs--resume-session-path b)))
+            (if (/= am bm)
+                (> am bm)
+              (string< ap bp))))))
+
 (defun psi-emacs--resume-session-candidates (sessions)
   "Build deterministic selector candidates from SESSIONS.
 
 Returns list of cons cells (DISPLAY . CANONICAL-PATH)."
   (let ((seen (make-hash-table :test #'equal))
         (candidates nil))
-    (dolist (session sessions)
-      (let* ((path (string-trim (or (alist-get :psi.session-info/path session nil nil #'equal) ""))))
+    (dolist (session (psi-emacs--sort-resume-sessions sessions))
+      (let ((path (psi-emacs--resume-session-path session)))
         (when (not (string-empty-p path))
           (let* ((description (psi-emacs--resume-session-description session))
                  (base (format "%s — %s" description path))

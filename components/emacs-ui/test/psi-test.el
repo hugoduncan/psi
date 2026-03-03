@@ -377,7 +377,8 @@
     (psi-emacs-mode)
     (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
     (unwind-protect
-        (let ((rpc-calls nil))
+        (let ((rpc-calls nil)
+              (psi-emacs-enable-resume-parity nil))
           (insert " /resume ")
           (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker 1 nil))
           (cl-letf (((symbol-value 'psi-emacs--send-request-function)
@@ -502,6 +503,22 @@
           (should-not (string-match-p "Assistant:" (buffer-string))))
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-resume-session-candidates-sort-newest-first-by-modified ()
+  (let* ((sessions (list '((:psi.session-info/path . "/tmp/sessions/older.ndedn")
+                           (:psi.session-info/name . "Older")
+                           (:psi.session-info/modified . "2025-01-01T01:00:00Z"))
+                         '((:psi.session-info/path . "/tmp/sessions/newer.ndedn")
+                           (:psi.session-info/name . "Newer")
+                           (:psi.session-info/modified . "2025-01-01T02:00:00Z"))
+                         '((:psi.session-info/path . "/tmp/sessions/newest.ndedn")
+                           (:psi.session-info/name . "Newest")
+                           (:psi.session-info/modified . "2025-01-01T03:00:00Z"))))
+         (candidates (psi-emacs--resume-session-candidates sessions)))
+    (should (equal '(("Newest — /tmp/sessions/newest.ndedn" . "/tmp/sessions/newest.ndedn")
+                     ("Newer — /tmp/sessions/newer.ndedn" . "/tmp/sessions/newer.ndedn")
+                     ("Older — /tmp/sessions/older.ndedn" . "/tmp/sessions/older.ndedn"))
+                   candidates))))
 
 (ert-deftest psi-idle-resume-parity-explicit-path-dispatches-switch-session-and-bypasses-prompt ()
   (with-temp-buffer

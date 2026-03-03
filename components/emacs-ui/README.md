@@ -7,7 +7,8 @@ This frontend runs psi over `--rpc-edn` in a dedicated Emacs buffer.
 When the frontend is **idle** (not streaming), these built-in slash commands are intercepted locally and do **not** fall through to `prompt` RPC:
 
 - `/quit`, `/exit` — close the frontend buffer/process
-- `/resume` — explicit MVP fallback message (`resume selector unavailable in Emacs MVP`)
+- `/resume` — resume prior session (`/resume <path>`), or open selector when no path is provided
+  - set `psi-emacs-enable-resume-parity` to `nil` to force MVP fallback message
 - `/new` — request `new_session`, reset transcript/session rendering state, and continue in the new session
 - `/status` — append deterministic frontend/session diagnostics text
 - `/help`, `/?` — render slash command help
