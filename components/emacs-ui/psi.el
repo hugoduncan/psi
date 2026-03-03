@@ -508,12 +508,87 @@ Return nil for no argument. Otherwise return trimmed argument string."
   (psi-emacs--append-assistant-message
    "Resume selector unavailable in this frontend."))
 
-(defun psi-emacs--handle-idle-resume-parity-no-arg (_state)
-  "Handle parity-mode `/resume` without explicit session path.
+(defun psi-emacs--resume-session-list-query ()
+  "Return canonical EQL query string for `/resume` session discovery."
+  "[{:psi.session/list [:psi.session-info/path
+                        :psi.session-info/name
+                        :psi.session-info/first-message
+                        :psi.session-info/modified]}]")
 
-Selector flow is implemented by follow-up tasks; keep deterministic interim text."
-  (psi-emacs--append-assistant-message
-   "Resume selector unavailable in this frontend."))
+(defun psi-emacs--resume-session-list-from-query-frame (frame)
+  "Extract session list vector from `query_eql` FRAME."
+  (let* ((data (alist-get :data frame nil nil #'equal))
+         (result (and (listp data) (alist-get :result data nil nil #'equal)))
+         (sessions (and (listp result)
+                        (alist-get :psi.session/list result nil nil #'equal))))
+    (cond
+     ((vectorp sessions) (append sessions nil))
+     ((listp sessions) sessions)
+     (t nil))))
+
+(defun psi-emacs--resume-session-description (session)
+  "Return description-first label seed for SESSION."
+  (let ((name (string-trim (or (alist-get :psi.session-info/name session nil nil #'equal) "")))
+        (first-message (string-trim (or (alist-get :psi.session-info/first-message session nil nil #'equal) "")))
+        (path (string-trim (or (alist-get :psi.session-info/path session nil nil #'equal) ""))))
+    (cond
+     ((not (string-empty-p name)) name)
+     ((not (string-empty-p first-message)) first-message)
+     ((not (string-empty-p path)) (file-name-nondirectory path))
+     (t "(unnamed session)"))))
+
+(defun psi-emacs--resume-session-candidates (sessions)
+  "Build deterministic selector candidates from SESSIONS.
+
+Returns list of cons cells (DISPLAY . CANONICAL-PATH)."
+  (let ((seen (make-hash-table :test #'equal))
+        (candidates nil))
+    (dolist (session sessions)
+      (let* ((path (string-trim (or (alist-get :psi.session-info/path session nil nil #'equal) ""))))
+        (when (not (string-empty-p path))
+          (let* ((description (psi-emacs--resume-session-description session))
+                 (base (format "%s — %s" description path))
+                 (count (1+ (gethash base seen 0)))
+                 (label (if (= count 1)
+                            base
+                          (format "%s (%d)" base count))))
+            (puthash base count seen)
+            (push (cons label path) candidates)))))
+    (nreverse candidates)))
+
+(defun psi-emacs--resume-select-session-path (candidates)
+  "Prompt for session selection from CANDIDATES.
+
+CANDIDATES is a list of (DISPLAY . CANONICAL-PATH).
+Returns canonical path string, or nil when cancelled/no selection."
+  (condition-case _
+      (let* ((labels (mapcar #'car candidates))
+             (chosen (completing-read "Resume session: " labels nil t)))
+        (when (and (stringp chosen)
+                   (not (string-empty-p chosen)))
+          (cdr (assoc chosen candidates))))
+    (quit nil)))
+
+(defun psi-emacs--request-resume-session-list (callback)
+  "Fetch session list via `query_eql` and invoke CALLBACK with response frame."
+  (psi-emacs--dispatch-request
+   "query_eql"
+   `((:query . ,(psi-emacs--resume-session-list-query)))
+   callback))
+
+(defun psi-emacs--handle-idle-resume-parity-no-arg (state)
+  "Handle parity-mode `/resume` without explicit session path."
+  (let ((buffer (current-buffer)))
+    (psi-emacs--request-resume-session-list
+     (lambda (frame)
+       (when (buffer-live-p buffer)
+         (with-current-buffer buffer
+           (when (eq state psi-emacs--state)
+             (let* ((sessions (psi-emacs--resume-session-list-from-query-frame frame))
+                    (candidates (psi-emacs--resume-session-candidates sessions))
+                    (selected-path (psi-emacs--resume-select-session-path candidates)))
+               (when selected-path
+                 (psi-emacs--handle-idle-resume-parity-explicit-path state selected-path))))))))))
 
 (defun psi-emacs--handle-idle-resume-parity-explicit-path (_state _session-path)
   "Handle parity-mode `/resume <session-path>`.
