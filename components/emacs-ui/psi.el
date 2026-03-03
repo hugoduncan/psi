@@ -1129,21 +1129,25 @@ Renders according to the current global tool-output-view-mode."
 
 (defun psi-emacs--projection-footer-text (data)
   "Extract deterministic footer projection text from event DATA."
-  (let* ((path-line (psi-emacs--event-data-get data '(:path-line path-line :pathLine pathLine)))
-         (stats-line (psi-emacs--event-data-get data '(:stats-line stats-line :statsLine statsLine)))
-         (status-line (psi-emacs--event-data-get data '(:status-line status-line :statusLine statusLine)))
-         (canonical-lines (delq nil
-                                (mapcar (lambda (line)
-                                          (when (and (stringp line)
-                                                     (not (string-empty-p line)))
-                                            line))
-                                        (list path-line stats-line status-line)))))
+  (let* ((canonical-lines
+          (delq nil
+                (mapcar (lambda (line)
+                          (when (stringp line)
+                            (let ((trimmed (string-trim line)))
+                              (unless (string-empty-p trimmed)
+                                trimmed))))
+                        (list (psi-emacs--event-data-get data '(:path-line path-line :pathLine pathLine))
+                              (psi-emacs--event-data-get data '(:stats-line stats-line :statsLine statsLine))
+                              (psi-emacs--event-data-get data '(:status-line status-line :statusLine statusLine)))))))
     (if canonical-lines
         (string-join canonical-lines " | ")
       (let ((value (psi-emacs--event-data-get data
                                               '(:text text :message message :footer footer :content content))))
         (cond
-         ((stringp value) value)
+         ((stringp value)
+          (let ((trimmed (string-trim value)))
+            (unless (string-empty-p trimmed)
+              trimmed)))
          ((null value) nil)
          (t (format "%s" value)))))))
 

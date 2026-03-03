@@ -1351,6 +1351,36 @@
       (should (>= (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))
                   before-anchor)))))
 
+(ert-deftest psi-projection-footer-text-uses-camelcase-canonical-aliases ()
+  (should (equal "~/psi-main | latency 12ms | connected"
+                 (psi-emacs--projection-footer-text
+                  '((:pathLine . "~/psi-main")
+                    (:statsLine . "latency 12ms")
+                    (:statusLine . "connected"))))))
+
+(ert-deftest psi-projection-footer-text-canonical-precedence-over-legacy ()
+  (should (equal "~/psi-main | latency 12ms"
+                 (psi-emacs--projection-footer-text
+                  '((:path-line . "~/psi-main")
+                    (:stats-line . "latency 12ms")
+                    (:text . "legacy footer should be ignored"))))))
+
+(ert-deftest psi-projection-footer-text-falls-back-when-canonical-blank ()
+  (should (equal "legacy parity"
+                 (psi-emacs--projection-footer-text
+                  '((:path-line . "   ")
+                    (:stats-line . "")
+                    (:status-line . "\n\t")
+                    (:message . " legacy parity "))))))
+
+(ert-deftest psi-projection-footer-text-returns-nil-when-all-values-blank ()
+  (should-not
+   (psi-emacs--projection-footer-text
+    '((:path-line . "  ")
+      (:stats-line . "")
+      (:status-line . "\t")
+      (:text . "\n ")))))
+
 (ert-deftest psi-extension-ui-dialog-requested-confirm-sends-resolve-boolean ()
   (with-temp-buffer
     (psi-emacs-mode)
