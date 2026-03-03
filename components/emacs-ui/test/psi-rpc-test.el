@@ -159,6 +159,8 @@
                                (psi-rpc-client-transport-state client))))
           (should (equal "1.0" (psi-rpc-client-protocol-version client)))
           (should (equal psi-rpc-mvp-topics (psi-rpc-client-subscribed-topics client)))
+          (dolist (topic psi-rpc-parity-extension-ui-topics)
+            (should-not (member topic (psi-rpc-client-subscribed-topics client))))
           (should (null errors))
           (should (member '(running handshaking) states))
           (should (member '(running ready) states)))
@@ -193,6 +195,52 @@
                                (psi-rpc-client-transport-state client))))
           (should (= 1 (length errors)))
           (should (equal "protocol/unsupported-version" (caar errors))))
+      (when (and process (process-live-p process))
+        (delete-process process)))))
+
+(ert-deftest psi-rpc-startup-lifecycle-ready-path-with-parity-topics ()
+  (let* ((states nil)
+         (errors nil)
+         (subscribed-topics nil)
+         (client (psi-rpc-make-client
+                  :on-state-change (lambda (c)
+                                     (push (list (psi-rpc-client-process-state c)
+                                                 (psi-rpc-client-transport-state c))
+                                           states))
+                  :on-rpc-error (lambda (code message _frame)
+                                  (push (list code message) errors))))
+         (process nil))
+    (setf (psi-rpc-client-send-function client)
+          (lambda (_proc payload)
+            (pcase (psi-rpc--parse-line (string-trim-right payload))
+              (`(:ok ,frame)
+               (let ((id (alist-get :id frame))
+                     (op (alist-get :op frame)))
+                 (cond
+                  ((equal op "handshake")
+                   (psi-rpc--handle-frame
+                    client
+                    `((:id . ,id) (:kind . :response) (:op . "handshake") (:ok . t)
+                      (:data . ((:server-info . ((:protocol-version . "1.0"))))))))
+                  ((equal op "subscribe")
+                   (setq subscribed-topics (append (alist-get :topics (alist-get :params frame)) nil))
+                   (psi-rpc--handle-frame
+                    client
+                    `((:id . ,id) (:kind . :response) (:op . "subscribe") (:ok . t)
+                      (:data . ((:subscribed . []))))))))))))
+    (unwind-protect
+        (progn
+          (psi-rpc-start! client #'psi-rpc-test--spawn-cat '("cat") psi-rpc-parity-topics)
+          (setq process (psi-rpc-client-process client))
+          (sleep-for 0.02)
+          (should (equal '(running ready)
+                         (list (psi-rpc-client-process-state client)
+                               (psi-rpc-client-transport-state client))))
+          (should (equal psi-rpc-parity-topics (psi-rpc-client-subscribed-topics client)))
+          (should (equal psi-rpc-parity-topics subscribed-topics))
+          (should (null errors))
+          (should (member '(running handshaking) states))
+          (should (member '(running ready) states)))
       (when (and process (process-live-p process))
         (delete-process process)))))
 

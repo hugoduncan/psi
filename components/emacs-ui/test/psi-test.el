@@ -1247,6 +1247,34 @@
     ;; Mode must still be expanded
     (should (eq 'expanded (psi-emacs-state-tool-output-view-mode psi-emacs--state)))))
 
+(ert-deftest psi-start-rpc-client-uses-mvp-topics-when-extension-ui-parity-disabled ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((captured-topics :unset)
+          (psi-emacs-enable-extension-ui-parity nil))
+      (cl-letf (((symbol-function 'psi-rpc-start!)
+                 (lambda (client _spawn-fn _command &optional topics)
+                   (setq captured-topics topics)
+                   client)))
+        (psi-emacs--start-rpc-client (current-buffer)))
+      (should (equal psi-rpc-mvp-topics captured-topics))
+      (dolist (topic psi-rpc-parity-extension-ui-topics)
+        (should-not (member topic captured-topics))))))
+
+(ert-deftest psi-start-rpc-client-uses-parity-topics-when-extension-ui-parity-enabled ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((captured-topics :unset)
+          (psi-emacs-enable-extension-ui-parity t))
+      (cl-letf (((symbol-function 'psi-rpc-start!)
+                 (lambda (client _spawn-fn _command &optional topics)
+                   (setq captured-topics topics)
+                   client)))
+        (psi-emacs--start-rpc-client (current-buffer)))
+      (should (equal psi-rpc-parity-topics captured-topics)))))
+
 (provide 'psi-test)
 
 ;;; psi-test.el ends here

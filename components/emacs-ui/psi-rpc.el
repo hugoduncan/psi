@@ -13,7 +13,7 @@
   "Non-nil when parseedn is available for EDN parsing/printing.")
 
 (defconst psi-rpc-protocol-version "1.0"
-  "Supported rpc-edn protocol version for Emacs MVP transport.")
+  "Supported rpc-edn protocol version for Emacs transport.")
 
 (defconst psi-rpc-mvp-topics
   '("assistant/delta"
@@ -26,6 +26,18 @@
     "session/updated"
     "error")
   "MVP topic subscription set for Emacs frontend.")
+
+(defconst psi-rpc-parity-extension-ui-topics
+  '("ui/dialog-requested"
+    "ui/widgets-updated"
+    "ui/status-updated"
+    "ui/notification"
+    "footer/updated")
+  "Extension UI parity topics for Emacs frontend.")
+
+(defconst psi-rpc-parity-topics
+  (append psi-rpc-mvp-topics psi-rpc-parity-extension-ui-topics)
+  "Parity topic subscription set for Emacs frontend.")
 
 (cl-defstruct psi-rpc-client
   process

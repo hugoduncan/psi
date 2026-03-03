@@ -41,6 +41,14 @@ When nil, `/resume` uses the MVP fallback message."
   :type 'boolean
   :group 'psi-emacs)
 
+(defcustom psi-emacs-enable-extension-ui-parity nil
+  "Enable extension UI parity topic subscription in Emacs frontend.
+
+When nil (default), subscribe to `psi-rpc-mvp-topics` only.
+When non-nil, subscribe to `psi-rpc-parity-topics`."
+  :type 'boolean
+  :group 'psi-emacs)
+
 (cl-defstruct psi-emacs-state
   process
   process-state
@@ -316,7 +324,12 @@ and transition to `error'."
                      :on-rpc-error (lambda (code message-text frame)
                                      (psi-emacs--on-rpc-error buffer code message-text frame)))))
         (setf (psi-emacs-state-rpc-client psi-emacs--state) client)
-        (psi-rpc-start! client psi-emacs--spawn-process-function psi-emacs-command)
+        (psi-rpc-start! client
+                        psi-emacs--spawn-process-function
+                        psi-emacs-command
+                        (if psi-emacs-enable-extension-ui-parity
+                            psi-rpc-parity-topics
+                          psi-rpc-mvp-topics))
         (setf (psi-emacs-state-process psi-emacs--state) (psi-rpc-client-process client))
         (setq psi-emacs--owned-process (psi-rpc-client-process client))
         (psi-emacs--refresh-header-line)))))
