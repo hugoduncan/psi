@@ -531,8 +531,8 @@
 
 (defn- handle-command-result!
   "Map a commands/dispatch result to canonical RPC event emissions.
-   Implemented fully in Task #118. Stub: emits assistant/message with
-   a deterministic fallback text for each result type."
+   Emits assistant/message (and session/updated + footer/updated via caller)
+   for each command result type without invoking the agent loop."
   [cmd-result _ctx _request-id emit!]
   (let [result-type (:type cmd-result)]
     (case result-type
