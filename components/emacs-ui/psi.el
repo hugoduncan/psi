@@ -576,6 +576,28 @@ Returns canonical path string, or nil when cancelled/no selection."
    `((:query . ,(psi-emacs--resume-session-list-query)))
    callback))
 
+(defun psi-emacs--handle-switch-session-response (_state _session-path _frame)
+  "Handle `switch_session` callback frame.
+
+This function is intentionally minimal in task scope and is extended by
+follow-up tasks for success rehydrate and deterministic failure handling."
+  nil)
+
+(defun psi-emacs--request-switch-session (state session-path)
+  "Dispatch `switch_session` for SESSION-PATH from STATE."
+  (when (and state
+             (stringp session-path)
+             (not (string-empty-p session-path)))
+    (let ((buffer (current-buffer)))
+      (psi-emacs--dispatch-request
+       "switch_session"
+       `((:session-path . ,session-path))
+       (lambda (frame)
+         (when (buffer-live-p buffer)
+           (with-current-buffer buffer
+             (when (eq state psi-emacs--state)
+               (psi-emacs--handle-switch-session-response state session-path frame)))))))))
+
 (defun psi-emacs--handle-idle-resume-parity-no-arg (state)
   "Handle parity-mode `/resume` without explicit session path."
   (let ((buffer (current-buffer)))
@@ -590,12 +612,9 @@ Returns canonical path string, or nil when cancelled/no selection."
                (when selected-path
                  (psi-emacs--handle-idle-resume-parity-explicit-path state selected-path))))))))))
 
-(defun psi-emacs--handle-idle-resume-parity-explicit-path (_state _session-path)
-  "Handle parity-mode `/resume <session-path>`.
-
-Direct session switch dispatch is implemented by follow-up tasks."
-  (psi-emacs--append-assistant-message
-   "Resume selector unavailable in this frontend."))
+(defun psi-emacs--handle-idle-resume-parity-explicit-path (state session-path)
+  "Handle parity-mode `/resume <session-path>`."
+  (psi-emacs--request-switch-session state session-path))
 
 (defun psi-emacs--handle-idle-resume-command (state message)
   "Handle `/resume` MESSAGE according to capability flags and args."
