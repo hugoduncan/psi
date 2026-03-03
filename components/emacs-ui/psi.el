@@ -649,19 +649,35 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
              (psi-emacs--set-run-state state 'idle)
              (psi-emacs--refresh-header-line))))))))
 
+(defun psi-emacs--switch-session-error-message (frame)
+  "Return deterministic `/resume` switch failure text derived from FRAME."
+  (let* ((data (alist-get :data frame nil nil #'equal))
+         (details (or (alist-get :error-message frame nil nil #'equal)
+                      (alist-get :message frame nil nil #'equal)
+                      (and (listp data)
+                           (or (alist-get :error-message data nil nil #'equal)
+                               (alist-get :message data nil nil #'equal))))))
+    (if (and (stringp details) (not (string-empty-p details)))
+        (format "Unable to switch session: %s" details)
+      "Unable to switch session.")))
+
 (defun psi-emacs--handle-switch-session-response (state _session-path frame)
   "Handle `switch_session` callback FRAME for STATE.
 
 Success path clears stale transcript/render state, then requests and replays
-messages for deterministic rehydration. Failure handling remains in a
-follow-up task and intentionally performs no success-side effects."
+messages for deterministic rehydration.
+
+Failure path appends deterministic assistant-visible feedback, sets
+`last-error`, and does not run success-only side effects."
   (when (and state (eq state psi-emacs--state))
     (if (psi-emacs--rpc-frame-success-p frame)
         (progn
           (psi-emacs--reset-transcript-state)
           (psi-emacs--set-run-state state 'streaming)
           (psi-emacs--request-get-messages-for-switch state))
-      nil)))
+      (let ((message (psi-emacs--switch-session-error-message frame)))
+        (psi-emacs--append-assistant-message message)
+        (psi-emacs--set-last-error state message)))))
 
 (defun psi-emacs--request-switch-session (state session-path)
   "Dispatch `switch_session` for SESSION-PATH from STATE."

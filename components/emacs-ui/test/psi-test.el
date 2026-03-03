@@ -591,8 +591,32 @@
                (:error-code . "request/not-found")
                (:error-message . "session file not found"))))
           (should (equal '() rpc-calls))
-          (should (equal "keep me" (buffer-string)))
+          (should (string-prefix-p
+                   "keep me\nAssistant: Unable to switch session: session file not found\n"
+                   (buffer-string)))
+          (should (string-match-p
+                   "Error: Unable to switch session: session file not found"
+                   (buffer-string)))
           (should (= 1 (hash-table-count (psi-emacs-state-tool-rows psi-emacs--state)))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-switch-session-failure-sets-last-error-from-deterministic-message ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (psi-emacs--handle-switch-session-response
+           psi-emacs--state
+           "sessions/missing.ndedn"
+           '((:kind . :error)
+             (:error-code . "request/not-found")
+             (:error-message . "session file not found")))
+          (should (equal "Unable to switch session: session file not found"
+                         (psi-emacs-state-last-error psi-emacs--state)))
+          (should (string-match-p "Error: Unable to switch session: session file not found"
+                                  (buffer-string))))
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
