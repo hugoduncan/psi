@@ -529,6 +529,73 @@
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-resume-switch-success-resets-before-get-messages-and-replays-order ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (let ((rpc-calls nil)
+              (cleared-before-replay nil))
+          (insert "old transcript\n/resume sessions/new.ndedn")
+          (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+                (copy-marker (+ (length "old transcript\n") 1) nil))
+          (psi-emacs--set-last-error psi-emacs--state "runtime/fail: old")
+          (puthash "stale-tool" (list :id "stale-tool" :stage "result" :text "stale")
+                   (psi-emacs-state-tool-rows psi-emacs--state))
+          (let ((psi-emacs-enable-resume-parity t))
+            (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                       (lambda (_state op params &optional callback)
+                         (push (list op params) rpc-calls)
+                         (cond
+                          ((and callback (equal op "switch_session"))
+                           (funcall callback
+                                    '((:kind . :response)
+                                      (:ok . t)
+                                      (:data . ((:session-id . "s-new"))))))
+                          ((and callback (equal op "get_messages"))
+                           (setq cleared-before-replay
+                                 (and (not (string-match-p "old transcript" (buffer-string)))
+                                      (null (psi-emacs-state-last-error psi-emacs--state))
+                                      (zerop (hash-table-count (psi-emacs-state-tool-rows psi-emacs--state)))))
+                           (funcall callback
+                                    '((:kind . :response)
+                                      (:ok . t)
+                                      (:data . ((:messages .
+                                                [((:role . :user) (:text . "First"))
+                                                 ((:role . :assistant) (:text . "Second"))]))))))))))
+              (psi-emacs-send-from-buffer nil)))
+          (setq rpc-calls (nreverse rpc-calls))
+          (should (equal '("switch_session" "get_messages") (mapcar #'car rpc-calls)))
+          (should cleared-before-replay)
+          (should (equal "User: First\nAssistant: Second\n" (buffer-string)))
+          (should (eq 'idle (psi-emacs-state-run-state psi-emacs--state))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-switch-session-failure-does-not-trigger-success-rehydrate-side-effects ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (let ((rpc-calls nil))
+          (insert "keep me")
+          (puthash "keep-tool" (list :id "keep-tool" :stage "result" :text "keep")
+                   (psi-emacs-state-tool-rows psi-emacs--state))
+          (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                     (lambda (_state op params &optional _callback)
+                       (push (list op params) rpc-calls))))
+            (psi-emacs--handle-switch-session-response
+             psi-emacs--state
+             "sessions/missing.ndedn"
+             '((:kind . :error)
+               (:error-code . "request/not-found")
+               (:error-message . "session file not found"))))
+          (should (equal '() rpc-calls))
+          (should (equal "keep me" (buffer-string)))
+          (should (= 1 (hash-table-count (psi-emacs-state-tool-rows psi-emacs--state)))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-idle-new-slash-requests-new-session-and-resets-transcript ()
   (with-temp-buffer
     (psi-emacs-mode)

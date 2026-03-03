@@ -576,12 +576,92 @@ Returns canonical path string, or nil when cancelled/no selection."
    `((:query . ,(psi-emacs--resume-session-list-query)))
    callback))
 
-(defun psi-emacs--handle-switch-session-response (_state _session-path _frame)
-  "Handle `switch_session` callback frame.
+(defun psi-emacs--rpc-frame-success-p (frame)
+  "Return non-nil when FRAME is a successful RPC response."
+  (and (eq (alist-get :kind frame) :response)
+       (eq (alist-get :ok frame) t)))
 
-This function is intentionally minimal in task scope and is extended by
-follow-up tasks for success rehydrate and deterministic failure handling."
-  nil)
+(defun psi-emacs--frame-messages-list (frame)
+  "Extract `:messages` list from FRAME payload.
+
+Returns a proper list in canonical order, or nil when missing/unreadable."
+  (let* ((data (alist-get :data frame nil nil #'equal))
+         (messages (and (listp data)
+                        (alist-get :messages data nil nil #'equal))))
+    (cond
+     ((vectorp messages) (append messages nil))
+     ((listp messages) messages)
+     (t nil))))
+
+(defun psi-emacs--message-text-from-content (content)
+  "Extract display text from message CONTENT payload."
+  (cond
+   ((stringp content) content)
+   ((and (listp content)
+         (or (alist-get :text content nil nil #'equal)
+             (alist-get 'text content nil nil #'equal)))
+    (or (alist-get :text content nil nil #'equal)
+        (alist-get 'text content nil nil #'equal)
+        ""))
+   (t (psi-emacs--assistant-content->text content))))
+
+(defun psi-emacs--message->transcript-line (message)
+  "Render MESSAGE as one deterministic transcript line."
+  (let* ((role-raw (or (alist-get :role message nil nil #'equal)
+                       (alist-get 'role message nil nil #'equal)
+                       :assistant))
+         (role (if (stringp role-raw) (intern role-raw) role-raw))
+         (content (or (alist-get :content message nil nil #'equal)
+                      (alist-get 'content message nil nil #'equal)))
+         (text (or (alist-get :text message nil nil #'equal)
+                   (alist-get 'text message nil nil #'equal)
+                   (alist-get :message message nil nil #'equal)
+                   (alist-get 'message message nil nil #'equal)
+                   (psi-emacs--message-text-from-content content)
+                   "")))
+    (format "%s: %s\n"
+            (if (eq role :user) "User" "Assistant")
+            text)))
+
+(defun psi-emacs--replay-session-messages (messages)
+  "Replay MESSAGES into transcript in deterministic input order."
+  (let ((follow-anchor (psi-emacs--draft-anchor-at-end-p)))
+    (save-excursion
+      (goto-char (point-max))
+      (dolist (message messages)
+        (when (listp message)
+          (insert (psi-emacs--message->transcript-line message)))))
+    (when follow-anchor
+      (psi-emacs--set-draft-anchor-to-end))))
+
+(defun psi-emacs--request-get-messages-for-switch (state)
+  "Request `get_messages` and replay transcript for switched STATE."
+  (let ((buffer (current-buffer)))
+    (psi-emacs--dispatch-request
+     "get_messages"
+     nil
+     (lambda (messages-frame)
+       (when (buffer-live-p buffer)
+         (with-current-buffer buffer
+           (when (eq state psi-emacs--state)
+             (psi-emacs--replay-session-messages
+              (psi-emacs--frame-messages-list messages-frame))
+             (psi-emacs--set-run-state state 'idle)
+             (psi-emacs--refresh-header-line))))))))
+
+(defun psi-emacs--handle-switch-session-response (state _session-path frame)
+  "Handle `switch_session` callback FRAME for STATE.
+
+Success path clears stale transcript/render state, then requests and replays
+messages for deterministic rehydration. Failure handling remains in a
+follow-up task and intentionally performs no success-side effects."
+  (when (and state (eq state psi-emacs--state))
+    (if (psi-emacs--rpc-frame-success-p frame)
+        (progn
+          (psi-emacs--reset-transcript-state)
+          (psi-emacs--set-run-state state 'streaming)
+          (psi-emacs--request-get-messages-for-switch state))
+      nil)))
 
 (defun psi-emacs--request-switch-session (state session-path)
   "Dispatch `switch_session` for SESSION-PATH from STATE."
