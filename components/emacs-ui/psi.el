@@ -30,6 +30,7 @@
   process
   process-state
   transport-state
+  run-state
   assistant-in-progress
   assistant-range
   tool-rows
@@ -81,6 +82,7 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :process process
    :process-state (if (and process (process-live-p process)) 'running 'starting)
    :transport-state 'disconnected
+   :run-state 'idle
    :assistant-in-progress nil
    :assistant-range nil
    :tool-rows (make-hash-table :test #'equal)
@@ -90,10 +92,18 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
 
 (defun psi-emacs--status-string (state)
   "Return minimal status string for STATE."
-  (format "psi [%s/%s] tools:%s"
+  (format "psi [%s/%s/%s] tools:%s"
           (or (psi-emacs-state-transport-state state) 'unknown)
           (or (psi-emacs-state-process-state state) 'unknown)
+          (or (psi-emacs-state-run-state state) 'idle)
           (or (psi-emacs-state-tool-output-view-mode state) 'collapsed)))
+
+(defun psi-emacs--set-run-state (state run-state)
+  "Set RUN-STATE on STATE and refresh header for the current psi buffer."
+  (when state
+    (setf (psi-emacs-state-run-state state) run-state)
+    (when (eq state psi-emacs--state)
+      (psi-emacs--refresh-header-line))))
 
 (defun psi-emacs--refresh-header-line ()
   "Refresh minimal header-line status for current psi buffer."
@@ -112,6 +122,9 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
               (psi-rpc-client-transport-state client))
         (setf (psi-emacs-state-process psi-emacs--state)
               (psi-rpc-client-process client))
+        (when (and (eq (psi-emacs-state-run-state psi-emacs--state) 'reconnecting)
+                   (eq (psi-rpc-client-transport-state client) 'ready))
+          (psi-emacs--set-run-state psi-emacs--state 'idle))
         (setq psi-emacs--owned-process (psi-rpc-client-process client))
         (psi-emacs--refresh-header-line)))))
 
@@ -119,6 +132,9 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
   "Surface RPC error in minibuffer only for BUFFER."
   (ignore frame)
   (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when psi-emacs--state
+        (psi-emacs--set-run-state psi-emacs--state 'error)))
     (message "psi rpc error [%s]: %s" code message-text)))
 
 (defun psi-emacs--on-rpc-event (buffer frame)
@@ -208,10 +224,8 @@ COMMAND is a list suitable for `make-process'."
 
 (defun psi-emacs--streaming-p ()
   "Return non-nil when the frontend is in streaming mode."
-  (when psi-emacs--state
-    (let ((text (psi-emacs-state-assistant-in-progress psi-emacs--state)))
-      (and (stringp text)
-           (not (string-empty-p text))))))
+  (and psi-emacs--state
+       (eq (psi-emacs-state-run-state psi-emacs--state) 'streaming)))
 
 (defun psi-emacs--tail-draft-text ()
   "Return compose text from draft anchor to end-of-buffer."
@@ -291,6 +305,7 @@ USED-REGION-P non-nil means compose came from region and anchor is untouched."
     (clrhash (psi-emacs-state-tool-rows psi-emacs--state))
     (setf (psi-emacs-state-draft-anchor psi-emacs--state)
           (copy-marker (point-max) nil))
+    (psi-emacs--set-run-state psi-emacs--state 'idle)
     (psi-emacs--refresh-header-line))
   (set-buffer-modified-p nil))
 
@@ -372,6 +387,7 @@ to normal prompt dispatch."
                                psi-emacs--state
                                message))))
     (unless handled
+      (psi-emacs--set-run-state psi-emacs--state 'streaming)
       (psi-emacs--dispatch-request "prompt" `((:message . ,message))))
     handled))
 
@@ -385,10 +401,12 @@ When idle, routes through slash interception then normal prompt fallback."
   (let* ((used-region-p (use-region-p))
          (message (psi-emacs--composed-text)))
     (if (psi-emacs--streaming-p)
-        (psi-emacs--dispatch-request
-         "prompt_while_streaming"
-         `((:message . ,message)
-           (:behavior . ,(if prefix "queue" "steer"))))
+        (progn
+          (psi-emacs--set-run-state psi-emacs--state 'streaming)
+          (psi-emacs--dispatch-request
+           "prompt_while_streaming"
+           `((:message . ,message)
+             (:behavior . ,(if prefix "queue" "steer")))))
       (psi-emacs--dispatch-idle-compose-message message))
     (psi-emacs--consume-tail-draft used-region-p)))
 
@@ -398,10 +416,12 @@ When idle, routes through slash interception then normal prompt fallback."
   (let* ((used-region-p (use-region-p))
          (message (psi-emacs--composed-text)))
     (if (psi-emacs--streaming-p)
-        (psi-emacs--dispatch-request
-         "prompt_while_streaming"
-         `((:message . ,message)
-           (:behavior . "queue")))
+        (progn
+          (psi-emacs--set-run-state psi-emacs--state 'streaming)
+          (psi-emacs--dispatch-request
+           "prompt_while_streaming"
+           `((:message . ,message)
+             (:behavior . "queue"))))
       (psi-emacs--dispatch-idle-compose-message message))
     (psi-emacs--consume-tail-draft used-region-p)))
 
@@ -411,7 +431,8 @@ When idle, routes through slash interception then normal prompt fallback."
   (psi-emacs--dispatch-request "abort" nil)
   (when psi-emacs--state
     (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
-    (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)))
+    (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
+    (psi-emacs--set-run-state psi-emacs--state 'idle)))
 
 (defun psi-emacs--ensure-newline-before-append ()
   "Ensure appending at end starts on a new line if buffer has content."
@@ -476,6 +497,7 @@ When idle, routes through slash interception then normal prompt fallback."
 (defun psi-emacs--assistant-delta (text)
   "Apply assistant delta TEXT to the in-progress assistant block."
   (when psi-emacs--state
+    (psi-emacs--set-run-state psi-emacs--state 'streaming)
     (let ((next (concat (or (psi-emacs-state-assistant-in-progress psi-emacs--state) "")
                         (or text ""))))
       (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) next)
@@ -489,7 +511,8 @@ When idle, routes through slash interception then normal prompt fallback."
       (psi-emacs--set-assistant-line final)
       (goto-char (point-max))
       (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
-      (setf (psi-emacs-state-assistant-range psi-emacs--state) nil))))
+      (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
+      (psi-emacs--set-run-state psi-emacs--state 'idle))))
 
 (defun psi-emacs--event-data-get (data keys)
   "Return first non-nil value from DATA for KEYS.
@@ -641,6 +664,7 @@ reconnect the user starts with the default collapsed view."
     (setf (psi-emacs-state-draft-anchor psi-emacs--state)
           (copy-marker (point-max) nil))
     (setf (psi-emacs-state-tool-output-view-mode psi-emacs--state) 'collapsed)
+    (psi-emacs--set-run-state psi-emacs--state 'idle)
     (psi-emacs--refresh-header-line))
   (set-buffer-modified-p nil))
 
@@ -691,6 +715,7 @@ This command is valid even when no tool rows exist."
       (psi-emacs--reset-transcript-state)
       (setf (psi-emacs-state-transport-state psi-emacs--state) 'disconnected)
       (setf (psi-emacs-state-process-state psi-emacs--state) 'starting)
+      (psi-emacs--set-run-state psi-emacs--state 'reconnecting)
       (psi-emacs--refresh-header-line)
       (psi-emacs--start-rpc-client (current-buffer)))))
 
