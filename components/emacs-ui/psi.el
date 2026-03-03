@@ -26,11 +26,22 @@
   :type 'string
   :group 'psi-emacs)
 
+(defcustom psi-emacs-stream-timeout-seconds 45
+  "Seconds without streaming progress before watchdog timeout triggers.
+
+Used to detect stalled streaming runs and transition to deterministic recovery."
+  :type 'number
+  :group 'psi-emacs)
+
 (cl-defstruct psi-emacs-state
   process
   process-state
   transport-state
   run-state
+  last-stream-progress-at
+  stream-watchdog-timer
+  last-error
+  error-line-range
   assistant-in-progress
   assistant-range
   tool-rows
@@ -83,6 +94,10 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
    :process-state (if (and process (process-live-p process)) 'running 'starting)
    :transport-state 'disconnected
    :run-state 'idle
+   :last-stream-progress-at nil
+   :stream-watchdog-timer nil
+   :last-error nil
+   :error-line-range nil
    :assistant-in-progress nil
    :assistant-range nil
    :tool-rows (make-hash-table :test #'equal)
@@ -98,12 +113,135 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
           (or (psi-emacs-state-run-state state) 'idle)
           (or (psi-emacs-state-tool-output-view-mode state) 'collapsed)))
 
+(defun psi-emacs--status-diagnostics-string (state)
+  "Return status diagnostics string for STATE, including last-error summary."
+  (let ((base (psi-emacs--status-string state))
+        (last-error (psi-emacs-state-last-error state)))
+    (if (and (stringp last-error)
+             (not (string-empty-p last-error)))
+      (format "%s\nlast-error: %s" base last-error)
+      base)))
+
 (defun psi-emacs--set-run-state (state run-state)
   "Set RUN-STATE on STATE and refresh header for the current psi buffer."
   (when state
     (setf (psi-emacs-state-run-state state) run-state)
     (when (eq state psi-emacs--state)
       (psi-emacs--refresh-header-line))))
+
+(defun psi-emacs--error-line-text (message)
+  "Render deterministic persistent error line for MESSAGE."
+  (format "Error: %s\n" (or message "unknown")))
+
+(defun psi-emacs--clear-error-line (state)
+  "Remove persistent error line from current buffer for STATE."
+  (when state
+    (let ((range (psi-emacs-state-error-line-range state)))
+      (when (and (consp range)
+                 (markerp (car range))
+                 (markerp (cdr range))
+                 (marker-buffer (car range))
+                 (marker-buffer (cdr range)))
+        (save-excursion
+          (delete-region (car range) (cdr range))))
+      (when (and (consp range) (markerp (car range)))
+        (set-marker (car range) nil))
+      (when (and (consp range) (markerp (cdr range)))
+        (set-marker (cdr range) nil)))
+    (setf (psi-emacs-state-error-line-range state) nil)))
+
+(defun psi-emacs--upsert-error-line (state message)
+  "Insert or replace persistent error line for STATE with MESSAGE."
+  (when state
+    (let ((follow-anchor (psi-emacs--draft-anchor-at-end-p))
+          (range (psi-emacs-state-error-line-range state))
+          (line-text (psi-emacs--error-line-text message)))
+      (if (and (consp range)
+               (markerp (car range))
+               (markerp (cdr range))
+               (marker-buffer (car range))
+               (marker-buffer (cdr range)))
+          (save-excursion
+            (goto-char (car range))
+            (delete-region (car range) (cdr range))
+            (insert line-text)
+            (set-marker (cdr range) (point)))
+        (save-excursion
+          (psi-emacs--ensure-newline-before-append)
+          (let ((start (copy-marker (point) nil))
+                (end (copy-marker (point) t)))
+            (insert line-text)
+            (set-marker end (point))
+            (setf (psi-emacs-state-error-line-range state) (cons start end)))))
+      (when follow-anchor
+        (psi-emacs--set-draft-anchor-to-end)))))
+
+(defun psi-emacs--set-last-error (state message)
+  "Persist MESSAGE as STATE last error and upsert transcript error line."
+  (when state
+    (setf (psi-emacs-state-last-error state) message)
+    (if (and (stringp message) (not (string-empty-p message)))
+        (psi-emacs--upsert-error-line state message)
+      (psi-emacs--clear-error-line state))
+    (when (eq state psi-emacs--state)
+      (psi-emacs--refresh-header-line))))
+
+(defun psi-emacs--clear-last-error (state)
+  "Clear persistent error summary/line from STATE and refresh header."
+  (when state
+    (setf (psi-emacs-state-last-error state) nil)
+    (psi-emacs--clear-error-line state)
+    (when (eq state psi-emacs--state)
+      (psi-emacs--refresh-header-line))))
+
+(defun psi-emacs--stream-watchdog-timeout-message ()
+  "Return deterministic timeout message for stalled streaming."
+  (format "Streaming stalled after %.0fs without progress. Aborted current run."
+          psi-emacs-stream-timeout-seconds))
+
+(defun psi-emacs--on-stream-watchdog-timeout (buffer state)
+  "Watchdog timeout callback for BUFFER/STATE.
+
+When streaming has stalled, abort once, append deterministic feedback,
+and transition to `error'."
+  (when (and (buffer-live-p buffer)
+             state)
+    (with-current-buffer buffer
+      (when (and psi-emacs--state
+                 (eq psi-emacs--state state)
+                 (eq (psi-emacs-state-run-state state) 'streaming))
+        (let ((timeout-message (psi-emacs--stream-watchdog-timeout-message)))
+          (psi-emacs--disarm-stream-watchdog state)
+          (psi-emacs--dispatch-request "abort" nil)
+          (setf (psi-emacs-state-assistant-in-progress state) nil)
+          (setf (psi-emacs-state-assistant-range state) nil)
+          (psi-emacs--set-last-error state timeout-message)
+          (psi-emacs--set-run-state state 'error))))))
+
+(defun psi-emacs--disarm-stream-watchdog (state)
+  "Cancel and clear the stream watchdog timer for STATE."
+  (when state
+    (when-let ((timer (psi-emacs-state-stream-watchdog-timer state)))
+      (cancel-timer timer))
+    (setf (psi-emacs-state-stream-watchdog-timer state) nil)))
+
+(defun psi-emacs--arm-stream-watchdog (state)
+  "Arm stream watchdog timer for STATE using `psi-emacs-stream-timeout-seconds'."
+  (when state
+    (psi-emacs--disarm-stream-watchdog state)
+    (setf (psi-emacs-state-last-stream-progress-at state) (float-time))
+    (setf (psi-emacs-state-stream-watchdog-timer state)
+          (run-at-time psi-emacs-stream-timeout-seconds nil
+                       #'psi-emacs--on-stream-watchdog-timeout
+                       (current-buffer)
+                       state))))
+
+(defun psi-emacs--reset-stream-watchdog (state)
+  "Record streaming progress for STATE and reset watchdog timeout window."
+  (when state
+    (setf (psi-emacs-state-last-stream-progress-at state) (float-time))
+    (when (eq (psi-emacs-state-run-state state) 'streaming)
+      (psi-emacs--arm-stream-watchdog state))))
 
 (defun psi-emacs--refresh-header-line ()
   "Refresh minimal header-line status for current psi buffer."
@@ -134,7 +272,10 @@ Prefers `markdown-mode' when available, otherwise `text-mode'."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (when psi-emacs--state
-        (psi-emacs--set-run-state psi-emacs--state 'error)))
+        (let ((summary (format "%s: %s" code message-text)))
+          (psi-emacs--disarm-stream-watchdog psi-emacs--state)
+          (psi-emacs--set-last-error psi-emacs--state summary)
+          (psi-emacs--set-run-state psi-emacs--state 'error))))
     (message "psi rpc error [%s]: %s" code message-text)))
 
 (defun psi-emacs--on-rpc-event (buffer frame)
@@ -197,6 +338,8 @@ COMMAND is a list suitable for `make-process'."
   (when (and psi-emacs--state
              (psi-rpc-client-p (psi-emacs-state-rpc-client psi-emacs--state)))
     (psi-rpc-stop! (psi-emacs-state-rpc-client psi-emacs--state)))
+  (psi-emacs--disarm-stream-watchdog psi-emacs--state)
+  (psi-emacs--clear-last-error psi-emacs--state)
   (when (process-live-p psi-emacs--owned-process)
     (delete-process psi-emacs--owned-process))
   (when (and psi-emacs--state
@@ -300,6 +443,8 @@ USED-REGION-P non-nil means compose came from region and anchor is untouched."
   (let ((inhibit-read-only t))
     (erase-buffer))
   (when psi-emacs--state
+    (psi-emacs--disarm-stream-watchdog psi-emacs--state)
+    (psi-emacs--clear-last-error psi-emacs--state)
     (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
     (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
     (clrhash (psi-emacs-state-tool-rows psi-emacs--state))
@@ -361,7 +506,7 @@ normal prompt dispatch."
        t)
       ("/status"
        (psi-emacs--append-assistant-message
-        (psi-emacs--status-string state))
+        (psi-emacs--status-diagnostics-string state))
        t)
       ((or "/help" "/?")
        (psi-emacs--append-assistant-message
@@ -388,6 +533,7 @@ to normal prompt dispatch."
                                message))))
     (unless handled
       (psi-emacs--set-run-state psi-emacs--state 'streaming)
+      (psi-emacs--reset-stream-watchdog psi-emacs--state)
       (psi-emacs--dispatch-request "prompt" `((:message . ,message))))
     handled))
 
@@ -403,6 +549,7 @@ When idle, routes through slash interception then normal prompt fallback."
     (if (psi-emacs--streaming-p)
         (progn
           (psi-emacs--set-run-state psi-emacs--state 'streaming)
+          (psi-emacs--reset-stream-watchdog psi-emacs--state)
           (psi-emacs--dispatch-request
            "prompt_while_streaming"
            `((:message . ,message)
@@ -418,6 +565,7 @@ When idle, routes through slash interception then normal prompt fallback."
     (if (psi-emacs--streaming-p)
         (progn
           (psi-emacs--set-run-state psi-emacs--state 'streaming)
+          (psi-emacs--reset-stream-watchdog psi-emacs--state)
           (psi-emacs--dispatch-request
            "prompt_while_streaming"
            `((:message . ,message)
@@ -432,6 +580,7 @@ When idle, routes through slash interception then normal prompt fallback."
   (when psi-emacs--state
     (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
     (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
+    (psi-emacs--disarm-stream-watchdog psi-emacs--state)
     (psi-emacs--set-run-state psi-emacs--state 'idle)))
 
 (defun psi-emacs--ensure-newline-before-append ()
@@ -498,6 +647,7 @@ When idle, routes through slash interception then normal prompt fallback."
   "Apply assistant delta TEXT to the in-progress assistant block."
   (when psi-emacs--state
     (psi-emacs--set-run-state psi-emacs--state 'streaming)
+    (psi-emacs--reset-stream-watchdog psi-emacs--state)
     (let ((next (concat (or (psi-emacs-state-assistant-in-progress psi-emacs--state) "")
                         (or text ""))))
       (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) next)
@@ -512,6 +662,7 @@ When idle, routes through slash interception then normal prompt fallback."
       (goto-char (point-max))
       (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
       (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
+      (psi-emacs--disarm-stream-watchdog psi-emacs--state)
       (psi-emacs--set-run-state psi-emacs--state 'idle))))
 
 (defun psi-emacs--event-data-get (data keys)
@@ -638,6 +789,7 @@ Renders according to the current global tool-output-view-mode."
                                                   '(:text text :output output :delta delta :message message :result-text result-text))
                        ""))
              (stage (replace-regexp-in-string "^tool/" "" event)))
+         (psi-emacs--reset-stream-watchdog psi-emacs--state)
          (psi-emacs--upsert-tool-row tool-id stage text)))
       (_ nil))))
 
@@ -658,6 +810,8 @@ reconnect the user starts with the default collapsed view."
   (let ((inhibit-read-only t))
     (erase-buffer))
   (when psi-emacs--state
+    (psi-emacs--disarm-stream-watchdog psi-emacs--state)
+    (psi-emacs--clear-last-error psi-emacs--state)
     (setf (psi-emacs-state-assistant-in-progress psi-emacs--state) nil)
     (setf (psi-emacs-state-assistant-range psi-emacs--state) nil)
     (clrhash (psi-emacs-state-tool-rows psi-emacs--state))

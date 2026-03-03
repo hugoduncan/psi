@@ -75,6 +75,82 @@
     (should (string-match-p "psi \\[disconnected/starting/streaming\\]"
                             (psi-emacs--status-string state)))))
 
+(ert-deftest psi-status-diagnostics-includes-last-error-when-present ()
+  (let ((state (psi-emacs--initialize-state nil)))
+    (setf (psi-emacs-state-last-error state) "runtime/fail: boom")
+    (let ((status (psi-emacs--status-diagnostics-string state)))
+      (should (string-match-p "psi \\[disconnected/starting/idle\\]" status))
+      (should (string-match-p "last-error: runtime/fail: boom" status)))))
+
+(ert-deftest psi-watchdog-arms-when-entering-streaming ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-run-state psi-emacs--state) 'streaming)
+    (unwind-protect
+        (progn
+          (psi-emacs--arm-stream-watchdog psi-emacs--state)
+          (should (timerp (psi-emacs-state-stream-watchdog-timer psi-emacs--state)))
+          (should (numberp (psi-emacs-state-last-stream-progress-at psi-emacs--state))))
+      (psi-emacs--disarm-stream-watchdog psi-emacs--state))))
+
+(ert-deftest psi-watchdog-disarms-on-finalize ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-run-state psi-emacs--state) 'streaming)
+    (psi-emacs--arm-stream-watchdog psi-emacs--state)
+    (should (timerp (psi-emacs-state-stream-watchdog-timer psi-emacs--state)))
+    (psi-emacs--assistant-finalize "done")
+    (should-not (psi-emacs-state-stream-watchdog-timer psi-emacs--state))))
+
+(ert-deftest psi-watchdog-resets-on-assistant-delta ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-run-state psi-emacs--state) 'streaming)
+    (psi-emacs--arm-stream-watchdog psi-emacs--state)
+    (let ((first-timer (psi-emacs-state-stream-watchdog-timer psi-emacs--state))
+          (first-ts (psi-emacs-state-last-stream-progress-at psi-emacs--state)))
+      (psi-emacs--handle-rpc-event
+       '((:event . "assistant/delta") (:data . ((:text . "tick")))))
+      (should (timerp (psi-emacs-state-stream-watchdog-timer psi-emacs--state)))
+      (should-not (eq first-timer (psi-emacs-state-stream-watchdog-timer psi-emacs--state)))
+      (should (>= (psi-emacs-state-last-stream-progress-at psi-emacs--state) first-ts))
+      (psi-emacs--disarm-stream-watchdog psi-emacs--state))))
+
+(ert-deftest psi-watchdog-timeout-aborts-once-and-sets-error ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls nil))
+      (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) calls))))
+        (setf (psi-emacs-state-run-state psi-emacs--state) 'streaming)
+        (psi-emacs--arm-stream-watchdog psi-emacs--state)
+        (psi-emacs--on-stream-watchdog-timeout (current-buffer) psi-emacs--state)
+        (psi-emacs--on-stream-watchdog-timeout (current-buffer) psi-emacs--state))
+      (setq calls (nreverse calls))
+      (should (equal '(("abort" nil)) calls))
+      (should (eq 'error (psi-emacs-state-run-state psi-emacs--state)))
+      (should-not (psi-emacs-state-stream-watchdog-timer psi-emacs--state))
+      (should (string-match-p "Error: Streaming stalled after" (buffer-string))))))
+
+(ert-deftest psi-watchdog-noop-when-not-streaming ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls nil))
+      (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                 (lambda (_state op params &optional _callback)
+                   (push (list op params) calls))))
+        (setf (psi-emacs-state-run-state psi-emacs--state) 'idle)
+        (psi-emacs--on-stream-watchdog-timeout (current-buffer) psi-emacs--state))
+      (should (equal '() calls))
+      (should (eq 'idle (psi-emacs-state-run-state psi-emacs--state)))
+      (should (string= "" (buffer-string))))))
+
 (ert-deftest psi-killing-dedicated-buffer-terminates-only-owned-subprocess ()
   (let ((psi-emacs-command '("cat"))
         (psi-emacs--spawn-process-function #'psi-test--spawn-long-lived-process)
@@ -370,6 +446,8 @@
     (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
     (unwind-protect
         (let ((rpc-calls nil))
+          (psi-emacs--set-last-error psi-emacs--state "runtime/fail: boom")
+          (erase-buffer)
           (insert "/status")
           (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker 1 nil))
           (cl-letf (((symbol-value 'psi-emacs--send-request-function)
@@ -377,6 +455,7 @@
                        (push (list op params) rpc-calls))))
             (psi-emacs-send-from-buffer nil))
           (should (string-match-p "Assistant: psi \\[disconnected/.*/idle\\]" (buffer-string)))
+          (should (string-match-p "last-error: runtime/fail: boom" (buffer-string)))
           (should (equal '() rpc-calls)))
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
@@ -626,7 +705,18 @@
     (psi-emacs--set-run-state psi-emacs--state 'error)
     (should (string= "psi [disconnected/starting/error] tools:collapsed" header-line-format))))
 
-(ert-deftest psi-rpc-error-event-goes-to-minibuffer-not-transcript ()
+(ert-deftest psi-error-line-upsert-replaces-previous ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--set-last-error psi-emacs--state "first error")
+    (psi-emacs--set-last-error psi-emacs--state "second error")
+    (let ((buf (buffer-string)))
+      (should (string-match-p "Error: second error" buf))
+      (should-not (string-match-p "Error: first error" buf))
+      (should (= 1 (how-many "^Error:" (point-min) (point-max)))))))
+
+(ert-deftest psi-rpc-error-persists-in-transcript-and-sets-last-error ()
   (with-temp-buffer
     (psi-emacs-mode)
     (insert "existing\n")
@@ -638,8 +728,10 @@
         (psi-emacs--on-rpc-event
          (current-buffer)
          '((:event . "error") (:data . ((:code . "runtime/fail") (:message . "boom"))))))
-      (should (equal "existing\n" (buffer-string)))
+      (should (string-match-p "existing" (buffer-string)))
+      (should (string-match-p "Error: runtime/fail: boom" (buffer-string)))
       (should (= 1 (length messages)))
+      (should (equal "runtime/fail: boom" (psi-emacs-state-last-error psi-emacs--state)))
       (should (eq 'error (psi-emacs-state-run-state psi-emacs--state)))
       (should (string-match-p "runtime/fail" (car messages))))))
 
@@ -669,6 +761,7 @@
           (cons (copy-marker (point-min) nil) (copy-marker (point-max) t)))
     (puthash "t1" (list :id "t1" :stage "result" :text "done")
              (psi-emacs-state-tool-rows psi-emacs--state))
+    (psi-emacs--set-last-error psi-emacs--state "old error")
     (let ((started nil)
           (stop-called nil))
       (setf (psi-emacs-state-rpc-client psi-emacs--state) (psi-rpc-make-client))
@@ -684,6 +777,8 @@
       (should (string= "" (buffer-string)))
       (should-not (buffer-modified-p))
       (should-not (psi-emacs-state-assistant-in-progress psi-emacs--state))
+      (should-not (psi-emacs-state-last-error psi-emacs--state))
+      (should-not (psi-emacs-state-error-line-range psi-emacs--state))
       (should (zerop (hash-table-count (psi-emacs-state-tool-rows psi-emacs--state)))))))
 
 (ert-deftest psi-reconnect-does-not-auto-resume ()
