@@ -12,7 +12,7 @@
 --   Manual reconnect supervision policy
 --   Phase progression from MVP to parity capabilities
 --   Parity compose autocomplete delegation (/, @ file references)
---   Parity slash-command execution delegation (/resume, /quit, etc.)
+--   MVP slash-command execution delegation with prompt fallback (/resume, /quit, /history, ...)
 --
 -- Delegates to:
 --   EDN RPC transport protocol (rpc-edn.allium)
@@ -245,13 +245,22 @@ rule ParityComposeAutocompleteUsesSharedContract {
     ensures: SlashAndAtCompletionParity(frontend)
 }
 
-rule ParitySlashCommandExecutionUsesSharedContract {
+rule MvpSlashCommandExecutionUsesSharedContract {
+    when: FrontendPhaseChanged(frontend, phase)
+
+    requires: phase = mvp
+
+    ensures: slash_commands/PromptSlashCommandContract governs slash command execution
+    ensures: MvpIdleBuiltInSlashInterception(frontend, commands: ["/resume", "/quit", "/exit", "/new", "/status", "/help", "/?"])
+    ensures: MvpNonInterceptedSlashInputFallsThroughToPrompt(frontend)
+}
+
+rule ParitySlashCommandExecutionRetainsSharedContract {
     when: FrontendPhaseChanged(frontend, phase)
 
     requires: phase = parity
 
     ensures: slash_commands/PromptSlashCommandContract governs slash command execution
-    ensures: BuiltInSlashCommandParity(frontend, commands: ["/resume", "/quit", "/exit", "/new", "/status", "/help"])
 }
 
 ------------------------------------------------------------
@@ -399,6 +408,7 @@ rule QueueKeyFallsBackToNormalSendWhenIdle {
     requires: sourceKey = config.queue_key
     requires: frontend.rpc.transportState = ready
     requires: not frontend.session.isStreaming
+    requires: not StartsWith(Trim(ComposedText(frontend)), "/")
 
     ensures: PromptForwarded(frontend.session, ComposedText(frontend))
 }
@@ -409,8 +419,49 @@ rule SendKeyUsesNormalPromptWhenIdle {
     requires: sourceKey = config.send_key
     requires: frontend.rpc.transportState = ready
     requires: not frontend.session.isStreaming
+    requires: not StartsWith(Trim(ComposedText(frontend)), "/")
 
     ensures: PromptForwarded(frontend.session, ComposedText(frontend))
+}
+
+rule MvpIdleSlashSubmissionUsesSharedContract {
+    when: BufferSendRequested(frontend, sourceKey, prefix?)
+
+    requires: frontend.phase = mvp
+    requires: sourceKey in [config.send_key, config.queue_key]
+    requires: frontend.rpc.transportState = ready
+    requires: not frontend.session.isStreaming
+    requires: StartsWith(Trim(ComposedText(frontend)), "/")
+
+    ensures: slash_commands/PromptSlashCommandContract governs slash command execution
+    ensures: SlashDispatchEvaluatedBeforePromptForward(frontend, ComposedText(frontend))
+}
+
+rule MvpIdleBuiltInSlashCommandsBypassPromptRpc {
+    when: BufferSendRequested(frontend, sourceKey, prefix?)
+
+    requires: frontend.phase = mvp
+    requires: sourceKey in [config.send_key, config.queue_key]
+    requires: frontend.rpc.transportState = ready
+    requires: not frontend.session.isStreaming
+    requires: BuiltInMvpIdleSlashCommand(Trim(ComposedText(frontend)), commands: ["/resume", "/quit", "/exit", "/new", "/status", "/help", "/?"])
+
+    ensures: PromptNotForwarded(frontend.session, ComposedText(frontend))
+    ensures: LocalSlashCommandResultRendered(frontend)
+}
+
+rule MvpIdleNonInterceptedSlashFallsThroughToPromptRpc {
+    when: BufferSendRequested(frontend, sourceKey, prefix?)
+
+    requires: frontend.phase = mvp
+    requires: sourceKey in [config.send_key, config.queue_key]
+    requires: frontend.rpc.transportState = ready
+    requires: not frontend.session.isStreaming
+    requires: StartsWith(Trim(ComposedText(frontend)), "/")
+    requires: not BuiltInMvpIdleSlashCommand(Trim(ComposedText(frontend)), commands: ["/resume", "/quit", "/exit", "/new", "/status", "/help", "/?"])
+
+    ensures: PromptForwarded(frontend.session, ComposedText(frontend))
+    ensures: ServerSideSlashDispatchMayRunViaPrompt(frontend, ComposedText(frontend))
 }
 
 rule AbortKeySendsAbort {
@@ -822,9 +873,12 @@ surface EmacsSessionApi {
         --   slash command completion and @ file-reference expansion follow
         --   prompt-input-autocomplete.allium.
         --
-        -- Parity slash command execution:
-        --   /resume, /quit, /exit, /new, /status, /help, and related slash
-        --   command dispatch semantics follow prompt-slash-commands.allium.
+        -- MVP slash command execution:
+        --   idle slash input is evaluated against prompt-slash-commands.allium first.
+        --   locally intercepted built-ins (/resume, /quit, /exit, /new, /status,
+        --   /help, /?) bypass prompt RPC; non-intercepted slash input falls through
+        --   to prompt RPC for server-side dispatch.
+        --   parity retains the same shared slash-command contract.
         --
         -- Transcript content is editable; edits are local UX affordances and
         -- do not imply session rehydration semantics in MVP.
