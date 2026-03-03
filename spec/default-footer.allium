@@ -258,14 +258,14 @@ rule RightStatsAlwaysIncludesProvider {
 
 rule ThinkingLevelNormalization {
     -- Query may surface thinking level as keyword or string.
-    -- Footer display always uses plain lowercase text.
+    -- Runtime uses Clojure name/string conversion without case normalization.
     when: ThinkingLevelNormalized(level)
 
     ensures:
         if level = null:
             NormalizeThinkingLevel(level) = "off"
         else:
-            NormalizeThinkingLevel(level) = Lowercase(KeywordNameOrString(level))
+            NormalizeThinkingLevel(level) = KeywordNameOrString(level)
 }
 
 rule StatsLineLayoutFallback {
@@ -402,9 +402,4 @@ surface DefaultFooterView {
 deferred FooterRenderer.ansi_styles        -- dim/warn/error styling choices
 deferred FooterQueryExecution.error_policy -- query-fn exception handling internals
 
-------------------------------------------------------------
--- Open Questions
-------------------------------------------------------------
-
-open_question "Should provider prefix remain always visible, or hide when only one provider is configured?"
-open_question "Should footer status line wrap to multiple rows instead of truncating at terminal width?"
+-- Distilled as-is from current runtime behavior; no unresolved behavior questions in this contract.
