@@ -427,6 +427,7 @@
   (testing "extension-cmd-executes-handler and captures stdout"
     (let [ctx    (session/create-context)
           loop-called? (atom false)
+          received-args (atom nil)
           state  (atom {:ready? true
                         :pending {}
                         :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
@@ -440,8 +441,10 @@
       (with-redefs [commands/dispatch (fn [_ctx _text _opts]
                                         {:type    :extension-cmd
                                          :name    "test-cmd"
-                                         :args    ""
-                                         :handler (fn [_] (println "ext output"))})]
+                                         :args    "some args"
+                                         :handler (fn [args]
+                                                    (reset! received-args args)
+                                                    (println "ext output"))})]
         (let [{:keys [out-lines]} (run-loop input handler state 250)
               frames  (->> out-lines
                            (keep (fn [line] (try (edn/read-string line) (catch Throwable _ nil))))
@@ -449,6 +452,8 @@
               events  (filter #(= :event (:kind %)) frames)
               msg-evt (some #(when (= "assistant/message" (:event %)) %) events)]
           (is (false? @loop-called?) "agent loop must NOT be called for extension-cmd")
+          (is (= "some args" @received-args)
+              "extension handler must receive raw args string")
           (is (some? msg-evt) "assistant/message must be emitted")
           (is (some #(str/includes? (get % :text "") "ext output")
                     (get-in msg-evt [:data :content]))

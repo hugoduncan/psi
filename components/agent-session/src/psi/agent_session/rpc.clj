@@ -563,7 +563,7 @@
       :extension-cmd
       (let [output (try
                      (let [out (with-out-str
-                                 ((:handler cmd-result) {:args (:args cmd-result)}))]
+                                 ((:handler cmd-result) (:args cmd-result)))]
                        (if (str/blank? out)
                          "[extension command returned no output]"
                          out))
