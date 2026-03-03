@@ -13,7 +13,7 @@
 --
 -- Excludes:
 --   - Prompt template and skill expansion internals (coding-agent/skills/prompt-templates)
---   - Session-selector rendering internals
+--   - Session-selector rendering internals (see tui-resume-selector.allium)
 
 ------------------------------------------------------------
 -- Config
@@ -223,6 +223,7 @@ surface PromptSlashCommandContract {
         -- Slash command dispatch runs before normal prompt submission.
         -- /quit and /exit are equivalent.
         -- /resume is a runtime capability: selector UIs open selection; others provide fallback messaging.
+        -- Selector-level /resume behavior for TUI is specified in tui-resume-selector.allium.
         -- Non-intercepted slash input falls through to normal agent prompting, enabling downstream
         -- template/skill expansion paths.
 }

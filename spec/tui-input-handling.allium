@@ -10,6 +10,7 @@
 
 use "./prompt-input-autocomplete.allium" as autocomplete
 use "./prompt-slash-commands.allium" as slash
+use "./tui-resume-selector.allium" as resume
 use "./tui-input-history.allium" as history
 use "./tui-input-interrupts.allium" as interrupts
 
@@ -19,6 +20,7 @@ surface TuiPromptInputContract {
     exposes:
         autocomplete/PromptAutocompleteContract
         slash/PromptSlashCommandContract
+        resume/TuiResumeSelectorContract
         history/PromptHistoryContract
         interrupts/PromptInterruptContract
 
@@ -26,6 +28,7 @@ surface TuiPromptInputContract {
         -- Prompt input handling is split by concern:
         --   1) completion suggestions and acceptance
         --   2) slash command dispatch/execution (/resume, /quit, etc.)
-        --   3) history recording and recall navigation
-        --   4) interrupt/clear/exit control actions
+        --   3) /resume selector interactions (scope/search/nav/select/cancel)
+        --   4) history recording and recall navigation
+        --   5) interrupt/clear/exit control actions
 }

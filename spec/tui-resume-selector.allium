@@ -1,0 +1,326 @@
+-- tui-resume-selector.allium
+--
+-- Scope: TUI-specific /resume selector workflow for restoring prior sessions.
+--
+-- Source distillation:
+--   - components/tui/src/psi/tui/app.clj
+--   - components/tui/test/psi/tui/app_test.clj
+--   - components/agent-session/src/psi/agent_session/main.clj
+--
+-- Includes:
+--   - /resume handoff from slash dispatch into selector mode
+--   - selector initialization from current cwd session directory
+--   - current/all scope toggle with lazy loading of all sessions
+--   - search filtering, navigation, and bounded selection
+--   - selection confirmation, resume callback invocation, and transcript/tool rehydration
+--   - selector cancellation and exit controls
+--
+-- Delegates to:
+--   - prompt-slash-commands.allium (shared slash-command dispatch typing)
+--   - session-persistence.allium   (session metadata listing/discovery)
+--   - session-management.allium    (actual session resume lifecycle)
+--
+-- Excludes:
+--   - generic slash-command behavior unrelated to /resume
+--   - terminal rendering/style internals (colors, padding, truncation visuals)
+--   - session file parse/migration internals
+
+use "./prompt-slash-commands.allium" as slash
+use "./session-persistence.allium" as persist
+use "./session-management.allium" as session
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    default_selector_scope: current | all = current
+}
+
+------------------------------------------------------------
+-- Entities
+------------------------------------------------------------
+
+entity TuiResumeRuntime {
+    phase: idle | streaming | selecting_session | exiting
+
+    cwd: String
+    currentSessionFile: String?
+
+    supportsResumeSelector: Boolean = true
+
+    selector: SessionSelectorState?
+
+    messages: List<Map<String, Any>>
+    toolCalls: Map<String, Any>
+    toolOrder: List<String>
+}
+
+entity SessionSelectorState {
+    scope: current | all
+
+    search: String
+    selected: Integer
+
+    currentScopeSessions: List<persist/SessionInfo>
+    allScopeSessions: List<persist/SessionInfo>?
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value ResumeRestoreState {
+    messages: List<Map<String, Any>>
+    toolCalls: Map<String, Any>
+    toolOrder: List<String>
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+rule ResumeSlashResultOpensSelector {
+    when: slash/SlashCommandResultApplied(runtime, result)
+
+    requires: result.type = resume
+    requires: runtime.supportsResumeSelector
+
+    ensures: runtime.phase = selecting_session
+    ensures: runtime.selector = SessionSelectorState.created(
+        scope: config.default_selector_scope,
+        search: "",
+        selected: 0,
+        currentScopeSessions: persist/SessionsListed(runtime.cwd),
+        allScopeSessions: null
+    )
+}
+
+rule SelectorTabFromCurrentLoadsAllSessionsLazily {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = tab
+    requires: runtime.selector.scope = current
+
+    ensures: runtime.selector.scope = all
+
+    ensures:
+        if runtime.selector.allScopeSessions = null:
+            runtime.selector.allScopeSessions = persist/AllSessionsListed()
+}
+
+rule SelectorTabFromAllReturnsToCurrent {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = tab
+    requires: runtime.selector.scope = all
+
+    ensures: runtime.selector.scope = current
+}
+
+rule SelectorScopeDeterminesCandidatePool {
+    when: SelectorSessionsEvaluated(runtime)
+
+    requires: runtime.phase = selecting_session
+
+    ensures:
+        if runtime.selector.scope = current:
+            ActiveSelectorSessions(runtime) = runtime.selector.currentScopeSessions
+        else:
+            ActiveSelectorSessions(runtime) = runtime.selector.allScopeSessions or []
+}
+
+rule SelectorBlankSearchShowsUnfilteredScope {
+    when: SelectorSessionsEvaluated(runtime)
+
+    requires: runtime.phase = selecting_session
+    requires: IsBlank(runtime.selector.search)
+
+    ensures: FilteredSelectorSessions(runtime) = ActiveSelectorSessions(runtime)
+}
+
+rule SelectorSearchFiltersByNameFirstMessageAndCwd {
+    when: SelectorSessionsEvaluated(runtime)
+
+    requires: runtime.phase = selecting_session
+    requires: not IsBlank(runtime.selector.search)
+
+    ensures: FilteredSelectorSessions(runtime) =
+        ActiveSelectorSessions(runtime)
+            where ContainsCaseInsensitive(session.name, runtime.selector.search)
+               or ContainsCaseInsensitive(session.first_message, runtime.selector.search)
+               or ContainsCaseInsensitive(session.cwd, runtime.selector.search)
+}
+
+rule SelectorSelectionIndexIsAlwaysClamped {
+    when: SelectorStateChanged(runtime)
+
+    requires: runtime.phase = selecting_session
+
+    let n = FilteredSelectorSessions(runtime).count
+
+    ensures: runtime.selector.selected >= 0
+    ensures: runtime.selector.selected <= max(0, n - 1)
+}
+
+rule SelectorUpMovesSelectionBackward {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = up
+
+    ensures: runtime.selector.selected = max(0, runtime.selector.selected - 1)
+}
+
+rule SelectorDownMovesSelectionForward {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = down
+
+    let max-index = max(0, FilteredSelectorSessions(runtime).count - 1)
+
+    ensures: runtime.selector.selected = min(max-index, runtime.selector.selected + 1)
+}
+
+rule SelectorPrintableInputExtendsSearch {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: PrintableKey(key)
+
+    ensures: runtime.selector.search = runtime.selector.search + KeyText(key)
+}
+
+rule SelectorBackspaceShrinksSearch {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = backspace
+
+    ensures: runtime.selector.search = RemoveLastCharacter(runtime.selector.search)
+}
+
+rule SelectorNonPrintableUnknownKeysAreIgnored {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key not in [escape, ctrl+c, tab, up, down, enter, backspace]
+    requires: not PrintableKey(key)
+
+    ensures: SelectorStateUnchanged(runtime)
+}
+
+rule SelectorEnterResumesChosenSession {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = enter
+    requires: FilteredSelectorSessions(runtime).count > 0
+
+    let chosen   = FilteredSelectorSessions(runtime)[runtime.selector.selected]
+    let restored = ResumeCallbackResult(runtime, chosen.path)
+
+    ensures: ResumeCallbackInvoked(runtime, chosen.path)
+
+    ensures: runtime.phase = idle
+    ensures: runtime.selector = null
+    ensures: runtime.currentSessionFile = chosen.path
+
+    ensures: runtime.messages = RestoredMessages(restored)
+    ensures: runtime.toolCalls = RestoredToolCalls(restored)
+    ensures: runtime.toolOrder = RestoredToolOrder(restored)
+}
+
+rule SelectorEnterWithNoCandidatesClosesSelector {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = enter
+    requires: FilteredSelectorSessions(runtime).count = 0
+
+    ensures: runtime.phase = idle
+    ensures: runtime.selector = null
+}
+
+rule SelectorEscapeCancelsSelection {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = escape
+
+    ensures: runtime.phase = idle
+    ensures: runtime.selector = null
+    ensures: SessionSwitchNotRequested(runtime)
+}
+
+rule SelectorCtrlCRequestsExit {
+    when: ResumeSelectorKeyPressed(runtime, key)
+
+    requires: runtime.phase = selecting_session
+    requires: key = ctrl+c
+
+    ensures: FrontendExitRequested(runtime)
+}
+
+rule ResumeCallbackMapShapeRestoresMessagesAndTools {
+    when: ResumeCallbackReturned(payload)
+
+    requires: IsMap(payload)
+
+    ensures: RestoredMessages(payload) = payload.messages or []
+    ensures: RestoredToolCalls(payload) = payload.toolCalls or {}
+    ensures: RestoredToolOrder(payload) = payload.toolOrder or []
+}
+
+rule ResumeCallbackLegacyMessageVectorIsStillAccepted {
+    when: ResumeCallbackReturned(payload)
+
+    requires: IsList(payload)
+
+    ensures: RestoredMessages(payload) = payload
+    ensures: RestoredToolCalls(payload) = {}
+    ensures: RestoredToolOrder(payload) = []
+}
+
+------------------------------------------------------------
+-- Surface
+------------------------------------------------------------
+
+surface TuiResumeSelectorContract {
+    for caller: InteractivePromptRuntime
+
+    context runtime: TuiResumeRuntime
+
+    provides:
+        slash/SlashCommandResultApplied(runtime, result)
+        ResumeSelectorKeyPressed(runtime, key)
+        ResumeCallbackReturned(payload)
+
+    exposes:
+        runtime.phase
+        runtime.selector
+        runtime.currentSessionFile
+
+    related:
+        slash/PromptSlashCommandContract
+        persist/SessionPersistenceApi
+        session/AgentSessionApi
+
+    guidance:
+        -- /resume opens a selector only for runtimes that support resume selection.
+        -- Selector starts in current-project scope; Tab toggles current/all scopes.
+        -- Search is case-insensitive over session name, first message, and cwd.
+        -- Selection index is clamped after every scope/search/list change.
+        -- Enter rehydrates transcript + tool rows immediately from resume callback output.
+        -- Escape cancels selector without switching sessions; Ctrl+C exits.
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open_question "When selector is empty and Enter is pressed, should we close immediately (current behavior) or keep selector open with guidance text?"
+open_question "Should selecting the already-active session be a no-op, or should it force a full rehydrate as today?"
