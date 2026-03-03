@@ -863,12 +863,13 @@ rule ParityFooterUsesSharedProjectionContract {
     ensures: emacs_footer/EmacsFooterProjectionContract governs footer/updated projection behavior
 }
 
-rule FooterUpdatedEventsRefreshProjectionText {
+rule FooterUpdatedEventsRefreshProjectionViaEmacsFooterContract {
     when: RpcEventReceived(frontend.rpc, "footer/updated", payload: rpc/FooterUpdatedPayload)
 
     requires: frontend.phase = parity
     requires: frontend.footerParityEnabled
 
+    ensures: emacs_footer/EmacsFooterProjectionContract governs footer/updated payload interpretation
     ensures: frontend.footerProjection = emacs_footer/CanonicalFooterProjectionText(payload)
 }
 
