@@ -33,6 +33,14 @@ Used to detect stalled streaming runs and transition to deterministic recovery."
   :type 'number
   :group 'psi-emacs)
 
+(defcustom psi-emacs-enable-resume-parity nil
+  "Enable parity-mode `/resume` routing in Emacs frontend.
+
+When nil (default), `/resume` always uses the MVP fallback message.
+When non-nil, `/resume` routes to parity entry points (implemented incrementally)."
+  :type 'boolean
+  :group 'psi-emacs)
+
 (cl-defstruct psi-emacs-state
   process
   process-state
@@ -486,6 +494,43 @@ USED-REGION-P non-nil means compose came from region and anchor is untouched."
          (with-current-buffer buffer
            (psi-emacs--handle-new-session-response frame)))))))
 
+(defun psi-emacs--resume-args-from-message (message)
+  "Extract `/resume` argument tail from MESSAGE.
+
+Return nil for no argument. Otherwise return trimmed argument string."
+  (let* ((trimmed (string-trim (or message "")))
+         (tail (string-trim (string-remove-prefix "/resume" trimmed))))
+    (unless (string-empty-p tail)
+      tail)))
+
+(defun psi-emacs--handle-idle-resume-default (_state _message)
+  "Handle `/resume` in default MVP mode."
+  (psi-emacs--append-assistant-message
+   "Resume selector unavailable in this frontend."))
+
+(defun psi-emacs--handle-idle-resume-parity-no-arg (_state)
+  "Handle parity-mode `/resume` without explicit session path.
+
+Selector flow is implemented by follow-up tasks; keep deterministic interim text."
+  (psi-emacs--append-assistant-message
+   "Resume selector unavailable in this frontend."))
+
+(defun psi-emacs--handle-idle-resume-parity-explicit-path (_state _session-path)
+  "Handle parity-mode `/resume <session-path>`.
+
+Direct session switch dispatch is implemented by follow-up tasks."
+  (psi-emacs--append-assistant-message
+   "Resume selector unavailable in this frontend."))
+
+(defun psi-emacs--handle-idle-resume-command (state message)
+  "Handle `/resume` MESSAGE according to capability flags and args."
+  (if (not psi-emacs-enable-resume-parity)
+      (psi-emacs--handle-idle-resume-default state message)
+    (let ((session-path (psi-emacs--resume-args-from-message message)))
+      (if session-path
+          (psi-emacs--handle-idle-resume-parity-explicit-path state session-path)
+        (psi-emacs--handle-idle-resume-parity-no-arg state)))))
+
 (defun psi-emacs--default-handle-idle-slash-command (state message)
   "Default idle slash handler.
 
@@ -498,8 +543,7 @@ normal prompt dispatch."
        (psi-emacs--request-frontend-exit)
        t)
       ("/resume"
-       (psi-emacs--append-assistant-message
-        "Resume selector unavailable in this frontend.")
+       (psi-emacs--handle-idle-resume-command state message)
        t)
       ("/new"
        (psi-emacs--request-new-session)
