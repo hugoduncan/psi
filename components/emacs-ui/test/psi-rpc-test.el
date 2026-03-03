@@ -8,6 +8,30 @@
              (expand-file-name "../" (file-name-directory (or load-file-name buffer-file-name))))
 (require 'psi-rpc)
 
+(ert-deftest psi-rpc-topic-profiles-remain-explicit-and-stable ()
+  (should
+   (equal
+    '("assistant/delta"
+      "assistant/message"
+      "tool/start"
+      "tool/delta"
+      "tool/executing"
+      "tool/update"
+      "tool/result"
+      "session/updated"
+      "error")
+    psi-rpc-mvp-topics))
+  (should
+   (equal
+    '("ui/dialog-requested"
+      "ui/widgets-updated"
+      "ui/status-updated"
+      "ui/notification"
+      "footer/updated")
+    psi-rpc-parity-extension-ui-topics))
+  (should (equal (append psi-rpc-mvp-topics psi-rpc-parity-extension-ui-topics)
+                 psi-rpc-parity-topics)))
+
 (defun psi-rpc-test--spawn-cat (_command)
   "Spawn a long-lived process used in rpc transport tests."
   (make-process
