@@ -79,6 +79,22 @@ RPC request shapes:
 
 `dialog-id` is always echoed from the inbound event; Emacs never invents IDs.
 
+## Footer projection (parity)
+
+When parity is enabled, `footer/updated` events are rendered as a single deterministic line in the projection block.
+
+Payload handling uses strict canonical-over-legacy precedence:
+
+- **Canonical keys**: `:path-line`, `:stats-line`, `:status-line` (with camelCase aliases `pathLine`, `statsLine`, `statusLine`). Non-blank lines are joined with `" | "` to produce footer text.
+- **Legacy fallback**: `:text`, `:message`, `:footer`, `:content`. Used only when all canonical lines are absent or blank.
+- **Blank omission**: whitespace-only values are treated as blank. When resolved footer text is blank, the `Footer:` line is omitted from the projection block.
+
+Rendered as: `Footer: <path-line> | <stats-line> | <status-line>` (omitting blank segments).
+
+Footer projection is cleared on reconnect and `/new` session reset. Footer updates are projection-only and do not alter transcript history or draft-anchor behavior.
+
+Spec references: `spec/emacs-footer.allium`, `spec/emacs-frontend.allium`.
+
 ## Renderer boundary (explicit)
 
 Emacs does **not** execute extension-provided renderer functions from extension UI state.
