@@ -267,3 +267,24 @@
                    (append-history :workflow/resume
                                    {:run-id run-id
                                     :step-id (:current-step-id workflow-run)})))))
+
+(defn cancel-run
+  "Cancel a non-terminal workflow run.
+
+   Cancellation is runtime-owned and records a terminal outcome plus history entry."
+  [state run-id reason]
+  (update-in state (run-path run-id)
+             (fn [workflow-run]
+               (-> workflow-run
+                   (assoc :status :cancelled
+                          :blocked nil
+                          :current-step-id (:current-step-id workflow-run)
+                          :updated-at (now)
+                          :finished-at (now)
+                          :terminal-outcome {:outcome :cancelled
+                                             :reason reason
+                                             :step-id (:current-step-id workflow-run)})
+                   (append-history :workflow/cancel
+                                   {:run-id run-id
+                                    :step-id (:current-step-id workflow-run)
+                                    :reason reason})))))
