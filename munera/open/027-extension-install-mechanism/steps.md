@@ -1,0 +1,28 @@
+- [x] Refine the hybrid manifest + tools.deps install model with the user
+- [x] Confirm the `deps.edn`-shaped manifest schema using top-level `:deps`
+- [x] Confirm manifest locations (`~/.psi/agent/extensions.edn`, `.psi/extensions.edn`)
+- [x] Confirm minimal slice-one `:psi/*` metadata set (`:psi/init`, `:psi/enabled`)
+- [x] Confirm project-over-user precedence by library key
+- [x] Confirm policy allowing ordinary non-extension deps in extension manifests
+- [x] Confirm duplicate effective `:psi/init` claims are hard errors
+- [x] Confirm `:git/sha` is required for git extension deps in both scopes
+- [x] Confirm standard deps forms include local, git, and mvn
+- [x] Confirm structured validation/introspection should live on the canonical read surface
+- [x] Confirm explicit reload/apply is included in slice one for extension development
+- [x] Confirm restart remains the fallback guaranteed apply path
+- [x] Confirm explicit reload/apply result semantics are narrowed to `:applied` and `:restart-required`
+- [x] Confirm the intended projection shape for raw manifests, effective entries, diagnostics, and last-apply status
+- [x] Convert the agreed design into implementation slices
+
+Implementation checklist:
+- [ ] Add manifest schemas and validation rules for user/project `extensions.edn`
+- [ ] Implement manifest reading from `~/.psi/agent/extensions.edn` and `.psi/extensions.edn`
+- [ ] Implement effective merge with project-over-user precedence and provenance capture
+- [ ] Implement duplicate-init validation on the effective extension set
+- [ ] Implement git-sha validation for git extension deps
+- [ ] Implement structured diagnostics production
+- [ ] Implement dependency realization and extension activation for local/git/mvn deps
+- [ ] Implement per-extension load status tracking
+- [ ] Implement explicit reload/apply with `:applied` / `:restart-required` results
+- [ ] Implement canonical read-surface projection for raw manifests, effective state, diagnostics, and last-apply result
+- [ ] Document manifest format and developer workflow
