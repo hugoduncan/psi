@@ -56,6 +56,20 @@ Current status:
   - next-step derivation
 - Added focused statechart/compilation tests in `workflow_statechart_test.clj`
 
+2026-04-19 — workflow run creation groundwork
+- Added `components/agent-session/src/psi/agent_session/workflow_runtime.clj`
+- Implemented pure canonical-root operations for:
+  - workflow definition registration
+  - workflow run creation from a registered definition id
+  - workflow run creation from an inline definition
+- Workflow runs now capture immutable effective-definition snapshots at creation time
+- Workflow runs initialize:
+  - `:status :pending`
+  - `:current-step-id` from compiled step order
+  - per-step `:step-runs`
+  - canonical creation history entry (`:workflow/run-created`)
+- Added focused runtime tests in `workflow_runtime_test.clj`
+
 Notes:
-- This is still execution-semantics groundwork only; it does not yet create workflow runs in canonical state or orchestrate execution sessions.
-- Existing extension workflow runtime in `workflows.clj` remains separate; this new statechart module defines the deterministic workflow-run transition model for the new runtime.
+- This slice is still pure runtime/state groundwork; it has not yet been wired through dispatch mutations, Pathom resolvers, or `psi-tool`.
+- Existing extension workflow runtime in `workflows.clj` remains separate; `workflow_runtime.clj` is for the new canonical deterministic workflow-run state.
