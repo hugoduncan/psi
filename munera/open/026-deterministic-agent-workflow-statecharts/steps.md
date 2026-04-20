@@ -11,7 +11,7 @@
 Implementation checkpoints:
 - [x] Define canonical root-state placement, entity names, and linkage attrs for workflow definitions, runs, step runs, and step attempts
 - [x] Add malli schemas for workflow definitions, step definitions, runs, attempts, result envelopes, retry policy, and capability policy
-- [ ] Define the workflow→statechart compilation boundary and explicit event/status model for slice one
+- [x] Define the workflow→statechart compilation boundary and explicit event/status model for slice one
 - [ ] Implement workflow run creation and effective-definition snapshot capture
 - [ ] Implement one execution session per step attempt, with workflow linkage written into canonical sessions
 - [ ] Implement structured result-envelope submission, validation, and advancement logic
