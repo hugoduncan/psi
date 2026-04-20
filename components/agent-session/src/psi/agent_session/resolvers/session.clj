@@ -307,6 +307,34 @@
    ::pco/output [:psi.agent-session/worktree-path]}
   {:psi.agent-session/worktree-path (support/session-worktree-path agent-session-ctx session-id)})
 
+(defn- workflow-session-link-attrs
+  [sd]
+  {:psi.agent-session/workflow-run-id     (:workflow-run-id sd)
+   :psi.agent-session/workflow-step-id    (:workflow-step-id sd)
+   :psi.agent-session/workflow-attempt-id (:workflow-attempt-id sd)
+   :psi.agent-session/workflow-owned?     (:workflow-owned? sd false)})
+
+(pco/defresolver agent-session-workflow-linkage
+  "Resolve workflow linkage attrs carried by canonical sessions.
+   Ordinary sessions expose nil linkage attrs and false workflow-owned?."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.agent-session/workflow-run-id
+                 :psi.agent-session/workflow-step-id
+                 :psi.agent-session/workflow-attempt-id
+                 :psi.agent-session/workflow-owned?]}
+  (workflow-session-link-attrs (support/session-data agent-session-ctx session-id)))
+
+(pco/defresolver agent-session-workflow-run-ref
+  "Resolve workflow run reference for workflow-owned execution sessions."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.workflow.run/id]}
+  (let [run-id (:workflow-run-id (support/session-data agent-session-ctx session-id))]
+    (cond-> {}
+      run-id (assoc :psi.workflow.run/id run-id))))
+
+
 (pco/defresolver agent-session-git-branch
   "Resolve current git branch for the explicit session worktree path.
    Returns nil outside git repos and \"detached\" for detached HEAD."
@@ -509,6 +537,8 @@
    agent-session-extensions
    agent-session-context-usage
    agent-session-cwd
+   agent-session-workflow-linkage
+   agent-session-workflow-run-ref
    agent-session-git-branch
    runtime-nrepl-info
    agent-session-git-context
