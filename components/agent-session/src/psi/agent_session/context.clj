@@ -22,6 +22,7 @@
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.tool-plan :as tool-plan]
+   [psi.agent-session.workflow-model :as workflow-model]
    [psi.agent-session.workflows :as wf]
    [psi.history.resolvers :as history-resolvers]
    [psi.query.core :as query]
@@ -96,6 +97,7 @@
   "Build the initial value for the canonical root state atom."
   [nrepl-runtime-atom recursion-ctx]
   {:agent-session {:sessions {}}
+   :workflows (workflow-model/initial-workflow-state)
    :runtime {:nrepl (or (some-> nrepl-runtime-atom deref) nil)
              :rpc-trace {:enabled? false
                          :file nil}}

@@ -365,7 +365,11 @@
 (defn- session-turn-ctx-path [sid] [:agent-session :sessions sid :turn :ctx])
 
 (def ^:private static-state-paths
-  {:nrepl-runtime   [:runtime :nrepl]
+  {:workflow-state  [:workflows]
+   :workflow-definitions [:workflows :definitions]
+   :workflow-runs   [:workflows :runs]
+   :workflow-run-order [:workflows :run-order]
+   :nrepl-runtime   [:runtime :nrepl]
    :background-jobs [:background-jobs :store]
    :ui-state        [:ui :extension-ui]
    :recursion       [:recursion]
