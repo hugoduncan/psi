@@ -11,23 +11,20 @@
    [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.workflow-progression :as workflow-progression]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.query.core :as query]))
 
 (def psi-tool
   {:name        "psi-tool"
    :label       "Psi Tool"
    :description (str "Execute a live psi runtime operation. Canonical requests use `action` with one of: "
-                     "`query`, `eval`, `reload-code`, `project-repl`, or `workflow`. `query` executes an EQL query against the live session graph; "
+                     "`query`, `eval`, `reload-code`, or `project-repl`. `query` executes an EQL query against the live session graph; "
                      "`eval` evaluates an in-process Clojure form in a named already-loaded namespace; "
                      "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; "
-                     "`project-repl` controls the managed project REPL with explicit `op` values `status|start|attach|stop|eval|interrupt`; "
-                     "`workflow` manages deterministic workflow definitions and runs with explicit `op` values `list-definitions|create-run|read-run|list-runs|resume-run|cancel-run`. "
+                     "`project-repl` controls the managed project REPL with explicit `op` values `status|start|attach|stop|eval|interrupt`. "
                      "Legacy query-only calls of the form `{query: ...}` remain accepted only as a compatibility alias for `action: \"query\"`. "
                      "Optional `entity` seeds root attributes for explicit query targeting, e.g. entity {:psi.agent-session/session-id \"sid\"}.")
    :parameters  {:type       "object"
-                 :properties {:action        {:type "string" :enum ["query" "eval" "reload-code" "project-repl" "workflow"]
+                 :properties {:action        {:type "string" :enum ["query" "eval" "reload-code" "project-repl"]
                                               :description "Canonical psi-tool operation discriminator."}
                               :query         {:type "string" :description "For `action: \"query\"`: EQL query vector as EDN string, e.g. \"[:psi.agent-session/phase :psi.agent-session/session-id]\""}
                               :entity        {:type "string" :description "For `action: \"query\"`: optional EDN root entity map to seed the query, e.g. \"{:psi.agent-session/session-id \\\"sid\\\"}\" for explicit session targeting."}
@@ -40,12 +37,7 @@
                                               :description "For `action: \"project-repl\"`: managed project REPL operation discriminator."}
                               :host          {:type "string" :description "For `action: \"project-repl\"`, `op: \"attach\"`: explicit attach host override."}
                               :port          {:type "integer" :description "For `action: \"project-repl\"`, `op: \"attach\"`: explicit attach port override."}
-                              :code          {:type "string" :description "For `action: \"project-repl\"`, `op: \"eval\"`: Clojure code to evaluate in the managed project REPL."}
-                              :definition-id {:type "string" :description "For `action: \"workflow\"`: registered workflow definition id."}
-                              :definition    {:type "string" :description "For `action: \"workflow\"`: inline workflow definition as EDN."}
-                              :workflow-input {:type "string" :description "For `action: \"workflow\"`: workflow input map as EDN."}
-                              :run-id        {:type "string" :description "For `action: \"workflow\"`: workflow run id."}
-                              :reason        {:type "string" :description "For `action: \"workflow\"`: optional cancel reason."}}
+                              :code          {:type "string" :description "For `action: \"project-repl\"`, `op: \"eval\"`: Clojure code to evaluate in the managed project REPL."}}
                  :required   []}})
 
 (defn- sanitize-psi-tool-result
@@ -57,9 +49,6 @@
        (dissoc x :psi/agent-session-ctx :psi/memory-ctx :psi/recursion-ctx :psi/engine-ctx)
 
        (instance? Throwable x)
-       (str x)
-
-       (instance? java.time.temporal.TemporalAccessor x)
        (str x)
 
        :else x))
@@ -78,16 +67,13 @@
     :else          nil))
 
 (def ^:private psi-tool-supported-actions
-  ["query" "eval" "reload-code" "project-repl" "workflow"])
+  ["query" "eval" "reload-code" "project-repl"])
 
 (def ^:private project-repl-supported-ops
   ["status" "start" "attach" "stop" "eval" "interrupt"])
 
-(def ^:private workflow-supported-ops
-  ["list-definitions" "create-run" "read-run" "list-runs" "resume-run" "cancel-run"])
-
 (defn- validate-psi-tool-request
-  [{:strs [query entity ns form namespaces worktree-path op host port code definition-id definition workflow-input run-id reason] :as args}]
+  [{:strs [query entity ns form namespaces worktree-path op host port code] :as args}]
   (let [effective-action (psi-tool-action args)]
     (cond
       (nil? effective-action)
@@ -151,33 +137,7 @@
          :worktree-path worktree-path
          :host          host
          :port          port
-         :code          code})
-
-      (= effective-action "workflow")
-      (do
-        (when-not (some #{op} workflow-supported-ops)
-          (throw (ex-info "psi-tool workflow action requires valid `op`"
-                          {:phase         :validate
-                           :action        effective-action
-                           :op            op
-                           :supported-ops workflow-supported-ops})))
-        (when (and (= op "create-run") definition-id definition)
-          (throw (ex-info "psi-tool workflow create-run accepts either `definition-id` or `definition`, not both"
-                          {:phase :validate :action effective-action :op op})))
-        (when (and (= op "create-run") (nil? definition-id) (nil? definition))
-          (throw (ex-info "psi-tool workflow create-run requires `definition-id` or `definition`"
-                          {:phase :validate :action effective-action :op op})))
-        (when (and ((set ["read-run" "resume-run" "cancel-run"]) op)
-                   (not (string? run-id)))
-          (throw (ex-info "psi-tool workflow op requires `run-id`"
-                          {:phase :validate :action effective-action :op op})))
-        {:action         effective-action
-         :op             op
-         :definition-id  definition-id
-         :definition     definition
-         :workflow-input workflow-input
-         :run-id         run-id
-         :reason         reason}))))
+         :code          code}))))
 
 (defn- sanitize-psi-tool-data
   [x]
@@ -201,7 +161,7 @@
    :is-error true})
 
 (defn telemetry-args
-  [{:strs [action query ns form namespaces worktree-path op host port code definition-id definition workflow-input run-id reason]}]
+  [{:strs [action query ns form namespaces worktree-path op host port code]}]
   (cond-> (ordered-map)
     action (assoc "action" action)
     query (assoc "query" query)
@@ -212,12 +172,7 @@
     op (assoc "op" op)
     host (assoc "host" host)
     port (assoc "port" port)
-    code (assoc "code" code)
-    definition-id (assoc "definition-id" definition-id)
-    definition (assoc "definition" definition)
-    workflow-input (assoc "workflow-input" workflow-input)
-    run-id (assoc "run-id" run-id)
-    reason (assoc "reason" reason)))
+    code (assoc "code" code)))
 
 (defn- execute-psi-tool-query
   [query-fn {:keys [query entity]}]
@@ -472,7 +427,7 @@
              :psi-tool/worktree-source worktree-source))))
 
 (defn truncation-visible-prefix
-  [{:keys [action ns form namespaces worktree-path op code definition-id run-id]}]
+  [{:keys [action ns form namespaces worktree-path op code]}]
   (case action
     "eval"
     (str "Eval action=eval ns=" ns " form=" form)
@@ -488,13 +443,6 @@
            (str " worktree-path=" worktree-path))
          (when (= op "eval")
            (str " code=" code)))
-
-    "workflow"
-    (str "Workflow action=workflow op=" op
-         (when definition-id
-           (str " definition-id=" definition-id))
-         (when run-id
-           (str " run-id=" run-id)))
 
     nil))
 
@@ -539,136 +487,6 @@
          :psi-tool/duration-ms     (long (/ (- (System/nanoTime) started-at) 1000000))
          :psi-tool/overall-status  :error
          :psi-tool/error           (psi-tool-error-summary :project-repl e)}))))
-
-(defn- parse-workflow-definition-string
-  [definition]
-  (let [parsed (parse-edn-string definition)]
-    (when-not (map? parsed)
-      (throw (ex-info "psi-tool workflow definition must be an EDN map"
-                      {:phase :validate :action "workflow" :op "create-run"})))
-    parsed))
-
-(defn- parse-workflow-input-string
-  [workflow-input]
-  (when (some? workflow-input)
-    (let [parsed (parse-edn-string workflow-input)]
-      (when-not (map? parsed)
-        (throw (ex-info "psi-tool workflow-input must be an EDN map"
-                        {:phase :validate :action "workflow" :op "create-run"})))
-      parsed)))
-
-(defn- workflow-run-summary
-  [workflow-run]
-  {:run-id               (:run-id workflow-run)
-   :status               (:status workflow-run)
-   :source-definition-id (:source-definition-id workflow-run)
-   :workflow-input       (:workflow-input workflow-run)
-   :current-step-id      (:current-step-id workflow-run)
-   :created-at           (:created-at workflow-run)
-   :updated-at           (:updated-at workflow-run)
-   :finished-at          (:finished-at workflow-run)
-   :blocked              (:blocked workflow-run)
-   :terminal-outcome     (:terminal-outcome workflow-run)})
-
-(defn- execute-psi-tool-workflow-report
-  [{:keys [ctx]} {:keys [op definition-id definition workflow-input run-id reason]}]
-  (let [started-at (System/nanoTime)]
-    (try
-      (when-not ctx
-        (throw (ex-info "psi-tool workflow action requires live runtime ctx"
-                        {:phase :validate :action "workflow" :op op})))
-      (let [result
-            (case op
-              "list-definitions"
-              (let [definitions (->> (get-in @(:state* ctx) [:workflows :definitions])
-                                     vals
-                                     (sort-by :definition-id)
-                                     vec)]
-                {:psi-tool/action         :workflow
-                 :psi-tool/workflow-op    :list-definitions
-                 :psi-tool/overall-status :ok
-                 :psi-tool/workflow       {:definition-count (count definitions)
-                                           :definition-ids (mapv :definition-id definitions)
-                                           :definitions (mapv (fn [definition]
-                                                                {:definition-id (:definition-id definition)
-                                                                 :name (:name definition)
-                                                                 :summary (:summary definition)
-                                                                 :step-order (:step-order definition)})
-                                                              definitions)}})
-
-              "create-run"
-              (let [create-opts (cond-> {}
-                                  definition-id (assoc :definition-id definition-id)
-                                  definition (assoc :definition (parse-workflow-definition-string definition))
-                                  true (assoc :workflow-input (or (parse-workflow-input-string workflow-input) {})))
-                    [new-state created-run-id workflow-run] (workflow-runtime/create-run @(:state* ctx) create-opts)]
-                ((:apply-root-state-update-fn ctx) ctx (constantly new-state))
-                {:psi-tool/action         :workflow
-                 :psi-tool/workflow-op    :create-run
-                 :psi-tool/overall-status :ok
-                 :psi-tool/workflow       {:run-id created-run-id
-                                           :run (workflow-run-summary workflow-run)}})
-
-              "read-run"
-              (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
-                (when-not workflow-run
-                  (throw (ex-info "Workflow run not found"
-                                  {:phase :validate :action "workflow" :op op :run-id run-id})))
-                {:psi-tool/action         :workflow
-                 :psi-tool/workflow-op    :read-run
-                 :psi-tool/overall-status :ok
-                 :psi-tool/workflow       {:run-id run-id
-                                           :run (workflow-run-summary workflow-run)}})
-
-              "list-runs"
-              (let [runs (workflow-runtime/list-workflow-runs @(:state* ctx))]
-                {:psi-tool/action         :workflow
-                 :psi-tool/workflow-op    :list-runs
-                 :psi-tool/overall-status :ok
-                 :psi-tool/workflow       {:run-count (count runs)
-                                           :run-ids (mapv :run-id runs)
-                                           :runs (mapv workflow-run-summary runs)}})
-
-              "resume-run"
-              (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
-                (when-not workflow-run
-                  (throw (ex-info "Workflow run not found"
-                                  {:phase :validate :action "workflow" :op op :run-id run-id})))
-                (when-not (= :blocked (:status workflow-run))
-                  (throw (ex-info "Workflow run is not blocked"
-                                  {:phase :validate :action "workflow" :op op :run-id run-id :status (:status workflow-run)})))
-                (let [new-state (workflow-progression/resume-blocked-run @(:state* ctx) run-id)
-                      resumed-run (workflow-runtime/workflow-run-in new-state run-id)]
-                  ((:apply-root-state-update-fn ctx) ctx (constantly new-state))
-                  {:psi-tool/action         :workflow
-                   :psi-tool/workflow-op    :resume-run
-                   :psi-tool/overall-status :ok
-                   :psi-tool/workflow       {:run-id run-id
-                                             :run (workflow-run-summary resumed-run)}}))
-
-              "cancel-run"
-              (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
-                (when-not workflow-run
-                  (throw (ex-info "Workflow run not found"
-                                  {:phase :validate :action "workflow" :op op :run-id run-id})))
-                (when (contains? #{:completed :failed :cancelled} (:status workflow-run))
-                  (throw (ex-info "Workflow run is already terminal"
-                                  {:phase :validate :action "workflow" :op op :run-id run-id :status (:status workflow-run)})))
-                (let [new-state (workflow-progression/cancel-run @(:state* ctx) run-id (or reason "cancelled by psi-tool"))
-                      cancelled-run (workflow-runtime/workflow-run-in new-state run-id)]
-                  ((:apply-root-state-update-fn ctx) ctx (constantly new-state))
-                  {:psi-tool/action         :workflow
-                   :psi-tool/workflow-op    :cancel-run
-                   :psi-tool/overall-status :ok
-                   :psi-tool/workflow       {:run-id run-id
-                                             :run (workflow-run-summary cancelled-run)}})))]
-        (assoc result :psi-tool/duration-ms (long (/ (- (System/nanoTime) started-at) 1000000))))
-      (catch Exception e
-        {:psi-tool/action         :workflow
-         :psi-tool/workflow-op    (some-> op keyword)
-         :psi-tool/duration-ms    (long (/ (- (System/nanoTime) started-at) 1000000))
-         :psi-tool/overall-status :error
-         :psi-tool/error          (psi-tool-error-summary :workflow e)}))))
 
 (defn serialize-operation-output
   [opts request output narrowing-hint]
@@ -728,14 +546,7 @@
                                                                request)
                   output (pr-str report)]
               (assoc (serialize-operation-output opts request output "Use a narrower project REPL result to reduce output size.")
-                     :is-error (not= :ok (:psi-tool/overall-status report))))
-
-            "workflow"
-            (let [report (execute-psi-tool-workflow-report {:ctx (:ctx opts)} request)
-                  safe-report (sanitize-psi-tool-data report)
-                  output (pr-str safe-report)]
-              (assoc (serialize-operation-output opts request output "Use a narrower workflow result to reduce output size.")
-                     :is-error (not= :ok (:psi-tool/overall-status safe-report))))))
+                     :is-error (not= :ok (:psi-tool/overall-status report))))))
         (catch StackOverflowError _
           {:content  "EQL query error: result contains recursive data that overflowed printer stack"
            :is-error true})
@@ -759,20 +570,11 @@
                  :is-error true})
 
               "project-repl"
-              (let [report {:psi-tool/action          :project-repl
+              (let [report {:psi-tool/action         :project-repl
                             :psi-tool/project-repl-op (some-> (get args "op") keyword)
-                            :psi-tool/duration-ms     0
-                            :psi-tool/overall-status  :error
-                            :psi-tool/error           (psi-tool-error-summary :project-repl e)}]
-                {:content  (pr-str report)
-                 :is-error true})
-
-              "workflow"
-              (let [report {:psi-tool/action         :workflow
-                            :psi-tool/workflow-op    (some-> (get args "op") keyword)
                             :psi-tool/duration-ms    0
                             :psi-tool/overall-status :error
-                            :psi-tool/error          (psi-tool-error-summary :workflow e)}]
+                            :psi-tool/error          (psi-tool-error-summary :project-repl e)}]
                 {:content  (pr-str report)
                  :is-error true})
 

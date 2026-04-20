@@ -5,7 +5,6 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.workflow-runtime]
    [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.agent-session.psi_tool :as psi-tool]
    [psi.agent-session.tools :as tools]))
@@ -97,30 +96,7 @@
     (testing "project-repl eval requires code"
       (let [result ((:execute tool) {"action" "project-repl" "op" "eval"})]
         (is (true? (:is-error result)))
-        (is (re-find #"requires `code`" (:content result)))))
-
-    (testing "workflow requires valid op"
-      (let [result ((:execute tool) {"action" "workflow"})]
-        (is (true? (:is-error result)))
-        (is (re-find #"requires valid `op`" (:content result)))))
-
-    (testing "workflow create-run requires definition-id or definition"
-      (let [result ((:execute tool) {"action" "workflow" "op" "create-run"})]
-        (is (true? (:is-error result)))
-        (is (re-find #"requires `definition-id` or `definition`" (:content result)))))
-
-    (testing "workflow create-run rejects both definition-id and definition"
-      (let [result ((:execute tool) {"action" "workflow"
-                                     "op" "create-run"
-                                     "definition-id" "x"
-                                     "definition" "{:step-order [] :steps {}}"})]
-        (is (true? (:is-error result)))
-        (is (re-find #"either `definition-id` or `definition`, not both" (:content result)))))
-
-    (testing "workflow read-run requires run-id"
-      (let [result ((:execute tool) {"action" "workflow" "op" "read-run"})]
-        (is (true? (:is-error result)))
-        (is (re-find #"requires `run-id`" (:content result)))))))
+        (is (re-find #"requires `code`" (:content result)))))))
 
 (deftest make-psi-tool-invalid-edn-test
   (testing "invalid EDN returns error"
@@ -340,119 +316,6 @@
           parsed (read-string (:content result))]
       (is (false? (:is-error result)))
       (is (= ["psi.agent-session.tools"] (get-in parsed [:psi-tool/code-reload :namespaces]))))))
-
-(deftest make-psi-tool-workflow-test
-  (testing "workflow list-definitions reports registered definitions"
-    (let [[ctx session-id] (create-session-context {:persist? false})
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (first
-                      (let [[state' _ _]
-                            (psi.agent-session.workflow-runtime/register-definition
-                             state
-                             {:definition-id "plan-build-review"
-                              :name "Plan Build Review"
-                              :step-order ["plan"]
-                              :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                               :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                               :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}})]
-                        [state']))))
-          tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-          result ((:execute tool) {"action" "workflow" "op" "list-definitions"})
-          parsed (read-string (:content result))]
-      (is (false? (:is-error result)))
-      (is (= :workflow (:psi-tool/action parsed)))
-      (is (= :list-definitions (:psi-tool/workflow-op parsed)))
-      (is (= :ok (:psi-tool/overall-status parsed)))
-      (is (= 1 (get-in parsed [:psi-tool/workflow :definition-count])))
-      (is (= ["plan-build-review"] (get-in parsed [:psi-tool/workflow :definition-ids])))))
-
-  (testing "workflow create-run creates a run from inline definition"
-    (let [[ctx session-id] (create-session-context {:persist? false})
-          tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-          result ((:execute tool) {"action" "workflow"
-                                   "op" "create-run"
-                                   "definition" "{:name \"Inline\" :step-order [\"plan\"] :steps {\"plan\" {:executor {:type :agent :profile \"planner\" :mode :sync} :result-schema [:map [:outcome [:= :ok]] [:outputs :map]] :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}"
-                                   "workflow-input" "{:task \"ship it\"}"})
-          parsed (read-string (:content result))
-          run-id (get-in parsed [:psi-tool/workflow :run-id])]
-      (is (false? (:is-error result)))
-      (is (= :create-run (:psi-tool/workflow-op parsed)))
-      (is (= :ok (:psi-tool/overall-status parsed)))
-      (is (string? run-id))
-      (is (= :pending (get-in parsed [:psi-tool/workflow :run :status])))
-      (is (= {:task "ship it"} (get-in parsed [:psi-tool/workflow :run :workflow-input])))
-      (is (= run-id (get-in @(:state* ctx) [:workflows :run-order 0])))))
-
-  (testing "workflow list-runs and read-run return run summaries"
-    (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "plan-build-review"
-                      :name "Plan Build Review"
-                      :step-order ["plan"]
-                      :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                       :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                       :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[state1 definition-id _] (psi.agent-session.workflow-runtime/register-definition state definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
-                       state2)))
-          tool        (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-          list-result ((:execute tool) {"action" "workflow" "op" "list-runs"})
-          list-parsed (read-string (:content list-result))
-          read-result ((:execute tool) {"action" "workflow" "op" "read-run" "run-id" "run-1"})
-          read-parsed (read-string (:content read-result))]
-      (is (false? (:is-error list-result)))
-      (is (= :list-runs (:psi-tool/workflow-op list-parsed)))
-      (is (= 1 (get-in list-parsed [:psi-tool/workflow :run-count])))
-      (is (= ["run-1"] (get-in list-parsed [:psi-tool/workflow :run-ids])))
-      (is (false? (:is-error read-result)))
-      (is (= :read-run (:psi-tool/workflow-op read-parsed)))
-      (is (= "run-1" (get-in read-parsed [:psi-tool/workflow :run-id])))
-      (is (= :pending (get-in read-parsed [:psi-tool/workflow :run :status])))))
-
-  (testing "workflow resume-run resumes blocked runs"
-    (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "plan-build-review"
-                      :name "Plan Build Review"
-                      :step-order ["plan"]
-                      :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                       :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                       :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[state1 definition-id _] (psi.agent-session.workflow-runtime/register-definition state definition)
-                           [state2 run-id _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
-                       (assoc-in state2 [:workflows :runs run-id :status] :blocked))))
-          tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-          result ((:execute tool) {"action" "workflow" "op" "resume-run" "run-id" "run-1"})
-          parsed (read-string (:content result))]
-      (is (false? (:is-error result)))
-      (is (= :resume-run (:psi-tool/workflow-op parsed)))
-      (is (= :running (get-in parsed [:psi-tool/workflow :run :status])))
-      (is (= :running (get-in @(:state* ctx) [:workflows :runs "run-1" :status])))))
-
-  (testing "workflow cancel-run cancels non-terminal runs"
-    (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "plan-build-review"
-                      :name "Plan Build Review"
-                      :step-order ["plan"]
-                      :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                       :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                       :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[state1 definition-id _] (psi.agent-session.workflow-runtime/register-definition state definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
-                       state2)))
-          tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-          result ((:execute tool) {"action" "workflow" "op" "cancel-run" "run-id" "run-1" "reason" "operator request"})
-          parsed (read-string (:content result))]
-      (is (false? (:is-error result)))
-      (is (= :cancel-run (:psi-tool/workflow-op parsed)))
-      (is (= :cancelled (get-in parsed [:psi-tool/workflow :run :status])))
-      (is (= "operator request" (get-in parsed [:psi-tool/workflow :run :terminal-outcome :reason])))
-      (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "run-1" :status]))))))
 
 (deftest make-psi-tool-project-repl-test
   (testing "project-repl status reports absent instance"

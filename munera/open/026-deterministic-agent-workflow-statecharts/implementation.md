@@ -89,7 +89,6 @@ Current status:
   - validation-failure retry/fail behavior
   - execution-failure retry/fail behavior
   - blocked-run resume
-  - runtime-owned cancellation helper for workflow runs
 - Added focused tests in `workflow_progression_test.clj`
 
 2026-04-19 — Pathom/EQL workflow read surface
@@ -116,28 +115,10 @@ Current status:
 - Verified focused workflow + resolver tests are green:
   - `clojure -M:test --focus psi.agent-session.workflow-resolvers-test --focus psi.agent-session.workflow-attempts-test --focus psi.agent-session.workflow-progression-test --focus psi.agent-session.resolvers-test`
 
-2026-04-19 — `psi-tool` workflow ops
-- Extended `components/agent-session/src/psi/agent_session/psi_tool.clj` with `action: "workflow"`
-- Added slice-one workflow ops:
-  - `list-definitions`
-  - `create-run`
-  - `read-run`
-  - `list-runs`
-  - `resume-run`
-  - `cancel-run`
-- `create-run` supports:
-  - registered definitions via `definition-id`
-  - inline definitions via EDN `definition`
-  - EDN `workflow-input`
-- `resume-run` resumes blocked runs through runtime-owned progression
-- `cancel-run` applies runtime-owned terminal cancellation
-- Added focused workflow psi-tool coverage in `components/agent-session/test/psi/agent_session/tools_test.clj`
-- Verified focused workflow/runtime/query/tool tests are green:
-  - `clojure -M:test --focus psi.agent-session.tools-test --focus psi.agent-session.workflow-resolvers-test --focus psi.agent-session.workflow-attempts-test --focus psi.agent-session.workflow-progression-test --focus psi.agent-session.resolvers-test`
-
 Notes:
-- The deterministic workflow substrate now covers state model, statechart compilation, run creation, attempt/session linkage, result progression, Pathom/EQL read exposure, and initial `psi-tool` control operations.
+- The deterministic workflow substrate now covers state model, statechart compilation, run creation, attempt/session linkage, result progression, and Pathom/EQL read exposure.
 - Remaining work is primarily:
+  - `psi-tool` workflow ops
   - orchestration that combines run creation, attempt creation, and progression into a full executable lifecycle
   - representative chain-like proof and `agent-chain` follow-on
 - Existing extension workflow runtime in `workflows.clj` remains separate; `workflow_runtime.clj` and related files are for the new canonical deterministic workflow-run state.
