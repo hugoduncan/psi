@@ -1,6 +1,6 @@
 (ns psi.agent-session.scheduler-lifecycle-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.persistence :as persist]

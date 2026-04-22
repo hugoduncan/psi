@@ -5,8 +5,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
-   [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.test-support :as test-support]))
+   [psi.agent-session.mutations :as mutations]))
 
 (defn- create-two-session-context []
   (let [ctx (session/create-context {:persist? false

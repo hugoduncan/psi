@@ -50,3 +50,8 @@
   - removed unused test requires/helpers in auto-session-name, commit-checks, and LSP extension tests
   - removed dead workflow-step locals in `mcp_tasks_run.clj`
   - added an explicit `workflow-file-loader` alias in the workflow-loader delegate tests so `with-redefs` targets resolve cleanly under lint
+
+2026-04-22
+- Agent-session test slice 1:
+  - removed unused `testing` refers and dead requires from extension/scheduler/post-tool tests
+  - simplified one scheduler test local binding to clear a redundant-let/unused-result warning

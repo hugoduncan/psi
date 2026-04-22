@@ -1,6 +1,6 @@
 (ns psi.agent-session.extension-installs-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.extension-installs :as installs]
    [psi.agent-session.test-support :as test-support])

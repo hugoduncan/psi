@@ -1,6 +1,6 @@
 (ns psi.agent-session.scheduler-dispatch-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.test-support :as test-support]))
@@ -56,11 +56,11 @@
                                                                         :is-streaming true
                                                                         :scheduler {:schedules {"sch-1" initial-schedule}
                                                                                     :queue []}}})]
-    (let [result (dispatch/dispatch! ctx :scheduler/fired
-                                     {:session-id session-id
-                                      :schedule-id "sch-1"}
-                                     {:origin :core})
-          stored (get-in (ss/get-session-data-in ctx session-id)
+    (dispatch/dispatch! ctx :scheduler/fired
+                        {:session-id session-id
+                         :schedule-id "sch-1"}
+                        {:origin :core})
+    (let [stored (get-in (ss/get-session-data-in ctx session-id)
                          [:scheduler :schedules "sch-1"])]
       (is (= :queued (:status stored)))
       (is (= :queued (:status stored)))

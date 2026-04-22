@@ -14,3 +14,4 @@
   - trimmed low-risk extension/test warnings and fixed workflow-loader test alias resolution drift
 - [ ] Clean up remaining scattered warnings and run `bb lint` to green
   - app-runtime test cleanup slice removed unused `testing` refers and one dead binding
+  - agent-session test slice 1 targets low-risk extension/scheduler/post-tool warning cleanup

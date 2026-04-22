@@ -1,6 +1,6 @@
 (ns psi.agent-session.mutations-post-tool-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.post-tool :as post-tool]
