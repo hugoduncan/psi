@@ -32,7 +32,7 @@ Tests added/updated:
 
 Focused verification:
 - ran `clojure -M:test --focus extensions.work-on-test`
-- result: `18 tests, 96 assertions, 0 failures`
+- result: `20 tests, 111 assertions, 0 failures`
 
 Review follow-up summary:
 - review found that existing-branch attach success was not distinguished from fresh creation, so `:base-branch-applied?` could be overstated
