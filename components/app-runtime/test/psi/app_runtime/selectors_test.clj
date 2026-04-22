@@ -1,6 +1,6 @@
 (ns psi.app-runtime.selectors-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session-state :as ss]

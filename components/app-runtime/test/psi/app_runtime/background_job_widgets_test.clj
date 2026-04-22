@@ -1,6 +1,6 @@
 (ns psi.app-runtime.background-job-widgets-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.app-runtime.background-job-widgets :as widgets]))
 
 (def sample-jobs

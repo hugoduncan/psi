@@ -1,6 +1,6 @@
 (ns psi.app-runtime.background-job-view-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.app-runtime.background-job-view :as bg]))
 
 (deftest jobs-summary-sorts-and-renders-canonical-list-text-test

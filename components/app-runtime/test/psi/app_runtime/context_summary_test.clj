@@ -1,6 +1,6 @@
 (ns psi.app-runtime.context-summary-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [psi.app-runtime.context-summary :as context-summary]))
 
 (deftest session-tree-line-label-prefers-display-name-and-includes-time-and-worktree-test

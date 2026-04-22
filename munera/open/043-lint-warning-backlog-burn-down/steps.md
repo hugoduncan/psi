@@ -12,3 +12,4 @@
   - fixed missing `clojure.string` aliases and removed several unused helper/binding warnings
   - targeted `clj-kondo` for the touched slice reports `errors: 0, warnings: 0`
 - [ ] Clean up remaining scattered warnings and run `bb lint` to green
+  - app-runtime test cleanup slice removed unused `testing` refers and one dead binding

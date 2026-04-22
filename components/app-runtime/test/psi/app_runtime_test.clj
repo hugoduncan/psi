@@ -116,7 +116,6 @@
                                                          "assistant"
                                                          (:psi.agent-session/session-id
                                                           ((:query api) [:psi.agent-session/session-id]))))})
-                event-queue            (java.util.concurrent.LinkedBlockingQueue.)
                 tui-opts*              (atom nil)
                 tui-start!             (fn [_model-name _run-agent-fn opts]
                                          (reset! tui-opts* opts)

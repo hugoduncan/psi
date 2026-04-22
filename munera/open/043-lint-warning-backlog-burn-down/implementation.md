@@ -39,3 +39,8 @@
   - removed unused helpers/bindings in app-runtime navigation/context surfaces, workflow psi-tool handling, and LSP document close handling
   - simplified OpenAI chat completion header construction to remove a redundant-let warning without changing request semantics
   - verified the touched cross-component source slice with targeted `clj-kondo` (`errors: 0, warnings: 0`)
+
+2026-04-22
+- App-runtime test cleanup slice:
+  - removed unused `testing` refers from the small projection/selector tests
+  - removed an unused `event-queue` binding from `app_runtime_test.clj`
