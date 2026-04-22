@@ -270,21 +270,23 @@
 
 (defn request-diagnostics!
   [api {:keys [workspace-root paths diagnostics-timeout-ms dispatch-id]}]
-  (let [timeout-ms (long (or diagnostics-timeout-ms 1000))
-        deadline   (+ (System/currentTimeMillis) timeout-ms)]
+  (let [timeout-ms         (long (or diagnostics-timeout-ms 1000))
+        deadline           (+ (System/currentTimeMillis) timeout-ms)
+        per-request-max-ms 200]
     (loop [diagnostics-by-path {}]
       (let [pending-paths (remove #(contains? diagnostics-by-path %) paths)
             requested     (reduce (fn [acc path]
                                     (let [remaining-ms (max 1 (- deadline (System/currentTimeMillis)))
-                                          response     (jsonrpc-request! api
-                                                                         (dispatch/assoc-dispatch-id
-                                                                          {:workspace-root workspace-root
-                                                                           :id (str "diagnostic-" (hash path))
-                                                                           :method "textDocument/diagnostic"
-                                                                           :params (document-diagnostics-request path)
-                                                                           :timeout-ms remaining-ms}
-                                                                          dispatch-id))
-                                          items        (diagnostics-response->items response)]
+                                          request-timeout-ms (min per-request-max-ms remaining-ms)
+                                          response           (jsonrpc-request! api
+                                                                               (dispatch/assoc-dispatch-id
+                                                                                {:workspace-root workspace-root
+                                                                                 :id (str "diagnostic-" (hash path))
+                                                                                 :method "textDocument/diagnostic"
+                                                                                 :params (document-diagnostics-request path)
+                                                                                 :timeout-ms request-timeout-ms}
+                                                                                dispatch-id))
+                                          items              (diagnostics-response->items response)]
                                       (cond-> acc
                                         (some? items) (assoc path items))))
                                   diagnostics-by-path
