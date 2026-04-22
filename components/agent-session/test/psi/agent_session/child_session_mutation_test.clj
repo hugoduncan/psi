@@ -1,5 +1,6 @@
 (ns psi.agent-session.child-session-mutation-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
@@ -147,8 +148,8 @@
                  :enabled true}]
                (mapv #(select-keys % [:id :ext-path :section :content :enabled])
                      (:prompt-contributions child-sd))))
-        (is (clojure.string/includes? (prompt-request/effective-system-prompt child-sd)
-                                      "tool: /work-on"))))))
+        (is (str/includes? (prompt-request/effective-system-prompt child-sd)
+                           "tool: /work-on"))))))
 
 (deftest create-child-session-selection-filters-extension-contributions-coherently-test
   (testing "child selection allowlists extension prompt contributions consistently"
@@ -158,8 +159,8 @@
                     :prompt-contributions [{:id "a" :ext-path "/ext/a" :content "A" :enabled true}
                                            {:id "b" :ext-path "/ext/b" :content "B" :enabled true}]
                     :tool-defs []}]
-      (is (clojure.string/includes? (prompt-request/effective-system-prompt child-sd) "A"))
-      (is (not (clojure.string/includes? (prompt-request/effective-system-prompt child-sd) "B"))))))
+      (is (str/includes? (prompt-request/effective-system-prompt child-sd) "A"))
+      (is (not (str/includes? (prompt-request/effective-system-prompt child-sd) "B"))))))
 
 (deftest create-child-session-selection-rebuilds-minimal-base-prompt-and-filters-tools-test
   (testing "child selection can rebuild a reduced base prompt and align prompt-visible tools"
@@ -203,7 +204,7 @@
                (:prompt-component-selection child-sd)))
         (is (= ["read"] (mapv :name (:tool-defs child-sd))))
         (is (= [] (:skills child-sd)))
-        (is (not (clojure.string/includes? (:base-system-prompt child-sd) "Context text")))
+        (is (not (str/includes? (:base-system-prompt child-sd) "Context text")))
         (is (= ["read"] (mapv :name (:tools provider))))))))
 
 (deftest run-agent-loop-in-session-targets-child-session-test

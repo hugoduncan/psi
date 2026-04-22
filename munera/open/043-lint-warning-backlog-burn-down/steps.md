@@ -15,3 +15,4 @@
 - [ ] Clean up remaining scattered warnings and run `bb lint` to green
   - app-runtime test cleanup slice removed unused `testing` refers and one dead binding
   - agent-session test slice 1 targets low-risk extension/scheduler/post-tool warning cleanup
+  - agent-session/introspection/recursion/ai warning slice removed duplicate requires, added missing `clojure.string`/`clojure.edn` aliases, and trimmed unused test requires/helpers; targeted `clj-kondo` on the touched files reports `errors: 0, warnings: 0`

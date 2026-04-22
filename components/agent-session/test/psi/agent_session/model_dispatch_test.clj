@@ -2,6 +2,7 @@
   "Tests for model management, thinking level, and dispatch routing
   (prompt contributions, event log, projection setters)."
   (:require
+   [clojure.edn :as edn]
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
@@ -130,7 +131,7 @@
 
 (deftest dispatch-registry-and-event-log-eql-test
   (testing "query-in resolves registered dispatch handler metadata attrs"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx _session-id] (create-session-context)
           result (session/query-in ctx
                                    [:psi.agent-session/registered-dispatch-event-count
                                     {:psi.agent-session/registered-dispatch-events
@@ -195,8 +196,8 @@
         (is (= "/repo/replay" (:worktree-path sd))))))
 
   (testing "session ids are explicit when reading sibling sessions"
-    (let [[ctx session-id]      (create-session-context)
-          sd1                (session/new-session-in! ctx nil {})
+    (let [[ctx _session-id] (create-session-context)
+          sd1               (session/new-session-in! ctx nil {})
           first-id           (:session-id sd1)
           sd2                (session/new-session-in! ctx first-id {})
           second-id          (:session-id sd2)]
@@ -204,58 +205,59 @@
       (is (= second-id (:session-id (ss/get-session-data-in ctx second-id))))))
 
   (testing "new-session-in! initialization is logged through dispatch"
-    (let [[ctx session-id]       (create-session-context {:persist? false})
-          old-id             session-id
-          _                  (dispatch/clear-event-log!)
-          sd                 (session/new-session-in! ctx nil {:session-name "dispatch-new"
-                                                               :worktree-path "/repo/dispatch-new"})
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          old-id           session-id
+          _                (dispatch/clear-event-log!)
+          sd               (session/new-session-in! ctx nil {:session-name "dispatch-new"
+                                                             :worktree-path "/repo/dispatch-new"})
+          session-id       (:session-id sd)
+          ctx              (retarget ctx sd)
+          entry            (first (filter #(= :session/new-initialize (:event-type %))
+                                          (dispatch/event-log-entries)))]
+      (is (some? entry))
+      (is (not= old-id session-id))
+      (is (= session-id (:session-id (ss/get-session-data-in ctx session-id))))
+      (is (= :core (:origin entry)))
+      (is (= "dispatch-new" (get-in entry [:event-data :session-name])))
+      (is (= "/repo/dispatch-new" (get-in entry [:event-data :worktree-path]))))))
+
+(testing "resume-session-in! loaded state is logged through dispatch"
+  (let [[ctx session-id] (create-session-context {:session-defaults {:model {:provider "openai"
+                                                                             :id "gpt-5.3-codex"
+                                                                             :reasoning true}}
+                                                  :persist? false})
+        _   (dispatch/clear-event-log!)
+        f   (File/createTempFile "psi-resume-dispatch" ".ndedn")]
+    (.deleteOnExit f)
+    (spit f (str "{:type :session :version 4 :id \"sess-dispatch\" :timestamp #inst \"2024-01-01T00:00:00Z\" :cwd \"/legacy/cwd\" :worktree-path \"/repo/resume-dispatch\"}\n"
+                 "{:id \"e1\" :parent-id nil :timestamp #inst \"2024-01-01T00:00:01Z\" :kind :thinking-level :data {:thinking-level :medium}}\n"
+                 "{:id \"e2\" :parent-id \"e1\" :timestamp #inst \"2024-01-01T00:00:02Z\" :kind :session-info :data {:name \"Resume Dispatch\"}}\n"))
+    (let [sd                 (session/resume-session-in! ctx session-id (.getAbsolutePath f))
           session-id         (:session-id sd)
-          ctx                (retarget ctx sd)]
-      (let [entry (first (filter #(= :session/new-initialize (:event-type %))
-                                 (dispatch/event-log-entries)))]
-        (is (not= old-id session-id))
-        (is (= session-id (:session-id (ss/get-session-data-in ctx session-id))))
-        (is (= :core (:origin entry)))
-        (is (= "dispatch-new" (get-in entry [:event-data :session-name])))
-        (is (= "/repo/dispatch-new" (get-in entry [:event-data :worktree-path]))))))
+          ctx                (retarget ctx sd)
+          entry              (first (filter #(= :session/resume-loaded (:event-type %))
+                                            (dispatch/event-log-entries)))]
+      (is (= "Resume Dispatch" (:session-name (ss/get-session-data-in ctx session-id))))
+      (is (= :core (:origin entry)))
+      (is (= "sess-dispatch" (get-in entry [:event-data :session-id])))
+      (is (= "/repo/resume-dispatch" (get-in entry [:event-data :worktree-path])))
+      (is (= :medium (get-in entry [:event-data :thinking-level]))))))
 
-  (testing "resume-session-in! loaded state is logged through dispatch"
-    (let [[ctx session-id] (create-session-context {:session-defaults {:model {:provider "openai"
-                                                                               :id "gpt-5.3-codex"
-                                                                               :reasoning true}}
-                                                    :persist? false})
-          _   (dispatch/clear-event-log!)
-          f   (File/createTempFile "psi-resume-dispatch" ".ndedn")]
-      (.deleteOnExit f)
-      (spit f (str "{:type :session :version 4 :id \"sess-dispatch\" :timestamp #inst \"2024-01-01T00:00:00Z\" :cwd \"/legacy/cwd\" :worktree-path \"/repo/resume-dispatch\"}\n"
-                   "{:id \"e1\" :parent-id nil :timestamp #inst \"2024-01-01T00:00:01Z\" :kind :thinking-level :data {:thinking-level :medium}}\n"
-                   "{:id \"e2\" :parent-id \"e1\" :timestamp #inst \"2024-01-01T00:00:02Z\" :kind :session-info :data {:name \"Resume Dispatch\"}}\n"))
-      (let [sd                 (session/resume-session-in! ctx session-id (.getAbsolutePath f))
-            session-id         (:session-id sd)
-            ctx                (retarget ctx sd)
-            entry              (first (filter #(= :session/resume-loaded (:event-type %))
-                                              (dispatch/event-log-entries)))]
-        (is (= "Resume Dispatch" (:session-name (ss/get-session-data-in ctx session-id))))
-        (is (= :core (:origin entry)))
-        (is (= "sess-dispatch" (get-in entry [:event-data :session-id])))
-        (is (= "/repo/resume-dispatch" (get-in entry [:event-data :worktree-path])))
-        (is (= :medium (get-in entry [:event-data :thinking-level]))))))
-
-  (testing "fork-session-in! initialization is logged through dispatch"
-    (let [[ctx session-id]       (create-session-context {:persist? false})
-          _                  (dispatch/clear-event-log!)
-          parent-sd          (session/new-session-in! ctx nil {})
-          parent-id          (:session-id parent-sd)
-          entry-id  (:id (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "user"
-                                                                                      :content [{:type :text :text "fork-dispatch"}]
-                                                                                      :timestamp (java.time.Instant/now)})))]
-      (session/fork-session-in! ctx parent-id entry-id)
-      (let [entry (first (filter #(= :session/fork-initialize (:event-type %))
-                                 (dispatch/event-log-entries)))]
-        (is (= :core (:origin entry)))
-        (is (= parent-id (get-in entry [:event-data :parent-session-id])))
-        (is (= entry-id (get-in entry [:event-data :entry-id])))
-        (is (pos? (get-in entry [:event-data :entry-count])))))))
+(testing "fork-session-in! initialization is logged through dispatch"
+  (let [[ctx _session-id] (create-session-context {:persist? false})
+        _                 (dispatch/clear-event-log!)
+        parent-sd          (session/new-session-in! ctx nil {})
+        parent-id          (:session-id parent-sd)
+        entry-id  (:id (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "user"
+                                                                                    :content [{:type :text :text "fork-dispatch"}]
+                                                                                    :timestamp (java.time.Instant/now)})))]
+    (session/fork-session-in! ctx parent-id entry-id)
+    (let [entry (first (filter #(= :session/fork-initialize (:event-type %))
+                               (dispatch/event-log-entries)))]
+      (is (= :core (:origin entry)))
+      (is (= parent-id (get-in entry [:event-data :parent-session-id])))
+      (is (= entry-id (get-in entry [:event-data :entry-id])))
+      (is (pos? (get-in entry [:event-data :entry-count]))))))
 
 (deftest session-update-helper-consolidation-test
   (testing "session-update wrapper composes with apply-root-state-update-in! to update session data and context index"
@@ -395,9 +397,9 @@
         (is (= :prose (get-in prefs [:agent-session :prompt-mode]))))
       (is (= {:version 1
               :agent-session {:prompt-mode :prose}}
-             (clojure.edn/read-string (slurp shared-f))))
+             (edn/read-string (slurp shared-f))))
       (is (.exists local-f))
-      (is (= "anthropic" (get-in (clojure.edn/read-string (slurp local-f)) [:agent-session :model-provider])))))
+      (is (= "anthropic" (get-in (edn/read-string (slurp local-f)) [:agent-session :model-provider])))))
 
   (testing "set-thinking-level-in! persists project preferences to the local project layer"
     (let [cwd      (str (System/getProperty "java.io.tmpdir") "/psi-project-prefs-" (java.util.UUID/randomUUID))
@@ -415,8 +417,8 @@
         (is (= :prose (get-in prefs [:agent-session :prompt-mode]))))
       (is (= {:version 1
               :agent-session {:prompt-mode :prose}}
-             (clojure.edn/read-string (slurp shared-f))))
-      (is (= :high (get-in (clojure.edn/read-string (slurp local-f)) [:agent-session :thinking-level])))))
+             (edn/read-string (slurp shared-f))))
+      (is (= :high (get-in (edn/read-string (slurp local-f)) [:agent-session :thinking-level])))))
 
   (testing "cycle-thinking-level-in! advances level for reasoning model"
     (let [[ctx session-id] (create-session-context {:session-defaults {:thinking-level :off}})]

@@ -1,5 +1,6 @@
 (ns psi.introspection.graph-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
    [psi.engine.core :as engine]
    [psi.graph.analysis :as graph]
@@ -142,7 +143,7 @@
                                         (concat (flat-attrs (:psi.resolver/input r))
                                                 (flat-attrs (:psi.resolver/output r)))))
                               (filter keyword?))]
-          (is (every? #(clojure.string/starts-with? (namespace %) "psi.") all-attrs))))
+          (is (every? #(str/starts-with? (namespace %) "psi.") all-attrs))))
 
       (testing "sorted by sym"
         (let [syms (map (comp str :psi.resolver/sym) index)]

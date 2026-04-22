@@ -13,6 +13,7 @@
    This namespace exists to keep the graph surface easy to scan and to make
    discovery-contract regressions obvious."
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.session-state :as ss]
@@ -341,7 +342,7 @@
       (is (seq index))
 
       (testing "all keys are psi.* keywords"
-        (is (every? #(clojure.string/starts-with? (namespace %) "psi.") (keys index))))
+        (is (every? #(str/starts-with? (namespace %) "psi.") (keys index))))
 
       (testing "each entry has produced-by and reachable-via"
         (doseq [[_ v] index]

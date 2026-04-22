@@ -1,6 +1,5 @@
 (ns psi.ai.user-models-test
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest testing is]]
    [psi.ai.user-models :as user-models]))
 

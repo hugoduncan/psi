@@ -55,3 +55,11 @@
 - Agent-session test slice 1:
   - removed unused `testing` refers and dead requires from extension/scheduler/post-tool tests
   - simplified one scheduler test local binding to clear a redundant-let/unused-result warning
+
+2026-04-22
+- Agent-session/introspection/recursion/ai warning slice:
+  - removed duplicate `psi.agent-session.test-support` require in `eql_introspection_api_error_test.clj`
+  - added explicit `clojure.string` aliases in child-session/graph/jsonrpc/introspection tests and switched call sites to aliases so `clj-kondo` resolves them cleanly
+  - added explicit `clojure.edn` alias in `model_dispatch_test.clj` and converted local EDN reads to the alias
+  - removed unused `clojure.java.io` / recursion policy test requires and promoted one test helper from private to public to match cross-namespace usage
+  - targeted `clj-kondo` on the touched files now reports `errors: 0, warnings: 0`

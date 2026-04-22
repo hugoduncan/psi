@@ -1,5 +1,6 @@
 (ns jsonrpc-echo-bb
-  (:require [cheshire.core :as json])
+  (:require [cheshire.core :as json]
+            [clojure.string :as str])
   (:import
    (java.io BufferedInputStream ByteArrayOutputStream)
    (java.nio.charset StandardCharsets)))
@@ -28,8 +29,8 @@
       (cond
         (nil? line) (when (seq headers) headers)
         (empty? line) headers
-        :else (let [[k v] (clojure.string/split line #":\s*" 2)]
-                (recur (assoc headers (clojure.string/lower-case k) v)))))))
+        :else (let [[k v] (str/split line #":\s*" 2)]
+                (recur (assoc headers (str/lower-case k) v)))))))
 
 (defn read-exact [^BufferedInputStream in n]
   (let [buf (byte-array n)]

@@ -2,8 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.memory.core :as memory]
-   [psi.recursion.core :as core]
-   [psi.recursion.policy :as policy]))
+   [psi.recursion.core :as core]))
 
 (def ^:private all-ready
   {:query-ready true
@@ -37,7 +36,7 @@
   (core/register-hooks-in! ctx)
   (:cycle-id (core/handle-trigger-in! ctx (make-trigger :manual) all-ready)))
 
-(defn- setup-planned-cycle
+(defn setup-planned-cycle
   ([]
    (setup-planned-cycle {}))
   ([{:keys [config-overrides state-overrides graph-state memory-state]
