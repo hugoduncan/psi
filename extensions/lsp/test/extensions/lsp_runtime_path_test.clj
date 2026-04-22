@@ -55,21 +55,17 @@
     (session/register-mutations-in! qctx mutations/all-mutations true)
     (ext/create-extension-api (:extension-registry ctx) "/ext/lsp.clj" runtime-fns)))
 
-(defn- await-diagnostic
-  [api worktree file-path timeout-ms]
+(defn- await-diagnostic-finding
+  [api workspace-root file-path timeout-ms]
   (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
     (loop []
-      (let [result (sut/sync-tool-result! api
-                                          {:worktree-path worktree
-                                           :tool-result {:effects [{:path file-path}]}
-                                           :config {:command lsp-fixture-command
-                                                    :startup-timeout-ms 2000
-                                                    :diagnostics-timeout-ms timeout-ms
-                                                    :sync-timeout-ms 2000}})
-            finding (get (:diagnostics-by-path result) file-path)]
-        (if (or finding
+      (let [diagnostics-by-path (sut/request-diagnostics! api {:workspace-root workspace-root
+                                                               :paths [file-path]
+                                                               :diagnostics-timeout-ms 500})
+            finding (get diagnostics-by-path file-path)]
+        (if (or (seq finding)
                 (>= (System/currentTimeMillis) deadline))
-          [result finding]
+          finding
           (do
             (Thread/sleep 100)
             (recur)))))))
@@ -321,8 +317,14 @@
                                                         :startup-timeout-ms 2000
                                                         :diagnostics-timeout-ms 5000}})
           _ (write-file! file-path "(ns demo) ;; warn\n")
-          [second-result finding] (await-diagnostic api worktree file-path 5000)
+          second-result (sut/sync-tool-result! api
+                                               {:worktree-path worktree
+                                                :tool-result {:effects [{:path file-path}]}
+                                                :config {:command lsp-fixture-command
+                                                         :startup-timeout-ms 2000
+                                                         :diagnostics-timeout-ms 5000}})
           root (:workspace-root second-result)
+          finding (await-diagnostic-finding api root file-path 5000)
           svc (services/service-in ctx (sut/workspace-key root))
           debug @(:debug-atom svc)]
       (try
@@ -365,7 +367,14 @@
           cleared-document-state (sut/document-state file-path)
           cleared-initialized? (sut/workspace-initialized? root)
           _ (write-file! file-path "(ns demo) ;; warn again\n")
-          [second-result finding] (await-diagnostic api worktree file-path 5000)
+          second-result (sut/sync-tool-result! api
+                                               {:worktree-path worktree
+                                                :tool-result {:effects [{:path file-path}]}
+                                                :config {:command lsp-fixture-command
+                                                         :startup-timeout-ms 2000
+                                                         :diagnostics-timeout-ms 5000
+                                                         :sync-timeout-ms 2000}})
+          finding (await-diagnostic-finding api root file-path 5000)
           svc-after (services/service-in ctx (sut/workspace-key root))
           entries (dispatch/dispatch-trace-entries)]
       (try
