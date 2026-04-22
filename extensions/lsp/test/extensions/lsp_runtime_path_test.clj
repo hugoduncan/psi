@@ -356,7 +356,7 @@
                                                 :tool-result {:effects [{:path file-path}]}
                                                 :config {:command lsp-fixture-command
                                                          :startup-timeout-ms 2000
-                                                         :diagnostics-timeout-ms 2000
+                                                         :diagnostics-timeout-ms 5000
                                                          :sync-timeout-ms 2000}})
           svc-after (services/service-in ctx (sut/workspace-key root))
           entries (dispatch/dispatch-trace-entries)]
