@@ -272,30 +272,31 @@
   [api {:keys [workspace-root paths diagnostics-timeout-ms dispatch-id]}]
   (let [timeout-ms (long (or diagnostics-timeout-ms 1000))
         deadline   (+ (System/currentTimeMillis) timeout-ms)]
-    (loop [remaining          (seq paths)
-           diagnostics-by-path {}]
-      (if-let [path (first remaining)]
-        (let [response (jsonrpc-request! api
-                                         (dispatch/assoc-dispatch-id
-                                          {:workspace-root workspace-root
-                                           :id (str "diagnostic-" (hash path))
-                                           :method "textDocument/diagnostic"
-                                           :params (document-diagnostics-request path)
-                                           :timeout-ms timeout-ms}
-                                          dispatch-id))
-              items    (diagnostics-response->items response)]
-          (recur (next remaining)
-                 (cond-> diagnostics-by-path
-                   (some? items) (assoc path items))))
-        (loop [published diagnostics-by-path]
-          (let [merged (merge published
-                              (diagnostics-from-published-cache api workspace-root paths))]
-            (if (or (diagnostics-known? merged paths)
-                    (>= (System/currentTimeMillis) deadline))
-              merged
-              (do
-                (Thread/sleep 50)
-                (recur merged)))))))))
+    (loop [diagnostics-by-path {}]
+      (let [pending-paths (remove #(contains? diagnostics-by-path %) paths)
+            requested     (reduce (fn [acc path]
+                                    (let [remaining-ms (max 1 (- deadline (System/currentTimeMillis)))
+                                          response     (jsonrpc-request! api
+                                                                         (dispatch/assoc-dispatch-id
+                                                                          {:workspace-root workspace-root
+                                                                           :id (str "diagnostic-" (hash path))
+                                                                           :method "textDocument/diagnostic"
+                                                                           :params (document-diagnostics-request path)
+                                                                           :timeout-ms remaining-ms}
+                                                                          dispatch-id))
+                                          items        (diagnostics-response->items response)]
+                                      (cond-> acc
+                                        (some? items) (assoc path items))))
+                                  diagnostics-by-path
+                                  pending-paths)
+            merged        (merge requested
+                                 (diagnostics-from-published-cache api workspace-root paths))]
+        (if (or (diagnostics-known? merged paths)
+                (>= (System/currentTimeMillis) deadline))
+          merged
+          (do
+            (Thread/sleep 50)
+            (recur merged)))))))
 
 (defn- changed-paths
   [{:keys [tool-result]}]

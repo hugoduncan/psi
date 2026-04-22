@@ -134,6 +134,31 @@
       (is (= "LSP diagnostics unavailable"
              (get-in contribution [:enrichments 0 :label]))))))
 
+(deftest request-diagnostics-retries-until-deadline-test
+  (testing "request-diagnostics! retries unresolved direct diagnostic requests until deadline"
+    (let [root (tmp-dir)
+          _    (mkdirs! (str root "/.git"))
+          path (spit! (str root "/src/foo/core.clj") "(ns foo.core)")
+          {:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/lsp.clj"})
+          calls* (atom 0)
+          api' (assoc api
+                      :list-services (fn [] [])
+                      :service-request (fn [spec]
+                                         (swap! state update :service-requests conj spec)
+                                         (swap! calls* inc)
+                                         (if (= 1 @calls*)
+                                           {:psi.extension.service/response {"result" {}}}
+                                           {:psi.extension.service/response
+                                            {"result" {"items" [{"message" "Unused require"
+                                                                 "severity" 2}]}}})))
+          diagnostics (sut/request-diagnostics! api' {:workspace-root root
+                                                      :paths [path]
+                                                      :diagnostics-timeout-ms 500})]
+      (is (= [{"message" "Unused require"
+               "severity" 2}]
+             (get diagnostics path)))
+      (is (<= 2 @calls*)))))
+
 (deftest lsp-post-tool-handler-live-runtime-diagnostics-test
   (testing "post-tool handler can use the live runtime path and append real diagnostics"
     (reset! sut/state {:initialized-workspaces #{} :documents {}})
