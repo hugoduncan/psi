@@ -1,0 +1,22 @@
+- [ ] Inspect `extensions.work-on` and choose the smallest clean internal shape for optional base-branch input, preferring a canonical request map if it improves clarity
+- [ ] Add a private `/work-on` arg parser supporting only `<description>` and `--base <branch> <description>`
+- [ ] Define and implement clear command-parse errors for malformed `--base` input, including missing branch value and missing description
+- [ ] Extend the canonical `work-on` execution path to accept optional `:base-branch`
+- [ ] Preserve default behavior by continuing to call `git.worktree/add!` with `:base_ref nil` when no base branch is specified
+- [ ] Thread explicit base-branch input into `git.worktree/add!` as `:base_ref` on successful new-creation paths
+- [ ] Add canonical result fields `:requested-base-branch` and `:base-branch-applied?` when a base branch is supplied
+- [ ] Ensure `:base-branch-applied?` is true only when the requested base branch is used as `:base_ref` on a successful new-creation path
+- [ ] Ensure existing-branch attach paths are reported as reuse for base-branch purposes, with `:base-branch-applied? false`
+- [ ] Preserve existing worktree/session reuse behavior unchanged while recording requested-but-not-applied base-branch metadata where appropriate
+- [ ] Update the `work-on` tool registration schema to include optional `base_branch`
+- [ ] Treat blank tool `base_branch` as invalid rather than silently absent
+- [ ] Update the tool execute wrapper to pass both `description` and `base_branch` through the shared execution path
+- [ ] Keep command presentation derived from the canonical result and parse/runtime errors rather than adding separate semantics
+- [ ] Add focused command parser tests for plain description and `--base <branch> <description>`
+- [ ] Add focused error tests for missing `--base` value, missing description, and any intentionally unsupported flag placements that need proof
+- [ ] Add focused tool validation tests for blank `base_branch`
+- [ ] Add focused happy-path tests proving explicit base branch reaches `git.worktree/add!` on both command and tool paths
+- [ ] Retain or extend default-path tests proving omitted base branch preserves current `:base_ref nil` behavior
+- [ ] Add focused reuse-path tests proving requested base branch is recorded but not considered applied when the target already exists
+- [ ] Run focused `extensions.work-on` tests and fix any regressions
+- [ ] Record implementation notes, syntax decisions, and result-field/reuse semantics in `implementation.md`
