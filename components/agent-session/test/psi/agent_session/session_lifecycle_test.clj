@@ -52,9 +52,9 @@
                       {:execution-result/turn-id (:prepared-request/id prepared)
                        :execution-result/session-id sid
                        :execution-result/assistant-message {:role "assistant"
-                                                           :content [{:type :text :text "ok"}]
-                                                           :stop-reason :stop
-                                                           :timestamp (java.time.Instant/now)}
+                                                            :content [{:type :text :text "ok"}]
+                                                            :stop-reason :stop
+                                                            :timestamp (java.time.Instant/now)}
                        :execution-result/turn-outcome :turn.outcome/stop
                        :execution-result/tool-calls []
                        :execution-result/stop-reason :stop})]
@@ -283,8 +283,8 @@
                                                                                              :content [{:type :text :text "branch-here"}]
                                                                                              :timestamp (java.time.Instant/now)})))
         _                  (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "assistant"
-                                                                                         :content [{:type :text :text "reply-here"}]
-                                                                                         :timestamp (java.time.Instant/now)}))
+                                                                                        :content [{:type :text :text "reply-here"}]
+                                                                                        :timestamp (java.time.Instant/now)}))
         child-sd           (session/fork-session-in! ctx parent-id entry-id)
         child-id           (:session-id child-sd)
         ctx                (retarget ctx child-sd)]
@@ -342,7 +342,7 @@
   (testing "resume-session-in! keeps current model when resumed journal has no model entry"
     (let [initial-model {:provider "openai" :id "gpt-5.3-codex" :reasoning true}
           [ctx session-id] (create-session-context {:session-defaults {:model initial-model
-                                                                      :thinking-level :high}})
+                                                                       :thinking-level :high}})
           f             (File/createTempFile "psi-resume-no-model" ".ndedn")
           entries       [(persist/thinking-level-entry :minimal)
                          (persist/message-entry {:role "user"
@@ -388,9 +388,9 @@
   (testing "resume-session-in! restores persisted worktree-path and runtime prompt metadata from header"
     (let [[ctx session-id] (create-session-context {:cwd "/repo/main"
                                                     :session-defaults {:system-prompt "base prompt"
-                                                                      :model {:provider "openai"
-                                                                              :id "gpt-5.3-codex"
-                                                                              :reasoning true}}})
+                                                                       :model {:provider "openai"
+                                                                               :id "gpt-5.3-codex"
+                                                                               :reasoning true}}})
           f   (File/createTempFile "psi-resume-worktree" ".ndedn")]
       (.deleteOnExit f)
       (spit f (str "{:type :session :version 4 :id \"sess-worktree\" :timestamp #inst \"2024-01-01T00:00:00Z\" :cwd \"/legacy/cwd\" :worktree-path \"/repo/feature-x\"}\n"

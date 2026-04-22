@@ -334,7 +334,6 @@
     (cond-> {}
       run-id (assoc :psi.workflow.run/id run-id))))
 
-
 (pco/defresolver agent-session-git-branch
   "Resolve current git branch for the explicit session worktree path.
    Returns nil outside git repos and \"detached\" for detached HEAD."

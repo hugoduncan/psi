@@ -186,7 +186,7 @@
           provider     (stub-provider "local-response")
           ctx          (core/create-context {:providers {:openai-completions provider}})
           {bg :future} (core/stream-response-in ctx conversation model options
-                                                 (fn [ev] (swap! events conj ev)))]
+                                                (fn [ev] (swap! events conj ev)))]
       @bg
       (is (some #(= :text-delta (:type %)) @events))
       (is (= "local-response" (:delta (first (filter #(= :text-delta (:type %)) @events)))))))
@@ -216,7 +216,7 @@
           ctx              (core/create-context {:providers {:my-provider        exact-provider
                                                              :openai-completions api-provider}})
           {bg :future}     (core/stream-response-in ctx conversation model options
-                                                     (fn [ev] (swap! events conj ev)))]
+                                                    (fn [ev] (swap! events conj ev)))]
       @bg
       (is (= "exact-match" (:delta (first (filter #(= :text-delta (:type %)) @events)))))))
 
@@ -240,7 +240,7 @@
                         :cache-write-cost 0.0}
           ctx          (core/create-context {:providers {}})]
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Unknown provider"
-            (core/stream-response-in ctx conversation model {} (fn [_])))))))
+                            (core/stream-response-in ctx conversation model {} (fn [_])))))))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; Query integration — resolvers registered in EQL graph

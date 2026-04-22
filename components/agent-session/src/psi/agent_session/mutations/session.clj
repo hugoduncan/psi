@@ -89,38 +89,38 @@
                                  :system-prompt    system-prompt
                                  :tool-defs        tool-defs
                                  :thinking-level   thinking-level}
-                           (some? model)
-                           (assoc :model model)
+                          (some? model)
+                          (assoc :model model)
 
-                           (some? skills)
-                           (assoc :skills skills)
+                          (some? skills)
+                          (assoc :skills skills)
 
-                           (some? preloaded-messages)
-                           (assoc :preloaded-messages preloaded-messages)
+                          (some? preloaded-messages)
+                          (assoc :preloaded-messages preloaded-messages)
 
-                           (some? cache-breakpoints)
-                           (assoc :cache-breakpoints cache-breakpoints)
+                          (some? cache-breakpoints)
+                          (assoc :cache-breakpoints cache-breakpoints)
 
-                           (some? prompt-component-selection)
-                           (assoc :prompt-component-selection prompt-component-selection)
+                          (some? prompt-component-selection)
+                          (assoc :prompt-component-selection prompt-component-selection)
 
-                           (some? developer-prompt)
-                           (assoc :developer-prompt developer-prompt)
+                          (some? developer-prompt)
+                          (assoc :developer-prompt developer-prompt)
 
-                           (some? developer-prompt-source)
-                           (assoc :developer-prompt-source developer-prompt-source)
+                          (some? developer-prompt-source)
+                          (assoc :developer-prompt-source developer-prompt-source)
 
-                           (some? workflow-run-id)
-                           (assoc :workflow-run-id workflow-run-id)
+                          (some? workflow-run-id)
+                          (assoc :workflow-run-id workflow-run-id)
 
-                           (some? workflow-step-id)
-                           (assoc :workflow-step-id workflow-step-id)
+                          (some? workflow-step-id)
+                          (assoc :workflow-step-id workflow-step-id)
 
-                           (some? workflow-attempt-id)
-                           (assoc :workflow-attempt-id workflow-attempt-id)
+                          (some? workflow-attempt-id)
+                          (assoc :workflow-attempt-id workflow-attempt-id)
 
-                           (contains? {:workflow-owned? workflow-owned?} :workflow-owned?)
-                           (assoc :workflow-owned? workflow-owned?))
+                          (contains? {:workflow-owned? workflow-owned?} :workflow-owned?)
+                          (assoc :workflow-owned? workflow-owned?))
                         {:origin :mutations})
     (let [sd       (ss/get-session-data-in agent-session-ctx child-sid)
           messages (vec (or preloaded-messages []))

@@ -21,21 +21,21 @@
    :summary "Plan, then build, then review"
    :step-order ["plan" "build"]
    :steps {"plan" {:label "Plan"
-                    :description "Create a plan"
-                    :executor {:type :agent :profile "planner" :mode :sync}
-                    :prompt-template "$INPUT"
-                    :input-bindings {:task {:source :workflow-input :path [:task]}}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                    :capability-policy {:tools #{"read" "bash"}}}
+                   :description "Create a plan"
+                   :executor {:type :agent :profile "planner" :mode :sync}
+                   :prompt-template "$INPUT"
+                   :input-bindings {:task {:source :workflow-input :path [:task]}}
+                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
+                   :capability-policy {:tools #{"read" "bash"}}}
            "build" {:label "Build"
-                     :description "Implement the plan"
-                     :executor {:type :agent :profile "builder" :mode :async}
-                     :prompt-template "Execute this plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
-                     :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                     :capability-policy {:tools #{"read" "edit" "write"}}}}})
+                    :description "Implement the plan"
+                    :executor {:type :agent :profile "builder" :mode :async}
+                    :prompt-template "Execute this plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+                    :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
+                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                    :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
+                    :capability-policy {:tools #{"read" "edit" "write"}}}}})
 
 (defn- install-run-with-attempt!
   [ctx parent-session-id]

@@ -419,7 +419,6 @@
       (.delete f)
       (.delete dir)))
 
-
   (testing "skips invalid files silently"
     (let [dir  (tmp-dir)
           bad  (io/file dir "bad.ndedn")

@@ -75,7 +75,7 @@
                    (append-history :workflow/attempt-started
                                    {:run-id run-id
                                     :step-id step-id
-                                    :attempt-id (:attempt-id (latest-attempt workflow-run step-id))})))) )
+                                    :attempt-id (:attempt-id (latest-attempt workflow-run step-id))})))))
 
 (defn- generic-envelope-validation
   [envelope]

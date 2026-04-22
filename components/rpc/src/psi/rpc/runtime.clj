@@ -1,5 +1,5 @@
 (ns psi.rpc.runtime
-  "Runtime/bootstrap implementation for the public RPC facade." 
+  "Runtime/bootstrap implementation for the public RPC facade."
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]

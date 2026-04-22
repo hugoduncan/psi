@@ -428,14 +428,14 @@
                                          []
                                          [{:run-id "run-1"
                                            :status :completed
-                                           :source-definition-id "planner"}] )})}})]
+                                           :source-definition-id "planner"}])})}})]
       (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
-                                                 :name "planner"
-                                                 :summary "Plans"
-                                                 :step-order ["step-1"]
-                                                 :steps {"step-1" {:label "planner"}}}}
+                                                :name "planner"
+                                                :summary "Plans"
+                                                :step-order ["step-1"]
+                                                :steps {"step-1" {:label "planner"}}}}
                        :errors []
                        :warnings []})]
         (wl/init api)
@@ -679,10 +679,10 @@
       (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
-                                                 :name "planner"
-                                                 :summary "Plans"
-                                                 :step-order ["step-1"]
-                                                 :steps {"step-1" {:label "planner"}}}}
+                                                :name "planner"
+                                                :summary "Plans"
+                                                :step-order ["step-1"]
+                                                :steps {"step-1" {:label "planner"}}}}
                        :errors []
                        :warnings []})]
         (wl/init api)

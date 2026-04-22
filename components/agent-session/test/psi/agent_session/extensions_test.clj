@@ -224,7 +224,7 @@
     (let [reg (ext/create-registry)]
       (ext/register-extension-in! reg "/ext/a")
       (ext/register-handler-in! reg "/ext/a" "session_switch"
-                                 (fn [_] "some-branch-name"))
+                                (fn [_] "some-branch-name"))
       (let [result (ext/dispatch-in reg "session_switch" {:reason :new})]
         (is (false? (:cancelled? result)))
         (is (nil? (:override result)))
@@ -669,9 +669,9 @@
                        :payload {:session-id "s1"}
                        :ext-path "/ext/test"}}
              ((:mutate api) 'psi.extension/schedule-event
-              {:delay-ms 250
-               :event-name "rename-checkpoint"
-               :payload {:session-id "s1"}})))))
+                            {:delay-ms 250
+                             :event-name "rename-checkpoint"
+                             :payload {:session-id "s1"}})))))
 
   (testing "API query-session and mutate-session target explicit sessions"
     (let [reg         (ext/create-registry)

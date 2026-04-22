@@ -92,7 +92,6 @@
     "resolve_dialog"
     "cancel_dialog"})
 
-
 (defn default-session-id-in
   [ctx]
   (some-> (ss/list-context-sessions-in ctx) first :session-id))
@@ -380,7 +379,6 @@
                                          :error-code    "runtime/failed"
                                          :error-message (or (ex-message t)
                                                             "unhandled runtime exception")}))))))))
-
 
 (defn run-stdio-loop!
   "Run an EDN-lines RPC loop.

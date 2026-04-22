@@ -12,8 +12,8 @@
    :name "Plan Build Review"
    :step-order ["plan" "build"]
    :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}}
+                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}}
            "build" {:executor {:type :agent :profile "builder" :mode :async}
                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
                     :retry-policy {:max-attempts 2 :retry-on #{:execution-failed}}}}})

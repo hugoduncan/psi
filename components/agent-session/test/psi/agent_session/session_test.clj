@@ -49,13 +49,13 @@
   (testing "scheduler state schema accepts canonical store shape"
     (is (session/valid-scheduler-state?
          {:schedules {"sch-1" {:schedule-id "sch-1"
-                                :label nil
-                                :message "wake up"
-                                :source :scheduled
-                                :created-at (java.time.Instant/now)
-                                :fire-at (java.time.Instant/now)
-                                :status :queued
-                                :session-id "sid-1"}}
+                               :label nil
+                               :message "wake up"
+                               :source :scheduled
+                               :created-at (java.time.Instant/now)
+                               :fire-at (java.time.Instant/now)
+                               :status :queued
+                               :session-id "sid-1"}}
           :queue ["sch-1"]}))))
 
 ;; ── Derived predicates ──────────────────────────────────────────────────────

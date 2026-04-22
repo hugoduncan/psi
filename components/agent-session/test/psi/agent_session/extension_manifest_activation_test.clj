@@ -43,8 +43,8 @@
     (intern *ns* 'init
             (fn [api]
               ((:register-command api) cmd-name
-               {:description (str "hello from " cmd-name)
-                :handler (fn [_] nil)})))))
+                                       {:description (str "hello from " cmd-name)
+                                        :handler (fn [_] nil)})))))
 
 (deftest reload-extensions-loads-manifest-local-root-extension-test
   (let [cwd        (test-support/temp-cwd)

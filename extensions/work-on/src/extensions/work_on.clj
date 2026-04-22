@@ -565,7 +565,7 @@
     :description "Create a layout-derived git worktree + branch and continue there"
     :parameters  {:type       "object"
                   :properties {"description" {:type "string"
-                                               :description "Description of the work to create a branch/worktree for"}}
+                                              :description "Description of the work to create a branch/worktree for"}}
                   :required   ["description"]}
     :execute     (fn
                    ([args] (work-on-tool-result (execute-work-on! (get args "description"))))

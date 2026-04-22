@@ -128,10 +128,10 @@
   [{:keys [workspace-root]}]
   {"processId" nil
    "clientInfo" {"name" "psi"
-                  "version" "0"}
+                 "version" "0"}
    "rootUri" (str "file://" workspace-root)
    "capabilities" {"workspace" {}
-                     "textDocument" {"publishDiagnostics" {"relatedInformation" true}}}})
+                   "textDocument" {"publishDiagnostics" {"relatedInformation" true}}}})
 
 (defn workspace-initialized?
   [workspace-root]
@@ -329,7 +329,7 @@
 (defn- full-change-params
   [path version text]
   {"textDocument" {"uri" (file-uri path)
-                    "version" version}
+                   "version" version}
    "contentChanges" [{"text" text}]})
 
 (defn- changed-region
@@ -372,10 +372,10 @@
         end-pos   (offset->position old-text end-old)
         changed   (subs new-text start end-new)]
     {"textDocument" {"uri" (file-uri path)
-                      "version" version}
+                     "version" version}
      "contentChanges" [{"range" {"start" start-pos
-                                    "end" end-pos}
-                         "text" changed}]}))
+                                 "end" end-pos}
+                        "text" changed}]}))
 
 (defn sync-document!
   [api {:keys [workspace-root path text dispatch-id]}]
@@ -388,9 +388,9 @@
         old-text    (:text (document-state path))
         params      (if first-open?
                       {"textDocument" {"uri" (file-uri path)
-                                        "languageId" "clojure"
-                                        "version" version
-                                        "text" text}}
+                                       "languageId" "clojure"
+                                       "version" version
+                                       "text" text}}
                       (if (= :incremental sync-kind)
                         (incremental-change-params path version old-text text)
                         (full-change-params path version text)))]
@@ -590,13 +590,13 @@
     :timeout-ms (:diagnostics-timeout-ms (default-config))
     :handler (make-post-tool-handler api)})
   ((:register-command api) "lsp-status"
-   {:description "Show LSP workspace status for the current worktree or a provided path"
-    :handler (fn [args]
-               (print-workspace-status! api (command-target api args)))})
+                           {:description "Show LSP workspace status for the current worktree or a provided path"
+                            :handler (fn [args]
+                                       (print-workspace-status! api (command-target api args)))})
   ((:register-command api) "lsp-restart"
-   {:description "Restart LSP workspace service for the current worktree or a provided path"
-    :handler (fn [args]
-               (restart-workspace! api (command-target api args)))})
+                           {:description "Restart LSP workspace service for the current worktree or a provided path"
+                            :handler (fn [args]
+                                       (restart-workspace! api (command-target api args)))})
   (warm-start-current-workspace! api)
   (when-let [ui (:ui api)]
     ((:notify ui) "lsp loaded" :info)))

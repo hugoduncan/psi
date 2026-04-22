@@ -60,7 +60,6 @@
   [job-id status payload]
   (orchestration/mark-background-job-terminal! mutate! job-id status payload))
 
-
 ;;; Definition loading and registration
 
 (defn- retire-removed-definitions!
@@ -245,7 +244,6 @@
         runs (:psi.workflow/runs result)]
     (some #(when (= run-id (:run-id %)) %) runs)))
 
-
 (defn- delegate-continue
   "Handle action=continue: push a stopped run forward with new prompt.
 
@@ -345,7 +343,6 @@
 
 ;;; Widget
 
-
 (defn- refresh-widgets!
   "Update widgets for workflow-loader background jobs using canonical workflow and background-job state."
   []
@@ -362,7 +359,7 @@
           delegate-jobs (->> (:psi.agent-session/background-jobs jobs-result)
                              (filter #(= "delegate" (:psi.background-job/tool-name %)))
                              (filter #(contains? #{:running :pending-cancel}
-                                                  (:psi.background-job/status %)))
+                                                 (:psi.background-job/status %)))
                              (sort-by :psi.background-job/started-at)
                              vec)
           current-wids (into #{} (map #(str "delegate-" (:psi.background-job/workflow-id %)) delegate-jobs))
@@ -381,7 +378,6 @@
       (swap! state assoc :widget-ids current-wids))))
 
 ;;; Delegate command
-
 
 ;;; Extension init
 

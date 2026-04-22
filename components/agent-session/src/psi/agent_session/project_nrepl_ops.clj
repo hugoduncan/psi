@@ -129,8 +129,8 @@
        "status" (status ctx effective-worktree)
        "start" (start ctx effective-worktree)
        "attach" (attach ctx effective-worktree (cond-> {}
-                                                  (some? host) (assoc :host host)
-                                                  (some? port) (assoc :port port)))
+                                                 (some? host) (assoc :host host)
+                                                 (some? port) (assoc :port port)))
        "stop" (stop ctx effective-worktree)
        "eval" (eval-op ctx effective-worktree code)
        "interrupt" (interrupt ctx effective-worktree))}))

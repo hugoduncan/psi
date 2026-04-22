@@ -154,10 +154,10 @@
                      :execution-result/stop-reason :stop})]
       (session/prompt-in! ctx session-id "hello"))
     (let [result (session/query-in ctx session-id [:psi.agent-session/last-prepared-turn-id
-                                        :psi.agent-session/last-prepared-message-count
-                                        :psi.agent-session/last-execution-turn-id
-                                        :psi.agent-session/last-execution-turn-outcome
-                                        :psi.agent-session/last-execution-stop-reason])
+                                                   :psi.agent-session/last-prepared-message-count
+                                                   :psi.agent-session/last-execution-turn-id
+                                                   :psi.agent-session/last-execution-turn-outcome
+                                                   :psi.agent-session/last-execution-stop-reason])
           entries (dispatch/event-log-entries)
           msgs    (journal-messages ctx session-id)]
       (is (string? (:psi.agent-session/last-prepared-turn-id result)))

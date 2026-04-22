@@ -209,9 +209,9 @@
                        "s1"
                        [(selector-session-item "s1" "Root" "/tmp/psi-test/root" :is-active true)])
           [state _]   ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                                  :cwd "/tmp/psi-test"
-                                                                  :focus-session-id "s1"
-                                                                  :session-selector-fn selector-fn}))
+                                                                :cwd "/tmp/psi-test"
+                                                                :focus-session-id "s1"
+                                                                :session-selector-fn selector-fn}))
           typed      (type-text update-fn state "/tree")
           [s1 _]     (update-fn typed (msg/key-press :enter))]
       (is (= :selecting-session (:phase s1)))
@@ -251,16 +251,16 @@
                        [(selector-session-item "s1" "Root" "/tmp/psi-test/root" :is-active true)
                         (selector-session-item "s2" "Child" "/tmp/psi-test/child" :parent-id "s1")])
           [state _]   ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                                  :cwd "/tmp/psi-test"
-                                                                  :focus-session-id "s1"
-                                                                  :session-selector-fn selector-fn
-                                                                  :switch-session-fn! (fn [sid]
-                                                                                        (reset! switched-id sid)
-                                                                                        {:nav/session-id sid
-                                                                                         :nav/rehydration {:messages [{:role :assistant
-                                                                                                                       :text (str "switched " sid)}]
-                                                                                                           :tool-calls {}
-                                                                                                           :tool-order []}})}))
+                                                                :cwd "/tmp/psi-test"
+                                                                :focus-session-id "s1"
+                                                                :session-selector-fn selector-fn
+                                                                :switch-session-fn! (fn [sid]
+                                                                                      (reset! switched-id sid)
+                                                                                      {:nav/session-id sid
+                                                                                       :nav/rehydration {:messages [{:role :assistant
+                                                                                                                     :text (str "switched " sid)}]
+                                                                                                         :tool-calls {}
+                                                                                                         :tool-order []}})}))
           typed       (type-text update-fn state "/tree")
           [s1 _]      (update-fn typed (msg/key-press :enter))
           [s2 _]      (update-fn s1 (msg/key-press :down))
@@ -278,9 +278,9 @@
                        [(selector-session-item "s1" "Root" "/tmp/psi-test/root" :is-active true)
                         (selector-session-item "s2" "Child" "/tmp/psi-test/child" :parent-id "s1")])
           [state _]   ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                                  :cwd "/tmp/psi-test"
-                                                                  :focus-session-id "s1"
-                                                                  :session-selector-fn selector-fn}))
+                                                                :cwd "/tmp/psi-test"
+                                                                :focus-session-id "s1"
+                                                                :session-selector-fn selector-fn}))
           typed     (type-text update-fn state "/tree")
           [s1 _]    (update-fn typed (msg/key-press :enter))
           plain     (ansi/strip-ansi (app/view (assoc s1 :width 120)))
@@ -304,9 +304,9 @@
                        [(selector-session-item "s1" "Root" "/tmp/psi-test/root" :is-active true)
                         (selector-session-item "s2" "Child" "/tmp/psi-test/child" :parent-id "s1" :is-streaming true)])
           [state _]   ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                                  :cwd "/tmp/psi-test"
-                                                                  :focus-session-id "s1"
-                                                                  :session-selector-fn selector-fn}))
+                                                                :cwd "/tmp/psi-test"
+                                                                :focus-session-id "s1"
+                                                                :session-selector-fn selector-fn}))
           typed      (type-text update-fn state "/tree")
           [s1 _]     (update-fn typed (msg/key-press :enter))
           plain      (ansi/strip-ansi (app/view (assoc s1 :width 120)))
@@ -334,9 +334,9 @@
                        [(selector-session-item "s1" "Investigate failing tests" "/tmp/psi-test/root" :is-active true)
                         (selector-session-item "s2" "Refactor selector" "/tmp/psi-test/child" :parent-id "s1")])
           [state _]   ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                                  :cwd "/tmp/psi-test"
-                                                                  :focus-session-id "s1"
-                                                                  :session-selector-fn selector-fn}))
+                                                                :cwd "/tmp/psi-test"
+                                                                :focus-session-id "s1"
+                                                                :session-selector-fn selector-fn}))
           typed     (type-text update-fn state "/tree")
           [s1 _]    (update-fn typed (msg/key-press :enter))
           plain     (ansi/strip-ansi (app/view (assoc s1 :width 120)))]
@@ -354,9 +354,9 @@
                         (selector-session-item "s2" "Child" "/tmp/psi-test/child" :parent-id "s1")
                         (selector-fork-item "s1" "e1" "Investigate prompt lifecycle convergence")])
           [state _]   ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                                  :cwd "/tmp/psi-test"
-                                                                  :focus-session-id "s1"
-                                                                  :session-selector-fn selector-fn}))
+                                                                :cwd "/tmp/psi-test"
+                                                                :focus-session-id "s1"
+                                                                :session-selector-fn selector-fn}))
           typed     (type-text update-fn state "/tree")
           [s1 _]    (update-fn typed (msg/key-press :enter))
           plain     (ansi/strip-ansi (app/view (assoc s1 :width 120)))
@@ -399,9 +399,9 @@
                                             :item/parent-id [:session "s1"]
                                             :item/display-name "Branch from here"}]}))
           [state _] ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                               :cwd "/tmp/psi-test"
-                                                               :focus-session-id "s1"
-                                                               :session-selector-fn selector-fn}))
+                                                              :cwd "/tmp/psi-test"
+                                                              :focus-session-id "s1"
+                                                              :session-selector-fn selector-fn}))
           typed     (type-text update-fn state "/tree")
           [s1 _]    (update-fn typed (msg/key-press :enter))
           plain     (ansi/strip-ansi (app/view (assoc s1 :width 120)))
@@ -425,18 +425,18 @@
                             (selector-session-item "s2" "Child" "/tmp/psi-test/child" :parent-id "s1")
                             (selector-fork-item "s1" "e1" "Branch from here")])
           [state _]       ((app/make-init "test-model" nil nil nil {:dispatch-fn default-dispatch-fn
-                                                                      :cwd "/tmp/psi-test"
-                                                                      :focus-session-id "s1"
-                                                                      :session-selector-fn selector-fn
-                                                                      :fork-session-fn! (fn [entry-id]
-                                                                                          (reset! forked-entry-id entry-id)
-                                                                                          {:nav/session-id "s3"
-                                                                                           :nav/rehydration {:messages [{:role :user
-                                                                                                                        :text "Branch from here"}
-                                                                                                                       {:role :assistant
-                                                                                                                        :text "reply included"}]
-                                                                                                             :tool-calls {}
-                                                                                                             :tool-order []}})}))
+                                                                    :cwd "/tmp/psi-test"
+                                                                    :focus-session-id "s1"
+                                                                    :session-selector-fn selector-fn
+                                                                    :fork-session-fn! (fn [entry-id]
+                                                                                        (reset! forked-entry-id entry-id)
+                                                                                        {:nav/session-id "s3"
+                                                                                         :nav/rehydration {:messages [{:role :user
+                                                                                                                       :text "Branch from here"}
+                                                                                                                      {:role :assistant
+                                                                                                                       :text "reply included"}]
+                                                                                                           :tool-calls {}
+                                                                                                           :tool-order []}})}))
           typed           (type-text update-fn state "/tree")
           [s1 _]          (update-fn typed (msg/key-press :enter))
           [s2 _]          (update-fn s1 (msg/key-press :down))

@@ -163,7 +163,7 @@
           (contains? m :effects)
           (contains? m :return)
           (contains? m :return-key)
-          (contains? m :return-effect-result?)))]] )
+          (contains? m :return-effect-result?)))]])
 
 (def valid-effect?
   "Compiled malli validator for effect descriptions."

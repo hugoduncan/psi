@@ -683,10 +683,10 @@
 (defn- handle-400-response!
   [options url request response consume-fn consume-stream-response!]
   (if-let [fallback (request-support/fallback-request-for-400
-                      request
-                      {:prompt-caching-beta prompt-caching-beta
-                       :interleaved-thinking-beta interleaved-thinking-beta
-                       :oauth-auth-request? oauth-auth-request?})]
+                     request
+                     {:prompt-caching-beta prompt-caching-beta
+                      :interleaved-thinking-beta interleaved-thinking-beta
+                      :oauth-auth-request? oauth-auth-request?})]
     (let [first-error (response->error response request)]
       (capture-response! options url (assoc first-error
                                             :retrying-with-compatibility-fallback true

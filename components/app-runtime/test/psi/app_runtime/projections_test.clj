@@ -23,12 +23,12 @@
                               "ext-a" {:extension-id "ext-a" :text "Alpha"}}
                    :notifications []
                    :tool-renderers {"read" {:tool-name "read"
-                                             :extension-path "ext-a"
-                                             :render-call-fn (fn [_] "call")
-                                             :render-result-fn (fn [_ _] "result")}}
+                                            :extension-path "ext-a"
+                                            :render-call-fn (fn [_] "call")
+                                            :render-result-fn (fn [_ _] "result")}}
                    :message-renderers {"custom" {:custom-type "custom"
-                                                  :extension-path "ext-a"
-                                                  :render-fn (fn [_ _] "msg")}}
+                                                 :extension-path "ext-a"
+                                                 :render-fn (fn [_ _] "msg")}}
                    :tools-expanded? true})]
     (is (= [["ext-a" "w-3"]
             ["ext-b" "w-1"]

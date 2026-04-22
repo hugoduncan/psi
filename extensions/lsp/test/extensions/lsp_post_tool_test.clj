@@ -42,7 +42,7 @@
                                            (if (= "textDocument/diagnostic" (get (:payload spec) "method"))
                                              (assoc base :psi.extension.service/response
                                                     {"result" {"items" [{"message" "Unused require"
-                                                                           "severity" 2}]}})
+                                                                         "severity" 2}]}})
                                              base)))
                       :service-notify (fn [spec]
                                         ((:mutate api) 'psi.extension/service-notify spec)))

@@ -18,7 +18,6 @@
   ([request data]
    (response-frame (:id request) frontend-action-result-op true data)))
 
-
 (defn- emit-navigation!
   [ctx state emit! nav]
   (emit/emit-navigation-result! emit! ctx state nav)
@@ -45,7 +44,6 @@
           (navigation/fork-session-result ctx state session-id entry-id)))
 
       nil)))
-
 
 (defn- handle-submitted-action!
   [{:keys [ctx state session-id resolve-model emit! action-key value]}]

@@ -181,11 +181,11 @@
         by-session-id      (into {} (keep (fn [session-map]
                                             (when-let [sid (:session-id session-map)]
                                               [sid session-map])))
-                                  sessions)
+                                 sessions)
         input-order        (into {} (keep-indexed (fn [i session-map]
                                                     (when-let [sid (:session-id session-map)]
                                                       [sid i])))
-                                  sessions)
+                                 sessions)
         children-by-parent (reduce (fn [acc session-map]
                                      (let [sid               (:session-id session-map)
                                            parent-session-id (:parent-session-id session-map)

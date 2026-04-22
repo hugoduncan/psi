@@ -63,7 +63,7 @@
    ::pco/output [{:psi.agent-session/project-nrepl project-nrepl-output}]}
   (let [worktree-path (project-nrepl-config/resolve-target-worktree
                        {:session-worktree-path (:worktree-path (get-in @(:state* agent-session-ctx)
-                                                                      [:agent-session :sessions session-id :data]))})
+                                                                       [:agent-session :sessions session-id :data]))})
         instance      (project-nrepl-runtime/instance-in agent-session-ctx worktree-path)]
     {:psi.agent-session/project-nrepl (when instance
                                         (instance->eql instance))}))

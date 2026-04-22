@@ -348,7 +348,7 @@
     (if (str/includes? subject marker)
       (do
         (notify! mutate-fn
-                       (str "PSL skipped for " source7 " (self commit marker " marker ")."))
+                 (str "PSL skipped for " source7 " (self commit marker " marker ")."))
         {:skip? true :reason :self-commit :source-sha source-sha :subject subject})
       ;; Create workflow — the job runs after this agent turn completes (deferred)
       (let [created (mutate-fn 'psi.extension.workflow/create
@@ -390,6 +390,6 @@
                                 (handle-git-head-changed mutate-fn ev)
                                 (catch Exception e
                                   (notify! mutate-fn
-                                                 (str "PSL error: " (ex-message e)))
+                                           (str "PSL error: " (ex-message e)))
                                   {:error (ex-message e)})))})
     (refresh-widget!)))

@@ -15,7 +15,7 @@
 (deftest rpc-extension-command-after-new-emits-assistant-message-for-new-session-test
   (testing "subscribe + /new + extension command emits assistant/message for the new active session"
     (let [[ctx session-id] (support/create-session-context {:mutations mutations/all-mutations
-                                                           :event-queue (java.util.concurrent.LinkedBlockingQueue.)})
+                                                            :event-queue (java.util.concurrent.LinkedBlockingQueue.)})
           reg              (:extension-registry ctx)
           ext-path         "/ext/which-session"
           _                (ext/register-extension-in! reg ext-path)
@@ -31,10 +31,10 @@
                                               ((:query api) [:psi.agent-session/session-id]))))})
           state            (atom {:transport {:ready? true :pending {}}
                                   :connection {:subscribed-topics #{"assistant/message"
-                                                                   "session/resumed"
-                                                                   "session/rehydrated"
-                                                                   "command-result"
-                                                                   "footer/updated"}}})
+                                                                    "session/resumed"
+                                                                    "session/rehydrated"
+                                                                    "command-result"
+                                                                    "footer/updated"}}})
           handler          (support/make-handler ctx state)
           input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                                 "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"session/resumed\" \"session/rehydrated\" \"command-result\" \"footer/updated\"]}}\n"
@@ -71,8 +71,8 @@
 
   (testing "command /new emits session/resumed and session/rehydrated canonical events"
     (let [[ctx _]             (support/create-session-context {:session-defaults {:model {:provider "openai"
-                                                                                                  :id "gpt-5.4"
-                                                                                                  :reasoning false}}})
+                                                                                          :id "gpt-5.4"
+                                                                                          :reasoning false}}})
           state               (atom {:transport {:ready? true :pending {}}
                                      :connection {:subscribed-topics #{"session/resumed" "session/rehydrated" "command-result" "footer/updated"}}})
           handler             (support/make-handler ctx state)

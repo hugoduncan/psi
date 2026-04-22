@@ -68,8 +68,8 @@
                      (or (:base-system-prompt sd) (:system-prompt sd) ""))
            prompt  (effective-prompt base contrib selection)]
        {:root-state-update (session/session-update session-id #(assoc %
-                                                           :base-system-prompt base
-                                                           :system-prompt prompt))
+                                                                      :base-system-prompt base
+                                                                      :system-prompt prompt))
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt}]})))
 
@@ -81,8 +81,8 @@
            selection (:prompt-component-selection (session/get-session-data-in ctx session-id))
            prompt*   (effective-prompt base* contrib selection)]
        {:root-state-update (session/session-update session-id #(assoc %
-                                                           :base-system-prompt base*
-                                                           :system-prompt prompt*))
+                                                                      :base-system-prompt base*
+                                                                      :system-prompt prompt*))
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt*}]})))
 
@@ -102,9 +102,9 @@
            prompt*   (effective-prompt base next* (:prompt-component-selection sd))]
        {:root-state-update
         (session/session-update session-id
-         #(assoc %
-                 :prompt-contributions next*
-                 :system-prompt prompt*))
+                                #(assoc %
+                                        :prompt-contributions next*
+                                        :system-prompt prompt*))
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt*}]
         :return {:registered?  true
@@ -135,8 +135,8 @@
                base    (or (:base-system-prompt sd) (:system-prompt sd) "")
                prompt* (effective-prompt base next* (:prompt-component-selection sd))]
            {:root-state-update (session/session-update session-id #(assoc %
-                                                               :prompt-contributions next*
-                                                               :system-prompt prompt*))
+                                                                          :prompt-contributions next*
+                                                                          :system-prompt prompt*))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
             :return {:updated?     true
@@ -159,8 +159,8 @@
          (let [base    (or (:base-system-prompt sd) (:system-prompt sd) "")
                prompt* (effective-prompt base next* (:prompt-component-selection sd))]
            {:root-state-update (session/session-update session-id #(assoc %
-                                                               :prompt-contributions next*
-                                                               :system-prompt prompt*))
+                                                                          :prompt-contributions next*
+                                                                          :system-prompt prompt*))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
             :return {:removed? true :count (count next*)}})))))
@@ -174,10 +174,10 @@
    :session/bootstrap-prompt-state
    (fn [_ctx {:keys [session-id system-prompt developer-prompt developer-prompt-source]}]
      {:root-state-update (session/session-update session-id #(assoc %
-                                                         :base-system-prompt system-prompt
-                                                         :system-prompt system-prompt
-                                                         :developer-prompt developer-prompt
-                                                         :developer-prompt-source developer-prompt-source))}))
+                                                                    :base-system-prompt system-prompt
+                                                                    :system-prompt system-prompt
+                                                                    :developer-prompt developer-prompt
+                                                                    :developer-prompt-source developer-prompt-source))}))
 
   (dispatch/register-handler!
    :session/ensure-base-system-prompt

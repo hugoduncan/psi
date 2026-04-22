@@ -63,9 +63,9 @@
                               :is-error false})]
       (ext/register-extension-in! reg "/ext/a")
       (ext/register-tool-in! reg "/ext/a" {:name "ext-tool"
-                                            :description "extension tool"
-                                            :parameters {:type "object"}
-                                            :execute exec-fn})
+                                           :description "extension tool"
+                                           :parameters {:type "object"}
+                                           :execute exec-fn})
       ;; Simulate the agent-core runtime projection stripping :execute while the
       ;; canonical extension registry still retains the executable fn.
       (agent-core/set-tools-in!
@@ -228,5 +228,4 @@
             r3 (mutate 'psi.extension/unregister-prompt-contribution {:ext-path "/ext/a" :id "c1"})]
         (is (true? (:psi.extension.prompt-contribution/registered? r1)))
         (is (true? (:psi.extension.prompt-contribution/updated? r2)))
-        (is (true? (:psi.extension.prompt-contribution/removed? r3))))))
-)
+        (is (true? (:psi.extension.prompt-contribution/removed? r3)))))))

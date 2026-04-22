@@ -31,8 +31,8 @@
           home      (test-support/temp-cwd)
           ext-root  (test-support/temp-cwd)
           _         (write-local-extension! ext-root
-                                           'psi.test.project-nrepl-ext
-                                           "(ns psi.test.project-nrepl-ext)\n\n(defn init [api]\n  ((:register-command api) \"project-repl-hello\" {:description \"hello from project nrepl manifest\" :handler (fn [_] nil)}))\n")
+                                            'psi.test.project-nrepl-ext
+                                            "(ns psi.test.project-nrepl-ext)\n\n(defn init [api]\n  ((:register-command api) \"project-repl-hello\" {:description \"hello from project nrepl manifest\" :handler (fn [_] nil)}))\n")
           [ctx sid] (test-support/create-test-session {:persist? false :cwd cwd})]
       (with-redefs [installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
                     installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))
@@ -75,7 +75,7 @@
                         (instance-in ctx worktree-path)))]
         (spit (installs/project-manifest-file cwd)
               (pr-str {:deps {'psi/test-project-nrepl-ext {:local/root ext-root
-                                                          :psi/init 'psi.test.project-nrepl-ext/init}}}))
+                                                           :psi/init 'psi.test.project-nrepl-ext/init}}}))
         (installs/persist-install-state-in! ctx (installs/compute-install-state cwd))
         (let [{:keys [project-repl]} (project-nrepl-ops/perform! ctx sid {:op "start" :worktree-path cwd})]
           (is (= :started (:status project-repl)))

@@ -66,7 +66,7 @@
                 :api      :openai-completions
                 :auth     {:api-key "env:REMOTE_KEY"}
                 :models   [{:id "model-b" :name "Remote Model B"}
-                            {:id "model-c"}]}}})
+                           {:id "model-c"}]}}})
 
 (deftest parse-minimal-config-test
   (let [result (user-models/parse-models-config minimal-config)]

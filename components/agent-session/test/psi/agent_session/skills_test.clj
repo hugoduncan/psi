@@ -514,7 +514,7 @@
 
     (testing "query visible/hidden counts via EQL"
       (let [result (session-core/query-in ctx session-id [:psi.skill/visible-count
-                                               :psi.skill/hidden-count])]
+                                                          :psi.skill/hidden-count])]
         (is (= 1 (:psi.skill/visible-count result)))
         (is (= 1 (:psi.skill/hidden-count result)))))
 

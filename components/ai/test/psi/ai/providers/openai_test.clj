@@ -605,8 +605,8 @@
         model (models/get-model :gpt-4o)]
     (testing "custom headers merge into request"
       (let [req (#'openai/build-request convo model
-                  {:api-key "sk-test"
-                   :headers {"X-Custom" "value" "X-Project" "psi"}})]
+                                        {:api-key "sk-test"
+                                         :headers {"X-Custom" "value" "X-Project" "psi"}})]
         (is (= "value" (get-in req [:headers "X-Custom"])))
         (is (= "psi" (get-in req [:headers "X-Project"])))
         ;; Standard headers preserved

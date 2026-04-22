@@ -124,7 +124,7 @@
     (is (= {:psi.agent-session/rpc-trace-enabled false
             :psi.agent-session/rpc-trace-file nil}
            (session/query-in ctx session-id [:psi.agent-session/rpc-trace-enabled
-                                  :psi.agent-session/rpc-trace-file])))
+                                             :psi.agent-session/rpc-trace-file])))
 
     (let [r1 (mutate 'psi.extension/set-rpc-trace
                      {:session-id session-id

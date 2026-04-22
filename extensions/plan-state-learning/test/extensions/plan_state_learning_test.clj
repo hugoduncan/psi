@@ -131,10 +131,10 @@
                                   (git-log-response "abc1234" "◈ Δ Auto-update munera/mementum state [psi:psl-auto]")
                                   {:psi.extension.tool/content "" :psi.extension.tool/is-error false}))
                     sut/notify! (fn [mutate-fn text]
-                                        (mutate-fn 'psi.extension/notify
-                                                   {:role "assistant"
-                                                    :content text
-                                                    :custom-type "plan-state-learning"}))]
+                                  (mutate-fn 'psi.extension/notify
+                                             {:role "assistant"
+                                              :content text
+                                              :custom-type "plan-state-learning"}))]
         (sut/init api)
         (let [handler (first (get-in @state [:handlers "git_commit_created"]))
               result  (handler {:head "abc1234" :previous-head "aaa111" :cwd "/tmp/repo"})

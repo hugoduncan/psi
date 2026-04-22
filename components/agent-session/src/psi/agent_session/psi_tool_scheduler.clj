@@ -36,7 +36,6 @@
   [target now*]
   (max 0 (.toMillis (java.time.Duration/between now* target))))
 
-
 (defn- resolve-fire-time!
   [{:keys [delay-ms at]}]
   (cond
@@ -152,17 +151,17 @@
                              (let [{:keys [created-at fire-at delay-ms]} (resolve-fire-time! {:delay-ms delay-ms :at at})
                                    new-schedule-id (str "sch-" (java.util.UUID/randomUUID))
                                    schedule (dispatch/dispatch! ctx
-                                                               :scheduler/create
-                                                               {:session-id session-id
-                                                                :schedule-id new-schedule-id
-                                                                :kind kind
-                                                                :label label
-                                                                :message message
-                                                                :session-config session-config
-                                                                :created-at created-at
-                                                                :fire-at fire-at
-                                                                :delay-ms delay-ms}
-                                                               {:origin :core})]
+                                                                :scheduler/create
+                                                                {:session-id session-id
+                                                                 :schedule-id new-schedule-id
+                                                                 :kind kind
+                                                                 :label label
+                                                                 :message message
+                                                                 :session-config session-config
+                                                                 :created-at created-at
+                                                                 :fire-at fire-at
+                                                                 :delay-ms delay-ms}
+                                                                {:origin :core})]
                                {:psi-tool/action :scheduler
                                 :psi-tool/scheduler-op :create
                                 :psi-tool/overall-status :ok
@@ -181,10 +180,10 @@
                              (throw (ex-info "scheduler cancel requires `schedule-id`"
                                              {:phase :validate :action "scheduler" :op op})))
                            (let [schedule (dispatch/dispatch! ctx
-                                                             :scheduler/cancel
-                                                             {:session-id session-id
-                                                              :schedule-id schedule-id}
-                                                             {:origin :core})]
+                                                              :scheduler/cancel
+                                                              {:session-id session-id
+                                                               :schedule-id schedule-id}
+                                                              {:origin :core})]
                              {:psi-tool/action :scheduler
                               :psi-tool/scheduler-op :cancel
                               :psi-tool/overall-status :ok

@@ -231,9 +231,9 @@
                         {:execution-result/turn-id (:prepared-request/id prepared)
                          :execution-result/session-id sid
                          :execution-result/assistant-message {:role "assistant"
-                                                             :content [{:type :text :text (str "reply for " sid)}]
-                                                             :stop-reason :stop
-                                                             :timestamp (java.time.Instant/now)}
+                                                              :content [{:type :text :text (str "reply for " sid)}]
+                                                              :stop-reason :stop
+                                                              :timestamp (java.time.Instant/now)}
                          :execution-result/turn-outcome :turn.outcome/stop
                          :execution-result/tool-calls []
                          :execution-result/stop-reason :stop})]

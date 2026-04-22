@@ -359,9 +359,9 @@
                                            :completed-count nil})
                     sut/resolve-step-prompt (fn [_project-dir _prompt-name] "prompt")
                     sut/run-step-agent! (fn [_]
-                                             {:ok? true
-                                              :step-session pending-session
-                                              :text "MCP_TASKS_RUN_USER_CONFIRMATION: {:question \"Continue?\" :expected-answer :yes-no}"})]
+                                          {:ok? true
+                                           :step-session pending-session
+                                           :text "MCP_TASKS_RUN_USER_CONFIRMATION: {:question \"Continue?\" :expected-answer :yes-no}"})]
         (let [res (#'sut/run-loop-job {:run-id "run-1"
                                        :task-id 42
                                        :project-dir "/tmp"
@@ -409,10 +409,10 @@
                                             entry))
                     sut/resolve-step-prompt (fn [_project-dir _prompt-name] "prompt")
                     sut/run-step-agent! (fn [args]
-                                             (reset! captured args)
-                                             {:ok? true
-                                              :step-session pending-session
-                                              :text "Processed answer and created new story tasks."})]
+                                          (reset! captured args)
+                                          {:ok? true
+                                           :step-session pending-session
+                                           :text "Processed answer and created new story tasks."})]
         (let [res (#'sut/run-loop-job {:run-id "run-1"
                                        :task-id 42
                                        :project-dir "/tmp"
@@ -922,7 +922,7 @@
           fake-session-ctx  {:session-id fake-session-id
                              :agent-ctx fake-agent-ctx
                              :session-data-atom (atom {:session-id fake-session-id
-                                                      :tool-output-overrides {}})
+                                                       :tool-output-overrides {}})
                              :tool-output-stats-atom (atom {:calls []
                                                             :aggregates {:total-context-bytes 0
                                                                          :by-tool {}
@@ -983,10 +983,10 @@
                     sut/create-step-session-ctx (fn [_]
                                                   (throw (ex-info "should not create a new session ctx" {})))
                     prompt-loop/run-agent-loop! (fn [& args]
-                                               (reset! captured args)
-                                               {:role "assistant"
-                                                :stop-reason :stop
-                                                :content [{:type :text :text "ok"}]})]
+                                                  (reset! captured args)
+                                                  {:role "assistant"
+                                                   :stop-reason :stop
+                                                   :content [{:type :text :text "ok"}]})]
         (let [result (#'sut/run-step-agent!
                       {:run-id "run-1"
                        :step-name "review-story-implementation"

@@ -384,8 +384,8 @@
                     (str "Reload action=reload-code mode=namespaces namespaces=" (pr-str namespaces))
                     (str "Reload action=reload-code mode=worktree worktree-path=" worktree-path))
     "project-repl" (str "Project REPL action=project-repl op=" op
-                         (when worktree-path (str " worktree-path=" worktree-path))
-                         (when (= op "eval") (str " code=" code)))
+                        (when worktree-path (str " worktree-path=" worktree-path))
+                        (when (= op "eval") (str " code=" code)))
     "workflow" (str "Workflow action=workflow op=" op
                     (when definition-id (str " definition-id=" definition-id))
                     (when run-id (str " run-id=" run-id)))
@@ -450,8 +450,8 @@
                                       output (pr-str report)]
                                   (assoc (serialize-operation-output opts request output "Use a narrower reload scope to reduce output size.") :is-error (not= :ok (:psi-tool/overall-status report))))
                   "project-repl" (let [report (execute-psi-tool-project-repl-report {:ctx (:ctx opts) :session-id (:session-id opts)} request)
-                                        output (pr-str report)]
-                                    (assoc (serialize-operation-output opts request output "Use a narrower project REPL result to reduce output size.") :is-error (not= :ok (:psi-tool/overall-status report))))
+                                       output (pr-str report)]
+                                   (assoc (serialize-operation-output opts request output "Use a narrower project REPL result to reduce output size.") :is-error (not= :ok (:psi-tool/overall-status report))))
                   "workflow" (let [report (execute-psi-tool-workflow-report {:ctx (:ctx opts) :session-id (:session-id opts)} request)
                                    safe-report (sanitize-psi-tool-data report)
                                    output (pr-str safe-report)]

@@ -35,10 +35,10 @@
   ([opts]
    (create-session-context
     {:session-defaults (merge {:model {:provider "anthropic"
-                                      :id       "test-model"
-                                      :reasoning false}
-                              :system-prompt "test prompt"}
-                             opts)
+                                       :id       "test-model"
+                                       :reasoning false}
+                               :system-prompt "test prompt"}
+                              opts)
      :cwd (test-support/temp-cwd)
      :persist? false})))
 
@@ -570,7 +570,7 @@
       (is (some? (model-registry/find-model :local "test-llm")))
       ;; cleanup: reset registry to built-ins only
       (model-registry/init! {:user-models-path    nil
-                              :project-models-path nil}))))
+                             :project-models-path nil}))))
 
 (deftest reload-extension-installs-command-test
   (testing "/reload-extension-installs returns :text result with apply summary"

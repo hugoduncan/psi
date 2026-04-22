@@ -221,8 +221,8 @@
 
   (testing "resume-session-in! loaded state is logged through dispatch"
     (let [[ctx session-id] (create-session-context {:session-defaults {:model {:provider "openai"
-                                                                              :id "gpt-5.3-codex"
-                                                                              :reasoning true}}
+                                                                               :id "gpt-5.3-codex"
+                                                                               :reasoning true}}
                                                     :persist? false})
           _   (dispatch/clear-event-log!)
           f   (File/createTempFile "psi-resume-dispatch" ".ndedn")]

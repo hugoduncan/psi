@@ -767,9 +767,9 @@
   ;; Tests null context isolation across independent temporary repositories.
   (testing "create-null-context isolation"
     (let [ctx-a (git/create-null-context [{:message "only in A"
-                                          :files   {"a.txt" "a\n"}}])
+                                           :files   {"a.txt" "a\n"}}])
           ctx-b (git/create-null-context [{:message "only in B"
-                                          :files   {"b.txt" "b\n"}}])]
+                                           :files   {"b.txt" "b\n"}}])]
       (testing "ctx-a sees only its own commit history"
         (is (str/includes?
              (:git.commit/subject (first (git/log ctx-a {})))

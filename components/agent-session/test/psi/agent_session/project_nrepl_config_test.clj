@@ -9,10 +9,10 @@
 (deftest resolve-config-test
   (testing "merges project nREPL config from user and project scopes"
     (with-redefs [user-config/read-config (fn [] {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                                                                   :attach {:host "localhost" :port 7888}}}})
+                                                                                  :attach {:host "localhost" :port 7888}}}})
                   project-prefs/read-preferences (fn [cwd]
-                                                  (is (= "/tmp/project" cwd))
-                                                  {:agent-session {:project-nrepl {:attach {:port 9999}}}})]
+                                                   (is (= "/tmp/project" cwd))
+                                                   {:agent-session {:project-nrepl {:attach {:port 9999}}}})]
       (is (= {:project-nrepl {:start-command ["bb" "nrepl-server"]
                               :attach {:host "localhost" :port 9999}}}
              (project-nrepl-config/resolve-config "/tmp/project")))))

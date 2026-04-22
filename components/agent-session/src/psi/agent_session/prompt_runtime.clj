@@ -36,7 +36,7 @@
 
 (defn abort-active-turn-in!
   "Abort the currently active prepared-request turn for `session-id`, if any.
-   Cancels the stream handle and forces an aborted terminal turn result." 
+   Cancels the stream handle and forces an aborted terminal turn result."
   [ctx session-id]
   (when-let [turn-ctx (sa/turn-context-in ctx session-id)]
     (prompt-stream/abort-turn! turn-ctx)

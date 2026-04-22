@@ -31,8 +31,8 @@
                      {:active-dialog nil
                       :widgets []
                       :visible-notifications [{:id "n2" :message "second" :level :info}
-                                               {:id "n3" :message "third" :level :warning}
-                                               {:id "n4" :message "fourth" :level :error}]
+                                              {:id "n3" :message "third" :level :warning}
+                                              {:id "n4" :message "fourth" :level :error}]
                       :tools-expanded? false})
                     (assoc :width 120))
           plain (ansi/strip-ansi (app/view state))]

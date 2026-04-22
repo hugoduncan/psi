@@ -1,5 +1,5 @@
 (ns psi.app-runtime.background-job-view
-  "Canonical background-job view model shared across app-runtime projections." 
+  "Canonical background-job view model shared across app-runtime projections."
   (:require
    [clojure.string :as str]))
 

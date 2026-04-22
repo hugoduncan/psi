@@ -10,14 +10,14 @@
   {:definition-id "plan-build-review"
    :step-order ["plan" "build" "review"]
    :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}}
+                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}}
            "build" {:executor {:type :agent :profile "builder" :mode :async}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 2 :retry-on #{:execution-failed}}}
+                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed}}}
            "review" {:executor {:type :agent :profile "reviewer" :mode :sync}
-                      :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                      :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}})
+                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                     :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}})
 
 (defn- run-chart-phase-after
   [events]

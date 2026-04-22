@@ -18,22 +18,22 @@
           state (atom {:transport {:ready? true :pending {}}
                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                        :execute-prepared-request-fn (fn [_ai-ctx _ctx _session-id _prepared-request progress-queue]
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :text-delta :text "Hello" :type :agent-event})
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :thinking-delta :text "thinking..." :type :agent-event})
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :tool-start :tool-id "tc-1" :tool-name "read" :type :agent-event})
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :tool-result
-                                                     :tool-id "tc-1"
-                                                     :tool-name "read"
-                                                     :content [{:type :text :text "done"}]
-                                                     :result-text "done"
-                                                     :details nil
-                                                     :is-error false
-                                                     :type :agent-event})
-                                            (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "Hello final"}] :stop-reason :stop :usage {:total-tokens 3}}))})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :text-delta :text "Hello" :type :agent-event})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :thinking-delta :text "thinking..." :type :agent-event})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :tool-start :tool-id "tc-1" :tool-name "read" :type :agent-event})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :tool-result
+                                                               :tool-id "tc-1"
+                                                               :tool-name "read"
+                                                               :content [{:type :text :text "done"}]
+                                                               :result-text "done"
+                                                               :details nil
+                                                               :is-error false
+                                                               :type :agent-event})
+                                                      (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "Hello final"}] :stop-reason :stop :usage {:total-tokens 3}}))})
           handler (support/make-handler ctx state)
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                        "{:id \"p1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/delta\" \"assistant/thinking-delta\" \"assistant/message\" \"tool/start\" \"tool/result\" \"session/updated\" \"footer/updated\"]}}\n"
@@ -69,9 +69,9 @@
           state (atom {:transport {:ready? true :pending {}}
                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                        :execute-prepared-request-fn (fn [_ai-ctx _ctx _session-id _prepared-request progress-queue]
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :text-delta :text "Hello" :type :agent-event})
-                                            (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "Hello final"}] :stop-reason :stop :usage {:total-tokens 3}}))})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :text-delta :text "Hello" :type :agent-event})
+                                                      (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "Hello final"}] :stop-reason :stop :usage {:total-tokens 3}}))})
           handler (support/make-handler ctx state)
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                        "{:id \"p1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/delta\" \"assistant/message\" \"session/updated\" \"footer/updated\" \"error\"]}}\n"
@@ -126,13 +126,13 @@
           state (atom {:transport {:ready? true :pending {}}
                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                        :execute-prepared-request-fn (fn [_ai-ctx _ctx _session-id _prepared-request progress-queue]
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :thinking-delta :text "plan-1" :type :agent-event})
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :tool-start :tool-id "tc-1" :tool-name "read" :type :agent-event})
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :thinking-delta :text "plan-2" :type :agent-event})
-                                            (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "done"}] :stop-reason :stop :usage {:total-tokens 3}}))})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :thinking-delta :text "plan-1" :type :agent-event})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :tool-start :tool-id "tc-1" :tool-name "read" :type :agent-event})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :thinking-delta :text "plan-2" :type :agent-event})
+                                                      (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "done"}] :stop-reason :stop :usage {:total-tokens 3}}))})
           handler (support/make-handler ctx state)
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                        "{:id \"p1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/thinking-delta\" \"tool/start\" \"assistant/message\"]}}\n"

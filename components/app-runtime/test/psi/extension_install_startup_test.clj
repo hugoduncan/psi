@@ -39,8 +39,8 @@
     (intern *ns* 'init
             (fn [api]
               ((:register-command api) cmd-name
-               {:description (str "hello from " cmd-name)
-                :handler (fn [_] nil)})))))
+                                       {:description (str "hello from " cmd-name)
+                                        :handler (fn [_] nil)})))))
 
 (defn- startup-bootstrap-bindings [cwd home]
   {#'installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
@@ -178,7 +178,7 @@
           _        (define-runtime-extension-ns! 'psi.test.startup-mixed-remote "startup-mixed-remote")
           {:keys [result]} (bootstrap-with-manifest
                             {:deps {'psi/test-startup-mixed-local {:local/root ext-root
-                                                                  :psi/init 'psi.test.startup-mixed-local/init}
+                                                                   :psi/init 'psi.test.startup-mixed-local/init}
                                     'psi/test-startup-mixed-remote {:mvn/version "1.2.3"
                                                                     :psi/init 'psi.test.startup-mixed-remote/init}
                                     'psi/test-startup-mixed-missing {:git/url "https://example.com/ext"
@@ -206,14 +206,14 @@
           home       (test-support/temp-cwd)
           ext-root   (test-support/temp-cwd)
           _          (write-local-extension! ext-root
-                                            'psi.test.reload-ext
-                                            "(ns psi.test.reload-ext)\n\n(defn init [api]\n  ((:register-command api) \"reload-hello\" {:description \"hello from reload manifest\" :handler (fn [_] nil)}))\n")
+                                             'psi.test.reload-ext
+                                             "(ns psi.test.reload-ext)\n\n(defn init [api]\n  ((:register-command api) \"reload-hello\" {:description \"hello from reload manifest\" :handler (fn [_] nil)}))\n")
           [ctx sid]  (test-support/create-test-session {:persist? false :cwd cwd})]
       (with-redefs [installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
                     installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))]
         (spit (installs/project-manifest-file cwd)
               (pr-str {:deps {'psi/test-reload-ext {:local/root ext-root
-                                                   :psi/init 'psi.test.reload-ext/init}}}))
+                                                    :psi/init 'psi.test.reload-ext/init}}}))
         (installs/persist-install-state-in! ctx (installs/compute-install-state cwd))
         (let [result (ext-rt/reload-extensions-in! ctx sid [] cwd)]
           (is (= :loaded

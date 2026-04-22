@@ -42,7 +42,7 @@
 
 (defn eval-instance-in!
   "Evaluate `code` on the managed single nREPL client session for `worktree-path`.
-   Enforces first-slice single-flight semantics per worktree instance." 
+   Enforces first-slice single-flight semantics per worktree instance."
   [ctx worktree-path code]
   (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
         instance           (project-nrepl-runtime/instance-in ctx effective-worktree)

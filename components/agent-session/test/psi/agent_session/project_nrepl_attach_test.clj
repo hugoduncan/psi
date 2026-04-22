@@ -65,7 +65,7 @@
     (let [ctx      (make-ctx)
           worktree (System/getProperty "user.dir")]
       (with-redefs [psi.agent-session.project-nrepl-client/connect-instance-in! (fn [_ _]
-                                                                                  (throw (ex-info "attach-boom" {:phase :connect}))) ]
+                                                                                  (throw (ex-info "attach-boom" {:phase :connect})))]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"attach-boom"

@@ -143,10 +143,10 @@
                                                          :head head})]
               (notify! mutate-fn
                        (str "Commit checks found " (count failures)
-                                  " failing command"
-                                  (when (not= 1 (count failures)) "s")
-                                  "; injected follow-up prompt ("
-                                  (name (or (:psi.extension/prompt-delivery result) :unknown)) ")."))
+                            " failing command"
+                            (when (not= 1 (count failures)) "s")
+                            "; injected follow-up prompt ("
+                            (name (or (:psi.extension/prompt-delivery result) :unknown)) ")."))
               {:failures failures
                :prompt-sent? true
                :workspace-dir workspace-dir*})))))))

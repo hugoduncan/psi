@@ -17,13 +17,13 @@
   (testing "scheduler attrs resolve from session root and entity-seeded schedule id"
     (let [[ctx session-id] (create-session-context {:persist? false})
           created         (dispatch/dispatch! ctx :scheduler/create
-                                             {:session-id session-id
-                                              :schedule-id "sch-1"
-                                              :kind :message
-                                              :label "check-build"
-                                              :message "check build"
-                                              :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
-                                             {:origin :core})
+                                              {:session-id session-id
+                                               :schedule-id "sch-1"
+                                               :kind :message
+                                               :label "check-build"
+                                               :message "check build"
+                                               :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
+                                              {:origin :core})
           root-result     (session/query-in ctx session-id
                                             [:psi.scheduler/pending-count
                                              {:psi.scheduler/schedules

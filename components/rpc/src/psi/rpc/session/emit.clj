@@ -4,7 +4,6 @@
    [clojure.string :as str]
    [psi.rpc.events :as events]))
 
-
 (defn make-request-emitter
   [emit-frame! state request-id]
   (fn emit! [event payload]

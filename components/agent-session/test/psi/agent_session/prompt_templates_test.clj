@@ -459,7 +459,7 @@
                     :source :project
                     :file-path "/review.md"}]
         ctx     (session-core/create-context
-             {:session-defaults {:prompt-templates templates}})
+                 {:session-defaults {:prompt-templates templates}})
         sd      (session-core/new-session-in! ctx nil {})
         session-id (:session-id sd)]
 

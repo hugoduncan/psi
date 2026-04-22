@@ -77,8 +77,8 @@
                       {"jsonrpc" "2.0"
                        "id" id
                        "result" {"capabilities" {"diagnosticProvider" true
-                                                   "textDocumentSync" {"openClose" true
-                                                                       "change" 2}}}}
+                                                 "textDocumentSync" {"openClose" true
+                                                                     "change" 2}}}}
 
                       (and id (= method "textDocument/diagnostic"))
                       (let [uri (get-in params ["textDocument" "uri"])]

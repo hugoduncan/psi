@@ -310,9 +310,9 @@
                                 (recur (inc attempt)))))
                           (catch Exception e
                             (events/emit-event! emit-frame! state
-                                         {:event "error"
-                                          :data  {:error-code    "runtime/failed"
-                                                  :error-message (or (ex-message e) "extension run failed")}}))))]
+                                                {:event "error"
+                                                 :data  {:error-code    "runtime/failed"
+                                                         :error-message (or (ex-message e) "extension run failed")}}))))]
       (ext-rt/set-extension-run-fn-in! ctx session-id run-fn))))
 
 (defn- ensure-projection-listener!
@@ -329,7 +329,7 @@
                                   *err* (rpc.state/err-writer state)]
                           (loop []
                             (when-let [evt (.poll ^java.util.concurrent.LinkedBlockingQueue
-                                                  event-queue
+                                            event-queue
                                                   20
                                                   java.util.concurrent.TimeUnit/MILLISECONDS)]
                               (when (= :external-message (:type evt))
@@ -445,10 +445,10 @@
   [ctx request emit-frame! state session-id on-new-session!]
   (case (:op request)
     "new_session" (navigation/handle-new-session! {:ctx ctx
-                                                    :request (assoc request :emit-frame! emit-frame!)
-                                                    :state state
-                                                    :session-id session-id
-                                                    :on-new-session! on-new-session!})
+                                                   :request (assoc request :emit-frame! emit-frame!)
+                                                   :state state
+                                                   :session-id session-id
+                                                   :on-new-session! on-new-session!})
     "switch_session" (navigation/handle-switch-session! (navigation-request ctx request emit-frame! state session-id))
     "list_sessions" (ops/handle-list-sessions {:ctx ctx :request request :state state :session-id session-id})
     "fork" (navigation/handle-fork! (navigation-request ctx request emit-frame! state session-id))
@@ -477,14 +477,14 @@
        "ping" (ops/handle-ping request)
        "query_eql" (ops/handle-query-eql {:ctx ctx :request request :params params :session-id session-id :parse-query-edn! parse-query-edn!})
        "command" (rpc.commands/run-command! {:ctx ctx
-                                              :request request
-                                              :emit-frame! emit-frame!
-                                              :state state
-                                              :session-id session-id
-                                              :session-deps session-deps
-                                              :current-ai-model current-ai-model
-                                              :start-daemon-thread! start-daemon-thread!
-                                              :login-handler login/handle-login-start-command!})
+                                             :request request
+                                             :emit-frame! emit-frame!
+                                             :state state
+                                             :session-id session-id
+                                             :session-deps session-deps
+                                             :current-ai-model current-ai-model
+                                             :start-daemon-thread! start-daemon-thread!
+                                             :login-handler login/handle-login-start-command!})
        "frontend_action_result" (frontend-actions/handle-frontend-action-result! {:ctx ctx :request (assoc request :emit-frame! emit-frame!) :params params :state state :session-id session-id :resolve-model resolve-model})
        nil)
      (prompt-ops-dispatch ctx request params emit-frame! state session-id session-deps)

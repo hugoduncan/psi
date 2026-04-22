@@ -22,7 +22,7 @@
                                                      {:tool-call-id "tc-1"
                                                       :thread-id session-id
                                                       :tool-name "delegate"
-                                                      :job-id "job-1"}))) }
+                                                      :job-id "job-1"})))}
                               {:origin :test})
         _ (dispatch/dispatch! ctx :session/update-background-jobs-state
                               {:update-fn (fn [store]
@@ -31,7 +31,7 @@
                                                      {:tool-call-id "tc-2"
                                                       :thread-id session-id
                                                       :tool-name "delegate"
-                                                      :job-id "job-2"}))) }
+                                                      :job-id "job-2"})))}
                               {:origin :test})
         _ (dispatch/dispatch! ctx :session/update-background-jobs-state
                               {:update-fn (fn [store]

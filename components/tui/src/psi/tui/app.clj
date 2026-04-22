@@ -178,7 +178,6 @@
 
         state))))
 
-
 (load "app_autocomplete")
 (load "app_support")
 (load "app_update_helpers")
@@ -400,7 +399,6 @@
             (handle-idle-key-message state m run-agent-fn!))
           (handle-streaming-input state m)
           [state nil]))))
-
 
 (load "app_render")
 

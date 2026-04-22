@@ -145,9 +145,9 @@
     (let [base-headers (cond-> {"Content-Type" "application/json"}
                         ;; Skip Authorization when :no-auth-header is set
                         ;; (e.g. local servers that reject auth headers)
-                        (not (:no-auth-header options))
-                        (assoc "Authorization"
-                               (str "Bearer " (or (:api-key options)
+                         (not (:no-auth-header options))
+                         (assoc "Authorization"
+                                (str "Bearer " (or (:api-key options)
                                                    (System/getenv "OPENAI_API_KEY")))))
           ;; Merge any custom headers from provider config
           headers (if-let [custom (:headers options)]
@@ -352,16 +352,16 @@
       (let [response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
           (transport/emit-error! options
-                              :openai-completions
-                              url
-                              consume-fn
-                              (transport/response->error response))
+                                 :openai-completions
+                                 url
+                                 consume-fn
+                                 (transport/response->error response))
           (with-open [reader (io/reader (:body response))]
             (doseq [line (line-seq reader)]
               (process-chat-sse-line! stream-state consume-fn model options url line)))))
       (catch Exception e
         (transport/emit-error! options
-                            :openai-completions
-                            url
-                            consume-fn
-                            (transport/exception->error e))))))
+                               :openai-completions
+                               url
+                               consume-fn
+                               (transport/exception->error e))))))

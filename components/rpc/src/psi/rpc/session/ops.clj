@@ -70,7 +70,7 @@
   (let [message (get params :message)
         _       (when-not (and (string? message) (not (str/blank? message)))
                   (throw (ex-info "invalid request parameter :message: non-empty string"
-                                  {:error-code "request/invalid-params"}))) ]
+                                  {:error-code "request/invalid-params"})))]
     (session/steer-in! ctx session-id message)
     (response-frame (:id request) (:op request) true {:accepted true})))
 
@@ -100,7 +100,7 @@
 (defn handle-list-sessions
   [{:keys [ctx request state session-id]}]
   (response-frame (:id request) (:op request) true {:active-session-id (or session-id
-                                                                            (rpc.state/focus-session-id state))
+                                                                           (rpc.state/focus-session-id state))
                                                     :sessions (ss/list-context-sessions-in ctx)}))
 
 (defn handle-set-session-name

@@ -104,9 +104,9 @@
 
 (defn- create-workflow-child-session!
   [ctx parent-session-id {:keys [child-session-id session-name system-prompt tool-defs thinking-level model skills
-                                  developer-prompt developer-prompt-source preloaded-messages
-                                  cache-breakpoints prompt-component-selection
-                                  workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
+                                 developer-prompt developer-prompt-source preloaded-messages
+                                 cache-breakpoints prompt-component-selection
+                                 workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
   (dispatch/dispatch! ctx
                       :session/create-child
                       (cond-> {:session-id parent-session-id

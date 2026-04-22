@@ -82,14 +82,14 @@
                   :psi.agent-session/model-reasoning false
                   :psi.ui/statuses []}
                  {:context-sessions [{:session-id "s1"
-                                     :display-name "main"
-                                     :runtime-state "running"}
-                                    {:session-id "s2"
-                                     :display-name "helper"
-                                     :runtime-state "waiting"}
-                                    {:session-id "s3"
-                                     :session-name "notes"
-                                     :runtime-state "waiting"}]})]
+                                      :display-name "main"
+                                      :runtime-state "running"}
+                                     {:session-id "s2"
+                                      :display-name "helper"
+                                      :runtime-state "waiting"}
+                                     {:session-id "s3"
+                                      :session-name "notes"
+                                      :runtime-state "waiting"}]})]
       (is (= "sessions: waiting helper, notes · running main"
              (get-in model [:footer/session-activity :line])))
       (is (= [{:state "waiting" :labels ["helper" "notes"]}
@@ -108,15 +108,15 @@
                   :psi.agent-session/model-reasoning false
                   :psi.ui/statuses []}
                  {:context-sessions [{:session-id "child"
-                                     :parent-session-id "parent"
-                                     :display-name "helper"
-                                     :runtime-state "waiting"}
-                                    {:session-id "parent"
-                                     :display-name "main"
-                                     :runtime-state "running"}
-                                    {:session-id "s3"
-                                     :display-name "notes"
-                                     :runtime-state "waiting"}]})]
+                                      :parent-session-id "parent"
+                                      :display-name "helper"
+                                      :runtime-state "waiting"}
+                                     {:session-id "parent"
+                                      :display-name "main"
+                                      :runtime-state "running"}
+                                     {:session-id "s3"
+                                      :display-name "notes"
+                                      :runtime-state "waiting"}]})]
       (is (= "sessions: waiting helper, notes · running main"
              (get-in model [:footer/session-activity :line]))))))
 
@@ -130,9 +130,9 @@
                   :psi.agent-session/model-reasoning false
                   :psi.ui/statuses []}
                  {:context-sessions [{:session-id "s1" :display-name "main" :runtime-state "waiting"}
-                                    {:session-id "s2" :display-name "helper" :runtime-state "running"}
-                                    {:session-id "s3" :display-name "summarize" :runtime-state "retrying"}
-                                    {:session-id "s4" :display-name "prune-history" :runtime-state "compacting"}]})]
+                                     {:session-id "s2" :display-name "helper" :runtime-state "running"}
+                                     {:session-id "s3" :display-name "summarize" :runtime-state "retrying"}
+                                     {:session-id "s4" :display-name "prune-history" :runtime-state "compacting"}]})]
       (is (= "sessions: waiting main · running helper · retrying summarize · compacting prune-history"
              (get-in model [:footer/session-activity :line]))))))
 

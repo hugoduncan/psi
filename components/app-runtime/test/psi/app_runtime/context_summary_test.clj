@@ -30,7 +30,7 @@
 
 (deftest context-widget-visible-only-for-multiple-sessions-test
   (let [one (context-summary/context-widget {:active-session-id "s1"
-                                            :sessions [{:id "s1" :name "main"}]})
+                                             :sessions [{:id "s1" :name "main"}]})
         many (context-summary/context-widget {:active-session-id "s1"
                                               :sessions [{:id "s1" :name "main"}
                                                          {:id "s2" :name "child"}]})]

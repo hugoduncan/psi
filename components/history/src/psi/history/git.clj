@@ -253,7 +253,7 @@
   (.exists (File. (str path))))
 
 (defn head-reflog-latest
-  "Return the latest HEAD reflog entry as {:head :selector :subject}, or nil." 
+  "Return the latest HEAD reflog entry as {:head :selector :subject}, or nil."
   [ctx]
   (try
     (let [out (run-git ctx ["reflog" "-1" "--format=%H%x1f%gD%x1f%gs" "HEAD"])]
@@ -266,7 +266,7 @@
       nil)))
 
 (defn commit-parent-count
-  "Return the parent count for `sha`, or nil when unavailable." 
+  "Return the parent count for `sha`, or nil when unavailable."
   [ctx sha]
   (when (seq (str sha))
     (try

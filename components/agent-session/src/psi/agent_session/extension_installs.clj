@@ -250,7 +250,7 @@
                         (str/replace "-" "_"))]
     (when rel
       [(str rel ".clj")
-       (str rel ".cljc")])) )
+       (str rel ".cljc")])))
 
 (defn- local-root-source-paths
   [local-root]
@@ -320,13 +320,13 @@
   ([install-state previous-install-state]
    (let [entries-by-lib      (get-in install-state [:psi.extensions/effective :entries-by-lib])
          enabled-exts        (into {}
-                                    (filter (fn [[_ {:keys [extension? enabled?]}]]
-                                              (and extension? enabled?)))
-                                    entries-by-lib)
+                                   (filter (fn [[_ {:keys [extension? enabled?]}]]
+                                             (and extension? enabled?)))
+                                   entries-by-lib)
          local-entries       (into {}
-                                    (filter (fn [[_ {:keys [dep]}]]
-                                              (= :local (coordinate-family dep))))
-                                    enabled-exts)
+                                   (filter (fn [[_ {:keys [dep]}]]
+                                             (= :local (coordinate-family dep))))
+                                   enabled-exts)
          deps-extension-libs (into #{}
                                    (keep (fn [[lib {:keys [dep]}]]
                                            (when (not= :local (coordinate-family dep))
@@ -379,8 +379,8 @@
                                               (:resolution-errors plan))
                        manifest-id      (manifest-extension-id entry-lib)
                        load-error       (or (get errors-by-path path)
-                                             (get errors-by-path manifest-id)
-                                             resolution-error)
+                                            (get errors-by-path manifest-id)
+                                            resolution-error)
                        status           (cond
                                           (not extension?) :not-applicable
                                           (not enabled?) :disabled
@@ -399,7 +399,7 @@
                                           :else :configured)]
                    [entry-lib (cond-> (assoc entry :status status)
                                 load-error (assoc :load-error load-error))]))
-          entries-by-lib))))
+               entries-by-lib))))
 
 (defn finalize-apply-state
   [install-state plan reload-result]

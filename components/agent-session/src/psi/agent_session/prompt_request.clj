@@ -243,8 +243,8 @@
   [ctx session-id {:keys [turn-id user-message runtime-opts runtime-model commands] :as opts}]
   (let [session-data       (ss/get-session-data-in ctx session-id)
         {:keys [user-message expansion]} (or (expand-user-message session-data user-message commands)
-                                            {:user-message user-message
-                                             :expansion nil})
+                                             {:user-message user-message
+                                              :expansion nil})
         base-messages      (-> (session->provider-messages ctx session-id)
                                (replace-current-user-message user-message))
         steering-messages  (queued-steering-messages session-data user-message)

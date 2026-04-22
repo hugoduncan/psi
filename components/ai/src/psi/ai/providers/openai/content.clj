@@ -148,8 +148,8 @@
    "status"  "completed"
    "id"      (new-msg-id)
    "content" [{"type" "output_text"
-                "text" text
-                "annotations" []}]})
+               "text" text
+               "annotations" []}]})
 
 (defn pad-base64url
   "Pad base64url string to a multiple of 4 chars."

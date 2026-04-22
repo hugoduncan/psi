@@ -26,7 +26,7 @@
   (let [async-run-ids (->> jobs
                            (filter #(= "delegate" (:psi.background-job/tool-name %)))
                            (filter #(contains? #{:running :pending-cancel}
-                                                (:psi.background-job/status %)))
+                                               (:psi.background-job/status %)))
                            (map :psi.background-job/workflow-id)
                            set)]
     (if (empty? runs)
@@ -105,8 +105,8 @@
          (str/join "\n"
                    (for [[name defn-map] (sort-by key definitions)]
                      (str "- " name ": " (or (:summary defn-map)
-                                               (:description defn-map)
-                                               "")))))))
+                                             (:description defn-map)
+                                             "")))))))
 
 (defn parse-delegate-command
   "Parse `/delegate <workflow> <prompt>` args."

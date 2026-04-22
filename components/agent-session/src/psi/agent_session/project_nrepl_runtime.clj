@@ -67,7 +67,7 @@
 
    Returns the existing active instance when the acquisition request matches.
    Throws on conflicting acquisition attempts unless the caller uses
-   `replace-instance-in!` explicitly." 
+   `replace-instance-in!` explicitly."
   [ctx {:keys [worktree-path acquisition-mode endpoint command-vector] :as opts}]
   (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
         state              (:state (:project-nrepl-registry ctx))

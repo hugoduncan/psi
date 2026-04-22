@@ -239,7 +239,6 @@
       (is (= :idle (:phase s1)))
       (is (nil? cmd)))))
 
-
 ;;;; Input/selector tests moved to psi.tui.app-input-selector-test
 
 ;;;; View/runtime tests moved to psi.tui.app-view-runtime-test

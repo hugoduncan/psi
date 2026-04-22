@@ -199,7 +199,7 @@
   (testing "on-retry-triggered increments retry-attempt and schedules backoff with configured limits"
     (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry-attempt 2}})
           ctx             (assoc ctx :config {:auto-retry-base-delay-ms 100
-                                             :auto-retry-max-delay-ms 250})]
+                                              :auto-retry-max-delay-ms 250})]
       (with-registered-handlers
         ctx
         #(let [result (invoke-handler ctx :on-retry-triggered {:session-id session-id})]

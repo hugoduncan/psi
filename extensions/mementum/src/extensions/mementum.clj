@@ -4,8 +4,7 @@
    In lambda mode the engage prefix is omitted (the preamble already provides it).
    In prose mode the engage prefix is prepended so the protocol activates correctly.
 
-   Source: https://github.com/michaelwhitford/mementum/blob/main/MEMENTUM-LAMBDA.md"
-)
+   Source: https://github.com/michaelwhitford/mementum/blob/main/MEMENTUM-LAMBDA.md")
 
 (defonce state (atom {:api nil}))
 
@@ -101,8 +100,6 @@
   (if (lambda-mode?)
     mementum-lambda
     (str engage-prefix mementum-lambda)))
-
-
 
 (defn- register-prompt-contribution! [api]
   (when-let [register! (:register-prompt-contribution api)]

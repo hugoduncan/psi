@@ -37,7 +37,7 @@
                                                  assoc
                                                  :parent-session-id root-id)
         entry         (persist/message-entry {:role "user"
-                                             :content [{:type :text :text "Branch from here"}]})
+                                              :content [{:type :text :text "Branch from here"}]})
         _             (ss/journal-append-in! ctx root-id entry)
         items         (selectors/context-session-selector-items ctx root-id)]
     (is (= [[:session root-id]
@@ -78,7 +78,7 @@
 (deftest context-session-selector-adds-default-labels-test
   (let [[ctx root-id] (create-session-context {:persist? false})
         entry         (persist/message-entry {:role "user"
-                                             :content [{:type :text :text "Branch from here"}]})
+                                              :content [{:type :text :text "Branch from here"}]})
         _             (ss/journal-append-in! ctx root-id entry)
         items         (selectors/context-session-selector-items ctx root-id)
         session-item  (first items)

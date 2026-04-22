@@ -60,19 +60,17 @@
         (is (= #{"hello" "real reply"} (set texts)))
         (is (not (some #{"status only"} texts))))))
 
-    (testing "append-message becomes part of future LLM-visible conversation assembly"
-      (let [[ctx2 session-id2] (test-support/make-session-ctx {})
-            mutate2!           (mutate-fn ctx2 session-id2)]
-        (agent-core/append-message-in! (ss/agent-ctx-in ctx2 session-id2)
-                                       {:role "user"
-                                        :content [{:type :text :text "hello"}]})
-        (mutate2! 'psi.extension/append-message
-                  {:role "assistant"
-                   :content "synthetic reply"})
-        (let [messages (:messages (agent-core/get-data-in (ss/agent-ctx-in ctx2 session-id2)))
-              conv     (#'conversation/agent-messages->ai-conversation "sys" messages [] {})
-              texts    (conversation-texts conv)]
-          (is (= 2 (count texts)))
-          (is (= #{"hello" "synthetic reply"} (set texts))))))
-
-    )
+  (testing "append-message becomes part of future LLM-visible conversation assembly"
+    (let [[ctx2 session-id2] (test-support/make-session-ctx {})
+          mutate2!           (mutate-fn ctx2 session-id2)]
+      (agent-core/append-message-in! (ss/agent-ctx-in ctx2 session-id2)
+                                     {:role "user"
+                                      :content [{:type :text :text "hello"}]})
+      (mutate2! 'psi.extension/append-message
+                {:role "assistant"
+                 :content "synthetic reply"})
+      (let [messages (:messages (agent-core/get-data-in (ss/agent-ctx-in ctx2 session-id2)))
+            conv     (#'conversation/agent-messages->ai-conversation "sys" messages [] {})
+            texts    (conversation-texts conv)]
+        (is (= 2 (count texts)))
+        (is (= #{"hello" "synthetic reply"} (set texts)))))))

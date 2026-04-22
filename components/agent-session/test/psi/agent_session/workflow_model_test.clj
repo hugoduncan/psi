@@ -8,25 +8,25 @@
    :name "Plan Build Review"
    :step-order ["plan" "build" "review"]
    :steps {"plan" {:label "Plan"
-                    :executor {:type :agent :profile "planner" :mode :sync}
-                    :prompt-template "$INPUT"
-                    :input-bindings {:task {:source :workflow-input :path [:task]}}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                    :capability-policy {:tools #{"read" "bash"}}}
+                   :executor {:type :agent :profile "planner" :mode :sync}
+                   :prompt-template "$INPUT"
+                   :input-bindings {:task {:source :workflow-input :path [:task]}}
+                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
+                   :capability-policy {:tools #{"read" "bash"}}}
            "build" {:label "Build"
-                     :executor {:type :agent :profile "builder" :mode :async}
-                     :prompt-template "Execute this plan: $INPUT"
-                     :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 2 :retry-on #{:execution-failed}}
-                     :capability-policy {:tools #{"read" "edit" "write" "bash"}}}
+                    :executor {:type :agent :profile "builder" :mode :async}
+                    :prompt-template "Execute this plan: $INPUT"
+                    :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
+                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed}}
+                    :capability-policy {:tools #{"read" "edit" "write" "bash"}}}
            "review" {:label "Review"
-                      :executor {:type :agent :profile "reviewer" :mode :sync}
-                      :prompt-template "Review this implementation: $INPUT"
-                      :input-bindings {:build-result {:source :step-output :path ["build" :outputs]}}
-                      :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                      :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}})
+                     :executor {:type :agent :profile "reviewer" :mode :sync}
+                     :prompt-template "Review this implementation: $INPUT"
+                     :input-bindings {:build-result {:source :step-output :path ["build" :outputs]}}
+                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                     :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}})
 
 (def valid-run
   {:run-id "run-1"
@@ -36,10 +36,10 @@
    :workflow-input {:task "implement feature"}
    :current-step-id "plan"
    :step-runs {"plan" {:step-id "plan"
-                        :attempts [{:attempt-id "plan-a1"
-                                    :status :pending
-                                    :created-at (java.time.Instant/now)
-                                    :updated-at (java.time.Instant/now)}]}}
+                       :attempts [{:attempt-id "plan-a1"
+                                   :status :pending
+                                   :created-at (java.time.Instant/now)
+                                   :updated-at (java.time.Instant/now)}]}}
    :history [{:event :workflow/run-created
               :timestamp (java.time.Instant/now)
               :data {:run-id "run-1"}}]

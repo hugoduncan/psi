@@ -104,9 +104,9 @@
 
           (defn git-log-output [since merges? & args]
             (:out (apply shell {:out :string}
-                        (concat ["git" "log" "-n" (str since)]
-                                (when-not merges? ["--no-merges"])
-                                args))))
+                         (concat ["git" "log" "-n" (str since)]
+                                 (when-not merges? ["--no-merges"])
+                                 args))))
 
           (defn sort-top-file-rows [sort rows]
             (case sort
@@ -358,13 +358,13 @@
                                 "}"
                                 "console.log('Chiasmus check passed');"))]
              (System/exit (:exit result))))}
-             ref-report
-             {:doc
-              "Report public fns used only by tests and fns that could be private",
-              :requires ([hugoduncan.bb-task-lib.ref-report :as ref-report]),
-              :task (ref-report/run)} 
-             gordian 
-             {:doc
-              "Analyze codebase architecture with gordian; all args passed through (run with --help for full usage)",
-              :requires ([hugoduncan.bb-task-lib.gordian :as gordian]),
-              :task (gordian/run)}} :paths [".bbum/lib"]}
+  ref-report
+  {:doc
+   "Report public fns used only by tests and fns that could be private",
+   :requires ([hugoduncan.bb-task-lib.ref-report :as ref-report]),
+   :task (ref-report/run)}
+  gordian
+  {:doc
+   "Analyze codebase architecture with gordian; all args passed through (run with --help for full usage)",
+   :requires ([hugoduncan.bb-task-lib.gordian :as gordian]),
+   :task (gordian/run)}} :paths [".bbum/lib"]}

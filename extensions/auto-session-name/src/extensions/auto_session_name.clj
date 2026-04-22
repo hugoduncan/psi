@@ -134,10 +134,10 @@
 
 (defn- schedule-checkpoint! [api session-id turn-count]
   ((:mutate api) 'psi.extension/schedule-event
-   {:delay-ms   (:delay-ms @state)
-    :event-name checkpoint-event
-    :payload    {:session-id session-id
-                 :turn-count turn-count}}))
+                 {:delay-ms   (:delay-ms @state)
+                  :event-name checkpoint-event
+                  :payload    {:session-id session-id
+                               :turn-count turn-count}}))
 
 (defn- helper-session? [session-id]
   (contains? (:helper-session-ids @state) session-id))
@@ -211,23 +211,23 @@
           helper-model   (select-helper-model api source-session-id)]
       (when (seq user-prompt)
         (let [child ((:mutate-session api) source-session-id 'psi.extension/create-child-session
-                     {:session-name               "auto-session-name"
-                      :system-prompt              system-prompt
-                      :tool-defs                  []
-                      :thinking-level             :off
-                      :prompt-component-selection {:agents-md? false
-                                                   :extension-prompt-contributions []
-                                                   :tool-names []
-                                                   :skill-names []
-                                                   :components #{}}
-                      :cache-breakpoints          #{}})
+                                           {:session-name               "auto-session-name"
+                                            :system-prompt              system-prompt
+                                            :tool-defs                  []
+                                            :thinking-level             :off
+                                            :prompt-component-selection {:agents-md? false
+                                                                         :extension-prompt-contributions []
+                                                                         :tool-names []
+                                                                         :skill-names []
+                                                                         :components #{}}
+                                            :cache-breakpoints          #{}})
               child-session-id (:psi.agent-session/session-id child)]
           (when child-session-id
             (remember-helper-session! child-session-id)
             (let [run-result ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
-                              (cond-> {:prompt user-prompt}
-                                helper-model
-                                (assoc :model helper-model)))
+                                                    (cond-> {:prompt user-prompt}
+                                                      helper-model
+                                                      (assoc :model helper-model)))
                   title      (some-> (:psi.agent-session/agent-run-text run-result)
                                      normalize-title)
                   current-name (query-session-name api source-session-id)]
@@ -236,7 +236,7 @@
                          (not (stale-checkpoint? source-session-id checkpoint-turn-count))
                          (not (manual-override? source-session-id current-name)))
                 ((:mutate-session api) source-session-id 'psi.extension/set-session-name
-                 {:name title})
+                                       {:name title})
                 (remember-auto-name! source-session-id title)
                 title))))))))
 
@@ -262,13 +262,13 @@
          :ui (:ui api)
          :turn-counts {})
   ((:on api) "session_turn_finished"
-   (fn [payload]
-     (on-turn-finished api payload)
-     nil))
+             (fn [payload]
+               (on-turn-finished api payload)
+               nil))
   ((:on api) checkpoint-event
-   (fn [payload]
-     (on-checkpoint api payload)
-     nil))
+             (fn [payload]
+               (on-checkpoint api payload)
+               nil))
   (when-let [ui (:ui api)]
     (when-let [notify (:notify ui)]
       (notify "auto-session-name loaded" :info))))

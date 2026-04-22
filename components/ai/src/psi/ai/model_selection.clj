@@ -97,9 +97,9 @@
                               :latency-tier       (:latency-tier model)
                               :cost-tier          (:cost-tier model)}
                   :reference {:configured? (boolean (or (nil? auth)
-                                                       (:api-key auth)
-                                                       (seq (:headers auth))
-                                                       (false? (:auth-header? auth))))}})))
+                                                        (:api-key auth)
+                                                        (seq (:headers auth))
+                                                        (false? (:auth-header? auth))))}})))
         (sort-by (juxt :provider :id))
         vec)})
 

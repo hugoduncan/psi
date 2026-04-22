@@ -83,7 +83,7 @@
   (let [install-state {:psi.extensions/effective {:raw-deps {'foo/ext {:mvn/version "1.1.0"
                                                                        :psi/init 'foo.ext/init}}
                                                   :entries-by-lib {'foo/ext {:dep {:mvn/version "1.1.0"
-                                                                                    :psi/init 'foo.ext/init}
+                                                                                   :psi/init 'foo.ext/init}
                                                                              :extension? true
                                                                              :enabled? true}}}}
         previous-state {:psi.extensions/effective {:raw-deps {'foo/ext {:mvn/version "1.0.0"

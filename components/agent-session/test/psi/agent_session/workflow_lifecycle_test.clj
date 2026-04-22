@@ -21,23 +21,23 @@
    :summary "Representative chain-like workflow proof"
    :step-order ["plan" "build" "review"]
    :steps {"plan" {:label "Plan"
-                    :executor {:type :agent :profile "planner" :mode :sync}
-                    :input-bindings {:task {:source :workflow-input :path [:task]}}
+                   :executor {:type :agent :profile "planner" :mode :sync}
+                   :input-bindings {:task {:source :workflow-input :path [:task]}}
+                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
+                   :capability-policy {:tools #{"read" "bash"}}}
+           "build" {:label "Build"
+                    :executor {:type :agent :profile "builder" :mode :async}
+                    :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
                     :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                    :capability-policy {:tools #{"read" "bash"}}}
-           "build" {:label "Build"
-                     :executor {:type :agent :profile "builder" :mode :async}
-                     :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                     :capability-policy {:tools #{"read" "edit" "write"}}}
+                    :capability-policy {:tools #{"read" "edit" "write"}}}
            "review" {:label "Review"
-                      :executor {:type :agent :profile "reviewer" :mode :sync}
-                      :input-bindings {:build {:source :step-output :path ["build" :outputs :build]}}
-                      :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                      :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}
-                      :capability-policy {:tools #{"read"}}}}})
+                     :executor {:type :agent :profile "reviewer" :mode :sync}
+                     :input-bindings {:build {:source :step-output :path ["build" :outputs :build]}}
+                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                     :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}
+                     :capability-policy {:tools #{"read"}}}}})
 
 (defn- install-definition-and-run!
   [ctx]

@@ -561,8 +561,8 @@
                       (get (query/query-in qctx
                                            {:psi/agent-session-ctx ctx}
                                            [(list op (cond-> (assoc params :psi/agent-session-ctx ctx)
-                       (not (contains? params :session-id))
-                       (assoc :session-id thread-id)))])
+                                                       (not (contains? params :session-id))
+                                                       (assoc :session-id thread-id)))])
                            op))]
       ;; Register workflow type and create/start a workflow instance
       (wf/register-type-in! reg ext-path {:type :instant-done :chart instant-done-chart})
@@ -630,8 +630,8 @@
                       (get (query/query-in qctx
                                            {:psi/agent-session-ctx ctx}
                                            [(list op (cond-> (assoc params :psi/agent-session-ctx ctx)
-                       (not (contains? params :session-id))
-                       (assoc :session-id thread-id)))])
+                                                       (not (contains? params :session-id))
+                                                       (assoc :session-id thread-id)))])
                            op))]
       (wf/register-type-in! reg ext-path {:type :delayed-done :chart delayed-done-chart})
       (wf/ensure-pump! reg)

@@ -50,8 +50,8 @@
                :effective-definition {:definition-id "def"
                                       :step-order ["plan"]
                                       :steps {"plan" {:executor {:type :agent}
-                                                       :result-schema :any
-                                                       :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}}
+                                                      :result-schema :any
+                                                      :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}}
                :workflow-input {}
                :current-step-id "plan"
                :step-runs {"plan" {:step-id "plan" :attempts []}}

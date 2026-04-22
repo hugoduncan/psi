@@ -57,7 +57,6 @@
       (is (str/includes? error "OPENAI_API_KEY"))
       (is (str/includes? error "anthropic")))))
 
-
 (defn- with-main-bootstrap-stubs
   [f]
   (with-redefs [psi.app-runtime/resolve-model

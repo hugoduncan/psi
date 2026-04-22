@@ -104,12 +104,12 @@
 
 (defn- append-assistant-msg [conv msg]
   (let [thinking-blocks (->> (:content msg)
-                              (keep (fn [block]
-                                      (when (= :thinking (:type block))
-                                        (cond-> {:kind :thinking
-                                                 :text (or (:text block) "")}
-                                          (:provider block)  (assoc :provider (:provider block))
-                                          (:signature block) (assoc :signature (:signature block)))))))
+                             (keep (fn [block]
+                                     (when (= :thinking (:type block))
+                                       (cond-> {:kind :thinking
+                                                :text (or (:text block) "")}
+                                         (:provider block)  (assoc :provider (:provider block))
+                                         (:signature block) (assoc :signature (:signature block)))))))
         text-parts      (keep #(when (= :text (:type %)) (:text %)) (:content msg))
         tool-calls      (filter #(= :tool-call (:type %)) (:content msg))
         text            (str/join "\n" text-parts)

@@ -63,7 +63,7 @@
   (testing "eval transport failure returns unavailable and records last-error"
     (let [ctx      (make-ctx)
           worktree (System/getProperty "user.dir")
-          client-session (fn [_] (throw (ex-info "eval-boom" {:phase :eval}))) ]
+          client-session (fn [_] (throw (ex-info "eval-boom" {:phase :eval})))]
       (install-instance! ctx worktree client-session)
       (let [result (project-nrepl-eval/eval-instance-in! ctx worktree "(+ 1 2)")
             instance (project-nrepl-runtime/instance-in ctx worktree)]

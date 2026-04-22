@@ -1365,9 +1365,9 @@
                  :last-output   (task-preview (:text step-result) 500)
                  :started-ms    (:started-ms ctx)
                  :error-message (no-progress-error-message (:prompt-name step-ctx)
-                                                          next-state
-                                                          has-tasks-stall?
-                                                          no-progress-streak)})))
+                                                           next-state
+                                                           has-tasks-stall?
+                                                           no-progress-streak)})))
 
 (defn- post-step-result
   [ctx step-ctx step-result base-entry history']

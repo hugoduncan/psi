@@ -13,7 +13,7 @@
    3. :send-fn            fire-and-forget write only
 
    Responses from request/await modes are surfaced as :response for higher-level
-   protocol adapters." 
+   protocol adapters."
   ([ctx service-key request]
    (send-service-request! ctx service-key request nil))
   ([ctx service-key {:keys [request-id payload timeout-ms] :as request} {:keys [dispatch-id]}]
@@ -61,7 +61,7 @@
   "Project one service-request response to a JSON-RPC result payload.
 
    Returns the inner `result` when present, the whole payload when no JSON-RPC
-   envelope/result is present, or nil when no response is available." 
+   envelope/result is present, or nil when no response is available."
   [request-result]
   (let [response (:response request-result)
         payload  (or (:payload response) response)]

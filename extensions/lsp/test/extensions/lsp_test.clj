@@ -51,7 +51,7 @@
           {:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/lsp.clj"})]
       (sut/ensure-lsp-service! (assoc api :ensure-service (fn [spec]
-                                                           ((:mutate api) 'psi.extension/ensure-service spec)))
+                                                            ((:mutate api) 'psi.extension/ensure-service spec)))
                                {:path file
                                 :worktree-path root})
       (is (= [{:key [:lsp (.getCanonicalPath (io/file root))]
@@ -70,7 +70,7 @@
           {:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/lsp.clj"})]
       (sut/ensure-lsp-service! (assoc api :ensure-service (fn [spec]
-                                                           ((:mutate api) 'psi.extension/ensure-service spec)))
+                                                            ((:mutate api) 'psi.extension/ensure-service spec)))
                                {:path file
                                 :worktree-path root
                                 :config {:command ["custom-lsp" "--stdio"]}})
@@ -117,7 +117,7 @@
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/lsp.clj"})]
       (sut/init (assoc api :register-post-tool-processor (fn [spec]
-                                                          ((:mutate api) 'psi.extension/register-post-tool-processor spec))))
+                                                           ((:mutate api) 'psi.extension/register-post-tool-processor spec))))
       (is (= 1 (count (:post-tool-processors @state))))
       (is (= "lsp-diagnostics"
              (get-in @state [:post-tool-processors 0 :name]))))))

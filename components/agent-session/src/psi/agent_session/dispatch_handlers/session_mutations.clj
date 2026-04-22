@@ -539,9 +539,7 @@
                          :count  (if existing? (count tools) (inc (count tools)))}}
          (not existing?)
          (assoc :effects [{:effect/type :runtime/agent-set-tools
-                           :tool-maps (conj (vec tools) tool)}])))))
-
-  )
+                           :tool-maps (conj (vec tools) tool)}]))))))
 
 (defn register!
   "Register all session mutation handlers. Called once during context creation."

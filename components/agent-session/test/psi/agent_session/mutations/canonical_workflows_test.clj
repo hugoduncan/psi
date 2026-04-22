@@ -37,7 +37,7 @@
   (testing "registers a valid definition"
     (let [ctx (make-test-ctx)
           result (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
-                                                                  :definition sample-definition})]
+                                                                 :definition sample-definition})]
       (is (true? (:psi.workflow/registered? result)))
       (is (= "test-workflow" (:psi.workflow/definition-id result)))
       (is (nil? (:psi.workflow/error result)))
@@ -47,7 +47,7 @@
   (testing "returns error for invalid definition"
     (let [ctx (make-test-ctx)
           result (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
-                                                                  :definition {:bad "data"}})]
+                                                                 :definition {:bad "data"}})]
       (is (false? (:psi.workflow/registered? result)))
       (is (string? (:psi.workflow/error result))))))
 

@@ -54,7 +54,7 @@
                                                                       change)))]
         (rpc.state/set-projection-listener-id! state listener-id)
         (rpc.state/set-projection-listener-stop-fn! state
-                                                   #(unregister-projection-listener! ctx state))
+                                                    #(unregister-projection-listener! ctx state))
         listener-id))))
 
 (defn unregister-projection-listener!

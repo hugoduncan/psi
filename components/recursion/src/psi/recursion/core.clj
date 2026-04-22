@@ -305,8 +305,8 @@
   (let [step-results (merge base-steps
                             {:approval-result approval-result}
                             (run-orchestration-steps ctx cycle-id {:hook-executor hook-executor
-                                                                  :check-runner check-runner
-                                                                  :memory-ctx memory-ctx}))]
+                                                                   :check-runner check-runner
+                                                                   :memory-ctx memory-ctx}))]
     (if-let [[phase _failed-result] (failed-step step-results)]
       (orchestration-result false phase cycle-id step-results)
       (orchestration-result true :completed cycle-id step-results))))

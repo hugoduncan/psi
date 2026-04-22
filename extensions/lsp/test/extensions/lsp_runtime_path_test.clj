@@ -150,19 +150,19 @@
         (let [qtrace (:psi.dispatch-trace/recent
                       (session/query-in ctx
                                         [{:psi.dispatch-trace/recent [:psi.dispatch-trace/trace-kind
-                                                                     :psi.dispatch-trace/dispatch-id
-                                                                     :psi.dispatch-trace/event-type
-                                                                     :psi.dispatch-trace/method
-                                                                     :psi.dispatch-trace/interceptor-id]}]
+                                                                      :psi.dispatch-trace/dispatch-id
+                                                                      :psi.dispatch-trace/event-type
+                                                                      :psi.dispatch-trace/method
+                                                                      :psi.dispatch-trace/interceptor-id]}]
                                         {:session-id session-id}))
               qtrace-by-id (:psi.dispatch-trace/by-id
                             (session/query-in ctx
                                               [{:psi.dispatch-trace/by-id [:psi.dispatch-trace/trace-kind
-                                                                          :psi.dispatch-trace/dispatch-id
-                                                                          :psi.dispatch-trace/event-type
-                                                                          :psi.dispatch-trace/method
-                                                                          :psi.dispatch-trace/effect-type
-                                                                          :psi.dispatch-trace/interceptor-id]}]
+                                                                           :psi.dispatch-trace/dispatch-id
+                                                                           :psi.dispatch-trace/event-type
+                                                                           :psi.dispatch-trace/method
+                                                                           :psi.dispatch-trace/effect-type
+                                                                           :psi.dispatch-trace/interceptor-id]}]
                                               {:session-id session-id
                                                :psi.dispatch-trace/dispatch-id dispatch-id}))]
           (is (some #(and (= :dispatch/received (:psi.dispatch-trace/trace-kind %))

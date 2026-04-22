@@ -196,8 +196,8 @@
                  {state' :state schedule' :schedule}
                  (scheduler/deliver-schedule (scheduler-state-in ctx session-id) schedule-id)
                  final-schedule  (assoc schedule'
-                                   :created-session-id created-id
-                                   :delivery-phase :prompt-submit)
+                                        :created-session-id created-id
+                                        :delivery-phase :prompt-submit)
                  final-state     (assoc-in state' [:schedules schedule-id] final-schedule)]
              {:root-state-update (scheduler-update session-id (constantly final-state))
               :return {:schedule final-schedule

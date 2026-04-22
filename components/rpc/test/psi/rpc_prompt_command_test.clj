@@ -45,8 +45,8 @@
           state        (atom {:transport {:ready? true :pending {}}
                               :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                               :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
-                                                   (reset! loop-called? true)
-                                                   (support/ok-execution-result session-id))})
+                                                             (reset! loop-called? true)
+                                                             (support/ok-execution-result session-id))})
           handler (support/make-handler ctx state)
           input        (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                             "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"session/updated\" \"footer/updated\"]}}\n"
@@ -78,8 +78,8 @@
           state        (atom {:transport {:ready? true :pending {}}
                               :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                               :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
-                                                   (reset! loop-called? true)
-                                                   (support/ok-execution-result session-id [{:type :text :text "ok"}]))})
+                                                             (reset! loop-called? true)
+                                                             (support/ok-execution-result session-id [{:type :text :text "ok"}]))})
           handler (support/make-handler ctx state)
           input        (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                             "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"plain text\"}}\n")]
@@ -189,8 +189,8 @@
           state  (atom {:transport {:ready? true :pending {}}
                         :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                         :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
-                                             (reset! loop-called? true)
-                                             (support/ok-execution-result session-id))})
+                                                       (reset! loop-called? true)
+                                                       (support/ok-execution-result session-id))})
           handler (support/make-handler ctx state)
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                        "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\"]}}\n"
@@ -222,8 +222,8 @@
           state  (atom {:transport {:ready? true :pending {}}
                         :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                         :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
-                                             (reset! loop-called? true)
-                                             (support/ok-execution-result session-id))})
+                                                       (reset! loop-called? true)
+                                                       (support/ok-execution-result session-id))})
           handler (support/make-handler ctx state)
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                        "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\"]}}\n"
@@ -277,8 +277,8 @@
           state        (atom {:transport {:ready? true :pending {}}
                               :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                               :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
-                                                   (reset! loop-called? true)
-                                                   (support/ok-execution-result session-id))})
+                                                             (reset! loop-called? true)
+                                                             (support/ok-execution-result session-id))})
           handler (support/make-handler ctx state)]
       (with-redefs [commands/dispatch-in
                     (fn [_ctx _session-id text _opts]
@@ -322,8 +322,8 @@
           state        (atom {:transport {:ready? true :pending {}}
                               :rpc-ai-model {:provider "openai" :id "stub" :supports-reasoning true}
                               :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
-                                                   (reset! loop-called? true)
-                                                   (support/ok-execution-result session-id))})
+                                                             (reset! loop-called? true)
+                                                             (support/ok-execution-result session-id))})
           handler (support/make-handler ctx state)]
       (with-redefs [commands/dispatch-in
                     (fn [_ctx _session-id text _opts]

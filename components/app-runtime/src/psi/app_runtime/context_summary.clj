@@ -60,7 +60,7 @@
                   is-active    (boolean (:is-active slot))
                   parent-id    (:parent-session-id slot)
                   indent       (if (or (= item-kind "fork-point")
-                                        (and parent-id (contains? slot-id-set parent-id)))
+                                       (and parent-id (contains? slot-id-set parent-id)))
                                  "  " "")
                   base-label   (session-tree-line-label slot)
                   current-text (when is-active " ← current")

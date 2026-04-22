@@ -67,7 +67,7 @@
   (vals (get-in @(:state (:service-registry ctx)) [:services])))
 
 (defn service-keys-in [ctx]
-  (keys (get-in @(:state (:service-registry ctx)) [:services])) )
+  (keys (get-in @(:state (:service-registry ctx)) [:services])))
 
 (defn service-count-in [ctx]
   (count (service-keys-in ctx)))

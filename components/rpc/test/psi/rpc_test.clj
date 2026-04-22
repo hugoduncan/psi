@@ -458,9 +458,9 @@
           state (atom {:transport {:ready? true :pending {}}
                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                        :execute-prepared-request-fn (fn [_ai-ctx _ctx _session-id _prepared-request progress-queue]
-                                            (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                    {:event-kind :text-delta :text "Hello" :type :agent-event})
-                                            (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "Hello final"}] :stop-reason :stop :usage {:total-tokens 2}}))})
+                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
+                                                              {:event-kind :text-delta :text "Hello" :type :agent-event})
+                                                      (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "Hello final"}] :stop-reason :stop :usage {:total-tokens 2}}))})
           handler (support/make-handler ctx state)
           input (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                      "{:id \"q1\" :kind :request :op \"query_eql\" :params {:query \"[:psi.graph/domain-coverage :psi.memory/status]\"}}\n"

@@ -24,9 +24,9 @@
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/schedule_event.clj"})]
       ((:mutate api) 'psi.extension/schedule-event
-       {:delay-ms 250
-        :event-name "rename-checkpoint"
-        :payload {:session-id "s1" :turn-count 2}})
+                     {:delay-ms 250
+                      :event-name "rename-checkpoint"
+                      :payload {:session-id "s1" :turn-count 2}})
       (is (= [{:ext-path "/test/schedule_event.clj"
                :delay-ms 250
                :event-name "rename-checkpoint"

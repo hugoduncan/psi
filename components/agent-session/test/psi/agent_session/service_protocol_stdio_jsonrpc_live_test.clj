@@ -10,7 +10,7 @@
 
 (def ^:private jsonrpc-echo-command
   [(or (System/getenv "BB") "bb")
-   (str (.getCanonicalPath (java.io.File. "components/agent-session/test/psi/agent_session/jsonrpc_echo_bb.clj")))] )
+   (str (.getCanonicalPath (java.io.File. "components/agent-session/test/psi/agent_session/jsonrpc_echo_bb.clj")))])
 
 (defn- create-session-context []
   (let [ctx (session/create-context (test-support/safe-context-opts {}))

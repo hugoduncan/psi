@@ -191,7 +191,7 @@
 (defn list-node
   "List node. Renders item-spec once per element at items-path in query result."
   [items-path item-spec & {:keys [key vertical indent]
-                            :or   {vertical true indent 0}}]
+                           :or   {vertical true indent 0}}]
   (cond-> {:type       :list
            :items-path items-path
            :item-spec  item-spec
@@ -223,7 +223,7 @@
    :spec          — root WidgetNode
    :subscriptions — vector of EventSubscription maps"
   [id placement spec-node & {:keys [query entity subscriptions]
-                              :or   {query [] subscriptions []}}]
+                             :or   {query [] subscriptions []}}]
   (cond-> {:id            id
            :placement     placement
            :query         (vec query)

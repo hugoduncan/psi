@@ -149,31 +149,31 @@
                                                         :execution-result/stop-reason :stop})
                        :persist?                     false
                        :notify-extension-fn         (fn
-                                                       ([ctx role content custom-type]
-                                                        (let [msg {:role      role
-                                                                   :content   [{:type :text :text (str content)}]
-                                                                   :timestamp (java.time.Instant/now)}
-                                                              msg (cond-> msg
-                                                                    custom-type (assoc :custom-type custom-type)
-                                                                    (not custom-type) (assoc :custom-type "extension-notification"))
-                                                              session-id (some-> (ss/list-context-sessions-in ctx) first :session-id)]
-                                                          (dispatch/dispatch! ctx
-                                                                              :session/notify-extension
-                                                                              {:session-id session-id :message msg}
-                                                                              {:origin :core})
-                                                          msg))
-                                                       ([ctx session-id role content custom-type]
-                                                        (let [msg {:role      role
-                                                                   :content   [{:type :text :text (str content)}]
-                                                                   :timestamp (java.time.Instant/now)}
-                                                              msg (cond-> msg
-                                                                    custom-type (assoc :custom-type custom-type)
-                                                                    (not custom-type) (assoc :custom-type "extension-notification"))]
-                                                          (dispatch/dispatch! ctx
-                                                                              :session/notify-extension
-                                                                              {:session-id session-id :message msg}
-                                                                              {:origin :core})
-                                                          msg)))
+                                                      ([ctx role content custom-type]
+                                                       (let [msg {:role      role
+                                                                  :content   [{:type :text :text (str content)}]
+                                                                  :timestamp (java.time.Instant/now)}
+                                                             msg (cond-> msg
+                                                                   custom-type (assoc :custom-type custom-type)
+                                                                   (not custom-type) (assoc :custom-type "extension-notification"))
+                                                             session-id (some-> (ss/list-context-sessions-in ctx) first :session-id)]
+                                                         (dispatch/dispatch! ctx
+                                                                             :session/notify-extension
+                                                                             {:session-id session-id :message msg}
+                                                                             {:origin :core})
+                                                         msg))
+                                                      ([ctx session-id role content custom-type]
+                                                       (let [msg {:role      role
+                                                                  :content   [{:type :text :text (str content)}]
+                                                                  :timestamp (java.time.Instant/now)}
+                                                             msg (cond-> msg
+                                                                   custom-type (assoc :custom-type custom-type)
+                                                                   (not custom-type) (assoc :custom-type "extension-notification"))]
+                                                         (dispatch/dispatch! ctx
+                                                                             :session/notify-extension
+                                                                             {:session-id session-id :message msg}
+                                                                             {:origin :core})
+                                                         msg)))
                        :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
                        :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
                        :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
@@ -212,7 +212,7 @@
    (let [persist? (not= false (:persist? opts))
          _        (when persist?
                     (let [cwd-path      (.getCanonicalPath (java.io.File. (str (or (:cwd opts)
-                                                                                 (System/getProperty "user.dir")))))
+                                                                                   (System/getProperty "user.dir")))))
                           user-dir-path (.getCanonicalPath (java.io.File. (System/getProperty "user.dir")))]
                       (when (= cwd-path user-dir-path)
                         (throw (ex-info "Unsafe persisted test context cwd resolves to process user.dir"

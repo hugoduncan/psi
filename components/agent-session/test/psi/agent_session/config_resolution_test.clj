@@ -36,10 +36,10 @@
                                                                          :prompt-mode :prose
                                                                          :nucleus-prelude-override "user prelude"}})
                   project-prefs/read-preferences (fn [cwd]
-                                                  (is (= "/tmp/project" cwd))
-                                                  {:agent-session {:model-provider "openai"
-                                                                   :model-id "gpt-5"
-                                                                   :prompt-mode :lambda}})]
+                                                   (is (= "/tmp/project" cwd))
+                                                   {:agent-session {:model-provider "openai"
+                                                                    :model-id "gpt-5"
+                                                                    :prompt-mode :lambda}})]
       (is (= {:model-provider "openai"
               :model-id "gpt-5"
               :thinking-level :medium

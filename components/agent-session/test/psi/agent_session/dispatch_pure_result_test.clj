@@ -342,11 +342,11 @@
                 by-id))
       (is (some #(and (= :dispatch/handler-result (:trace/kind %))
                       (= {:kind :pure-result
-                           :effect-count 0
-                           :has-root-state-update false
-                           :has-return true
-                           :return-key nil
-                           :return-effect-result? false}
+                          :effect-count 0
+                          :has-root-state-update false
+                          :has-return true
+                          :return-key nil
+                          :return-effect-result? false}
                          (:result %)))
                 by-id))
       (is (some #(and (= :dispatch/completed (:trace/kind %))
@@ -363,7 +363,7 @@
                                                 :value 1}]
                                      :return :ok}))
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"effect boom"
-            (dispatch/dispatch! ctx :effect-throws {:x 1})))
+                            (dispatch/dispatch! ctx :effect-throws {:x 1})))
       (let [entries (dispatch/dispatch-trace-entries)
             dispatch-id (:dispatch-id (first entries))
             by-id (filter #(= dispatch-id (:dispatch-id %)) entries)]

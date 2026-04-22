@@ -103,7 +103,7 @@
                       (consume-fn {:type :done :reason :stop}))]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream! stream-fn]
       (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id stub-model
-                                {:progress-queue q})
+                                   {:progress-queue q})
       (let [events (loop [acc []]
                      (if-let [e (.poll q 5 TimeUnit/MILLISECONDS)]
                        (recur (conj acc e))
@@ -150,7 +150,7 @@
                       (consume-fn {:type :done :reason :stop}))]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream! stream-fn]
       (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id stub-model
-                                {:progress-queue q})
+                                   {:progress-queue q})
       (let [events (loop [acc []]
                      (if-let [e (.poll q 5 TimeUnit/MILLISECONDS)]
                        (recur (conj acc e))
@@ -176,7 +176,7 @@
                       (consume-fn {:type :done :reason :stop}))]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream! stream-fn]
       (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id stub-model
-                                {:progress-queue q})
+                                   {:progress-queue q})
       (let [events (loop [acc []]
                      (if-let [e (.poll q 5 TimeUnit/MILLISECONDS)]
                        (recur (conj acc e))
@@ -201,7 +201,7 @@
                        (consume-fn {:type :done :reason :stop}))]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream! stream-fn]
       (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id openai-model
-                                {:progress-queue q})
+                                   {:progress-queue q})
       (let [events          (loop [acc []]
                               (if-let [e (.poll q 5 TimeUnit/MILLISECONDS)]
                                 (recur (conj acc e))

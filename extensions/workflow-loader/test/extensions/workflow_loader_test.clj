@@ -134,10 +134,10 @@
                     (fn [_]
                       (case (swap! load-call* inc)
                         1 {:definitions {"planner" {:definition-id "planner"
-                                                     :name "planner"
-                                                     :summary "Plans"
-                                                     :step-order ["step-1"]
-                                                     :steps {"step-1" {:label "planner"}}}}
+                                                    :name "planner"
+                                                    :summary "Plans"
+                                                    :step-order ["step-1"]
+                                                    :steps {"step-1" {:label "planner"}}}}
                            :errors []
                            :warnings []}
                         2 {:definitions {}
@@ -157,17 +157,17 @@
                     (fn [_]
                       (case (swap! load-call* inc)
                         1 {:definitions {"planner" {:definition-id "planner"
-                                                     :name "planner"
-                                                     :summary "Plans"
-                                                     :step-order ["step-1"]
-                                                     :steps {"step-1" {:label "planner"}}}}
+                                                    :name "planner"
+                                                    :summary "Plans"
+                                                    :step-order ["step-1"]
+                                                    :steps {"step-1" {:label "planner"}}}}
                            :errors []
                            :warnings []}
                         2 {:definitions {"planner-v2" {:definition-id "planner-v2"
-                                                         :name "planner-v2"
-                                                         :summary "Plans v2"
-                                                         :step-order ["step-1"]
-                                                         :steps {"step-1" {:label "planner-v2"}}}}
+                                                       :name "planner-v2"
+                                                       :summary "Plans v2"
+                                                       :step-order ["step-1"]
+                                                       :steps {"step-1" {:label "planner-v2"}}}}
                            :errors []
                            :warnings []}))]
         (wl/init api)
@@ -231,19 +231,19 @@
                     (fn [_]
                       (case (swap! load-call* inc)
                         1 {:definitions {"complexity-reduction-pr" {:definition-id "complexity-reduction-pr"
-                                                                     :name "complexity-reduction-pr"
-                                                                     :summary "Reduce complexity"
-                                                                     :step-order ["step-1"]
-                                                                     :steps {"step-1" {:label "complexity-reduction-pr"
-                                                                                        :capability-policy {:tools #{"read" "bash" "edit" "write" "work-on"}}}}}}
+                                                                    :name "complexity-reduction-pr"
+                                                                    :summary "Reduce complexity"
+                                                                    :step-order ["step-1"]
+                                                                    :steps {"step-1" {:label "complexity-reduction-pr"
+                                                                                      :capability-policy {:tools #{"read" "bash" "edit" "write" "work-on"}}}}}}
                            :errors []
                            :warnings []}
                         2 {:definitions {"complexity-reduction-pr" {:definition-id "complexity-reduction-pr"
-                                                                     :name "complexity-reduction-pr"
-                                                                     :summary "Reduce complexity"
-                                                                     :step-order ["step-1"]
-                                                                     :steps {"step-1" {:label "complexity-reduction-pr"
-                                                                                        :capability-policy {:tools #{"read" "bash" "edit" "write" "work-on"}}}}}}
+                                                                    :name "complexity-reduction-pr"
+                                                                    :summary "Reduce complexity"
+                                                                    :step-order ["step-1"]
+                                                                    :steps {"step-1" {:label "complexity-reduction-pr"
+                                                                                      :capability-policy {:tools #{"read" "bash" "edit" "write" "work-on"}}}}}}
                            :errors []
                            :warnings []}))]
         (wl/init api)

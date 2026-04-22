@@ -25,7 +25,7 @@
                                         ((:mutate api) 'psi.extension/ensure-service spec))
                       :service-request (fn [spec]
                                          ((:mutate api) 'psi.extension/service-request
-                                          (assoc spec :response {"result" {"capabilities" {"textDocumentSync" {"change" 2}}}})))
+                                                        (assoc spec :response {"result" {"capabilities" {"textDocumentSync" {"change" 2}}}})))
                       :service-notify (fn [spec]
                                         ((:mutate api) 'psi.extension/service-notify spec))
                       :get-service (fn [_] nil))]
@@ -51,11 +51,11 @@
                                                                       :psi.service/ext-path]}]
                                              q)
                                         {:psi.service/services [{:psi.service/key [:lsp "/repo"]
-                                                                :psi.service/status :running
-                                                                :psi.service/command ["clojure-lsp"]
-                                                                :psi.service/cwd "/repo"
-                                                                :psi.service/transport :stdio
-                                                                :psi.service/ext-path "/test/lsp.clj"}]}
+                                                                 :psi.service/status :running
+                                                                 :psi.service/command ["clojure-lsp"]
+                                                                 :psi.service/cwd "/repo"
+                                                                 :psi.service/transport :stdio
+                                                                 :psi.service/ext-path "/test/lsp.clj"}]}
                                         {}))})
           lines (sut/workspace-status-lines (assoc api :list-services (fn []
                                                                         (:psi.service/services
@@ -66,7 +66,7 @@
                                                                                                    :psi.service/cwd
                                                                                                    :psi.service/transport
                                                                                                    :psi.service/ext-path]}]))))
-                                           {:cwd "/repo"})]
+                                            {:cwd "/repo"})]
       (is (= "LSP workspace: /repo" (first lines)))
       (is (some #(= "Initialized: true" %) lines))
       (is (some #(= "Service status: :running" %) lines))
@@ -116,7 +116,7 @@
                                         ((:mutate api) 'psi.extension/ensure-service spec))
                       :service-request (fn [spec]
                                          ((:mutate api) 'psi.extension/service-request
-                                          (assoc spec :response {"result" {"capabilities" {"textDocumentSync" {"change" 2}}}})))
+                                                        (assoc spec :response {"result" {"capabilities" {"textDocumentSync" {"change" 2}}}})))
                       :service-notify (fn [spec]
                                         ((:mutate api) 'psi.extension/service-notify spec))
                       :get-service (fn [_] nil))]

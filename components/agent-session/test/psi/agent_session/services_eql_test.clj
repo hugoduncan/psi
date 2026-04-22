@@ -25,14 +25,14 @@
                      :transport :stdio}
               :ext-path "/ext/lsp.clj"})
           result (session/query-in ctx session-id [:psi.service/count
-                                        :psi.service/keys
-                                        {:psi.service/services
-                                         [:psi.service/key
-                                          :psi.service/status
-                                          :psi.service/command
-                                          :psi.service/cwd
-                                          :psi.service/transport
-                                          :psi.service/ext-path]}])]
+                                                   :psi.service/keys
+                                                   {:psi.service/services
+                                                    [:psi.service/key
+                                                     :psi.service/status
+                                                     :psi.service/command
+                                                     :psi.service/cwd
+                                                     :psi.service/transport
+                                                     :psi.service/ext-path]}])]
       (try
         (is (= 1 (:psi.service/count result)))
         (is (= [[:lsp "/repo"]] (:psi.service/keys result)))
@@ -70,20 +70,20 @@
                       :enrichments []}
         :worktree-path "/repo"})
       (let [result (session/query-in ctx session-id [:psi.post-tool-processor/count
-                                          {:psi.post-tool-processors
-                                           [:psi.post-tool-processor/name
-                                            :psi.post-tool-processor/ext-path
-                                            :psi.post-tool-processor/tools
-                                            :psi.post-tool-processor/timeout-ms]}
-                                          :psi.post-tool/processed-count
-                                          :psi.post-tool/timeout-count
-                                          :psi.post-tool/error-count
-                                          {:psi.post-tool/recent-events
-                                           [:psi.post-tool/tool-call-id
-                                            :psi.post-tool/tool-name
-                                            :psi.post-tool/processor-name
-                                            :psi.post-tool/status
-                                            :psi.post-tool/duration-ms]}])]
+                                                     {:psi.post-tool-processors
+                                                      [:psi.post-tool-processor/name
+                                                       :psi.post-tool-processor/ext-path
+                                                       :psi.post-tool-processor/tools
+                                                       :psi.post-tool-processor/timeout-ms]}
+                                                     :psi.post-tool/processed-count
+                                                     :psi.post-tool/timeout-count
+                                                     :psi.post-tool/error-count
+                                                     {:psi.post-tool/recent-events
+                                                      [:psi.post-tool/tool-call-id
+                                                       :psi.post-tool/tool-name
+                                                       :psi.post-tool/processor-name
+                                                       :psi.post-tool/status
+                                                       :psi.post-tool/duration-ms]}])]
         (is (= 1 (:psi.post-tool-processor/count result)))
         (is (= [{:psi.post-tool-processor/name "lint"
                  :psi.post-tool-processor/ext-path "/ext/lsp.clj"

@@ -290,24 +290,24 @@
                            :results results
                            :by-id   by-id
                            :error   (ex-message e)}))]
-           (case (:status outcome)
-             :continue
-             (recur (inc idx) (rest remaining) (:results outcome) (:by-id outcome))
+          (case (:status outcome)
+            :continue
+            (recur (inc idx) (rest remaining) (:results outcome) (:by-id outcome))
 
-             :stop
-             {:succeeded?      false
-              :step-count      (count steps)
-              :completed-count (count (:results outcome))
-              :failed-step-id  (:step-id outcome)
-              :results         (:results outcome)
-              :result-by-id    (:by-id outcome)
-              :error           (:error outcome)}
+            :stop
+            {:succeeded?      false
+             :step-count      (count steps)
+             :completed-count (count (:results outcome))
+             :failed-step-id  (:step-id outcome)
+             :results         (:results outcome)
+             :result-by-id    (:by-id outcome)
+             :error           (:error outcome)}
 
-             :error
-             {:succeeded?      false
-              :step-count      (count steps)
-              :completed-count (count (:results outcome))
-              :failed-step-id  (:step-id outcome)
-              :results         (:results outcome)
-              :result-by-id    (:by-id outcome)
-              :error           (:error outcome)}))))))
+            :error
+            {:succeeded?      false
+             :step-count      (count steps)
+             :completed-count (count (:results outcome))
+             :failed-step-id  (:step-id outcome)
+             :results         (:results outcome)
+             :result-by-id    (:by-id outcome)
+             :error           (:error outcome)}))))))
