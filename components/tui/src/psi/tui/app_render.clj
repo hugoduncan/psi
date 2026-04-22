@@ -1,6 +1,15 @@
 (in-ns 'psi.tui.app)
 ;; extracted: render
 
+(declare title-style
+         dim-style
+         user-style
+         assist-style
+         sep-style
+         error-style
+         spinner-frames
+         has-active-dialog?)
+
 ;; ── View ────────────────────────────────────────────────────
 
 (defn- render-banner [model-name prompt-templates skills extension-summary]

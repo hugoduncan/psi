@@ -182,6 +182,28 @@
 (load "app_support")
 (load "app_update_helpers")
 
+(declare handle-agent-event
+         handle-agent-result
+         handle-agent-poll
+         handle-streaming-escape
+         handle-streaming-submit
+         handle-ctrl-d
+         handle-idle-escape
+         handle-ctrl-c
+         clear-live-turn
+         delete-prev-word
+         autocomplete-open?
+         refresh-autocomplete
+         maybe-auto-open-autocomplete
+         move-autocomplete-selection
+         apply-selected-autocomplete
+         open-tab-autocomplete
+         continue-input-line
+         submit-input
+         clear-autocomplete
+         handle-selector-key
+         view)
+
 ;; ── Update ──────────────────────────────────────────────────
 
 (defn- update-tick-state

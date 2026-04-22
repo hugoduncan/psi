@@ -1,6 +1,8 @@
 (in-ns 'psi.tui.app)
 ;; extracted: support
 
+(import '[java.util.concurrent LinkedBlockingQueue TimeUnit])
+
 ;; ── Custom message predicates ───────────────────────────────
 
 (defn agent-result? [m] (= :agent-result (:type m)))

@@ -37,6 +37,7 @@
 (defmacro with-temp-dir
   [[sym prefix] & body]
   `(let [~sym (str (java.nio.file.Files/createTempDirectory ~prefix (make-array java.nio.file.attribute.FileAttribute 0)))]
+     ~sym
      (try
        ~@body
        (finally
@@ -301,28 +302,32 @@
     (is (= runtime-model (:prepared-request/model prepared)))))
 
 (deftest build-prepared-request-expands-skill-invocation-into-user-message-test
-  (with-temp-dir [dir "psi-skill-expand"]
-    (let [skill-file (str dir "/demo/SKILL.md")
-          _          (.mkdirs (java.io.File. (str dir "/demo")))
-          _          (spit skill-file "---\nname: demo\ndescription: Demo skill\n---\n# Skill Body\nUse this skill carefully.")
-          skill      {:name "demo"
-                      :description "Demo skill"
-                      :file-path skill-file
-                      :base-dir (str dir "/demo")
-                      :source :path
-                      :disable-model-invocation false}
-          [ctx session-id] (create-session-context {:persist? false
-                                                    :session-defaults {:skills [skill]}})
-          prepared   (psi.agent-session.prompt-request/build-prepared-request
-                      ctx session-id {:turn-id "t-skill"
-                                      :commands []
-                                      :user-message {:role "user"
-                                                     :content [{:type :text :text "/skill:demo apply this"}]}})]
-      (is (= :skill (get-in prepared [:prepared-request/input-expansion :kind])))
-      (is (= "demo" (get-in prepared [:prepared-request/input-expansion :name])))
-      (is (str/includes? (get-in prepared [:prepared-request/user-message :content 0 :text]) "<skill name=\"demo\""))
-      (is (str/includes? (get-in prepared [:prepared-request/user-message :content 0 :text]) "# Skill Body"))
-      (is (str/includes? (get-in prepared [:prepared-request/user-message :content 0 :text]) "apply this")))))
+  (let [dir (str (java.nio.file.Files/createTempDirectory "psi-skill-expand"
+                                                          (make-array java.nio.file.attribute.FileAttribute 0)))]
+    (try
+      (let [skill-file (str dir "/demo/SKILL.md")
+            _          (.mkdirs (java.io.File. (str dir "/demo")))
+            _          (spit skill-file "---\nname: demo\ndescription: Demo skill\n---\n# Skill Body\nUse this skill carefully.")
+            skill      {:name "demo"
+                        :description "Demo skill"
+                        :file-path skill-file
+                        :base-dir (str dir "/demo")
+                        :source :path
+                        :disable-model-invocation false}
+            [ctx session-id] (create-session-context {:persist? false
+                                                      :session-defaults {:skills [skill]}})
+            prepared   (psi.agent-session.prompt-request/build-prepared-request
+                        ctx session-id {:turn-id "t-skill"
+                                        :commands []
+                                        :user-message {:role "user"
+                                                       :content [{:type :text :text "/skill:demo apply this"}]}})]
+        (is (= :skill (get-in prepared [:prepared-request/input-expansion :kind])))
+        (is (= "demo" (get-in prepared [:prepared-request/input-expansion :name])))
+        (is (str/includes? (get-in prepared [:prepared-request/user-message :content 0 :text]) "<skill name=\"demo\""))
+        (is (str/includes? (get-in prepared [:prepared-request/user-message :content 0 :text]) "# Skill Body"))
+        (is (str/includes? (get-in prepared [:prepared-request/user-message :content 0 :text]) "apply this")))
+      (finally
+        (delete-tree! dir)))))
 
 (deftest build-prepared-request-expands-template-invocation-into-user-message-test
   (let [[ctx session-id] (create-session-context

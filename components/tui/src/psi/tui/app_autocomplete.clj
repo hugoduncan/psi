@@ -1,6 +1,10 @@
 (in-ns 'psi.tui.app)
 ;; extracted: autocomplete
 
+(declare input-value
+         builtin-slash-commands
+         set-input-value)
+
 (defn- input-pos [state]
   (let [v (input-value state)]
     (min (max 0 (or (get-in state [:input :pos]) (count v))) (count v))))

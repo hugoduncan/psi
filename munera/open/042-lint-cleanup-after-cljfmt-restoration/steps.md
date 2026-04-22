@@ -1,5 +1,5 @@
-- [ ] Remove or correct invalid lint path entries
-- [ ] Fix TUI extracted-file unresolved symbol/namespace lint errors
-- [ ] Fix current blocking test-file lint errors
+- [x] Remove or correct invalid lint path entries
+- [x] Fix TUI extracted-file unresolved symbol/namespace lint errors
+- [x] Fix current blocking test-file lint errors
 - [ ] Clean up adjacent unused requires/bindings needed for a green lint run
 - [ ] Run `bb lint` to green and record outcomes in `implementation.md`
