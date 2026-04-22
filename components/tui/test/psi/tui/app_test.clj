@@ -3,7 +3,6 @@
    Exercises init/update/view as pure functions — no terminal needed.
    Includes a JLine integration smoke test for terminal + keymap creation."
   (:require
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [charm.components.text-input :as text-input]
@@ -74,12 +73,6 @@
     (.put queue {:kind :done
                  :result {:role    "assistant"
                           :content [{:type :text :text response-text}]}})))
-
-(defn- error-agent-fn
-  "A stub run-agent-fn! that immediately puts an error on the queue."
-  [error-msg]
-  (fn [_text ^LinkedBlockingQueue queue]
-    (.put queue {:kind :error :message error-msg})))
 
 ;;;; Init
 

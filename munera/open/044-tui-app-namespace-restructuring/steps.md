@@ -1,6 +1,6 @@
-- [ ] Inventory current TUI app split-file symbols and dependency directions
-- [ ] Choose explicit target namespaces and dependency flow
-- [ ] Replace `in-ns` + `load` with explicit `ns` + `require` structure
-- [ ] Update TUI tests and any affected call sites
-- [ ] Verify targeted lint and TUI tests
-- [ ] Run `bb lint`
+- [x] Inventory current TUI app split-file symbols and dependency directions
+- [x] Choose explicit target namespaces and dependency flow
+- [x] Replace `in-ns` + `load` with explicit `ns` + `require` structure
+- [x] Update TUI tests and any affected call sites
+- [x] Verify targeted lint and TUI tests
+- [x] Run `bb lint`

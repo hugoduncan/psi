@@ -1,3 +1,27 @@
 2026-04-22
 - Task created to separate architectural TUI namespace restructuring from the warning burn-down in `043`.
 - User decision: do not solve the remaining TUI warnings with lint config; remove the `in-ns` pattern directly.
+- Inventory complete: current split-file `psi.tui.app` ownership falls into four real clusters plus a shared helper layer:
+  - support/init/dialog/polling
+  - autocomplete
+  - update/session-switching/stream-event handling
+  - render/view/footer/tool-progress
+  - shared styles/input/history/timing helpers
+- Chosen target shape: thin `psi.tui.app` facade over explicit namespaces under `psi.tui.app.*` with one-way dependencies:
+  - `shared` -> `support`
+  - `shared` + `support` -> `autocomplete`
+  - `shared` + `support` + `autocomplete` -> `update`
+  - `shared` + `support` -> `render`
+  - `psi.tui.app` composes the public entry surface only
+- This keeps `make-init`, `make-update`, `view`, and `start!` stable while removing hidden load-order coupling.
+- Implementation landed as explicit namespaces under `components/tui/src/psi/tui/app/`:
+  - `shared.clj`
+  - `support.clj`
+  - `autocomplete.clj`
+  - `update.clj`
+  - `render.clj`
+- `components/tui/src/psi/tui/app.clj` is now a thin composition facade.
+- Targeted verification:
+  - `clj-kondo` over the TUI app sources/tests now reports clean (`0 errors, 0 warnings`).
+  - `bb test:tui` passes (`152 tests, 505 assertions, 0 failures`).
+  - `bb lint` now reaches a single unrelated repository warning (`psi.agent-session.psi_tool` underscore namespace); the TUI split-file warning cluster is gone.

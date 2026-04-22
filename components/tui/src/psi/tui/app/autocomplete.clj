@@ -1,22 +1,18 @@
-(in-ns 'psi.tui.app)
-;; extracted: autocomplete
+(ns psi.tui.app.autocomplete
+  (:require
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [psi.tui.app.shared :as shared]
+   [psi.tui.app.support :as support]))
 
-(declare input-value
-         builtin-slash-commands
-         set-input-value)
-
-(defn- input-pos [state]
-  (let [v (input-value state)]
-    (min (max 0 (or (get-in state [:input :pos]) (count v))) (count v))))
-
-(defn- whitespace-char?
+(defn whitespace-char?
   [^Character c]
   (Character/isWhitespace c))
 
-(defn- token-context-at-cursor
+(defn token-context-at-cursor
   [state]
-  (let [text        (input-value state)
-        pos         (input-pos state)
+  (let [text        (shared/input-value state)
+        pos         (shared/input-pos state)
         before      (subs text 0 pos)
         after       (subs text pos)
         token-start (or (some->> (keep-indexed (fn [i ch]
@@ -46,7 +42,7 @@
      :context context
      :prefix token}))
 
-(defn- as-slash-command
+(defn as-slash-command
   [x]
   (let [s (some-> x str str/trim)]
     (when (seq s)
@@ -54,12 +50,12 @@
         s
         (str "/" s)))))
 
-(defn- slash-candidates
+(defn slash-candidates
   [state prefix]
   (let [templates  (mapv (fn [{:keys [name]}] (str "/" name)) (:prompt-templates state))
         skills     (mapv (fn [{:keys [name]}] (str "/skill:" name)) (:skills state))
         ext-cmds   (vec (keep as-slash-command (:extension-command-names state)))
-        all        (->> (concat builtin-slash-commands templates skills ext-cmds)
+        all        (->> (concat shared/builtin-slash-commands templates skills ext-cmds)
                         (remove str/blank?)
                         distinct
                         sort)
@@ -74,7 +70,7 @@
                   :kind :slash_command
                   :is-directory false})))))
 
-(defn- rel-path
+(defn rel-path
   [cwd ^java.io.File f]
   (let [cwd-path (.toPath (io/file cwd))
         file-path (.toPath f)]
@@ -82,19 +78,19 @@
         (.normalize)
         (.toString))))
 
-(defn- hidden-or-git-path?
+(defn hidden-or-git-path?
   [rel]
   (or (= ".git" rel)
       (str/starts-with? rel ".git/")
       (str/includes? rel "/.git/")
       (str/ends-with? rel "/.git")))
 
-(defn- quote-if-needed [s]
+(defn quote-if-needed [s]
   (if (str/includes? s " ")
     (str "\"" s "\"")
     s))
 
-(defn- file-reference-candidates
+(defn file-reference-candidates
   [state prefix]
   (let [cwd        (:cwd state)
         token      (or prefix "@")
@@ -123,7 +119,7 @@
                     :kind :file_reference
                     :is-directory dir?}))))))
 
-(defn- path-completion-candidates
+(defn path-completion-candidates
   [state prefix]
   (let [cwd          (:cwd state)
         token        (or prefix "")
@@ -158,7 +154,7 @@
                       :kind :file_path
                       :is-directory dir?})))))))
 
-(defn- clear-autocomplete
+(defn clear-autocomplete
   [state]
   (assoc-in state [:prompt-input-state :autocomplete]
             {:prefix ""
@@ -167,7 +163,7 @@
              :context nil
              :trigger-mode nil}))
 
-(defn- open-autocomplete
+(defn open-autocomplete
   [state {:keys [prefix context trigger-mode token-start token-end]} candidates]
   (if (seq candidates)
     (assoc-in state [:prompt-input-state :autocomplete]
@@ -180,7 +176,7 @@
                :token-end token-end})
     (clear-autocomplete state)))
 
-(defn- context-candidates
+(defn context-candidates
   [state context prefix]
   (case context
     :slash_command (slash-candidates state prefix)
@@ -188,7 +184,7 @@
     :file_path (path-completion-candidates state prefix)
     []))
 
-(defn- refresh-autocomplete
+(defn refresh-autocomplete
   [state trigger-mode]
   (let [{:keys [context prefix token-start token-end]} (token-context-at-cursor state)
         candidates (context-candidates state context prefix)]
@@ -199,11 +195,11 @@
                               :token-end token-end}
                        candidates)))
 
-(defn- autocomplete-open?
+(defn autocomplete-open?
   [state]
   (seq (get-in state [:prompt-input-state :autocomplete :candidates])))
 
-(defn- move-autocomplete-selection
+(defn move-autocomplete-selection
   [state delta]
   (let [cands (get-in state [:prompt-input-state :autocomplete :candidates])
         cnt   (count cands)]
@@ -214,19 +210,19 @@
                    (let [i (or i 0)]
                      (mod (+ i delta) cnt)))))))
 
-(defn- drop-duplicate-closing-quote-in-after
+(defn drop-duplicate-closing-quote-in-after
   [replacement after]
   (if (and (str/ends-with? replacement "\"")
            (str/starts-with? (or after "") "\""))
     (subs after 1)
     after))
 
-(defn- apply-selected-autocomplete
+(defn apply-selected-autocomplete
   [state]
   (let [ac         (get-in state [:prompt-input-state :autocomplete])
         idx        (or (:selected-index ac) 0)
         candidate  (nth (:candidates ac) idx nil)
-        text       (input-value state)
+        text       (shared/input-value state)
         start      (or (:token-start ac) (count text))
         end        (or (:token-end ac) (count text))
         before     (subs text 0 (min start (count text)))
@@ -245,14 +241,12 @@
                           replacement)
             text'      (str before replacement after)]
         (-> state
-            (set-input-value text')
+            (shared/set-input-value text')
             clear-autocomplete)))))
 
-(declare printable-key)
-
-(defn- maybe-auto-open-autocomplete
+(defn maybe-auto-open-autocomplete
   [state key-token]
-  (let [ch (printable-key key-token)]
+  (let [ch (support/printable-key key-token)]
     (if-not (or (= ch "/") (= ch "@"))
       state
       (let [{:keys [context token]} (token-context-at-cursor state)]
@@ -267,7 +261,7 @@
           :else
           state)))))
 
-(defn- open-tab-autocomplete
+(defn open-tab-autocomplete
   [state]
   (let [{:keys [token token-start token-end]} (token-context-at-cursor state)
         context    (if (and (= token-start 0) (str/starts-with? token "/"))
