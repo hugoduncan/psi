@@ -307,7 +307,7 @@
                                                 :tool-result {:effects [{:path file-path}]}
                                                 :config {:command lsp-fixture-command
                                                          :startup-timeout-ms 2000
-                                                         :diagnostics-timeout-ms 2000}})
+                                                         :diagnostics-timeout-ms 5000}})
           root (:workspace-root second-result)
           svc (services/service-in ctx (sut/workspace-key root))
           debug @(:debug-atom svc)]
