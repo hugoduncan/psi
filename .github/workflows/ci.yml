@@ -51,11 +51,16 @@ jobs:
 
       - name: Install cljfmt
         run: |
-          VERSION=$(curl -fsSL https://api.github.com/repos/weavejester/cljfmt/releases/latest \
-            | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "v\(.*\)".*/\1/')
-          curl -fsSL "https://github.com/weavejester/cljfmt/releases/download/v${VERSION}/cljfmt-${VERSION}-linux-amd64.zip" \
-            -o /tmp/cljfmt.zip
-          sudo unzip -q /tmp/cljfmt.zip -d /usr/local/bin
+          VERSION=$(python3 - <<'PY'
+          import json, urllib.request
+          with urllib.request.urlopen('https://api.github.com/repos/weavejester/cljfmt/releases/latest') as r:
+              print(json.load(r)['tag_name'].removeprefix('v'))
+          PY
+          )
+          curl -fsSL "https://github.com/weavejester/cljfmt/releases/download/${VERSION}/cljfmt-${VERSION}-linux-amd64.tar.gz" \
+            -o /tmp/cljfmt.tar.gz
+          tar -xzf /tmp/cljfmt.tar.gz -C /tmp
+          sudo install /tmp/cljfmt /usr/local/bin/cljfmt
           cljfmt --version
 
       - name: Format check
