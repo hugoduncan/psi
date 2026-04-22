@@ -1,7 +1,7 @@
-- [ ] Inspect `bb fmt:check`, `.pre-commit-config.yaml`, hook scripts, and `.github/workflows/ci.yml` to confirm the current formatting-enforcement gap
-- [ ] Run `cljfmt fix` across the canonical repo formatting targets and isolate the formatting-only diff
-- [ ] Verify staged-file `cljfmt` hook behavior with a realistic pre-commit scenario
-- [ ] Adjust hook/config behavior only if needed so staged-file formatting issues block commit completion as intended
-- [ ] Re-enable `bb fmt:check` in the CI `check` job
-- [ ] Update developer docs if formatting or hook setup guidance changed
-- [ ] Run the relevant verification commands and record outcomes in `implementation.md`
+- [x] Inspect `bb fmt:check`, `.pre-commit-config.yaml`, hook scripts, and `.github/workflows/ci.yml` to confirm the current formatting-enforcement gap
+- [x] Run `cljfmt fix` across the canonical repo formatting targets and isolate the formatting-only diff
+- [x] Verify staged-file `cljfmt` hook behavior with a realistic pre-commit scenario
+- [x] Adjust hook/config behavior only if needed so staged-file formatting issues block commit completion as intended
+- [x] Re-enable `bb fmt:check` in the CI `check` job
+- [x] Update developer docs if formatting or hook setup guidance changed
+- [x] Run the relevant verification commands and record outcomes in `implementation.md`

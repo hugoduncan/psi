@@ -49,6 +49,18 @@ jobs:
           sudo unzip -q /tmp/clj-kondo.zip -d /usr/local/bin
           clj-kondo --version
 
+      - name: Install cljfmt
+        run: |
+          VERSION=$(curl -fsSL https://api.github.com/repos/weavejester/cljfmt/releases/latest \
+            | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "v\(.*\)".*/\1/')
+          curl -fsSL "https://github.com/weavejester/cljfmt/releases/download/v${VERSION}/cljfmt-${VERSION}-linux-amd64.zip" \
+            -o /tmp/cljfmt.zip
+          sudo unzip -q /tmp/cljfmt.zip -d /usr/local/bin
+          cljfmt --version
+
+      - name: Format check
+        run: bb fmt:check
+
       - name: Lint
         run: bb lint
 

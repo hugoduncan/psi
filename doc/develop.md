@@ -2,16 +2,19 @@
 
 ## Prerequisites
 
-Install [pipx](https://pipx.pypa.io/) and then install pre-commit:
+Install `pre-commit`:
 
 ```bash
+# preferred
 pipx install pre-commit
+
+# or on Homebrew-based systems
+brew install pre-commit
 ```
 
-> **Note:** macOS ships a broken Python 2 `pre-commit` stub at
-> `/usr/local/bin/pre-commit`. The pipx-installed version at
-> `~/.local/bin/pre-commit` takes precedence once your shell PATH
-> includes `~/.local/bin` (pipx ensures this).
+> **Note:** macOS can ship a broken Python 2 `pre-commit` stub at
+> `/usr/local/bin/pre-commit`. A pipx- or Homebrew-installed version on
+> your PATH should take precedence.
 
 ## Setting up the git hooks
 

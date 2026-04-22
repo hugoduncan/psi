@@ -10,3 +10,33 @@
   - `doc/develop.md` documents the intended fix-and-retry behavior
   - `.github/workflows/ci.yml` currently runs `bb lint` but not `bb fmt:check` in the `check` job
 - Execution should verify actual hook behavior rather than assuming the documented contract is still true.
+
+2026-04-22
+- Confirmed the current enforcement gap:
+  - `bb fmt:check` already existed and reported 124 incorrectly formatted files
+  - `.pre-commit-config.yaml` already declared `cljfmt-fix`
+  - `.pre-commit-hooks/cljfmt-fix.sh` already had the intended behavior: run `cljfmt fix`, restage changed files, and exit non-zero when it reformats anything
+  - `.github/workflows/ci.yml` had drifted and was only running `bb lint` in the `check` job
+- Ran the canonical formatting pass:
+  - `cljfmt fix bb.edn deps.edn .lsp/config.edn .psi/startup-prompts.edn components extensions spec tests.edn extensions/tests.edn`
+  - committed separately as `6946388` `⚒ fmt: run cljfmt fix across project`
+- Verified staged-file pre-commit behavior with a realistic probe file:
+  - installed `pre-commit` locally
+  - installed hooks for the repo/worktree
+  - created a temporary misformatted `.clj` file under a tracked Clojure path
+  - ran `pre-commit run cljfmt-fix --files <temp-file>`
+  - observed the expected contract: the hook reformatted the file, restaged it, and exited with status `1`, requiring a rerun of `git commit`
+- Conclusion from hook verification:
+  - no hook script or `.pre-commit-config.yaml` change was needed
+  - the intended staged-file blocking behavior already existed; the missing piece was proving it and documenting installation options clearly
+- Updated CI:
+  - re-enabled formatting enforcement in `.github/workflows/ci.yml`
+  - added explicit `Install cljfmt` step in the `check` job
+  - added `Format check` step running `bb fmt:check` before lint
+- Updated docs:
+  - `doc/develop.md` now documents both `pipx install pre-commit` and `brew install pre-commit`
+  - macOS note now reflects either pipx- or Homebrew-installed `pre-commit`
+- Verification results:
+  - `bb fmt:check` passes after the formatting commit
+  - staged-file `pre-commit` `cljfmt-fix` behavior is proven locally
+  - `bb lint` currently fails for pre-existing repository issues unrelated to this task, including existing unresolved-symbol/errors and a `specs` path lint problem; this task did not broaden into fixing those unrelated lint failures
