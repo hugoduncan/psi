@@ -1,4 +1,4 @@
-(ns psi.agent-session.psi_tool
+(ns psi.agent-session.psi-tool
   "psi-tool runtime contract, validation, query/eval/reload execution, and output shaping."
   (:require
    [clojure.edn :as edn]

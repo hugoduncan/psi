@@ -8,7 +8,7 @@
    [psi.agent-session.workflow-runtime]
    [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.agent-session.project-nrepl-ops]
-   [psi.agent-session.psi_tool :as psi-tool]
+   [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.tools :as tools]))
 
 (defn- delete-tree! [path]

@@ -86,3 +86,10 @@
   - added explicit workflow prompt-control / attempts / progression requires in `workflow_execution_test.clj`
   - added `clojure.string` alias use in workflow execution assertions and explicit `project-nrepl-ops` require in `tools_test.clj`
   - targeted `clj-kondo` on the touched files now reports `errors: 0, warnings: 0`
+
+2026-04-22
+- Final warning slice:
+  - resolved the last repo-wide lint warning by renaming the `psi-tool` implementation namespace from `psi.agent-session.psi_tool` to `psi.agent-session.psi-tool`
+  - updated the remaining source/test requires in `tools.clj`, `tool_execution.clj`, and `tools_test.clj`
+  - verified `clj-kondo` on the touched psi-tool files (`errors: 0, warnings: 0`)
+  - verified full `bb lint` is now green (`errors: 0, warnings: 0`)

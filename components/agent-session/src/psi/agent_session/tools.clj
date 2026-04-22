@@ -7,7 +7,7 @@
    [babashka.process :as proc]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.psi_tool :as psi-tool]
+   [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.tool-output :as tool-output]
    [psi.agent-session.tool-path :as tool-path])
   (:import
