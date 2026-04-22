@@ -31,3 +31,4 @@
   - fixed a couple of redundant-let sites while touching nearby code
   - verified the touched source slice with targeted `clj-kondo` (`errors: 0, warnings: 0`)
   - broader agent-session test warning backlog remains and is still the largest remaining category
+  - current repo-wide `bb lint` is now down to `136` warnings remaining
