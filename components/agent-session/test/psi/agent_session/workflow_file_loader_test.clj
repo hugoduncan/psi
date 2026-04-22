@@ -114,8 +114,8 @@
 
 (deftest directory-precedence-test
   (testing "project definitions override global definitions with same name"
-    (let [global-planner (str "---\nname: planner\ndescription: Global planner\n---\nGlobal.")
-          project-planner (str "---\nname: planner\ndescription: Project planner\n---\nProject.")]
+    (let [global-planner "---\nname: planner\ndescription: Global planner\n---\nGlobal."
+          project-planner "---\nname: planner\ndescription: Project planner\n---\nProject."]
       (with-temp-workflow-dir
         {"planner.md" global-planner}
         (fn [global-dir]

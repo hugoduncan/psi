@@ -153,11 +153,11 @@
   (testing "missing reference detected"
     (let [defs [(-> (compiler/compile-workflow-file single-step-no-config) :definition)
                 ;; Multi-step references "builder" and "reviewer" which are not defined
-                (-> (compiler/compile-workflow-file multi-step-parsed) :definition)]]
-      (let [result (compiler/validate-step-references defs)]
-        (is (false? (:valid? result)))
-        (is (= #{"builder" "reviewer"}
-               (set (map :missing (:errors result)))))))))
+                (-> (compiler/compile-workflow-file multi-step-parsed) :definition)]
+          result (compiler/validate-step-references defs)]
+      (is (false? (:valid? result)))
+      (is (= #{"builder" "reviewer"}
+             (set (map :missing (:errors result))))))))
 
 (deftest validate-no-name-collisions-test
   (testing "no collisions"
@@ -167,7 +167,7 @@
 
   (testing "duplicate names detected"
     (let [defs [(-> (compiler/compile-workflow-file single-step-no-config) :definition)
-                (-> (compiler/compile-workflow-file single-step-no-config) :definition)]]
-      (let [result (compiler/validate-no-name-collisions defs)]
-        (is (false? (:valid? result)))
-        (is (= ["planner"] (:duplicates result)))))))
+                (-> (compiler/compile-workflow-file single-step-no-config) :definition)]
+          result (compiler/validate-no-name-collisions defs)]
+      (is (false? (:valid? result)))
+      (is (= ["planner"] (:duplicates result))))))

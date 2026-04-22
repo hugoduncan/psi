@@ -65,6 +65,14 @@
   - targeted `clj-kondo` on the touched files now reports `errors: 0, warnings: 0`
 
 2026-04-22
+- EQL/workflow file warning slice:
+  - moved EQL introspection helper fns out of inline test positions to remove `inline def` warnings without changing test behavior
+  - removed one dead EQL helper (`make-tool-call-msg`) after helper extraction made its non-use explicit
+  - simplified workflow compiler validation tests to avoid redundant nested lets while preserving assertions
+  - removed no-op `str` wrappers from workflow loader test fixtures and restored the error-count assertion shape
+  - targeted `clj-kondo` on `eql_introspection_test.clj`, `workflow_file_compiler_test.clj`, and `workflow_file_loader_test.clj` now reports `errors: 0, warnings: 0`
+
+2026-04-22
 - Prompt/session/query/runtime test warning slice:
   - removed dead `post-tool` / `service-protocol` / graph-helper requires that were no longer referenced after prior test splits
   - added/trimmed bindings in prompt execution and turn accumulator tests so only message fixtures that are actually journaled remain bound

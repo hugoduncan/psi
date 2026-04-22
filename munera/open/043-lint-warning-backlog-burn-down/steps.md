@@ -18,3 +18,4 @@
   - agent-session/introspection/recursion/ai warning slice removed duplicate requires, added missing `clojure.string`/`clojure.edn` aliases, and trimmed unused test requires/helpers; targeted `clj-kondo` on the touched files reports `errors: 0, warnings: 0`
   - project-nREPL/workflow/tool warning slice added explicit namespaces needed by `with-redefs` and helper call sites; targeted `clj-kondo` on the touched files reports `errors: 0, warnings: 0`
   - prompt/session/query/runtime test warning slice removed low-risk unused bindings/requires and redundant lets across prompt execution, turn accumulation, session lifecycle, query graph, service protocol, and resolver tests; targeted `clj-kondo` on the touched files reports `errors: 0, warnings: 0`
+  - eql/workflow file warning slice moved helper defs out of inline test positions and cleaned workflow compiler/loader assertions; targeted `clj-kondo` on the touched files reports `errors: 0, warnings: 0`
