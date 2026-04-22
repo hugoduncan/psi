@@ -273,15 +273,17 @@
   (let [timeout-ms         (long (or diagnostics-timeout-ms 1000))
         deadline           (+ (System/currentTimeMillis) timeout-ms)
         per-request-max-ms 200]
-    (loop [diagnostics-by-path {}]
+    (loop [attempt 0
+           diagnostics-by-path {}]
       (let [pending-paths (remove #(contains? diagnostics-by-path %) paths)
             requested     (reduce (fn [acc path]
-                                    (let [remaining-ms (max 1 (- deadline (System/currentTimeMillis)))
+                                    (let [remaining-ms       (max 1 (- deadline (System/currentTimeMillis)))
                                           request-timeout-ms (min per-request-max-ms remaining-ms)
+                                          request-id         (str "diagnostic-" (hash path) "-" attempt "-" (System/nanoTime))
                                           response           (jsonrpc-request! api
                                                                                (dispatch/assoc-dispatch-id
                                                                                 {:workspace-root workspace-root
-                                                                                 :id (str "diagnostic-" (hash path))
+                                                                                 :id request-id
                                                                                  :method "textDocument/diagnostic"
                                                                                  :params (document-diagnostics-request path)
                                                                                  :timeout-ms request-timeout-ms}
@@ -298,7 +300,7 @@
           merged
           (do
             (Thread/sleep 50)
-            (recur merged)))))))
+            (recur (inc attempt) merged)))))))
 
 (defn- changed-paths
   [{:keys [tool-result]}]
