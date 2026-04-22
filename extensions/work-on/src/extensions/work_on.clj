@@ -336,6 +336,50 @@
          "` on branch `" (:branch-name result) "`")
     (:error result)))
 
+(def ^:private work-on-usage
+  "usage: /work-on <description>\n       /work-on --base <branch> <description>")
+
+(defn- work-on-usage-error
+  []
+  (work-on-error work-on-usage))
+
+(def ^:private work-on-base-usage-error
+  "usage error: --base requires a branch and description\n\nusage: /work-on <description>\n       /work-on --base <branch> <description>")
+
+(defn- parse-work-on-command-args
+  [args]
+  (let [args* (trim-arg args)]
+    (cond
+      (nil? args*)
+      {:ok? false
+       :error work-on-usage}
+
+      (str/starts-with? args* "--base")
+      (let [[_ branch description] (re-matches #"--base\s+(\S+)(?:\s+(.+))?" args*)]
+        (cond
+          (not (re-find #"^--base(?:\s|$)" args*))
+          {:ok? false :error work-on-usage}
+
+          (nil? branch)
+          (if (re-matches #"--base\s*" args*)
+            {:ok? false :error work-on-base-usage-error}
+            {:ok? false :error work-on-usage})
+
+          (nil? description)
+          {:ok? false :error work-on-base-usage-error}
+
+          (nil? (trim-arg description))
+          {:ok? false :error work-on-base-usage-error}
+
+          :else
+          {:ok? true
+           :request {:description description
+                     :base-branch branch}}))
+
+      :else
+      {:ok? true
+       :request {:description args*}})))
+
 (defn- work-on-tool-result
   [result]
   {:content  (work-on-result-message result)
@@ -351,34 +395,46 @@
                                           slug)}))
 
 (defn- add-worktree!
-  [worktree-path branch-name]
+  [worktree-path branch-name base-branch]
   (let [create-result (mutate! 'git.worktree/add!
                                {:input {:path worktree-path
                                         :branch branch-name
-                                        :base_ref nil
+                                        :base_ref base-branch
                                         :create-branch true}})]
     (if (= "branch already exists" (:error create-result))
-      (mutate! 'git.worktree/add!
-               {:input {:path worktree-path
-                        :branch branch-name
-                        :base_ref nil
-                        :create-branch false}})
-      create-result)))
+      (assoc (mutate! 'git.worktree/add!
+                      {:input {:path worktree-path
+                               :branch branch-name
+                               :base_ref nil
+                               :create-branch false}})
+             :reused-existing-branch? true)
+      (assoc create-result :reused-existing-branch? false))))
+
+(defn- maybe-assoc-base-branch-result
+  [result requested-base-branch applied?]
+  (if (some? requested-base-branch)
+    (assoc result
+           :requested-base-branch requested-base-branch
+           :base-branch-applied? applied?)
+    result))
 
 (defn- create-work-on-session-result
-  [session description worktree-path branch-name reused?]
+  [session description worktree-path branch-name reused? requested-base-branch base-branch-applied?]
   (let [origin-session-id (:psi.agent-session/session-id session)
         _                 (set-current-session-worktree-path! origin-session-id worktree-path)
         sd                (create-worktree-session! description worktree-path origin-session-id)]
-    (work-on-result true
-                    :reused? reused?
-                    :worktree-path worktree-path
-                    :branch-name branch-name
-                    :session-id (created-session-id sd)
-                    :session-name description)))
+    (maybe-assoc-base-branch-result
+     (work-on-result true
+                     :reused? reused?
+                     :worktree-path worktree-path
+                     :branch-name branch-name
+                     :session-id (created-session-id sd)
+                     :session-name description)
+     requested-base-branch
+     base-branch-applied?)))
 
 (defn- reuse-existing-worktree-result
-  [session description worktree-path branch-name]
+  [session description worktree-path branch-name requested-base-branch]
   (if-let [existing-wt (find-worktree-by-path worktree-path)]
     (let [origin-session-id (:psi.agent-session/session-id session)
           _                 (set-current-session-worktree-path! origin-session-id worktree-path)
@@ -387,22 +443,35 @@
       (if existing-session
         (do
           (switch-to-session! (:psi.session-info/id existing-session))
-          (work-on-result true
-                          :reused? true
-                          :worktree-path worktree-path
-                          :branch-name resolved-branch
-                          :session-id (:psi.session-info/id existing-session)
-                          :session-name (:psi.session-info/name existing-session)))
-        (create-work-on-session-result session description worktree-path resolved-branch true)))
+          (maybe-assoc-base-branch-result
+           (work-on-result true
+                           :reused? true
+                           :worktree-path worktree-path
+                           :branch-name resolved-branch
+                           :session-id (:psi.session-info/id existing-session)
+                           :session-name (:psi.session-info/name existing-session))
+           requested-base-branch
+           false))
+        (create-work-on-session-result session description worktree-path resolved-branch true requested-base-branch false)))
     (work-on-error
      (str "worktree path already exists but is not a registered git worktree: "
           worktree-path))))
 
 (defn- execute-work-on!
-  [description]
-  (let [description* (trim-arg description)]
-    (if (nil? description*)
-      (work-on-error "usage: /work-on <description>")
+  [request-or-description]
+  (let [{:keys [description base-branch]} (if (map? request-or-description)
+                                            request-or-description
+                                            {:description request-or-description})
+        description* (trim-arg description)
+        base-branch* (when (some? base-branch) (trim-arg base-branch))]
+    (cond
+      (nil? description*)
+      (work-on-usage-error)
+
+      (and (some? base-branch) (nil? base-branch*))
+      (work-on-error "base_branch must be a non-blank string")
+
+      :else
       (let [session    (current-session-query)
             current-wt (:git.worktree/current session)
             main-wt    (or (current-main-worktree) current-wt)]
@@ -415,13 +484,20 @@
 
           :else
           (let [{:keys [worktree-path branch-name]} (work-on-target description* current-wt main-wt)
-                add-result                          (add-worktree! worktree-path branch-name)]
+                add-result                          (add-worktree! worktree-path branch-name base-branch*)]
             (cond
               (:success add-result)
-              (create-work-on-session-result session description* worktree-path branch-name false)
+              (create-work-on-session-result session
+                                             description*
+                                             worktree-path
+                                             branch-name
+                                             (:reused-existing-branch? add-result)
+                                             base-branch*
+                                             (and (some? base-branch*)
+                                                  (not (:reused-existing-branch? add-result))))
 
               (= "worktree path already exists" (:error add-result))
-              (reuse-existing-worktree-result session description* worktree-path branch-name)
+              (reuse-existing-worktree-result session description* worktree-path branch-name base-branch*)
 
               :else
               (work-on-error
@@ -430,8 +506,8 @@
                         "missing git mutation payload"))))))))))
 
 (defn work-on!
-  [description]
-  (execute-work-on! description))
+  [description & [base-branch]]
+  (execute-work-on! {:description description :base-branch base-branch}))
 
 (defn work-done!
   []
@@ -516,7 +592,11 @@
 
 (defn- handle-work-on-command
   [args]
-  (append-assistant-message! (work-on-result-message (execute-work-on! args))))
+  (let [{:keys [ok? request error]} (parse-work-on-command-args args)]
+    (append-assistant-message!
+     (if ok?
+       (work-on-result-message (execute-work-on! request))
+       error))))
 
 (defn- handle-work-done-command
   [_args]
@@ -565,11 +645,17 @@
     :description "Create a layout-derived git worktree + branch and continue there"
     :parameters  {:type       "object"
                   :properties {"description" {:type "string"
-                                              :description "Description of the work to create a branch/worktree for"}}
+                                              :description "Description of the work to create a branch/worktree for"}
+                               "base_branch" {:type "string"
+                                              :description "Optional base branch to use when creating a new branch/worktree"}}
                   :required   ["description"]}
     :execute     (fn
-                   ([args] (work-on-tool-result (execute-work-on! (get args "description"))))
-                   ([args _opts] (work-on-tool-result (execute-work-on! (get args "description")))))})
+                   ([args] (work-on-tool-result
+                            (execute-work-on! {:description (get args "description")
+                                               :base-branch (get args "base_branch")})))
+                   ([args _opts] (work-on-tool-result
+                                  (execute-work-on! {:description (get args "description")
+                                                     :base-branch (get args "base_branch")}))))})
   ((:register-command api) "work-on"
                            {:description "Create a layout-derived git worktree + branch and continue there"
                             :handler handle-work-on-command})
