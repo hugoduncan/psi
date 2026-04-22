@@ -1,7 +1,7 @@
 (ns extensions.commit-checks-test
   (:require
    [clojure.java.io :as io]
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [extensions.commit-checks :as sut]
    [psi.extension-test-helpers.nullable-api :as nullable]))
 

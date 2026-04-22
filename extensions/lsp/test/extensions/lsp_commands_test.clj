@@ -1,18 +1,8 @@
 (ns extensions.lsp-commands-test
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [extensions.lsp :as sut]
    [psi.extension-test-helpers.nullable-api :as nullable]))
-
-(defn- mkdirs! [path]
-  (.mkdirs (io/file path))
-  path)
-
-(defn- tmp-dir []
-  (str (java.nio.file.Files/createTempDirectory
-        "psi-lsp-commands-"
-        (make-array java.nio.file.attribute.FileAttribute 0))))
 
 (deftest init-registers-lsp-commands-test
   (testing "init registers lsp status/restart commands and notifies ui"

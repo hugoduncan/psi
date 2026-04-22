@@ -44,3 +44,9 @@
 - App-runtime test cleanup slice:
   - removed unused `testing` refers from the small projection/selector tests
   - removed an unused `event-queue` binding from `app_runtime_test.clj`
+
+2026-04-22
+- Extension cleanup slice:
+  - removed unused test requires/helpers in auto-session-name, commit-checks, and LSP extension tests
+  - removed dead workflow-step locals in `mcp_tasks_run.clj`
+  - added an explicit `workflow-file-loader` alias in the workflow-loader delegate tests so `with-redefs` targets resolve cleanly under lint

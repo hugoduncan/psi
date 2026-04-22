@@ -2,7 +2,8 @@
   "Tests for the delegate tool async/sync mode, fork_session, and include_result_in_context."
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [extensions.workflow-loader :as wl])
+   [extensions.workflow-loader :as wl]
+   [psi.agent-session.workflow-file-loader :as workflow-file-loader])
   (:import
    [java.util.concurrent Future]))
 
@@ -13,7 +14,7 @@
 (defn- make-mock-api
   "Create a mock extension API that captures tool/command registrations
    and provides controllable mutate/query functions."
-  [{:keys [definitions mutate-results query-result query-session-result]}]
+  [{:keys [mutate-results query-result query-session-result]}]
   (let [tools (atom {})
         commands (atom {})
         logs (atom [])
@@ -65,7 +66,7 @@
                       (swap! tools assoc (:name tool-def) tool-def))
      :register-command (fn [name cmd-def]
                          (swap! commands assoc name cmd-def))
-     :register-prompt-contribution (fn [{:keys [id content] :as pc}]
+     :register-prompt-contribution (fn [{:keys [id] :as pc}]
                                      (swap! prompt-contributions assoc id pc))
      :on (fn [_event-name _handler] nil)}))
 
@@ -74,17 +75,11 @@
     (when tool-def
       ((:execute tool-def) args))))
 
-(defn- get-mutate-calls []
-  @(:mutate-calls @test-state))
-
 (defn- get-mutate-session-calls []
   @(:mutate-session-calls @test-state))
 
 (defn- get-query-session-calls []
   @(:query-session-calls @test-state))
-
-(defn- get-notifications []
-  @(:notifications @test-state))
 
 ;;; Fixtures
 
@@ -137,7 +132,7 @@
                  'psi.workflow/list-runs
                  (fn [_] {:psi.workflow/runs []})}})]
       ;; Stub the loader to return a known definition
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -183,7 +178,7 @@
                     :psi.workflow/result "sync plan output"})
                  'psi.workflow/list-runs
                  (fn [_] {:psi.workflow/runs []})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -226,7 +221,7 @@
                    {:psi.workflow/status :completed})
                  'psi.workflow/list-runs
                  (fn [_] {:psi.workflow/runs []})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"slow" {:definition-id "slow"
                                              :name "slow"
@@ -284,7 +279,7 @@
                    {})
                  'psi.extension/append-entry
                  (fn [_] {})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -336,7 +331,7 @@
                    {:psi.workflow/status :completed})
                  'psi.workflow/list-runs
                  (fn [_] {:psi.workflow/runs []})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -363,7 +358,7 @@
                  (fn [_] {:psi.workflow/registered? true})
                  'psi.workflow/list-runs
                  (fn [_] {:psi.workflow/runs []})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -393,7 +388,7 @@
                     :psi.workflow/removed? true})
                  'psi.workflow/list-runs
                  (fn [_] {:psi.workflow/runs []})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {}
                        :errors []
@@ -429,7 +424,7 @@
                                          [{:run-id "run-1"
                                            :status :completed
                                            :source-definition-id "planner"}])})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -451,7 +446,7 @@
                  (fn [_] {:psi.workflow/registered? true})
                  'psi.workflow/list-runs
                  (fn [_] {:psi.workflow/runs []})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -498,7 +493,7 @@
                                            :status :running
                                            :source-definition-id "planner"}]
                                          [])})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -561,7 +556,7 @@
                             (swap! widget-calls conj {:wid wid :placement placement :lines lines}))
               :clear-widget (fn [wid]
                               (swap! clear-calls conj wid))})
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -625,7 +620,7 @@
                                          :source-definition-id "planner"}]})
                  'psi.extension/append-entry
                  (fn [_] {})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {}
                        :errors []
@@ -676,7 +671,7 @@
                                          :source-definition-id "planner"}]})
                  'psi.extension/append-entry
                  (fn [_] {})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {"planner" {:definition-id "planner"
                                                 :name "planner"
@@ -709,7 +704,7 @@
                    {:psi.workflow/runs [{:run-id "run-1"
                                          :status :running
                                          :source-definition-id "planner"}]})}})]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [workflow-file-loader/load-workflow-definitions
                     (fn [_]
                       {:definitions {}
                        :errors []

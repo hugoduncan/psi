@@ -816,7 +816,7 @@
                              (resolve-active-model))
         api-key          (when (fn? get-api-key-fn)
                            (get-api-key-fn (:provider model)))
-        req              (when-not resume?
+        _                (when-not resume?
                            (build-step-request {:step-name step-name
                                                 :prompt-body prompt-body
                                                 :task-id task-id
@@ -829,10 +829,6 @@
                                                 :user-confirmation user-confirmation
                                                 :user-answer user-answer
                                                 :category-prompt category-prompt}))
-        user-text        (if resume? (str (or user-answer "")) req)
-        user-msg         {:role      "user"
-                          :content   [{:type :text :text user-text}]
-                          :timestamp (java.time.Instant/now)}
         step-session     {:agent-ctx agent-ctx
                           :session-ctx step-session-ctx
                           :model model
