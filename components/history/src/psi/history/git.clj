@@ -370,9 +370,14 @@
    - :create-branch (defaults to true)
 
    Compatibility:
+   - accepts both :base-ref and :base_ref
    - accepts both :create-branch and :create_branch"
   [ctx req]
-  (let [{:keys [path branch base-ref] :as req*} req
+  (let [{:keys [path branch] :as req*} req
+        base-ref      (if (contains? req* :base-ref)
+                        (:base-ref req*)
+                        (when (contains? req* :base_ref)
+                          (:base_ref req*)))
         create-branch (if (contains? req* :create-branch)
                         (:create-branch req*)
                         (if (contains? req* :create_branch)
