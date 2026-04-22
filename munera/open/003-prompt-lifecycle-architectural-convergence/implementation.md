@@ -22,3 +22,15 @@ Initialized from the prior active planning tracker on 2026-04-17.
   - `psi.app-runtime-test`
   - `psi.rpc-prompt-test`
 
+2026-04-22 — system-prompt refresh correctness for incrementally registered skills
+
+- Reproduced that incrementally registering a skill could leave the rebuilt system prompt stale even after refresh, so newly added skills were absent from the prompt-visible skills section.
+- Added a focused regression proof in `components/agent-session/test/psi/agent_session/config_compaction_test.clj` covering `:session/register-skill` followed by prompt refresh.
+- Fixed `components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj` so prompt-refresh effects emitted from prompt-mode/tool/skill/prompt-component mutations always carry explicit `:session-id`, and `:session/register-skill` now triggers prompt refresh.
+- Fixed `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_handlers.clj` so refresh rebuild overlays canonical live session `:skills` and selected tools onto stored `:system-prompt-build-opts` instead of trusting stale build opts alone.
+- Focused verification is green:
+  - `psi.agent-session.config-compaction-test`
+  - `psi.agent-session.system-prompt-test`
+  - `psi.agent-session.child-session-mutation-test`
+  - `psi.agent-session.prompt-lifecycle-test`
+

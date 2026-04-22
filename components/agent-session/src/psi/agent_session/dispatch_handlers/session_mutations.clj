@@ -110,7 +110,8 @@
                                       :prefs {:prompt-mode validated}}
                             nil)]
        {:root-state-update (session/session-update session-id #(assoc % :prompt-mode validated))
-        :effects (cond-> [{:effect/type :runtime/refresh-system-prompt}]
+        :effects (cond-> [{:effect/type :runtime/refresh-system-prompt
+                           :session-id session-id}]
                    persist-effect (conj persist-effect))})))
 
   (register-core-handler!
@@ -204,20 +205,23 @@
                                                                       :tool-defs tool-defs))
         :effects [{:effect/type :runtime/agent-set-tools
                    :tool-maps tool-defs}
-                  {:effect/type :runtime/refresh-system-prompt}]})))
+                  {:effect/type :runtime/refresh-system-prompt
+                   :session-id session-id}]})))
 
   (register-core-handler!
    :session/set-skills
    (fn [_ctx {:keys [session-id skills]}]
      {:root-state-update (session/session-update session-id #(assoc % :skills (vec (or skills []))))
-      :effects [{:effect/type :runtime/refresh-system-prompt}]
+      :effects [{:effect/type :runtime/refresh-system-prompt
+                 :session-id session-id}]
       :return {:skills (vec (or skills []))}}))
 
   (register-core-handler!
    :session/set-prompt-component-selection
    (fn [_ctx {:keys [session-id selection]}]
      {:root-state-update (session/session-update session-id #(assoc % :prompt-component-selection selection))
-      :effects [{:effect/type :runtime/refresh-system-prompt}]
+      :effects [{:effect/type :runtime/refresh-system-prompt
+                 :session-id session-id}]
       :return {:prompt-component-selection selection}})))
 
 (defn- register-session-state-handlers! []
@@ -440,7 +444,9 @@
            next-count (if existing? (count skills) (inc (count skills)))]
        (cond-> {:return {:added? (not existing?) :count next-count}}
          (not existing?)
-         (assoc :root-state-update (session/session-update session-id #(update % :skills (fnil conj []) skill)))))))
+         (assoc :root-state-update (session/session-update session-id #(update % :skills (fnil conj []) skill))
+                :effects [{:effect/type :runtime/refresh-system-prompt
+                           :session-id session-id}])))))
 
   (register-core-handler!
    :session/request-interrupt

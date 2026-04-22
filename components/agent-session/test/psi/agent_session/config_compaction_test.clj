@@ -3,6 +3,7 @@
   manual compaction, extension dispatch, and diagnostics."
   (:require
    [psi.agent-session.test-support :as test-support]
+   [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
@@ -119,9 +120,31 @@
         (is (= [:session/enqueue-steering-message
                 :session/enqueue-follow-up-message
                 :session/register-prompt-template
+                :session/refresh-system-prompt
                 :session/register-skill
                 :session/clear-queued-messages]
-               event-types))))))
+               event-types)))))
+
+  (testing "register-skill refreshes the system prompt so newly added skills appear"
+    (let [[ctx session-id] (create-session-context)
+          skill {:name "coding"
+                 :description "Use coding guidance"
+                 :file-path "/tmp/SKILL.md"
+                 :base-dir "/tmp"
+                 :source :project
+                 :disable-model-invocation false}]
+      (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
+                          {:session-id session-id
+                           :opts {:cwd "/tmp"
+                                  :selected-tools ["read" "bash" "edit" "write" "psi-tool"]
+                                  :skills []}}
+                          {:origin :test})
+      (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :test})
+      (let [before-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
+        (is (not (str/includes? (or before-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md"))))
+      (dispatch/dispatch! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
+      (let [after-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
+        (is (str/includes? (or after-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md"))))))
 
 ;; ── Auto-retry and compaction config ───────────────────────────────────────
 
