@@ -124,3 +124,7 @@ For direct project-local REPL support distinct from psi's own runtime nREPL, see
 - [Fulcrologic statecharts](https://github.com/fulcrologic/statecharts)
 - [Pathom3](https://pathom3.wsscode.com/)
 - [nucleus](https://github.com/michaelwhitford/nucleus)
+
+## Links
+
+[![Hypercommit](https://img.shields.io/badge/Hypercommit-DB2475)](https://hypercommit.com/psi)
