@@ -142,19 +142,16 @@
                         (:max-tokens options)  (assoc :max_tokens  (:max-tokens options))
                         (seq tool-defs)        (assoc :tools tool-defs)
                         effort                 (assoc :reasoning_effort effort))]
-    (let [base-headers (cond-> {"Content-Type" "application/json"}
-                        ;; Skip Authorization when :no-auth-header is set
-                        ;; (e.g. local servers that reject auth headers)
-                         (not (:no-auth-header options))
-                         (assoc "Authorization"
-                                (str "Bearer " (or (:api-key options)
-                                                   (System/getenv "OPENAI_API_KEY")))))
-          ;; Merge any custom headers from provider config
-          headers (if-let [custom (:headers options)]
-                    (merge base-headers custom)
-                    base-headers)]
-      {:headers headers
-       :body    (json/generate-string body)})))
+    {:headers (cond-> {"Content-Type" "application/json"}
+                ;; Skip Authorization when :no-auth-header is set
+                ;; (e.g. local servers that reject auth headers)
+                (not (:no-auth-header options))
+                (assoc "Authorization"
+                       (str "Bearer " (or (:api-key options)
+                                          (System/getenv "OPENAI_API_KEY"))))
+                (:headers options)
+                (merge (:headers options)))
+     :body    (json/generate-string body)}))
 
 (defn- completions-usage-map
   [model usage]

@@ -515,7 +515,7 @@
 (defn close-document!
   [api {:keys [workspace-root path]}]
   (when (document-open? path)
-    (when-let [notify! (:service-notify api)]
+    (when (:service-notify api)
       (jsonrpc-notify! api {:workspace-root workspace-root
                             :method "textDocument/didClose"
                             :params {"textDocument" {"uri" (file-uri path)}}}))

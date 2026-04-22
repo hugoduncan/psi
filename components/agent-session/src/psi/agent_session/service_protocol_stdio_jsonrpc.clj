@@ -8,6 +8,7 @@
   (:require
    [cheshire.core :as json]
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [psi.agent-session.services :as services])
   (:import
    (java.io BufferedInputStream BufferedOutputStream ByteArrayOutputStream BufferedReader InputStreamReader)
@@ -18,8 +19,8 @@
   (.getBytes ^String s StandardCharsets/UTF_8))
 
 (defn- parse-header-line [line]
-  (let [[k v] (clojure.string/split line #":\s*" 2)]
-    [(some-> k clojure.string/lower-case) v]))
+  (let [[k v] (str/split line #":\s*" 2)]
+    [(some-> k str/lower-case) v]))
 
 (defn- read-line-crlf [^BufferedInputStream in]
   (let [line-bytes (ByteArrayOutputStream.)]

@@ -50,7 +50,7 @@
             (as-> state (str " [" state "]")))))
 
 (defn session-tree-widget-lines
-  [slots active-id]
+  [slots _active-id]
   (let [slot-ids    (->> slots (map :id) (filter string?) vec)
         slot-id-set (set slot-ids)]
     (mapv (fn [slot]

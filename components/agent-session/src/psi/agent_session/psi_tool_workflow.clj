@@ -88,7 +88,7 @@
 ;; ── Workflow op handler ──────────────────────────────────────────────────────
 
 (defn execute-psi-tool-workflow-report
-  [{:keys [ctx session-id]} {:keys [op definition-id definition workflow-input run-id chain-name reason]}]
+  [{:keys [ctx session-id]} {:keys [op definition-id definition workflow-input run-id reason]}]
   (let [started-at (System/nanoTime)]
     (try
       (when-not ctx

@@ -19,16 +19,8 @@
      :tool-calls    (or tool-calls {})
      :tool-order    (or tool-order [])}))
 
-(defn context-snapshot
-  [ctx state sid]
-  (let [active-session-id (if (instance? clojure.lang.IAtom state)
-                            (or (:focus-session-id @state)
-                                sid)
-                            sid)]
-    (app-context/context-snapshot ctx active-session-id sid)))
-
 (defn navigation-result
-  [ctx state nav-op sid & [{:keys [tool-calls tool-order follow-up-ui-actions active-session-id]}]]
+  [ctx _state nav-op sid & [{:keys [tool-calls tool-order follow-up-ui-actions active-session-id]}]]
   {:nav/op                nav-op
    :nav/session-id        sid
    :nav/session-file      (:session-file (ss/get-session-data-in ctx sid))

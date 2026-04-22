@@ -4,6 +4,7 @@
    Single source of truth for model lookup and custom provider auth.
    Replaces direct references to psi.ai.models/all-models."
   (:require
+   [clojure.string :as str]
    [psi.ai.models :as built-in]
    [psi.ai.user-models :as user-models]
    [taoensso.timbre :as log]))
@@ -78,13 +79,12 @@
         project-keys (set (map (fn [m] [(:provider m) (:id m)])
                                (:models project-result)))
         with-user-pruned (reduce (fn [cat pk]
-                                   (let [existing (get cat pk)]
-                                     ;; Only prune if the existing is from a custom
-                                     ;; provider (not built-in). Check: if the key
-                                     ;; exists in the original built-ins, don't prune.
-                                     (if (contains? built-ins pk)
-                                       cat
-                                       (dissoc cat pk))))
+                                   ;; Only prune if the existing is from a custom
+                                   ;; provider (not built-in). Check: if the key
+                                   ;; exists in the original built-ins, don't prune.
+                                   (if (contains? built-ins pk)
+                                     cat
+                                     (dissoc cat pk)))
                                  with-user
                                  project-keys)
 
@@ -98,7 +98,7 @@
 
         ;; Collect errors
         errors (keep identity [(:error user-result) (:error project-result)])
-        load-error (when (seq errors) (clojure.string/join "; " errors))]
+        load-error (when (seq errors) (str/join "; " errors))]
 
     {:catalog    final-catalog
      :auth       final-auth

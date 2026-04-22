@@ -1,7 +1,6 @@
 (ns psi.app-runtime.background-job-widgets
   "Adapter-neutral background-job widget/status projections shared across interactive UIs."
   (:require
-   [clojure.string :as str]
    [psi.app-runtime.background-job-view :as view]))
 
 (defn- status->level

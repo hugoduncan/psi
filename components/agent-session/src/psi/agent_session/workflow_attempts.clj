@@ -7,6 +7,7 @@
    Child-session creation is delegated via :create-workflow-child-session-fn on ctx
    to avoid a load cycle through mutations/session → core → context."
   (:require
+   [clojure.string :as str]
    [psi.agent-session.session :as session]
    [psi.agent-session.session-state :as session-state]))
 
@@ -15,7 +16,7 @@
 
 (defn- blankish? [x]
   (or (nil? x)
-      (and (string? x) (clojure.string/blank? x))))
+      (and (string? x) (str/blank? x))))
 
 (defn normalize-attempt-id
   [attempt-id]

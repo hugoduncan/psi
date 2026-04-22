@@ -32,3 +32,10 @@
   - verified the touched source slice with targeted `clj-kondo` (`errors: 0, warnings: 0`)
   - broader agent-session test warning backlog remains and is still the largest remaining category
   - current repo-wide `bb lint` is now down to `136` warnings remaining
+
+2026-04-22
+- Scattered source cleanup slice:
+  - fixed missing `clojure.string` aliases in model registry and agent-session JSON-RPC/workflow attempt source files
+  - removed unused helpers/bindings in app-runtime navigation/context surfaces, workflow psi-tool handling, and LSP document close handling
+  - simplified OpenAI chat completion header construction to remove a redundant-let warning without changing request semantics
+  - verified the touched cross-component source slice with targeted `clj-kondo` (`errors: 0, warnings: 0`)

@@ -97,10 +97,6 @@
   [ctx]
   (some-> (ss/list-context-sessions-in ctx) first :session-id))
 
-(defn- active-session-id-in-session-state
-  []
-  (app-nrepl/active-session-id-in-session-state session-state default-session-id-in))
-
 (defn- merge-startup-summary
   "Merge manifest/bootstrap startup summary maps.
 
@@ -178,7 +174,7 @@ Available: " (str/join ", " (map name (keys all))))
    {:assistant-message message?
     :prepared-request map?
     :ai-model model?}"
-  [ctx session-id fallback-ai-model text images {:keys [progress-queue sync-on-git-head-change?]}]
+  [ctx session-id fallback-ai-model text images {:keys [progress-queue]}]
   (let [ai-model (current-ai-model-in ctx session-id fallback-ai-model)
         _        (when ai-model
                    (dispatch/dispatch! ctx :session/set-model
