@@ -1,0 +1,12 @@
+2026-04-22
+- Task created after `042` cleared hard lint errors but exposed a large warning backlog.
+- Starting point:
+  - `bb fmt:check` passes
+  - `bb lint` reports `errors: 0`
+  - `bb lint` still exits non-zero because warnings remain and the repo treats warnings as failing
+- Initial dominant categories:
+  - unused requires
+  - unused bindings
+  - unused private vars
+  - unresolved namespace warnings in split TUI files and some tests
+- Execute as an area-based warning burn-down rather than a single noisy sweep.

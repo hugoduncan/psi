@@ -1,0 +1,5 @@
+- [ ] Clean up TUI split-file warning backlog
+- [ ] Clean up RPC test warning backlog
+- [ ] Clean up agent-session warning backlog
+- [ ] Clean up extension warning backlog
+- [ ] Clean up remaining scattered warnings and run `bb lint` to green
