@@ -80,7 +80,6 @@
                                "components"
                                "extensions"
                                "spec"
-                               "specs"
                                "test"
                                "tests.edn"
                                "extensions/tests.edn"]}}
@@ -96,7 +95,6 @@
                        "components"
                        "extensions"
                        "spec"
-                       "specs"
                        "tests.edn"
                        "extensions/tests.edn"]}
   :test-paths {:extra-paths ["test-support"
