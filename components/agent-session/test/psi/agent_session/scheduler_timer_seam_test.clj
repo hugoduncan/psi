@@ -19,24 +19,24 @@
           now              (java.time.Instant/parse "2026-04-21T17:00:00Z")
           fire-at          (.plusSeconds now 5)
           observed-delay*  (atom nil)
-          callback*        (atom nil)]
-      (let [ctx* (assoc ctx
-                        :now-fn (fn [] now)
-                        :scheduler-run-after-delay-fn (fn [_ctx delay-ms f]
-                                                        (reset! observed-delay* delay-ms)
-                                                        (reset! callback* f)
-                                                        {:handle :fake}))]
-        (dispatch/dispatch! ctx* :scheduler/create
-                            {:session-id session-id
-                             :schedule-id "sch-1"
-                             :label "later"
-                             :message "later"
-                             :fire-at fire-at}
-                            {:origin :core})
-        (is (= 5000 @observed-delay*))
-        (is (= {:handle :fake} (get @(:scheduler-timers* ctx*) "sch-1")))
-        (@callback*)
-        (is (= :delivered (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
+          callback*        (atom nil)
+          ctx*             (assoc ctx
+                                  :now-fn (fn [] now)
+                                  :scheduler-run-after-delay-fn (fn [_ctx delay-ms f]
+                                                                  (reset! observed-delay* delay-ms)
+                                                                  (reset! callback* f)
+                                                                  {:handle :fake}))]
+      (dispatch/dispatch! ctx* :scheduler/create
+                          {:session-id session-id
+                           :schedule-id "sch-1"
+                           :label "later"
+                           :message "later"
+                           :fire-at fire-at}
+                          {:origin :core})
+      (is (= 5000 @observed-delay*))
+      (is (= {:handle :fake} (get @(:scheduler-timers* ctx*) "sch-1")))
+      (@callback*)
+      (is (= :delivered (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status])))))
 
   (testing "scheduler cancel uses injected cancel fn for non-thread handles"
     (let [[ctx session-id] (create-session-context {:persist? false})

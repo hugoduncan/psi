@@ -44,8 +44,7 @@
 
 (deftest text-only-response-test
   (let [agent-ctx    (setup-agent-ctx!)
-        [session-ctx session-ctx-id]  (setup-session-ctx! agent-ctx)
-        user-msg     {:role "user" :content [{:type :text :text "hello"}]}]
+        [session-ctx session-ctx-id]  (setup-session-ctx! agent-ctx)]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream!
                   (stub-text-stream "Hello! I'm here to help.")]
       (let [result (prompt-loop/run-agent-loop!
@@ -61,8 +60,7 @@
 
 (deftest error-response-test
   (let [agent-ctx   (setup-agent-ctx!)
-        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hello"}]}]
+        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream!
                   (fn [_ai-ctx _conv _model _opts consume-fn]
                     (consume-fn {:type :start})
@@ -78,7 +76,6 @@
 (deftest multiple-text-deltas-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (consume-fn {:type :start})
                       (consume-fn {:type :text-delta :delta "Hello"})
@@ -95,7 +92,6 @@
 (deftest thinking-delta-emits-progress-event-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         q           (LinkedBlockingQueue.)
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (consume-fn {:type :start})
@@ -119,7 +115,6 @@
 (deftest thinking-start-end-without-delta-still-produces-thinking-block-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (consume-fn {:type :start})
                       (consume-fn {:type :thinking-start :content-index 0})
@@ -139,7 +134,6 @@
   these into non-duplicating accumulated text so consumers can safely replace."
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         q           (LinkedBlockingQueue.)
         ;; Simulate Anthropic cumulative snapshots: each delta = full text so far
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
@@ -166,7 +160,6 @@
 (deftest thinking-delta-resets-after-toolcall-start-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         q           (LinkedBlockingQueue.)
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (consume-fn {:type :start})
@@ -187,7 +180,6 @@
 (deftest openai-thinking-delta-resets-after-toolcall-start-with-different-index-test
   (let [agent-ctx    (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg     {:role "user" :content [{:type :text :text "hi"}]}
         q            (LinkedBlockingQueue.)
         openai-model {:provider "openai" :id "gpt-5.3-codex"}
         stream-fn    (fn [_ai-ctx _conv _model _opts consume-fn]
@@ -268,7 +260,6 @@
 (deftest text-boundary-events-are-recorded-in-turn-data-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (consume-fn {:type :start})
                       (consume-fn {:type :text-start :content-index 0})
@@ -290,7 +281,6 @@
 (deftest cumulative-snapshot-text-deltas-replace-instead-of-repeating-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (consume-fn {:type :start})
                       ;; Snapshot-style chunks that differ near tail (newline churn)
@@ -308,7 +298,6 @@
 (deftest incremental-short-prefix-delta-does-not-shrink-streamed-text-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (consume-fn {:type :start})
                       ;; Reproduces the real regression where a short incremental delta
@@ -412,7 +401,6 @@
 (deftest idle-timeout-resets-on-stream-progress-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (future
                         (consume-fn {:type :start})
@@ -431,7 +419,6 @@
 (deftest idle-timeout-errors-when-stream-stalls-test
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         stream-fn   (fn [_ai-ctx _conv _model _opts consume-fn]
                       (future
                         (consume-fn {:type :start})

@@ -3,7 +3,6 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.service-protocol :as protocol]
    [psi.agent-session.services :as services]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))

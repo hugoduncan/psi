@@ -4,7 +4,6 @@
    [clojure.test :refer [deftest testing is]]
    [clojure.string :as str]
    [psi.agent-core.core :as agent]
-   [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.prompt-loop :as prompt-loop]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-runtime :as prompt-runtime]
@@ -68,8 +67,7 @@
 
 (deftest turn-ctx-atom-test
   (let [agent-ctx   (setup-agent-ctx!)
-        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}]
+        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream!
                   (stub-text-stream "ok")]
       (let [result (prompt-loop/run-agent-loop!
@@ -77,8 +75,7 @@
         (is (= "assistant" (:role result))))))
 
   (let [agent-ctx   (setup-agent-ctx!)
-        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}]
+        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream!
                   (stub-text-stream "hello world")]
       (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id stub-model)
@@ -92,7 +89,6 @@
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
         _           (ss/update-state-value-in! session-ctx (ss/state-path :session-data session-ctx-id)
                                                assoc :thinking-level :high)
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         seen-opts   (atom nil)
         stream-fn   (fn [_ai-ctx _conv _model opts consume-fn]
                       (reset! seen-opts opts)
@@ -135,7 +131,6 @@
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx* session-ctx-id] (setup-session-ctx! agent-ctx)
         session-ctx (assoc session-ctx* :config {:llm-stream-idle-timeout-ms 777})
-        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
         seen-opts   (atom nil)
         stream-fn   (fn [_ai-ctx _conv _model opts consume-fn]
                       (reset! seen-opts opts)

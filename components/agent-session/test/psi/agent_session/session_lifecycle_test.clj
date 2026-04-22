@@ -41,11 +41,11 @@
       (is (ss/idle-in? ctx sid))))
 
   (testing "session lifecycle events can be routed through dispatch statechart boundary"
-    (let [[ctx session-id]       (create-session-context {:persist? false})
-          _                  (dispatch/clear-event-log!)
-          sd                 (session/new-session-in! ctx nil {})
-          session-id         (:session-id sd)
-          ctx                (retarget ctx sd)]
+    (let [[ctx _session-id] (create-session-context {:persist? false})
+          _                 (dispatch/clear-event-log!)
+          sd                (session/new-session-in! ctx nil {})
+          session-id        (:session-id sd)
+          ctx               (retarget ctx sd)]
       (is (= :idle (ss/sc-phase-in ctx session-id)))
       (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                     (fn [_ai-ctx _ctx sid prepared _progress-queue]
@@ -75,11 +75,11 @@
         (is (instance? java.time.Instant (:timestamp user-msg))))))
 
   (testing "statechart action handlers use pure session-update results"
-    (let [[ctx session-id]       (create-session-context {:persist? false})
-          _                  (dispatch/clear-event-log!)
-          sd                 (session/new-session-in! ctx nil {})
-          session-id         (:session-id sd)
-          ctx                (retarget ctx sd)]
+    (let [[ctx _session-id] (create-session-context {:persist? false})
+          _                 (dispatch/clear-event-log!)
+          sd                (session/new-session-in! ctx nil {})
+          session-id        (:session-id sd)
+          ctx               (retarget ctx sd)]
       (is (false? (:is-streaming (ss/get-session-data-in ctx session-id))))
       (dispatch/dispatch! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
       (let [sd    (ss/get-session-data-in ctx session-id)
@@ -109,7 +109,7 @@
   (testing "ensure-session-loaded-in! resumes by context session id"
     (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-context-load-" (java.util.UUID/randomUUID))
           _                  (.mkdirs (java.io.File. cwd))
-          [ctx session-id]      (create-session-context {:cwd cwd})
+          [ctx _session-id] (create-session-context {:cwd cwd})
           sd1                (session/new-session-in! ctx nil {})
           sid1               (:session-id sd1)
           path1              (:session-file sd1)
@@ -155,8 +155,8 @@
         (is (= "Investigate failing tests" (:display-name slot))))))
 
   (testing "new-session-in! accepts explicit worktree-path and session-name and keeps prior context peer"
-    (let [[ctx session-id]       (create-session-context {:cwd "/repo/main"
-                                                          :session-defaults {:worktree-path "/repo/main"}})
+    (let [[ctx _session-id] (create-session-context {:cwd "/repo/main"
+                                                     :session-defaults {:worktree-path "/repo/main"}})
           sd-1               (session/new-session-in! ctx nil {:session-name "main"
                                                                :worktree-path "/repo/main"})
           ctx-1              (retarget ctx sd-1)
@@ -183,11 +183,10 @@
 
 (deftest new-session-test
   (testing "new-session-in! resets session-id"
-    (let [[ctx session-id]       (create-session-context)
-          old-id             session-id
-          sd                 (session/new-session-in! ctx nil {})
-          new-id             (:session-id sd)
-          ctx                (retarget ctx sd)]
+    (let [[ctx session-id] (create-session-context)
+          old-id          session-id
+          sd              (session/new-session-in! ctx nil {})
+          new-id          (:session-id sd)]
       (is (not= old-id new-id))))
 
   (testing "new-session-in! clears queues"
@@ -234,7 +233,7 @@
 
   (testing "new-session-in! appends active model entry when model exists"
     (let [model              {:provider "anthropic" :id "claude-3-5-sonnet" :reasoning false}
-          [ctx session-id]      (create-session-context {:session-defaults {:model model}})
+          [ctx _session-id] (create-session-context {:session-defaults {:model model}})
           sd                 (session/new-session-in! ctx nil {})
           session-id         (:session-id sd)
           ctx                (retarget ctx sd)]
@@ -274,7 +273,7 @@
 (deftest fork-session-persists-child-file-with-parent-lineage-test
   (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-fork-" (java.util.UUID/randomUUID))
         _                  (.mkdirs (java.io.File. cwd))
-        [ctx session-id]      (create-session-context {:cwd cwd})
+        [ctx _session-id] (create-session-context {:cwd cwd})
         parent-sd          (session/new-session-in! ctx nil {})
         parent-id          (:session-id parent-sd)
         ctx                (retarget ctx parent-sd)
@@ -287,23 +286,23 @@
                                                                                         :timestamp (java.time.Instant/now)}))
         child-sd           (session/fork-session-in! ctx parent-id entry-id)
         child-id           (:session-id child-sd)
-        ctx                (retarget ctx child-sd)]
-    (let [child-sd     (ss/get-session-data-in ctx child-id)
-          child-file   (:session-file child-sd)
-          loaded-child (persist/load-session-file child-file)]
-      (is (string? child-file))
-      (is (.exists (java.io.File. child-file)))
-      (is (= parent-file (get-in loaded-child [:header :parent-session])))
-      (is (= parent-id (get-in loaded-child [:header :parent-session-id])))
-      (is (= child-id (get-in loaded-child [:header :id])))
-      (is (= (count (persist/all-entries-in ctx child-id)) (count (:entries loaded-child))))
-      (is (= ["user" "assistant"]
-             (->> (:entries loaded-child)
-                  (filter #(= :message (:kind %)))
-                  (mapv #(get-in % [:data :message :role]))))))))
+        ctx                (retarget ctx child-sd)
+        child-sd           (ss/get-session-data-in ctx child-id)
+        child-file         (:session-file child-sd)
+        loaded-child       (persist/load-session-file child-file)]
+    (is (string? child-file))
+    (is (.exists (java.io.File. child-file)))
+    (is (= parent-file (get-in loaded-child [:header :parent-session])))
+    (is (= parent-id (get-in loaded-child [:header :parent-session-id])))
+    (is (= child-id (get-in loaded-child [:header :id])))
+    (is (= (count (persist/all-entries-in ctx child-id)) (count (:entries loaded-child))))
+    (is (= ["user" "assistant"]
+           (->> (:entries loaded-child)
+                (filter #(= :message (:kind %)))
+                (mapv #(get-in % [:data :message :role])))))))
 
 (deftest fork-session-includes-selected-user-reply-turn-test
-  (let [[ctx session-id] (test-support/make-session-ctx {})
+  (let [[ctx _session-id] (test-support/make-session-ctx {})
         parent-sd        (session/new-session-in! ctx nil {})
         parent-id        (:session-id parent-sd)
         _                (dispatch/dispatch! ctx :session/update-context-usage {:session-id parent-id :tokens 22000 :window 200000} {:origin :core})
@@ -412,16 +411,15 @@
         (is (= "base prompt" (:psi.agent-session/system-prompt result))))))
 
   (testing "resume-session-in! missing-file fallback is logged through dispatch"
-    (let [f                  (str (System/getProperty "java.io.tmpdir") "/psi-missing-" (java.util.UUID/randomUUID) ".ndedn")
-          [ctx session-id]      (create-session-context {:persist? false})
-          _                  (dispatch/clear-event-log!)
-          sd                 (session/resume-session-in! ctx session-id f)
-          session-id         (:session-id sd)
-          ctx                (retarget ctx sd)]
-      (let [sd    (ss/get-session-data-in ctx session-id)
-            entry (first (filter #(= :session/resume-missing-initialize (:event-type %))
-                                 (dispatch/event-log-entries)))]
-        (is (= f (:session-file sd)))
-        (is (= [] (persist/all-entries-in ctx session-id)))
-        (is (= :core (:origin entry)))
-        (is (= {:session-path f} (dissoc (:event-data entry) :session-id)))))))
+    (let [f          (str (System/getProperty "java.io.tmpdir") "/psi-missing-" (java.util.UUID/randomUUID) ".ndedn")
+          [ctx session-id] (create-session-context {:persist? false})
+          _          (dispatch/clear-event-log!)
+          sd         (session/resume-session-in! ctx session-id f)
+          session-id (:session-id sd)
+          ctx        (retarget ctx sd)
+          entry      (first (filter #(= :session/resume-missing-initialize (:event-type %))
+                                    (dispatch/event-log-entries)))]
+      (is (= f (:session-file sd)))
+      (is (= [] (persist/all-entries-in ctx session-id)))
+      (is (= :core (:origin entry)))
+      (is (= {:session-path f} (dissoc (:event-data entry) :session-id))))))

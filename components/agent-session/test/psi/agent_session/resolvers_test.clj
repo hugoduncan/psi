@@ -13,7 +13,6 @@
    Each test asserts that a direct EQL query against a fresh session context
    returns a well-typed value for the target attribute — no resolver error."
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]

@@ -6,7 +6,7 @@
    [psi.agent-session.services :as services]
    [psi.agent-session.test-support :as test-support]))
 
-(defn- start-jsonrpc-echo-process []
+(defn start-jsonrpc-echo-process []
   (let [script (str "python3 -u - <<'PY'\n"
                     "import sys, json\n"
                     "while True:\n"
@@ -44,13 +44,13 @@
                 :spec {:command ["bash" "-lc" "sleep 5"]
                        :cwd cwd
                        :transport :stdio}})
-          runtime (with-redefs [stdio-jsonrpc/create-jsonrpc-runtime
-                                (fn [_ _]
-                                  {:send-fn (fn [_] nil)
-                                   :await-response-fn (fn [{:keys [request-id]}]
-                                                        {:payload {"result" {"echo" request-id}}})
-                                   :await-response-sends? false})]
-                    (stdio-jsonrpc/attach-jsonrpc-runtime-in! ctx [:jsonrpc cwd]))
+          _runtime (with-redefs [stdio-jsonrpc/create-jsonrpc-runtime
+                                 (fn [_ _]
+                                   {:send-fn (fn [_] nil)
+                                    :await-response-fn (fn [{:keys [request-id]}]
+                                                         {:payload {"result" {"echo" request-id}}})
+                                    :await-response-sends? false})]
+                     (stdio-jsonrpc/attach-jsonrpc-runtime-in! ctx [:jsonrpc cwd]))
           svc (services/service-in ctx [:jsonrpc cwd])]
       (try
         (is (fn? (:send-fn svc)))

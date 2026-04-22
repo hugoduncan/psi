@@ -65,6 +65,14 @@
   - targeted `clj-kondo` on the touched files now reports `errors: 0, warnings: 0`
 
 2026-04-22
+- Prompt/session/query/runtime test warning slice:
+  - removed dead `post-tool` / `service-protocol` / graph-helper requires that were no longer referenced after prior test splits
+  - added/trimmed bindings in prompt execution and turn accumulator tests so only message fixtures that are actually journaled remain bound
+  - simplified a few nested `let` shapes in scheduler/session lifecycle tests and repaired one temporary structural slip introduced during cleanup
+  - removed now-unused query-graph helper requires from the split graph test namespaces and the unused `clojure.java.io` alias from `resolvers_test.clj`
+  - targeted `clj-kondo` on the touched files now reports `errors: 0, warnings: 0`
+
+2026-04-22
 - Project-nREPL/workflow/tool warning slice:
   - added explicit project-nREPL client/config/ops/started namespace requires so `with-redefs` targets resolve cleanly under lint
   - added explicit workflow prompt-control / attempts / progression requires in `workflow_execution_test.clj`
