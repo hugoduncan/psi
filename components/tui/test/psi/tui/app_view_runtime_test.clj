@@ -2,11 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [charm.components.text-input :as text-input]
-   [charm.core :as charm]
-   [charm.input.keymap :as keymap]
    [charm.message :as msg]
-   [psi.agent-session.persistence :as persist]
    [psi.app-runtime.projections :as projections]
    [psi.tui.app :as app]
    [psi.tui.ansi :as ansi]

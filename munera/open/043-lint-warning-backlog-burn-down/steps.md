@@ -1,4 +1,6 @@
-- [ ] Clean up TUI split-file warning backlog
+- [x] Clean up TUI split-file warning backlog
+  - removed dead top-level aliases/helpers from `psi.tui.app` and split TUI tests
+  - warning count moved from `235` to `213` on `bb lint`
 - [ ] Clean up RPC test warning backlog
 - [ ] Clean up agent-session warning backlog
 - [ ] Clean up extension warning backlog

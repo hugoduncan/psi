@@ -1,6 +1,9 @@
 (in-ns 'psi.tui.app)
 ;; extracted: update helpers
 
+(declare key-token->string
+         printable-key)
+
 ;; ── Update helpers ──────────────────────────────────────────
 
 (defn- open-session-selector

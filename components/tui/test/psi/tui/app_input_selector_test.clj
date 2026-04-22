@@ -6,9 +6,7 @@
    [charm.components.text-input :as text-input]
    [charm.core :as charm]
    [charm.message :as msg]
-   [psi.agent-session.persistence :as persist]
    [psi.app-runtime.projections :as projections]
-   [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app :as app]
    [psi.ui.state :as ui-state])
   (:import
@@ -64,34 +62,6 @@
     (.put queue {:kind :done
                  :result {:role    "assistant"
                           :content [{:type :text :text response-text}]}})))
-
-(defn- selector-session-item
-  [session-id display-name worktree-path & {:keys [parent-id is-active is-streaming]}]
-  {:item/id [:session session-id]
-   :item/kind :session
-   :item/session-id session-id
-   :item/parent-id (when parent-id [:session parent-id])
-   :item/display-name display-name
-   :item/is-active (boolean is-active)
-   :item/is-streaming (boolean is-streaming)
-   :item/worktree-path worktree-path})
-
-(defn- selector-fork-item
-  [session-id entry-id display-name & {:keys [parent-id]}]
-  {:item/id [:fork-point entry-id]
-   :item/kind :fork-point
-   :item/session-id session-id
-   :item/entry-id entry-id
-   :item/parent-id (vector :session (or parent-id session-id))
-   :item/display-name display-name})
-
-(defn- make-session-selector-fn
-  [active-id items]
-  (let [selector {:selector/kind :context-session
-                  :selector/active-item-id (some-> active-id (vector :session))
-                  :selector/items items}]
-    (fn []
-      (ui-actions/context-session-action selector))))
 
 (deftest history-up-from-empty-enters-browsing-at-newest-test
   (testing "up from empty input enters history browse mode at newest entry"

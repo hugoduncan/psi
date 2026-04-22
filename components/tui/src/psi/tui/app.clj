@@ -2,22 +2,8 @@
   (:require
    [charm.core :as charm]
    [charm.message :as msg]
-   [clojure.java.io :as io]
    [clojure.string :as str]
-   [taoensso.timbre :as timbre]
-   [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.persistence :as persist]
-   [psi.app-runtime.footer :as footer]
-   [psi.app-runtime.ui-actions :as ui-actions]
-   [psi.tui.ansi :as ansi]
-   [psi.tui.markdown :as md]
-   [psi.tui.patches :as patches]
-   [psi.tui.session-selector :as session-selector]
-   [psi.tui.session-selector-render :as selector-render]
-   [psi.tui.tool-render :as tool-render])
-  (:import
-   [java.time Instant]
-   [java.util.concurrent LinkedBlockingQueue TimeUnit]))
+   [psi.tui.patches :as patches]))
 
 (patches/install!)
 
@@ -27,10 +13,6 @@
 (def ^:private error-style   (charm/style :fg charm/red))
 (def ^:private dim-style     (charm/style :fg 240))
 (def ^:private sep-style     (charm/style :fg 240))
-(def ^:private tool-style    (charm/style :fg charm/yellow :bold true))
-(def ^:private tool-ok-style (charm/style :fg charm/green))
-(def ^:private tool-err-style (charm/style :fg charm/red))
-(def ^:private tool-dim-style (charm/style :fg 245))
 
 (def ^:private spinner-frames
   ["⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"])
@@ -178,11 +160,19 @@
 
         state))))
 
-(load "app_autocomplete")
-(load "app_support")
-(load "app_update_helpers")
-
-(declare handle-agent-event
+(declare dispatch-ui-event!
+         refresh-extension-command-names
+         key-debug-enabled?
+         agent-event?
+         external-message?
+         agent-result?
+         agent-error?
+         agent-poll?
+         poll-cmd
+         has-active-dialog?
+         handle-dialog-key
+         make-init
+         handle-agent-event
          handle-agent-result
          handle-agent-poll
          handle-streaming-escape
@@ -203,6 +193,10 @@
          clear-autocomplete
          handle-selector-key
          view)
+
+(load "app_autocomplete")
+(load "app_support")
+(load "app_update_helpers")
 
 ;; ── Update ──────────────────────────────────────────────────
 

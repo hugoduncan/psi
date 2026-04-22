@@ -10,11 +10,8 @@
    [charm.core :as charm]
    [charm.input.keymap :as keymap]
    [charm.message :as msg]
-   [psi.agent-session.persistence :as persist]
    [psi.app-runtime.projections :as projections]
-   [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app :as app]
-   [psi.tui.ansi :as ansi]
    [psi.ui.state :as ui-state])
   (:import
    [java.util.concurrent LinkedBlockingQueue]))
@@ -77,44 +74,6 @@
     (.put queue {:kind :done
                  :result {:role    "assistant"
                           :content [{:type :text :text response-text}]}})))
-
-(defn- selector-session-item
-  [session-id display-name worktree-path & {:keys [parent-id is-active is-streaming]}]
-  {:item/id [:session session-id]
-   :item/kind :session
-   :item/session-id session-id
-   :item/parent-id (when parent-id [:session parent-id])
-   :item/display-name display-name
-   :item/is-active (boolean is-active)
-   :item/is-streaming (boolean is-streaming)
-   :item/worktree-path worktree-path})
-
-(defn- selector-fork-item
-  [session-id entry-id display-name & {:keys [parent-id]}]
-  {:item/id [:fork-point entry-id]
-   :item/kind :fork-point
-   :item/session-id session-id
-   :item/entry-id entry-id
-   :item/parent-id (vector :session (or parent-id session-id))
-   :item/display-name display-name})
-
-(defn- make-session-selector-fn
-  [active-id items]
-  (let [selector {:selector/kind :context-session
-                  :selector/active-item-id (some-> active-id (vector :session))
-                  :selector/items items}]
-    (fn []
-      (ui-actions/context-session-action selector))))
-
-(defn- submit-text
-  "Type s then press enter; if submission starts streaming, advance once to idle."
-  [update-fn state s]
-  (let [typed          (type-text update-fn state s)
-        [submitted _]  (update-fn typed (msg/key-press :enter))]
-    (if (= :streaming (:phase submitted))
-      (first (update-fn submitted {:type :agent-result
-                                   :result {:content [{:type :text :text "ok"}]}}))
-      submitted)))
 
 (defn- error-agent-fn
   "A stub run-agent-fn! that immediately puts an error on the queue."
