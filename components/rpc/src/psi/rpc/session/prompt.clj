@@ -15,14 +15,13 @@
    [psi.rpc.transport :refer [response-frame]]))
 
 (defn run-prompt-async!
-  [{:keys [ctx request emit-frame! state session-id session-deps current-ai-model effective-sync-on-git-head-change? start-daemon-thread! login-handle-start-command! login-pending-state login-complete-pending!]}]
+  [{:keys [ctx request emit-frame! state session-id session-deps current-ai-model _effective-sync-on-git-head-change? start-daemon-thread! login-handle-start-command! login-pending-state login-complete-pending!]}]
   (let [message      (get-in request [:params :message])
         images       (get-in request [:params :images])
         request-id   (:id request)
         _            (when-not session-id
                        (throw (ex-info "no target session available for prompt"
                                        {:error-code "request/not-found"})))
-        sync-on-git-head-change? (effective-sync-on-git-head-change? session-deps)
         on-new-session! (:on-new-session! session-deps)
         progress-q   (java.util.concurrent.LinkedBlockingQueue.)
         worker       (start-daemon-thread!

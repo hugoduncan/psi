@@ -17,3 +17,10 @@
   - trimmed unused helpers/requires from `app_input_selector_test.clj`, `app_test.clj`, and `app_view_runtime_test.clj`
   - this did not fix the remaining split-file `in-ns` unresolved-namespace warnings; those are still present and appear to need either a lint config approach or a different extraction shape
   - `bb lint` warning count moved from `235` to `213`
+
+2026-04-22
+- RPC slice:
+  - removed unused requires from `rpc.events`, `rpc.session.prompt`, and the RPC test support/tests
+  - replaced a few fully-qualified references in tests with aliased requires so `clj-kondo` resolves vars cleanly (`rpc.events`, `session/query-in`)
+  - cleaned unused destructured `state`/`session-id` bindings in RPC tests
+  - targeted `clj-kondo` on the full RPC warning set now reports `errors: 0, warnings: 0`

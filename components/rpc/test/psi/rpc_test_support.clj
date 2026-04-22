@@ -1,29 +1,11 @@
 (ns psi.rpc-test-support
   (:require
-   [cheshire.core :as json]
-   [clj-http.client :as http]
    [clojure.edn :as edn]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
-   [psi.ai.models :as ai-models]
-   [psi.agent-core.core :as agent]
-   [psi.agent-session.background-jobs :as bg-jobs]
-   [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.session-state :as ss]
-   [psi.agent-session.state-accessors :as sa]
-   [psi.agent-session.oauth.core :as oauth]
-   [psi.agent-session.persistence :as persist]
    [psi.rpc :as rpc]
-   [psi.rpc.events :as rpc.events]
-   [psi.rpc.transport :as rpc.transport]
-   [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.tools :as tools]
-   [psi.agent-session.prompt-runtime :as prompt-runtime]
-   [psi.memory.core :as memory]
-   [psi.memory.store :as store]))
+   [psi.agent-session.test-support :as test-support]))
 
 (defn assistant-msg->execution-result
   "Convert an assistant message map into the shaped execution-result map

@@ -4,14 +4,9 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as bg-jobs]
-   [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.oauth.core :as oauth]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.session-state :as ss]
-   [psi.agent-session.state-accessors :as sa]
+   [psi.rpc.events :as rpc.events]
    [psi.rpc.transport :as rpc.transport]
    [psi.rpc-test-support :as support]))
 
@@ -82,7 +77,7 @@
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
-          {:keys [out-lines state]}
+          {:keys [out-lines]}
           (support/run-loop (str "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/delta\" \"tool/start\"]}}\n"
                                  "{:id \"s2\" :kind :request :op \"unsubscribe\" :params {:topics [\"tool/start\"]}}\n")
                             handler
@@ -92,14 +87,14 @@
       (is (= ["assistant/delta" "tool/start"] (get-in f1 [:data :subscribed])))
       (is (= :response (:kind f2)))
       (is (= ["assistant/delta"] (get-in f2 [:data :subscribed])))
-      (is (= #{"assistant/delta"} (get-in state [:connection :subscribed-topics])))))
+      (is (= #{"assistant/delta"} (get-in @state [:connection :subscribed-topics])))))
 
   (testing "projection listener unregisters when projection topics are removed but unrelated topics remain"
     (let [[ctx _] (support/create-session-context)
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
-          {:keys [out-lines state]}
+          {:keys [out-lines]}
           (support/run-loop (str "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"context/updated\"]}}\n"
                                  "{:id \"s2\" :kind :request :op \"unsubscribe\" :params {:topics [\"context/updated\"]}}\n")
                             handler
@@ -108,8 +103,8 @@
           f2 (second responses)]
       (is (= :response (:kind f2)))
       (is (= ["assistant/message"] (get-in f2 [:data :subscribed])))
-      (is (= #{"assistant/message"} (get-in state [:connection :subscribed-topics])))
-      (is (nil? (get-in state [:workers :projection-listener-id])))))
+      (is (= #{"assistant/message"} (get-in @state [:connection :subscribed-topics])))
+      (is (nil? (get-in @state [:workers :projection-listener-id])))))
 
   (testing "background job list/inspect/cancel ops route through session job store"
     (let [[ctx thread-id] (support/create-session-context)
@@ -185,7 +180,7 @@
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
-          {:keys [out-lines state]}
+          {:keys [out-lines]}
           (support/run-loop (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                                  "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/widgets-updated\"]}}\n")
                             handler
@@ -198,7 +193,7 @@
       (is (= ["hello widget"] (get-in widget-evt [:data :widgets 0 :content]))))))
 
 (deftest rpc-ui-snapshot-delegates-to-canonical-extension-ui-projection-test
-  (let [snapshot (psi.rpc.events/ui-snapshot
+  (let [snapshot (rpc.events/ui-snapshot
                   (first (support/create-session-context)))]
     (is (map? snapshot))))
 
@@ -226,7 +221,7 @@
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
-          {:keys [out-lines state]}
+          {:keys [out-lines]}
           (support/run-loop (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                                  "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/widgets-updated\" \"ui/status-updated\"]}}\n")
                             handler
@@ -254,7 +249,7 @@
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
-          {:keys [out-lines state]}
+          {:keys [out-lines]}
           (support/run-loop (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                                  "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/notification\"]}}\n")
                             handler

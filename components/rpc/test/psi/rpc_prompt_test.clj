@@ -6,7 +6,9 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.ai.models :as ai-models]
+   [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.tools :as tools]
    [psi.rpc-test-support :as support]))
@@ -85,21 +87,21 @@
                        :psi.agent-session/model-reasoning false
                        :psi.agent-session/thinking-level :off
                        :psi.ui/statuses :pathom/unknown}
-          orig-query-in psi.agent-session.core/query-in
+          orig-query-in session/query-in
           {:keys [out-lines]}
-          (with-redefs [psi.agent-session.core/query-in
+          (with-redefs [session/query-in
                         (fn
                           ([ctx q]
-                           (if (= @#'psi.rpc.events/footer-query q)
+                           (if (= @#'rpc.events/footer-query q)
                              footer-data
                              (orig-query-in ctx q)))
                           ([ctx x y]
-                           (if (or (= @#'psi.rpc.events/footer-query x)
-                                   (= @#'psi.rpc.events/footer-query y))
+                           (if (or (= @#'rpc.events/footer-query x)
+                                   (= @#'rpc.events/footer-query y))
                              footer-data
                              (orig-query-in ctx x y)))
                           ([ctx session-id q extra-entity]
-                           (if (= @#'psi.rpc.events/footer-query q)
+                           (if (= @#'rpc.events/footer-query q)
                              footer-data
                              (orig-query-in ctx session-id q extra-entity))))]
             (support/run-loop input handler state 250))

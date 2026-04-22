@@ -2,7 +2,6 @@
   "RPC event topics and payload projection helpers."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.core :as session]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.session-state :as ss]
    [psi.app-runtime.context :as app-context]
@@ -151,7 +150,7 @@
 (defn context-updated-payload
   ([ctx state session-id]
    (context-updated-payload ctx state (focus-session-id state) session-id))
-  ([ctx state active-session-id session-id]
+  ([ctx _state active-session-id session-id]
    (let [snapshot (app-context/context-snapshot ctx active-session-id session-id)
          widget   (context-summary/context-widget snapshot)]
      (cond-> snapshot

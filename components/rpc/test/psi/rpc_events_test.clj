@@ -1,10 +1,8 @@
 (ns psi.rpc-events-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.persistence :as persist]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.session-state :as ss]
    [psi.rpc.events :as rpc.events]

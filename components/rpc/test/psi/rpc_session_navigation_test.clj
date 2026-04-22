@@ -1,7 +1,5 @@
 (ns psi.rpc-session-navigation-test
   (:require
-   [clojure.edn :as edn]
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
@@ -95,7 +93,7 @@
   (testing "command /resume <path> emits session/resumed and session/rehydrated canonical events"
     (let [cwd                 (str (System/getProperty "java.io.tmpdir") "/psi-rpc-resume-" (java.util.UUID/randomUUID))
           _                   (.mkdirs (java.io.File. cwd))
-          [ctx session-id]    (support/create-session-context {:cwd cwd})
+          [ctx _]             (support/create-session-context {:cwd cwd})
           sd1                 (session/new-session-in! ctx nil {})
           session-id          (:session-id sd1)
           path1               (:session-file sd1)

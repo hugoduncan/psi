@@ -1,7 +1,9 @@
 - [x] Clean up TUI split-file warning backlog
   - removed dead top-level aliases/helpers from `psi.tui.app` and split TUI tests
   - warning count moved from `235` to `213` on `bb lint`
-- [ ] Clean up RPC test warning backlog
+- [x] Clean up RPC test warning backlog
+  - removed unused requires/bindings across `components/rpc/src` and `components/rpc/test`
+  - fixed direct fully-qualified test references so `clj-kondo` resolves aliased vars cleanly
 - [ ] Clean up agent-session warning backlog
 - [ ] Clean up extension warning backlog
 - [ ] Clean up remaining scattered warnings and run `bb lint` to green
