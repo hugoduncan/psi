@@ -63,3 +63,10 @@
   - added explicit `clojure.edn` alias in `model_dispatch_test.clj` and converted local EDN reads to the alias
   - removed unused `clojure.java.io` / recursion policy test requires and promoted one test helper from private to public to match cross-namespace usage
   - targeted `clj-kondo` on the touched files now reports `errors: 0, warnings: 0`
+
+2026-04-22
+- Project-nREPL/workflow/tool warning slice:
+  - added explicit project-nREPL client/config/ops/started namespace requires so `with-redefs` targets resolve cleanly under lint
+  - added explicit workflow prompt-control / attempts / progression requires in `workflow_execution_test.clj`
+  - added `clojure.string` alias use in workflow execution assertions and explicit `project-nrepl-ops` require in `tools_test.clj`
+  - targeted `clj-kondo` on the touched files now reports `errors: 0, warnings: 0`

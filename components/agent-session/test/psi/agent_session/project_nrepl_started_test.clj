@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.project-nrepl-client]
    [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
    [psi.agent-session.project-nrepl-started :as project-nrepl-started]
    [psi.agent-session.test-support :as test-support]))

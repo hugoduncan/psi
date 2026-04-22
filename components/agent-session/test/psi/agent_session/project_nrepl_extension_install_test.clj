@@ -5,7 +5,9 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.extension-installs :as installs]
+   [psi.agent-session.project-nrepl-config]
    [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
+   [psi.agent-session.project-nrepl-started]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- manifest-file [root rel]

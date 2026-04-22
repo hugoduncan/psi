@@ -1,6 +1,10 @@
 (ns psi.agent-session.workflow-execution-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.prompt-control]
+   [psi.agent-session.workflow-attempts]
+   [psi.agent-session.workflow-progression]
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.session :as session-model]
@@ -452,8 +456,8 @@
           (is (= [contribution]
                  (mapv #(select-keys % [:id :ext-path :section :content :enabled :created-at :updated-at])
                        (:prompt-contributions child-sd))))
-          (is (clojure.string/includes? (prompt-request/effective-system-prompt child-sd)
-                                        "command: /work-on")))))))
+          (is (str/includes? (prompt-request/effective-system-prompt child-sd)
+                             "command: /work-on")))))))
 
 (deftest execute-run-blocked-test
   (testing "execute-run! stops and reports blocked runs"

@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.agent-session.project-nrepl-config]
+   [psi.agent-session.project-nrepl-ops]
    [psi.agent-session.test-support :as test-support]))
 
 (deftest project-nrepl-command-dispatch-test
