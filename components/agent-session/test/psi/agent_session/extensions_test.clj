@@ -435,7 +435,7 @@
         (is (= "my-tool" (:name (first tools))))
         (is (= "/ext/a" (:extension-path (first tools))))
         (is (= :extension (:source (first tools))))
-        (is (= {:type "object"} (:parameters (first tools)))))))
+        (is (= {:type "object" :properties {}} (:parameters (first tools)))))))
 
   (testing "first registration per name wins"
     (let [reg (ext/create-registry)]
@@ -521,7 +521,7 @@
       (ext/register-tool-in! reg "/ext/a" {:name "my-tool" :label "T"})
       (let [tool (ext/get-tool-in reg "my-tool")]
         (is (= "my-tool" (:name tool)))
-        (is (= {:type "object"} (:parameters tool))))))
+        (is (= {:type "object" :properties {}} (:parameters tool))))))
 
   (testing "returns nil for unknown tool"
     (let [reg (ext/create-registry)]

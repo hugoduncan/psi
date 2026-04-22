@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.agent-session.tools :as tools]
    [psi.query.core :as query]))
 
@@ -10,11 +10,12 @@
   ([]
    (create-session-context {}))
   ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
+   (let [ctx (session/create-context (merge {:cwd (System/getProperty "user.dir")}
+                                            opts))
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
 
-(deftest reload-code-preserves-workflow-loader-state-across-namespace-reload
+(deftest ^:integration reload-code-preserves-workflow-loader-state-across-namespace-reload
   (testing "namespace reload preserves workflow-loader state so delegate-reload remains usable"
     (let [[ctx session-id] (create-session-context {:persist? false})
           qctx            (query/create-query-context)
@@ -25,12 +26,10 @@
                                             query-v))
           tool            (tools/make-psi-tool q {:ctx ctx :session-id session-id})
           _               (session/register-resolvers-in! qctx false)
+          _               (extension-runtime/reload-extensions-in! ctx session-id [] (System/getProperty "user.dir"))
           before          (q [:psi.extension/command-names :psi.extension/tool-names :psi.workflow/definitions])
           result          ((:execute tool) {"action" "reload-code"
-                                            "namespaces" ["extensions.workflow-loader.text"
-                                                          "extensions.workflow-loader.orchestration"
-                                                          "extensions.workflow-loader.delivery"
-                                                          "extensions.workflow-loader"]})
+                                            "worktree-path" (System/getProperty "user.dir")})
           parsed          (read-string (:content result))
           after           (q [:psi.extension/command-names :psi.extension/tool-names :psi.workflow/definitions])
           complexity-def  (some #(when (= "complexity-reduction-pr" (:psi.workflow.definition/id %)) %)

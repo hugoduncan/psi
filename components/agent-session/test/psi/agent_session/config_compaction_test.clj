@@ -65,8 +65,8 @@
           tool-maps  [{:name "read"} {:name "bash"}]]
       (dispatch/dispatch! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-maps} {:origin :core})
       (is (= #{"read" "bash"} (:active-tools (ss/get-session-data-in ctx session-id))))
-      (is (= [{:name "read" :label "read" :description "" :parameters {:type "object"} :lambda-description nil :source nil :ext-path nil :enabled? true}
-              {:name "bash" :label "bash" :description "" :parameters {:type "object"} :lambda-description nil :source nil :ext-path nil :enabled? true}]
+      (is (= [{:name "read" :label "read" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}
+              {:name "bash" :label "bash" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}]
              (:tool-defs (ss/get-session-data-in ctx session-id))))
       (let [entry (last (dispatch/event-log-entries))]
         (is (= :session/set-active-tools (:event-type entry)))
