@@ -6,7 +6,6 @@
    extension API's `mutate!`."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.workflow-model :as workflow-model]
    [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 

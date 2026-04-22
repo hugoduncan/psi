@@ -25,10 +25,6 @@
   (some->> (latest-attempt-index workflow-run step-id)
            (get-in workflow-run [:step-runs step-id :attempts])))
 
-(defn- attempt-path
-  [run-id step-id attempt-idx]
-  [:workflows :runs run-id :step-runs step-id :attempts attempt-idx])
-
 (defn- step-definition
   [workflow-run step-id]
   (get-in workflow-run [:effective-definition :steps step-id]))

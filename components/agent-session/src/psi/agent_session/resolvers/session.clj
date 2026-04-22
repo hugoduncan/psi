@@ -3,7 +3,6 @@
   (:require
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-core.core :as agent]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.resolvers.support :as support]
@@ -11,7 +10,6 @@
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.state-accessors :as accessors]
    [psi.agent-session.statechart :as sc]
-   [psi.ai.models :as ai-models]
    [psi.ai.model-registry :as model-registry]
    [psi.history.git :as git]))
 

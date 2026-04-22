@@ -18,7 +18,7 @@
   "Build the runtime-fns map for extension API EQL access.
    Extensions interact with session state via query/mutation only.
    Secrets are exposed via narrow capability fns (not queryable resolvers)."
-  [ctx session-id ext-path]
+  [ctx session-id _ext-path]
   (let [register-resolvers!  (:register-resolvers-fn ctx)
         register-mutations!  (:register-mutations-fn ctx)
         active-session-id    (fn [] (or *active-extension-session-id* session-id))

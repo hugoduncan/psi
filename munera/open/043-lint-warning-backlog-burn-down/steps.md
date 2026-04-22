@@ -4,6 +4,8 @@
 - [x] Clean up RPC test warning backlog
   - removed unused requires/bindings across `components/rpc/src` and `components/rpc/test`
   - fixed direct fully-qualified test references so `clj-kondo` resolves aliased vars cleanly
-- [ ] Clean up agent-session warning backlog
+- [x] Clean up agent-session warning backlog
+  - removed an initial low-risk source slice of dead requires/bindings/private helpers across dispatch, resolvers, workflow, service, and nREPL support namespaces
+  - targeted `clj-kondo` on that source slice now reports `errors: 0, warnings: 0`
 - [ ] Clean up extension warning backlog
 - [ ] Clean up remaining scattered warnings and run `bb lint` to green

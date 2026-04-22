@@ -54,12 +54,11 @@
                    :content   (cond-> [{:type :text :text text}]
                                 images (into images))
                    :timestamp (java.time.Instant/now)}
-         submit-r (dispatch/dispatch! ctx :session/prompt-submit
-                                      {:session-id session-id :user-msg user-msg}
-                                      {:origin :core})
-         turn-id  (:turn-id submit-r)
-         _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})]
-     (let [result (dispatch/dispatch! ctx :session/prompt-prepare-request
+         turn-id  (:turn-id (dispatch/dispatch! ctx :session/prompt-submit
+                                                {:session-id session-id :user-msg user-msg}
+                                                {:origin :core}))
+         _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
+         result   (dispatch/dispatch! ctx :session/prompt-prepare-request
                                       (cond-> {:session-id session-id
                                                :turn-id    turn-id
                                                :user-msg   user-msg}
@@ -68,8 +67,8 @@
                                         (:runtime-opts opts)
                                         (assoc :runtime-opts (:runtime-opts opts)))
                                       {:origin :core})]
-       (runtime/safe-maybe-sync-on-git-head-change! ctx session-id)
-       result))))
+     (runtime/safe-maybe-sync-on-git-head-change! ctx session-id)
+     result)))
 
 (defn last-assistant-message-in
   "Return the last assistant message from the session journal, or nil."

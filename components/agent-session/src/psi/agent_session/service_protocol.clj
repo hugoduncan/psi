@@ -1,7 +1,6 @@
 (ns psi.agent-session.service-protocol
   "Shared stdio request/response and JSON-RPC helper semantics for managed services."
-  (:require [clojure.edn :as edn]
-            [psi.agent-session.dispatch :as dispatch]
+  (:require [psi.agent-session.dispatch :as dispatch]
             [psi.agent-session.services :as services]))
 
 (defn send-service-request!

@@ -74,7 +74,7 @@
    (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
          validated-command  (project-nrepl-config/resolved-start-command
                              {:project-nrepl {:start-command command-vector}})
-         instance           (project-nrepl-runtime/ensure-instance-in!
+         _                  (project-nrepl-runtime/ensure-instance-in!
                              ctx
                              {:worktree-path effective-worktree
                               :acquisition-mode :started

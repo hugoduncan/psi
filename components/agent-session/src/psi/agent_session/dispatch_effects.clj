@@ -186,17 +186,17 @@
                        (swap! scheduler-timer-handles* dissoc schedule-id)
                        (when-let [timers* (:scheduler-timers* ctx)]
                          (swap! timers* dissoc schedule-id)))))]
-    (let [handle (run-after-delay! ctx delay-ms callback)]
-      (swap! scheduler-timer-handles* assoc schedule-id handle)
-      (when-let [timers* (:scheduler-timers* ctx)]
-        (swap! timers* assoc schedule-id handle))
-      handle)))
+    ((fn [handle]
+       (swap! scheduler-timer-handles* assoc schedule-id handle)
+       (when-let [timers* (:scheduler-timers* ctx)]
+         (swap! timers* assoc schedule-id handle))
+       handle)
+     (run-after-delay! ctx delay-ms callback))))
 
 (defmethod execute-effect! :scheduler/cancel-timer [ctx effect]
-  (let [schedule-id (:schedule-id effect)
-        handle (or (get @scheduler-timer-handles* schedule-id)
-                   (some-> ctx :scheduler-timers* deref (get schedule-id)))]
-    (when handle
+  (let [schedule-id (:schedule-id effect)]
+    (when-let [handle (or (get @scheduler-timer-handles* schedule-id)
+                          (some-> ctx :scheduler-timers* deref (get schedule-id)))]
       (try
         (cond
           (instance? Thread handle) (.interrupt ^Thread handle)

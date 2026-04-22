@@ -177,7 +177,7 @@
 (defn initialize-child-session-state
   "Add a child session entry without switching active-session-id.
    The child is a lightweight session for agent execution."
-  [state parent-sd {:keys [child-session-id session-name system-prompt tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
+  [state parent-sd {:keys [child-session-id session-name thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
   (let [{:keys [prompt-component-selection tool-defs skills system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state (assoc parent-sd :skills (or skills (:skills parent-sd))) child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]

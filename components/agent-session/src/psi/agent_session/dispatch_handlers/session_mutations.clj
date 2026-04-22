@@ -4,8 +4,6 @@
    steering/follow-up messages, compaction, runtime projections, interrupt,
    tool execution, skills, context usage, etc."
   (:require
-   [clojure.set :as set]
-   [clojure.string :as str]
    [psi.agent-core.core :as agent]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
@@ -19,38 +17,9 @@
 (defn- register-core-handler! [event handler]
   (dispatch/register-handler! event handler))
 
-(defn- remove-queue-entry
-  [queue schedule-id]
-  (->> (or queue [])
-       (remove #(= schedule-id %))
-       vec))
-
-(defn- scheduler-schedules
-  [session-data]
-  (get-in session-data [:scheduler :schedules] {}))
-
-(defn- scheduler-queue
-  [session-data]
-  (get-in session-data [:scheduler :queue] []))
-
-(defn- update-scheduler-record
-  [session-data schedule-id f]
-  (if (get-in session-data [:scheduler :schedules schedule-id])
-    (update-in session-data [:scheduler :schedules schedule-id] f)
-    session-data))
-
 (defn- schedule-record
   [session-data schedule-id]
   (get-in session-data [:scheduler :schedules schedule-id]))
-
-(defn- delivered-scheduled-user-message
-  [schedule]
-  {:role "user"
-   :content [{:type :text :text (:message schedule)}]
-   :timestamp (java.time.Instant/now)
-   :source :scheduled
-   :schedule-id (:schedule-id schedule)
-   :label (:label schedule)})
 
 (defn- register-session-config-handlers! []
   (register-core-handler!

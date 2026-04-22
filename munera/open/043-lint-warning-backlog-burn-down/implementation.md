@@ -24,3 +24,10 @@
   - replaced a few fully-qualified references in tests with aliased requires so `clj-kondo` resolves vars cleanly (`rpc.events`, `session/query-in`)
   - cleaned unused destructured `state`/`session-id` bindings in RPC tests
   - targeted `clj-kondo` on the full RPC warning set now reports `errors: 0, warnings: 0`
+
+2026-04-22
+- Agent-session source slice:
+  - removed dead helpers and unused requires/bindings in dispatch/effect/scheduler/session-state/runtime-fns/canonical-workflows/project-nrepl/resolvers/service/workflow progression namespaces
+  - fixed a couple of redundant-let sites while touching nearby code
+  - verified the touched source slice with targeted `clj-kondo` (`errors: 0, warnings: 0`)
+  - broader agent-session test warning backlog remains and is still the largest remaining category

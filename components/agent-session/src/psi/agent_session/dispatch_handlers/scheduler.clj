@@ -2,7 +2,6 @@
   "Dispatch handlers for session-scoped delayed scheduler actions: same-session delayed prompts and delayed fresh top-level session creation."
   (:require
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.persistence :as persist]
    [psi.agent-session.scheduler :as scheduler]
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
    [psi.agent-session.session-lifecycle :as session-lifecycle]
