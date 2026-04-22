@@ -1,0 +1,12 @@
+2026-04-22
+- Task created to restore consistent `cljfmt` enforcement across local commit flow and CI.
+- User-requested outcomes:
+  - run `cljfmt fix` on the project and commit
+  - ensure staged-file pre-commit enforcement blocks commits on formatting failures/reformatting
+  - re-enable CI formatting checks
+- Initial inspection already suggests:
+  - `bb fmt:check` exists
+  - `.pre-commit-config.yaml` already declares a `cljfmt-fix` hook
+  - `doc/develop.md` documents the intended fix-and-retry behavior
+  - `.github/workflows/ci.yml` currently runs `bb lint` but not `bb fmt:check` in the `check` job
+- Execution should verify actual hook behavior rather than assuming the documented contract is still true.
