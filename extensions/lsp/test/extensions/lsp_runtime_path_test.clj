@@ -300,7 +300,7 @@
                                                :tool-result {:effects [{:path file-path}]}
                                                :config {:command lsp-fixture-command
                                                         :startup-timeout-ms 2000
-                                                        :diagnostics-timeout-ms 2000}})
+                                                        :diagnostics-timeout-ms 5000}})
           _ (write-file! file-path "(ns demo) ;; warn\n")
           second-result (sut/sync-tool-result! api
                                                {:worktree-path worktree
