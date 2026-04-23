@@ -481,6 +481,127 @@
       (is (= "/tmp/psi-test/b.ndedn" (:ui.result/value @captured)))
       (is (nil? (:session-selector closed))))))
 
+(deftest frontend-action-select-session-switch-submit-test
+  (testing "select-session switch submit preserves canonical ui/action, status, and selected value shape"
+    (let [captured   (atom nil)
+          update-fn  (app/make-update (stub-agent-fn ""))
+          action     (ui-actions/context-session-action
+                      {:selector/kind :context-session
+                       :selector/active-item-id [:session "s1"]
+                       :selector/items [{:item/id [:session "s1"]
+                                         :item/kind :session
+                                         :item/session-id "s1"
+                                         :item/display-name "Root"
+                                         :item/is-active true
+                                         :item/worktree-path "/tmp/psi-test/root"
+                                         :item/action {:action/kind :switch-session
+                                                       :action/session-id "s1"}}
+                                        {:item/id [:session "s2"]
+                                         :item/kind :session
+                                         :item/session-id "s2"
+                                         :item/parent-id [:session "s1"]
+                                         :item/display-name "Child"
+                                         :item/worktree-path "/tmp/psi-test/child"
+                                         :item/action {:action/kind :switch-session
+                                                       :action/session-id "s2"}}
+                                        {:item/id [:fork-point "e1"]
+                                         :item/kind :fork-point
+                                         :item/session-id "s1"
+                                         :item/entry-id "e1"
+                                         :item/parent-id [:session "s1"]
+                                         :item/display-name "Branch from here"
+                                         :item/action {:action/kind :fork-session
+                                                       :action/entry-id "e1"}}]})
+          state      (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
+                                                               :request-id "req-s1"
+                                                               :ui/action action})
+          [moved _]  (update-fn opened (msg/key-press :down))
+          [closed _] (update-fn moved (msg/key-press :enter))]
+      (is (= :selecting-session (:phase opened)))
+      (is (= :tree (:session-selector-mode opened)))
+      (is (= action (get-in opened [:session-selector :ui/action])))
+      (is (= :submitted (:ui.result/status @captured)))
+      (is (= "req-s1" (:ui.result/request-id @captured)))
+      (is (= :select-session (:ui.result/action-key @captured)))
+      (is (= action (:ui.result/ui-action @captured)))
+      (is (= {:action/kind :switch-session :action/session-id "s2"}
+             (:ui.result/value @captured)))
+      (is (nil? (:session-selector closed))))))
+
+(deftest frontend-action-select-session-fork-submit-test
+  (testing "select-session fork submit preserves canonical ui/action, status, and selected value shape"
+    (let [captured   (atom nil)
+          update-fn  (app/make-update (stub-agent-fn ""))
+          action     (ui-actions/context-session-action
+                      {:selector/kind :context-session
+                       :selector/active-item-id [:session "s1"]
+                       :selector/items [{:item/id [:session "s1"]
+                                         :item/kind :session
+                                         :item/session-id "s1"
+                                         :item/display-name "Root"
+                                         :item/is-active true
+                                         :item/worktree-path "/tmp/psi-test/root"
+                                         :item/action {:action/kind :switch-session
+                                                       :action/session-id "s1"}}
+                                        {:item/id [:session "s2"]
+                                         :item/kind :session
+                                         :item/session-id "s2"
+                                         :item/parent-id [:session "s1"]
+                                         :item/display-name "Child"
+                                         :item/worktree-path "/tmp/psi-test/child"
+                                         :item/action {:action/kind :switch-session
+                                                       :action/session-id "s2"}}
+                                        {:item/id [:fork-point "e1"]
+                                         :item/kind :fork-point
+                                         :item/session-id "s1"
+                                         :item/entry-id "e1"
+                                         :item/parent-id [:session "s1"]
+                                         :item/display-name "Branch from here"
+                                         :item/action {:action/kind :fork-session
+                                                       :action/entry-id "e1"}}]})
+          state      (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
+                                                               :request-id "req-s2"
+                                                               :ui/action action})
+          [moved1 _] (update-fn opened (msg/key-press :down))
+          [moved2 _] (update-fn moved1 (msg/key-press :down))
+          [closed _] (update-fn moved2 (msg/key-press :enter))]
+      (is (= :submitted (:ui.result/status @captured)))
+      (is (= "req-s2" (:ui.result/request-id @captured)))
+      (is (= :select-session (:ui.result/action-key @captured)))
+      (is (= action (:ui.result/ui-action @captured)))
+      (is (= {:action/kind :fork-session :action/entry-id "e1" :action/session-id nil}
+             (:ui.result/value @captured)))
+      (is (nil? (:session-selector closed))))))
+
+(deftest frontend-action-select-session-cancel-test
+  (testing "select-session cancel preserves canonical cancelled semantics"
+    (let [captured   (atom nil)
+          update-fn  (app/make-update (stub-agent-fn ""))
+          action     (ui-actions/context-session-action
+                      {:selector/kind :context-session
+                       :selector/active-item-id [:session "s1"]
+                       :selector/items [{:item/id [:session "s1"]
+                                         :item/kind :session
+                                         :item/session-id "s1"
+                                         :item/display-name "Root"
+                                         :item/is-active true
+                                         :item/worktree-path "/tmp/psi-test/root"
+                                         :item/action {:action/kind :switch-session
+                                                       :action/session-id "s1"}}]})
+          state      (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
+                                                               :request-id "req-s3"
+                                                               :ui/action action})
+          [closed _] (update-fn opened (msg/key-press :escape))]
+      (is (= :cancelled (:ui.result/status @captured)))
+      (is (= "req-s3" (:ui.result/request-id @captured)))
+      (is (= :select-session (:ui.result/action-key @captured)))
+      (is (= action (:ui.result/ui-action @captured)))
+      (is (= "Cancelled select-session." (:ui.result/message @captured)))
+      (is (nil? (:session-selector closed))))))
+
 (deftest tree-rename-result-renders-status-message-test
   (testing "tree rename command result appends confirmation text"
     (let [dispatch-fn (fn [text]

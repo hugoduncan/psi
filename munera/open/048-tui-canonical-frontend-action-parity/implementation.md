@@ -42,15 +42,25 @@ Proof added
   - `select-model` cancel
   - `select-thinking-level` submit
   - `select-thinking-level` cancel
-- focused TUI semantic-convergence proof for session-oriented canonical frontend action:
+- focused TUI semantic-convergence proof for session-oriented canonical frontend actions:
   - `select-resume-session`
+  - `select-session` switch submit
+  - `select-session` fork submit
+  - `select-session` cancel
 - bounded-failure proof:
-  - unsupported frontend action reports a clear assistant message and does not corrupt TUI phase, selector state, or input editing
+  - unsupported frontend action reports a clear assistant message and clears any stale frontend-action selector/dialog state without corrupting input editing
 - existing `/tree` selector tests remained green, proving no regression of plain TUI selector semantics.
+
+Post-review follow-up changes
+- unsupported frontend-action handling now clears stale frontend-action state before surfacing unsupported-action feedback.
+- frontend-action select dialogs now reuse shared dialog-selection helpers from `components/tui/src/psi/tui/app/support.clj` for selected-value lookup and up/down movement.
+- semantic unification is complete for the supported action family, while presentation remains intentionally split:
+  - dialog-backed for `select-model` and `select-thinking-level`
+  - session-selector-backed for `select-resume-session` and `select-session`
 
 Focused verification run
 - `clojure -M:test --focus psi.tui.app-update-runtime-test --focus psi.tui.app-session-selector-test`
-- result: `32 tests, 129 assertions, 0 failures`
+- result: `35 tests, 154 assertions, 0 failures`
 
 Notes
 - this slice achieves semantic parity with RPC/Emacs frontend-action handling without forcing TUI through RPC transport framing.

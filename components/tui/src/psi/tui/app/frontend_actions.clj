@@ -4,6 +4,7 @@
    [charm.message :as msg]
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app.shared :as shared]
+   [psi.tui.app.support :as support]
    [psi.tui.session-selector :as session-selector]))
 
 (defn frontend-action-dialog
@@ -33,29 +34,6 @@
        (shared/set-input-model (charm/text-input-reset (:input state))))
    nil])
 
-(defn open-frontend-action
-  [state {:keys [request-id] ui-action :ui/action}]
-  (case (keyword (:ui/action-name ui-action))
-    :select-session
-    (open-frontend-action-selector state :tree ui-action request-id)
-
-    :select-resume-session
-    (open-frontend-action-selector state :resume ui-action request-id)
-
-    (:select-model :select-thinking-level)
-    [(-> state
-         (assoc :frontend-action/request-id request-id
-                :frontend-action/ui-action ui-action
-                :frontend-action/dialog (frontend-action-dialog ui-action)
-                :dialog-selected-index nil
-                :dialog-input-text nil)
-         (shared/set-input-model (charm/text-input-reset (:input state))))
-     nil]
-
-    [(update state :messages conj {:role :assistant
-                                   :text (str "Unsupported frontend action: " (:ui/action-name ui-action))})
-     nil]))
-
 (defn clear-frontend-action-state
   [state]
   (-> state
@@ -68,6 +46,32 @@
              :session-selector-mode nil)
       (cond-> (= :selecting-session (:phase state))
         (assoc :phase :idle))))
+
+(defn open-frontend-action
+  [state {:keys [request-id] ui-action :ui/action}]
+  (case (keyword (:ui/action-name ui-action))
+    :select-session
+    (open-frontend-action-selector state :tree ui-action request-id)
+
+    :select-resume-session
+    (open-frontend-action-selector state :resume ui-action request-id)
+
+    (:select-model :select-thinking-level)
+    [(-> state
+         clear-frontend-action-state
+         (assoc :frontend-action/request-id request-id
+                :frontend-action/ui-action ui-action
+                :frontend-action/dialog (frontend-action-dialog ui-action)
+                :dialog-selected-index nil
+                :dialog-input-text nil)
+         (shared/set-input-model (charm/text-input-reset (:input state))))
+     nil]
+
+    [(-> state
+         clear-frontend-action-state
+         (update :messages conj {:role :assistant
+                                 :text (str "Unsupported frontend action: " (:ui/action-name ui-action))}))
+     nil]))
 
 (defn apply-frontend-action-result
   [state action-result handle-dispatch-result]
@@ -108,17 +112,14 @@
       (msg/key-match? m "escape")
       (cancel-frontend-action state (:frontend-action/ui-action state) handle-dispatch-result)
 
+      (msg/key-match? m "enter")
+      (when-let [value (support/selected-dialog-value state dialog)]
+        (submit-frontend-action state (:frontend-action/ui-action state) value handle-dispatch-result))
+
       (and (= :select (:kind dialog)) (msg/key-match? m "up"))
-      [(update state :dialog-selected-index #(max 0 (dec (or % 0)))) nil]
+      (support/move-dialog-selection state dialog -1)
 
       (and (= :select (:kind dialog)) (msg/key-match? m "down"))
-      (let [last-idx (max 0 (dec (count (:options dialog))))]
-        [(update state :dialog-selected-index #(min last-idx (inc (or % 0)))) nil])
-
-      (msg/key-match? m "enter")
-      (let [idx   (or (:dialog-selected-index state) 0)
-            value (get-in dialog [:options idx :value])]
-        (when value
-          (submit-frontend-action state (:frontend-action/ui-action state) value handle-dispatch-result)))
+      (support/move-dialog-selection state dialog 1)
 
       :else nil)))

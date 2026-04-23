@@ -68,6 +68,13 @@
             (-> idx (+ delta) (max 0) (min last-idx)))
      nil]))
 
+(defn selected-dialog-value
+  [state dialog]
+  (let [idx     (dialog-select-index state)
+        options (:options dialog)]
+    (when (seq options)
+      (:value (nth options idx nil)))))
+
 (defn backspace-dialog-input
   [state]
   [(assoc state :dialog-input-text
@@ -92,9 +99,7 @@
       [(clear-dialog-local-state state) nil])
 
     :select
-    (let [idx     (dialog-select-index state)
-          options (:options dialog)
-          value   (when (seq options) (:value (nth options idx nil)))]
+    (let [value (selected-dialog-value state dialog)]
       (when value
         (resolve-dialog! state dialog value))
       [(clear-dialog-local-state state) nil])

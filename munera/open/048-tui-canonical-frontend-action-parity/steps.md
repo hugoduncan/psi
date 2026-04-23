@@ -64,3 +64,21 @@
   - final TUI state shape for active frontend-action context
   - whether session-oriented convergence used selector or dialog path
   - any remaining `select-session` follow-on gap
+
+- [x] Address review follow-up: harden unsupported frontend-action handling
+  - clear any stale frontend-action selector/dialog state before surfacing unsupported-action feedback
+  - add focused proof that unsupported input leaves TUI state clean even when stale frontend-action state exists
+
+- [x] Address review follow-up: reduce dialog-handling duplication
+  - reuse shared select-dialog navigation/selection helpers for frontend-action-backed dialogs where practical
+  - keep frontend-action-specific logic limited to canonical submit/cancel result emission
+
+- [x] Address review follow-up: add focused `select-session` semantic proof
+  - prove switch-session submit preserves canonical `:ui/action`, status, and selected value shape
+  - prove fork-session submit preserves canonical `:ui/action`, status, and selected value shape
+  - prove cancel preserves canonical cancelled semantics
+
+- [x] Update `implementation.md` with post-review convergence notes
+  - document unsupported-action hardening
+  - document dialog-helper reuse decision
+  - document added `select-session` proof coverage

@@ -283,11 +283,21 @@
       (is (= "Cancelled select-thinking-level." (:ui.result/message cancelled))))))
 
 (deftest unsupported-frontend-action-is-bounded-and-state-safe-test
-  (testing "unsupported frontend action reports clearly and does not corrupt TUI state"
+  (testing "unsupported frontend action reports clearly and clears stale frontend-action state"
     (let [update-fn (app/make-update (stub-agent-fn ""))
+          stale-action (ui-actions/model-picker-action [{:provider "openai" :id "gpt-5.3" :reasoning true}])
           state     (assoc (init-state)
                            :messages [{:role :assistant :text "keep me"}]
-                           :phase :idle)
+                           :phase :selecting-session
+                           :frontend-action/request-id "req-stale"
+                           :frontend-action/ui-action stale-action
+                           :frontend-action/dialog {:frontend-action? true
+                                                    :kind :select
+                                                    :title "Stale"
+                                                    :options [{:label "old" :value :old}]}
+                           :session-selector {:frontend-action? true :selected 0}
+                           :session-selector-mode :resume
+                           :dialog-selected-index 0)
           action    {:ui/action-name :select-unknown
                      :ui/prompt "Unsupported"}
           [s1 cmd]  (app-update/handle-dispatch-result state {:type :frontend-action
@@ -296,8 +306,12 @@
           [s2 _]    (update-fn s1 (msg/key-press "x"))]
       (is (nil? cmd))
       (is (= :idle (:phase s1)))
+      (is (nil? (:frontend-action/request-id s1)))
+      (is (nil? (:frontend-action/ui-action s1)))
       (is (nil? (:frontend-action/dialog s1)))
       (is (nil? (:session-selector s1)))
+      (is (nil? (:session-selector-mode s1)))
+      (is (nil? (:dialog-selected-index s1)))
       (is (= "keep me" (get-in s1 [:messages 0 :text])))
       (is (= "Unsupported frontend action: :select-unknown"
              (get-in s1 [:messages 1 :text])))
