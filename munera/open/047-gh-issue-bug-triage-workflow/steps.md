@@ -1,0 +1,8 @@
+- [x] Create Munera task `047-gh-issue-bug-triage-workflow`
+- [x] Capture a complete design for bug-triage workflow behavior and outcome branches
+- [x] Write the new `issue-bug-triage` skill
+- [x] Write the new `gh-bug-triage` workflow
+- [x] Add a prompt/example file for `gh-bug-triage`
+- [x] Add the task to `munera/plan.md`
+- [x] Re-read changed files for coherence and adjust wording if needed
+- [x] Summarize the resulting workflow/skill contract for handoff
