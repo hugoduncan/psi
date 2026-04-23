@@ -1,0 +1,16 @@
+- [ ] Inspect the current TUI `context/updated` handling path and note where canonical context snapshot and `session-tree-widget` payloads enter and are stored in TUI state.
+- [ ] Inspect the existing `/tree` command path and identify the current selector/session-switch actions it reuses.
+- [ ] Define the minimal TUI state changes needed to store the authoritative backend-projected `session-tree-widget` without introducing a competing local tree model.
+- [ ] Implement TUI state handling so authoritative `context/updated` can add, preserve, or remove the stored `session-tree-widget` correctly.
+- [ ] Add a visible session/context section in the normal TUI view rendered from the stored projected widget.
+- [ ] Wire activation from the visible section to the existing canonical session selection/switch flow.
+- [ ] Ensure hierarchy/current/runtime indicators render from canonical projected data.
+- [ ] Ensure active-session indication survives unrelated refreshes while authoritative context still includes the widget.
+- [ ] Ensure later authoritative widget removal clears the visible section cleanly without stale selection/focus state.
+- [ ] Align `/tree` with the same canonical session selection path where practical, while keeping backend-projected widget data authoritative for hierarchy/order/indicator semantics.
+- [ ] Add focused tests for visible-section presence when authoritative context includes a multi-session `session-tree-widget` and absence when authoritative context omits it for single-session context.
+- [ ] Add focused tests for indicator rendering and session activation from the visible section.
+- [ ] Add focused tests proving unrelated refreshes preserve the visible section and later authoritative removal clears it cleanly.
+- [ ] Run targeted TUI tests.
+- [ ] Run the relevant broader test slice if targeted changes touch shared adapter/runtime seams.
+- [ ] Update `implementation.md` with decisions and discoveries while executing.
