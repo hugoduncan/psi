@@ -237,6 +237,8 @@
          :switch-session-fn!      (:switch-session-fn! opts)
          :fork-session-fn!        (:fork-session-fn! opts)
          :session-selector-fn     (:session-selector-fn opts)
+         :context-widget-fn       (:context-widget-fn opts)
+         :context-session-tree-widget nil
          :session-selector        nil
          :session-selector-mode   nil
          :prompt-input-state      (initial-prompt-input-state-fn)

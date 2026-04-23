@@ -91,6 +91,54 @@
       (is (= "hello" (:text (second (:messages s1)))))
       (is (some? cmd)))))
 
+(deftest update-tick-state-loads-context-widget-and-removes-it-authoritatively-test
+  (testing "tick loads authoritative context widget when present and clears it when later omitted"
+    (let [widget*   (atom {:placement "left"
+                           :extension-id "psi-session"
+                           :widget-id "session-tree"
+                           :content-lines [{:text "main [s1] ← current [idle]"}]})
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state "test-model" {:context-widget-fn (fn [] @widget*)})
+          [s1 _]    (update-fn state {:type :agent-poll})
+          _         (reset! widget* nil)
+          [s2 _]    (update-fn s1 {:type :agent-poll})]
+      (is (= @widget* nil))
+      (is (= "session-tree" (get-in s1 [:context-session-tree-widget :widget-id])))
+      (is (nil? (:context-session-tree-widget s2))))))
+
+(deftest update-tick-state-preserves-context-widget-across-unrelated-refreshes-while-authoritative-widget-remains-test
+  (testing "unrelated refreshes preserve context widget while authoritative source still includes it"
+    (let [widget    {:placement "left"
+                     :extension-id "psi-session"
+                     :widget-id "session-tree"
+                     :content-lines [{:text "main [s1] ← current [idle]"}
+                                     {:text "  child [s2] [running]"}]}
+          ui-atom    (atom {:widgets {[:ext "w1"] {:placement :above-editor
+                                                   :extension-id "ext"
+                                                   :widget-id "w1"
+                                                   :content ["widget body"]}}
+                            :widget-specs {}
+                            :statuses {}
+                            :notifications {}
+                            :tool-renderers {}
+                            :message-renderers {}
+                            :dialog-queue {:active nil :pending []}
+                            :tools-expanded? false})
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state "test-model"
+                                {:ui-state* ui-atom
+                                 :context-widget-fn (constantly widget)})
+          [s1 _]    (update-fn state {:type :agent-poll})
+          _         (swap! ui-atom assoc-in [:widgets [:ext "w2"]]
+                           {:placement :below-editor
+                            :extension-id "ext"
+                            :widget-id "w2"
+                            :content ["other widget"]})
+          [s2 _]    (update-fn s1 {:type :agent-poll})]
+      (is (= widget (:context-session-tree-widget s1)))
+      (is (= widget (:context-session-tree-widget s2)))
+      (is (= 2 (count (get-in s2 [:ui-snapshot :widgets])))))))
+
 (deftest agent-error-transitions-to-idle-test
   (testing "agent-error message sets error and goes idle"
     (let [update-fn (app/make-update (error-agent-fn "boom"))

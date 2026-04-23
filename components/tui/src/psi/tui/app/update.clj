@@ -25,6 +25,7 @@
           (assoc :phase :selecting-session
                  :session-selector sel
                  :session-selector-mode mode)
+          (dissoc :context-session-tree-selected-index)
           (shared/set-input-model (charm/text-input-reset (:input state))))
       nil])))
 
@@ -167,7 +168,9 @@
 
 (defn close-session-selector
   [state]
-  [(assoc state :phase :idle :session-selector nil :session-selector-mode nil) nil])
+  [(-> state
+       (assoc :phase :idle :session-selector nil :session-selector-mode nil)
+       (dissoc :context-session-tree-selected-index)) nil])
 
 (defn toggle-selector-scope
   [sel]

@@ -107,6 +107,16 @@
       (when (seq widgets)
         (str (str/join "\n" (mapcat :content widgets)) "\n")))))
 
+(defn render-context-session-tree-widget
+  [widget]
+  (when (seq (:content-lines widget))
+    (str (charm/render shared/title-style "Session Context") "\n"
+         (str/join "\n"
+                   (map (fn [line]
+                          (str "  " (:text line)))
+                        (:content-lines widget)))
+         "\n")))
+
 (def footer-query footer/footer-query)
 
 (defn footer-data
@@ -386,6 +396,7 @@
   [state]
   (let [{:keys [messages phase error input spinner-frame model-name
                 prompt-templates skills extension-summary ui-snapshot
+                context-session-tree-widget
                 tool-calls tool-order
                 active-turn-order active-turn-events session-selector current-session-file width force-clear?]} state
         spinner-char   (nth shared/spinner-frames (mod spinner-frame (count shared/spinner-frames)))
@@ -415,6 +426,8 @@
        (str (render-banner model-name prompt-templates skills extension-summary)
             "\n"
             (render-messages messages term-width)
+            (when context-session-tree-widget
+              (str (render-context-session-tree-widget context-session-tree-widget) "\n"))
             (when (= :streaming phase)
               (if has-progress?
                 (str (or (render-active-turn state spinner-char term-width)

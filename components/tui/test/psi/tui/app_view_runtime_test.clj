@@ -68,6 +68,25 @@
       (is (string? out))
       (is (str/includes? out "gpt-4o")))))
 
+(deftest view-renders-discoverable-context-session-section-when-widget-present-test
+  (testing "normal TUI view renders visible session/context section from authoritative context widget"
+    (let [widget {:placement "left"
+                  :extension-id "psi-session"
+                  :widget-id "session-tree"
+                  :content-lines [{:text "main [s1] ← current [idle]"}
+                                  {:text "  child [s2] [running]"}]}
+          state  (assoc (init-state)
+                        :context-session-tree-widget widget)
+          plain  (ansi/strip-ansi (app/view (assoc state :width 120)))]
+      (is (str/includes? plain "Session Context"))
+      (is (str/includes? plain "main [s1] ← current [idle]"))
+      (is (str/includes? plain "child [s2] [running]")))))
+
+(deftest view-omits-discoverable-context-session-section-when-widget-absent-test
+  (testing "normal TUI view omits session/context section when authoritative context widget is absent"
+    (let [plain (ansi/strip-ansi (app/view (assoc (init-state) :width 120)))]
+      (is (not (str/includes? plain "Session Context"))))))
+
 (deftest view-renders-messages-test
   (testing "view renders user and assistant messages"
     (let [state (assoc (init-state)

@@ -17,6 +17,9 @@
         state (if-let [read-fn (:ui-read-fn state)]
                 (let [snap (read-fn)]
                   (assoc state :ui-snapshot snap :tools-expanded? (boolean (:tools-expanded? snap))))
+                state)
+        state (if-let [context-widget-fn (:context-widget-fn state)]
+                (assoc state :context-session-tree-widget (context-widget-fn))
                 state)]
     (support/dispatch-ui-event! state :session/ui-dismiss-expired {})
     (support/dispatch-ui-event! state :session/ui-dismiss-overflow {})

@@ -61,6 +61,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
+   [psi.app-runtime.context-summary :as context-summary]
    [psi.app-runtime.nrepl-runtime :as app-nrepl]
    [psi.app-runtime.output :as output]
    [psi.app-runtime.projections :as projections]
@@ -714,6 +715,14 @@ Available: " (str/join ", " (map name (keys all))))
                     {:query-fn             (fn [q] (session/query-in ctx @tui-focus* q))
                      :session-selector-fn  (fn [] (ui-actions/context-session-action
                                                    (selectors/context-session-selector ctx @tui-focus*)))
+                     :context-widget-fn    (fn []
+                                             (let [snapshot (selectors/context-session-selector ctx @tui-focus*)
+                                                   widget   (context-summary/context-widget snapshot)]
+                                               (when (:widget/visible? widget)
+                                                 {:placement (some-> (:widget/placement widget) name)
+                                                  :extension-id (:widget/extension-id widget)
+                                                  :widget-id (:widget/widget-id widget)
+                                                  :content-lines (:widget/content-lines widget)})))
                      :ui-read-fn       (fn [] (projections/extension-ui-snapshot ctx))
                      :ui-dispatch-fn   (fn [event-type payload]
                                          (dispatch/dispatch! ctx event-type payload {:origin :tui}))
