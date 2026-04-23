@@ -19,6 +19,7 @@ Key decisions and outcomes:
 
 Notable behavior details:
 - On branch-already-exists fallback, the second `git.worktree/add!` call still uses `:create-branch false` and `:base_ref nil`; requested base branch is recorded but not applied.
+- Fresh branch creation now passes `--no-track` through the git worktree add path so a requested base ref such as `origin/master` sets ancestry without incorrectly configuring the new branch to track that base ref.
 - Command parse errors surface usage/help before execution; git/base-branch validity remains enforced by the canonical git mutation path rather than prevalidation.
 
 Tests added/updated:

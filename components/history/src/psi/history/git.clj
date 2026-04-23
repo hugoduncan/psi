@@ -401,7 +401,7 @@
       :else
       (let [base-ref* (or base-ref "HEAD")
             args      (if create-branch
-                        (cond-> ["worktree" "add" "-b" branch path]
+                        (cond-> ["worktree" "add" "--no-track" "-b" branch path]
                           (seq base-ref*) (conj base-ref*))
                         ["worktree" "add" path branch])]
         (try

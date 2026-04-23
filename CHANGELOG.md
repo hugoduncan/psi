@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-23
+
+- λ Δ Fixed `/work-on --base <branch>` branch tracking when creating a new worktree branch:
+  - fresh `git worktree add -b` creation now uses `--no-track`
+  - requested base refs such as `origin/master` still determine the new branch start point
+  - newly created `/work-on` branches no longer auto-track the selected base branch
+- ✓ Verification:
+  - `clojure -M:test --focus psi.history.git-test --focus extensions.work-on-test`
+
 ## 2026-04-19
 
 - λ Δ Added direct project nREPL support as a first-class worktree-bound runtime capability:

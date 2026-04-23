@@ -941,7 +941,13 @@
           (is (= origin-master-sha head-sha)
               "fresh worktree branch should start at origin/master, not the current local HEAD")
           (is (not= local-head-sha head-sha)
-              "if this equals local HEAD then the requested base ref was ignored"))))))
+              "if this equals local HEAD then the requested base ref was ignored")
+          (is (= "fatal: no upstream configured for branch 'fix-flakey-test'"
+                 (try
+                   (str/trim (run-git! worktree-path "rev-parse" "--abbrev-ref" "--symbolic-full-name" "@{u}"))
+                   (catch clojure.lang.ExceptionInfo e
+                     (-> e ex-data :err str/trim))))
+              "new branch should not auto-track the base ref when created from origin/master"))))))
 
 (deftest work-done-and-rebase-commands-test
   (testing "/work-done fast-forwards onto the cached default branch, switches sessions, and /work-rebase emits notifications"

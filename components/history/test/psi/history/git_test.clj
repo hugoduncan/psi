@@ -67,6 +67,17 @@
     (run! "git" "add" rel-path)
     (run! "git" "commit" "-m" message)))
 
+(defn- upstream-branch
+  [repo-dir]
+  (let [pb   (ProcessBuilder. ^java.util.List ["git" "rev-parse" "--abbrev-ref" "--symbolic-full-name" "@{u}"])
+        _    (.directory pb (File. ^String repo-dir))
+        proc (.start pb)
+        out  (str/trim (slurp (.getInputStream proc)))
+        _    (slurp (.getErrorStream proc))
+        exit (.waitFor proc)]
+    (when (zero? exit)
+      out)))
+
 ;;; git/log
 
 (deftest create-context-defaults-to-cwd
@@ -389,19 +400,22 @@
 ;;; worktree and branch mutations
 
 (deftest worktree-add-and-remove-roundtrip
-  ;; Tests linked worktree creation, listing, and removal end-to-end.
+  ;; Tests linked worktree creation, listing, removal, and no-upstream default.
   (testing "worktree add/remove"
-    (let [ctx     (git/create-null-context seed-commits)
-          wt-path (linked-worktree-path ctx "feature-alpha")
-          added   (git/worktree-add ctx {:path wt-path
-                                         :branch "feature-alpha"})
-          listed  (git/worktree-list ctx)
-          removed (git/worktree-remove ctx {:path wt-path})]
+    (let [ctx      (git/create-null-context seed-commits)
+          wt-path  (linked-worktree-path ctx "feature-alpha")
+          added    (git/worktree-add ctx {:path wt-path
+                                          :branch "feature-alpha"})
+          listed   (git/worktree-list ctx)
+          upstream (upstream-branch wt-path)
+          removed  (git/worktree-remove ctx {:path wt-path})]
       (testing "adds the worktree successfully"
         (is (true? (:success added)))
         (is (= wt-path (:path added)))
         (is (= "feature-alpha" (:branch added)))
         (is (string? (:head added))))
+      (testing "newly created branches do not inherit tracking by default"
+        (is (nil? upstream)))
       (testing "lists the added worktree"
         (is (worktree-listed? listed wt-path)))
       (testing "removes the worktree successfully"
