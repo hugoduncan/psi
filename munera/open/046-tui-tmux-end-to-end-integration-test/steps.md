@@ -1,24 +1,28 @@
-- [ ] Inspect current TUI test layout and existing slow/integration execution surfaces
-- [ ] Choose the namespace/file placement for the tmux harness and baseline scenario
-- [ ] Choose the runner/task surface for intentionally invoking the tmux-backed integration test
-- [ ] Define the minimal harness helper API and default timeout/marker constants
-- [ ] Implement `tmux` availability detection
-- [ ] Implement CI detection using existing project/environment conventions if available
-- [ ] Encode local missing-tmux behavior as skip + warning/explanatory message
-- [ ] Encode CI missing-tmux behavior as clear environment/setup failure
-- [ ] Implement unique tmux session-name allocation for each test run
-- [ ] Implement detached tmux session startup
-- [ ] Implement deterministic primary pane-id discovery
-- [ ] Implement helpers to send line/key input to the tmux pane
-- [ ] Implement helpers to capture pane output for diagnostics
-- [ ] Implement ANSI-normalization helpers for stable text assertions
-- [ ] Implement wait/poll helpers with configurable timeout and polling intervals
-- [ ] Implement reliable tmux cleanup that runs on success, assertion failure, and unexpected exception paths
-- [ ] Implement failure evidence capture before cleanup
-- [ ] Add the baseline scenario: launch -> ready marker -> `/help` -> help marker -> `/quit` -> clean exit
-- [ ] Make timeout failures distinguish startup, help, and quit phases clearly
-- [ ] Wire the test into the chosen slow/integration execution path
-- [ ] Add or update bb task/test runner documentation if needed for discoverability
+- [x] Inspect current TUI test layout and existing slow/integration execution surfaces
+- [x] Choose the namespace/file placement for the tmux harness and baseline scenario
+  - harness: `components/tui/test/psi/tui/test_harness/tmux.clj`
+  - baseline scenario: `components/tui/test/psi/tui/tmux_integration_harness_test.clj`
+- [x] Choose the runner/task surface for intentionally invoking the tmux-backed integration test
+  - Kaocha `:integration` suite via `^:integration`
+  - bb task: `bb clojure:test:integration`
+- [x] Define the minimal harness helper API and default timeout/marker constants
+- [x] Implement `tmux` availability detection
+- [x] Implement CI detection using existing project/environment conventions if available
+- [x] Encode local missing-tmux behavior as skip + warning/explanatory message
+- [x] Encode CI missing-tmux behavior as clear environment/setup failure
+- [x] Implement unique tmux session-name allocation for each test run
+- [x] Implement detached tmux session startup
+- [x] Implement deterministic primary pane-id discovery
+- [x] Implement helpers to send line/key input to the tmux pane
+- [x] Implement helpers to capture pane output for diagnostics
+- [x] Implement ANSI-normalization helpers for stable text assertions
+- [x] Implement wait/poll helpers with configurable timeout and polling intervals
+- [x] Implement reliable tmux cleanup that runs on success, assertion failure, and unexpected exception paths
+- [x] Implement failure evidence capture before cleanup
+- [x] Add the baseline scenario: launch -> ready marker -> `/help` -> help marker -> `/quit` -> clean exit
+- [x] Make timeout failures distinguish startup, help, and quit phases clearly
+- [x] Wire the test into the chosen slow/integration execution path
+- [x] Add or update bb task/test runner documentation if needed for discoverability
 - [ ] Run the focused test path with tmux available and fix any flakiness
 - [ ] Validate the missing-tmux local skip path
 - [ ] Confirm no stray tmux sessions remain after success/failure

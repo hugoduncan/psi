@@ -10,6 +10,15 @@ Implementation shape:
 - choose a home where the new coverage is discoverable and intentionally runnable without burdening the default fast path
 - prefer a test namespace plus a thin runner/task hook over one-off shell scripting if that keeps the behavior easier to maintain
 - keep harness code colocated with the test boundary rather than spreading `tmux` details into unrelated TUI test namespaces
+- placement decision after inspection:
+  - keep the black-box tmux harness in `components/tui/test/psi/tui/test_harness/tmux.clj`
+  - keep the baseline integration scenario in `components/tui/test/psi/tui/tmux_integration_harness_test.clj`
+  - keep execution on the existing Kaocha `:integration` suite via `^:integration` metadata
+  - keep intentional invocation through `bb clojure:test:integration`
+- rationale:
+  - the harness is TUI-specific and belongs with TUI test support rather than in global `test-support/`
+  - the scenario is already discoverable alongside other TUI tests while still excluded from fast/unit runs by meta-based suite selection
+  - no new bespoke runner is needed because the repository already has an integration suite and bb task for slow tests
 
 2. Define a small harness API before filling in command details
 - settle on a minimal helper surface that matches the spec’s responsibilities, such as:

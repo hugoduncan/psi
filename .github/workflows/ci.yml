@@ -99,8 +99,17 @@ jobs:
           cli: latest
           bb: latest
 
+      - name: Install tmux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux
+          tmux -V
+
       - name: Run Clojure tests
         run: bb clojure:test
+
+      - name: Run Clojure integration tests
+        run: bb clojure:test:integration
 
   # ── Emacs tests ───────────────────────────────────────────────────────────
   emacs-test:

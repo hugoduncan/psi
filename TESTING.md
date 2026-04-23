@@ -25,6 +25,9 @@ bb test:components
 # Extensions tests
 bb clojure:test:extensions
 
+# Integration tests (slow, requires tmux; skips locally with warning if tmux is missing)
+bb clojure:test:integration
+
 # All tests
 bb test
 ```
