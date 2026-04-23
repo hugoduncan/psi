@@ -154,24 +154,36 @@
                       :scopes [scope]
                       :source :project-manifest})])))))
 
+(defn- absolutize-local-root
+  [base-dir dep]
+  (if-let [local-root (:local/root dep)]
+    (let [f (io/file local-root)]
+      (if (.isAbsolute f)
+        dep
+        (assoc dep :local/root (.getAbsolutePath (io/file base-dir local-root)))))
+    dep))
+
 (defn- normalize-entry
-  [lib scope dep source-manifests overridden?]
-  [lib {:dep dep
-        :extension? (extension-dep? dep)
-        :support-dep? (not (extension-dep? dep))
-        :enabled? (boolean (if (extension-dep? dep)
-                             (get dep :psi/enabled true)
-                             false))
-        :scope scope
-        :source-manifests (vec source-manifests)
-        :overridden? overridden?
-        :effective? true
-        :status (cond
-                  (not (extension-dep? dep)) :not-applicable
-                  (false? (get dep :psi/enabled true)) :disabled
-                  :else :configured)
-        :load-error nil
-        :init-var (when (extension-dep? dep) (:psi/init dep))}])
+  [lib scope dep source-manifests overridden? base-dir]
+  (let [dep* (if (map? dep)
+               (absolutize-local-root base-dir dep)
+               dep)]
+    [lib {:dep dep*
+          :extension? (extension-dep? dep*)
+          :support-dep? (not (extension-dep? dep*))
+          :enabled? (boolean (if (extension-dep? dep*)
+                               (get dep* :psi/enabled true)
+                               false))
+          :scope scope
+          :source-manifests (vec source-manifests)
+          :overridden? overridden?
+          :effective? true
+          :status (cond
+                    (not (extension-dep? dep*)) :not-applicable
+                    (false? (get dep* :psi/enabled true)) :disabled
+                    :else :configured)
+          :load-error nil
+          :init-var (when (extension-dep? dep*) (:psi/init dep*))}]))
 
 (defn- duplicate-init-diagnostics
   [entries-by-lib]
@@ -203,6 +215,8 @@
         user-deps      (:deps user-manifest)
         project-deps   (:deps project-manifest)
         all-libs       (set/union (set (keys user-deps)) (set (keys project-deps)))
+        user-base-dir  (.getParentFile ^java.io.File (user-manifest-file))
+        project-base-dir (io/file cwd)
         entries-by-lib (into {}
                              (map (fn [lib]
                                     (if (contains? project-deps lib)
@@ -211,12 +225,14 @@
                                                        (get project-deps lib)
                                                        (cond-> [:project]
                                                          (contains? user-deps lib) (conj :user))
-                                                       (boolean (contains? user-deps lib)))
+                                                       (boolean (contains? user-deps lib))
+                                                       project-base-dir)
                                       (normalize-entry lib
                                                        :user
                                                        (get user-deps lib)
                                                        [:user]
-                                                       false))))
+                                                       false
+                                                       user-base-dir))))
                              (sort all-libs))
         effective-raw-deps (into {}
                                  (map (fn [[lib {:keys [dep]}]] [lib dep]))
