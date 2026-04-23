@@ -21,9 +21,10 @@ Execution log
 
 Decisions
 
-- Keep `/tree` as the interactive selection/switch workflow, but make the normal TUI view visibly advertise the same context/session structure through a read-only discoverable section.
-- Source the visible section from app-runtime-owned context projection (`context-summary/context-widget`) supplied through a dedicated runtime callback, rather than synthesizing it from extension UI widgets or rebuilding it locally inside the TUI.
-- Treat each refresh of `:context-widget-fn` as authoritative: present widget replaces state; `nil` removes it.
+- Keep `/tree` as the interactive selection/switch workflow, but make the normal TUI view visibly advertise the same context/session structure and allow direct activation from that visible surface.
+- Source the visible section from app-runtime-owned context projection and deliver it to the TUI through explicit `:context-updated` events rather than a TUI-local polling callback.
+- Treat `:context-updated` as authoritative for present/replace/remove semantics of the discoverable session-context surface.
+- Preserve backend-owned line action commands as the canonical source for visible-section activation rather than inventing TUI-local switch semantics.
 
 Discoveries
 
@@ -33,7 +34,6 @@ Discoveries
 
 Risks / snags
 
-- The visible section is currently informational/discoverable; actual activation still goes through `/tree` / selector flow rather than direct normal-view cursor interaction.
-- Review feedback concluded this does not fully satisfy the task acceptance criteria around activation from the visible surface.
-- Review feedback also identified the runtime-supplied `:context-widget-fn` polling seam as weaker parity than consuming canonical `context/updated` ownership directly.
-- Task 049 has therefore been reopened for follow-on convergence on direct visible-surface activation and canonical context-update ownership.
+- Direct activation now routes through backend-projected line action commands, so future widget action-shape changes should continue to preserve backend ownership rather than teaching the TUI alternate local semantics.
+- The normal-view interaction is intentionally lightweight (`Ctrl+J/K`, `Alt+Enter`) rather than a broader transcript cursor/navigation redesign.
+- Task 049 was reopened to address review feedback and the follow-on fixes are now implemented and verified in focused and broader relevant test slices.

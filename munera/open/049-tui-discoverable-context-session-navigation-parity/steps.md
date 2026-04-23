@@ -1,16 +1,16 @@
 - [x] Inspect the current TUI `context/updated` handling path and note where canonical context snapshot and `session-tree-widget` payloads enter and are stored in TUI state.
 - [x] Inspect the existing `/tree` command path and identify the current selector/session-switch actions it reuses.
 - [x] Define the minimal TUI state changes needed to store the authoritative backend-projected `session-tree-widget` without introducing a competing local tree model.
-- [ ] Converge TUI ownership of the discoverable session/context surface on the canonical `context/updated` path so authoritative backend context updates add, preserve, or remove the stored `session-tree-widget` without a TUI-specific polling seam.
+- [x] Converge TUI ownership of the discoverable session/context surface on the canonical `context/updated` path so authoritative backend context updates add, preserve, or remove the stored `session-tree-widget` without a TUI-specific polling seam.
 - [x] Add a visible session/context section in the normal TUI view rendered from the stored projected widget.
-- [ ] Rework the visible `Session Context` section so activation can be triggered directly from that visible surface through the existing canonical session selection/switch flow.
+- [x] Rework the visible `Session Context` section so activation can be triggered directly from that visible surface through the existing canonical session selection/switch flow.
 - [x] Ensure hierarchy/current/runtime indicators render from canonical projected data.
 - [x] Ensure active-session indication survives unrelated refreshes while authoritative context still includes the widget.
 - [x] Ensure later authoritative widget removal clears the visible section cleanly without stale selection/focus state.
 - [x] Align `/tree` with the same canonical session selection path where practical, while keeping backend-projected widget data authoritative for hierarchy/order/indicator semantics.
 - [x] Add focused tests for visible-section presence when authoritative context includes a multi-session `session-tree-widget` and absence when authoritative context omits it for single-session context.
-- [ ] Add focused tests for indicator rendering and direct session activation from the visible section.
+- [x] Add focused tests for indicator rendering and direct session activation from the visible section.
 - [x] Add focused tests proving unrelated refreshes preserve the visible section and later authoritative removal clears it cleanly.
-- [ ] Run targeted TUI tests.
-- [ ] Run the relevant broader test slice if targeted changes touch shared adapter/runtime seams.
+- [x] Run targeted TUI tests.
+- [x] Run the relevant broader test slice if targeted changes touch shared adapter/runtime seams.
 - [x] Update `implementation.md` with decisions and discoveries while executing.
