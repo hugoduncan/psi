@@ -11,6 +11,7 @@
 (def agent-poll?   (fn [m] (= :agent-poll   (:type m))))
 (def agent-event?  (fn [m] (= :agent-event  (:type m))))
 (def external-message? (fn [m] (= :external-message (:type m))))
+(def context-updated? (fn [m] (= :context-updated (:type m))))
 
 (defn key-token->string
   "Normalize charm key token to a string when possible."
@@ -237,8 +238,8 @@
          :switch-session-fn!      (:switch-session-fn! opts)
          :fork-session-fn!        (:fork-session-fn! opts)
          :session-selector-fn     (:session-selector-fn opts)
-         :context-widget-fn       (:context-widget-fn opts)
-         :context-session-tree-widget nil
+         :context-session-tree-widget (:initial-context-session-tree-widget opts)
+         :context-session-tree-selected-index (when (seq (get-in opts [:initial-context-session-tree-widget :content-lines])) 0)
          :session-selector        nil
          :session-selector-mode   nil
          :prompt-input-state      (initial-prompt-input-state-fn)

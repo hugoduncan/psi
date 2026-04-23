@@ -11,6 +11,9 @@
    [psi.tui.app.support :as support]
    [psi.tui.session-selector :as session-selector]))
 
+(declare clear-context-session-tree-selection)
+(declare handle-dispatch-result)
+
 (defn open-session-selector
   ([state] (open-session-selector state :resume))
   ([state mode]
@@ -25,7 +28,7 @@
           (assoc :phase :selecting-session
                  :session-selector sel
                  :session-selector-mode mode)
-          (dissoc :context-session-tree-selected-index)
+          clear-context-session-tree-selection
           (shared/set-input-model (charm/text-input-reset (:input state))))
       nil])))
 
@@ -41,6 +44,33 @@
   [restored]
   (or (:nav/session-id restored)
       (:session-id restored)))
+
+(defn clear-context-session-tree-selection
+  [state]
+  (dissoc state :context-session-tree-selected-index))
+
+(defn context-session-tree-lines
+  [state]
+  (vec (get-in state [:context-session-tree-widget :content-lines] [])))
+
+(defn context-session-tree-line-count
+  [state]
+  (count (context-session-tree-lines state)))
+
+(defn context-session-tree-selected-index
+  [state]
+  (let [line-count (context-session-tree-line-count state)
+        idx        (or (:context-session-tree-selected-index state) 0)]
+    (when (pos? line-count)
+      (-> idx (max 0) (min (dec line-count))))))
+
+(defn visible-context-session-tree?
+  [state]
+  (seq (context-session-tree-lines state)))
+
+(defn context-session-tree-actionable?
+  [state]
+  (boolean (some #(get-in % [:action :command]) (context-session-tree-lines state))))
 
 (defn reset-input-model
   [state]
@@ -122,6 +152,45 @@
        (append-assistant-message text))
    nil])
 
+(defn handle-context-updated
+  [state event]
+  (let [widget      (:session-tree-widget event)
+        state'      (cond-> (assoc state :context-session-tree-widget widget)
+                      (nil? widget) clear-context-session-tree-selection)
+        line-count  (context-session-tree-line-count state')
+        selected    (context-session-tree-selected-index state')]
+    (cond-> state'
+      (and (pos? line-count) (nil? selected)) (assoc :context-session-tree-selected-index 0)
+      (and (pos? line-count) (some? selected)) (assoc :context-session-tree-selected-index selected))))
+
+(defn move-context-session-tree-selection
+  [state delta]
+  (let [line-count (context-session-tree-line-count state)]
+    (if (zero? line-count)
+      state
+      (assoc state
+             :context-session-tree-selected-index
+             (-> (or (:context-session-tree-selected-index state) 0)
+                 (+ delta)
+                 (max 0)
+                 (min (dec line-count)))))))
+
+(defn submit-context-session-tree-selection
+  [state]
+  (if-let [line (when-let [idx (context-session-tree-selected-index state)]
+                  (nth (context-session-tree-lines state) idx nil))]
+    (if-let [command (get-in line [:action :command])]
+      (let [dispatch-fn (:dispatch-fn state)
+            result      (when dispatch-fn (dispatch-fn command))]
+        (if result
+          (handle-dispatch-result (clear-context-session-tree-selection state) result)
+          [(-> state
+               clear-context-session-tree-selection
+               (append-assistant-message (str "Context action unavailable: " command)))
+           nil]))
+      [state nil])
+    [state nil]))
+
 (defn run-extension-command
   [result]
   (try
@@ -140,8 +209,6 @@
        (if (:uses-callback-server result)
          "\n\nWaiting for browser callback…"
          "\n\nPaste the authorization code below ↓")))
-
-(declare handle-dispatch-result)
 
 (defn handle-dispatch-result
   [state result]
@@ -170,7 +237,7 @@
   [state]
   [(-> state
        (assoc :phase :idle :session-selector nil :session-selector-mode nil)
-       (dissoc :context-session-tree-selected-index)) nil])
+       clear-context-session-tree-selection) nil])
 
 (defn toggle-selector-scope
   [sel]

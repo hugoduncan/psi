@@ -91,23 +91,27 @@
       (is (= "hello" (:text (second (:messages s1)))))
       (is (some? cmd)))))
 
-(deftest update-tick-state-loads-context-widget-and-removes-it-authoritatively-test
-  (testing "tick loads authoritative context widget when present and clears it when later omitted"
-    (let [widget*   (atom {:placement "left"
-                           :extension-id "psi-session"
-                           :widget-id "session-tree"
-                           :content-lines [{:text "main [s1] ← current [idle]"}]})
+(deftest context-updated-loads-context-widget-and-removes-it-authoritatively-test
+  (testing "authoritative context-updated sets context widget when present and clears it when later omitted"
+    (let [widget    {:placement "left"
+                     :extension-id "psi-session"
+                     :widget-id "session-tree"
+                     :content-lines [{:text "main [s1] ← current [idle]"}]}
           update-fn (app/make-update (stub-agent-fn ""))
-          state     (init-state "test-model" {:context-widget-fn (fn [] @widget*)})
-          [s1 _]    (update-fn state {:type :agent-poll})
-          _         (reset! widget* nil)
-          [s2 _]    (update-fn s1 {:type :agent-poll})]
-      (is (= @widget* nil))
+          state     (init-state "test-model")
+          [s1 _]    (update-fn state {:type :context-updated
+                                      :active-session-id "s1"
+                                      :session-tree-widget widget})
+          [s2 _]    (update-fn s1 {:type :context-updated
+                                   :active-session-id "s1"
+                                   :session-tree-widget nil})]
       (is (= "session-tree" (get-in s1 [:context-session-tree-widget :widget-id])))
-      (is (nil? (:context-session-tree-widget s2))))))
+      (is (zero? (:context-session-tree-selected-index s1)))
+      (is (nil? (:context-session-tree-widget s2)))
+      (is (nil? (:context-session-tree-selected-index s2))))))
 
-(deftest update-tick-state-preserves-context-widget-across-unrelated-refreshes-while-authoritative-widget-remains-test
-  (testing "unrelated refreshes preserve context widget while authoritative source still includes it"
+(deftest context-widget-preserves-across-unrelated-refreshes-while-authoritative-widget-remains-test
+  (testing "unrelated refreshes preserve context widget while authoritative context state still includes it"
     (let [widget    {:placement "left"
                      :extension-id "psi-session"
                      :widget-id "session-tree"
@@ -127,7 +131,7 @@
           update-fn (app/make-update (stub-agent-fn ""))
           state     (init-state "test-model"
                                 {:ui-state* ui-atom
-                                 :context-widget-fn (constantly widget)})
+                                 :initial-context-session-tree-widget widget})
           [s1 _]    (update-fn state {:type :agent-poll})
           _         (swap! ui-atom assoc-in [:widgets [:ext "w2"]]
                            {:placement :below-editor
@@ -229,6 +233,36 @@
           [s2 _]    (update-fn s1 (msg/key-press :backspace))]
       (is (= "abc" (text-input/value (:input s1))))
       (is (= "ab" (text-input/value (:input s2)))))))
+
+(deftest context-widget-direct-activation-submits-dispatch-command-test
+  (testing "visible context section can activate the selected line directly"
+    (let [captured   (atom [])
+          dispatch-fn (fn [text]
+                        (swap! captured conj text)
+                        (case text
+                          "/tree s2" {:type :tree-switch :session-id "s2"}
+                          {:type :text :message (str "unhandled: " text)}))
+          switch-fn  (fn [sid]
+                       {:messages [{:role :assistant :text (str "switched to " sid)}]
+                        :tool-calls {}
+                        :tool-order []
+                        :session-id sid})
+          widget     {:placement "left"
+                      :extension-id "psi-session"
+                      :widget-id "session-tree"
+                      :content-lines [{:text "main [s1] ← current [waiting]"}
+                                      {:text "  child [s2] [running]"
+                                       :action {:type "command" :command "/tree s2"}}]}
+          update-fn  (app/make-update (stub-agent-fn ""))
+          state      (init-state "test-model" {:dispatch-fn dispatch-fn
+                                               :switch-session-fn! switch-fn
+                                               :initial-context-session-tree-widget widget})
+          [s1 _]     (update-fn state (msg/key-press "j" :ctrl true))
+          [s2 _]     (update-fn s1 (msg/key-press :enter :alt true))]
+      (is (= ["/tree s2"] @captured))
+      (is (= :idle (:phase s2)))
+      (is (= "s2" (:focus-session-id s2)))
+      (is (= "switched to s2" (get-in s2 [:messages 0 :text]))))))
 
 (deftest double-escape-unsupported-action-is-safe-no-op-with-status-test
   (testing "unsupported double-escape action does not crash and emits status"

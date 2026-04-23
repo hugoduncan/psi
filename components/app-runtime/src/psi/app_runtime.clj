@@ -61,6 +61,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
+   [psi.app-runtime.context :as app-context]
    [psi.app-runtime.context-summary :as context-summary]
    [psi.app-runtime.nrepl-runtime :as app-nrepl]
    [psi.app-runtime.output :as output]
@@ -581,6 +582,22 @@ Available: " (str/join ", " (map name (keys all))))
                                   :result {:role    "assistant"
                                            :content [{:type :text :text text}]}}))
 
+         current-context-widget
+         (fn [active-session-id]
+           (let [snapshot (app-context/context-snapshot ctx active-session-id active-session-id)
+                 widget   (context-summary/context-widget snapshot)]
+             (when (:widget/visible? widget)
+               {:placement (some-> (:widget/placement widget) name)
+                :extension-id (:widget/extension-id widget)
+                :widget-id (:widget/widget-id widget)
+                :content-lines (:widget/content-lines widget)})))
+
+         context-event!
+         (fn [active-session-id]
+           (.put event-queue {:type :context-updated
+                              :active-session-id active-session-id
+                              :session-tree-widget (current-context-widget active-session-id)}))
+
          ;; Resume callback used by the TUI /resume selector.
          ;; Returns TUI resume state maps to display immediately after loading.
          resume-fn! (fn [session-path]
@@ -589,6 +606,7 @@ Available: " (str/join ", " (map name (keys all))))
                               sd          (session/resume-session-in! ctx current-sid session-path)
                               sid         (:session-id sd)
                               _           (reset! tui-focus* sid)
+                              _           (context-event! sid)
                               msgs        (:messages (agent/get-data-in (ss/agent-ctx-in ctx sid)))]
                           (transcript/agent-messages->tui-resume-state msgs))
                         (catch Exception e
@@ -604,6 +622,7 @@ Available: " (str/join ", " (map name (keys all))))
                                       sd                 (session/ensure-session-loaded-in! ctx source-session-id session-id)
                                       sid                (:session-id sd)
                                       _                  (reset! tui-focus* sid)
+                                      _                  (context-event! sid)
                                       msgs               (:messages (agent/get-data-in (ss/agent-ctx-in ctx sid)))]
                                   (transcript/agent-messages->tui-resume-state msgs))
                                 (catch Exception e
@@ -619,6 +638,7 @@ Available: " (str/join ", " (map name (keys all))))
                                     sd                (session/fork-session-in! ctx source-session-id entry-id)
                                     sid               (:session-id sd)
                                     _                 (reset! tui-focus* sid)
+                                    _                 (context-event! sid)
                                     msgs              (:messages (agent/get-data-in (ss/agent-ctx-in ctx sid)))]
                                 (assoc (transcript/agent-messages->tui-resume-state msgs)
                                        :session-id sid))
@@ -636,6 +656,7 @@ Available: " (str/join ", " (map name (keys all))))
                                        (let [source-session-id @tui-focus*
                                              result             (start-new-session-with-startup! ctx source-session-id ai-ctx ai-model)]
                                          (reset! tui-focus* (:session-id result))
+                                         (context-event! (:session-id result))
                                          result))}
 
          ;; dispatch-fn — called synchronously by the TUI on submit.
@@ -715,14 +736,7 @@ Available: " (str/join ", " (map name (keys all))))
                     {:query-fn             (fn [q] (session/query-in ctx @tui-focus* q))
                      :session-selector-fn  (fn [] (ui-actions/context-session-action
                                                    (selectors/context-session-selector ctx @tui-focus*)))
-                     :context-widget-fn    (fn []
-                                             (let [snapshot (selectors/context-session-selector ctx @tui-focus*)
-                                                   widget   (context-summary/context-widget snapshot)]
-                                               (when (:widget/visible? widget)
-                                                 {:placement (some-> (:widget/placement widget) name)
-                                                  :extension-id (:widget/extension-id widget)
-                                                  :widget-id (:widget/widget-id widget)
-                                                  :content-lines (:widget/content-lines widget)})))
+                     :initial-context-session-tree-widget (current-context-widget @tui-focus*)
                      :ui-read-fn       (fn [] (projections/extension-ui-snapshot ctx))
                      :ui-dispatch-fn   (fn [event-type payload]
                                          (dispatch/dispatch! ctx event-type payload {:origin :tui}))

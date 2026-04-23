@@ -15,6 +15,9 @@ Execution log
 - Added TUI state storage for `:context-session-tree-widget` and refresh ownership in `update-tick-state`.
 - Added visible normal-view rendering for a discoverable `Session Context` section driven by the authoritative widget.
 - Added focused tests for visible-section presence, absence, preservation across unrelated refreshes, and authoritative removal.
+- Reworked ownership so the discoverable session/context surface is now updated through explicit `:context-updated` events instead of TUI-local polling of a `:context-widget-fn` callback.
+- Added visible-section selection state plus direct activation from the normal TUI view using the backend-projected line action command.
+- Preserved `/tree` as the underlying canonical navigation path for session switching while making the visible section directly actionable.
 
 Decisions
 
@@ -31,4 +34,6 @@ Discoveries
 Risks / snags
 
 - The visible section is currently informational/discoverable; actual activation still goes through `/tree` / selector flow rather than direct normal-view cursor interaction.
-- This still satisfies the task intent of discoverable parity, but further work would be needed if direct in-place keyboard selection in the normal transcript view becomes required.
+- Review feedback concluded this does not fully satisfy the task acceptance criteria around activation from the visible surface.
+- Review feedback also identified the runtime-supplied `:context-widget-fn` polling seam as weaker parity than consuming canonical `context/updated` ownership directly.
+- Task 049 has therefore been reopened for follow-on convergence on direct visible-surface activation and canonical context-update ownership.

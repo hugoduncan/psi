@@ -108,14 +108,19 @@
         (str (str/join "\n" (mapcat :content widgets)) "\n")))))
 
 (defn render-context-session-tree-widget
-  [widget]
+  [widget selected-index]
   (when (seq (:content-lines widget))
-    (str (charm/render shared/title-style "Session Context") "\n"
-         (str/join "\n"
-                   (map (fn [line]
-                          (str "  " (:text line)))
-                        (:content-lines widget)))
-         "\n")))
+    (let [selected-index (or selected-index 0)]
+      (str (charm/render shared/title-style "Session Context") "\n"
+           (str/join "\n"
+                     (map-indexed (fn [idx line]
+                                    (let [selected? (= idx selected-index)
+                                          prefix    (if selected? "▸ " "  ")]
+                                      (str prefix (:text line))))
+                                  (:content-lines widget)))
+           "\n"
+           (charm/render shared/dim-style "  Ctrl+J/K navigate • Alt+Enter activate")
+           "\n"))))
 
 (def footer-query footer/footer-query)
 
@@ -396,7 +401,7 @@
   [state]
   (let [{:keys [messages phase error input spinner-frame model-name
                 prompt-templates skills extension-summary ui-snapshot
-                context-session-tree-widget
+                context-session-tree-widget context-session-tree-selected-index
                 tool-calls tool-order
                 active-turn-order active-turn-events session-selector current-session-file width force-clear?]} state
         spinner-char   (nth shared/spinner-frames (mod spinner-frame (count shared/spinner-frames)))
@@ -427,7 +432,7 @@
             "\n"
             (render-messages messages term-width)
             (when context-session-tree-widget
-              (str (render-context-session-tree-widget context-session-tree-widget) "\n"))
+              (str (render-context-session-tree-widget context-session-tree-widget context-session-tree-selected-index) "\n"))
             (when (= :streaming phase)
               (if has-progress?
                 (str (or (render-active-turn state spinner-char term-width)

@@ -221,6 +221,21 @@
       (is (= "Agent complete" (:text (first (:messages s1)))))
       (is (some? cmd)))))
 
+(deftest context-updated-updates-visible-context-widget-test
+  (testing "context-updated updates the discoverable session context surface"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state)
+          widget    {:placement "left"
+                     :extension-id "psi-session"
+                     :widget-id "session-tree"
+                     :content-lines [{:text "main [s1] ← current [waiting]"}]}
+          [s1 cmd]  (update-fn state {:type :context-updated
+                                      :active-session-id "s1"
+                                      :session-tree-widget widget})]
+      (is (= widget (:context-session-tree-widget s1)))
+      (is (zero? (:context-session-tree-selected-index s1)))
+      (is (some? cmd)))))
+
 (deftest agent-result-rich-render-test
   (testing "agent-result custom-type renders rich heading"
     (let [state (assoc (init-state)

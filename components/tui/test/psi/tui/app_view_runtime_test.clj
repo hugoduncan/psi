@@ -79,8 +79,9 @@
                         :context-session-tree-widget widget)
           plain  (ansi/strip-ansi (app/view (assoc state :width 120)))]
       (is (str/includes? plain "Session Context"))
-      (is (str/includes? plain "main [s1] ← current [idle]"))
-      (is (str/includes? plain "child [s2] [running]")))))
+      (is (str/includes? plain "▸ main [s1] ← current [idle]"))
+      (is (str/includes? plain "child [s2] [running]"))
+      (is (str/includes? plain "Ctrl+J/K navigate • Alt+Enter activate")))))
 
 (deftest view-omits-discoverable-context-session-section-when-widget-absent-test
   (testing "normal TUI view omits session/context section when authoritative context widget is absent"
