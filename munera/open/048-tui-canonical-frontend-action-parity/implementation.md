@@ -44,11 +44,13 @@ Proof added
   - `select-thinking-level` cancel
 - focused TUI semantic-convergence proof for session-oriented canonical frontend action:
   - `select-resume-session`
+- bounded-failure proof:
+  - unsupported frontend action reports a clear assistant message and does not corrupt TUI phase, selector state, or input editing
 - existing `/tree` selector tests remained green, proving no regression of plain TUI selector semantics.
 
 Focused verification run
 - `clojure -M:test --focus psi.tui.app-update-runtime-test --focus psi.tui.app-session-selector-test`
-- result: `31 tests, 122 assertions, 0 failures`
+- result: `32 tests, 129 assertions, 0 failures`
 
 Notes
 - this slice achieves semantic parity with RPC/Emacs frontend-action handling without forcing TUI through RPC transport framing.

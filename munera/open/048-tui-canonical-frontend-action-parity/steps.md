@@ -52,7 +52,7 @@
   - if small, include minimal semantic path/proof in this task
   - if not small, record the remaining gap in `implementation.md` and keep the slice bounded
 
-- [ ] Add optional bounded-failure proof if needed
+- [x] Add optional bounded-failure proof if needed
   - malformed or unsupported frontend action does not corrupt TUI state
 
 - [x] Run focused TUI tests and fix regressions

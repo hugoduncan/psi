@@ -4,6 +4,7 @@
    [charm.message :as msg]
    [clojure.string :as str]
    [psi.tui.app.autocomplete :as autocomplete]
+   [psi.tui.app.frontend-actions :as frontend-actions]
    [psi.tui.app.render :as render]
    [psi.tui.app.shared :as shared]
    [psi.tui.app.support :as support]
@@ -226,7 +227,7 @@
                          (msg/key-match? m "enter")
                          (msg/key-match? m "backspace")
                          (msg/key-match? m "space")))
-            (or (app-update/handle-frontend-action-dialog-key state m)
+            (or (frontend-actions/handle-frontend-action-dialog-key state m app-update/handle-dispatch-result)
                 (support/handle-dialog-key state m)
                 [state nil]))
           (handle-agent-message state m)

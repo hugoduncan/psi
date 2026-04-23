@@ -6,7 +6,7 @@
    [taoensso.timbre :as timbre]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.persistence :as persist]
-   [psi.app-runtime.ui-actions :as ui-actions]
+   [psi.tui.app.frontend-actions :as frontend-actions]
    [psi.tui.app.shared :as shared]
    [psi.tui.app.support :as support]
    [psi.tui.session-selector :as session-selector]))
@@ -140,120 +140,7 @@
          "\n\nWaiting for browser callback…"
          "\n\nPaste the authorization code below ↓")))
 
-(defn frontend-action-dialog
-  [ui-action]
-  {:frontend-action? true
-   :kind             :select
-   :title            (:ui/prompt ui-action)
-   :options          (mapv (fn [item]
-                             {:label       (:ui.item/label item)
-                              :description (some-> (:ui.item/meta item) :description)
-                              :value       (:ui.item/value item)})
-                           (:ui/items ui-action))})
-
-(defn open-frontend-action-selector
-  [state mode ui-action request-id]
-  [(-> state
-       (assoc :phase :selecting-session
-              :frontend-action/request-id request-id
-              :frontend-action/ui-action ui-action
-              :session-selector (assoc (session-selector/session-selector-init-from-action
-                                        (:cwd state)
-                                        (:current-session-file state)
-                                        (:focus-session-id state)
-                                        ui-action)
-                                       :frontend-action? true)
-              :session-selector-mode mode)
-       (shared/set-input-model (charm/text-input-reset (:input state))))
-   nil])
-
-(defn open-frontend-action
-  [state {:keys [request-id] ui-action :ui/action}]
-  (case (keyword (:ui/action-name ui-action))
-    :select-session
-    (open-frontend-action-selector state :tree ui-action request-id)
-
-    :select-resume-session
-    (open-frontend-action-selector state :resume ui-action request-id)
-
-    (:select-model :select-thinking-level)
-    [(-> state
-         (assoc :frontend-action/request-id request-id
-                :frontend-action/ui-action ui-action
-                :frontend-action/dialog (frontend-action-dialog ui-action)
-                :dialog-selected-index nil
-                :dialog-input-text nil)
-         reset-input-model)
-     nil]
-
-    (handle-text-result state (str "Unsupported frontend action: " (:ui/action-name ui-action)))))
-
-(defn clear-frontend-action-state
-  [state]
-  (-> state
-      (dissoc :frontend-action/request-id
-              :frontend-action/ui-action
-              :frontend-action/dialog)
-      (assoc :dialog-selected-index nil
-             :dialog-input-text nil
-             :session-selector nil
-             :session-selector-mode nil)
-      (cond-> (= :selecting-session (:phase state))
-        (assoc :phase :idle))))
-
 (declare handle-dispatch-result)
-
-(defn apply-frontend-action-result
-  [state action-result]
-  (let [state'  (-> state
-                    clear-frontend-action-state
-                    (assoc :last-frontend-action-result action-result))
-        handler (:frontend-action-handler-fn! state)
-        result  (when handler (handler action-result))]
-    (if result
-      (handle-dispatch-result state' result)
-      [state' nil])))
-
-(defn submit-frontend-action
-  [state ui-action value]
-  (apply-frontend-action-result
-   state
-   (ui-actions/action-result {:request-id (:frontend-action/request-id state)
-                              :action-name (name (:ui/action-name ui-action))
-                              :ui-action ui-action
-                              :status :submitted
-                              :value value})))
-
-(defn cancel-frontend-action
-  [state ui-action]
-  (apply-frontend-action-result
-   state
-   (ui-actions/action-result {:request-id (:frontend-action/request-id state)
-                              :action-name (name (:ui/action-name ui-action))
-                              :ui-action ui-action
-                              :status :cancelled})))
-
-(defn handle-frontend-action-dialog-key
-  [state m]
-  (when-let [dialog (:frontend-action/dialog state)]
-    (cond
-      (msg/key-match? m "escape")
-      (cancel-frontend-action state (:frontend-action/ui-action state))
-
-      (and (= :select (:kind dialog)) (msg/key-match? m "up"))
-      [(update state :dialog-selected-index #(max 0 (dec (or % 0)))) nil]
-
-      (and (= :select (:kind dialog)) (msg/key-match? m "down"))
-      (let [last-idx (max 0 (dec (count (:options dialog))))]
-        [(update state :dialog-selected-index #(min last-idx (inc (or % 0)))) nil])
-
-      (msg/key-match? m "enter")
-      (let [idx   (or (:dialog-selected-index state) 0)
-            value (get-in dialog [:options idx :value])]
-        (when value
-          (submit-frontend-action state (:frontend-action/ui-action state) value)))
-
-      :else nil)))
 
 (defn handle-dispatch-result
   [state result]
@@ -267,7 +154,7 @@
       :new-session (handle-new-session-result state result)
       :session-switch-restored (handle-restored-session-result state result)
       :session-resume-restored (handle-restored-session-result state result)
-      :frontend-action (open-frontend-action state result)
+      :frontend-action (frontend-actions/open-frontend-action state result)
       :text (handle-text-result state (:message result))
       (:login-error :logout) (handle-text-result state (:message result))
       :extension-cmd
@@ -346,11 +233,12 @@
             value     (or (:action-value chosen)
                           (:path chosen)
                           (:session-id chosen))]
-        (submit-frontend-action
+        (frontend-actions/submit-frontend-action
          (assoc state
                 :frontend-action/ui-action ui-action)
          ui-action
-         value))
+         value
+         handle-dispatch-result))
 
       (= :tree mode) (choose-tree-session state chosen)
       :else (choose-resume-session state chosen))))
@@ -362,7 +250,7 @@
     (cond
       (msg/key-match? m "escape")
       (if (:frontend-action? sel)
-        (cancel-frontend-action state (:frontend-action/ui-action state))
+        (frontend-actions/cancel-frontend-action state (:frontend-action/ui-action state) handle-dispatch-result)
         (close-session-selector state))
 
       (msg/key-match? m "ctrl+c") [state charm/quit-cmd]

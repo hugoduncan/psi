@@ -281,3 +281,24 @@
       (is (= :select-thinking-level (:ui.result/action-key cancelled)))
       (is (= action (:ui.result/ui-action cancelled)))
       (is (= "Cancelled select-thinking-level." (:ui.result/message cancelled))))))
+
+(deftest unsupported-frontend-action-is-bounded-and-state-safe-test
+  (testing "unsupported frontend action reports clearly and does not corrupt TUI state"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state)
+                           :messages [{:role :assistant :text "keep me"}]
+                           :phase :idle)
+          action    {:ui/action-name :select-unknown
+                     :ui/prompt "Unsupported"}
+          [s1 cmd]  (app-update/handle-dispatch-result state {:type :frontend-action
+                                                              :request-id "req-bad"
+                                                              :ui/action action})
+          [s2 _]    (update-fn s1 (msg/key-press "x"))]
+      (is (nil? cmd))
+      (is (= :idle (:phase s1)))
+      (is (nil? (:frontend-action/dialog s1)))
+      (is (nil? (:session-selector s1)))
+      (is (= "keep me" (get-in s1 [:messages 0 :text])))
+      (is (= "Unsupported frontend action: :select-unknown"
+             (get-in s1 [:messages 1 :text])))
+      (is (= "x" (text-input/value (:input s2)))))))
