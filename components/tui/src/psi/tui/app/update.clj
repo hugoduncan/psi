@@ -6,7 +6,7 @@
    [taoensso.timbre :as timbre]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.persistence :as persist]
-   [psi.tui.app.autocomplete :as autocomplete]
+   [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app.shared :as shared]
    [psi.tui.app.support :as support]
    [psi.tui.session-selector :as session-selector]))
@@ -103,6 +103,17 @@
          (append-assistant-message (:message result)))
      nil]))
 
+(defn handle-restored-session-result
+  [state {:keys [restored session-id path]}]
+  [(restore-session-view state
+                         (restored-session-payload restored)
+                         (cond-> {:phase :idle
+                                  :session-selector nil
+                                  :session-selector-mode nil}
+                           session-id (assoc :focus-session-id session-id)
+                           path (assoc :current-session-file path)))
+   nil])
+
 (defn handle-text-result
   [state text]
   [(-> state
@@ -129,6 +140,121 @@
          "\n\nWaiting for browser callback…"
          "\n\nPaste the authorization code below ↓")))
 
+(defn frontend-action-dialog
+  [ui-action]
+  {:frontend-action? true
+   :kind             :select
+   :title            (:ui/prompt ui-action)
+   :options          (mapv (fn [item]
+                             {:label       (:ui.item/label item)
+                              :description (some-> (:ui.item/meta item) :description)
+                              :value       (:ui.item/value item)})
+                           (:ui/items ui-action))})
+
+(defn open-frontend-action-selector
+  [state mode ui-action request-id]
+  [(-> state
+       (assoc :phase :selecting-session
+              :frontend-action/request-id request-id
+              :frontend-action/ui-action ui-action
+              :session-selector (assoc (session-selector/session-selector-init-from-action
+                                        (:cwd state)
+                                        (:current-session-file state)
+                                        (:focus-session-id state)
+                                        ui-action)
+                                       :frontend-action? true)
+              :session-selector-mode mode)
+       (shared/set-input-model (charm/text-input-reset (:input state))))
+   nil])
+
+(defn open-frontend-action
+  [state {:keys [request-id] ui-action :ui/action}]
+  (case (keyword (:ui/action-name ui-action))
+    :select-session
+    (open-frontend-action-selector state :tree ui-action request-id)
+
+    :select-resume-session
+    (open-frontend-action-selector state :resume ui-action request-id)
+
+    (:select-model :select-thinking-level)
+    [(-> state
+         (assoc :frontend-action/request-id request-id
+                :frontend-action/ui-action ui-action
+                :frontend-action/dialog (frontend-action-dialog ui-action)
+                :dialog-selected-index nil
+                :dialog-input-text nil)
+         reset-input-model)
+     nil]
+
+    (handle-text-result state (str "Unsupported frontend action: " (:ui/action-name ui-action)))))
+
+(defn clear-frontend-action-state
+  [state]
+  (-> state
+      (dissoc :frontend-action/request-id
+              :frontend-action/ui-action
+              :frontend-action/dialog)
+      (assoc :dialog-selected-index nil
+             :dialog-input-text nil
+             :session-selector nil
+             :session-selector-mode nil)
+      (cond-> (= :selecting-session (:phase state))
+        (assoc :phase :idle))))
+
+(declare handle-dispatch-result)
+
+(defn apply-frontend-action-result
+  [state action-result]
+  (let [state'  (-> state
+                    clear-frontend-action-state
+                    (assoc :last-frontend-action-result action-result))
+        handler (:frontend-action-handler-fn! state)
+        result  (when handler (handler action-result))]
+    (if result
+      (handle-dispatch-result state' result)
+      [state' nil])))
+
+(defn submit-frontend-action
+  [state ui-action value]
+  (apply-frontend-action-result
+   state
+   (ui-actions/action-result {:request-id (:frontend-action/request-id state)
+                              :action-name (name (:ui/action-name ui-action))
+                              :ui-action ui-action
+                              :status :submitted
+                              :value value})))
+
+(defn cancel-frontend-action
+  [state ui-action]
+  (apply-frontend-action-result
+   state
+   (ui-actions/action-result {:request-id (:frontend-action/request-id state)
+                              :action-name (name (:ui/action-name ui-action))
+                              :ui-action ui-action
+                              :status :cancelled})))
+
+(defn handle-frontend-action-dialog-key
+  [state m]
+  (when-let [dialog (:frontend-action/dialog state)]
+    (cond
+      (msg/key-match? m "escape")
+      (cancel-frontend-action state (:frontend-action/ui-action state))
+
+      (and (= :select (:kind dialog)) (msg/key-match? m "up"))
+      [(update state :dialog-selected-index #(max 0 (dec (or % 0)))) nil]
+
+      (and (= :select (:kind dialog)) (msg/key-match? m "down"))
+      (let [last-idx (max 0 (dec (count (:options dialog))))]
+        [(update state :dialog-selected-index #(min last-idx (inc (or % 0)))) nil])
+
+      (msg/key-match? m "enter")
+      (let [idx   (or (:dialog-selected-index state) 0)
+            value (get-in dialog [:options idx :value])]
+        (when value
+          (submit-frontend-action state (:frontend-action/ui-action state) value)))
+
+      :else nil)))
+
 (defn handle-dispatch-result
   [state result]
   (when result
@@ -139,6 +265,9 @@
       :tree-switch (handle-tree-switch-result state result)
       :tree-rename (handle-text-result state (str "Renamed session " (:session-id result) " to " (pr-str (:session-name result))))
       :new-session (handle-new-session-result state result)
+      :session-switch-restored (handle-restored-session-result state result)
+      :session-resume-restored (handle-restored-session-result state result)
+      :frontend-action (open-frontend-action state result)
       :text (handle-text-result state (:message result))
       (:login-error :logout) (handle-text-result state (:message result))
       :extension-cmd
@@ -211,6 +340,18 @@
         mode   (:session-selector-mode state :resume)]
     (cond
       (nil? chosen) (close-session-selector state)
+
+      (:frontend-action? sel)
+      (let [ui-action (:ui/action sel)
+            value     (or (:action-value chosen)
+                          (:path chosen)
+                          (:session-id chosen))]
+        (submit-frontend-action
+         (assoc state
+                :frontend-action/ui-action ui-action)
+         ui-action
+         value))
+
       (= :tree mode) (choose-tree-session state chosen)
       :else (choose-resume-session state chosen))))
 
@@ -219,7 +360,11 @@
   (let [sel       (:session-selector state)
         key-token (when (msg/key-press? m) (:key m))]
     (cond
-      (msg/key-match? m "escape") (close-session-selector state)
+      (msg/key-match? m "escape")
+      (if (:frontend-action? sel)
+        (cancel-frontend-action state (:frontend-action/ui-action state))
+        (close-session-selector state))
+
       (msg/key-match? m "ctrl+c") [state charm/quit-cmd]
       (and (msg/key-match? m "tab")
            (not= :tree (:session-selector-mode state)))
@@ -522,51 +667,44 @@
              (assoc-in [:tool-calls ui-id :status] :running)
              (assoc-in [:tool-calls ui-id :content] (:content event))
              (assoc-in [:tool-calls ui-id :details] (:details event))
-             (assoc-in [:tool-calls ui-id :result] (tool-result-text event))
-             (assoc-in [:tool-calls ui-id :is-error]
-                       (boolean (:is-error event)))
+             (assoc-in [:tool-calls ui-id :result] result-text)
+             (assoc-in [:tool-calls ui-id :is-error] (boolean (:is-error event)))
              (assoc-in [:active-turn-items ui-id :item-kind] :tool)
              (assoc-in [:active-turn-items ui-id :tool-id] ui-id)
              (assoc-in [:active-turn-items ui-id :status] :running))
          nil])
 
       :tool-result
-      (let [final-status   (if (:is-error event) :error :success)
-            result-text    (tool-result-text event)
-            snapshot       (tool-event-snapshot
-                            (:tool-name event)
-                            nil
-                            final-status
-                            nil
-                            (:content event)
-                            (:details event)
-                            result-text
-                            (boolean (:is-error event)))
-            state0         (append-active-turn-event
-                            state
-                            {:item-kind   :tool-lifecycle
-                             :tool-id     (:tool-id event)
-                             :tool-name   (:tool-name event)
-                             :status      final-status
-                             :content     (:content event)
-                             :result-text result-text
-                             :details     (:details event)
-                             :is-error    (boolean (:is-error event))
-                             :snapshot    snapshot})
+      (let [result-text    (tool-result-text event)
+            status         (if (:is-error event) :error :success)
+            state0         (append-active-turn-event state {:item-kind   :tool-lifecycle
+                                                            :tool-id     (:tool-id event)
+                                                            :tool-name   (:tool-name event)
+                                                            :status      status
+                                                            :content     (:content event)
+                                                            :result-text result-text
+                                                            :details     (:details event)
+                                                            :is-error    (boolean (:is-error event))
+                                                            :snapshot    (tool-event-snapshot
+                                                                          (:tool-name event)
+                                                                          nil
+                                                                          status
+                                                                          nil
+                                                                          (:content event)
+                                                                          (:details event)
+                                                                          result-text
+                                                                          (boolean (:is-error event)))})
             [state' ui-id] (ensure-tool-row state0 {:tool-id (:tool-id event)
                                                     :tool-name (:tool-name event)})]
         [(-> state'
-             (assoc-in [:tool-calls ui-id :status] final-status)
+             (assoc-in [:tool-calls ui-id :status] status)
              (assoc-in [:tool-calls ui-id :content] (:content event))
              (assoc-in [:tool-calls ui-id :details] (:details event))
-             (assoc-in [:tool-calls ui-id :result] (tool-result-text event))
-             (assoc-in [:tool-calls ui-id :is-error]
-                       (boolean (:is-error event)))
-             (assoc-in [:tool-calls ui-id :expanded?]
-                       (boolean (:tools-expanded? state)))
+             (assoc-in [:tool-calls ui-id :result] result-text)
+             (assoc-in [:tool-calls ui-id :is-error] (boolean (:is-error event)))
              (assoc-in [:active-turn-items ui-id :item-kind] :tool)
              (assoc-in [:active-turn-items ui-id :tool-id] ui-id)
-             (assoc-in [:active-turn-items ui-id :status] final-status))
+             (assoc-in [:active-turn-items ui-id :status] status))
          nil])
 
       [state nil])))
@@ -591,17 +729,76 @@
     [(update state :spinner-frame #(mod (inc %) n))
      (support/poll-cmd (:queue state) 300)]))
 
-(defn handle-ctrl-c
+(defn handle-streaming-escape
   [state]
-  (let [now        (shared/now-ms)
-        window-ms  (shared/double-press-window-ms state)
-        last-clear (get-in state [:prompt-input-state :timing :last-ctrl-c-ms])]
-    (if (shared/within-double-press-window? last-clear now window-ms)
-      [(assoc-in state [:prompt-input-state :timing :last-ctrl-c-ms] nil)
-       charm/quit-cmd]
+  (let [{:keys [queued-text message]} (if-let [interrupt-fn! (:on-interrupt-fn! state)]
+                                        (interrupt-fn! state)
+                                        {:queued-text nil
+                                         :message "Interrupted active work."})
+        merged-text (shared/merge-queued-and-draft queued-text (shared/input-value state))]
+    [(-> state
+         (shared/set-input-value merged-text)
+         (assoc :phase :idle)
+         clear-live-turn
+         (shared/append-assistant-status (or message "Interrupted active work.")))
+     nil]))
+
+(defn handle-streaming-submit
+  [state]
+  (let [text (str/trim (shared/input-value state))]
+    (if (str/blank? text)
+      [state nil]
+      (let [{:keys [message]} (if-let [queue-fn! (:on-queue-input-fn! state)]
+                                (queue-fn! text state)
+                                {:message "Queued input."})]
+        [(-> state
+             (shared/set-input-value "")
+             (shared/append-assistant-status (or message "Queued input.")))
+         nil]))))
+
+(defn handle-idle-escape
+  [state]
+  (let [now-ms      (System/currentTimeMillis)
+        last-ms     (get-in state [:prompt-input-state :timing :last-escape-ms])
+        window-ms   (:double-press-window-ms state 500)
+        within?     (and last-ms (<= (- now-ms last-ms) window-ms))
+        empty-input? (str/blank? (shared/input-value state))]
+    (cond
+      (not empty-input?)
       [(-> state
            (shared/set-input-value "")
-           (assoc-in [:prompt-input-state :timing :last-ctrl-c-ms] now))
+           (assoc-in [:prompt-input-state :timing :last-escape-ms] now-ms))
+       nil]
+
+      within?
+      (case (:double-escape-action state :none)
+        :quit [state charm/quit-cmd]
+        [(-> state
+             (assoc-in [:prompt-input-state :timing :last-escape-ms] now-ms)
+             (append-assistant-message (str "Double-Escape action " (pr-str (:double-escape-action state :none)) " not available in this runtime.")))
+         nil])
+
+      :else
+      [(assoc-in state [:prompt-input-state :timing :last-escape-ms] now-ms) nil])))
+
+(defn handle-ctrl-c
+  [state]
+  (let [now-ms       (System/currentTimeMillis)
+        last-ms      (get-in state [:prompt-input-state :timing :last-ctrl-c-ms])
+        window-ms    (:double-press-window-ms state 500)
+        within?      (and last-ms (<= (- now-ms last-ms) window-ms))
+        empty-input? (str/blank? (shared/input-value state))]
+    (cond
+      within?
+      [state charm/quit-cmd]
+
+      empty-input?
+      [(assoc-in state [:prompt-input-state :timing :last-ctrl-c-ms] now-ms) nil]
+
+      :else
+      [(-> state
+           (shared/set-input-value "")
+           (assoc-in [:prompt-input-state :timing :last-ctrl-c-ms] now-ms))
        nil])))
 
 (defn handle-ctrl-d
@@ -609,80 +806,3 @@
   (if (str/blank? (shared/input-value state))
     [state charm/quit-cmd]
     [state nil]))
-
-(defn handle-idle-escape
-  [state]
-  (let [current-text   (shared/input-value state)
-        now            (shared/now-ms)
-        window-ms      (shared/double-press-window-ms state)
-        action         (:double-escape-action state :none)
-        last-escape    (get-in state [:prompt-input-state :timing :last-escape-ms])
-        second-escape? (shared/within-double-press-window? last-escape now window-ms)]
-    (cond
-      (not (str/blank? current-text))
-      [state nil]
-
-      (= action :none)
-      [state nil]
-
-      second-escape?
-      (case action
-        :tree
-        [(-> state
-             (assoc-in [:prompt-input-state :timing :last-escape-ms] nil)
-             (shared/append-assistant-status "Double Escape action '/tree' is not available in this runtime."))
-         nil]
-
-        :fork
-        [(-> state
-             (assoc-in [:prompt-input-state :timing :last-escape-ms] nil)
-             (shared/append-assistant-status "Double Escape action '/fork' is not available in this runtime."))
-         nil]
-
-        [(-> state
-             (assoc-in [:prompt-input-state :timing :last-escape-ms] nil)
-             (shared/append-assistant-status (str "Unsupported double Escape action: " (pr-str action))))
-         nil])
-
-      :else
-      [(assoc-in state [:prompt-input-state :timing :last-escape-ms] now) nil])))
-
-(defn handle-streaming-escape
-  [state]
-  (if-let [interrupt-fn (:on-interrupt-fn! state)]
-    (let [{:keys [queued-text message]} (or (interrupt-fn state) {})
-          merged-text (shared/merge-queued-and-draft queued-text (shared/input-value state))
-          next-state  (-> state
-                          (shared/set-input-value merged-text)
-                          (assoc :phase :idle)
-                          clear-live-turn
-                          (autocomplete/clear-autocomplete)
-                          (assoc-in [:prompt-input-state :timing :last-escape-ms] (shared/now-ms))
-                          (shared/append-assistant-status (or message "Interrupted.")))]
-      [next-state (support/poll-cmd (:queue state))])
-    [(shared/append-assistant-status state "Interrupt unavailable in this runtime.") nil]))
-
-(defn handle-streaming-submit
-  [state]
-  (let [text     (str/trim (shared/input-value state))
-        queue-fn (:on-queue-input-fn! state)]
-    (cond
-      (str/blank? text)
-      [state (support/poll-cmd (:queue state))]
-
-      queue-fn
-      (let [result  (try
-                      (queue-fn text state)
-                      (catch Exception e
-                        {:message (str "Failed to queue input: " (ex-message e))}))
-            message (or (:message result)
-                        "Queued for next turn.")]
-        [(-> state
-             (shared/set-input-value "")
-             (autocomplete/clear-autocomplete)
-             (shared/append-assistant-status message))
-         (support/poll-cmd (:queue state))])
-
-      :else
-      [(shared/append-assistant-status state "Queueing input is unavailable in this runtime.")
-       (support/poll-cmd (:queue state))])))

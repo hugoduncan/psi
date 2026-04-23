@@ -6,7 +6,9 @@
    [charm.core :as charm]
    [charm.message :as msg]
    [psi.app-runtime.projections :as projections]
+   [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app :as app]
+   [psi.tui.app.update :as app-update]
    [psi.ui.state :as ui-state])
   (:import
    [java.util.concurrent LinkedBlockingQueue]))
@@ -212,3 +214,70 @@
       (is (= 100 (count entries)))
       (is (= "p-5" (first entries)))
       (is (= "p-104" (last entries))))))
+
+(deftest frontend-action-select-model-submit-test
+  (testing "backend-requested select-model opens TUI affordance and submit returns canonical action-result semantics"
+    (let [captured    (atom nil)
+          update-fn   (app/make-update (stub-agent-fn ""))
+          action      (ui-actions/model-picker-action [{:provider "openai"
+                                                        :id "gpt-5.3"
+                                                        :reasoning true}
+                                                       {:provider "anthropic"
+                                                        :id "claude-sonnet"
+                                                        :reasoning false}])
+          state       (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          [opened _]  (app-update/handle-dispatch-result state {:type :frontend-action
+                                                                :request-id "req-1"
+                                                                :ui/action action})
+          [submitted _] (update-fn opened (msg/key-press :enter))]
+      (is (= "Select a model" (get-in opened [:frontend-action/dialog :title])))
+      (is (= :submitted (:ui.result/status @captured)))
+      (is (= "req-1" (:ui.result/request-id @captured)))
+      (is (= :select-model (:ui.result/action-key @captured)))
+      (is (= action (:ui.result/ui-action @captured)))
+      (is (= {:provider "openai" :id "gpt-5.3"} (:ui.result/value @captured)))
+      (is (nil? (:frontend-action/dialog submitted))))))
+
+(deftest frontend-action-select-model-cancel-test
+  (testing "backend-requested select-model cancel returns canonical cancelled semantics"
+    (let [captured  (atom nil)
+          update-fn (app/make-update (stub-agent-fn ""))
+          action    (ui-actions/model-picker-action [{:provider "openai" :id "gpt-5.3" :reasoning true}])
+          state     (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
+                                                               :request-id "req-2"
+                                                               :ui/action action})
+          [closed _] (update-fn opened (msg/key-press :escape))]
+      (is (= :cancelled (:ui.result/status @captured)))
+      (is (= "req-2" (:ui.result/request-id @captured)))
+      (is (= :select-model (:ui.result/action-key @captured)))
+      (is (= action (:ui.result/ui-action @captured)))
+      (is (= "Cancelled select-model." (:ui.result/message @captured)))
+      (is (nil? (:frontend-action/dialog closed))))))
+
+(deftest frontend-action-select-thinking-level-submit-and-cancel-test
+  (testing "backend-requested select-thinking-level submit and cancel preserve canonical semantics"
+    (let [captured  (atom [])
+          update-fn (app/make-update (stub-agent-fn ""))
+          action    (ui-actions/thinking-picker-action)
+          state     (init-state "test-model" {:frontend-action-handler-fn! #(swap! captured conj %)})
+          [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
+                                                               :request-id "req-3"
+                                                               :ui/action action})
+          [moved _]  (update-fn opened (msg/key-press :down))
+          [_ _]      (update-fn moved (msg/key-press :enter))
+          [opened2 _] (app-update/handle-dispatch-result state {:type :frontend-action
+                                                                :request-id "req-4"
+                                                                :ui/action action})
+          [_ _]      (update-fn opened2 (msg/key-press :escape))
+          [submitted cancelled] @captured]
+      (is (= :submitted (:ui.result/status submitted)))
+      (is (= "req-3" (:ui.result/request-id submitted)))
+      (is (= :select-thinking-level (:ui.result/action-key submitted)))
+      (is (= action (:ui.result/ui-action submitted)))
+      (is (= "minimal" (:ui.result/value submitted)))
+      (is (= :cancelled (:ui.result/status cancelled)))
+      (is (= "req-4" (:ui.result/request-id cancelled)))
+      (is (= :select-thinking-level (:ui.result/action-key cancelled)))
+      (is (= action (:ui.result/ui-action cancelled)))
+      (is (= "Cancelled select-thinking-level." (:ui.result/message cancelled))))))

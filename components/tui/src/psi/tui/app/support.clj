@@ -30,8 +30,13 @@
                (>= (int (.charAt ^String s 0)) 32))
       s)))
 
+(defn active-dialog
+  [state]
+  (or (:frontend-action/dialog state)
+      (get-in state [:ui-snapshot :active-dialog])))
+
 (defn has-active-dialog? [state]
-  (boolean (get-in state [:ui-snapshot :active-dialog])))
+  (boolean (active-dialog state)))
 
 (defn clear-dialog-local-state
   [state]
@@ -103,7 +108,7 @@
 
 (defn handle-dialog-key
   [state m]
-  (when-let [dialog (get-in state [:ui-snapshot :active-dialog])]
+  (when-let [dialog (active-dialog state)]
     (cond
       (msg/key-match? m "escape")
       (do
@@ -209,6 +214,7 @@
          :query-fn                query-fn
          :ui-read-fn              ui-read-fn
          :ui-dispatch-fn          ui-dispatch-fn
+         :frontend-action-handler-fn! (:frontend-action-handler-fn! opts)
          :ui-snapshot             ui-snap
          :dialog-selected-index   nil
          :dialog-input-text       nil

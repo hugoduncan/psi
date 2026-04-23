@@ -207,37 +207,36 @@
                             notes))
              "\n")))))
 
-(defn render-dialog [ui-snapshot selected-index input-text]
-  (when ui-snapshot
-    (when-let [dialog (:active-dialog ui-snapshot)]
-      (case (:kind dialog)
-        :confirm
+(defn render-dialog [dialog selected-index input-text]
+  (when-let [dialog dialog]
+    (case (:kind dialog)
+      :confirm
+      (str (charm/render shared/title-style (:title dialog)) "\n"
+           "  " (:message dialog) "\n"
+           (charm/render shared/dim-style "  Enter=confirm  Escape=cancel") "\n")
+
+      :select
+      (let [idx     (or selected-index 0)
+            options (:options dialog)]
         (str (charm/render shared/title-style (:title dialog)) "\n"
-             "  " (:message dialog) "\n"
-             (charm/render shared/dim-style "  Enter=confirm  Escape=cancel") "\n")
+             (str/join "\n"
+                       (map-indexed
+                        (fn [i opt]
+                          (if (= i idx)
+                            (str (charm/render shared/user-style (str "▸ " (:label opt)))
+                                 (when (:description opt)
+                                   (str "  " (charm/render shared/dim-style (:description opt)))))
+                            (str "  " (:label opt))))
+                        options))
+             "\n"
+             (charm/render shared/dim-style "  ↑/↓=navigate  Enter=select  Escape=cancel") "\n"))
 
-        :select
-        (let [idx     (or selected-index 0)
-              options (:options dialog)]
-          (str (charm/render shared/title-style (:title dialog)) "\n"
-               (str/join "\n"
-                         (map-indexed
-                          (fn [i opt]
-                            (if (= i idx)
-                              (str (charm/render shared/user-style (str "▸ " (:label opt)))
-                                   (when (:description opt)
-                                     (str "  " (charm/render shared/dim-style (:description opt)))))
-                              (str "  " (:label opt))))
-                          options))
-               "\n"
-               (charm/render shared/dim-style "  ↑/↓=navigate  Enter=select  Escape=cancel") "\n"))
+      :input
+      (str (charm/render shared/title-style (:title dialog)) "\n"
+           "  " (or input-text "") "█" "\n"
+           (charm/render shared/dim-style "  Enter=submit  Escape=cancel") "\n")
 
-        :input
-        (str (charm/render shared/title-style (:title dialog)) "\n"
-             "  " (or input-text "") "█" "\n"
-             (charm/render shared/dim-style "  Enter=submit  Escape=cancel") "\n")
-
-        ""))))
+      "")))
 
 (defn wrap-chunks
   [^String text max-width]
@@ -430,7 +429,7 @@
             "\n"
             (render-separator term-width) "\n"
             (if dialog-active?
-              (render-dialog ui-snapshot (:dialog-selected-index state) (:dialog-input-text state))
+              (render-dialog (support/active-dialog state) (:dialog-selected-index state) (:dialog-input-text state))
               (str (wrap-text-input-view input term-width)
                    (when (= :streaming phase)
                      (str "\n"

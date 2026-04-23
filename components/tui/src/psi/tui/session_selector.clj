@@ -136,23 +136,26 @@
                        :tree-prefix (str spaces "↳ ")))))
           sessions)))
 
+(defn session-selector-init-from-action
+  [cwd current-session-file active-id action]
+  (let [items    (selector-items->tui-sessions cwd (:ui/items action))
+        selected (selected-index-for-session-id items active-id)]
+    {:sessions             items
+     :all-sessions         nil
+     :scope                :current
+     :search               ""
+     :selected             selected
+     :loading?             false
+     :current-session-file current-session-file
+     :active-session-id    active-id
+     :ui/action            action}))
+
 (defn session-selector-init-from-context
   [session-selector-fn cwd current-session-file active-id]
   (if-not session-selector-fn
     (session-selector-init cwd current-session-file)
     (try
-      (let [action   (session-selector-fn)
-            items    (selector-items->tui-sessions cwd (:ui/items action))
-            selected (selected-index-for-session-id items active-id)]
-        {:sessions             items
-         :all-sessions         nil
-         :scope                :current
-         :search               ""
-         :selected             selected
-         :loading?             false
-         :current-session-file current-session-file
-         :active-session-id    active-id
-         :ui/action            action})
+      (session-selector-init-from-action cwd current-session-file active-id (session-selector-fn))
       (catch Exception _
         (session-selector-init cwd current-session-file)))))
 

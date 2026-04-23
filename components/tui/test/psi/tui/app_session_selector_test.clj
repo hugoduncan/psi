@@ -7,6 +7,7 @@
    [psi.app-runtime.projections :as projections]
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app :as app]
+   [psi.tui.app.update :as app-update]
    [psi.tui.ansi :as ansi]
    [psi.ui.state :as ui-state])
   (:import
@@ -448,6 +449,37 @@
       (is (= "Branch from here" (get-in s4 [:messages 0 :text])))
       (is (= "reply included" (get-in s4 [:messages 1 :text])))
       (is (:force-clear? s4)))))
+
+(deftest frontend-action-select-resume-session-semantic-convergence-test
+  (testing "select-resume-session preserves canonical ui/action, status, and selected session-path semantics"
+    (let [captured   (atom nil)
+          update-fn  (app/make-update (stub-agent-fn ""))
+          action     (ui-actions/resume-session-action
+                      {:psi.session/list [{:psi.session-info/path "/tmp/psi-test/a.ndedn"
+                                           :psi.session-info/name "Session A"
+                                           :psi.session-info/worktree-path "/tmp/psi-test"
+                                           :psi.session-info/first-message "hello"
+                                           :psi.session-info/modified (java.time.Instant/now)}
+                                          {:psi.session-info/path "/tmp/psi-test/b.ndedn"
+                                           :psi.session-info/name "Session B"
+                                           :psi.session-info/worktree-path "/tmp/psi-test"
+                                           :psi.session-info/first-message "world"
+                                           :psi.session-info/modified (java.time.Instant/now)}]})
+          state      (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
+                                                               :request-id "req-r1"
+                                                               :ui/action action})
+          [moved _]  (update-fn opened (msg/key-press :down))
+          [closed _] (update-fn moved (msg/key-press :enter))]
+      (is (= :selecting-session (:phase opened)))
+      (is (= :resume (:session-selector-mode opened)))
+      (is (= action (get-in opened [:session-selector :ui/action])))
+      (is (= :submitted (:ui.result/status @captured)))
+      (is (= "req-r1" (:ui.result/request-id @captured)))
+      (is (= :select-resume-session (:ui.result/action-key @captured)))
+      (is (= action (:ui.result/ui-action @captured)))
+      (is (= "/tmp/psi-test/b.ndedn" (:ui.result/value @captured)))
+      (is (nil? (:session-selector closed))))))
 
 (deftest tree-rename-result-renders-status-message-test
   (testing "tree rename command result appends confirmation text"
