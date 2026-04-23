@@ -14,6 +14,7 @@ Backlog:
 `munera/open/040-work-on-execute-function-code-shaping/`
 `munera/open/045-work-on-base-branch-selection/`
 `munera/open/046-custom-llm-providers/`
+`munera/open/046-tui-tmux-end-to-end-integration-test/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.
