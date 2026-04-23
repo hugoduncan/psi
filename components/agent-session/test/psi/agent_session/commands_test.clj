@@ -532,7 +532,9 @@
                  "/reload-models"
                  "/jobs" "/job" "/cancel-job"
                  "/help" "/prompts" "/skills"]]
-      (is (str/includes? s cmd) (str "help should mention " cmd)))))
+      (is (str/includes? s cmd) (str "help should mention " cmd)))
+    (is (str/includes? s "~/.psi/agent/models.edn"))
+    (is (str/includes? s ".psi/models.edn"))))
 
 (deftest format-prompts-none-test
   (let [[ctx session-id] (make-test-ctx)

@@ -131,7 +131,7 @@
          "  /thinking [level] — show current thinking level or set level\n"
          "  /remember [text] — capture a memory note for future ψ\n"
          "  /worktree — show git worktree context\n"
-         "  /reload-models — reload custom model definitions from disk\n"
+         "  /reload-models — reload custom model definitions from ~/.psi/agent/models.edn and .psi/models.edn\n"
          "  /reload-extension-installs — reload/apply extension installs from extensions.edn\n"
          "  /jobs [status ...] — list background jobs (default: running,pending-cancel)\n"
          "  /job <job-id> — inspect a background job\n"

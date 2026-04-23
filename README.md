@@ -107,8 +107,9 @@ For prompt lifecycle introspection summaries and normalized prompt-turn attrs, s
 ## Configuration
 
 Config file locations, precedence (session > project-local > project-shared > user > system), settings
-reference, and runtime scoped setters:
+reference, runtime scoped setters, and custom provider setup:
 - [`doc/configuration.md`](doc/configuration.md)
+- [`doc/custom-providers.md`](doc/custom-providers.md)
 
 ## ψ Psi project config
 

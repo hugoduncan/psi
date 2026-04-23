@@ -13,6 +13,7 @@ Backlog:
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/040-work-on-execute-function-code-shaping/`
 `munera/open/045-work-on-base-branch-selection/`
+`munera/open/046-custom-llm-providers/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.

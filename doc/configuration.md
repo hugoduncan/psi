@@ -22,6 +22,9 @@ are not written to disk unless you specify a scope when setting them.
 
 ## Config files
 
+For custom provider/model definitions loaded from `models.edn` rather than the
+session settings files documented below, see [`doc/custom-providers.md`](custom-providers.md).
+
 All config files use the same EDN shape:
 
 ```edn

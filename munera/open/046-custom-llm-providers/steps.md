@@ -1,0 +1,8 @@
+- [x] Inspect the existing custom-provider implementation and current docs to identify the smallest user-facing gap that keeps issue #25 effectively unresolved
+- [x] Write a dedicated user-facing custom-provider setup guide covering file locations, schema shape, reload workflow, and runtime model selection
+- [x] Add a concrete OpenAI-compatible example close to the issue request, such as MiniMax
+- [x] Document the Anthropic-compatible variant as also supported by the same config surface
+- [x] Add or update discoverability links from `README.md` and other relevant operator-facing docs
+- [x] Review `/help` and nearby command-surface text for a small discoverability improvement if needed
+- [x] Verify the changed docs and any help-text update for coherence with the current implementation
+- [x] Update `implementation.md` with what changed and why
