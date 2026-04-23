@@ -20,19 +20,27 @@ Implemented follow-on refinements:
 - preserved result diagnostics with `:reason`, `:error-message`, and `:pane-snapshot` on failure
 - updated CI workflow to install `tmux` and run `bb clojure:test:integration`
 - updated `TESTING.md` to document the integration test path and local skip behavior
+- fixed a harness regression introduced during pane-targeting refactoring: the single-arg `capture-pane` overload was recursively self-calling for map inputs, which caused a stack overflow in the integration test path; this is now corrected
 
 Observed validation outcome:
-- local environment currently does not have `tmux` on PATH, so the new local preflight path is the active behavior here
+- local environment without `tmux` on PATH exercises the local preflight skip path as intended
 - targeted formatting/lint for the new/updated TUI harness files is clean
 - full unit suite is green after the changes (`1311 tests, 10180 assertions, 0 failures`)
-- a full `bb clojure:test:integration` run in this environment remains blocked by unrelated pre-existing failures in `workflow-loader-reload-runtime-test`, so the tmux integration scenario itself is not the current integration blocker
+- live tmux validation was run in this session using `mise exec tmux -- ...`
+  - `tmux -V` succeeded
+  - a manual black-box tmux smoke check passed end-to-end:
+    - TUI boot reached the ready marker
+    - `/help` rendered the expected stable help marker
+    - `/quit` exited cleanly
+  - the shell trap then reported `can't find session` during cleanup because the session had already ended, which is consistent with successful quit and teardown rather than a lingering-session failure
+- a full `mise exec tmux -- clojure -M:test --focus integration` run remains blocked by unrelated pre-existing failures in `workflow-loader-reload-runtime-test`
+- after fixing the harness recursion bug, the tmux integration test is no longer the source of the integration-suite failure; the remaining failures are still the unrelated workflow-loader reload failures
 
 Decisions recorded:
-- missing-tmux policy is now implemented as local skip + warning, CI hard failure
-- pane targeting now prefers an explicitly discovered tmux `pane_id`; `session:0.0` remains as a pragmatic fallback when pane-id lookup is unavailable
+- missing-tmux policy is implemented as local skip + warning, CI hard failure
+- pane targeting prefers an explicitly discovered tmux `pane_id`; `session:0.0` remains a pragmatic fallback when pane-id lookup is unavailable
 - existing harness/test code was refined in place rather than replaced wholesale
 
-Further implementation notes to record if the task continues:
-- whether explicit pane-id discovery should replace the current `:0.0` assumption
-- final evidence from a green integration run in an environment where tmux is available and unrelated integration failures are absent
-- any additional timeout/marker tuning needed after live tmux validation
+Follow-on notes:
+- the manual live tmux smoke result provides strong evidence that the baseline scenario is viable in a real terminal boundary
+- once the unrelated workflow-loader integration failures are fixed, rerunning the full integration suite should provide final suite-level confirmation for this task

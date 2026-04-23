@@ -79,9 +79,10 @@
 
 (defn capture-pane
   ([session-name]
-   (capture-pane {:session-name session-name}))
-  ([{:keys [capture-lines] :as target}
-    & _]
+   (if (string? session-name)
+     (capture-pane {:session-name session-name})
+     (capture-pane session-name {})))
+  ([{:keys [capture-lines] :as target} _opts]
    (let [{:keys [exit out err]}
          (run-sh (format "tmux capture-pane -pt %s -S -%d"
                          (pane-target target)

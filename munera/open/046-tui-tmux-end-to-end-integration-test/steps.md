@@ -23,7 +23,7 @@
 - [x] Make timeout failures distinguish startup, help, and quit phases clearly
 - [x] Wire the test into the chosen slow/integration execution path
 - [x] Add or update bb task/test runner documentation if needed for discoverability
-- [ ] Run the focused test path with tmux available and fix any flakiness
-- [ ] Validate the missing-tmux local skip path
-- [ ] Confirm no stray tmux sessions remain after success/failure
-- [ ] Record final implementation notes, markers, timeout choices, placement, and missing-tmux policy in `implementation.md`
+- [x] Run the focused test path with tmux available and fix any flakiness
+- [x] Validate the missing-tmux local skip path
+- [x] Confirm no stray tmux sessions remain after success/failure
+- [x] Record final implementation notes, markers, timeout choices, placement, and missing-tmux policy in `implementation.md`
