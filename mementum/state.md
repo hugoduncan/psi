@@ -109,6 +109,15 @@ Bootstrapped on 2026-04-02.
   - child runtime initialization now preserves those preloaded messages in both runtime message state and the child journal seed
 
 ## Current work update
+- Task 050 (TUI live operator-awareness parity) is now closed:
+  - wired `footer-model-fn` closure from app-runtime into TUI, replacing the local `footer-data` + `footer-model-from-data` query path with a single code path
+  - TUI footer now renders `session-activity-line` when multiple sessions are active (same format as Emacs)
+  - proved background-job widget refresh cycle (snapshot atom swap → tick → visible change)
+  - proved notification rendering lifecycle (appear → backdate → dismiss → gone)
+  - proved frontend-action cancel feedback visibility (Escape → "Cancelled select-model." in transcript)
+  - discovered and documented snapshot-before-dismiss tick ordering: dismiss mutates the atom but the current tick's snapshot was already read, so dismissed state is visible on the next tick
+  - full suite green: 1330 unit tests, 10202 assertions; 141 extension tests, 560 assertions
+
 - The workflow-loader convergence thread is now closed through munera tasks `029`, `030`, `031`, and `032`:
   - `029` unified workflow loading/delegation on `.psi/workflows/` + `workflow-loader`
   - `030` removed remaining post-029 legacy surface drift
@@ -136,13 +145,14 @@ Bootstrapped on 2026-04-02.
 
 ## Suggested next step
 - Active munera tasks are now:
-  1. `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
-  2. `munera/open/001-post-wave-b-gordian-follow-on/`
-  3. `munera/open/002-compatibility-scaffold-removal/`
-  4. `munera/open/003-prompt-lifecycle-architectural-convergence/`
-  5. `munera/open/004-lsp-integration-managed-services-post-tool-processing/`
-  6. `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
-  7. `munera/open/006-agent-tool-skill-prelude-follow-on/`
+  1. `munera/open/047-tui-feature-parity-with-emacs-ui/` (parent umbrella for TUI parity)
+  2. `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
+  3. `munera/open/001-post-wave-b-gordian-follow-on/`
+  4. `munera/open/002-compatibility-scaffold-removal/`
+  5. `munera/open/003-prompt-lifecycle-architectural-convergence/`
+  6. `munera/open/004-lsp-integration-managed-services-post-tool-processing/`
+  7. `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
+  8. `munera/open/006-agent-tool-skill-prelude-follow-on/`
 - Highest-value next threads remain:
   1. **026 deterministic workflows**: break or route around the `psi-tool` execution-control load cycle cleanly
   2. **Prompt lifecycle / skill prelude**: refine cache-breakpoint shaping and decide whether prelude/source metadata should surface in introspection
