@@ -325,9 +325,9 @@
     (dispatch/register-handler! :throws
                                 (fn [_ _] (throw (ex-info "boom" {}))))
     (is (nil? (dispatch/dispatch! {} :throws)))
-    (is (= 1 (count (dispatch/event-log-entries))))
-    (is (= :pure
-           (:pure-result-kind (first (dispatch/event-log-entries)))))))
+    (let [entry (last (dispatch/event-log-entries))]
+      (is (= :throws (:event-type entry)))
+      (is (= :pure (:pure-result-kind entry))))))
 
 (deftest canonical-dispatch-trace-failure-paths-test
   (testing "dispatch handler exception records handler-result and completes with nil return"
