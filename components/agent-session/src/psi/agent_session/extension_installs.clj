@@ -78,25 +78,25 @@
                                     :data {:path (.getAbsolutePath ^java.io.File file)}})]}))))
 
 (def psi-owned-extension-catalog
-  {'psi/auto-session-name {:psi/init 'extensions.auto_session_name/init
+  {'psi/auto-session-name {:psi/init 'extensions.auto-session-name/init
                            :source-policies {:installed {:local/root "extensions/auto-session-name"}}}
-   'psi/commit-checks {:psi/init 'extensions.commit_checks/init
+   'psi/commit-checks {:psi/init 'extensions.commit-checks/init
                        :source-policies {:installed {:local/root "extensions/commit-checks"}}}
-   'psi/hello-ext {:psi/init 'extensions.hello_ext/init
+   'psi/hello-ext {:psi/init 'extensions.hello-ext/init
                    :source-policies {:installed {:local/root "extensions/hello-ext"}}}
    'psi/lsp {:psi/init 'extensions.lsp/init
              :source-policies {:installed {:local/root "extensions/lsp"}}}
-   'psi/mcp-tasks-run {:psi/init 'extensions.mcp_tasks_run/init
+   'psi/mcp-tasks-run {:psi/init 'extensions.mcp-tasks-run/init
                        :source-policies {:installed {:local/root "extensions/mcp-tasks-run"}}}
    'psi/mementum {:psi/init 'extensions.mementum/init
                   :source-policies {:installed {:local/root "extensions/mementum"}}}
    'psi/munera {:psi/init 'extensions.munera/init
                 :source-policies {:installed {:local/root "extensions/munera"}}}
-   'psi/plan-state-learning {:psi/init 'extensions.plan_state_learning/init
+   'psi/plan-state-learning {:psi/init 'extensions.plan-state-learning/init
                              :source-policies {:installed {:local/root "extensions/plan-state-learning"}}}
-   'psi/work-on {:psi/init 'extensions.work_on/init
+   'psi/work-on {:psi/init 'extensions.work-on/init
                  :source-policies {:installed {:local/root "extensions/work-on"}}}
-   'psi/workflow-loader {:psi/init 'extensions.workflow_loader/init
+   'psi/workflow-loader {:psi/init 'extensions.workflow-loader/init
                          :source-policies {:installed {:local/root "extensions/workflow-loader"}}}})
 
 (defn- catalog-entry
@@ -277,7 +277,7 @@
                                                        (get project-deps lib)
                                                        (cond-> [:project]
                                                          (contains? user-deps lib) (conj :user))
-                                                       (boolean (contains? user-deps lib))
+                                                       (contains? user-deps lib)
                                                        project-base-dir)
                                       (normalize-entry lib
                                                        :user
@@ -339,29 +339,34 @@
 (defn resolve-local-root-entry
   [lib {:keys [dep]}]
   (let [local-root (:local/root dep)
-        init-var   (:psi/init dep)
-        candidates (init-ns->relative-candidates init-var)]
-    (when (and local-root init-var candidates)
-      (let [root          (io/file local-root)
-            source-paths  (local-root-source-paths local-root)
-            files         (for [src source-paths
-                                rel candidates]
-                            (io/file root src rel))
-            existing-file (some #(when (.exists ^java.io.File %) %) files)]
-        (if existing-file
-          {:lib lib
-           :id (.getAbsolutePath ^java.io.File existing-file)
-           :kind :path
-           :path (.getAbsolutePath ^java.io.File existing-file)
-           :init-var init-var}
-          {:lib lib
-           :id (manifest-extension-id lib)
-           :kind :path
-           :path nil
-           :init-var init-var
-           :error (str "Unable to resolve local extension source file for " lib
-                       " from :local/root " local-root
-                       " and :psi/init " init-var)})))))
+        init-var   (:psi/init dep)]
+    (when (and local-root init-var)
+      (if (catalog-entry lib)
+        {:lib lib
+         :id (manifest-extension-id lib)
+         :kind :init-var
+         :init-var init-var}
+        (let [root          (io/file local-root)
+              source-paths  (local-root-source-paths local-root)
+              candidates    (init-ns->relative-candidates init-var)
+              files         (for [src source-paths
+                                  rel candidates]
+                              (io/file root src rel))
+              existing-file (some #(when (.exists ^java.io.File %) %) files)]
+          (if existing-file
+            {:lib lib
+             :id (.getAbsolutePath ^java.io.File existing-file)
+             :kind :path
+             :path (.getAbsolutePath ^java.io.File existing-file)
+             :init-var init-var}
+            {:lib lib
+             :id (manifest-extension-id lib)
+             :kind :path
+             :path nil
+             :init-var init-var
+             :error (str "Unable to resolve local extension source file for " lib
+                         " from :local/root " local-root
+                         " and :psi/init " init-var)}))))))
 
 (defn- non-local-effective-raw-deps
   [install-state]
@@ -405,7 +410,8 @@
          resolved            (mapv (fn [[lib entry]]
                                      (resolve-local-root-entry lib entry))
                                    local-entries)
-         resolved-ok         (filterv :path resolved)
+         resolved-init-var   (filterv #(= :init-var (:kind %)) resolved)
+         resolved-path       (filterv :path resolved)
          resolved-fail       (filterv :error resolved)
          diagnostics         (mapv (fn [{:keys [lib init-var error]}]
                                      (diagnostic {:severity :error
@@ -415,8 +421,19 @@
                                                   :init-var init-var
                                                   :source :effective}))
                                    resolved-fail)]
-     {:extension-paths (mapv :path resolved-ok)
-      :path->lib (into {} (map (juxt :path :lib)) resolved-ok)
+     {:local-activation-entries (vec (concat
+                                      (map (fn [{:keys [id init-var lib]}]
+                                             {:type :init-var
+                                              :id id
+                                              :lib lib
+                                              :init-var init-var})
+                                           resolved-init-var)
+                                      (map (fn [{:keys [id path]}]
+                                             {:type :path
+                                              :id id
+                                              :path path})
+                                           resolved-path)))
+      :path->lib (into {} (map (juxt :path :lib)) resolved-path)
       :deps-to-realize deps-to-realize
       :deps-extension-libs deps-extension-libs
       :deps-apply-safe? deps-apply-safe?
@@ -428,10 +445,7 @@
   [entries-by-lib plan reload-result]
   (let [loaded-ids         (set (:loaded reload-result))
         errors-by-path     (into {} (map (juxt :path :error)) (:errors reload-result))
-        path->lib          (:path->lib plan)
-        failed-libs        (into #{} (concat
-                                      (map second path->lib)
-                                      (map :lib (:resolution-errors plan))))
+        failed-libs        (into #{} (map :lib (:resolution-errors plan)))
         deps-extension-libs (:deps-extension-libs plan)
         restart-required-libs (:restart-required-libs plan)
         deps-realized?     (boolean (:deps-realized? reload-result))]
@@ -441,20 +455,18 @@
                        extension?       (:extension? entry)
                        enabled?         (:enabled? entry)
                        coord-family     (when extension? (coordinate-family dep))
-                       path             (some (fn [[p l]] (when (= l entry-lib) p)) path->lib)
                        resolution-error (some (fn [{:keys [lib error]}]
                                                 (when (= lib entry-lib) error))
                                               (:resolution-errors plan))
                        manifest-id      (manifest-extension-id entry-lib)
-                       load-error       (or (get errors-by-path path)
-                                            (get errors-by-path manifest-id)
+                       load-error       (or (get errors-by-path manifest-id)
                                             resolution-error)
                        status           (cond
                                           (not extension?) :not-applicable
                                           (not enabled?) :disabled
                                           (= :local coord-family)
                                           (cond
-                                            (contains? loaded-ids path) :loaded
+                                            (contains? loaded-ids manifest-id) :loaded
                                             load-error :failed
                                             (contains? failed-libs entry-lib) :failed
                                             :else :configured)

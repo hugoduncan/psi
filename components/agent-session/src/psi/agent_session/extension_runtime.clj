@@ -64,11 +64,7 @@
   [plan]
   (vec
    (concat
-    (map (fn [path]
-           {:type :path
-            :id   path
-            :path path})
-         (:extension-paths plan))
+    (:local-activation-entries plan)
     (keep (fn [[lib {:keys [dep extension? enabled?]}]]
             (when (and extension?
                        enabled?
@@ -115,7 +111,8 @@
   "Activate manifest-aware extensions through one shared abstraction.
 
    `plan` keys used:
-   - :extension-paths
+   - :local-activation-entries
+   - :local-deps-to-realize
    - :entries-by-lib
    - :deps-realized?
 

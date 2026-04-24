@@ -14,19 +14,19 @@
 
 (def psi-owned-extension-catalog
   {'psi/auto-session-name
-   {:psi/init 'extensions.auto_session_name/init
+   {:psi/init 'extensions.auto-session-name/init
     :source-policies
     {:development {:local/root "extensions/auto-session-name"}
      :installed   {:local/root "extensions/auto-session-name"}}}
 
    'psi/commit-checks
-   {:psi/init 'extensions.commit_checks/init
+   {:psi/init 'extensions.commit-checks/init
     :source-policies
     {:development {:local/root "extensions/commit-checks"}
      :installed   {:local/root "extensions/commit-checks"}}}
 
    'psi/hello-ext
-   {:psi/init 'extensions.hello_ext/init
+   {:psi/init 'extensions.hello-ext/init
     :source-policies
     {:development {:local/root "extensions/hello-ext"}
      :installed   {:local/root "extensions/hello-ext"}}}
@@ -38,7 +38,7 @@
      :installed   {:local/root "extensions/lsp"}}}
 
    'psi/mcp-tasks-run
-   {:psi/init 'extensions.mcp_tasks_run/init
+   {:psi/init 'extensions.mcp-tasks-run/init
     :source-policies
     {:development {:local/root "extensions/mcp-tasks-run"}
      :installed   {:local/root "extensions/mcp-tasks-run"}}}
@@ -56,19 +56,19 @@
      :installed   {:local/root "extensions/munera"}}}
 
    'psi/plan-state-learning
-   {:psi/init 'extensions.plan_state_learning/init
+   {:psi/init 'extensions.plan-state-learning/init
     :source-policies
     {:development {:local/root "extensions/plan-state-learning"}
      :installed   {:local/root "extensions/plan-state-learning"}}}
 
    'psi/work-on
-   {:psi/init 'extensions.work_on/init
+   {:psi/init 'extensions.work-on/init
     :source-policies
     {:development {:local/root "extensions/work-on"}
      :installed   {:local/root "extensions/work-on"}}}
 
    'psi/workflow-loader
-   {:psi/init 'extensions.workflow_loader/init
+   {:psi/init 'extensions.workflow-loader/init
     :source-policies
     {:development {:local/root "extensions/workflow-loader"}
      :installed   {:local/root "extensions/workflow-loader"}}}})

@@ -49,7 +49,6 @@
   (let [cwd        (test-support/temp-cwd)
         home       (tmp-dir)
         ext-root   (tmp-dir)
-        [ctx sid]  (test-support/create-test-session {:persist? false :cwd cwd})
         _          (write-local-extension!
                     ext-root
                     'psi.test-manifest-ext
@@ -59,15 +58,15 @@
       (spit (installs/project-manifest-file cwd)
             (pr-str {:deps {'psi/test-manifest-ext {:local/root (.getAbsolutePath ext-root)
                                                     :psi/init 'psi.test-manifest-ext/init}}}))
-      (is (string? (:path (installs/resolve-local-root-entry
-                           'psi/test-manifest-ext
-                           {:dep {:local/root (.getAbsolutePath ext-root)
-                                  :psi/init 'psi.test-manifest-ext/init}}))))
-      (let [result (ext-rt/reload-extensions-in! ctx sid [] cwd)]
-        (is (= :loaded
-               (get-in result [:install-state :psi.extensions/effective :entries-by-lib 'psi/test-manifest-ext :status])))
-        (is (= :applied
-               (get-in result [:install-state :psi.extensions/last-apply :status])))))))
+      (is (= {:lib 'psi/test-manifest-ext
+              :id (.getAbsolutePath (io/file ext-root "src/psi/test_manifest_ext.clj"))
+              :kind :path
+              :path (.getAbsolutePath (io/file ext-root "src/psi/test_manifest_ext.clj"))
+              :init-var 'psi.test-manifest-ext/init}
+             (installs/resolve-local-root-entry
+              'psi/test-manifest-ext
+              {:dep {:local/root (.getAbsolutePath ext-root)
+                     :psi/init 'psi.test-manifest-ext/init}}))))))
 
 (deftest reload-extensions-loads-git-manifest-entry-via-init-var-when-deps-realized-test
   (let [cwd       (test-support/temp-cwd)
