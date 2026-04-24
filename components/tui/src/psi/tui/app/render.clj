@@ -2,7 +2,6 @@
   (:require
    [charm.core :as charm]
    [clojure.string :as str]
-   [psi.app-runtime.footer :as footer]
    [psi.tui.ansi :as ansi]
    [psi.tui.app.shared :as shared]
    [psi.tui.app.support :as support]
@@ -122,17 +121,6 @@
            (charm/render shared/dim-style "  Ctrl+J/K navigate • Alt+Enter activate")
            "\n"))))
 
-(def footer-query footer/footer-query)
-
-(defn footer-data
-  [state]
-  (if-let [query-fn (:query-fn state)]
-    (try
-      (or (query-fn footer-query) {})
-      (catch Exception _
-        {}))
-    {}))
-
 (defn middle-truncate
   [s width]
   (if (<= (ansi/display-width s) width)
@@ -162,8 +150,7 @@
 
 (defn build-footer-lines
   [state width]
-  (let [d              (footer-data state)
-        model          (footer/footer-model-from-data d {:cwd (:cwd state)})
+  (let [model          ((:footer-model-fn state))
         path-text      (get-in model [:footer/lines :path-line] "")
         usage-parts    (get-in model [:footer/usage :parts] [])
         context-text   (get-in model [:footer/context :text] "")
@@ -198,9 +185,13 @@
 
                            :else left*))
         status-line    (some-> (get-in model [:footer/lines :status-line])
+                               (ansi/truncate-to-width width (charm/render shared/dim-style "...")))
+        activity-line  (some-> (get-in model [:footer/lines :session-activity-line])
+                               (->> (charm/render shared/dim-style))
                                (ansi/truncate-to-width width (charm/render shared/dim-style "...")))]
     (cond-> [path-line stats-line]
-      status-line (conj status-line))))
+      status-line   (conj status-line)
+      activity-line (conj activity-line))))
 
 (defn render-footer
   [state width]

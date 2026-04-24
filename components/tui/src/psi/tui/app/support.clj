@@ -218,6 +218,7 @@
          :extension-summary       (or (:psi.agent-session/extension-summary introspected) {})
          :extension-command-names (vec (:psi.extension/command-names introspected))
          :query-fn                query-fn
+         :footer-model-fn         (or (:footer-model-fn opts) (constantly {}))
          :ui-read-fn              ui-read-fn
          :ui-dispatch-fn          ui-dispatch-fn
          :frontend-action-handler-fn! (:frontend-action-handler-fn! opts)

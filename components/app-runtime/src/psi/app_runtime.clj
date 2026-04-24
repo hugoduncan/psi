@@ -63,6 +63,7 @@
    [psi.app-runtime.background-job-ui :as background-job-ui]
    [psi.app-runtime.context :as app-context]
    [psi.app-runtime.context-summary :as context-summary]
+   [psi.app-runtime.footer :as footer]
    [psi.app-runtime.nrepl-runtime :as app-nrepl]
    [psi.app-runtime.output :as output]
    [psi.app-runtime.projections :as projections]
@@ -734,6 +735,7 @@ Available: " (str/join ", " (map name (keys all))))
 
      (tui-start-fn! (:name ai-model) run-agent-fn!
                     {:query-fn             (fn [q] (session/query-in ctx @tui-focus* q))
+                     :footer-model-fn      (fn [] (footer/footer-model ctx @tui-focus*))
                      :session-selector-fn  (fn [] (ui-actions/context-session-action
                                                    (selectors/context-session-selector ctx @tui-focus*)))
                      :initial-context-session-tree-widget (current-context-widget @tui-focus*)

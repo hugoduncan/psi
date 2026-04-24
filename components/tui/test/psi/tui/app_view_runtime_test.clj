@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [charm.message :as msg]
+   [psi.app-runtime.footer :as footer]
    [psi.app-runtime.projections :as projections]
    [psi.tui.app :as app]
    [psi.tui.ansi :as ansi]
@@ -110,33 +111,35 @@
       (is (str/ends-with? out "\u001b[J")))))
 
 (deftest view-renders-default-footer-from-query-test
-  (testing "footer renders path, stats, provider/model, and statuses from EQL query data"
-    (let [qfn (fn [_q]
-                {:psi.agent-session/cwd "/repo/project"
-                 :psi.agent-session/git-branch "master"
-                 :psi.agent-session/session-name "session-a"
-                 :psi.agent-session/session-display-name "session-a"
-                 :psi.agent-session/usage-input 76000
-                 :psi.agent-session/usage-output 3600
-                 :psi.agent-session/usage-cache-read 1400000
-                 :psi.agent-session/usage-cache-write 0
-                 :psi.agent-session/usage-cost-total 0.434
-                 :psi.agent-session/context-fraction 0.176
-                 :psi.agent-session/context-window 400000
-                 :psi.agent-session/auto-compaction-enabled true
-                 :psi.agent-session/model-provider "openai"
-                 :psi.agent-session/model-id "gpt-5.3-codex"
-                 :psi.agent-session/model-reasoning true
-                 :psi.agent-session/thinking-level :xhigh
-                 :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
-                                   {:extension-id "a" :text "Clojure-LSP\nclojure-lsp"}]})
-          init-fn (app/make-init "test-model" qfn nil nil {:cwd "/repo/project"})
+  (testing "footer renders path, stats, provider/model, and statuses from footer-model-fn"
+    (let [footer-data {:psi.agent-session/worktree-path "/repo/project"
+                       :psi.agent-session/git-branch "master"
+                       :psi.agent-session/session-name "session-a"
+                       :psi.agent-session/session-display-name "session-a"
+                       :psi.agent-session/usage-input 76000
+                       :psi.agent-session/usage-output 3600
+                       :psi.agent-session/usage-cache-read 1400000
+                       :psi.agent-session/usage-cache-write 0
+                       :psi.agent-session/usage-cost-total 0.434
+                       :psi.agent-session/context-fraction 0.176
+                       :psi.agent-session/context-window 400000
+                       :psi.agent-session/auto-compaction-enabled true
+                       :psi.agent-session/model-provider "openai"
+                       :psi.agent-session/model-id "gpt-5.3-codex"
+                       :psi.agent-session/model-reasoning true
+                       :psi.agent-session/thinking-level :xhigh
+                       :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
+                                         {:extension-id "a" :text "Clojure-LSP\nclojure-lsp"}]}
+          model   (footer/footer-model-from-data footer-data {:worktree-path "/repo/project"})
+          init-fn (app/make-init "test-model" nil nil nil
+                                 {:cwd "/repo/project"
+                                  :footer-model-fn (constantly model)})
           [state _] (init-fn)
           out (app/view (assoc state :width 120))]
       (is (str/includes? out "/repo/project (master) • session-a"))
       (is (str/includes? out "↑76k"))
       (is (str/includes? out "↓3.6k"))
-      (is (str/includes? out "R1.4M"))
+      (is (str/includes? out "CR1.4M"))
       (is (str/includes? out "$0.434"))
       (is (str/includes? out "17.6%/400k (auto)"))
       (is (str/includes? out "(openai) gpt-5.3-codex • thinking xhigh"))
@@ -144,28 +147,59 @@
 
 (deftest view-renders-footer-using-session-display-name-test
   (testing "footer uses derived display name when explicit session name is absent"
-    (let [qfn (fn [_q]
-                {:psi.agent-session/cwd "/repo/project"
-                 :psi.agent-session/git-branch "master"
-                 :psi.agent-session/session-name nil
-                 :psi.agent-session/session-display-name "Investigate failing tests"
-                 :psi.agent-session/usage-input 0
-                 :psi.agent-session/usage-output 0
-                 :psi.agent-session/usage-cache-read 0
-                 :psi.agent-session/usage-cache-write 0
-                 :psi.agent-session/usage-cost-total 0.0
-                 :psi.agent-session/context-fraction nil
-                 :psi.agent-session/context-window 400000
-                 :psi.agent-session/auto-compaction-enabled false
-                 :psi.agent-session/model-provider "openai"
-                 :psi.agent-session/model-id "gpt-5.3-codex"
-                 :psi.agent-session/model-reasoning true
-                 :psi.agent-session/thinking-level :high
-                 :psi.ui/statuses []})
-          init-fn (app/make-init "test-model" qfn nil nil {:cwd "/repo/project"})
+    (let [footer-data {:psi.agent-session/worktree-path "/repo/project"
+                       :psi.agent-session/git-branch "master"
+                       :psi.agent-session/session-name nil
+                       :psi.agent-session/session-display-name "Investigate failing tests"
+                       :psi.agent-session/usage-input 0
+                       :psi.agent-session/usage-output 0
+                       :psi.agent-session/usage-cache-read 0
+                       :psi.agent-session/usage-cache-write 0
+                       :psi.agent-session/usage-cost-total 0.0
+                       :psi.agent-session/context-fraction nil
+                       :psi.agent-session/context-window 400000
+                       :psi.agent-session/auto-compaction-enabled false
+                       :psi.agent-session/model-provider "openai"
+                       :psi.agent-session/model-id "gpt-5.3-codex"
+                       :psi.agent-session/model-reasoning true
+                       :psi.agent-session/thinking-level :high
+                       :psi.ui/statuses []}
+          model   (footer/footer-model-from-data footer-data {:worktree-path "/repo/project"})
+          init-fn (app/make-init "test-model" nil nil nil
+                                 {:cwd "/repo/project"
+                                  :footer-model-fn (constantly model)})
           [state _] (init-fn)
           out (app/view (assoc state :width 120))]
       (is (str/includes? out "/repo/project (master) • Investigate failing tests")))))
+
+(deftest view-renders-session-activity-line-when-present-test
+  (testing "footer renders session-activity-line from footer model when multiple sessions are active"
+    (let [footer-data {:psi.agent-session/worktree-path "/repo/project"
+                       :psi.agent-session/git-branch "main"
+                       :psi.agent-session/session-display-name "root"
+                       :psi.agent-session/usage-input 0
+                       :psi.agent-session/usage-output 0
+                       :psi.agent-session/usage-cache-read 0
+                       :psi.agent-session/usage-cache-write 0
+                       :psi.agent-session/usage-cost-total 0.0
+                       :psi.agent-session/context-fraction nil
+                       :psi.agent-session/context-window 200000
+                       :psi.agent-session/auto-compaction-enabled false
+                       :psi.agent-session/model-provider "anthropic"
+                       :psi.agent-session/model-id "claude-sonnet"
+                       :psi.agent-session/model-reasoning false
+                       :psi.agent-session/thinking-level :off
+                       :psi.ui/statuses []}
+          context-sessions [{:session-id "s1" :display-name "root" :runtime-state "waiting"}
+                            {:session-id "s2" :display-name "builder" :parent-session-id "s1" :runtime-state "running"}]
+          model   (footer/footer-model-from-data footer-data {:worktree-path "/repo/project"
+                                                              :context-sessions context-sessions})
+          init-fn (app/make-init "test-model" nil nil nil
+                                 {:cwd "/repo/project"
+                                  :footer-model-fn (constantly model)})
+          [state _] (init-fn)
+          plain (ansi/strip-ansi (app/view (assoc state :width 120)))]
+      (is (str/includes? plain "sessions: waiting root · running builder")))))
 
 (deftest view-separators-track-terminal-width-test
   (testing "chat separators render to current terminal width"
