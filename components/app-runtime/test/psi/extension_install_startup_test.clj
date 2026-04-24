@@ -80,6 +80,16 @@
                  (bootstrap!))
                (bootstrap!))}))
 
+(deftest startup-loads-recognized-psi-owned-minimal-entry-test
+  (testing "bootstrap startup loads recognized psi-owned minimal manifest entries"
+    (let [{:keys [result]} (bootstrap-with-manifest
+                            {:deps {'psi/mementum {}}}
+                            {})
+          {:keys [ctx summary]} result]
+      (is (= 1 (:extension-loaded-count summary)))
+      (is (some #(re-find #"extensions/mementum\.clj" %) (startup-registry-paths ctx)))
+      (is (= :loaded (startup-entry-status ctx 'psi/mementum))))))
+
 (deftest startup-persists-install-state-and-loads-manifest-extension-paths-test
   (testing "bootstrap startup computes install state and loads manifest-backed local-root extensions"
     (let [ext-root (test-support/temp-cwd)

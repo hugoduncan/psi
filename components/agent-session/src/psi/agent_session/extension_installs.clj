@@ -77,6 +77,51 @@
                                     :source source
                                     :data {:path (.getAbsolutePath ^java.io.File file)}})]}))))
 
+(def psi-owned-extension-catalog
+  {'psi/auto-session-name {:psi/init 'extensions.auto_session_name/init
+                           :source-policies {:installed {:local/root "extensions/auto-session-name"}}}
+   'psi/commit-checks {:psi/init 'extensions.commit_checks/init
+                       :source-policies {:installed {:local/root "extensions/commit-checks"}}}
+   'psi/hello-ext {:psi/init 'extensions.hello_ext/init
+                   :source-policies {:installed {:local/root "extensions/hello-ext"}}}
+   'psi/lsp {:psi/init 'extensions.lsp/init
+             :source-policies {:installed {:local/root "extensions/lsp"}}}
+   'psi/mcp-tasks-run {:psi/init 'extensions.mcp_tasks_run/init
+                       :source-policies {:installed {:local/root "extensions/mcp-tasks-run"}}}
+   'psi/mementum {:psi/init 'extensions.mementum/init
+                  :source-policies {:installed {:local/root "extensions/mementum"}}}
+   'psi/munera {:psi/init 'extensions.munera/init
+                :source-policies {:installed {:local/root "extensions/munera"}}}
+   'psi/plan-state-learning {:psi/init 'extensions.plan_state_learning/init
+                             :source-policies {:installed {:local/root "extensions/plan-state-learning"}}}
+   'psi/work-on {:psi/init 'extensions.work_on/init
+                 :source-policies {:installed {:local/root "extensions/work-on"}}}
+   'psi/workflow-loader {:psi/init 'extensions.workflow_loader/init
+                         :source-policies {:installed {:local/root "extensions/workflow-loader"}}}})
+
+(defn- catalog-entry
+  [lib]
+  (get psi-owned-extension-catalog lib))
+
+(defn- runtime-root
+  []
+  (when-let [url (io/resource "psi/agent_session/extension_installs.clj")]
+    (let [path (.getPath (io/file url))]
+      (some-> path
+              (str/replace #"/components/agent-session/src/psi/agent_session/extension_installs\.clj$" "")
+              not-empty))))
+
+(defn- installed-default-entry
+  [lib]
+  (let [entry (catalog-entry lib)
+        root  (runtime-root)]
+    (when entry
+      (cond-> (merge (get-in entry [:source-policies :installed])
+                     {:psi/init (:psi/init entry)})
+        root (update :local/root #(if (and % (not (.isAbsolute (io/file %))))
+                                    (.getAbsolutePath (io/file root %))
+                                    %))))))
+
 (defn- psi-meta-keys
   [dep]
   (->> (keys dep)
@@ -163,11 +208,18 @@
         (assoc dep :local/root (.getAbsolutePath (io/file base-dir local-root)))))
     dep))
 
+(defn- expand-recognized-psi-owned-entry
+  [lib dep]
+  (if-let [defaults (and (map? dep) (installed-default-entry lib))]
+    (merge defaults dep)
+    dep))
+
 (defn- normalize-entry
   [lib scope dep source-manifests overridden? base-dir]
-  (let [dep* (if (map? dep)
-               (absolutize-local-root base-dir dep)
-               dep)]
+  (let [dep0 (expand-recognized-psi-owned-entry lib dep)
+        dep* (if (map? dep0)
+               (absolutize-local-root base-dir dep0)
+               dep0)]
     [lib {:dep dep*
           :extension? (extension-dep? dep*)
           :support-dep? (not (extension-dep? dep*))

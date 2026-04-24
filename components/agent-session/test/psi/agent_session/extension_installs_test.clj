@@ -94,6 +94,20 @@
            (:deps-to-realize plan)))
     (is (empty? (:restart-required-libs plan)))))
 
+(deftest compute-install-state-expands-recognized-psi-owned-minimal-entries
+  (let [cwd (.getAbsolutePath (tmp-dir))
+        home (tmp-dir)]
+    (with-redefs [installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
+                  installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))]
+      (spit (installs/project-manifest-file cwd)
+            (pr-str {:deps {'psi/mementum {}}}))
+      (let [state (installs/compute-install-state cwd)
+            dep   (get-in state [:psi.extensions/effective :raw-deps 'psi/mementum])]
+        (is (= 'extensions.mementum/init
+               (:psi/init dep)))
+        (is (= :local
+               (installs/coordinate-family dep)))))))
+
 (deftest eql-query-exposes-extension-install-config
   (let [cwd (test-support/temp-cwd)
         home (tmp-dir)
