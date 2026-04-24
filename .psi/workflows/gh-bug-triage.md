@@ -48,11 +48,17 @@ Required procedure:
    - If the fetch fails, stop and report the failure rather than proceeding on a stale base.
 
 4. Create the issue worktree before reproduction.
-   - Use the `work-on` tool, not manual `git worktree` shell commands.
-   - Base the worktree on `origin/master`, using the explicit base-branch input supported by `work-on`.
-   - Use a short issue-derived description, such as the issue number plus a concise bug title fragment.
-   - After `work-on`, treat the resulting worktree path as authoritative for all repository edits, git commands, reproduction attempts, and later PR work.
-   - If the `work-on` tool is unavailable, stop and report that limitation instead of improvising another mechanism.
+   - Call the `work-on` tool directly.
+   - Do not use `/work-on` slash-command syntax.
+   - Do not reason from command-line usage text such as `--base`; this workflow must use the structured tool surface.
+   - Invoke `work-on` with structured arguments:
+     - `description`: a short issue-derived description, such as the issue number plus a concise bug title fragment
+     - `base_branch`: `origin/master`
+   - Example tool call shape:
+     - `{"description":"25 custom llm providers","base_branch":"origin/master"}`
+   - Do not use manual `git worktree` shell commands.
+   - After a successful `work-on` tool call, treat the returned worktree path as authoritative for all repository edits, git commands, reproduction attempts, and later PR work.
+   - If the `work-on` tool is unavailable or the tool call fails, stop and report that limitation or failure instead of improvising another mechanism.
 
 5. Attempt reproduction.
    - Use the `issue-bug-triage` skill.

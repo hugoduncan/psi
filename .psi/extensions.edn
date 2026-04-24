@@ -1,24 +1,7 @@
 {:deps
- {psi/workflow-loader
-  {:local/root "extensions/workflow-loader"
-   :psi/init extensions.workflow-loader/init}
-
-  psi/auto-session-name
-  {:local/root "extensions/auto-session-name"
-   :psi/init extensions.auto-session-name/init}
-
-  psi/commit-checks
-  {:local/root "extensions/commit-checks"
-   :psi/init extensions.commit-checks/init}
-
-  psi/mementum
-  {:local/root "extensions/mementum"
-   :psi/init extensions.mementum/init}
-
-  psi/munera
-  {:local/root "extensions/munera"
-   :psi/init extensions.munera/init}
-
-  psi/work-on
-  {:local/root "extensions/work-on"
-   :psi/init extensions.work-on/init}}}
+ {psi/workflow-loader   {}
+  psi/auto-session-name {}
+  psi/commit-checks     {}
+  psi/mementum          {}
+  psi/munera            {}
+  psi/work-on           {}}}
