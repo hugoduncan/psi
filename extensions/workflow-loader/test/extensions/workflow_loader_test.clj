@@ -186,7 +186,10 @@
           api {:query (fn [_]
                         {:psi.agent-session/worktree-path "/tmp/test-worktree"
                          :psi.agent-session/session-id "test-session-1"})
-               :mutate (fn [_ _] {})
+               :mutate (fn [sym _]
+                         (condp = sym
+                           'psi.workflow/list-runs {:psi.workflow/runs []}
+                           {}))
                :query-session (fn [& _] nil)
                :mutate-session (fn [& _] nil)
                :log (fn [_] nil)
@@ -220,6 +223,43 @@
         (is (contains? @commands "delegate"))
         (is (contains? @commands "delegate-reload"))
         (is (= ["session_switch"] (mapv first @handlers)))))))
+
+(deftest delegate-command-list-route-test
+  (testing "/delegate list routes to delegate-list behavior"
+    (let [commands (atom {})
+          logs (atom [])
+          api {:query (fn [_]
+                        {:psi.agent-session/worktree-path "/tmp/test-worktree"
+                         :psi.agent-session/session-id "test-session-1"
+                         :psi.agent-session/background-jobs []})
+               :query-session (fn [& _] nil)
+               :mutate (fn [sym _]
+                         (condp = sym
+                           'psi.workflow/register-definition {:psi.workflow/registered? true}
+                           'psi.workflow/list-runs {:psi.workflow/runs []}
+                           {}))
+               :mutate-session (fn [& _] nil)
+               :log (fn [msg] (swap! logs conj msg))
+               :notify (fn [_ _] nil)
+               :register-tool (fn [_] nil)
+               :register-command (fn [name cmd-def] (swap! commands assoc name cmd-def))
+               :register-prompt-contribution (fn [_] nil)
+               :on (fn [_ _] nil)}]
+      (with-redefs [loader/load-workflow-definitions
+                    (fn [_]
+                      {:definitions {"explore" {:definition-id "explore"
+                                                :name "explore"
+                                                :summary "Explore a topic"
+                                                :step-order ["step-1"]
+                                                :steps {"step-1" {:label "explore"}}}}
+                       :errors []
+                       :warnings []})]
+        (wl/init api)
+        ((:handler (get @commands "delegate")) "list")
+        (let [log-lines @logs]
+          (is (= 1 (count log-lines)))
+          (is (.contains ^String (first log-lines) "Available workflows:"))
+          (is (.contains ^String (first log-lines) "explore")))))))
 
 (deftest reload-preserves-extension-state-atom-test
   (testing "namespace reload preserves workflow-loader state so registered command handlers keep working"

@@ -437,7 +437,7 @@
 
   ;; Register /delegate command
   ((:register-command api) "delegate"
-                           {:description "Delegate to a workflow: /delegate <workflow> <prompt> (defaults to action=run)"
+                           {:description "Delegate to a workflow: /delegate [list|<workflow> <prompt>]"
                             :handler (fn [args]
                                        (let [{:keys [workflow prompt]} (text/parse-delegate-command args)]
                                          (cond
@@ -445,6 +445,9 @@
                                            (log! (str "Available workflows:\n"
                                                       (text/available-workflows-text
                                                        (:loaded-definitions @state))))
+
+                                           (= "list" workflow)
+                                           (log! (delegate-list))
 
                                            (nil? prompt)
                                            (log! (str "Usage: /delegate " workflow " <prompt>"))
