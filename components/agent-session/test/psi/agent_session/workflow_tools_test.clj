@@ -5,13 +5,62 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
+   [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-runtime]))
+
+(defn- execute-run-nullable
+  [state*]
+  (fn [_ctx _session-id run-id]
+    (loop [steps-executed []]
+      (let [run (psi.agent-session.workflow-runtime/workflow-run-in @state* run-id)
+            status (:status run)]
+        (cond
+          (contains? #{:completed :failed :cancelled} status)
+          {:run-id run-id
+           :status status
+           :steps-executed steps-executed
+           :terminal? true
+           :blocked? false}
+
+          (= :blocked status)
+          {:run-id run-id
+           :status status
+           :steps-executed steps-executed
+           :terminal? false
+           :blocked? true}
+
+          :else
+          (let [step-id (:current-step-id run)
+                next-step-id (second (drop-while #(not= step-id %) (get-in run [:effective-definition :step-order])))
+                envelope {:outcome :ok :outputs {:text (str step-id " output")}}]
+            (swap! state* workflow-progression/submit-result-envelope run-id step-id envelope)
+            (recur (conj steps-executed {:step-id step-id
+                                         :attempt-id (str step-id "-attempt")
+                                         :execution-session-id (str step-id "-session")
+                                         :status (get-in @state* [:workflows :runs run-id :status])
+                                         :next-step-id next-step-id}))))))))
+
+(defn- resume-and-execute-run-nullable
+  [state*]
+  (fn [ctx session-id run-id]
+    (swap! state* workflow-progression/resume-blocked-run run-id)
+    ((execute-run-nullable state*) ctx session-id run-id)))
 
 (defn- create-session-context
   ([]
    (create-session-context {}))
   ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
+   (let [ctx (session/create-context
+              (test-support/safe-context-opts
+               (merge {:execute-workflow-run-fn (execute-run-nullable nil)
+                       :resume-and-execute-workflow-run-fn (resume-and-execute-run-nullable nil)}
+                      opts)))
+         _   (swap! (:state* ctx)
+                    (fn [state]
+                      state))
+         ctx (assoc ctx
+                    :execute-workflow-run-fn (execute-run-nullable (:state* ctx))
+                    :resume-and-execute-workflow-run-fn (resume-and-execute-run-nullable (:state* ctx)))
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
 

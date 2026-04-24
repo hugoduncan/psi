@@ -185,8 +185,10 @@
    :publish-projection-change-fn (fn [_ctx change] (publish-projection-change! projection-listeners* change))
    :all-mutations mutations})
 
-(defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations]
-                         :or {persist? true mutations []}}]
+(defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
+                                create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn]
+                         :or {persist? true mutations []}
+                         :as opts}]
   (let [resolved-cwd (or cwd (System/getProperty "user.dir"))
         resolved-defaults (resolve-session-defaults session-defaults resolved-cwd ui-type)
         state* (atom (initial-root-state nrepl-runtime-atom recursion-ctx))
@@ -216,7 +218,16 @@
                      :background-job-ui-refresh-fn (atom nil)
                      :scheduler-timers* (atom {})
                      :projection-listeners* projection-listeners*}
-                    (callback-fns mutations projection-listeners*))
+                    (callback-fns mutations projection-listeners*)
+                    (cond-> {}
+                      (contains? opts :create-workflow-child-session-fn)
+                      (assoc :create-workflow-child-session-fn create-workflow-child-session-fn)
+
+                      (contains? opts :execute-workflow-run-fn)
+                      (assoc :execute-workflow-run-fn execute-workflow-run-fn)
+
+                      (contains? opts :resume-and-execute-workflow-run-fn)
+                      (assoc :resume-and-execute-workflow-run-fn resume-and-execute-workflow-run-fn)))
         _ (dispatch-handlers/register-all! ctx0)
         actions-fn (dispatch-handlers/make-actions-fn ctx0)
         ctx (assoc ctx0 :session-actions-fn actions-fn)]

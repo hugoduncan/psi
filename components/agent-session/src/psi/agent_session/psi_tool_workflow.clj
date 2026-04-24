@@ -70,18 +70,21 @@
 
 (defn- ensure-workflow-callbacks
   "Patch older live ctx maps on demand so workflow execution controls can run
-   without requiring a full runtime/context rebuild."
+   without requiring a full runtime/context rebuild.
+
+   Presence is authoritative: explicit nil means intentionally disabled and must
+   not be backfilled. Only absent keys are auto-wired for compatibility."
   [ctx]
   (cond-> ctx
-    (nil? (:create-workflow-child-session-fn ctx))
+    (not (contains? ctx :create-workflow-child-session-fn))
     (assoc :create-workflow-child-session-fn
            (find-required-fn "psi.agent-session.context" "create-workflow-child-session!"))
 
-    (nil? (:execute-workflow-run-fn ctx))
+    (not (contains? ctx :execute-workflow-run-fn))
     (assoc :execute-workflow-run-fn
            (find-required-fn "psi.agent-session.workflow-execution" "execute-run!"))
 
-    (nil? (:resume-and-execute-workflow-run-fn ctx))
+    (not (contains? ctx :resume-and-execute-workflow-run-fn))
     (assoc :resume-and-execute-workflow-run-fn
            (find-required-fn "psi.agent-session.workflow-execution" "resume-and-execute-run!"))))
 
