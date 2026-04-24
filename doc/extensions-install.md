@@ -136,6 +136,26 @@ Runtime:
 - reload/apply remains useful as a convenience path after startup
 - `:restart-required` remains a runtime convenience/recovery status, not the canonical startup contract
 
+### Launcher/runtime boundary note
+
+For recognized psi-owned minimal manifest entries such as:
+
+```clojure
+{:deps {psi/workflow-loader {}
+        psi/mementum {}}}
+```
+
+ownership is split deliberately:
+- launcher expands the concise manifest syntax into concrete startup deps and puts those extension namespaces on the JVM classpath
+- runtime computes install state, activates extensions, reports diagnostics, and supports reload/apply after startup
+
+This means launcher-started `psi` is the authoritative proof path for classpath-sensitive behavior.
+Direct bootstrap or in-process test paths that do not cross the launcher boundary are useful for runtime activation testing, but they are **not** equivalent proofs of launcher-owned classpath construction.
+
+For recognized psi-owned minimal entries, runtime activation is canonicalized through `:psi/init` and the live registry identity is stable `manifest:{lib}` rather than a source file path, for example:
+- `manifest:psi/workflow-loader`
+- `manifest:psi/mementum`
+
 ## Introspection
 
 The canonical read surface exposes:
