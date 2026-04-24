@@ -1,7 +1,7 @@
-- [ ] Decide and document the explicit retryable transport-failure allowlist/pattern set for this task
-- [ ] Extend retry classification for transient transport/stream failures
-- [ ] Add focused retry classifier tests for chunked-stream failure and guardrails
-- [ ] Prove session auto-retry statechart path activates for newly classified transport failures
-- [ ] Shape workflow execution so child-turn error outcome/stop-reason overrides text extraction and records execution failure with required `:message`
-- [ ] Add focused workflow execution tests preventing empty-success envelopes from assistant error turns
+- [x] Decide and document the explicit retryable transport-failure allowlist/pattern set for this task
+- [x] Extend retry classification for transient transport/stream failures
+- [x] Add focused retry classifier tests for chunked-stream failure and guardrails
+- [x] Prove session auto-retry statechart path activates for newly classified transport failures
+- [x] Shape workflow execution so child-turn error outcome/stop-reason overrides text extraction and records execution failure with required `:message`
+- [x] Add focused workflow execution tests preventing empty-success envelopes from assistant error turns
 - [ ] Run relevant test suites and record results

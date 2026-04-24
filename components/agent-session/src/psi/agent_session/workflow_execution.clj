@@ -84,6 +84,30 @@
         (:content assistant-message))
       ""))
 
+(defn- assistant-error-message
+  [assistant-message]
+  (or (:error-message assistant-message)
+      (some->> (:content assistant-message)
+               (filter map?)
+               (keep (fn [block]
+                       (when (= :error (:type block))
+                         (:text block))))
+               seq
+               (clojure.string/join "\n"))
+      "Assistant turn ended in error"))
+
+(defn- execution-failure-payload
+  [execution-session-id assistant-message]
+  (cond-> {:message (assistant-error-message assistant-message)}
+    (:stop-reason assistant-message)
+    (assoc :stop-reason (:stop-reason assistant-message))
+
+    (= :error (:stop-reason assistant-message))
+    (assoc :turn-outcome :turn.outcome/error)
+
+    execution-session-id
+    (assoc :session-id execution-session-id)))
+
 (defn- compose-system-prompt
   [base-system-prompt framing-prompt]
   (cond
@@ -204,14 +228,25 @@
     (try
       (prompt-control/prompt-in! ctx (:session-id execution-session) prompt)
       (let [assistant-message (prompt-control/last-assistant-message-in ctx (:session-id execution-session))
-            envelope          {:outcome :ok
-                               :outputs {:text (assistant-message-text assistant-message)}}]
-        (swap! (:state* ctx) workflow-progression/submit-result-envelope run-id step-id envelope)
-        {:run-id run-id
-         :step-id step-id
-         :attempt-id (:attempt-id attempt)
-         :execution-session-id (:session-id execution-session)
-         :status (get-in @(:state* ctx) [:workflows :runs run-id :status])})
+            failure-payload   (when (= :error (:stop-reason assistant-message))
+                                (execution-failure-payload (:session-id execution-session) assistant-message))]
+        (if failure-payload
+          (do
+            (swap! (:state* ctx) workflow-progression/record-execution-failure run-id step-id failure-payload)
+            {:run-id run-id
+             :step-id step-id
+             :attempt-id (:attempt-id attempt)
+             :execution-session-id (:session-id execution-session)
+             :status (get-in @(:state* ctx) [:workflows :runs run-id :status])
+             :error (:message failure-payload)})
+          (let [envelope {:outcome :ok
+                          :outputs {:text (assistant-message-text assistant-message)}}]
+            (swap! (:state* ctx) workflow-progression/submit-result-envelope run-id step-id envelope)
+            {:run-id run-id
+             :step-id step-id
+             :attempt-id (:attempt-id attempt)
+             :execution-session-id (:session-id execution-session)
+             :status (get-in @(:state* ctx) [:workflows :runs run-id :status])})))
       (catch Exception e
         (swap! (:state* ctx) workflow-progression/record-execution-failure run-id step-id {:message (ex-message e)})
         {:run-id run-id

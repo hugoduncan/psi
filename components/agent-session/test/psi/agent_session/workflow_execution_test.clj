@@ -552,6 +552,43 @@
           (is (= {:outcome :ok :outputs {:text "done"}}
                  (get-in run [:step-runs "step-1-builder" :accepted-result]))))))))
 
+(deftest execute-current-step-records-assistant-error-turn-as-execution-failure-test
+  (testing "assistant error turn records execution failure instead of empty success envelope"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[state1 _ _] (workflow-runtime/register-definition state retry-definition)
+                           [state2 _ _] (workflow-runtime/create-run state1 {:definition-id "retry-build"
+                                                                             :run-id "run-error-1"
+                                                                             :workflow-input {:input "retry me"}})]
+                       state2)))]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id _opts]
+                      {:attempt {:attempt-id "a1" :status :pending :execution-session-id "child-1"}
+                       :execution-session {:session-id "child-1"}})
+                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx _child-session-id _prompt] nil)
+                    psi.agent-session.prompt-control/last-assistant-message-in (fn [_ctx _child-session-id]
+                                                                                 {:role "assistant"
+                                                                                  :content [{:type :error
+                                                                                             :text "Premature end of chunk coded message body: closing chunk expected"}
+                                                                                            {:type :text
+                                                                                             :text "partial text that must not become success"}]
+                                                                                  :stop-reason :error
+                                                                                  :error-message "Premature end of chunk coded message body: closing chunk expected"})]
+        (let [result (workflow-execution/execute-current-step! ctx session-id "run-error-1")
+              run    (workflow-runtime/workflow-run-in @(:state* ctx) "run-error-1")
+              attempt (get-in run [:step-runs "step-1-builder" :attempts 0])]
+          (is (= :running (:status result)))
+          (is (= "Premature end of chunk coded message body: closing chunk expected" (:error result)))
+          (is (= :running (:status run)))
+          (is (nil? (get-in run [:step-runs "step-1-builder" :accepted-result])))
+          (is (= :execution-failed (:status attempt)))
+          (is (= {:message "Premature end of chunk coded message body: closing chunk expected"
+                  :stop-reason :error
+                  :turn-outcome :turn.outcome/error
+                  :session-id "child-1"}
+                 (:execution-error attempt))))))))
+
 (deftest resume-and-execute-run-test
   (testing "resume-and-execute-run! resumes blocked runs and continues with a fresh attempt"
     (let [[ctx session-id] (create-session-context {:persist? false})

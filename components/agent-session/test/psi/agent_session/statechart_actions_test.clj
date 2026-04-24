@@ -194,6 +194,29 @@
                 (apply-root-state-update! ctx))
            (is (false? (:is-compacting (session-state/get-session-data-in ctx session-id)))))))))
 
+(deftest retry-classified-transport-failure-activates-retry-path-test
+  (testing "classified transport failure admits the retry guard and triggers retry effects"
+    (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:auto-retry-enabled true
+                                                                          :retry-attempt 0}})
+          should-retry?    (resolve 'psi.agent-session.statechart/should-retry?)
+          guard-data       {:ctx ctx
+                            :session-id session-id
+                            :config {:auto-retry-max-retries 3}
+                            :pending-agent-event {:type :agent-end
+                                                  :messages [{:role "assistant"
+                                                              :stop-reason :error
+                                                              :error-message "Premature end of chunk coded message body: closing chunk expected"}]}}]
+      (is (boolean (should-retry? guard-data)))
+      (with-registered-handlers
+        ctx
+        #(let [result (invoke-handler ctx :on-retry-triggered {:session-id session-id})]
+           (apply-root-state-update! ctx result)
+           (is (= 1 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
+           (is (= [{:effect/type :runtime/schedule-thread-sleep-send-event
+                    :delay-ms 2000
+                    :event :session/retry-done}]
+                  (:effects result))))))))
+
 (deftest retry-handlers-test
   ;; Tests retry backoff scheduling and retry continuation effects.
   (testing "on-retry-triggered increments retry-attempt and schedules backoff with configured limits"

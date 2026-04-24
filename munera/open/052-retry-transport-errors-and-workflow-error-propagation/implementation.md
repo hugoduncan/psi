@@ -3,3 +3,23 @@ Implementation notes:
 - Initial diagnosis:
   - session auto-retry was enabled but did not trigger because retry classification did not recognize `Premature end of chunk coded message body: closing chunk expected`
   - workflow execution converted the errored child assistant message into `{:outcome :ok :outputs {:text ""}}` because it extracted only `:text` blocks and ignored `:error` blocks / error outcome
+
+2026-04-24 — slice 1: retry classification + truthful workflow error propagation
+- Centralized retryable message matching in `session.clj` via explicit `retriable-error-patterns` alongside the existing retryable HTTP status set.
+- Added the minimum required transport-failure patterns for this task:
+  - `Premature end of chunk coded message body`
+  - `closing chunk expected`
+- Extended `session_test.clj` to prove:
+  - chunked-stream termination failure is retryable
+  - auth failure remains non-retryable
+- Updated `workflow_execution.clj` so child-session assistant turns with `:stop-reason :error` no longer produce success envelopes.
+- Added workflow-execution helpers to:
+  - derive assistant error message text
+  - shape canonical execution-failure payloads with required `:message`
+  - include optional diagnostic fields `:stop-reason`, `:turn-outcome`, and `:session-id` when available
+- Added focused tests proving:
+  - retry guard admits the classified transport failure and `:on-retry-triggered` produces the retry scheduling effect
+  - workflow execution records assistant error turns as `:execution-failed` attempts instead of `{:outcome :ok :outputs {:text ""}}`
+- Focused verification run:
+  - `clojure -M:test --focus psi.agent-session.session-test --focus psi.agent-session.statechart-actions-test --focus psi.agent-session.workflow-execution-test`
+  - result: `29 tests, 150 assertions, 0 failures`

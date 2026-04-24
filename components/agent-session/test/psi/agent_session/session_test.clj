@@ -155,11 +155,17 @@
   (testing "retry-error? true for overloaded"
     (is (session/retry-error? :error "Service Overloaded")))
 
+  (testing "retry-error? true for chunked stream termination failure"
+    (is (session/retry-error? :error "Premature end of chunk coded message body: closing chunk expected")))
+
   (testing "retry-error? false for stop reason"
     (is (not (session/retry-error? :stop nil))))
 
   (testing "retry-error? false for nil error"
     (is (not (session/retry-error? :error nil))))
+
+  (testing "retry-error? false for auth failure"
+    (is (not (session/retry-error? :error "401 unauthorized api key invalid"))))
 
   (testing "context-overflow-error? true for context length"
     (is (session/context-overflow-error? "context length exceeded")))

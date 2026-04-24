@@ -454,6 +454,15 @@
 (def ^:private retriable-http-statuses
   #{429 500 502 503 529})
 
+(def ^:private retriable-error-patterns
+  [#"(?i)rate.limit"
+   #"(?i)too.many.requests"
+   #"(?i)overloaded"
+   #"(?i)status[ .:_]429"
+   #"(?i)status[ .:_]5\d\d"
+   #"(?i)premature end of chunk coded message body"
+   #"(?i)closing chunk expected"])
+
 (defn retry-error?
   ([stop-reason error-message]
    (retry-error? stop-reason error-message nil))
@@ -461,11 +470,7 @@
    (and (= stop-reason :error)
         (or (contains? retriable-http-statuses http-status)
             (some #(re-find % (or error-message ""))
-                  [#"(?i)rate.limit"
-                   #"(?i)too.many.requests"
-                   #"(?i)overloaded"
-                   #"(?i)status[ .:_]429"
-                   #"(?i)status[ .:_]5\d\d"])))))
+                  retriable-error-patterns)))))
 
 (defn context-overflow-error?
   [error-message]
