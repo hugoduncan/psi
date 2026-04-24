@@ -114,3 +114,20 @@ Closure recommendation:
   - `clojure -M:test --focus psi.tui.tmux-integration-harness-test --skip-meta foo` → passes (`1 tests, 1 assertions, 0 failures`)
   - `bb bb/psi.clj --help` now resolves launcher code instead of failing with `Could not locate psi/launcher...`
 - Net result: the PR failure was not a tmux harness logic regression; it was a launcher-classpath plus policy-selection mismatch in the CI shim path.
+
+2026-04-24 — Remote canonical install proof now succeeds
+
+- Re-ran the final canonical remote packaging proof after the launcher work landed on `master`.
+- `bbin install io.github.hugoduncan/psi --as psi-remote-proof-051` now resolves merged commit `527dc2a5d600df9a8adeead9bda825993419c465`.
+- Verified the installed command starts successfully and exercises the canonical launcher path:
+  - `psi-remote-proof-051 --help` reaches the runtime launcher path and starts psi successfully
+  - `psi-remote-proof-051 --launcher-debug --cwd /Users/duncan/projects/hugoduncan/psi/fix-extensions /quit` emits launcher debug output and launches psi with the expected startup basis
+- The remote-installed launcher debug output showed:
+  - policy `installed`
+  - startup basis materialized from the remote gitlibs checkout under `~/.gitlibs/libs/io.github.hugoduncan/psi/527dc2a5...`
+  - expected built-in extensions loaded, including `workflow-loader`
+- Confirmed the installed remote ref matches current `origin/master`:
+  - local `git rev-parse origin/master` → `527dc2a5d600df9a8adeead9bda825993419c465`
+  - remote-installed launcher basis also resolved `527dc2a5d600df9a8adeead9bda825993419c465`
+- This clears the final external blocker recorded in `steps.md`.
+- Task 051 is now complete by its own definition of done.

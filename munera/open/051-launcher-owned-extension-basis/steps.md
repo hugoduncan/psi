@@ -66,8 +66,9 @@
   - [x] Add a lightweight proof or testable check for the installable command contract where practical
   - [x] Prove the `bbin`-installed `psi` command exercises the same launcher arg contract and startup-basis code path as direct/local launcher invocation
   - [x] Confirm local frictionless install without explicit `--main-opts`
-  - [ ] Confirm frictionless install for the final canonical remote package path
-    - current blocker: remote installs resolve to published commit `2ce48fb08fc9263552ce769a4ee750acecfb0450`, which predates launcher packaging work
+  - [x] Confirm frictionless install for the final canonical remote package path
+    - `bbin install io.github.hugoduncan/psi --as psi-remote-proof-051` now resolves merged commit `527dc2a5d600df9a8adeead9bda825993419c465`
+    - installed remote launcher starts successfully and exercises the canonical launcher path
 
 - [x] Slice 7 — Documentation migration
   - [x] Update `README.md` quick start to use `bbin` installation and the `psi` command
@@ -86,26 +87,28 @@
   - [x] Make launcher debug reporting authoritative by deriving psi-owned default usage and inferred `:psi/init` usage from the actual expansion pipeline rather than from pre-expansion heuristics
   - [x] Add focused tests covering partially explicit psi-owned entries that still receive launcher defaults and inferred init reporting
   - [x] Reconcile operator-facing docs with actual remote packaging status until the published remote ref includes launcher packaging work
-  - [ ] Re-run local + remote install proofs after publication catches up and record the outcome in `implementation.md`
+  - [x] Re-run local + remote install proofs after publication catches up and record the outcome in `implementation.md`
 
 - [x] Review checkpoints
   - [x] Confirm launcher contract and arg surface are stable after Slice 1
   - [x] Confirm catalog/defaulting/inference rules are concrete and deterministic after Slice 3
   - [x] Confirm startup basis synthesis is real and explainable after Slice 4
-  - [~] Confirm canonical install surface exists after Slice 6
-    - local metadata-driven install path is proven; remote canonical package path remains publication-blocked
-  - [~] Confirm docs and operator story are coherent after Slice 7
-    - launcher-owned startup story is coherent and install docs now avoid overstating the remote path; full canonical remote install remains publication-blocked
+  - [x] Confirm canonical install surface exists after Slice 6
+    - local metadata-driven install path is proven
+    - canonical remote package path is now also proven against merged commit `527dc2a5d600df9a8adeead9bda825993419c465`
+  - [x] Confirm docs and operator story are coherent after Slice 7
+    - launcher-owned startup story is coherent
+    - remote canonical install proof now matches the documented canonical path
   - [x] Confirm launcher-focused verification path exists outside Kaocha namespace focus
     - direct `clojure.test/run-tests` via the `:test-paths` alias ran `psi.launcher-test` and `psi.launcher.extensions-test`
     - result: `13 tests, 39 assertions, 0 failures, 0 errors`
 
-- [ ] Definition of done
+- [x] Definition of done
   - [x] psi can be installed as a `bbin` command named `psi`
   - [x] psi can be started without a user-defined `:psi` alias
   - [x] startup basis is derived from user/project extension manifests before psi starts
   - [x] recognized psi-owned manifest entries can use concise syntax through launcher defaults and deterministic `:psi/init` inference
   - [x] docs present the launcher-owned startup path as the canonical operator workflow without overstating the currently unpublished remote package path
-  - [ ] final remote packaging path proves canonical `bbin install ...` works without extra install flags
+  - [x] final remote packaging path proves canonical `bbin install ...` works without extra install flags
   - [x] launcher entrypoint policy selection accurately represents and supports the intended installed-vs-development launcher behavior
   - [x] launcher debug reporting accurately reports psi-owned default application and inferred init usage, including partially explicit psi-owned entries
