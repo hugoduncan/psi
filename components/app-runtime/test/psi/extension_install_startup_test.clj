@@ -87,7 +87,7 @@
                             {})
           {:keys [ctx summary]} result]
       (is (= 1 (:extension-loaded-count summary)))
-      (is (some #(re-find #"extensions/mementum\.clj" %) (startup-registry-paths ctx)))
+      (is (contains? (startup-registry-paths ctx) "manifest:psi/mementum"))
       (is (= :loaded (startup-entry-status ctx 'psi/mementum))))))
 
 (deftest startup-persists-install-state-and-loads-manifest-extension-paths-test

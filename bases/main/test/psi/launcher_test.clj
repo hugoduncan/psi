@@ -88,6 +88,28 @@
         (is (= ['psi/mementum]
                (:inferred-init-libs (launcher/manifest-state "/repo/psi" "/repo/project" :installed))))))))
 
+(deftest startup-basis-expands-recognized-psi-owned-minimal-manifest-entry-into-basis-deps
+  (let [repo-config {:deps {'psi/main {:local/root "bases/main"}
+                            'org.clojure/clojure {:mvn/version "1.12.4"}}}
+        manifest-info {:user-path "/tmp/user.edn"
+                       :project-path "/tmp/project/.psi/extensions.edn"
+                       :user-present? false
+                       :project-present? true
+                       :user-manifest {:deps {}}
+                       :project-manifest {:deps {'psi/workflow-loader {}}}
+                       :merged-manifest {:deps {'psi/workflow-loader {}}}
+                       :expanded-manifest {:deps {'psi/workflow-loader {:local/root "/repo/psi/extensions/workflow-loader"
+                                                                        :psi/init 'extensions.workflow-loader/init}}}
+                       :defaulted-libs ['psi/workflow-loader]
+                       :inferred-init-libs ['psi/workflow-loader]}
+        result (with-redefs [launcher/repo-basis-config (constantly repo-config)
+                             launcher/manifest-state (fn [_ _ _] manifest-info)]
+                 (launcher/startup-basis "/repo/psi" "/repo/project" :installed))]
+    (is (= {:local/root "/repo/psi/extensions/workflow-loader"}
+           (get-in result [:basis :deps 'psi/workflow-loader])))
+    (is (= 'extensions.workflow-loader/init
+           (get-in result [:manifest-info :expanded-manifest :deps 'psi/workflow-loader :psi/init])))))
+
 (deftest launch-plan-test
   (let [basis-state {:basis {:deps {'foo/bar {:mvn/version "1.0.0"}}}
                      :manifest-info {:user-present? false

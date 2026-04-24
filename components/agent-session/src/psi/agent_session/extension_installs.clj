@@ -443,12 +443,16 @@
 
 (defn- merge-entry-statuses
   [entries-by-lib plan reload-result]
-  (let [loaded-ids         (set (:loaded reload-result))
-        errors-by-path     (into {} (map (juxt :path :error)) (:errors reload-result))
-        failed-libs        (into #{} (map :lib (:resolution-errors plan)))
-        deps-extension-libs (:deps-extension-libs plan)
+  (let [loaded-ids            (set (:loaded reload-result))
+        errors-by-path        (into {} (map (juxt :path :error)) (:errors reload-result))
+        failed-libs           (into #{} (map :lib (:resolution-errors plan)))
+        deps-extension-libs   (:deps-extension-libs plan)
         restart-required-libs (:restart-required-libs plan)
-        deps-realized?     (boolean (:deps-realized? reload-result))]
+        deps-realized?        (boolean (:deps-realized? reload-result))
+        loaded-path-libs      (into #{}
+                                    (keep (fn [loaded-id]
+                                            (get (:path->lib plan) loaded-id)))
+                                    loaded-ids)]
     (into {}
           (map (fn [[entry-lib entry]]
                  (let [dep              (:dep entry)
@@ -460,18 +464,24 @@
                                               (:resolution-errors plan))
                        manifest-id      (manifest-extension-id entry-lib)
                        load-error       (or (get errors-by-path manifest-id)
+                                            (some->> (get (:entries-by-lib plan) entry-lib)
+                                                     :dep
+                                                     :local/root
+                                                     (get errors-by-path))
                                             resolution-error)
+                       loaded?          (or (contains? loaded-ids manifest-id)
+                                            (contains? loaded-path-libs entry-lib))
                        status           (cond
                                           (not extension?) :not-applicable
                                           (not enabled?) :disabled
                                           (= :local coord-family)
                                           (cond
-                                            (contains? loaded-ids manifest-id) :loaded
+                                            loaded? :loaded
                                             load-error :failed
                                             (contains? failed-libs entry-lib) :failed
                                             :else :configured)
                                           (contains? restart-required-libs entry-lib) :restart-required
-                                          (contains? loaded-ids manifest-id) :loaded
+                                          loaded? :loaded
                                           (and (contains? deps-extension-libs entry-lib)
                                                deps-realized?
                                                (not load-error)) :loaded
