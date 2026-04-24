@@ -1,4 +1,8 @@
-- [ ] Step 1: footer-model-fn — wire closure, migrate build-footer-lines, update tests, render session-activity-line
-- [ ] Step 2: background-job widget refresh proof
-- [ ] Step 3: notification rendering lifecycle proof
-- [ ] Step 4: frontend-action cancel feedback proof
+- [x] Step 1: footer-model-fn — wire closure, migrate build-footer-lines, update tests, render session-activity-line
+  - 99c5476e — 4 files, 84 insertions, 56 deletions
+- [x] Step 2: background-job widget refresh proof
+  - 974cf9c4 — 1 file, 33 insertions
+- [x] Step 3: notification rendering lifecycle proof
+  - 11627fb9 — 1 new file, 51 insertions
+- [x] Step 4: frontend-action cancel feedback proof
+  - 4764e37c — 1 file, 19 insertions
