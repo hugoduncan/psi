@@ -1,0 +1,4 @@
+- [ ] Step 1: footer-model-fn — wire closure, migrate build-footer-lines, update tests, render session-activity-line
+- [ ] Step 2: background-job widget refresh proof
+- [ ] Step 3: notification rendering lifecycle proof
+- [ ] Step 4: frontend-action cancel feedback proof
