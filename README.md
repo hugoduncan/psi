@@ -18,17 +18,15 @@ EQL-queryable, extensible. Inspired by
 Install the launcher:
 
 ```bash
-# Current proven local/repo path
-bbin install . --as psi
-```
-
-The intended canonical remote path is:
-
-```bash
+# Canonical install path
 bbin install io.github.hugoduncan/psi --as psi
 ```
 
-but remote publication is currently catching up to the launcher packaging work, so the repo-local install path above is the currently proven workflow.
+Repo-local / development alternative:
+
+```bash
+bbin install . --as psi
+```
 
 Then run psi directly:
 

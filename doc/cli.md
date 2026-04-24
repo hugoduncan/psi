@@ -18,16 +18,16 @@ Launcher realization policy is explicit:
 
 ## Install
 
-Current proven install path from the repo/worktree you are using:
-
-```bash
-bbin install . --as psi
-```
-
-Intended canonical remote install path after publication catches up:
+Canonical install path:
 
 ```bash
 bbin install io.github.hugoduncan/psi --as psi
+```
+
+Repo-local / development install alternative:
+
+```bash
+bbin install . --as psi
 ```
 
 Repo-local development path without installation:
