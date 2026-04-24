@@ -41,11 +41,30 @@ jobs:
           bb: latest
 
       - name: Install clj-kondo
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(curl -fsSL https://api.github.com/repos/clj-kondo/clj-kondo/releases/latest \
-            | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "v\(.*\)".*/\1/')
-          curl -fsSL "https://github.com/clj-kondo/clj-kondo/releases/download/v${VERSION}/clj-kondo-${VERSION}-linux-amd64.zip" \
-            -o /tmp/clj-kondo.zip
+          VERSION=$(python3 - <<'PY'
+          import json, os, sys, urllib.request
+
+          fallback = '2026.03.14'
+          url = 'https://api.github.com/repos/clj-kondo/clj-kondo/releases/latest'
+          req = urllib.request.Request(url, headers={
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f"Bearer {os.environ.get('GITHUB_TOKEN', '')}",
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'psi-ci'
+          })
+          try:
+              with urllib.request.urlopen(req) as r:
+                  data = json.load(r)
+              print(data['tag_name'].removeprefix('v'))
+          except Exception:
+              print(fallback)
+          PY
+          )
+          ASSET_URL="https://github.com/clj-kondo/clj-kondo/releases/download/v${VERSION}/clj-kondo-${VERSION}-linux-amd64.zip"
+          curl -fLSs "$ASSET_URL" -o /tmp/clj-kondo.zip
           sudo unzip -q /tmp/clj-kondo.zip -d /usr/local/bin
           clj-kondo --version
 
