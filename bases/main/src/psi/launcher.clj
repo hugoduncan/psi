@@ -86,17 +86,8 @@
 (defn- materialize-self-dep
   [launcher-root policy dep]
   (case policy
-    :development
+    (:development :installed)
     (absolutize-local-root launcher-root dep)
-
-    :installed
-    (if-let [local-root (:local/root dep)]
-      (-> dep
-          (dissoc :local/root)
-          (assoc :git/url extensions/default-psi-git-url
-                 :git/tag extensions/default-installed-psi-version
-                 :deps/root local-root))
-      dep)
 
     (throw (ex-info "Unknown launcher policy"
                     {:stage :basis-construction
@@ -153,13 +144,32 @@
                [lib (dissoc dep :psi/init :psi/enabled)]))
         dep-map))
 
+(defn- installed-project-local-lib?
+  [launcher-root cwd dep]
+  (when-let [local-root (:local/root dep)]
+    (let [dep-path     (.getCanonicalPath (io/file cwd local-root))
+          launcher-path (.getCanonicalPath (io/file launcher-root))]
+      (.startsWith dep-path launcher-path))))
+
+(defn- materialize-manifest-dep
+  [launcher-root cwd policy dep]
+  (let [dep* (absolutize-local-root-dep cwd dep)]
+    (case policy
+      :development dep*
+      :installed (if (installed-project-local-lib? launcher-root cwd dep)
+                   dep*
+                   dep*)
+      (throw (ex-info "Unknown launcher policy"
+                      {:stage :basis-construction
+                       :policy policy})))))
+
 (defn startup-basis
   [launcher-root cwd policy]
   (let [self-basis       (update (psi-self-basis launcher-root policy) :deps basis-deps)
         manifest-info0   (manifest-state cwd policy)
         expanded-deps    (->> (get-in manifest-info0 [:expanded-manifest :deps])
                               (map (fn [[lib dep]]
-                                     [lib (-> (absolutize-local-root-dep cwd dep)
+                                     [lib (-> (materialize-manifest-dep launcher-root cwd policy dep)
                                               (dissoc :psi/init :psi/enabled))]))
                               (into {}))
         manifest-info    (assoc-in manifest-info0 [:expanded-manifest :deps] expanded-deps)]

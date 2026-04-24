@@ -6,7 +6,7 @@
 
 (def default-installed-psi-version
   "Explicit launcher-owned default psi version identity for installed mode."
-  "main")
+  "11f9c9f582dbe3a9fb1689ffcfd9f00c52bf2f6a")
 
 (def default-psi-git-url
   "Explicit launcher-owned psi source identity for installed mode."
@@ -18,7 +18,7 @@
     :source-policies
     {:development {:local/root "extensions/auto-session-name"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/auto-session-name"}}}
 
    'psi/commit-checks
@@ -26,7 +26,7 @@
     :source-policies
     {:development {:local/root "extensions/commit-checks"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/commit-checks"}}}
 
    'psi/hello-ext
@@ -34,7 +34,7 @@
     :source-policies
     {:development {:local/root "extensions/hello-ext"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/hello-ext"}}}
 
    'psi/lsp
@@ -42,7 +42,7 @@
     :source-policies
     {:development {:local/root "extensions/lsp"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/lsp"}}}
 
    'psi/mcp-tasks-run
@@ -50,7 +50,7 @@
     :source-policies
     {:development {:local/root "extensions/mcp-tasks-run"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/mcp-tasks-run"}}}
 
    'psi/mementum
@@ -58,7 +58,7 @@
     :source-policies
     {:development {:local/root "extensions/mementum"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/mementum"}}}
 
    'psi/munera
@@ -66,7 +66,7 @@
     :source-policies
     {:development {:local/root "extensions/munera"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/munera"}}}
 
    'psi/plan-state-learning
@@ -74,7 +74,7 @@
     :source-policies
     {:development {:local/root "extensions/plan-state-learning"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/plan-state-learning"}}}
 
    'psi/work-on
@@ -82,7 +82,7 @@
     :source-policies
     {:development {:local/root "extensions/work-on"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/work-on"}}}
 
    'psi/workflow-loader
@@ -90,7 +90,7 @@
     :source-policies
     {:development {:local/root "extensions/workflow-loader"}
      :installed   {:git/url default-psi-git-url
-                   :git/tag default-installed-psi-version
+                   :git/sha default-installed-psi-version
                    :deps/root "extensions/workflow-loader"}}}})
 
 (defn coordinate-family
@@ -209,7 +209,7 @@
            merged          (cond-> dep
                              (or (nil? explicit-family)
                                  (= explicit-family default-family))
-                             (merge defaults)
+                             (#(merge defaults %))
                              true
                              (assoc :psi/init (or (:psi/init dep) (:psi/init entry))))]
        (validate-coordinate-family! lib merged))

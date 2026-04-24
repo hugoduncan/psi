@@ -55,13 +55,9 @@
                nrepl/nrepl {:mvn/version "1.5.1"}}
              (:deps (with-redefs [launcher/repo-basis-config (constantly repo-config)]
                       (launcher/psi-self-basis "/repo/psi" :development))))))
-    (testing "installed policy rewrites local roots to git deps/root entries"
-      (is (= '{psi/main {:git/url "https://github.com/hugoduncan/psi.git"
-                         :git/tag "main"
-                         :deps/root "bases/main"}
-               psi/app-runtime {:git/url "https://github.com/hugoduncan/psi.git"
-                                :git/tag "main"
-                                :deps/root "components/app-runtime"}
+    (testing "installed policy keeps repo component roots coherent via absolute local roots"
+      (is (= '{psi/main {:local/root "/repo/psi/bases/main"}
+               psi/app-runtime {:local/root "/repo/psi/components/app-runtime"}
                org.clojure/clojure {:mvn/version "1.12.4"}
                nrepl/nrepl {:mvn/version "1.5.1"}}
              (:deps (with-redefs [launcher/repo-basis-config (constantly repo-config)]
@@ -78,7 +74,7 @@
 
 (deftest manifest-state-test
   (testing "manifest state reports defaulted and inferred libs from expansion results"
-    (let [user-manifest {:deps {'psi/mementum {:git/tag "release-tag"}}}
+    (let [user-manifest {:deps {'psi/mementum {:git/sha "release-sha"}}}
           project-manifest {:deps {'psi/mementum {:git/sha "override-sha"}
                                    'third-party/ext {:mvn/version "1.0.0"}}}]
       (with-redefs [launcher/user-manifest-path (constantly "/tmp/user.edn")

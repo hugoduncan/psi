@@ -54,14 +54,13 @@
 (deftest expand-entry-test
   (testing "recognized psi-owned entry expands from minimal syntax"
     (is (= '{:git/url "https://github.com/hugoduncan/psi.git"
-             :git/tag "main"
+             :git/sha "11f9c9f582dbe3a9fb1689ffcfd9f00c52bf2f6a"
              :deps/root "extensions/mementum"
              :psi/init extensions.mementum/init}
            (ext/expand-entry 'psi/mementum {}))))
   (testing "explicit fields override catalog defaults field-by-field"
     (is (= '{:git/url "https://github.com/hugoduncan/psi.git"
              :git/sha "override-sha"
-             :git/tag "main"
              :deps/root "extensions/mementum"
              :psi/init extensions.mementum/init}
            (ext/expand-entry 'psi/mementum {:git/sha "override-sha"}))))
@@ -89,7 +88,7 @@
 
 (deftest expand-manifest-test
   (is (= '{:deps {psi/mementum {:git/url "https://github.com/hugoduncan/psi.git"
-                                :git/tag "main"
+                                :git/sha "11f9c9f582dbe3a9fb1689ffcfd9f00c52bf2f6a"
                                 :deps/root "extensions/mementum"
                                 :psi/init extensions.mementum/init}
                   third-party/ext {:mvn/version "1.0.0"}}}
@@ -100,7 +99,7 @@
 (deftest manifest-expansion-report-test
   (testing "minimal psi-owned entry reports defaults and inferred init"
     (is (= {:expanded-manifest '{:deps {psi/mementum {:git/url "https://github.com/hugoduncan/psi.git"
-                                                      :git/tag "main"
+                                                      :git/sha "11f9c9f582dbe3a9fb1689ffcfd9f00c52bf2f6a"
                                                       :deps/root "extensions/mementum"
                                                       :psi/init extensions.mementum/init}}}
             :defaulted-libs ['psi/mementum]
@@ -111,7 +110,6 @@
   (testing "partially explicit psi-owned entry still reports defaults and inferred init"
     (is (= {:expanded-manifest '{:deps {psi/mementum {:git/url "https://github.com/hugoduncan/psi.git"
                                                       :git/sha "override-sha"
-                                                      :git/tag "main"
                                                       :deps/root "extensions/mementum"
                                                       :psi/init extensions.mementum/init}}}
             :defaulted-libs ['psi/mementum]
