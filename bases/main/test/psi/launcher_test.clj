@@ -74,8 +74,8 @@
 
 (deftest manifest-state-test
   (testing "manifest state reports defaulted and inferred libs from expansion results"
-    (let [user-manifest {:deps {'psi/mementum {:git/sha "release-sha"}}}
-          project-manifest {:deps {'psi/mementum {:git/sha "override-sha"}
+    (let [user-manifest {:deps {'psi/mementum {:local/root "user-root"}}}
+          project-manifest {:deps {'psi/mementum {}
                                    'third-party/ext {:mvn/version "1.0.0"}}}]
       (with-redefs [launcher/user-manifest-path (constantly "/tmp/user.edn")
                     launcher/project-manifest-path (constantly "/tmp/project.edn")
@@ -84,9 +84,9 @@
                                                       "/tmp/user.edn" user-manifest
                                                       "/tmp/project.edn" project-manifest))]
         (is (= ['psi/mementum]
-               (:defaulted-libs (launcher/manifest-state "/repo/project" :installed))))
+               (:defaulted-libs (launcher/manifest-state "/repo/psi" "/repo/project" :installed))))
         (is (= ['psi/mementum]
-               (:inferred-init-libs (launcher/manifest-state "/repo/project" :installed))))))))
+               (:inferred-init-libs (launcher/manifest-state "/repo/psi" "/repo/project" :installed))))))))
 
 (deftest launch-plan-test
   (let [basis-state {:basis {:deps {'foo/bar {:mvn/version "1.0.0"}}}

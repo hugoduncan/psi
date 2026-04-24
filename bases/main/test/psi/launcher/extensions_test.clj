@@ -48,25 +48,21 @@
   (testing "catalog entry contains explicit init and installed policy"
     (is (= 'extensions.mementum/init
            (get-in ext/psi-owned-extension-catalog ['psi/mementum :psi/init])))
-    (is (= "https://github.com/hugoduncan/psi.git"
-           (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :installed :git/url])))))
+    (is (= "extensions/mementum"
+           (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :installed :local/root])))))
 
 (deftest expand-entry-test
   (testing "recognized psi-owned entry expands from minimal syntax"
-    (is (= '{:git/url "https://github.com/hugoduncan/psi.git"
-             :git/sha "11f9c9f582dbe3a9fb1689ffcfd9f00c52bf2f6a"
-             :deps/root "extensions/mementum"
+    (is (= '{:local/root "extensions/mementum"
              :psi/init extensions.mementum/init}
            (ext/expand-entry 'psi/mementum {}))))
   (testing "explicit fields override catalog defaults field-by-field"
-    (is (= '{:git/url "https://github.com/hugoduncan/psi.git"
-             :git/sha "override-sha"
-             :deps/root "extensions/mementum"
+    (is (= '{:local/root "override-root"
              :psi/init extensions.mementum/init}
-           (ext/expand-entry 'psi/mementum {:git/sha "override-sha"}))))
+           (ext/expand-entry 'psi/mementum {:local/root "override-root"}))))
   (testing "explicit init overrides inferred init"
     (is (= 'custom.mementum/init
-           (:psi/init (ext/expand-entry 'psi/mementum {:git/sha "override-sha"
+           (:psi/init (ext/expand-entry 'psi/mementum {:local/root "override-root"
                                                        :psi/init 'custom.mementum/init})))))
   (testing "unrecognized libs do not receive psi-owned defaults"
     (is (= '{:mvn/version "1.2.3"}
@@ -87,9 +83,7 @@
                                                              :git/tag "v1"}))))))
 
 (deftest expand-manifest-test
-  (is (= '{:deps {psi/mementum {:git/url "https://github.com/hugoduncan/psi.git"
-                                :git/sha "11f9c9f582dbe3a9fb1689ffcfd9f00c52bf2f6a"
-                                :deps/root "extensions/mementum"
+  (is (= '{:deps {psi/mementum {:local/root "extensions/mementum"
                                 :psi/init extensions.mementum/init}
                   third-party/ext {:mvn/version "1.0.0"}}}
          (ext/expand-manifest
@@ -98,9 +92,7 @@
 
 (deftest manifest-expansion-report-test
   (testing "minimal psi-owned entry reports defaults and inferred init"
-    (is (= {:expanded-manifest '{:deps {psi/mementum {:git/url "https://github.com/hugoduncan/psi.git"
-                                                      :git/sha "11f9c9f582dbe3a9fb1689ffcfd9f00c52bf2f6a"
-                                                      :deps/root "extensions/mementum"
+    (is (= {:expanded-manifest '{:deps {psi/mementum {:local/root "extensions/mementum"
                                                       :psi/init extensions.mementum/init}}}
             :defaulted-libs ['psi/mementum]
             :inferred-init-libs ['psi/mementum]}
@@ -108,18 +100,16 @@
             (ext/manifest-expansion-report '{:deps {psi/mementum {}}})
             [:expanded-manifest :defaulted-libs :inferred-init-libs]))))
   (testing "partially explicit psi-owned entry still reports defaults and inferred init"
-    (is (= {:expanded-manifest '{:deps {psi/mementum {:git/url "https://github.com/hugoduncan/psi.git"
-                                                      :git/sha "override-sha"
-                                                      :deps/root "extensions/mementum"
+    (is (= {:expanded-manifest '{:deps {psi/mementum {:local/root "override-root"
                                                       :psi/init extensions.mementum/init}}}
-            :defaulted-libs ['psi/mementum]
+            :defaulted-libs []
             :inferred-init-libs ['psi/mementum]}
            (select-keys
-            (ext/manifest-expansion-report '{:deps {psi/mementum {:git/sha "override-sha"}}})
+            (ext/manifest-expansion-report '{:deps {psi/mementum {:local/root "override-root"}}})
             [:expanded-manifest :defaulted-libs :inferred-init-libs]))))
   (testing "explicit init suppresses inferred-init reporting"
     (is (= []
            (:inferred-init-libs
             (ext/manifest-expansion-report
-             '{:deps {psi/mementum {:git/sha "override-sha"
+             '{:deps {psi/mementum {:local/root "override-root"
                                     :psi/init custom.mementum/init}}}))))))

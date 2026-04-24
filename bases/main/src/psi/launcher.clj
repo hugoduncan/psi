@@ -108,7 +108,7 @@
       (update :deps assoc 'nrepl/nrepl {:mvn/version "1.5.1"})))
 
 (defn manifest-state
-  [cwd policy]
+  [launcher-root cwd policy]
   (let [home               (System/getProperty "user.home")
         user-path          (user-manifest-path home)
         project-path       (project-manifest-path cwd)
@@ -116,7 +116,13 @@
         project-manifest   (extensions/read-manifest-file project-path)
         merged-manifest    (extensions/merge-manifests user-manifest project-manifest)
         expansion-report   (extensions/manifest-expansion-report merged-manifest {:policy policy})
-        expanded-manifest  (:expanded-manifest expansion-report)]
+        expanded-manifest0 (:expanded-manifest expansion-report)
+        expanded-manifest  (update expanded-manifest0 :deps
+                                   (fn [deps]
+                                     (into {}
+                                           (map (fn [[lib dep]]
+                                                  [lib (absolutize-local-root launcher-root dep)]))
+                                           deps)))]
     {:user-path          user-path
      :project-path       project-path
      :user-present?      (.exists (io/file user-path))
@@ -147,7 +153,10 @@
 (defn- installed-project-local-lib?
   [launcher-root cwd dep]
   (when-let [local-root (:local/root dep)]
-    (let [dep-path     (.getCanonicalPath (io/file cwd local-root))
+    (let [dep-file      (io/file local-root)
+          dep-path      (.getCanonicalPath (if (.isAbsolute dep-file)
+                                             dep-file
+                                             (io/file cwd local-root)))
           launcher-path (.getCanonicalPath (io/file launcher-root))]
       (.startsWith dep-path launcher-path))))
 
@@ -166,7 +175,7 @@
 (defn startup-basis
   [launcher-root cwd policy]
   (let [self-basis       (update (psi-self-basis launcher-root policy) :deps basis-deps)
-        manifest-info0   (manifest-state cwd policy)
+        manifest-info0   (manifest-state launcher-root cwd policy)
         expanded-deps    (->> (get-in manifest-info0 [:expanded-manifest :deps])
                               (map (fn [[lib dep]]
                                      [lib (-> (materialize-manifest-dep launcher-root cwd policy dep)

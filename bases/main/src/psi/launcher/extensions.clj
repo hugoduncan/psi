@@ -17,81 +17,61 @@
    {:psi/init 'extensions.auto_session_name/init
     :source-policies
     {:development {:local/root "extensions/auto-session-name"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/auto-session-name"}}}
+     :installed   {:local/root "extensions/auto-session-name"}}}
 
    'psi/commit-checks
    {:psi/init 'extensions.commit_checks/init
     :source-policies
     {:development {:local/root "extensions/commit-checks"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/commit-checks"}}}
+     :installed   {:local/root "extensions/commit-checks"}}}
 
    'psi/hello-ext
    {:psi/init 'extensions.hello_ext/init
     :source-policies
     {:development {:local/root "extensions/hello-ext"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/hello-ext"}}}
+     :installed   {:local/root "extensions/hello-ext"}}}
 
    'psi/lsp
    {:psi/init 'extensions.lsp/init
     :source-policies
     {:development {:local/root "extensions/lsp"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/lsp"}}}
+     :installed   {:local/root "extensions/lsp"}}}
 
    'psi/mcp-tasks-run
    {:psi/init 'extensions.mcp_tasks_run/init
     :source-policies
     {:development {:local/root "extensions/mcp-tasks-run"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/mcp-tasks-run"}}}
+     :installed   {:local/root "extensions/mcp-tasks-run"}}}
 
    'psi/mementum
    {:psi/init 'extensions.mementum/init
     :source-policies
     {:development {:local/root "extensions/mementum"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/mementum"}}}
+     :installed   {:local/root "extensions/mementum"}}}
 
    'psi/munera
    {:psi/init 'extensions.munera/init
     :source-policies
     {:development {:local/root "extensions/munera"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/munera"}}}
+     :installed   {:local/root "extensions/munera"}}}
 
    'psi/plan-state-learning
    {:psi/init 'extensions.plan_state_learning/init
     :source-policies
     {:development {:local/root "extensions/plan-state-learning"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/plan-state-learning"}}}
+     :installed   {:local/root "extensions/plan-state-learning"}}}
 
    'psi/work-on
    {:psi/init 'extensions.work_on/init
     :source-policies
     {:development {:local/root "extensions/work-on"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/work-on"}}}
+     :installed   {:local/root "extensions/work-on"}}}
 
    'psi/workflow-loader
    {:psi/init 'extensions.workflow_loader/init
     :source-policies
     {:development {:local/root "extensions/workflow-loader"}
-     :installed   {:git/url default-psi-git-url
-                   :git/sha default-installed-psi-version
-                   :deps/root "extensions/workflow-loader"}}}})
+     :installed   {:local/root "extensions/workflow-loader"}}}})
 
 (defn coordinate-family
   [dep]
