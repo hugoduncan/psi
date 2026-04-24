@@ -4,4 +4,4 @@
 - [x] Prove session auto-retry statechart path activates for newly classified transport failures
 - [x] Shape workflow execution so child-turn error outcome/stop-reason overrides text extraction and records execution failure with required `:message`
 - [x] Add focused workflow execution tests preventing empty-success envelopes from assistant error turns
-- [ ] Run relevant test suites and record results
+- [x] Run relevant test suites and record results

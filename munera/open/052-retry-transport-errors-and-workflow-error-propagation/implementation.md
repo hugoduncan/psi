@@ -23,3 +23,6 @@ Implementation notes:
 - Focused verification run:
   - `clojure -M:test --focus psi.agent-session.session-test --focus psi.agent-session.statechart-actions-test --focus psi.agent-session.workflow-execution-test`
   - result: `29 tests, 150 assertions, 0 failures`
+- Broader relevant regression run:
+  - `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.workflow-progression-test --focus psi.agent-session.workflow-execution-test`
+  - result: `37 tests, 161 assertions, 0 failures`
