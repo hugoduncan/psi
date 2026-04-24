@@ -24,12 +24,12 @@ Four vertical slices, each independently committable. The footer-model-fn slice 
 1. In `components/app-runtime/src/psi/app_runtime.clj`, add `:footer-model-fn` to the TUI opts map:
    `(fn [] (footer/footer-model ctx @tui-focus*))`.
 
-2. In `components/tui/src/psi/tui/app/support.clj`, thread `:footer-model-fn` from opts into the TUI state map in `build-init`.
+2. In `components/tui/src/psi/tui/app/support.clj`, thread `:footer-model-fn` from opts into the TUI state map in `build-init`. Default to `(constantly {})` when not supplied — this produces a minimal empty footer for tests that don't care about footer content. The default lives here, not in the render path.
 
 3. In `components/tui/src/psi/tui/app/render.clj`:
    - Remove `footer-data` function.
    - Remove `footer-query` re-export.
-   - Rewrite `build-footer-lines` to call `(:footer-model-fn state)` as its sole source of the footer model. When `footer-model-fn` is absent, return minimal empty footer lines.
+   - Rewrite `build-footer-lines` to call `(:footer-model-fn state)` as its sole source of the footer model. No nil-guard — `footer-model-fn` is always present (defaulted in `build-init`).
    - Extract `:session-activity-line` from the footer model and append it to the footer lines when present (dim style, same as status-line).
 
 4. Update `components/tui/test/psi/tui/app_view_runtime_test.clj`:
@@ -58,13 +58,13 @@ Commit: `⚒ 050: prove background-job widget refresh cycle`
 1. Create `components/tui/test/psi/tui/notification_render_test.clj`:
    - Create a real `ui-state` atom via `ui/create-ui-state`.
    - Create `ui-read-fn` returning `(ui/snapshot ui-state-atom)`.
-   - Create `ui-dispatch-fn` that handles `:session/ui-dismiss-expired` by calling `(ui/dismiss-expired! ui-state-atom 0)` (0ms max-age so backdated notifications are dismissed immediately).
+   - Create `ui-dispatch-fn` that handles `:session/ui-dismiss-expired` by calling `(ui/dismiss-expired! ui-state-atom)` with default max-age (5000ms), and `:session/ui-dismiss-overflow` by calling `(ui/dismiss-overflow! ui-state-atom)`.
    - Init TUI state with `make-init` using these fns.
    - Call `(ui/notify! ui-state-atom "test-ext" "Alert: disk full" :warning)`.
-   - Send a window-size message through `update-fn` to trigger a tick (which refreshes `ui-snapshot` and calls dismiss).
+   - Send a window-size message through `update-fn` to trigger a tick. The fresh notification survives dismiss (created < 5s ago). The tick refreshes `ui-snapshot`.
    - Render and assert "Alert: disk full" appears in the view.
    - Backdate the notification's `:created-at` to 0 in the atom (e.g. `swap!` over `:notifications` to set `:created-at` to 0).
-   - Send another window-size message to trigger dismiss-expired.
+   - Send another window-size message to trigger another tick. dismiss-expired now finds the notification > 5s old and dismisses it.
    - Render and assert "Alert: disk full" is gone.
 
 Commit: `⚒ 050: prove notification rendering lifecycle`

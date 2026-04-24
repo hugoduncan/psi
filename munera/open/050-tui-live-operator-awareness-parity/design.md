@@ -81,8 +81,8 @@ Solution: replace this with a single `footer-model-fn` code path.
 
 Concrete changes:
 - In `app-runtime`, add a `:footer-model-fn` to the TUI opts map: `(fn [] (footer/footer-model ctx @tui-focus*))`.
-- In `psi.tui.app.support/build-init`, thread `:footer-model-fn` into the TUI state.
-- In `psi.tui.app.render`, remove `footer-data` and the local `footer-model-from-data` call. `build-footer-lines` calls `(:footer-model-fn state)` as its sole source of footer model data. When `footer-model-fn` is absent (should not happen in production), `build-footer-lines` returns empty/minimal footer lines.
+- In `psi.tui.app.support/build-init`, thread `:footer-model-fn` from opts into the TUI state. When not supplied, default to `(constantly {})` — this produces a minimal empty footer. The default lives in `build-init`, not in the render path. `build-footer-lines` always calls `footer-model-fn` unconditionally.
+- In `psi.tui.app.render`, remove `footer-data` and the local `footer-model-from-data` call. `build-footer-lines` calls `(:footer-model-fn state)` as its sole source of footer model data. No nil-guard in the render path — `footer-model-fn` is always present.
 - In `build-footer-lines`, extract `:session-activity-line` from the footer model and append it to the footer lines when present (same dim style as the status line).
 - Remove the `footer-query` re-export from `psi.tui.app.render` since the TUI no longer queries footer data directly.
 - Update existing footer tests (`app_view_runtime_test.clj`) to supply `footer-model-fn` instead of `query-fn` for footer data. Tests construct footer models via `footer-model-from-data` with test data — this is cleaner because the test controls exactly what the footer model contains without mocking EQL queries.
@@ -104,14 +104,15 @@ This proves the live refresh cycle through the same path the real TUI uses.
 Write a test in a new `notification_render_test.clj` that:
 - creates a real `ui-state` atom via `ui/create-ui-state`
 - creates a `ui-read-fn` that returns `(ui/snapshot ui-state-atom)`
-- initializes TUI state with `make-init` using this `ui-read-fn` and a `ui-dispatch-fn` that calls `ui/dismiss-expired!` and `ui/dismiss-overflow!` on the atom
+- initializes TUI state with `make-init` using this `ui-read-fn` and a `ui-dispatch-fn` that handles `:session/ui-dismiss-expired` by calling `(ui/dismiss-expired! ui-state-atom)` with default max-age (5000ms) and `:session/ui-dismiss-overflow` by calling `(ui/dismiss-overflow! ui-state-atom)`
 - calls `ui/notify!` to add a notification
+- triggers a tick cycle via a window-size message (which refreshes `ui-snapshot` and calls dismiss — the fresh notification survives because it was created < 5s ago)
 - renders the view and asserts the notification message text appears
-- backdates the notification's `:created-at` in the atom to simulate time passage (same technique as `extension_ui_test.clj` line 110 — directly manipulate the notification map in the atom)
-- triggers a tick cycle (which calls dismiss-expired via `ui-dispatch-fn`)
+- backdates the notification's `:created-at` to 0 in the atom to simulate time passage (same technique as `extension_ui_test.clj` line 110 — directly manipulate the notification map in the atom)
+- triggers another tick cycle (dismiss-expired now finds the notification > 5s old and dismisses it)
 - renders the view and asserts the notification message text is gone
 
-This avoids real time delays by directly manipulating `:created-at`, following the established pattern in `extension_ui_test.clj`.
+This avoids real time delays by directly manipulating `:created-at`, following the established pattern in `extension_ui_test.clj`. The default 5000ms max-age means fresh notifications survive dismiss on the first tick, and backdated ones are dismissed on the second tick.
 
 **4. Frontend-action cancel feedback (proof)**
 
