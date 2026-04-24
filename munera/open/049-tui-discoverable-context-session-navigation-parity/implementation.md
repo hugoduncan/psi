@@ -37,3 +37,14 @@ Risks / snags
 - Direct activation now routes through backend-projected line action commands, so future widget action-shape changes should continue to preserve backend ownership rather than teaching the TUI alternate local semantics.
 - The normal-view interaction is intentionally lightweight (`Ctrl+J/K`, `Alt+Enter`) rather than a broader transcript cursor/navigation redesign.
 - Task 049 was reopened to address review feedback and the follow-on fixes are now implemented and verified in focused and broader relevant test slices.
+
+Review-fix follow-on evaluation
+
+- Evaluated whether the visible context-widget interaction helpers in `psi.tui.app.update` should move to a dedicated helper namespace.
+  - Decision: not yet.
+  - Reason: the current helpers are few, tightly coupled to the TUI idle/update state machine, and small enough that extraction would add namespace indirection without reducing conceptual load.
+  - Trigger for later extraction: if more visible widget interaction modes accumulate beyond the current context-session-tree selection/activation path, extract them as a focused TUI widget-interaction helper surface.
+- Evaluated whether TUI context invalidation should converge further with the generalized RPC projection-listener/invalidation path.
+  - Decision: not in this task.
+  - Reason: the current TUI ownership is intentionally narrow and event-driven; `:context-updated` already gives authoritative add/preserve/remove semantics at the runtime transition points this task needs.
+  - Trigger for later convergence: if TUI begins to require broader live projection invalidation semantics outside current context transition points, revisit a shared listener/invalidation abstraction rather than growing ad hoc TUI refresh paths.

@@ -14,3 +14,5 @@
 - [x] Run targeted TUI tests.
 - [x] Run the relevant broader test slice if targeted changes touch shared adapter/runtime seams.
 - [x] Update `implementation.md` with decisions and discoveries while executing.
+- [x] Evaluate whether the visible context-widget interaction helpers in `psi.tui.app.update` should be extracted into a small dedicated helper namespace if more TUI widget interactions accumulate.
+- [x] Evaluate whether TUI context invalidation should converge further with the generalized projection-listener/invalidation path used by RPC if future live context-update needs expand beyond the current runtime transition points.
