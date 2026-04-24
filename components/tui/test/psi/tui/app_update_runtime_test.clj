@@ -398,3 +398,22 @@
       (is (= "Unsupported frontend action: :select-unknown"
              (get-in s1 [:messages 1 :text])))
       (is (= "x" (text-input/value (:input s2)))))))
+
+(deftest frontend-action-cancel-feedback-visible-in-transcript-test
+  (testing "cancelled model picker produces a visible assistant message in the transcript"
+    (let [update-fn (app/make-update (fn [_ _]))
+          action    (ui-actions/model-picker-action [{:provider "openai"
+                                                      :id "gpt-5.3"
+                                                      :reasoning true}])
+          handler   (fn [action-result]
+                      (let [{:ui.result/keys [status message]} action-result]
+                        (when (= :cancelled status)
+                          {:type :text :message message})))
+          state     (init-state "test-model" {:frontend-action-handler-fn! handler})
+          [opened _]  (app-update/handle-dispatch-result state {:type :frontend-action
+                                                                :request-id "req-cancel"
+                                                                :ui/action action})
+          [closed _]  (update-fn opened (msg/key-press :escape))
+          last-msg    (last (:messages closed))]
+      (is (= :assistant (:role last-msg)))
+      (is (= "Cancelled select-model." (:text last-msg))))))
