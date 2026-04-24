@@ -26,3 +26,7 @@ Implementation notes:
 - Broader relevant regression run:
   - `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.workflow-progression-test --focus psi.agent-session.workflow-execution-test`
   - result: `37 tests, 161 assertions, 0 failures`
+- Review follow-on notes:
+  - current retry-guard proof is strong but still split across guard truthiness and handler-effect verification rather than one more direct statechart-path proof
+  - `should-retry?` currently returns truthy values rather than a strict boolean and should be tightened for clarity
+  - workflow execution currently branches on `:stop-reason`; review whether it should instead branch on canonical assistant-message classification for tighter architectural alignment
