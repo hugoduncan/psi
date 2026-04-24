@@ -1,4 +1,4 @@
-{:paths ["bb" "bb/src" ".bbum/lib" "bases/main/src"]
+{:paths ["bb" ".bbum/lib" "bases/main/src"]
  :bbin/bin {psi {:main-opts ["-m" "psi.launcher-main"]}}
  :tasks
  {:requires ([babashka.tasks :refer [shell]]
