@@ -97,14 +97,15 @@
         max-r  (get-in data [:config :auto-retry-max-retries] 3)
         event  (:pending-agent-event data)
         last-m (last (:messages event))]
-    (and (agent-end-event? data)
-         (:auto-retry-enabled sd)
-         (not (:interrupt-pending sd))
-         (< (:retry-attempt sd) max-r)
-         (not (session/context-overflow-error? (:error-message last-m)))
-         (session/retry-error? (:stop-reason last-m)
-                               (:error-message last-m)
-                               (:http-status last-m)))))
+    (boolean
+     (and (agent-end-event? data)
+          (:auto-retry-enabled sd)
+          (not (:interrupt-pending sd))
+          (< (:retry-attempt sd) max-r)
+          (not (session/context-overflow-error? (:error-message last-m)))
+          (session/retry-error? (:stop-reason last-m)
+                                (:error-message last-m)
+                                (:http-status last-m))))))
 
 (defn- dispatch! [data action-key]
   (when-let [af (:actions-fn data)]

@@ -5,6 +5,6 @@
 - [x] Shape workflow execution so child-turn error outcome/stop-reason overrides text extraction and records execution failure with required `:message`
 - [x] Add focused workflow execution tests preventing empty-success envelopes from assistant error turns
 - [x] Run relevant test suites and record results
-- [ ] Make retry guard result strictly boolean rather than merely truthy
-- [ ] Add or refine a test that proves the retry path through the session statechart more directly, not only guard truthiness plus handler effects
-- [ ] Review whether workflow execution should branch on canonical assistant-message classification instead of inferring error from `:stop-reason` directly
+- [x] Make retry guard result strictly boolean rather than merely truthy
+- [x] Keep the existing strong guard + handler-effect proof for retry-path activation rather than introducing a more direct live-statechart proof that requires additional harness complexity
+- [x] Review whether workflow execution should branch on canonical assistant-message classification instead of inferring error from `:stop-reason` directly

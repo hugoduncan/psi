@@ -206,7 +206,7 @@
                                                   :messages [{:role "assistant"
                                                               :stop-reason :error
                                                               :error-message "Premature end of chunk coded message body: closing chunk expected"}]}}]
-      (is (boolean (should-retry? guard-data)))
+      (is (true? (should-retry? guard-data)))
       (with-registered-handlers
         ctx
         #(let [result (invoke-handler ctx :on-retry-triggered {:session-id session-id})]

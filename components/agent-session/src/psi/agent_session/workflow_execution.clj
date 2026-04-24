@@ -14,6 +14,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.prompt-control :as prompt-control]
+   [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
@@ -96,17 +97,22 @@
                (clojure.string/join "\n"))
       "Assistant turn ended in error"))
 
+(defn- assistant-turn-classification
+  [assistant-message]
+  (prompt-recording/classify-assistant-message assistant-message))
+
 (defn- execution-failure-payload
   [execution-session-id assistant-message]
-  (cond-> {:message (assistant-error-message assistant-message)}
-    (:stop-reason assistant-message)
-    (assoc :stop-reason (:stop-reason assistant-message))
+  (let [{:keys [turn/outcome]} (assistant-turn-classification assistant-message)]
+    (cond-> {:message (assistant-error-message assistant-message)}
+      (:stop-reason assistant-message)
+      (assoc :stop-reason (:stop-reason assistant-message))
 
-    (= :error (:stop-reason assistant-message))
-    (assoc :turn-outcome :turn.outcome/error)
+      (= :turn.outcome/error outcome)
+      (assoc :turn-outcome outcome)
 
-    execution-session-id
-    (assoc :session-id execution-session-id)))
+      execution-session-id
+      (assoc :session-id execution-session-id))))
 
 (defn- compose-system-prompt
   [base-system-prompt framing-prompt]
@@ -228,7 +234,8 @@
     (try
       (prompt-control/prompt-in! ctx (:session-id execution-session) prompt)
       (let [assistant-message (prompt-control/last-assistant-message-in ctx (:session-id execution-session))
-            failure-payload   (when (= :error (:stop-reason assistant-message))
+            {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
+            failure-payload   (when (= :turn.outcome/error outcome)
                                 (execution-failure-payload (:session-id execution-session) assistant-message))]
         (if failure-payload
           (do
