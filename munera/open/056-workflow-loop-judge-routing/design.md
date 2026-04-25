@@ -169,9 +169,12 @@ Separating the judge from the actor keeps actor steps fully reusable — the bui
 #### Judge schema
 
 ```clojure
-{:prompt "..."              ; narrow decision prompt
+{:prompt "..."              ; user-turn prompt — the decision question sent to the judge
+ :system-prompt "..."       ; optional system prompt for the judge session
  :projection <projection>}  ; how much actor context to carry over
 ```
+
+The `:prompt` is the **user message** — the specific question the judge must answer (e.g. "Respond exactly: APPROVED or REVISE"). The optional `:system-prompt` sets the judge session's system prompt (e.g. "You are a workflow routing judge. Respond with exactly one word."). When `:system-prompt` is absent, the judge session gets no system prompt — only the projected context and the user prompt.
 
 #### Projection
 
@@ -210,17 +213,20 @@ Maps signal strings to routing directives:
 | Key | Type | Meaning |
 |-----|------|---------|
 | `:goto` | `:next`, `:previous`, `:done`, or step-id string | Where to route |
-| `:max-iterations` | `pos-int?` | Bound on how many times this step can be looped to |
+| `:max-iterations` | `pos-int?` | Bound on how many times the **target step** can be entered |
 
-- `:goto :next` — advance to next step in definition order (current linear behavior)
+- `:goto :next` — advance to next step in definition order (current linear behavior). When the current step is the last in order, this completes the workflow (equivalent to `:goto :done`).
 - `:goto :done` — complete the workflow immediately
 - `:goto :previous` — jump to previous step in definition order
 - `:goto "step-id"` — jump to a named step
-- `:max-iterations` — per-step iteration count; when exhausted, the workflow **fails**
+
+**`:max-iterations`** is declared on the directive but the counter is **per-step** — all gotos targeting the same step share a single counter. If multiple directives target the same step with different `:max-iterations` values, the limit from the directive that fires is checked against the shared counter. The first directive to find the counter exhausted triggers failure.
 
 When `:on` is absent, the implicit routing table is `{:ok {:goto :next}}` — identical to today's behavior.
 
-Iteration counting is **per-step** — all gotos targeting the same step share a single counter.
+#### Goto targets in file format vs compiled step-ids
+
+In the `.psi/workflows/*.md` file format, `:goto` values use **workflow names** (e.g. `"builder"`), matching the `:workflow` key on other steps. The compiler resolves these to compiled step-ids (e.g. `"step-2-builder"`) during compilation, using the same name→step-id mapping used for step references. This keeps the file format author-friendly while the runtime operates on canonical step-ids.
 
 ### Step run state additions
 
@@ -231,7 +237,9 @@ Iteration counting is **per-step** — all gotos targeting the same step share a
 | `:judge-event` | `string?` | The matched signal |
 | `:iteration-count` | `int` | How many times this step has been entered (per-step) |
 
-### Execution flow (statechart-driven)
+### Execution flow
+
+#### Phase A (statechart-driven, target architecture)
 
 ```
 1. Statechart enters step state
@@ -250,6 +258,26 @@ Iteration counting is **per-step** — all gotos targeting the same step share a
    b. No  → transition to next step state (implicit {:ok {:goto :next}})
 5. Exit action: record result + judge result into context
 ```
+
+#### Phase B (progression-layer, first cut)
+
+In Phase B, `execute-current-step!` is extended with a post-actor judge phase:
+
+```
+1. Actor step executes → :ok envelope
+2. Step has :judge?
+   a. Yes → DO NOT call submit-result-envelope (which would advance to next step)
+          → instead: record :ok result on step-run (without advancing)
+          → call execute-judge! → get routing result
+          → apply routing result via new progression path:
+              :goto → set current-step-id to target, increment target iteration count
+              :complete → transition to :completed
+              :fail → transition to :failed
+   b. No  → existing path: call submit-result-envelope (advances to next step)
+3. execute-run! loop unchanged — picks up whatever current-step-id was set
+```
+
+The key invariant: for judged steps, the judge routing **replaces** the normal `submit-result-envelope` advancement. The actor's `:ok` result is recorded, but `current-step-id` is set by the routing directive, not by `next-step-id-fn`.
 
 ### File format
 
@@ -288,7 +316,8 @@ No special loop-feedback binding source in the first cut. The goto target gets i
 4. **Iteration counting** → **per-step**. All gotos targeting the same step share one counter.
 5. **Loop-back input bindings** → **no** for now. The goto target re-executes with its normal input bindings (`:workflow-input`, `:step-output` from prior accepted results). No special `:loop-feedback` binding source. Can be added later if needed.
 6. **Judge retry limit** → **fixed at 2** retries (3 total attempts). Not configurable per judge in the first cut.
-7. **Judge system prompt** → **author-provided** via the `:judge {:prompt "..."}` field. No auto-generation from `:on` keys. The author is responsible for instructing the judge to produce one of the expected signals.
+7. **Judge system prompt** → **author-provided** via the optional `:judge {:system-prompt "..."}` field. No auto-generation from `:on` keys. The author is responsible for instructing the judge to produce one of the expected signals. The `:judge {:prompt "..."}` is the user-turn question.
+8. **Statechart events in Phase B vs A** → Phase B adds `:verdict/advance`, `:verdict/goto`, `:verdict/exhausted` as **history markers** for observability. They are appended to the run's history log but do not drive execution (the imperative code does). Phase A will use signal strings as actual statechart events that drive transitions.
 
 ## Open questions
 

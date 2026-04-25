@@ -4,7 +4,7 @@
 
 ### Slice 1 — Model schemas
 - [ ] Add `projection-schema` to `workflow_model.clj`
-- [ ] Add `judge-schema` to `workflow_model.clj`
+- [ ] Add `judge-schema` to `workflow_model.clj` (`:prompt`, optional `:system-prompt`, optional `:projection`)
 - [ ] Add `routing-directive-schema` to `workflow_model.clj`
 - [ ] Add `routing-table-schema` to `workflow_model.clj`
 - [ ] Extend `workflow-step-definition-schema` with optional `:judge` and `:on`
@@ -46,16 +46,16 @@
 
 ### Slice 6 — Execution: wire judge into step execution
 - [ ] After actor `:ok` completion, check step def for `:judge`
-- [ ] If judge: call `execute-judge!`, apply routing via progression
-- [ ] If no judge: existing advance path unchanged
+- [ ] If judge: record actor result on step-run WITHOUT calling `submit-result-envelope`, then call `execute-judge!`, apply routing via new judged-result progression path (judge routing replaces normal advancement)
+- [ ] If no judge: existing advance path unchanged (call `submit-result-envelope`)
 - [ ] `execute-run!` loop handles goto naturally (different `current-step-id`)
 - [ ] Tests: `execute-current-step!` with judge, `execute-run!` with loop
 
 ### Slice 7 — Compiler: thread judge and routing from file format
 - [ ] `compile-multi-step`: thread `:judge` from step config to canonical step def
-- [ ] `compile-multi-step`: thread `:on` from step config to canonical step def
-- [ ] Extend `validate-step-references` to check `:goto` targets in `:on` directives
-- [ ] Tests: compile with judge+on, compile without (unchanged), invalid goto target
+- [ ] `compile-multi-step`: thread `:on` from step config — resolve `:goto` workflow names to compiled step-ids; keywords (`:next`, `:previous`, `:done`) pass through
+- [ ] Extend `validate-step-references` to check resolved `:goto` string targets in `:on` directives
+- [ ] Tests: compile with judge+on (verify workflow-name→step-id resolution), compile without (unchanged), invalid goto target
 
 ### Slice 8 — End-to-end integration and backward compatibility
 - [ ] End-to-end: plan→build→review with judge loop (REVISE→build→review→APPROVED→done)
