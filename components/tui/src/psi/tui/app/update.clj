@@ -588,9 +588,14 @@
   [block]
   (= :thinking (block-type-kw block)))
 
-(defn- tool-call-block?
-  [block]
-  (= :tool-call (block-type-kw block)))
+(defn- content-blocks-seq
+  "Normalize result content to a flat sequence of block maps."
+  [content]
+  (cond
+    (sequential? content) (filter map? content)
+    (and (map? content) (= :structured (block-type-kw (:kind content))))
+    (content-blocks-seq (:blocks content))
+    :else []))
 
 (defn handle-agent-result
   [state result]
@@ -599,32 +604,36 @@
         errors   (message-text/content-error-parts content)
         error    (first errors)
         display  (if (seq (or text "")) text "(no response)")
-        blocks   (cond
-                   (sequential? content) content
-                   (and (map? content)
-                        (= :structured (or (:kind content) (:type content))))
-                   (:blocks content)
-                   :else [])
-        ;; Emit thinking and tool-call blocks in content order, then assistant text.
-        ;; Tool-call blocks become {:role :tool :tool-id ui-id} messages so they
-        ;; render inline with the transcript in the correct position.
-        ;; Resolve the provider tool-id to the ui-id used in tool-calls
-        ;; (ensure-tool-row prefixes with "tool/").
-        resolve-tool-ui-id (fn [provider-id]
-                             (or (get-in state [:tool-ui-id-by-tool-id provider-id])
-                                 (when (contains? (:tool-calls state) provider-id) provider-id)
-                                 (str "tool/" provider-id)))
-        ordered-msgs (keep (fn [b]
-                             (cond
-                               (thinking-block? b)
-                               {:role :thinking :text (:text b)}
-
-                               (tool-call-block? b)
-                               (let [id (or (:id b) (get b "id"))]
-                                 (when id {:role :tool :tool-id (resolve-tool-ui-id id)}))
-
-                               :else nil))
-                           blocks)]
+        ;; Use active-turn-order as the authoritative source for post-turn message
+        ;; ordering when streaming events were received. It was built in real-time
+        ;; and has the exact interleaved order of thinking blocks and tool calls.
+        ;; build-final-content in turn_accumulator puts all thinking first then
+        ;; tool-calls, so we cannot use result content blocks for ordering when
+        ;; active-turn-order is available.
+        ;; When active-turn-order is empty (no streaming events observed, e.g.
+        ;; in tests or edge cases), fall back to scanning result content blocks
+        ;; for thinking entries so they are not silently dropped.
+        order    (:active-turn-order state)
+        items    (:active-turn-items state)
+        ordered-msgs (if (seq order)
+                       (keep (fn [item-id]
+                               (let [item (get items item-id)]
+                                 (case (:item-kind item)
+                                   :thinking
+                                   (when-let [t (not-empty (:text item))]
+                                     {:role :thinking :text t})
+                                   :tool
+                                   {:role :tool :tool-id (:tool-id item)}
+                                   ;; :text items become the assistant message — skip here
+                                   nil)))
+                             order)
+                       ;; Fallback: extract thinking blocks from result content in order.
+                       ;; Tool entries are already in tool-calls/tool-order from streaming.
+                       (keep (fn [block]
+                               (when (thinking-block? block)
+                                 (when-let [t (not-empty (:text block))]
+                                   {:role :thinking :text t})))
+                             (content-blocks-seq content)))]
     [(-> state
          (update :messages into ordered-msgs)
          (update :messages conj {:role :assistant :text display})

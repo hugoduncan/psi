@@ -360,6 +360,71 @@
       (is (str/includes? out "· My reasoning here."))
       (is (str/includes? out "Done.")))))
 
+(deftest archive-on-done-preserves-streaming-arrival-order-tool-then-thinking-test
+  (testing "when tool arrives before thinking during streaming, post-turn messages preserve that order"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          ;; Tool arrives first (content-index 0), then thinking at content-index 2
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0
+                                      :tool-id "t1" :tool-name "read"
+                                      :arguments "{\"path\":\"foo.clj\"}"})
+          [s2 _]    (update-fn s1 {:type :agent-event :event-kind :tool-result
+                                   :tool-id "t1" :tool-name "read"
+                                   :content [{:type :text :text "file content"}]
+                                   :is-error false})
+          [s3 _]    (update-fn s2 {:type :agent-event :event-kind :thinking-delta
+                                   :content-index 2 :text "Post-tool thinking."})
+          ;; Result content has thinking first (build-final-content sorts it that way),
+          ;; but active-turn-order must override that and keep tool before thinking.
+          result    {:role "assistant"
+                     :content [{:type :thinking :text "Post-tool thinking."}
+                               {:type :tool-call :id "t1" :name "read"
+                                :arguments "{\"path\":\"foo.clj\"}"}
+                               {:type :text :text "Done."}]}
+          [s4 _]    (update-fn s3 {:type :agent-result :result result})
+          msgs      (:messages s4)
+          tool-idx  (.indexOf msgs {:role :tool :tool-id "tool/t1"})
+          think-idx (.indexOf msgs {:role :thinking :text "Post-tool thinking."})
+          asst-idx  (.indexOf msgs {:role :assistant :text "Done."})]
+      (is (= :idle (:phase s4)))
+      ;; streaming arrival order: tool before thinking
+      (is (= ["tool/t1" "thinking/2"] (:active-turn-order s3)))
+      ;; post-turn messages must preserve that order
+      (is (< tool-idx think-idx))
+      (is (< think-idx asst-idx)))))
+
+(deftest archive-on-done-view-preserves-streaming-arrival-order-tool-then-thinking-test
+  (testing "rendered view after turn completes shows tool row before thinking line when tool arrived first"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0
+                                      :tool-id "t1" :tool-name "read"
+                                      :arguments "{\"path\":\"foo.clj\"}"})
+          [s2 _]    (update-fn s1 {:type :agent-event :event-kind :tool-result
+                                   :tool-id "t1" :tool-name "read"
+                                   :content [{:type :text :text "file content"}]
+                                   :is-error false})
+          [s3 _]    (update-fn s2 {:type :agent-event :event-kind :thinking-delta
+                                   :content-index 2 :text "Post-tool thinking."})
+          result    {:role "assistant"
+                     :content [{:type :thinking :text "Post-tool thinking."}
+                               {:type :tool-call :id "t1" :name "read"
+                                :arguments "{\"path\":\"foo.clj\"}"}
+                               {:type :text :text "Done."}]}
+          [s4 _]    (update-fn s3 {:type :agent-result :result result})
+          out       (ansi/strip-ansi (app/view s4))
+          tool-pos  (.indexOf out "foo.clj")
+          think-pos (.indexOf out "· Post-tool thinking.")
+          asst-pos  (.indexOf out "Done.")]
+      (is (str/includes? out "foo.clj"))
+      (is (str/includes? out "· Post-tool thinking."))
+      (is (str/includes? out "Done."))
+      ;; tool row before thinking, thinking before assistant text
+      (is (< tool-pos think-pos))
+      (is (< think-pos asst-pos)))))
+
 ;; ── Tool rendering post-turn and ctrl+o toggle ────────────────────────────────
 
 (deftest tool-rows-visible-after-turn-completes-test
