@@ -25,9 +25,9 @@ Recommended execution order:
 
 ## Decisions to make before execution
 
-- Version scheme: calver (`YYYY.0M.0D[.N]`) vs semver (`0.1.0`)?
-  - Recommendation: calver for a tool with frequent cadence; semver if API
-    stability guarantees are needed.
+- Version scheme: **decided** — semver `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count`.
+  - `version.edn` stores `{:major 0 :minor 1}`; patch auto-derived at tag time.
+  - First release: `0.1.1985`.
 - Clojars publish: yes/no? (GitHub Releases + bbin is sufficient for now.)
 - Changelog format: keep-a-changelog (`## [Unreleased]`) vs current freeform?
   - Recommendation: keep-a-changelog; tooling exists.

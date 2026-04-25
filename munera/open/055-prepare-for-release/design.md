@@ -31,14 +31,18 @@ Five parallel tracks, each a focused sub-task:
   versioned sections (`[Unreleased]`, `[x.y.z]`).
 
 ### Track B — bb launcher release management
-- Decide and document the version scheme (calver `YYYY.MM.DD` or semver).
-- Establish how a release version is embedded: a `version.edn` or
-  `resources/psi/version.edn` file read at runtime.
+- Version scheme: `MAJOR.MINOR.PATCH` semver where:
+  - `MAJOR.MINOR` is stored in `version.edn` as `{:major 0 :minor 1}` (bumped manually on breaking change or milestone).
+  - `PATCH` is always auto-derived at build/tag time via `(b/git-count-revs nil)` (`git rev-list HEAD --count`); never committed.
+  - First release will be `0.1.1985` (current count).
+- Establish how a release version is embedded: `version.edn` at repo root stores `{:major 0 :minor 1}`; full version string computed at build time and written to `resources/psi/version.edn`.
 - Provide a `bb release:tag` task that:
-  1. Reads the current `[Unreleased]` changelog section.
-  2. Stamps it with the chosen version + date.
-  3. Writes `resources/psi/version.edn`.
-  4. Commits + tags `vX.Y.Z`.
+  1. Reads `MAJOR.MINOR` from `version.edn`.
+  2. Computes `PATCH` via `git rev-list HEAD --count`.
+  3. Reads the current `[Unreleased]` changelog section.
+  4. Stamps changelog section with the computed version + date.
+  5. Writes full version string to `resources/psi/version.edn`.
+  6. Commits + tags `vMAJOR.MINOR.PATCH`.
 - Document the bbin install command for end-users pointing at a tag.
 
 ### Track C — Jar build
@@ -88,5 +92,6 @@ Five parallel tracks, each a focused sub-task:
   additive.
 - Keep the version scheme consistent across launcher, jar manifest, and
   GitHub Release tag.
+- `version.edn` stores only `{:major 0 :minor 1}`; patch is never committed.
 - `bb release:tag` must be idempotent (re-running on an already-tagged commit
   is a no-op or a clear error).

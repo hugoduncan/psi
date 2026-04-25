@@ -1,8 +1,9 @@
 # Steps — 055 prepare-for-release
 
 ## Track B — launcher version scheme
-- [ ] Decide version scheme (calver vs semver) — needs human decision
-- [ ] Create `resources/psi/version.edn` with `{:version "unreleased"}`
+- [x] Decide version scheme — semver `MAJOR.MINOR.PATCH`, PATCH = git-count-revs, starts at `0.1`
+- [ ] Create `version.edn` at repo root: `{:major 0 :minor 1}`
+- [ ] Create `resources/psi/version.edn` placeholder: `{:version "unreleased"}` (overwritten at tag time)
 - [ ] Add `psi.version` namespace that reads the resource at startup
 - [ ] Expose `--version` flag in `launcher-main`
 - [ ] Write `bb release:tag` task (reads changelog, stamps version, commits, tags)
