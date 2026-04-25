@@ -381,8 +381,12 @@
   {:doc  "Fail if CHANGELOG.md has no entries in the [Unreleased] section."
    :task (bb.release/check-changelog! *command-line-args*)}
 
+  release
+  {:doc  "Cut a release and push: stamp changelog, commit, tag, reset, then push master + tags to origin."
+   :task (bb.release/release-and-push! *command-line-args*)}
+
   release:tag
-  {:doc  "Cut a release: stamp changelog, bake version, commit, tag vMAJOR.MINOR.PATCH, reset to unreleased."
+  {:doc  "Cut a release (tag only, no push): stamp changelog, bake version, commit, tag vMAJOR.MINOR.PATCH, reset to unreleased."
    :task (bb.release/release! *command-line-args*)}
 
   ref-report

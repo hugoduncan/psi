@@ -58,6 +58,12 @@ Releases are tagged `vMAJOR.MINOR.PATCH` on the
 [releases page](https://github.com/hugoduncan/psi/releases).
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
+Each release is also published to [Clojars](https://clojars.org/io.github.hugoduncan/psi)
+as `io.github.hugoduncan/psi`. The launcher auto-detects released versions and
+resolves psi from the Maven cache instead of re-fetching from git — no action
+required. Force a specific resolution strategy with `PSI_LAUNCHER_POLICY`
+(`jar` | `installed` | `development`); see [`doc/cli.md`](doc/cli.md).
+
 Then run psi directly:
 
 ```bash

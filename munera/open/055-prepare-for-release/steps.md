@@ -50,16 +50,17 @@
 ## Track F — release polish (gaps identified post-E)
 
 ### Documentation
-- [ ] Document `:jar` launcher policy in `doc/cli.md` — auto-detection behaviour, `PSI_LAUNCHER_POLICY=jar`, override with `=installed`
-- [ ] Document Clojars artifact in README — note that released versions resolve via Maven automatically; bbin git-tag install still works
+- [x] Document `:jar` launcher policy in `doc/cli.md` — auto-detection behaviour, `PSI_LAUNCHER_POLICY=jar`, override with `=installed`
+- [x] Document Clojars artifact in README — note that released versions resolve via Maven automatically; bbin git-tag install still works
 
 ### Operator experience
-- [ ] Add `bb release` convenience task — runs `bb release:tag` then prints/executes `git push origin master --tags`
-- [ ] `bb deploy` should auto-invoke `bb build:lib` if lib jar is absent (or clearly error with the exact command to run first)
+- [x] Add `bb release` convenience task — `bb release:tag` + `git push origin master --tags` in one step; `bb release:tag` retained for tag-only use
+- [x] `bb deploy` auto-invokes `bb build:lib` if lib jar is absent
 
 ### Release workflow robustness
-- [ ] `release.yml` post-deploy smoke: add a step that exercises `PSI_LAUNCHER_POLICY=jar` against the freshly deployed Clojars artifact — validates the mvn coord is actually fetchable and the launcher `:jar` policy resolves correctly before creating the GH Release
-- [ ] Keep-a-changelog comparison links — add `[Unreleased]:` / `[vX.Y.Z]:` footer links to `CHANGELOG.md` and update `bb release:tag` to maintain them
+- [x] `release.yml` post-deploy smoke: step exercises `PSI_LAUNCHER_POLICY=jar` against the freshly deployed Clojars artifact — validates mvn coord is fetchable and `psi --version` matches the tag before GH Release is created
+- [x] Keep-a-changelog comparison links — `[Unreleased]:` / `[vX.Y.Z]:` footer added to `CHANGELOG.md`; `bb release:tag` (and `bb release`) now maintain them on every stamp
 
 ### Validation
+- [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
 - [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created + `:jar` policy smoke passes

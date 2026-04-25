@@ -31,3 +31,6 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - `/work-on --base <branch>` no longer auto-tracks the base branch on fresh worktree creation.
 - Tool output rows no longer inherit the assistant prefix face in Emacs.
 - Prompt-turn git-head sync no longer duplicated across app-runtime and RPC wrappers.
+
+<!-- Comparison links -->
+[Unreleased]: https://github.com/hugoduncan/psi/compare/master...HEAD

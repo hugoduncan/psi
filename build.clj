@@ -122,16 +122,17 @@
 
 (defn deploy
   "Deploy the library jar to Clojars.
+   Builds the library jar first if it is not already present.
    Requires CLOJARS_USERNAME and CLOJARS_PASSWORD env vars."
-  [_]
+  [opts]
   (let [version (version-string)
         jar     (lib-jar-file version)]
     (when (= "unreleased" version)
       (throw (ex-info "Cannot deploy: version resource is 'unreleased'. Run bb release:tag first."
                       {:version version})))
     (when-not (.exists (io/file jar))
-      (throw (ex-info (str "Library jar not found: " jar ". Run clojure -T:build lib first.")
-                      {:jar jar})))
+      (println (str "Library jar not found — building first ..."))
+      (lib opts))
     (println (str "Deploying " jar " to Clojars as " psi-lib " " version " ..."))
     ;; deps-deploy is loaded dynamically so :deploy alias must be active
     (let [deploy-fn (requiring-resolve 'deps-deploy.deps-deploy/deploy)]

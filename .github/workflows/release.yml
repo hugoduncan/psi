@@ -283,6 +283,28 @@ jobs:
           CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
         run: bb deploy
 
+      - name: Smoke-test :jar policy (validates Clojars artifact is fetchable)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BB_BIN="$(command -v bb)"
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/psi" <<EOF
+          #!/usr/bin/env bash
+          export PSI_LAUNCHER_POLICY=jar
+          exec "$BB_BIN" bb/psi.clj -- "\$@"
+          EOF
+          chmod +x "$HOME/.local/bin/psi"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          # Allow Maven to pick up the just-deployed artifact
+          # (deps-deploy pushes to Clojars; allow a brief propagation window)
+          sleep 10
+          OUTPUT="$("$HOME/.local/bin/psi" --version)"
+          echo "psi --version output: $OUTPUT"
+          if [[ "$OUTPUT" != "psi $VERSION" ]]; then
+            echo "ERROR: expected 'psi $VERSION', got '$OUTPUT'" >&2
+            exit 1
+          fi
+
       - name: Build uberjar (GitHub Release asset)
         run: bb build:jar
 

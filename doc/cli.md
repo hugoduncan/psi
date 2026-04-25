@@ -12,9 +12,26 @@ The launcher constructs startup basis data before `psi.main` starts.
 That means user/project extension manifests participate in classpath and
 extension availability before the JVM launches.
 
-Launcher realization policy is explicit:
-- default launcher policy is `installed`
-- set `PSI_LAUNCHER_POLICY=development` when running contributor/repo-local launcher flows that should materialize psi and psi-owned extensions from local roots instead of installed git coordinates
+Launcher realization policy controls how psi and psi-owned extensions are
+resolved at startup. Three policies exist:
+
+| Policy | When used | How psi is resolved |
+|--------|-----------|---------------------|
+| `jar` | Default for released versions | Single `io.github.hugoduncan/psi` Maven coordinate from Clojars — fast, cached |
+| `installed` | Default for unreleased/git installs | Local paths relative to the launcher root (git checkout) |
+| `development` | Contributor/repo-local flows | Local paths relative to the launcher root (source tree) |
+
+Auto-detection: when `psi/version.edn` contains a release semver (not
+`"unreleased"`), the launcher defaults to `:jar` policy. An unreleased build
+defaults to `:installed`.
+
+Override with `PSI_LAUNCHER_POLICY`:
+
+```bash
+PSI_LAUNCHER_POLICY=jar psi          # force Maven resolution (released builds)
+PSI_LAUNCHER_POLICY=installed psi    # force git/local paths (installed builds)
+PSI_LAUNCHER_POLICY=development psi  # force source-tree paths (contributors)
+```
 
 ## Requirements
 

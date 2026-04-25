@@ -92,15 +92,54 @@
     (when (seq body)
       (str/join "\n" body))))
 
+(def ^:private repo-url "https://github.com/hugoduncan/psi")
+
+(defn- unreleased-link
+  "Comparison link for [Unreleased] against a known previous tag."
+  [prev-tag]
+  (str "[Unreleased]: " repo-url "/compare/" prev-tag "...HEAD"))
+
+(defn- version-link
+  "Comparison link for a released version against its predecessor."
+  [version-str prev-tag]
+  (str "[" version-str "]: " repo-url "/compare/" prev-tag "...v" version-str))
+
+(defn- previous-release-tag
+  "Return the most recent vX.Y.Z tag reachable from HEAD, or nil."
+  []
+  (try
+    (let [tag (str/trim (:out (process/shell {:out :string :err :string :continue true}
+                                             "git" "describe" "--tags" "--abbrev=0"
+                                             "--match" "v*" "HEAD^")))]
+      (when-not (str/blank? tag) tag))
+    (catch Exception _ nil)))
+
 (defn- stamp-changelog!
-  "Replace [Unreleased] with [version] - date and prepend a fresh [Unreleased]."
+  "Replace [Unreleased] with [version] - date, prepend a fresh [Unreleased],
+   and update the comparison link footer."
   [version-str date-str]
-  (let [changelog (read-changelog)
-        stamped   (str/replace-first
-                   changelog
-                   #"(?m)^## \[Unreleased\]"
-                   (str "## [Unreleased]\n\n## [" version-str "] - " date-str))]
-    (spit "CHANGELOG.md" stamped)))
+  (let [changelog  (read-changelog)
+        prev-tag   (previous-release-tag)
+        ;; 1. Replace the section header
+        stamped    (str/replace-first
+                    changelog
+                    #"(?m)^## \[Unreleased\]"
+                    (str "## [Unreleased]\n\n## [" version-str "] - " date-str))
+        ;; 2. Update or insert comparison links footer
+        new-tag    (str "v" version-str)
+        unrel-link (unreleased-link new-tag)
+        ver-link   (when prev-tag (version-link version-str prev-tag))
+        ;; Replace existing [Unreleased]: link if present, else append
+        with-unrel (if (re-find #"(?m)^\[Unreleased\]:" stamped)
+                     (str/replace stamped #"(?m)^\[Unreleased\]:.*" unrel-link)
+                     (str (str/trimr stamped) "\n\n<!-- Comparison links -->\n" unrel-link "\n"))
+        ;; Insert new version link after [Unreleased]: line
+        with-ver   (if ver-link
+                     (str/replace-first with-unrel
+                                        #"(?m)^\[Unreleased\]:.*"
+                                        (str unrel-link "\n" ver-link))
+                     with-unrel)]
+    (spit "CHANGELOG.md" with-ver)))
 
 ;; ---------------------------------------------------------------------------
 ;; Partial-failure recovery
@@ -194,3 +233,17 @@
     (println)
     (println "Done. Push with:")
     (println "  git push origin master --tags")))
+
+(defn push!
+  "Push master + tags to origin. Intended as the second half of `bb release`."
+  [_args]
+  (println "Pushing master + tags to origin ...")
+  (git! "push" "origin" "master" "--tags")
+  (println "Done."))
+
+(defn release-and-push!
+  "Cut a release (stamp changelog, commit, tag) then push to origin.
+   Equivalent to: bb release:tag && git push origin master --tags"
+  [args]
+  (release! args)
+  (push! args))
