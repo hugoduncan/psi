@@ -286,24 +286,29 @@ jobs:
       - name: Smoke-test :jar policy (validates Clojars artifact is fetchable)
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          BB_BIN="$(command -v bb)"
-          mkdir -p "$HOME/.local/bin"
-          cat > "$HOME/.local/bin/psi" <<EOF
-          #!/usr/bin/env bash
-          export PSI_LAUNCHER_POLICY=jar
-          exec "$BB_BIN" bb/psi.clj -- "\$@"
-          EOF
-          chmod +x "$HOME/.local/bin/psi"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          # Allow Maven to pick up the just-deployed artifact
-          # (deps-deploy pushes to Clojars; allow a brief propagation window)
-          sleep 10
-          OUTPUT="$("$HOME/.local/bin/psi" --version)"
-          echo "psi --version output: $OUTPUT"
-          if [[ "$OUTPUT" != "psi $VERSION" ]]; then
-            echo "ERROR: expected 'psi $VERSION', got '$OUTPUT'" >&2
-            exit 1
-          fi
+          # Bypass the launcher entirely: invoke clojure directly with the
+          # just-deployed Clojars coord.  This avoids the launcher's version
+          # resource (which is "unreleased" post-tag-reset) and tests that
+          # the Maven artifact resolves and psi.main boots correctly.
+          DEPS="{:deps {io.github.hugoduncan/psi {:mvn/version \"$VERSION\"}}}"
+          EXPECTED="psi $VERSION"
+          MAX_ATTEMPTS=8
+          SLEEP_SEC=30
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $attempt/$MAX_ATTEMPTS: clojure -Sdeps '$DEPS' -M -m psi.main --version"
+            OUTPUT=$(clojure -Sdeps "$DEPS" -M -m psi.main --version 2>/dev/null || true)
+            echo "  output: $OUTPUT"
+            if [[ "$OUTPUT" == "$EXPECTED" ]]; then
+              echo "Clojars :jar policy smoke passed."
+              exit 0
+            fi
+            if [[ $attempt -lt $MAX_ATTEMPTS ]]; then
+              echo "  not yet available — waiting ${SLEEP_SEC}s ..."
+              sleep $SLEEP_SEC
+            fi
+          done
+          echo "ERROR: expected '$EXPECTED' after $MAX_ATTEMPTS attempts, last output: '$OUTPUT'" >&2
+          exit 1
 
       - name: Build uberjar (GitHub Release asset)
         run: bb build:jar

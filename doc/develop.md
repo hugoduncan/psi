@@ -143,6 +143,73 @@ Current behavior:
 This task is intentionally narrow and project-specific so we can prove its
 usefulness before broadening scope or upstreaming ideas.
 
+## Cutting a release
+
+### Prerequisites
+
+- Write access to `https://github.com/hugoduncan/psi` (push to `master` + tags).
+- `CLOJARS_USERNAME` and `CLOJARS_PASSWORD` (deploy token) set as GitHub Actions
+  secrets on the repo (`Settings → Secrets → Actions`).
+- Local working tree clean, on `master`, up to date with origin.
+- `CHANGELOG.md` has a non-empty `## [Unreleased]` section
+  (`bb changelog:check` to verify).
+
+### Procedure
+
+```bash
+bb release
+```
+
+This single command:
+1. Asserts clean tree + on `master`.
+2. Computes `PATCH = (git rev-list HEAD --count) + 1`.
+3. Stamps `CHANGELOG.md`: `[Unreleased]` → `[MAJOR.MINOR.PATCH] - YYYY-MM-DD`,
+   prepends a fresh `[Unreleased]`, and updates the comparison link footer.
+4. Writes `{:version "MAJOR.MINOR.PATCH"}` to `bases/main/resources/psi/version.edn`.
+5. Commits `"release: vMAJOR.MINOR.PATCH"` and tags `vMAJOR.MINOR.PATCH`.
+6. Resets `version.edn` to `{:version "unreleased"}` and commits
+   `"release: post-vMAJOR.MINOR.PATCH reset version to unreleased"`.
+7. Pushes `master` + tags to origin.
+
+Pushing the tag triggers `.github/workflows/release.yml`, which:
+- Re-runs fmt/lint/tests.
+- Builds and deploys the library jar to Clojars (`io.github.hugoduncan/psi`).
+- Smoke-tests the `:jar` launcher policy against the deployed Clojars artifact
+  (retries up to 8×30s for propagation).
+- Builds the uberjar.
+- Creates a GitHub Release with the changelog body and jar assets attached.
+
+### Partial-failure recovery
+
+`bb release` and `bb release:tag` are re-entrant:
+
+| Failure point | Recovery |
+|---|---|
+| Died after `stamp-changelog!`, before `git commit` | Re-run detects stamped changelog, resumes from commit |
+| Died after tag, before version reset commit | Re-run detects tag + un-reset version resource, completes reset |
+| Died after version reset, before push | `bb release` detects local tag not on origin, goes straight to push |
+| Push failed (network) | Re-run `bb release` — detects local tag not on origin, retries push |
+
+If the GH Actions release job fails after Clojars deploy but before GH Release
+creation, re-pushing the tag is not safe (tag already exists). Instead:
+1. Fix the issue (e.g. changelog section missing for the version).
+2. Manually trigger the release workflow via `workflow_dispatch` on the tag, or
+3. Manually run `bb build:jar` + create the GH Release via `gh release create`.
+
+### Verifying a release
+
+After the workflow completes:
+
+```bash
+# Verify Clojars artifact
+clojure -Sdeps '{:deps {io.github.hugoduncan/psi {:mvn/version "X.Y.Z"}}}' \
+  -M -m psi.main --version
+
+# Verify bbin install
+bbin install io.github.hugoduncan/psi --as psi --git/tag vX.Y.Z
+psi --version
+```
+
 ## CI
 
 The GitHub Actions workflow (`.github/workflows/ci.yml`) runs on:

@@ -241,6 +241,8 @@ munera/plan.md - active task orchestration (internal)
   | user_visible(δ) ≡ δ ∈ {commands ∨ flags ∨ behaviours ∨ breaking ∨ bug_fix ∨ extension_capability}
   | user_visible(δ) → entry([Unreleased], δ) ∧ entry ≺ commit(δ)
   | ¬user_visible(δ) ≡ δ ∈ {refactor ∨ tests ∨ lint ∨ internal} → ∅
+  | footer: [Unreleased]: url ∧ [vX.Y.Z]: url — maintained by bb release:tag ∧ bb release
+  | ¬edit(footer manually) — bb release:tag owns footer updates
 
 Canonical process: keep user docs (`README.md` + `doc/`) synchronized with meta/spec/code/tests on every change.
 

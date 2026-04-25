@@ -145,6 +145,14 @@
 ;; Partial-failure recovery
 ;; ---------------------------------------------------------------------------
 
+(defn- changelog-already-stamped?
+  "True if CHANGELOG.md has already been stamped with version-str
+   (i.e. ## [version-str] section exists) but the [Unreleased] section
+   is now empty — indicating stamp completed but commit did not."
+  [version-str]
+  (let [changelog (read-changelog)]
+    (boolean (re-find (re-pattern (str "(?m)^## \\[" (java.util.regex.Pattern/quote version-str) "\\]")) changelog))))
+
 (defn- post-tag-reset-needed?
   "True if the tag exists but the version resource still shows the release
    version — i.e. the reset commit was not yet made."
@@ -152,6 +160,12 @@
   (and (tag-exists? tag)
        (= version-str
           (-> (version-resource-path) slurp edn/read-string :version))))
+
+(defn- post-tag-push-needed?
+  "True if the tag exists locally but has not been pushed to origin."
+  [tag]
+  (and (tag-exists? tag)
+       (not (git-ok? "ls-remote" "--exit-code" "--tags" "origin" (str "refs/tags/" tag)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Public entry points
@@ -202,6 +216,22 @@
     (when (tag-exists? tag)
       (throw (ex-info (str "Tag " tag " already exists.") {:tag tag})))
 
+    ;; Partial-failure recovery: changelog stamped but not yet committed
+    ;; (process died between stamp-changelog! and git commit)
+    (when (changelog-already-stamped? version-str)
+      (println "  CHANGELOG.md already stamped — resuming from pre-commit state ...")
+      (write-version-resource! version-str)
+      (git! "add" "CHANGELOG.md" (version-resource-path))
+      (git! "commit" "-m" (str "release: " tag))
+      (git! "tag" tag)
+      (write-version-resource! "unreleased")
+      (git! "add" (version-resource-path))
+      (git! "commit" "-m" (str "release: post-" tag " reset version to unreleased"))
+      (println)
+      (println "Done. Push with:")
+      (println "  git push origin master --tags")
+      (System/exit 0))
+
     ;; Assert changelog has content to release
     (let [body (unreleased-section (read-changelog))]
       (when-not body
@@ -243,7 +273,19 @@
 
 (defn release-and-push!
   "Cut a release (stamp changelog, commit, tag) then push to origin.
-   Equivalent to: bb release:tag && git push origin master --tags"
-  [args]
-  (release! args)
-  (push! args))
+   Equivalent to: bb release:tag && git push origin master --tags
+
+   Partial-failure recovery: if the tag exists locally but has not been pushed
+   (e.g. prior network failure), skips re-tagging and goes straight to push."
+  [_args]
+  (let [version-base (read-version-edn)
+        patch        (inc (git-count-revs))
+        version-str  (compose-version version-base patch)
+        tag          (str "v" version-str)]
+    (if (post-tag-push-needed? tag)
+      (do
+        (println (str "  Tag " tag " exists locally but not on origin — retrying push ..."))
+        (push! nil))
+      (do
+        (release! nil)
+        (push! nil)))))
