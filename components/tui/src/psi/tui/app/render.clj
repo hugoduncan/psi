@@ -346,9 +346,9 @@
 
 (defn render-prompt-autocomplete
   [state width]
-  (let [{:keys [candidates selected-index]} (get-in state [:prompt-input-state :autocomplete])]
+  (let [{:keys [candidates] raw-selected-index :selected-index} (get-in state [:prompt-input-state :autocomplete])]
     (when (seq candidates)
-      (let [{:keys [start visible selected-index]} (autocomplete-window candidates selected-index)
+      (let [{:keys [start visible selected-index]} (autocomplete-window candidates raw-selected-index)
             width (max 1 (or width 1))]
         (str "\n"
              (charm/render shared/dim-style "Suggestions")
