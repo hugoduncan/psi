@@ -3,7 +3,8 @@
    [babashka.process :as process]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.launcher :as launcher]))
+   [psi.launcher :as launcher]
+   [psi.version :as version]))
 
 (defn- explicit-policy
   []
@@ -56,6 +57,9 @@
                                    (System/getProperty "user.dir")
                                    (launcher-root)
                                    (explicit-policy))]
+    (when (:version? plan)
+      (println (str "psi " (version/version-string)))
+      (System/exit 0))
     (when (:launcher-debug? plan)
       (print-debug-summary! plan))
     @(process/process (:command plan)

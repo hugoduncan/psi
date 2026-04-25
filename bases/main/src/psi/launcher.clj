@@ -23,13 +23,15 @@
    Consumes:
    - --cwd <path>
    - --launcher-debug
+   - --version
 
-   Returns {:cwd string? :launcher-debug? boolean :psi-args [...] }.
+   Returns {:cwd string? :launcher-debug? boolean :version? boolean :psi-args [...] }.
    Throws ex-info on malformed launcher-owned args."
   [args]
   (loop [remaining (strip-launcher-separator args)
          parsed {:cwd nil
                  :launcher-debug? false
+                 :version? false
                  :psi-args []}]
     (if-let [arg (first remaining)]
       (cond
@@ -43,6 +45,9 @@
 
         (= "--launcher-debug" arg)
         (recur (next remaining) (assoc parsed :launcher-debug? true))
+
+        (= "--version" arg)
+        (recur (next remaining) (assoc parsed :version? true))
 
         :else
         (recur (next remaining) (update parsed :psi-args conj arg)))
@@ -201,6 +206,7 @@
     {:cwd cwd
      :launcher-root launcher-root
      :launcher-debug? (:launcher-debug? parsed)
+     :version? (:version? parsed)
      :psi-args (:psi-args parsed)
      :policy policy
      :basis (:basis basis-state)

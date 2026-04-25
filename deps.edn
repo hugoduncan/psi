@@ -24,6 +24,7 @@
  :aliases
  {:dev   {:extra-paths ["dev"]}
   :run   {:extra-paths ["bases/main/src"
+                        "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
                         "components/agent-core/src"
@@ -47,6 +48,7 @@
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
   :psi   {:extra-paths ["bases/main/src"
+                        "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
                         "components/agent-core/src"
@@ -126,6 +128,7 @@
   :test  {:extra-paths ["test-support"
                         "bases/main/test"
                         "bases/main/src"
+                        "bases/main/resources"
                         "components/app-runtime/test"
                         "components/app-runtime/src"
                         "components/ai/test"
