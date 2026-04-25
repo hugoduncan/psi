@@ -13,12 +13,21 @@
   "exec bb bb/psi.clj -- --tui")
 
 (defn repo-local-launch-command-abs
-  "Launch command using an absolute path to bb/psi.clj, resolved from the
-   current working directory at call time.  Unlike [[repo-local-launch-command]],
-   this works when the tmux session is started with a different working-dir
-   (e.g. a temp fixture directory)."
+  "Launch command using absolute paths to both bb and bb/psi.clj, resolved
+   at call time.  Unlike [[repo-local-launch-command]], this works when the
+   tmux session is started with a different working-dir (e.g. a temp fixture
+   directory) because neither path is relative to the session CWD.
+
+   bb is located via `which bb` (falling back to the $BB env var that CI
+   sets, then the bare `bb` command).  bb/psi.clj is resolved relative to
+   the current JVM working directory (the repo root during test execution)."
   []
-  (str "exec bb " (.getCanonicalPath (io/file "bb/psi.clj")) " -- --tui"))
+  (let [bb-bin (or (let [{:keys [exit out]} (clojure.java.shell/sh "bash" "-lc" "which bb")]
+                     (when (zero? exit) (str/trim out)))
+                   (System/getenv "BB")
+                   "bb")
+        psi-clj (.getCanonicalPath (io/file "bb/psi.clj"))]
+    (str "exec " bb-bin " " psi-clj " -- --tui")))
 
 (def default-startup-timeout-ms 120000)
 (def default-step-timeout-ms 15000)

@@ -131,7 +131,10 @@
                                  (failure target :content-still-visible-after-timeout)
 
                                  :else
-                                 (let [pane (tmux/sanitize-pane-text (tmux/capture-pane target))]
+                                 ;; Use capture-pane-visible (no scrollback) for the
+                                 ;; collapsed-content check — scrollback retains
+                                 ;; output-line-1 after it scrolls off screen.
+                                 (let [pane (tmux/sanitize-pane-text (tmux/capture-pane-visible target))]
                                    (if (str/includes? pane "output-line-1")
                                      (assoc (failure target :content-visible-when-collapsed)
                                             :detail "Tool content should not be visible in collapsed mode")
