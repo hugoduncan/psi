@@ -2,6 +2,10 @@
 
 Open tasks in suggested execution order:
 
+Active:
+
+`munera/open/055-prepare-for-release/`
+
 Backlog:
 
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
