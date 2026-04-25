@@ -44,11 +44,11 @@ Test: projection of realistic message sequences — full history, tail-1, tail-3
 
 Pure functions in `workflow_judge.clj`:
 - `match-signal` — given a signal string and a routing table, return the matched directive or nil. Exact match after `str/trim`.
-- `resolve-goto-target` — given a directive's `:goto` value, the current step-id, and the step-order vector, return the concrete target step-id. Handles `:next`, `:previous`, `:done`, and string step-id.
+- `resolve-goto-target` — given a directive's `:goto` value, the current step-id, and the step-order vector, return `{:action :goto :target step-id}` or `{:action :complete}` or `{:action :fail :reason ...}`. The `:done` keyword and `:next` from the last step both return `{:action :complete}`. `:next`, `:previous`, and string step-ids return `{:action :goto :target concrete-step-id}`.
 - `check-iteration-limit` — given a step-run's `:iteration-count` and the directive's `:max-iterations`, return `:within-limit` or `:exhausted`.
-- `evaluate-routing` — compose the above: match signal → resolve target → check limit → return `{:action :goto :target step-id}` or `{:action :complete}` or `{:action :fail :reason ...}` or `{:action :no-match}`.
+- `evaluate-routing` — compose the above: match signal → resolve target → check limit → return `{:action :goto :target step-id}` or `{:action :complete}` or `{:action :fail :reason ...}` or `{:action :no-match}`. The `:no-match` action is consumed only by `execute-judge!` (slice 4) for its retry loop — it never reaches the progression layer.
 
-Test: each function individually, plus `evaluate-routing` integration — match, no-match, `:next`/`:previous`/`:done`/named, within-limit, exhausted.
+Test: each function individually, plus `evaluate-routing` integration — match, no-match, `:next`/`:previous`/`:done`/named, `:next` from last step (= complete), within-limit, exhausted.
 
 ### Slice 4 — Judge session execution
 
@@ -69,7 +69,7 @@ Test: with-redefs on session creation and prompting — successful match, no-mat
 
 Extend `workflow_progression.clj`:
 - `increment-iteration-count` — bump `:iteration-count` on a step-run when entering a step via goto
-- Modify `submit-result-envelope` or add a new `submit-judged-result` path that:
+- Add a new `submit-judged-result` progression path (does **not** modify `submit-result-envelope`) that:
   - Records the judge result on the step-run
   - Applies the routing result to determine the next step
   - On `:goto` to a named step: set `current-step-id`, increment target step's iteration count

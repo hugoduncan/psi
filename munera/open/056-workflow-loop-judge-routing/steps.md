@@ -22,10 +22,10 @@
 
 ### Slice 3 — Routing evaluation
 - [ ] `match-signal` — exact match after trim
-- [ ] `resolve-goto-target` — `:next`, `:previous`, `:done`, named step-id
+- [ ] `resolve-goto-target` — returns `{:action :goto :target id}` or `{:action :complete}` or `{:action :fail}`; handles `:next` (including last-step = complete), `:previous`, `:done`, named step-id
 - [ ] `check-iteration-limit` — within-limit vs exhausted
-- [ ] `evaluate-routing` — compose match → resolve → check → action
-- [ ] Tests: each function + `evaluate-routing` integration
+- [ ] `evaluate-routing` — compose match → resolve → check → action (`:no-match` consumed only by `execute-judge!` retry loop)
+- [ ] Tests: each function + `evaluate-routing` integration (including `:next` from last step = complete)
 
 ### Slice 4 — Judge session execution
 - [ ] `execute-judge!` — create judge session, prompt, extract signal, match

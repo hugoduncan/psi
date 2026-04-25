@@ -34,4 +34,4 @@ Designed in conversation 2026-04-25. Key design evolution:
 | 4 | Iteration counting | Per-step | All gotos to same step share one counter; simpler mental model |
 | 5 | Loop-back input bindings | No special source | Goto target uses normal bindings; reviewer output available via `:step-output` if wired |
 | 6 | Judge retry limit | Fixed at 2 retries (3 total) | Simple; not configurable per judge in first cut |
-| 7 | Judge system prompt | Author-provided | No auto-generation; author controls judge instructions via `:judge {:prompt ...}` |
+| 7 | Judge system prompt | Author-provided | No auto-generation; author controls judge instructions via optional `:judge {:system-prompt ...}`. `:judge {:prompt ...}` is the user-turn question. |
