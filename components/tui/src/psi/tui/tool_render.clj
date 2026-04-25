@@ -12,29 +12,76 @@
 (def ^:private tool-dim-style (charm/style :fg 245))
 (def ^:private dim-style      (charm/style :fg 240))
 
-(def ^:private default-preview-lines 5)
-(def ^:private read-preview-lines 10)
-(def ^:private write-preview-lines 10)
-(def ^:private ls-preview-lines 20)
-(def ^:private find-preview-lines 20)
-(def ^:private grep-preview-lines 15)
-(def ^:private bash-preview-lines 5)
-
 (defn- parse-tool-args
   [parsed-args args-str]
   (or parsed-args
       (try (json/parse-string args-str)
            (catch Exception _ nil))))
 
+(defn- tool-arg-get
+  "Return first non-nil value from args map for the given key variants."
+  [args & keys]
+  (when (map? args)
+    (some #(get args %) keys)))
+
+(defn- tool-int
+  [v]
+  (cond
+    (integer? v) v
+    (number? v)  (long v)
+    (string? v)  (try (Long/parseLong v) (catch Exception _ nil))
+    :else        nil))
+
+(defn- tool-line-range-suffix
+  "Return optional :line or :start:end suffix string for read/edit tools."
+  [tool-name args details]
+  (case tool-name
+    "read"
+    (let [offset* (tool-int (tool-arg-get args "offset" :offset))
+          limit*  (tool-int (tool-arg-get args "limit"  :limit))
+          offset  (or offset* (when limit* 1))]
+      (cond
+        (and offset limit* (pos? limit*))
+        (format ":%d:%d" offset (+ offset (dec limit*)))
+        offset
+        (format ":%d" offset)
+        :else ""))
+    "edit"
+    (let [first-changed* (or (get details :firstChangedLine)
+                             (get details :first-changed-line)
+                             (get details "firstChangedLine")
+                             (get details "first-changed-line"))
+          first-changed  (tool-int first-changed*)
+          old-text       (tool-arg-get args "oldText" :oldText "old_text")
+          span           (when (string? old-text)
+                           (max 1 (count (str/split-lines old-text))))]
+      (cond
+        (and first-changed span (> span 1))
+        (format ":%d:%d" first-changed (+ first-changed (dec span)))
+        first-changed
+        (format ":%d" first-changed)
+        :else ""))
+    ""))
+
 (defn- tool-header
-  [tool-name parsed-args args-str]
-  (let [args (parse-tool-args parsed-args args-str)]
-    (case tool-name
-      "read"  (str (charm/render tool-style "read")  " " (get args "path" "…"))
-      "bash"  (str (charm/render tool-style "$")     " " (get args "command" "…"))
-      "edit"  (str (charm/render tool-style "edit")  " " (get args "path" "…"))
-      "write" (str (charm/render tool-style "write") " " (get args "path" "…"))
-      (str (charm/render tool-style tool-name)))))
+  "Build the single-line header summary for a tool row.
+
+  Format: <display-name> <primary-arg><line-range-suffix>
+  Matches the Emacs psi-emacs--tool-summary format."
+  [tool-name parsed-args args-str details]
+  (let [args         (parse-tool-args parsed-args args-str)
+        display-name (case tool-name
+                       "bash"  "$"
+                       tool-name)
+        primary      (case tool-name
+                       ("read" "edit" "write") (tool-arg-get args "path" :path)
+                       "bash"                  (tool-arg-get args "command" :command)
+                       nil)
+        line-suffix  (tool-line-range-suffix tool-name args details)
+        label        (cond
+                       (seq primary) (str primary line-suffix)
+                       :else         "…")]
+    (str (charm/render tool-style display-name) " " label)))
 
 (defn- tool-status-indicator
   [status spinner-char]
@@ -50,10 +97,6 @@
   (if (or (nil? avail) (<= (ansi/visible-width line) avail))
     [line]
     (ansi/word-wrap-ansi line avail)))
-
-(defn- tool-expanded?
-  [tools-expanded? _tc]
-  (boolean tools-expanded?))
 
 (defn- content-block->text
   [block]
@@ -72,36 +115,11 @@
   (when (seq content)
     (str/join "\n" (map content-block->text content))))
 
-(defn- preview-lines-for-tool
-  [tool-name]
-  (case tool-name
-    "read" read-preview-lines
-    "write" write-preview-lines
-    "ls" ls-preview-lines
-    "find" find-preview-lines
-    "grep" grep-preview-lines
-    "bash" bash-preview-lines
-    default-preview-lines))
-
-(defn- tool-preview
-  [tool-name text expanded?]
+(defn- tool-all-lines
+  "Return all lines of tool result text for expanded display."
+  [_tool-name text]
   (when (and text (not (str/blank? text)))
-    (let [lines (str/split-lines text)
-          total (count lines)]
-      (if expanded?
-        {:lines lines :hidden? false :bash-tail? false :hidden-count 0}
-        (let [limit (preview-lines-for-tool tool-name)]
-          (if (<= total limit)
-            {:lines lines :hidden? false :bash-tail? false :hidden-count 0}
-            (if (= "bash" tool-name)
-              {:lines (vec (take-last limit lines))
-               :hidden? true
-               :bash-tail? true
-               :hidden-count (- total limit)}
-              {:lines (vec (take limit lines))
-               :hidden? true
-               :bash-tail? false
-               :hidden-count (- total limit)})))))))
+    (str/split-lines text)))
 
 (defn- detail-warning-lines
   [details]
@@ -185,38 +203,33 @@
        (for [id tool-order
              :let [tc (get tool-calls id)]
              :when tc]
-         (let [status-icon   (tool-status-indicator (:status tc) spinner-char)
+         (let [expanded?     (boolean tools-expanded?)
+               status-icon   (tool-status-indicator (:status tc) spinner-char)
                call-render   (extension-call-render ui-snapshot tc)
                header        (if (seq call-render)
                                call-render
-                               (tool-header (:name tc) (:parsed-args tc) (:args tc)))
+                               (tool-header (:name tc) (:parsed-args tc) (:args tc) (:details tc)))
                header        (if header-avail
                                (ansi/truncate-to-width header header-avail)
                                header)
-               expanded?     (tool-expanded? tools-expanded? tc)
-               raw-result    (or (:result tc) (tool-content->text (:content tc)))
-               {:keys [lines hidden? bash-tail? hidden-count]}
-               (or (tool-preview (:name tc) raw-result expanded?)
-                   {:lines [] :hidden? false :bash-tail? false :hidden-count 0})
-               hint-line     (when hidden?
-                               (if bash-tail?
-                                 (str "… (" hidden-count " earlier lines hidden, ctrl+o to expand)")
-                                 (str "… (" hidden-count " more lines, ctrl+o to expand)")))
-               warning-lines (into []
-                                   (concat (detail-warning-lines (:details tc))
-                                           (when hint-line [hint-line])))
-               result-render (extension-result-render ui-snapshot tc
-                                                      {:expanded? expanded?
-                                                       :width width
-                                                       :tool-id id
-                                                       :tool-name (:name tc)})
-               result-lines  (if (seq result-render)
-                               (str/split-lines result-render)
-                               lines)
-               warning-lines (if (seq result-render) [] warning-lines)
-               result-style  (if (:is-error tc) tool-err-style tool-dim-style)
-               body-lines    (concat (render-prefixed-lines result-lines result-avail result-style)
-                                     (render-prefixed-lines warning-lines result-avail dim-style))]
+               ;; Collapsed (default): header only — no content preview.
+               ;; Expanded (ctrl+o):   full content with warning lines.
+               body-lines    (when expanded?
+                               (let [raw-result    (or (:result tc) (tool-content->text (:content tc)))
+                                     result-render (extension-result-render ui-snapshot tc
+                                                                            {:expanded? true
+                                                                             :width width
+                                                                             :tool-id id
+                                                                             :tool-name (:name tc)})]
+                                 (if (seq result-render)
+                                   (render-prefixed-lines (str/split-lines result-render)
+                                                          result-avail
+                                                          (if (:is-error tc) tool-err-style tool-dim-style))
+                                   (let [lines         (or (tool-all-lines (:name tc) raw-result) [])
+                                         warning-lines (detail-warning-lines (:details tc))
+                                         result-style  (if (:is-error tc) tool-err-style tool-dim-style)]
+                                     (concat (render-prefixed-lines lines result-avail result-style)
+                                             (render-prefixed-lines warning-lines result-avail dim-style))))))]
            (str "  " status-icon " " header
                 (when (seq body-lines)
                   (str "\n" (str/join "\n" body-lines))))))))))

@@ -528,7 +528,7 @@
    1. Boot → ready marker
    2. Submit 'think' → wait for '· ' (thinking prefix)
    3. Submit 'tool'  → wait for spinner (⠋), then done marker (✓)
-   4. Assert truncation hint visible ('ctrl+o to expand')
+   4. Assert content NOT visible in collapsed mode (no 'output-line-1')
    5. Press ctrl+o   → assert expanded content visible ('output-line-10')
    6. /quit → clean exit"
   [{:keys [session-name
@@ -603,10 +603,10 @@
 
                                  :else
                                  (let [pane (sanitize-pane-text (capture-pane target))]
-                                   (if-not (str/includes? pane "ctrl+o to expand")
-                                     (assoc (failure-result target :truncation-hint-not-visible)
+                                   (if (str/includes? pane "output-line-1")
+                                     (assoc (failure-result target :content-visible-when-collapsed)
                                             :detail
-                                            "Expected truncation hint after 24-line bash result")
+                                            "Tool content should not be visible in collapsed mode")
                                      ;; ctrl+o expand
                                      (do
                                        (send-key! target "C-o")

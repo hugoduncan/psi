@@ -381,45 +381,113 @@
           out       (ansi/strip-ansi (app/view s3))]
       (is (= :idle (:phase s3)))
       (is (seq (:tool-order s3)))
-      ;; tool header and result visible in idle view
+      ;; header visible: tool name + path, no content in collapsed mode
       (is (str/includes? out "read"))
-      (is (str/includes? out "foo.clj")))))
+      (is (str/includes? out "foo.clj"))
+      (is (not (str/includes? out "file content"))))))
 
 (deftest ctrl-o-toggles-tools-expanded-during-streaming-test
-  (testing "ctrl+o expands/collapses tool output during a streaming turn"
+  (testing "ctrl+o expands tool output during a streaming turn; collapsed shows no content"
     (let [update-fn  (app/make-update (stub-agent-fn ""))
           state      (assoc (init-state) :phase :streaming :tools-expanded? false)
           [s1 _]     (update-fn state {:type :agent-event :event-kind :tool-result
                                        :tool-id "t1" :tool-name "bash"
-                                       :content [{:type :text :text (str/join "\n" (repeat 20 "output line"))}]
+                                       :content [{:type :text :text (str/join "\n" (repeat 20 "output-line"))}]
                                        :is-error false})
-          ;; collapsed view
           out-before (ansi/strip-ansi (app/view s1))
-          ;; toggle expand
           [s2 _]     (update-fn s1 (msg/key-press "o" :ctrl true))
           out-after  (ansi/strip-ansi (app/view s2))]
       (is (false? (:tools-expanded? s1)))
       (is (true?  (:tools-expanded? s2)))
-      ;; collapsed shows fewer lines than expanded
-      (is (< (count (str/split-lines out-before))
-             (count (str/split-lines out-after)))))))
+      ;; collapsed: no content lines
+      (is (not (str/includes? out-before "output-line")))
+      ;; expanded: content lines visible
+      (is (str/includes? out-after "output-line")))))
 
 (deftest ctrl-o-toggles-tools-expanded-in-idle-test
-  (testing "ctrl+o expands/collapses tool output in idle phase"
-    (let [update-fn (app/make-update (stub-agent-fn ""))
-          state     (assoc (init-state)
-                           :phase :idle
-                           :tools-expanded? false
-                           :tool-order ["t1"]
-                           :tool-calls {"t1" {:name "bash"
-                                              :args "{}"
-                                              :status :success
-                                              :result (str/join "\n" (repeat 20 "output line"))
-                                              :is-error false
-                                              :expanded? false}})
+  (testing "ctrl+o expands tool output in idle phase; collapsed shows no content"
+    (let [update-fn  (app/make-update (stub-agent-fn ""))
+          state      (assoc (init-state)
+                            :phase :idle
+                            :tools-expanded? false
+                            :tool-order ["t1"]
+                            :tool-calls {"t1" {:name "bash"
+                                               :args "{}"
+                                               :status :success
+                                               :result (str/join "\n" (repeat 20 "output-line"))
+                                               :is-error false}})
           out-before (ansi/strip-ansi (app/view state))
           [s2 _]     (update-fn state (msg/key-press "o" :ctrl true))
           out-after  (ansi/strip-ansi (app/view s2))]
       (is (true? (:tools-expanded? s2)))
-      (is (< (count (str/split-lines out-before))
-             (count (str/split-lines out-after)))))))
+      (is (not (str/includes? out-before "output-line")))
+      (is (str/includes? out-after "output-line")))))
+
+;; ── Tool header format ────────────────────────────────────────────────────────
+
+(deftest tool-header-read-with-line-range-test
+  (testing "read tool header shows path:offset:end derived from offset+limit args"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0 :tool-id "t1" :tool-name "read"
+                                      :arguments "{\"path\":\"src/foo.clj\",\"offset\":10,\"limit\":20}"})
+          out       (ansi/strip-ansi (app/view s1))]
+      (is (str/includes? out "read src/foo.clj:10:29")))))
+
+(deftest tool-header-read-offset-only-test
+  (testing "read tool header shows :offset suffix when limit absent"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0 :tool-id "t1" :tool-name "read"
+                                      :arguments "{\"path\":\"src/foo.clj\",\"offset\":5}"})
+          out       (ansi/strip-ansi (app/view s1))]
+      (is (str/includes? out "read src/foo.clj:5")))))
+
+(deftest tool-header-read-no-range-test
+  (testing "read tool header shows path only when no offset/limit"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0 :tool-id "t1" :tool-name "read"
+                                      :arguments "{\"path\":\"README.md\"}"})
+          out       (ansi/strip-ansi (app/view s1))]
+      (is (str/includes? out "read README.md"))
+      (is (not (str/includes? out "read README.md:"))))))
+
+(deftest tool-header-edit-with-line-range-test
+  (testing "edit tool header shows path:firstChangedLine:end from details + oldText span"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0 :tool-id "t1" :tool-name "edit"
+                                      :arguments "{\"path\":\"src/bar.clj\",\"oldText\":\"a\nb\nc\"}"})
+          [s2 _]    (update-fn s1 {:type :agent-event :event-kind :tool-result
+                                   :tool-id "t1" :tool-name "edit"
+                                   :content [{:type :text :text "ok"}]
+                                   :details {:firstChangedLine 20}
+                                   :is-error false})
+          out       (ansi/strip-ansi (app/view s2))]
+      (is (str/includes? out "edit src/bar.clj:20:22")))))
+
+(deftest tool-header-bash-test
+  (testing "bash tool header uses $ prefix and shows command"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0 :tool-id "t1" :tool-name "bash"
+                                      :arguments "{\"command\":\"git status\"}"})
+          out       (ansi/strip-ansi (app/view s1))]
+      (is (str/includes? out "$ git status")))))
+
+(deftest tool-collapsed-no-content-test
+  (testing "collapsed mode shows no content body regardless of result size"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-result
+                                      :tool-id "t1" :tool-name "read"
+                                      :content [{:type :text :text (str/join "\n" (repeat 50 "content-line"))}]
+                                      :is-error false})
+          out       (ansi/strip-ansi (app/view s1))]
+      (is (not (str/includes? out "content-line"))))))
