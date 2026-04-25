@@ -28,26 +28,29 @@
         session-dir (io/file (sessions-root) (str "--" encoded "--"))
         _           (.mkdirs session-dir)
         session-id  (str (java.util.UUID/randomUUID))
-        ts          "2024-01-01T00:00:00.000-00:00"
+        ts          (java.util.Date/from (java.time.Instant/parse "2024-01-01T00:00:00Z"))
         filename    (str (System/currentTimeMillis) "_" session-id ".ndedn")
         fixture     (io/file session-dir filename)
-        header      (str "{:type :session :version 4 :id \"" session-id "\""
-                         " :timestamp #inst \"" ts "\""
-                         " :worktree-path \"" tmpdir "\""
-                         " :parent-session-id nil :parent-session nil}")
+        header      {:type :session :version 4 :id session-id
+                     :timestamp ts
+                     :worktree-path tmpdir
+                     :parent-session-id nil :parent-session nil}
         user-id     (str (java.util.UUID/randomUUID))
-        user-entry  (str "{:id \"" user-id "\" :parent-id nil"
-                         " :timestamp #inst \"" ts "\""
-                         " :kind :message"
-                         " :data {:message {:role \"user\" :content [{:type :text :text \"explain recursion\"}]}}}")
+        user-entry  {:id user-id :parent-id nil
+                     :timestamp ts
+                     :kind :message
+                     :data {:message {:role "user"
+                                      :content [{:type :text :text "explain recursion"}]}}}
         asst-id     (str (java.util.UUID/randomUUID))
-        asst-entry  (str "{:id \"" asst-id "\" :parent-id \"" user-id "\""
-                         " :timestamp #inst \"" ts "\""
-                         " :kind :message"
-                         " :data {:message {:role \"assistant\""
-                         " :content [{:type :thinking :text \"Let me think about this carefully.\"}"
-                         " {:type :text :text \"Recursion is when a function calls itself.\"}]}}}")]
-    (spit fixture (str header "\n" user-entry "\n" asst-entry "\n"))
+        asst-entry  {:id asst-id :parent-id user-id
+                     :timestamp ts
+                     :kind :message
+                     :data {:message {:role "assistant"
+                                      :content [{:type :thinking :text "Let me think about this carefully."}
+                                                {:type :text :text "Recursion is when a function calls itself."}]}}}]
+    (spit fixture (str (pr-str header) "\n"
+                       (pr-str user-entry) "\n"
+                       (pr-str asst-entry) "\n"))
     (str (.getAbsolutePath fixture))))
 
 (defn delete-thinking-fixture!

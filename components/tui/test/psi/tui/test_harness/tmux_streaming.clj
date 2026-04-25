@@ -143,7 +143,7 @@
                                        (if (not (tmux/wait-for-marker target "output-line-10" step-timeout-ms))
                                          (failure target :expand-not-visible)
                                          (do
-                                           (tmux/send-line! target "/quit")
+                                           (tmux/send-key! target "C-d")
                                            (if (tmux/wait-for-java-exit target step-timeout-ms)
                                              {:status       :passed
                                               :session-name session-name*
