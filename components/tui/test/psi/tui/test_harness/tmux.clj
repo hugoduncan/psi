@@ -520,21 +520,113 @@
   (run-sh (format "tmux resize-pane -t %s -x %d"
                   (pane-target target) cols)))
 
+(defn check-layout-invariants
+  "Check that a captured pane snapshot satisfies TUI layout invariants.
+
+   Returns {:ok? true} when all checks pass, or
+           {:ok? false :violations [...]} when one or more fail.
+
+   Checks performed:
+
+   :banner-at-column-0
+     The line containing 'ψ Psi Agent Session' starts with 'ψ' (no leading
+     spaces).  A repaint failure or display offset shifts the banner right,
+     leaving blank columns before the first character.
+
+   :banner-appears-once
+     'ψ Psi Agent Session' appears exactly once.  A failed differential
+     repaint can leave ghost copies of the previous render on screen,
+     producing duplicate banner lines.
+
+   :separator-at-column-0
+     At least one '────' separator line starts with '─'.  If the display
+     is shifted right the separator begins with spaces instead.
+
+   :separator-spans-width
+     The trimmed length of the first separator line is within 2 columns of
+     `expected-width` (when provided).  After a resize the separator is
+     reflowed to the new width; a stale repaint leaves it at the old width.
+
+   :min-content-lines
+     At least 4 non-blank lines are present.  Guards against a totally blank
+     screen when the repaint produced no output at all.
+
+   `pane-text` should be the output of `sanitize-pane-text`."
+  ([pane-text]
+   (check-layout-invariants pane-text nil))
+  ([pane-text expected-width]
+   (let [lines        (str/split-lines pane-text)
+         non-blank    (remove str/blank? lines)
+         banner-lines (filter #(str/includes? % "ψ Psi Agent Session") lines)
+         banner-line  (first banner-lines)
+         sep-lines    (filter #(str/includes? % "────") lines)
+         sep-line     (first sep-lines)
+         violations
+         (cond-> []
+           ;; 1. Banner present and starts at column 0
+           (nil? banner-line)
+           (conj {:check  :banner-at-column-0
+                  :detail "No line containing 'ψ Psi Agent Session' found"})
+
+           (and banner-line (not (str/starts-with? banner-line "ψ")))
+           (conj {:check  :banner-at-column-0
+                  :detail (str "Banner line has unexpected leading content: "
+                               (pr-str (subs banner-line 0 (min 40 (count banner-line)))))})
+
+           ;; 2. Banner appears exactly once
+           (not= 1 (count banner-lines))
+           (conj {:check  :banner-appears-once
+                  :detail (str "Expected 1 banner line, found " (count banner-lines))})
+
+           ;; 3. Separator present and starts at column 0
+           (nil? sep-line)
+           (conj {:check  :separator-at-column-0
+                  :detail "No separator line (────) found"})
+
+           (and sep-line (not (str/starts-with? sep-line "─")))
+           (conj {:check  :separator-at-column-0
+                  :detail (str "Separator line has unexpected leading content: "
+                               (pr-str (subs sep-line 0 (min 40 (count sep-line)))))})
+
+           ;; 4. Separator spans expected width (when provided)
+           (and sep-line expected-width
+                (> (Math/abs (- (count (str/trim sep-line)) expected-width)) 2))
+           (conj {:check  :separator-spans-width
+                  :detail (str "Separator length " (count (str/trim sep-line))
+                               " differs from expected width " expected-width
+                               " by more than 2 columns")})
+
+           ;; 5. At least 4 non-blank lines
+           (< (count non-blank) 4)
+           (conj {:check  :min-content-lines
+                  :detail (str "Only " (count non-blank)
+                               " non-blank lines found (expected ≥ 4)")}))]
+     (if (empty? violations)
+       {:ok? true}
+       {:ok? false :violations violations}))))
+
 (defn run-resize-scenario!
   "Prove that the TUI repaints correctly after a terminal resize.
 
    Scenario:
-   1. Boot → ready marker
-   2. Capture initial pane width W
-   3. Resize pane to W-20 (narrower)
-   4. Wait for banner to remain visible (WidthChangedRender repainted)
+   1. Boot → ready marker; check initial layout invariants
+   2. Record initial pane width W
+   3. Resize pane to W-resize-delta (narrower, floor 40)
+   4. Wait for banner-marker to reappear; check layout invariants at new width
    5. Resize pane back to W
-   6. Wait for banner to remain visible after second resize
+   6. Wait for banner-marker again; check layout invariants at restored width
    7. /quit → clean exit
 
+   Layout invariants checked at each stage (via check-layout-invariants):
+   - 'ψ Psi Agent Session' starts at column 0 (not shifted right)
+   - banner appears exactly once (no double-render artefact)
+   - separator '────' starts at column 0
+   - separator length matches the current pane width (reflowed, not stale)
+   - at least 4 non-blank lines present (screen not blank)
+
    This exercises the JLine Display WidthChangedRender path: on every
-   width change the renderer calls Display.resize then re-renders the
-   full view, so the terminal is never left blank."
+   width change the renderer clears its internal state and re-renders
+   the full view from scratch."
   [{:keys [session-name
            working-dir
            launch-command
@@ -544,69 +636,92 @@
            banner-marker
            resize-delta
            keep-session-on-failure?]
-    :or {working-dir (str (.getCanonicalPath (io/file ".")))
-         launch-command (worktree-launch-command)
+    :or {working-dir      (str (.getCanonicalPath (io/file ".")))
+         launch-command   (worktree-launch-command)
          startup-timeout-ms default-startup-timeout-ms
-         step-timeout-ms default-step-timeout-ms
-         ready-markers default-ready-markers
-         ;; A stable string always present in the banner
-         banner-marker "ESC=interrupt"
-         ;; How many columns to shrink by
-         resize-delta 20
+         step-timeout-ms  default-step-timeout-ms
+         ready-markers    default-ready-markers
+         banner-marker    "ESC=interrupt"
+         resize-delta     20
          keep-session-on-failure? false}}]
   (let [preflight (tmux-preflight-result)]
     (if (not= :ok (:status preflight))
       preflight
       (let [session-name* (or session-name (unique-session-name))]
         (try
-          (let [target (start-session! {:session-name session-name*
-                                        :working-dir working-dir
+          (let [target (start-session! {:session-name   session-name*
+                                        :working-dir    working-dir
                                         :launch-command launch-command})
-                result (cond
-                         (not (wait-for-any-marker target ready-markers startup-timeout-ms))
-                         (failure-result target :startup-timeout)
+                result
+                (cond
+                  (not (wait-for-any-marker target ready-markers startup-timeout-ms))
+                  (failure-result target :startup-timeout)
 
-                         :else
-                         (let [initial-width (pane-width target)]
-                           (if (nil? initial-width)
-                             (assoc (failure-result target :pane-width-unavailable)
-                                    :detail "Could not read initial pane width")
-                             (let [narrow-width (max 40 (- initial-width resize-delta))]
-                               ;; Step 1: shrink the pane
-                               (resize-pane-width! target narrow-width)
-                               (cond
-                                 (not (wait-for-marker target banner-marker step-timeout-ms))
-                                 (assoc (failure-result target :banner-missing-after-shrink)
-                                        :detail (str "Banner not visible after resize to " narrow-width " cols"))
+                  :else
+                  (let [initial-width (pane-width target)]
+                    (if (nil? initial-width)
+                      (assoc (failure-result target :pane-width-unavailable)
+                             :detail "Could not read initial pane width")
+                      ;; Check layout before any resize
+                      (let [initial-snap  (sanitize-pane-text (capture-pane target))
+                            initial-check (check-layout-invariants initial-snap initial-width)]
+                        (if-not (:ok? initial-check)
+                          (assoc (failure-result target :layout-invalid-before-resize)
+                                 :detail     "Layout invariants failed before any resize"
+                                 :violations (:violations initial-check))
+                          (let [narrow-width (max 40 (- initial-width resize-delta))]
+                            ;; Step 1: shrink
+                            (resize-pane-width! target narrow-width)
+                            (cond
+                              (not (wait-for-marker target banner-marker step-timeout-ms))
+                              (assoc (failure-result target :banner-missing-after-shrink)
+                                     :detail (str "Banner not visible after resize to "
+                                                  narrow-width " cols"))
 
-                                 :else
-                                 ;; Step 2: restore original width
-                                 (do
-                                   (resize-pane-width! target initial-width)
-                                   (cond
-                                     (not (wait-for-marker target banner-marker step-timeout-ms))
-                                     (assoc (failure-result target :banner-missing-after-restore)
-                                            :detail (str "Banner not visible after resize back to " initial-width " cols"))
+                              :else
+                              (let [narrow-snap  (sanitize-pane-text (capture-pane target))
+                                    narrow-check (check-layout-invariants narrow-snap narrow-width)]
+                                (if-not (:ok? narrow-check)
+                                  (assoc (failure-result target :layout-invalid-after-shrink)
+                                         :detail     (str "Layout invariants failed after resize to "
+                                                          narrow-width " cols")
+                                         :violations (:violations narrow-check))
+                                  ;; Step 2: restore
+                                  (do
+                                    (resize-pane-width! target initial-width)
+                                    (cond
+                                      (not (wait-for-marker target banner-marker step-timeout-ms))
+                                      (assoc (failure-result target :banner-missing-after-restore)
+                                             :detail (str "Banner not visible after resize back to "
+                                                          initial-width " cols"))
 
-                                     :else
-                                     (do
-                                       (send-line! target "/quit")
-                                       (if (wait-for-java-exit target step-timeout-ms)
-                                         {:status :passed
-                                          :session-name session-name*
-                                          :pane-id (:pane-id target)}
-                                         (failure-result target :quit-timeout))))))))))]
+                                      :else
+                                      (let [restored-snap  (sanitize-pane-text (capture-pane target))
+                                            restored-check (check-layout-invariants
+                                                            restored-snap initial-width)]
+                                        (if-not (:ok? restored-check)
+                                          (assoc (failure-result target :layout-invalid-after-restore)
+                                                 :detail     (str "Layout invariants failed after "
+                                                                  "restore to " initial-width " cols")
+                                                 :violations (:violations restored-check))
+                                          (do
+                                            (send-line! target "/quit")
+                                            (if (wait-for-java-exit target step-timeout-ms)
+                                              {:status       :passed
+                                               :session-name session-name*
+                                               :pane-id      (:pane-id target)}
+                                              (failure-result target :quit-timeout))))))))))))))))]
             (when (or (= :passed (:status result))
                       (not keep-session-on-failure?))
               (kill-session-if-exists! session-name*))
             result)
           (catch Throwable t
             (let [target {:session-name session-name*
-                          :pane-id (primary-pane-id session-name*)}
-                  result {:status :failed
-                          :reason :exception
-                          :session-name session-name*
-                          :pane-id (:pane-id target)
+                          :pane-id      (primary-pane-id session-name*)}
+                  result {:status        :failed
+                          :reason        :exception
+                          :session-name  session-name*
+                          :pane-id       (:pane-id target)
                           :error-message (or (ex-message t) (str t))
                           :pane-snapshot (sanitize-pane-text (capture-pane target))}]
               (when-not keep-session-on-failure?
