@@ -234,7 +234,12 @@ doc/ - user-facing documentation (guides, references, workflows)
 
 META.md - psi meta model (internal)
 munera/plan.md - active task orchestration (internal)
-CHANGELOG.md - terse change summary (user facing)
+CHANGELOG.md - keep-a-changelog format (user facing)
+  | sections: `[Unreleased]` → stamped `[MAJOR.MINOR.PATCH] - YYYY-MM-DD` at release
+  | categories: Added | Changed | Fixed | Removed
+  | entry REQUIRED for: user-facing commands ∨ flags ∨ behaviours ∨ breaking changes ∨ user-visible bug fixes ∨ new extension capabilities
+  | entry NOT required for: refactor ∨ test additions ∨ lint fixes ∨ internal convergence
+  | λchange. user_visible(change) → add_entry([Unreleased]) ∧ precedes(commit)
 
 Canonical process: keep user docs (`README.md` + `doc/`) synchronized with meta/spec/code/tests on every change.
 
