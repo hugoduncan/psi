@@ -81,11 +81,20 @@
                                      {:role "assistant"
                                       :content [{:type :text :text "(step complete)"}]})})))))))
 
+(defn- dispatch-fn
+  [text]
+  (case (some-> text str/trim)
+    ("/quit" "/exit") {:type :quit}
+    "/resume"          {:type :resume}
+    "/tree"            {:type :tree-open}
+    nil))
+
 (defn -main
   [& _args]
-  (let [script    (read-script)
-        agent-fn  (if (seq script)
-                    (scripted-agent-fn (atom (vec script)))
-                    noop-agent-fn)
+  (let [script     (read-script)
+        agent-fn   (if (seq script)
+                     (scripted-agent-fn (atom (vec script)))
+                     noop-agent-fn)
         model-name (or (System/getenv "PSI_TUI_DEMO_MODEL") "demo-model")]
-    (app/start! model-name agent-fn {:alt-screen false})))
+    (app/start! model-name agent-fn {:alt-screen false
+                                     :dispatch-fn dispatch-fn})))
