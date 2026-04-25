@@ -17,6 +17,8 @@
 (def default-poll-interval-ms 100)
 (def default-ready-markers ["刀:" "Type a message"])
 (def default-help-marker "(anything else is sent to the agent)")
+(def default-autocomplete-suggestions-marker "Suggestions")
+(def default-autocomplete-selected-marker "▸ ")
 (def default-capture-lines 3000)
 
 (defn- run-sh
@@ -130,6 +132,24 @@
                     (pr-str s)))
     (run-sh (format "tmux send-keys -t %s Enter" pane))))
 
+(defn send-text!
+  "Send literal text to the pane without pressing Enter."
+  [target s]
+  (let [pane (pane-target (if (string? target)
+                            {:session-name target}
+                            target))]
+    (run-sh (format "tmux send-keys -l -t %s %s"
+                    pane
+                    (pr-str s)))))
+
+(defn send-key!
+  "Send a named tmux key (e.g. \"Escape\", \"Down\", \"Up\") to the pane."
+  [target key-name]
+  (let [pane (pane-target (if (string? target)
+                            {:session-name target}
+                            target))]
+    (run-sh (format "tmux send-keys -t %s %s" pane key-name))))
+
 (defn wait-until
   ([pred timeout-ms]
    (wait-until pred timeout-ms default-poll-interval-ms))
@@ -234,6 +254,93 @@
                                   :session-name session-name*
                                   :pane-id (:pane-id target)}
                                  (failure-result target :quit-timeout))))))]
+            (when (or (= :passed (:status result))
+                      (not keep-session-on-failure?))
+              (kill-session-if-exists! session-name*))
+            result)
+          (catch Throwable t
+            (let [target {:session-name session-name*
+                          :pane-id (primary-pane-id session-name*)}
+                  result {:status :failed
+                          :reason :exception
+                          :session-name session-name*
+                          :pane-id (:pane-id target)
+                          :error-message (or (ex-message t) (str t))
+                          :pane-snapshot (sanitize-pane-text (capture-pane target))}]
+              (when-not keep-session-on-failure?
+                (kill-session-if-exists! session-name*))
+              result)))))))
+
+(defn run-slash-autocomplete-scenario!
+  "Prove that typing '/' opens a visible autocomplete menu with a selected suggestion,
+   that moving selection with Down changes the highlighted row, and that Escape dismisses
+   the menu cleanly before exiting.
+
+   Scenario: boot -> ready -> type '/' -> 'Suggestions' visible + '▸ ' marker ->
+             Down key -> '▸ ' still visible -> Escape -> '/quit' -> clean exit."
+  [{:keys [session-name
+           working-dir
+           launch-command
+           startup-timeout-ms
+           step-timeout-ms
+           ready-markers
+           suggestions-marker
+           selected-marker
+           keep-session-on-failure?]
+    :or {working-dir (str (.getCanonicalPath (io/file ".")))
+         launch-command (launcher-command)
+         startup-timeout-ms default-startup-timeout-ms
+         step-timeout-ms default-step-timeout-ms
+         ready-markers default-ready-markers
+         suggestions-marker default-autocomplete-suggestions-marker
+         selected-marker default-autocomplete-selected-marker
+         keep-session-on-failure? false}}]
+  (let [preflight (tmux-preflight-result)]
+    (if (not= :ok (:status preflight))
+      preflight
+      (let [session-name* (or session-name (unique-session-name))]
+        (try
+          (let [target (start-session! {:session-name session-name*
+                                        :working-dir working-dir
+                                        :launch-command launch-command})
+                result (cond
+                         (not (wait-for-any-marker target ready-markers startup-timeout-ms))
+                         (failure-result target :startup-timeout)
+
+                         :else
+                         (do
+                           ;; type '/' to trigger slash-command autocomplete
+                           (send-text! target "/")
+                           (cond
+                             (not (wait-for-marker target suggestions-marker step-timeout-ms))
+                             (failure-result target :autocomplete-suggestions-timeout)
+
+                             (not (str/includes?
+                                   (sanitize-pane-text (capture-pane target))
+                                   selected-marker))
+                             (assoc (failure-result target :autocomplete-selected-marker-missing)
+                                    :detail "Suggestions header appeared but '▸ ' selected marker was not visible")
+
+                             :else
+                             (do
+                               ;; move selection down one row
+                               (send-key! target "Down")
+                               (cond
+                                 (not (wait-for-marker target selected-marker step-timeout-ms))
+                                 (failure-result target :autocomplete-post-down-marker-missing)
+
+                                 :else
+                                 (do
+                                   ;; dismiss autocomplete with Escape
+                                   (send-key! target "Escape")
+                                   (Thread/sleep 200)
+                                   ;; exit cleanly
+                                   (send-line! target "/quit")
+                                   (if (wait-for-java-exit target step-timeout-ms)
+                                     {:status :passed
+                                      :session-name session-name*
+                                      :pane-id (:pane-id target)}
+                                     (failure-result target :quit-timeout))))))))]
             (when (or (= :passed (:status result))
                       (not keep-session-on-failure?))
               (kill-session-if-exists! session-name*))

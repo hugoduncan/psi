@@ -32,3 +32,20 @@ Risks / decisions:
 - keep the marker/styling simple so tests can assert behavior on ANSI-stripped output
 - avoid introducing scrolling/paging behavior for the menu in this slice; capping visible rows is sufficient for the issue
 - avoid changing autocomplete navigation semantics unless rendering exposes a concrete correctness gap
+
+5. Add tmux integration proof (follow-on to unit rendering slice)
+   - add `send-text!` to harness: sends literal characters without pressing Enter (uses `-l` flag, no trailing Enter key)
+   - add `send-key!` to harness: sends a named tmux key (e.g. "Down", "Escape") without literal text
+   - add `run-slash-autocomplete-scenario!` to harness:
+     - boot → ready marker
+     - `send-text! "/"` → wait for `"Suggestions"` marker
+     - assert `"▸ "` selected-row marker is present
+     - `send-key! "Down"` → wait for `"▸ "` still present (selection moved)
+     - `send-key! "Escape"` → brief pause → `send-line! "/quit"` → wait for java exit
+   - refactor existing basic-scenario test assertion into shared `assert-scenario-result` helper
+   - add `^:integration` `tui-tmux-slash-autocomplete-scenario-test` using the new scenario
+   - run via `bb clojure:test:integration` with tmux available; record outcome in `implementation.md`
+
+   Risks:
+   - `send-text! "/"` races with TUI startup completion; the ready-marker wait before typing mitigates this
+   - Escape behaviour depends on TUI statechart wiring; if Escape triggers session interrupt rather than autocomplete dismiss the scenario will diverge — check render path before running live
