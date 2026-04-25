@@ -13,9 +13,11 @@
      KittyProtocolDisabledOnStop
      BracketedPasteDisabledOnStop"
   (:require
+   [clojure.string :as str]
    [psi.tui.protocols :as proto])
   (:import
-   (java.io FileInputStream PrintStream)))
+   (java.io FileInputStream PrintStream)
+   (org.jline.utils Signals)))
 
 ;;;; Escape constants
 
@@ -116,6 +118,21 @@
         (.waitFor))
     (catch Exception _ nil)))
 
+(defn- query-terminal-size
+  "Query the real terminal dimensions via `stty size`.
+   Returns {:cols n :rows n} or nil if unavailable."
+  []
+  (try
+    (let [pb  (-> (ProcessBuilder. ["stty" "size"])
+                  (.redirectInput (java.io.File. "/dev/tty")))
+          p   (.start pb)
+          out (slurp (.getInputStream p))
+          _   (.waitFor p)
+          [rows-s cols-s] (str/split (str/trim out) #"\s+")]
+      (when (and rows-s cols-s)
+        {:cols (Long/parseLong cols-s) :rows (Long/parseLong rows-s)}))
+    (catch Exception _ nil)))
+
 (def ^:private key-translations
   {"\r"         "enter"
    "\n"         "enter"
@@ -203,10 +220,23 @@
             reader-thread-atom]
 
   proto/Terminal
-  (start! [this on-input _on-resize]
+  (start! [this on-input on-resize]
     (reset! running-atom true)
     ;; Enable raw mode: no echo, no canonical buffering
     (run-stty! "-echo" "raw")
+    ;; Query real terminal size at startup; update atoms before first render.
+    (when-let [{:keys [cols rows]} (query-terminal-size)]
+      (reset! cols-atom cols)
+      (reset! rows-atom rows))
+    ;; Register SIGWINCH handler to update dimensions and trigger a repaint
+    ;; when the terminal is resized (e.g. via tmux resize-pane).
+    (Signals/register "WINCH"
+                      (reify Runnable
+                        (run [_]
+                          (when-let [{:keys [cols rows]} (query-terminal-size)]
+                            (reset! cols-atom cols)
+                            (reset! rows-atom rows)
+                            (on-resize cols rows)))))
     ;; Query Kitty protocol + enable bracketed paste + hide cursor
     (.print out kitty-query)
     (.print out paste-enable)

@@ -41,7 +41,8 @@
    Scenario steps:
    1. Boot → ready marker
    2. Submit 'think' → wait for '· ' (thinking prefix)
-   3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓
+   3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓;
+      then wait for 'ψ: Done.' (proves turn complete, tool row collapsed)
       (spinner is transient — may be missed on fast machines before first poll)
    4. Assert content NOT visible in collapsed mode (no 'output-line-1')
    5. Press ctrl+o   → assert expanded content visible ('output-line-10')
@@ -118,6 +119,13 @@
 
                                  (not (tmux/wait-for-marker target default-tool-done-marker step-timeout-ms))
                                  (failure target :tool-done-marker-not-visible)
+
+                                 ;; Wait for the assistant reply — proves the turn is
+                                 ;; complete and the tool row has collapsed.  Without
+                                 ;; this, the collapsed-content check can fire while
+                                 ;; the active turn is still rendering (tool body visible).
+                                 (not (tmux/wait-for-marker target "ψ: Done." step-timeout-ms))
+                                 (failure target :assistant-reply-timeout)
 
                                  :else
                                  (let [pane (tmux/sanitize-pane-text (tmux/capture-pane target))]
