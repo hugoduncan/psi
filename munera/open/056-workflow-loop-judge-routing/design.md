@@ -50,7 +50,9 @@ Prompts and projections are **computed functions of context**, not carried state
 
 ### Chart structure
 
-A workflow with steps `[plan, build, review]` where review has a judge:
+A workflow with steps `[plan, build, review]` where review has a judge.
+
+This chart describes the **Phase A target architecture**. Phase B implements the same semantics imperatively without this chart driving execution — see "Phase B execution flow" below.
 
 ```
 [workflow-run]
@@ -58,35 +60,50 @@ A workflow with steps `[plan, build, review]` where review has a judge:
   ├─ :pending
   │    on-entry: —
   │    :start → :step/plan
+  │    :workflow/cancel → :cancelled
   │
   ├─ :step/plan                            ← leaf state (no judge)
-  │    on-entry: create-actor-session(plan, context), prompt(plan)
+  │    on-entry: increment-iteration-count(plan),
+  │              create-actor-session(plan, context), prompt(plan)
   │    on-exit:  record-result(plan) into context
   │    :actor/done → :step/build
+  │    :actor/failed [guard: retry-available] → :step/plan
+  │    :actor/failed [guard: ¬retry-available] → :failed
+  │    :workflow/cancel → :cancelled
   │
   ├─ :step/build                           ← leaf state (no judge)
-  │    on-entry: create-actor-session(build, context), prompt(build)
+  │    on-entry: increment-iteration-count(build),
+  │              create-actor-session(build, context), prompt(build)
   │    on-exit:  record-result(build) into context
   │    :actor/done → :step/review
+  │    :actor/failed [guard: retry-available] → :step/build
+  │    :actor/failed [guard: ¬retry-available] → :failed
+  │    :workflow/cancel → :cancelled
   │
   ├─ :step/review                          ← compound state (has judge)
   │    │
   │    ├─ :step/review.acting
-  │    │    on-entry: create-actor-session(review, context), prompt(review)
+  │    │    on-entry: increment-iteration-count(review),
+  │    │              create-actor-session(review, context), prompt(review)
   │    │    on-exit:  record-result(review) into context
   │    │    :actor/done → :step/review.judging
+  │    │    :actor/failed [guard: retry-available] → :step/review.acting
+  │    │    :actor/failed [guard: ¬retry-available] → :failed
+  │    │    :workflow/cancel → :cancelled
   │    │
   │    └─ :step/review.judging
   │         on-entry: project(review-session, projection-spec),
-  │                   create-judge-session(projected-messages),
+  │                   create-judge-session(projected-messages, no-tools),
   │                   prompt(judge)
-  │         on-exit:  record-judge-result into context,
-  │                   increment-iteration-count
+  │         on-exit:  record-judge-result on attempt
   │         "APPROVED" → :completed
-  │         "REVISE" [guard: iterations < max] → :step/build
-  │         "REVISE" [guard: iterations >= max] → :failed
-  │         <no-match> [guard: judge-retries < max] → :step/review.judging  (retry judge)
+  │         "REVISE" [guard: target iterations < max] → :step/build
+  │         "REVISE" [guard: target iterations >= max] → :failed
+  │         <no-match> [internal, guard: judge-retries < max]
+  │              → action: inject feedback into same judge session, re-prompt
+  │              (internal transition — no exit/entry, same session continues)
   │         <no-match> [guard: judge-retries >= max] → :failed
+  │         :workflow/cancel → :cancelled
   │
   ├─ :completed
   │    on-entry: record-terminal-outcome(context)
@@ -98,22 +115,29 @@ A workflow with steps `[plan, build, review]` where review has a judge:
        on-entry: record-terminal-outcome(context)
 ```
 
+Key statechart modeling notes:
+- **Iteration count increment** is an on-entry action of each step (leaf or `.acting` sub-state), not an on-exit of judging. This matches resolved decision #10: count incremented on every entry including the first.
+- **Actor failure** is modeled as `:actor/failed` with retry guards, matching the existing `record-execution-failure` + retry logic.
+- **Cancel** transitions exist from every non-terminal state, matching the existing `workflow-statechart.clj`.
+- **Judge retry** is an **internal transition** (no exit/entry fired), not a self-transition. The same judge session continues via `prompt-in!` — no new session is created on retry. This matches resolved decision #13.
+
 ### Key structural properties
 
-**Steps without a judge are leaf states.** One event (`:actor/done`), one transition (to next step). The existing linear behavior.
+**Steps without a judge are leaf states.** Events: `:actor/done` (advance), `:actor/failed` (retry or fail), `:workflow/cancel`. The existing linear behavior plus failure handling.
 
-**Steps with a judge are compound states** with two sub-states: `.acting` and `.judging`. The actor produces `:actor/done` → transitions to `.judging`. The judge produces a signal string → the routing table maps it to a transition.
+**Steps with a judge are compound states** with two sub-states: `.acting` and `.judging`. The actor produces `:actor/done` → transitions to `.judging`. The judge produces a signal string → the routing table maps it to a transition. Judge retry is an internal transition (same session continues).
 
-**The imperative execution loop disappears.** There is no `execute-run!` loop. The statechart drives execution: entering a state fires its entry action (spawn agent), agent completes and emits an event, event fires a transition, next state entered, next entry action fires. The loop is the statechart's event-processing loop.
+**In Phase A, the imperative execution loop disappears.** The statechart drives execution: entering a state fires its entry action (spawn agent), agent completes and emits an event, event fires a transition, next state entered, next entry action fires. The loop is the statechart's event-processing loop. Phase B preserves the imperative loop and uses the statechart only for status tracking and history.
 
-**Context accumulation is explicit.** Each exit action writes to the extended state:
+**Context accumulation is explicit.** Each exit action writes to the extended state. The Phase A context shape is a flat map designed for statechart consumption:
 
 ```clojure
+;; Phase A — statechart extended state (flat, designed for statechart)
 context = {:workflow-input    {...}
            :step-outputs      {"plan"   {:text "..."}
                                "build"  {:text "..."}
                                "review" {:text "..."}}
-           :iteration-counts  {"review" 2}
+           :iteration-counts  {"plan" 1 "build" 2 "review" 2}
            :judge-results     {"review" {:output "REVISE" :event "REVISE"}}
            :sessions          {"plan"         "sid-1"
                                "build"        "sid-2"
@@ -121,18 +145,22 @@ context = {:workflow-input    {...}
                                "review-judge" "sid-4"}}
 ```
 
+Note: Phase B uses the existing nested `workflow-run` structure (step-runs → attempts → judge fields). The flat context shape above is the Phase A target. Phase A will need to either flatten the existing structure or adapt the statechart to work with the nested shape. This is a Phase A design decision, not a Phase B concern.
+
 ### Correspondence to current code
 
-| Current code | Statechart equivalent |
-|---|---|
-| `workflow-run` state map | Statechart extended state (context) |
-| `execute-current-step!` | Entry action on a step state |
-| `submit-result-envelope` | Exit action + event emission |
-| `execute-run!` loop | Statechart event-processing loop |
-| `next-step-id-fn` | Transition target (static for leaf states) |
-| routing table `:on` | Transition table with guards |
-| projection spec | Computed action parameter (context + session → messages) |
-| prompt template + bindings | Computed action parameter (context → string) |
+| Current code | Statechart equivalent | Notes |
+|---|---|---|
+| `workflow-run` state map | Statechart extended state (context) | Same data, different shape — nested (current) vs flat (Phase A target) |
+| `execute-current-step!` | Entry action on a step state | |
+| `submit-result-envelope` | Exit action + event emission | For judged steps, split into `record-actor-result` (exit of `.acting`) + judge routing |
+| `execute-run!` loop | Statechart event-processing loop | Phase B preserves the loop; Phase A replaces it |
+| `next-step-id-fn` | Transition target (static for leaf states) | For judged steps, replaced by `:on` routing table |
+| routing table `:on` | Transition table with guards | |
+| projection spec | Computed action parameter (context + session → messages) | |
+| prompt template + bindings | Computed action parameter (context → string) | |
+| `record-execution-failure` | `:actor/failed` event + retry guard | |
+| judge `prompt-in!` retry | Internal transition (no exit/entry) | Same session continues |
 
 ## Design
 

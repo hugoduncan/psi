@@ -68,11 +68,15 @@
 
 ## Phase A: Statechart-driven execution (follow-on task)
 
-- [ ] Compile definitions into hierarchical statecharts (leaf/compound states)
-- [ ] Entry actions own session creation + prompting
-- [ ] Exit actions own result recording into extended state
-- [ ] Extended state replaces workflow-run state map
-- [ ] Guards own iteration checks and signal matching
+- [ ] Compile definitions into hierarchical statecharts (leaf states for simple steps, compound `.acting`/`.judging` for judged steps)
+- [ ] Entry actions own: iteration count increment, session creation, prompting
+- [ ] Exit actions own: result recording into extended state
+- [ ] Model `:actor/failed` event with retry guards (matches existing `record-execution-failure`)
+- [ ] Model `:workflow/cancel` transitions from all non-terminal states
+- [ ] Model judge retry as internal transition (no exit/entry — same session continues)
+- [ ] Decide context shape: flatten existing nested workflow-run structure or adapt statechart to nested shape
+- [ ] Extended state replaces workflow-run state map as accumulator
+- [ ] Guards own iteration checks (target step count) and signal matching
 - [ ] `execute-run!` becomes "start statechart, process events until quiescent"
 - [ ] Imperative execution loop removed
 - [ ] Existing tests refactored to drive statechart
