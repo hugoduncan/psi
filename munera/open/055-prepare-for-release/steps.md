@@ -10,9 +10,9 @@
 - [ ] Document bbin install-from-tag command in README
 
 ## Track A — changelog discipline
-- [ ] Decide changelog format (keep-a-changelog recommended) — needs human decision
-- [ ] Migrate `CHANGELOG.md` to versioned sections (`[Unreleased]` header)
-- [ ] Write `bb changelog:check` task (fails if no unreleased entry on non-merge commit)
+- [x] Decide changelog format — keep-a-changelog, categories: Added/Changed/Fixed/Removed
+- [x] Replace `CHANGELOG.md` with structured `[Unreleased]` section seeded from recent work
+- [ ] Write `bb changelog:check` task (fails if `[Unreleased]` section is empty)
 - [ ] Add `changelog:check` step to CI `check` job
 
 ## Track C — jar build
