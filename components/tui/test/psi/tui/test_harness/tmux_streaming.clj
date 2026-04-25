@@ -42,7 +42,7 @@
    1. Boot → ready marker
    2. Submit 'think' → wait for '· ' (thinking prefix)
    3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓;
-      then wait for idle input prompt (proves active turn cleared, tool collapsed)
+      then poll until 'output-line-1' is absent (proves active turn cleared)
       (spinner is transient — may be missed on fast machines before first poll)
    4. Assert content NOT visible in collapsed mode (no 'output-line-1')
    5. Press ctrl+o   → assert expanded content visible ('output-line-10')
@@ -120,15 +120,15 @@
                                  (not (tmux/wait-for-marker target default-tool-done-marker step-timeout-ms))
                                  (failure target :tool-done-marker-not-visible)
 
-                                 ;; Wait for the input prompt to reappear — this proves
-                                 ;; the active turn has been fully cleared and the TUI
-                                 ;; is back at idle.  'ψ: Done.' appears while the active
-                                 ;; turn is still rendering (tool body still visible), so
-                                 ;; it is not a sufficient signal.  The input prompt
-                                 ;; ('Type a message') disappears during streaming and
-                                 ;; reappears only once the turn is fully committed.
-                                 (not (tmux/wait-for-any-marker target ready-markers step-timeout-ms))
-                                 (failure target :idle-prompt-timeout)
+                                 ;; Wait for tool body to be absent from the pane.
+                                 ;; output-line-1 is visible during the active turn and
+                                 ;; disappears once the turn is committed and the active
+                                 ;; turn area is cleared.  Polling for its absence is
+                                 ;; more reliable than waiting for any positive marker
+                                 ;; (ready prompt, assistant reply) that can appear in
+                                 ;; the same render frame as the tool body.
+                                 (not (tmux/wait-for-marker-absent target "output-line-1" step-timeout-ms))
+                                 (failure target :content-still-visible-after-timeout)
 
                                  :else
                                  (let [pane (tmux/sanitize-pane-text (tmux/capture-pane target))]

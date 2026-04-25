@@ -212,6 +212,14 @@
      (str/includes? (sanitize-pane-text (capture-pane target)) marker))
    timeout-ms))
 
+(defn wait-for-marker-absent
+  "Poll until `marker` is NOT present in the pane, or timeout."
+  [target marker timeout-ms]
+  (wait-until
+   (fn []
+     (not (str/includes? (sanitize-pane-text (capture-pane target)) marker)))
+   timeout-ms))
+
 (defn wait-for-java-exit
   [target timeout-ms]
   (wait-until
