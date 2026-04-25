@@ -75,12 +75,12 @@
            thinking-marker
            selector-marker
            keep-session-on-failure?]
-    :or {;; Use launcher-command (prefers installed `psi` binary) rather than
-         ;; worktree-launch-command (prefers `bb bb/psi.clj`).  The TUI is
-         ;; launched with working-dir set to the fixture temp dir, so a
-         ;; repo-relative `bb/psi.clj` path would not be found.  The installed
-         ;; `psi` shim works from any directory.
-         launch-command     (tmux/launcher-command)
+    :or {;; Use repo-local-launch-command-abs (absolute path to bb/psi.clj)
+         ;; rather than worktree-launch-command (relative bb/psi.clj path).
+         ;; The TUI is launched with working-dir set to the fixture temp dir
+         ;; so the session scoping is correct, but a relative bb/psi.clj
+         ;; would not be found there.  An absolute path works from any CWD.
+         launch-command     (tmux/repo-local-launch-command-abs)
          startup-timeout-ms tmux/default-startup-timeout-ms
          step-timeout-ms    tmux/default-step-timeout-ms
          ready-markers      tmux/default-ready-markers

@@ -12,6 +12,14 @@
 (def repo-local-launch-command
   "exec bb bb/psi.clj -- --tui")
 
+(defn repo-local-launch-command-abs
+  "Launch command using an absolute path to bb/psi.clj, resolved from the
+   current working directory at call time.  Unlike [[repo-local-launch-command]],
+   this works when the tmux session is started with a different working-dir
+   (e.g. a temp fixture directory)."
+  []
+  (str "exec bb " (.getCanonicalPath (io/file "bb/psi.clj")) " -- --tui"))
+
 (def default-startup-timeout-ms 120000)
 (def default-step-timeout-ms 15000)
 (def default-poll-interval-ms 100)
@@ -133,6 +141,19 @@
        out
        (str "tmux-capture-pane-failed: " (or err ""))))))
 
+(defn capture-pane-visible
+  "Capture only the currently visible screen (no scrollback history).
+   Use this when checking for content that should no longer be on screen
+   rather than checking positive presence — scrollback history retains
+   content that has scrolled off, making absence checks unreliable with
+   the default capture-pane which includes scrollback."
+  [target]
+  (let [{:keys [exit out err]}
+        (run-sh (format "tmux capture-pane -pt %s" (pane-target target)))]
+    (if (zero? exit)
+      out
+      (str "tmux-capture-pane-failed: " (or err "")))))
+
 (defn pane-current-command
   [target]
   (let [{:keys [exit out]}
@@ -213,11 +234,13 @@
    timeout-ms))
 
 (defn wait-for-marker-absent
-  "Poll until `marker` is NOT present in the pane, or timeout."
+  "Poll until `marker` is NOT present in the visible screen, or timeout.
+   Uses capture-pane-visible (no scrollback) so content that has scrolled
+   off the screen is not mistaken for still-visible content."
   [target marker timeout-ms]
   (wait-until
    (fn []
-     (not (str/includes? (sanitize-pane-text (capture-pane target)) marker)))
+     (not (str/includes? (sanitize-pane-text (capture-pane-visible target)) marker)))
    timeout-ms))
 
 (defn wait-for-java-exit
