@@ -34,4 +34,18 @@ Broader relevant verification:
   - failure modes: `:autocomplete-suggestions-timeout`, `:autocomplete-selected-marker-missing`, `:autocomplete-post-down-marker-missing`, `:quit-timeout`
 - Refactored existing basic-scenario test into a shared `assert-scenario-result` helper to avoid duplication.
 - Added `^:integration tui-tmux-slash-autocomplete-scenario-test` wired through the shared helper.
-- Live run with tmux available not yet recorded — pending next session with tmux on PATH.
+Live run outcome — `mise exec tmux -- bb clojure:test:integration`:
+- First run failed: `:autocomplete-suggestions-timeout` — root cause: `launcher-command` resolved to the installed `psi` binary (canonical) which is an older release without the autocomplete render feature. The basic boot/help/quit scenario passed with the installed binary but autocomplete was absent.
+- Fix: added `worktree-launch-command` to the harness; it prefers `bb` (repo-local current-worktree code) over the installed `psi` binary. The autocomplete scenario uses `worktree-launch-command` as its default. `run-basic-help-quit-scenario!` continues to use `launcher-command` (prefers installed binary) since it tests a stable surface.
+- Second run: `6 tests, 17 assertions, 0 failures` — all integration scenarios green.
+
+Manual probe confirmed intermediate behaviour: 2 seconds after sending `/`, the pane showed:
+  ```
+  刀: /
+  Suggestions
+  ▸ /cancel-job
+    /delegate
+    /delegate-reload
+    /exit
+    /gh-bug-triage
+  ```

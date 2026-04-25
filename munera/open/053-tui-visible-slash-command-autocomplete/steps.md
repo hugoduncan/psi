@@ -9,4 +9,4 @@
 - [x] Add `run-slash-autocomplete-scenario!` to the tmux harness (type `/` → suggestions visible → `▸ ` visible → Down → `▸ ` still visible → Escape → `/quit` → clean exit)
 - [x] Add `^:integration` test `tui-tmux-slash-autocomplete-scenario-test` in `tmux_integration_harness_test.clj`
 - [x] Refactor existing basic-scenario test to use shared `assert-scenario-result` helper
-- [ ] Run `bb clojure:test:integration` (with tmux available) and record results
+- [x] Run `bb clojure:test:integration` (with tmux available) and record results
