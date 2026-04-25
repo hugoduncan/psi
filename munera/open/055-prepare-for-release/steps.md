@@ -89,3 +89,24 @@
 ### Validation
 - [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
 - [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created + `:jar` policy smoke passes
+
+## Track H — gaps identified post-G
+
+### Bugs
+- [ ] **`release-and-push!` patch computation wrong on re-run** — after `release!` completes,
+  two extra commits exist (release commit + reset commit), so `(inc (git-count-revs))` returns
+  `original_patch + 3`, not `original_patch + 1`. `post-tag-push-needed?` checks the wrong tag
+  and the push-recovery path never fires. Fix: derive the tag from `git describe --tags --exact-match HEAD`
+  (the most recent local tag) rather than recomputing the version from commit count.
+
+### Missing test coverage
+- [ ] **No unit tests for `:jar` policy in launcher** — `psi-self-basis-test` covers
+  `:development` and `:installed` only; the `:jar` path in `psi-self-basis`,
+  `materialize-manifest-dep`, and `expand-entry {:policy :jar}` is untested.
+  The `:psi/release-version` placeholder resolution path is also untested.
+  Add tests to `launcher_test.clj` and `extensions_test.clj`.
+
+### Minor
+- [ ] **`doc/develop.md` runbook: mention `bb deploy` standalone** — runbook documents
+  `bb release` but doesn't mention that `bb deploy` (and `bb build:lib`) can be run
+  standalone for debugging a Clojars deploy without cutting a full release.
