@@ -34,6 +34,9 @@
   (zero? (:exit (run-sh (format "command -v %s >/dev/null 2>&1" cmd)))))
 
 (defn launcher-command
+  "Resolve the best available TUI launch command, preferring the installed
+   canonical `psi` binary when available.  For scenarios that need to exercise
+   code in the current worktree, use [[worktree-launch-command]] instead."
   []
   (cond
     (command-available? "psi")
@@ -41,6 +44,22 @@
 
     (command-available? "bb")
     repo-local-launch-command
+
+    :else
+    canonical-launch-command))
+
+(defn worktree-launch-command
+  "Resolve a launch command that always runs code from the current worktree,
+   preferring `bb` (repo-local) over the installed `psi` binary.
+   Use this for scenarios that test features that may not yet be in the
+   installed release."
+  []
+  (cond
+    (command-available? "bb")
+    repo-local-launch-command
+
+    (command-available? "psi")
+    canonical-launch-command
 
     :else
     canonical-launch-command))
@@ -288,7 +307,7 @@
            selected-marker
            keep-session-on-failure?]
     :or {working-dir (str (.getCanonicalPath (io/file ".")))
-         launch-command (launcher-command)
+         launch-command (worktree-launch-command)
          startup-timeout-ms default-startup-timeout-ms
          step-timeout-ms default-step-timeout-ms
          ready-markers default-ready-markers
