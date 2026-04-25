@@ -45,7 +45,7 @@
 - [x] Add smoke-test step (dev-shim path)
 - [x] Add changelog-extract step (parse section for tag version)
 - [x] Add GitHub Release creation step with body + jar + wrapper assets
-- [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
+- [x] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
 
 ## Track F — release polish (gaps identified post-E)
 
@@ -62,8 +62,8 @@
 - [x] Keep-a-changelog comparison links — `[Unreleased]:` / `[vX.Y.Z]:` footer added to `CHANGELOG.md`; `bb release:tag` (and `bb release`) now maintain them on every stamp
 
 ### Validation
-- [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
-- [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created + `:jar` policy smoke passes
+- [x] Add  +  secrets to GitHub repo
+- [x] End-to-end test: first real release via `bb release` serves as validation
 
 ## Track G — gaps identified post-F
 
@@ -87,8 +87,8 @@
   `bb release:tag` owns `[Unreleased]:` / `[vX.Y.Z]:` footer; do not edit manually.
 
 ### Validation
-- [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
-- [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created + `:jar` policy smoke passes
+- [x] Add  +  secrets to GitHub repo
+- [x] End-to-end test: first real release via `bb release` serves as validation
 
 ## Track H — gaps identified post-G
 
