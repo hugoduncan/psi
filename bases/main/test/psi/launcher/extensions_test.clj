@@ -49,7 +49,12 @@
     (is (= 'extensions.mementum/init
            (get-in ext/psi-owned-extension-catalog ['psi/mementum :psi/init])))
     (is (= "extensions/mementum"
-           (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :installed :local/root])))))
+           (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :installed :local/root]))))
+  (testing "catalog entry contains jar policy with release-version placeholder"
+    (is (= :psi/release-version
+           (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :jar :mvn/version])))
+    (is (= :psi/release-version
+           (get-in ext/psi-owned-extension-catalog ['psi/workflow-loader :source-policies :jar :mvn/version])))))
 
 (deftest expand-entry-test
   (testing "recognized psi-owned entry expands from minimal syntax"
@@ -64,6 +69,10 @@
     (is (= 'custom.mementum/init
            (:psi/init (ext/expand-entry 'psi/mementum {:local/root "override-root"
                                                        :psi/init 'custom.mementum/init})))))
+  (testing "jar policy expands to release-version placeholder"
+    (is (= {:mvn/version :psi/release-version
+            :psi/init 'extensions.mementum/init}
+           (ext/expand-entry 'psi/mementum {} {:policy :jar}))))
   (testing "unrecognized libs do not receive psi-owned defaults"
     (is (= '{:mvn/version "1.2.3"}
            (ext/expand-entry 'third-party/ext {:mvn/version "1.2.3"}))))
@@ -112,4 +121,12 @@
            (:inferred-init-libs
             (ext/manifest-expansion-report
              '{:deps {psi/mementum {:local/root "override-root"
-                                    :psi/init custom.mementum/init}}}))))))
+                                    :psi/init custom.mementum/init}}})))))
+  (testing "jar policy expands psi-owned entry to release-version placeholder"
+    (is (= {:expanded-manifest '{:deps {psi/mementum {:mvn/version :psi/release-version
+                                                      :psi/init extensions.mementum/init}}}
+            :defaulted-libs ['psi/mementum]
+            :inferred-init-libs ['psi/mementum]}
+           (select-keys
+            (ext/manifest-expansion-report '{:deps {psi/mementum {}}} {:policy :jar})
+            [:expanded-manifest :defaulted-libs :inferred-init-libs])))))

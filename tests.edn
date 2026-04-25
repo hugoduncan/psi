@@ -1,10 +1,12 @@
 #kaocha/v1
  {:tests
   [{:id :unit
-    :test-paths ["components/ai/test" "components/app-runtime/test" "components/engine/test" "components/query/test" "components/history/test"
+    :test-paths ["bases/main/test"
+                 "components/ai/test" "components/app-runtime/test" "components/engine/test" "components/query/test" "components/history/test"
                  "components/introspection/test" "components/memory/test" "components/recursion/test" "components/tui/test" "components/rpc/test" "components/agent-core/test"
                  "components/agent-session/test"]
-    :source-paths ["components/ai/src" "components/app-runtime/src" "components/engine/src" "components/query/src" "components/history/src"
+    :source-paths ["bases/main/src" "bases/main/resources"
+                   "components/ai/src" "components/app-runtime/src" "components/engine/src" "components/query/src" "components/history/src"
                    "components/introspection/src" "components/memory/src" "components/recursion/src" "components/tui/src" "components/rpc/src" "components/agent-core/src"
                    "components/agent-session/src" "components/system-bootstrap/src"
                    "extensions/auto-session-name/src" "extensions/commit-checks/src" "extensions/hello-ext/src" "extensions/lsp/src"

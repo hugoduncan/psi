@@ -167,6 +167,16 @@
   (and (tag-exists? tag)
        (not (git-ok? "ls-remote" "--exit-code" "--tags" "origin" (str "refs/tags/" tag)))))
 
+(defn- latest-local-release-tag
+  "Return the most recent vX.Y.Z tag pointing at HEAD, or nil.
+   Used by release-and-push! to find the tag to push without recomputing
+   the version from commit count (which changes after the release commits)."
+  []
+  (try
+    (let [tag (str/trim (git! "describe" "--tags" "--exact-match" "HEAD"))]
+      (when (re-matches #"v\d+\.\d+\.\d+" tag) tag))
+    (catch Exception _ nil)))
+
 ;; ---------------------------------------------------------------------------
 ;; Public entry points
 ;; ---------------------------------------------------------------------------
@@ -275,17 +285,19 @@
   "Cut a release (stamp changelog, commit, tag) then push to origin.
    Equivalent to: bb release:tag && git push origin master --tags
 
-   Partial-failure recovery: if the tag exists locally but has not been pushed
-   (e.g. prior network failure), skips re-tagging and goes straight to push."
+   Partial-failure recovery: if a vX.Y.Z tag points at HEAD but has not been
+   pushed (e.g. prior network failure), skips re-tagging and goes straight to
+   push.  Uses git describe rather than recomputing the version from commit
+   count, which would be wrong after the two release commits have been made."
   [_args]
-  (let [version-base (read-version-edn)
-        patch        (inc (git-count-revs))
-        version-str  (compose-version version-base patch)
-        tag          (str "v" version-str)]
+  (if-let [tag (latest-local-release-tag)]
     (if (post-tag-push-needed? tag)
       (do
         (println (str "  Tag " tag " exists locally but not on origin — retrying push ..."))
         (push! nil))
       (do
-        (release! nil)
-        (push! nil)))))
+        (println (str "  Tag " tag " already on origin — nothing to do."))
+        (println "If you intended a new release, ensure CHANGELOG.md has new entries.")))
+    (do
+      (release! nil)
+      (push! nil))))

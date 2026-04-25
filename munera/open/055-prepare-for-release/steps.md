@@ -93,20 +93,21 @@
 ## Track H — gaps identified post-G
 
 ### Bugs
-- [ ] **`release-and-push!` patch computation wrong on re-run** — after `release!` completes,
-  two extra commits exist (release commit + reset commit), so `(inc (git-count-revs))` returns
-  `original_patch + 3`, not `original_patch + 1`. `post-tag-push-needed?` checks the wrong tag
-  and the push-recovery path never fires. Fix: derive the tag from `git describe --tags --exact-match HEAD`
-  (the most recent local tag) rather than recomputing the version from commit count.
+- [x] **`release-and-push!` patch computation fixed** — replaced `(inc (git-count-revs))`
+  with `(latest-local-release-tag)` using `git describe --tags --exact-match HEAD`;
+  push-recovery now correctly identifies the already-created tag regardless of commit count.
 
 ### Missing test coverage
-- [ ] **No unit tests for `:jar` policy in launcher** — `psi-self-basis-test` covers
-  `:development` and `:installed` only; the `:jar` path in `psi-self-basis`,
-  `materialize-manifest-dep`, and `expand-entry {:policy :jar}` is untested.
-  The `:psi/release-version` placeholder resolution path is also untested.
-  Add tests to `launcher_test.clj` and `extensions_test.clj`.
+- [x] **`:jar` policy tests added** — `psi-self-basis-test`: `:jar` emits single mvn coord,
+  throws on unreleased; `startup-basis-jar-policy-resolves-release-version-placeholder`:
+  placeholder resolves to version string end-to-end, throws on unreleased;
+  `expand-entry-test`: `:jar` policy expands to placeholder; `manifest-expansion-report-test`:
+  `:jar` policy expansion report; `psi-owned-catalog-test`: catalog has `:jar` entries.
+  `bases/main/test` added to `:unit` suite in `tests.edn` (was on classpath but not discovered).
+  Pre-existing test shape mismatches fixed (`:version?` field, `:psi/init` strip behaviour).
+  Suite: 1366 tests, 10426 assertions, 0 failures.
 
 ### Minor
-- [ ] **`doc/develop.md` runbook: mention `bb deploy` standalone** — runbook documents
-  `bb release` but doesn't mention that `bb deploy` (and `bb build:lib`) can be run
-  standalone for debugging a Clojars deploy without cutting a full release.
+- [x] **`doc/develop.md` runbook: standalone deploy debugging** — added "Debugging Clojars
+  deploy without a full release" section with step-by-step instructions for `bb build:lib`
+  + `bb deploy` standalone use.

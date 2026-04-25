@@ -210,6 +210,28 @@ bbin install io.github.hugoduncan/psi --as psi --git/tag vX.Y.Z
 psi --version
 ```
 
+### Debugging Clojars deploy without a full release
+
+`bb build:lib` and `bb deploy` can be run standalone against an already-stamped
+version resource for debugging:
+
+```bash
+# 1. Temporarily stamp the version resource (do NOT commit)
+echo '{:version "0.1.9999"}' > bases/main/resources/psi/version.edn
+
+# 2. Build the library jar
+bb build:lib   # → target/psi-0.1.9999.jar
+
+# 3. Deploy to Clojars (requires CLOJARS_USERNAME + CLOJARS_PASSWORD in env)
+CLOJARS_USERNAME=you CLOJARS_PASSWORD=token bb deploy
+
+# 4. Restore the version resource
+echo '{:version "unreleased"}' > bases/main/resources/psi/version.edn
+```
+
+`bb deploy` auto-invokes `bb build:lib` if the jar is absent, so steps 2 and 3
+can be combined as just `bb deploy`.
+
 ## CI
 
 The GitHub Actions workflow (`.github/workflows/ci.yml`) runs on:
