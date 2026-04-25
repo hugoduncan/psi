@@ -16,3 +16,14 @@
 - [x] Verify relevant TUI/Emacs completion tests remain green
 - [x] Record which supported surfaces already included prompt-template completion vs which required change
 - [x] Record implementation notes and any boundary decisions in `implementation.md`
+
+Follow-on review steps:
+- [x] Make the RPC `command` op execute template fallback rather than silently no-op when `slash-resolution-in` returns `:template`
+- [x] Preserve backend ownership of template fallback when fixing the RPC/Emacs slash path; avoid reintroducing transport-local template resolution logic
+- [x] Add an end-to-end test proving the real Emacs/RPC slash path executes a loaded prompt template via `/name ...` rather than merely suppressing `[not a command]`
+- [x] Add a focused RPC test proving `command`-op template fallback reaches canonical prompt submission / prepared-request execution semantics
+- [x] Refresh Emacs slash completion data when prompt-template session state changes after startup so runtime-registered/reloaded templates become discoverable without reconnect
+- [x] Add a focused Emacs test proving runtime-added/reloaded prompt templates appear in slash completion after state refresh
+- [x] Reduce command-name drift risk by replacing or justifying the duplicated `builtin-command-names` authority set in `psi.agent-session.commands`
+- [x] Add a focused test guarding command/template precedence against future builtin-command catalog drift
+- [ ] Re-run focused Clojure + Emacs tests after the follow-on fixes

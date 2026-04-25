@@ -622,25 +622,29 @@
      :message "[New session started]"
      :rehydrate rehydrate}))
 
+(def ^:private exact-command-handlers
+  {"/quit" :quit
+   "/exit" :quit
+   "/new" :new
+   "/resume" :resume
+   "/status" :status
+   "/history" :history
+   "/help" :help
+   "/?" :help
+   "/prompts" :prompts
+   "/skills" :skills
+   "/worktree" :worktree
+   "/logout" :logout
+   "/reload-models" :reload-models
+   "/reload-extension-installs" :reload-extension-installs
+   "/project-repl" :project-repl})
+
+(def ^:private prefixed-command-prefixes
+  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/login" "/project-repl"])
+
 (defn- exact-command-handler
   [trimmed]
-  (case trimmed
-    "/quit" :quit
-    "/exit" :quit
-    "/new" :new
-    "/resume" :resume
-    "/status" :status
-    "/history" :history
-    "/help" :help
-    "/?" :help
-    "/prompts" :prompts
-    "/skills" :skills
-    "/worktree" :worktree
-    "/logout" :logout
-    "/reload-models" :reload-models
-    "/reload-extension-installs" :reload-extension-installs
-    "/project-repl" :project-repl
-    nil))
+  (get exact-command-handlers trimmed))
 
 (defn- prefixed-command
   [trimmed]
@@ -648,7 +652,7 @@
           (when (or (= trimmed prefix)
                     (str/starts-with? trimmed (str prefix " ")))
             prefix))
-        ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/login" "/project-repl"]))
+        prefixed-command-prefixes))
 
 (defn- dispatch-prefixed-command
   [ctx session-id trimmed {:keys [oauth-ctx ai-model supports-session-tree?]}]
@@ -667,10 +671,9 @@
 (declare dispatch*)
 
 (def ^:private builtin-command-names
-  #{"quit" "exit" "new" "resume" "status" "history" "help" "?"
-    "prompts" "skills" "worktree" "logout" "reload-models"
-    "reload-extension-installs" "project-repl" "tree" "jobs" "job"
-    "cancel-job" "remember" "model" "thinking" "login"})
+  (->> (concat (keys exact-command-handlers) prefixed-command-prefixes)
+       (map #(str/replace % #"^/" ""))
+       set))
 
 (defn loaded-command-names-in
   "Return the authoritative slash-command name set for `session-id`.

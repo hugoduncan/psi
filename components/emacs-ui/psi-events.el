@@ -24,6 +24,7 @@
 (declare-function psi-emacs--assistant-delta "psi-assistant-render" (text))
 (declare-function psi-emacs--dispatch-request "psi-compose" (op params &optional callback))
 (declare-function psi-emacs--append-assistant-message "psi-compose" (text))
+(declare-function psi-emacs--refresh-slash-completion-data "psi-session-commands")
 (declare-function psi-emacs--request-switch-session-by-id "psi-session-commands" (state session-id))
 (declare-function psi-emacs--request-frontend-exit "psi-session-commands")
 (declare-function psi-emacs--upsert-projection-block "psi-projection")
@@ -78,6 +79,8 @@ payloads can seed state before the first canonical session-targeted update."
   "Project `session/updated` DATA into frontend session/header state."
   (when (and psi-emacs--state
              (psi-emacs--event-session-matches-current-p data))
+    (when (fboundp 'psi-emacs--refresh-slash-completion-data)
+      (psi-emacs--refresh-slash-completion-data))
     (let* ((session-id (psi-emacs--session-normalize-text
                         (psi-emacs--event-data-get data '(:session-id session-id))))
            (phase (psi-emacs--session-normalize-text

@@ -660,6 +660,49 @@ B output into A. Switching to B later then produced corrupted transcript state."
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-template-slash-command-routes-through-backend-command-and-renders-assistant-result ()
+  "Regression: prompt-template `/name ...` uses the real command-path send, then renders backend prompt execution output.
+
+This guards the Emacs side of the RPC command-op template fallback: frontend send
+must go through `command`, local user echo should be preserved, and the backend's
+assistant/message result from canonical prompt execution should render without a
+`[not a command]` detour."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (let ((rpc-calls nil))
+          (insert "/gh-issue-work-on 27")
+          (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker 1 nil))
+          (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                     (lambda (_state op params &optional _callback)
+                       (push (list op params) rpc-calls)
+                       t)))
+            (psi-emacs-send-from-buffer nil))
+          (setq rpc-calls (nreverse rpc-calls))
+          (should (equal '(("command" ((:text . "/gh-issue-work-on 27")))) rpc-calls))
+          (should (string-match-p (regexp-quote "User: /gh-issue-work-on 27") (buffer-string)))
+          (should-not (string-match-p (regexp-quote "[not a command]") (buffer-string)))
+          (setf (psi-emacs-state-session-id psi-emacs--state) "s1")
+          (psi-emacs--handle-rpc-event
+           '((:event . "session/updated")
+             (:data . ((:session-id . "s1")
+                       (:phase . "idle")
+                       (:is-streaming . nil)
+                       (:is-compacting . nil)
+                       (:pending-message-count . 0)
+                       (:retry-attempt . 0)
+                       (:interrupt-pending . nil)))))
+          (psi-emacs--handle-rpc-event
+           '((:event . "assistant/message")
+             (:data . ((:session-id . "s1")
+                       (:role . "assistant")
+                       (:content . [((:type . "text") (:text . "template ok"))])))))
+          (should (string-match-p (regexp-quote "ψ: template ok") (buffer-string)))
+          (should-not (string-match-p (regexp-quote "[not a command]") (buffer-string))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-streaming-slash-commands-still-use-backend-command ()
   (with-temp-buffer
     (psi-emacs-mode)

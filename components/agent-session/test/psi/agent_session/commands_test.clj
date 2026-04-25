@@ -483,6 +483,8 @@
         (is (= :command (:kind resolution)))
         (is (= :text (get-in resolution [:result :type])))
         (is (str/includes? (get-in resolution [:result :message]) "Message history"))))
+    (testing "builtin command catalog stays aligned for precedence checks"
+      (is (contains? (commands/loaded-command-names-in ctx session-id) "history")))
     (testing "loaded runtime template resolves as template fallback"
       (let [resolution (commands/slash-resolution-in ctx session-id "/runtime-template")]
         (is (= :template (:kind resolution)))

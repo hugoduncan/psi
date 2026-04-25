@@ -533,26 +533,41 @@
               "journaled user message must contain the slash command text"))))))
 
 (deftest rpc-command-op-template-fallback-test
-  (testing "command op does not emit [not a command] for a loaded prompt template"
+  (testing "command op executes loaded prompt-template fallback through canonical prompt semantics"
     (let [[ctx session-id] (support/create-session-context)
           _ (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data]
                    assoc :prompt-templates [{:name "gh-issue-work-on"
                                              :description "Work on issue"
                                              :content "Template body for $1"
                                              :source :project}])
+          seen-prompt (atom nil)
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:focus-session-id session-id}
-                         :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}})
+                         :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
+                         :execute-prepared-request-fn (fn [_ai-ctx _ctx sid prepared _opts]
+                                                        (reset! seen-prompt (get-in prepared [:prepared-request/user-message :content 0 :text]))
+                                                        (support/ok-execution-result sid [{:type :text :text "template ok"}]))})
           handler (support/make-handler ctx state)
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                       "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"command-result\"]}}\n"
+                       "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"command-result\" \"assistant/message\" \"session/updated\" \"footer/updated\"]}}\n"
                        "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/gh-issue-work-on 27\"}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state 300)
+          {:keys [out-lines]} (support/run-loop input handler state 400)
           frames  (support/parse-frames out-lines)
           events  (filter #(= :event (:kind %)) frames)
-          command-results (filter #(= "command-result" (:event %)) events)]
+          command-results (filter #(= "command-result" (:event %)) events)
+          assistant-msg (some #(when (= "assistant/message" (:event %)) %) events)
+          command-response (some #(when (and (= :response (:kind %))
+                                             (= "command" (:op %))) %)
+                                 frames)]
       (is (empty? command-results)
           "loaded prompt-template fallback should not emit unknown command-result text")
+      (is (= "Template body for 27" @seen-prompt)
+          "command op should route through canonical prepared-request template expansion")
+      (is (some? assistant-msg))
+      (is (= "template ok"
+             (get-in assistant-msg [:data :content 0 :text])))
+      (is (= :template
+             (get-in command-response [:data :fallback])))
       (let [journal-entries (persist/all-entries-in ctx session-id)
             msg-entries     (filterv #(= :message (:kind %)) journal-entries)
             user-msg        (some #(when (= "user" (get-in % [:data :message :role])) %) msg-entries)]

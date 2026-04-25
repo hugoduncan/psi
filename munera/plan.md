@@ -4,6 +4,7 @@ Open tasks in suggested execution order:
 
 Backlog:
 
+`munera/open/054-prompt-template-slash-fallback/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`

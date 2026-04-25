@@ -97,6 +97,24 @@
       (should capf)
       (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands)))))))
 
+(ert-deftest psi-session-updated-refreshes-slash-completion-data ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (make-psi-emacs-state :session-id "s1" :prompt-templates nil))
+    (let ((refresh-count 0))
+      (cl-letf (((symbol-function 'psi-emacs--refresh-slash-completion-data)
+                 (lambda ()
+                   (setq refresh-count (1+ refresh-count)))))
+        (psi-emacs--handle-session-updated-event
+         '((:session-id . "s1")
+           (:phase . "idle")
+           (:is-streaming . nil)
+           (:is-compacting . nil)
+           (:pending-message-count . 0)
+           (:retry-attempt . 0)
+           (:interrupt-pending . nil)))
+        (should (= 1 refresh-count))))))
+
 (ert-deftest psi-capf-at-reference-context-returns-file-candidates-and-category ()
   (let* ((tmp (make-temp-file "psi-capf-ref-" t))
          (default-directory (file-name-as-directory tmp)))

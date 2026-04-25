@@ -3,6 +3,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.commands :as commands]
+   [psi.agent-session.core :as session]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.session-state :as ss]
    [psi.app-runtime.messages :as app-messages]
@@ -65,25 +66,61 @@
     (runtime/journal-user-message-in! ctx session-id text nil)
     (cond
       (or (= trimmed "/resume") (str/starts-with? trimmed "/resume "))
-      (command-resume/handle-resume-command! ctx state request-id emit! trimmed session-id)
+      (do
+        (command-resume/handle-resume-command! ctx state request-id emit! trimmed session-id)
+        (emit/emit-session-snapshots! emit! ctx state session-id)
+        (response-frame (:id request) "command" true {:accepted true
+                                                      :handled true}))
 
       (or (= trimmed "/tree") (str/starts-with? trimmed "/tree "))
-      (command-tree/handle-tree-command! ctx state request-id emit! trimmed session-id)
+      (do
+        (command-tree/handle-tree-command! ctx state request-id emit! trimmed session-id)
+        (emit/emit-session-snapshots! emit! ctx state session-id)
+        (response-frame (:id request) "command" true {:accepted true
+                                                      :handled true}))
 
       (or (= trimmed "/model") (= trimmed "/thinking"))
-      (command-pickers/handle-picker-command! request-id emit! trimmed)
+      (do
+        (command-pickers/handle-picker-command! request-id emit! trimmed)
+        (emit/emit-session-snapshots! emit! ctx state session-id)
+        (response-frame (:id request) "command" true {:accepted true
+                                                      :handled true}))
 
       (= :command (:kind resolution))
-      (handle-dispatched-command! ctx state emit-frame! request-id start-daemon-thread! login-handler cmd-result emit!)
+      (do
+        (handle-dispatched-command! ctx state emit-frame! request-id start-daemon-thread! login-handler cmd-result emit!)
+        (emit/emit-session-snapshots! emit! ctx state session-id)
+        (response-frame (:id request) "command" true {:accepted true
+                                                      :handled true}))
 
       (= :template (:kind resolution))
-      nil
+      (let [session-model {:provider  (some-> (:provider ai-model) name)
+                           :id        (:id ai-model)
+                           :reasoning (boolean (:supports-reasoning ai-model))}
+            _           (emit/emit-session-snapshots! emit! ctx state session-id)
+            _           (session/set-model-in! ctx session-id session-model)
+            api-key     (runtime/resolve-api-key-in ctx session-id ai-model)
+            _           (session/prompt-in! ctx session-id text nil
+                                            {:runtime-opts (cond-> {}
+                                                             api-key (assoc :api-key api-key))})
+            assistant   (session/last-assistant-message-in ctx session-id)]
+        (when assistant
+          (emit/emit-assistant-message! emit! session-id assistant))
+        (emit/emit-session-snapshots! emit! ctx state session-id)
+        (response-frame (:id request) "command" true {:accepted true
+                                                      :handled true
+                                                      :fallback :template}))
 
       (= :unknown (:kind resolution))
-      (command-results/emit-text-command-result! emit! (str "[not a command] " text))
+      (do
+        (command-results/emit-text-command-result! emit! (str "[not a command] " text))
+        (emit/emit-session-snapshots! emit! ctx state session-id)
+        (response-frame (:id request) "command" true {:accepted true
+                                                      :handled true}))
 
       :else
-      (command-results/emit-text-command-result! emit! (str "[not a command] " text)))
-    (emit/emit-session-snapshots! emit! ctx state session-id)
-    (response-frame (:id request) "command" true {:accepted true
-                                                  :handled true})))
+      (do
+        (command-results/emit-text-command-result! emit! (str "[not a command] " text))
+        (emit/emit-session-snapshots! emit! ctx state session-id)
+        (response-frame (:id request) "command" true {:accepted true
+                                                      :handled true})))))

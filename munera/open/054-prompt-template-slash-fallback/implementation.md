@@ -19,3 +19,26 @@ Implementation notes:
   - shared backend slash resolution unknown/template/precedence behavior
   - RPC command-op behavior for template fallback vs true unknown slash input
   - Emacs CAPF prompt-template visibility and collision dedupe
+
+Review follow-on notes:
+- Review found that the RPC `command` op currently detects `:template` fallback but does not execute it; this means the primary Emacs slash path suppresses `[not a command]` without yet running the template-backed prompt.
+- Review also found that Emacs prompt-template completion is refreshed at startup hydration time but not yet clearly refreshed from later prompt-template session-state changes such as registration/reload.
+- A further shaping pass should therefore:
+  - route RPC `command` template fallback into canonical prompt execution semantics
+  - add an end-to-end test for the real Emacs/RPC slash path
+  - refresh Emacs slash completion on later prompt-template state changes
+  - reduce drift risk around the duplicated builtin-command authority set
+
+Follow-on implementation landed:
+- RPC `command` template fallback now executes through canonical prompt submission semantics instead of silently no-oping.
+- The RPC path reuses backend-owned slash resolution, then for `:template` fallback:
+  - journals the raw slash input once
+  - sets the resolved session model canonically
+  - routes the original slash text through `session/prompt-in!`
+  - relies on canonical prepared-request expansion to turn `/name ...` into template-expanded prompt text
+  - emits the resulting assistant message and refreshed session/footer snapshots
+- Focused RPC coverage now proves command-op template fallback reaches canonical prepared-request expansion by asserting the prepared request sees expanded template content (`Template body for 27`) rather than raw slash text.
+- Emacs-side regression coverage now proves the real slash send path still dispatches `/gh-issue-work-on 27` via RPC `command`, preserves local user echo, and renders backend `assistant/message` output without any `[not a command]` detour.
+- Emacs slash completion refresh is now triggered from canonical `session/updated` handling in addition to startup hydration, so runtime prompt-template state changes can refresh cached completion data without reconnect.
+- Command-name drift risk was reduced by deriving `builtin-command-names` from the actual built-in exact/prefixed command catalogs instead of maintaining a duplicate manual set.
+- Focused backend precedence coverage now also guards that `loaded-command-names-in` still contains built-in names needed for command-over-template precedence.
