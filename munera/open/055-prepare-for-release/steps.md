@@ -42,8 +42,24 @@
 - [x] Wire `needs: [check, clojure-test, smoke-test, emacs-test]`
 - [x] Add build-lib + deploy-to-Clojars step
 - [x] Add build-jar step (uberjar for GH Release asset)
-- [x] Add smoke-test step
+- [x] Add smoke-test step (dev-shim path)
 - [x] Add changelog-extract step (parse section for tag version)
 - [x] Add GitHub Release creation step with body + jar + wrapper assets
 - [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
-- [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created
+
+## Track F — release polish (gaps identified post-E)
+
+### Documentation
+- [ ] Document `:jar` launcher policy in `doc/cli.md` — auto-detection behaviour, `PSI_LAUNCHER_POLICY=jar`, override with `=installed`
+- [ ] Document Clojars artifact in README — note that released versions resolve via Maven automatically; bbin git-tag install still works
+
+### Operator experience
+- [ ] Add `bb release` convenience task — runs `bb release:tag` then prints/executes `git push origin master --tags`
+- [ ] `bb deploy` should auto-invoke `bb build:lib` if lib jar is absent (or clearly error with the exact command to run first)
+
+### Release workflow robustness
+- [ ] `release.yml` post-deploy smoke: add a step that exercises `PSI_LAUNCHER_POLICY=jar` against the freshly deployed Clojars artifact — validates the mvn coord is actually fetchable and the launcher `:jar` policy resolves correctly before creating the GH Release
+- [ ] Keep-a-changelog comparison links — add `[Unreleased]:` / `[vX.Y.Z]:` footer links to `CHANGELOG.md` and update `bb release:tag` to maintain them
+
+### Validation
+- [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created + `:jar` policy smoke passes

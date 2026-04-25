@@ -102,9 +102,12 @@ Provide `bb smoke:test`. Wire into CI after `clojure-test`.
 - `bb build:jar` produces a runnable `psi.jar`. ✅
 - `psi --version` (bb) and `java -jar psi.jar --version` both print the version. ✅
 - `bb smoke:test` passes against the built jar. ⬜
-- Pushing a `vX.Y.Z` tag triggers the release workflow, creates a GitHub Release
-  with correct changelog body and jar attached. ⬜
+- Pushing a `vX.Y.Z` tag triggers the release workflow, deploys to Clojars,
+  creates a GitHub Release with correct changelog body and jar attached. ⬜
+- Released version auto-selects `:jar` policy; launcher resolves `io.github.hugoduncan/psi`
+  from Maven cache instead of re-fetching from git. ⬜
 - End-user `bbin install --git/tag vX.Y.Z` works and `psi --version` prints correctly. ⬜
+- `doc/cli.md` documents `:jar` policy and auto-detection. ⬜
 
 ## Constraints
 
