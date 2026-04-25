@@ -64,3 +64,37 @@
 ### Validation
 - [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
 - [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created + `:jar` policy smoke passes
+
+## Track G — gaps identified post-F
+
+### Bugs
+- [ ] **`:jar` policy post-deploy smoke is broken** — the smoke step uses the dev launcher shim
+  (`bb bb/psi.clj`), but after `bb release:tag` the version resource is reset to `"unreleased"`.
+  `release-version` returns `nil` so `:jar` policy throws immediately. Fix: the smoke must either
+  (a) use a bbin-installed psi at the tagged version, or (b) temporarily stamp the version resource
+  to the release version before running `psi --version`, then reset it, or (c) invoke the launcher
+  directly with an explicit `--version` flag against a temp deps basis pointing at the Clojars coord.
+  Simplest correct approach: use `clojure -Sdeps '{...mvn coord...}' -M -m psi.main --version`.
+
+- [ ] **`bb release` partial-failure recovery doesn't cover failed push** — if `release-and-push!`
+  fails during `git push` (network error), re-running hits the "tag already exists + version reset"
+  recovery path and exits without retrying the push. Fix: recovery path should detect
+  "tag exists + version reset" → attempt push.
+
+- [ ] **`bb release:tag` changelog partial-failure gap** — if the process dies after
+  `stamp-changelog!` but before `git commit`, the `[Unreleased]` section is already stamped.
+  Re-running fails because `[Unreleased]` no longer matches. Fix: detect already-stamped changelog
+  in the recovery path.
+
+### Robustness
+- [ ] **`:jar` policy smoke — replace fixed `sleep 10` with retry loop** — Clojars propagation
+  is not instantaneous and 10s is arbitrary. Replace with a retry loop (e.g. up to 5 attempts,
+  30s apart) so transient propagation delay doesn't fail the release.
+
+### Documentation
+- [ ] **`doc/develop.md` release runbook** — document the full operator procedure:
+  prerequisites (Clojars account, GH secrets), `bb release` command, what to watch in CI,
+  how to handle partial failures, and how to verify a release post-publish.
+
+- [ ] **`AGENTS.md` `λ changelog(δ)` rule** — extend to mention that `bb release:tag`
+  also maintains the `[Unreleased]:` / `[vX.Y.Z]:` comparison link footer.
