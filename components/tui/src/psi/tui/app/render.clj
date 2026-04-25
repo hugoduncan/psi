@@ -332,14 +332,14 @@
 
 (defn- autocomplete-window
   [candidates selected-index]
-  (let [candidates      (vec candidates)
-        total           (count candidates)
-        max-visible     autocomplete-max-visible
-        selected-index  (-> (or selected-index 0)
-                            (max 0)
-                            (min (max 0 (dec total))))
-        start           (max 0 (min selected-index (max 0 (- total max-visible))))
-        end             (min total (+ start max-visible))]
+  (let [candidates     (vec candidates)
+        total          (count candidates)
+        selected-index (-> (or selected-index 0)
+                           (max 0)
+                           (min (max 0 (dec total))))
+        max-start      (max 0 (- total autocomplete-max-visible))
+        start          (max 0 (min selected-index max-start))
+        end            (min total (+ start autocomplete-max-visible))]
     {:selected-index selected-index
      :start start
      :visible (subvec candidates start end)}))
@@ -349,7 +349,8 @@
   (let [{:keys [candidates] raw-selected-index :selected-index} (get-in state [:prompt-input-state :autocomplete])]
     (when (seq candidates)
       (let [{:keys [start visible selected-index]} (autocomplete-window candidates raw-selected-index)
-            width (max 1 (or width 1))]
+            effective-width  (max 1 (or width 1))
+            selected-offset  (- selected-index start)]
         (str "\n"
              (charm/render shared/dim-style "Suggestions")
              "\n"
@@ -357,12 +358,10 @@
               "\n"
               (map-indexed
                (fn [offset {:keys [label value description]}]
-                 (let [absolute-index (+ start offset)
-                       selected?      (= absolute-index selected-index)
-                       prefix         (if selected? "▸ " "  ")
-                       line           (cond-> (str prefix (or label value ""))
-                                        (seq description) (str " — " description))
-                       line           (ansi/truncate-to-width line width "...")]
+                 (let [selected? (= offset selected-offset)
+                       line      (-> (cond-> (str (if selected? "▸ " "  ") (or label value ""))
+                                       (seq description) (str " — " description))
+                                     (ansi/truncate-to-width effective-width "..."))]
                    (if selected?
                      (charm/render shared/user-style line)
                      line)))

@@ -112,18 +112,20 @@
       (str/trim out))))
 
 (defn- pane-target
-  [{:keys [session-name pane-id]}]
-  (or pane-id
-      (primary-pane-id session-name)
-      (str session-name ":0.0")))
+  [target]
+  (let [{:keys [session-name pane-id]} (if (string? target)
+                                         {:session-name target}
+                                         target)]
+    (or pane-id
+        (primary-pane-id session-name)
+        (str session-name ":0.0"))))
 
 (defn capture-pane
-  ([session-name]
-   (if (string? session-name)
-     (capture-pane {:session-name session-name})
-     (capture-pane session-name {})))
-  ([{:keys [capture-lines] :as target} _opts]
-   (let [{:keys [exit out err]}
+  ([target]
+   (capture-pane target {}))
+  ([target _opts]
+   (let [capture-lines (when (map? target) (:capture-lines target))
+         {:keys [exit out err]}
          (run-sh (format "tmux capture-pane -pt %s -S -%d"
                          (pane-target target)
                          (or capture-lines default-capture-lines)))]
@@ -135,39 +137,26 @@
   [target]
   (let [{:keys [exit out]}
         (run-sh (format "tmux display-message -p -t %s '#{pane_current_command}'"
-                        (pane-target (if (string? target)
-                                       {:session-name target}
-                                       target))))]
+                        (pane-target target)))]
     (when (zero? exit)
       (str/trim out))))
 
 (defn send-line!
   [target s]
-  (let [pane (pane-target (if (string? target)
-                            {:session-name target}
-                            target))]
-    (run-sh (format "tmux send-keys -l -t %s %s"
-                    pane
-                    (pr-str s)))
+  (let [pane (pane-target target)]
+    (run-sh (format "tmux send-keys -l -t %s %s" pane (pr-str s)))
     (run-sh (format "tmux send-keys -t %s Enter" pane))))
 
 (defn send-text!
   "Send literal text to the pane without pressing Enter."
   [target s]
-  (let [pane (pane-target (if (string? target)
-                            {:session-name target}
-                            target))]
-    (run-sh (format "tmux send-keys -l -t %s %s"
-                    pane
-                    (pr-str s)))))
+  (let [pane (pane-target target)]
+    (run-sh (format "tmux send-keys -l -t %s %s" pane (pr-str s)))))
 
 (defn send-key!
   "Send a named tmux key (e.g. \"Escape\", \"Down\", \"Up\") to the pane."
   [target key-name]
-  (let [pane (pane-target (if (string? target)
-                            {:session-name target}
-                            target))]
-    (run-sh (format "tmux send-keys -t %s %s" pane key-name))))
+  (run-sh (format "tmux send-keys -t %s %s" (pane-target target) key-name)))
 
 (defn wait-until
   ([pred timeout-ms]
