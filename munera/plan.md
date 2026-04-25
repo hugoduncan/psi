@@ -2,6 +2,11 @@
 
 Open tasks in suggested execution order:
 
+TUI thinking/tool streaming parity (sequenced):
+
+`munera/open/053-tui-thinking-display-parity/`     — style + archive + rehydration (footer/transcript)
+`munera/open/054-tui-active-turn-event-log-rendering/` — event-log → item-map render (dedup thinking+tool rows, mid-turn ordering)
+
 Backlog:
 
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`

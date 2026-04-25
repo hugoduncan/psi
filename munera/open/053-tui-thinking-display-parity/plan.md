@@ -1,33 +1,27 @@
-# Plan — 053 TUI thinking display parity
+# Plan — 053 TUI thinking display: style and footer parity
 
-Implement the four gaps in dependency order.
+Implement the three gaps in dependency order.
 
 ## Step order
 
-1. **Style** (Gap 4) — introduce a thinking style constant and `· ` prefix in
-   `tool_render` / `render.clj`. Purely additive; touches only render layer.
-   Update `render-stream-thinking` to use the new style.
+1. **Style** (Gap 1) — introduce `thinking-style` constant and `render-thinking-line`
+   helper. Update `render-stream-thinking` to use `· ` prefix + thinking style.
+   Purely additive; touches only the render layer.
 
-2. **Archive on turn complete** (Gap 1) — extend the message kind model to
-   include `:thinking`. Update `render-message` to render thinking messages.
-   In `handle-agent-event` for `:stream-done`, promote accumulated thinking
-   items into `messages`. Clear them from `active-turn-items`.
+2. **Archive on turn complete** (Gap 2) — add `:thinking` role to `render-message`.
+   In `handle-agent-result`, collect thinking items from `active-turn-items`
+   (sorted by content-index) and prepend them to `messages` before clearing the
+   live turn.
 
-3. **Boundary split** (Gap 2) — in `handle-agent-event` for
-   `:tool-call-assembly` (phase `:start`), if `stream-thinking` is non-blank,
-   archive the current thinking block into `messages` before processing the
-   tool event.
-
-4. **Rehydration** (Gap 3) — update
-   `psi.app-runtime.transcript/agent-messages->tui-resume-state` to collect
-   `:thinking` content blocks from assistant messages and include them as
-   `{:role :thinking :text ...}` entries in the reconstructed message list.
+3. **Rehydration** (Gap 3) — update `agent-messages->tui-resume-state` in
+   `transcript.clj` to collect `:thinking` content blocks from assistant messages
+   and emit `{:role :thinking :text ...}` entries in the reconstructed message list.
 
 ## Test plan
 
-- `render-stream-thinking` uses thinking style with `· ` prefix
+- `render-stream-thinking` uses `· ` prefix + thinking style (not `dim-style`)
 - `render-message` renders `{:role :thinking}` with `· ` prefix + thinking style
-- `handle-agent-event :stream-done` with thinking in flight → thinking appears in messages
-- `handle-agent-event :tool-call-assembly` mid-thinking → thinking archived before tool row
-- `agent-messages->tui-resume-state` with assistant message containing `:thinking` block
-  → thinking entry in reconstructed messages
+- `handle-agent-result` with thinking in flight → thinking appears in `messages`
+  before the assistant reply
+- `agent-messages->tui-resume-state` with assistant message containing `:thinking`
+  block → thinking entry in reconstructed messages
