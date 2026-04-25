@@ -23,10 +23,10 @@
 - [x] Document jar distribution decision — bundled extensions, Java 22+ wrapper, launcher-first
 
 ## Track D — smoke test
-- [ ] Define smoke test scope (launcher help, launcher-debug, nREPL discovery)
-- [ ] Write smoke test namespace(s) under `test/` or `smoke/`
-- [ ] Add `bb smoke:test` task
-- [ ] Wire `smoke:test` into CI as a job after `clojure-test`
+- [x] Define smoke test scope — RPC handshake subprocess + TUI tmux startup (no LLM key required)
+- [x] Write `bases/main/test/psi/rpc_smoke_test.clj` — launches `psi --rpc-edn`, sends handshake, asserts server-info response, clean exit
+- [x] Add `bb smoke:test` task — runs `psi.rpc-smoke-test` + `psi.tui.tmux-integration-harness-test` via `:integration` kaocha suite
+- [x] Wire `smoke-test` CI job — runs after `check`, parallel to `clojure-test`/`emacs-test`, with launcher shim + tmux
 
 ## Track E — GitHub release workflow
 - [ ] Create `.github/workflows/release.yml` triggered on `v*` tags
