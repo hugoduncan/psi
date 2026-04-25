@@ -5,7 +5,8 @@
   (:require
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
-   [psi.app-runtime :as app-runtime])
+   [psi.app-runtime :as app-runtime]
+   [psi.version :as version])
   (:gen-class))
 
 (def ^:private valid-log-levels
@@ -210,6 +211,9 @@
 
 (defn -main
   [& args]
+  (when (has-flag? args "--version")
+    (println (str "psi " (version/version-string)))
+    (System/exit 0))
   (set-log-level! (log-level-from-args args))
   (let [tui?     (has-flag? args "--tui")
         rpc-edn? (has-flag? args "--rpc-edn")]

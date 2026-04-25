@@ -16,11 +16,11 @@
 - [x] Add `changelog:check` step to CI `check` job
 
 ## Track C — jar build
-- [ ] Add `:build` alias to `deps.edn` with `io.github.clojure/tools.build`
-- [ ] Write `build.clj` with `uber` task
-- [ ] Add `bb build:jar` task delegating to `clojure -T:build uber`
-- [ ] Verify `java -jar psi.jar --help` exits 0
-- [ ] Document jar distribution decision (primary vs secondary)
+- [x] Add `:build` alias to `deps.edn` with `io.github.clojure/tools.build`
+- [x] Write `build.clj` with `uber` task (produces `target/psi.jar` + `target/psi` wrapper)
+- [x] Add `bb build:jar` task delegating to `clojure -T:build uber`
+- [x] Verify `java -jar psi.jar --version` works (fixed `runtime-root` jar-URL guard + `--version` in `psi.main`)
+- [x] Document jar distribution decision — bundled extensions, Java 22+ wrapper, launcher-first
 
 ## Track D — smoke test
 - [ ] Define smoke test scope (launcher help, launcher-debug, nREPL discovery)

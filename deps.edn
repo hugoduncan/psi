@@ -179,6 +179,8 @@
                         nrepl/nrepl         {:mvn/version "1.5.1"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "kaocha.runner"]}
+  :build {:deps      {io.github.clojure/tools.build {:mvn/version "0.10.12"}}
+          :ns-default build}
   :coverage {:extra-deps {lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}}}
   :debug-test {:extra-paths ["test"
                              "components/ai/test"

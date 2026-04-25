@@ -104,12 +104,17 @@
   (get psi-owned-extension-catalog lib))
 
 (defn- runtime-root
+  "Return the repo root when running from source on disk, nil otherwise.
+   Returns nil when running from an uberjar (jar: URL scheme) so that
+   psi-owned extension local/root paths are not resolved — extensions are
+   already on the classpath in that case."
   []
   (when-let [url (io/resource "psi/agent_session/extension_installs.clj")]
-    (let [path (.getPath (io/file url))]
-      (some-> path
-              (str/replace #"/components/agent-session/src/psi/agent_session/extension_installs\.clj$" "")
-              not-empty))))
+    (when (= "file" (.getProtocol url))
+      (let [path (.getPath (io/file url))]
+        (some-> path
+                (str/replace #"/components/agent-session/src/psi/agent_session/extension_installs\.clj$" "")
+                not-empty)))))
 
 (defn- installed-default-entry
   [lib]

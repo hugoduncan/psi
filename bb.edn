@@ -361,6 +361,10 @@
                                 "}"
                                 "console.log('Chiasmus check passed');"))]
              (System/exit (:exit result))))}
+  build:jar
+  {:doc  "Build target/psi.jar and target/psi wrapper script via tools.build."
+   :task (shell "clojure -T:build uber")}
+
   changelog:check
   {:doc  "Fail if CHANGELOG.md has no entries in the [Unreleased] section."
    :task (bb.release/check-changelog! *command-line-args*)}
