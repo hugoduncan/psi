@@ -1,0 +1,7 @@
+- [x] Confirm the narrow render seam for showing prompt autocomplete in the TUI view
+- [x] Implement visible autocomplete menu rendering from existing prompt autocomplete state
+- [x] Limit visible suggestions to the canonical maximum of 5
+- [x] Make the selected suggestion visibly distinct in stripped output
+- [x] Add focused TUI-facing rendering tests for open/closed slash autocomplete state
+- [x] Add focused test proving selection movement changes the rendered highlighted row
+- [x] Run relevant focused TUI tests and record results
