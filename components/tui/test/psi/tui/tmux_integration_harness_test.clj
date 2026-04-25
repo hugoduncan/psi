@@ -32,3 +32,7 @@
 (deftest ^:integration tui-tmux-slash-autocomplete-scenario-test
   (testing "typing '/' opens visible slash-command autocomplete menu with a selected suggestion, Down moves selection, Escape dismisses"
     (assert-scenario-result (tmux/run-slash-autocomplete-scenario! {}))))
+
+(deftest ^:integration tui-tmux-thinking-rehydration-scenario-test
+  (testing "resuming a session with a thinking block shows '· ' prefix in the transcript"
+    (assert-scenario-result (tmux/run-thinking-rehydration-scenario! {}))))

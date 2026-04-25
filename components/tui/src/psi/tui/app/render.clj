@@ -33,6 +33,12 @@
 (def agent-title-style (charm/style :fg charm/yellow :bold true))
 (def agent-head-style (charm/style :fg charm/cyan :bold true))
 (def psl-title-style (charm/style :fg charm/green :bold true))
+(def thinking-style (charm/style :fg 240 :italic true))
+
+(defn render-thinking-line
+  [text]
+  (when (and text (not (str/blank? text)))
+    (str (charm/render thinking-style (str "· " text)) "\n")))
 
 (defn render-agent-result
   [text width]
@@ -54,6 +60,9 @@
 (defn render-message
   [{:keys [role text custom-type]} width]
   (case role
+    :thinking
+    (str (charm/render thinking-style (str "· " text)))
+
     :user
     (str (charm/render shared/user-style "刀: ") text)
 
@@ -369,8 +378,7 @@
 
 (defn render-stream-thinking
   [text]
-  (when (and text (not (str/blank? text)))
-    (str (charm/render shared/dim-style (str "ψ⋯ " text)) "\n")))
+  (render-thinking-line text))
 
 (defn render-stream-text
   [text width]
@@ -385,44 +393,30 @@
       (str (str/join "\n" (cons first-line rest-lines))
            "\n"))))
 
-(defn render-tool-snapshot
-  [snapshot spinner-char width tools-expanded? ui-snapshot tool-id]
-  (when snapshot
-    (tool-render/render-tool-calls {tool-id (assoc snapshot :expanded? tools-expanded?)}
-                                   [tool-id]
-                                   spinner-char
-                                   width
-                                   tools-expanded?
-                                   ui-snapshot)))
-
-(defn render-active-turn-event
-  [state {:keys [item-kind content-index text tool-id snapshot]} spinner-char width]
-  (case item-kind
-    :thinking
-    (render-stream-thinking text)
-
-    :text
-    (render-stream-text text width)
-
-    (:tool :tool-lifecycle)
-    (if snapshot
-      (render-tool-snapshot snapshot spinner-char width (:tools-expanded? state) (:ui-snapshot state)
-                            (or tool-id
-                                (get-in state [:tool-ui-id-by-content-index content-index])
-                                (str "tool/event-" content-index)))
-      (let [ui-id (or (get-in state [:tool-ui-id-by-tool-id tool-id])
-                      (get-in state [:tool-ui-id-by-content-index content-index])
-                      tool-id)]
-        (when ui-id
-          (tool-render/render-tool-calls (:tool-calls state) [ui-id] spinner-char width (:tools-expanded? state) (:ui-snapshot state)))))
-
-    nil))
-
 (defn render-active-turn
   [state spinner-char width]
-  (let [events   (:active-turn-events state)
-        rendered (->> events
-                      (keep #(render-active-turn-event state % spinner-char width))
+  (let [order    (:active-turn-order state)
+        items    (:active-turn-items state)
+        rendered (->> order
+                      (keep (fn [item-id]
+                              (let [item (get items item-id)]
+                                (case (:item-kind item)
+                                  :thinking
+                                  (render-thinking-line (:text item))
+
+                                  :text
+                                  (render-stream-text (:text item) width)
+
+                                  :tool
+                                  (tool-render/render-tool-calls
+                                   (:tool-calls state)
+                                   [(:tool-id item)]
+                                   spinner-char
+                                   width
+                                   (boolean (:tools-expanded? state))
+                                   (:ui-snapshot state))
+
+                                  nil))))
                       (apply str))]
     (when-not (str/blank? rendered)
       rendered)))
@@ -433,11 +427,10 @@
                 prompt-templates skills extension-summary ui-snapshot
                 context-session-tree-widget context-session-tree-selected-index
                 tool-calls tool-order
-                active-turn-order active-turn-events session-selector current-session-file width force-clear?]} state
+                active-turn-order session-selector current-session-file width force-clear?]} state
         spinner-char   (nth shared/spinner-frames (mod spinner-frame (count shared/spinner-frames)))
         dialog-active? (support/has-active-dialog? state)
-        has-progress?  (or (seq active-turn-events)
-                           (seq active-turn-order)
+        has-progress?  (or (seq active-turn-order)
                            (seq tool-order))
         active-tool-spinner?
         (boolean

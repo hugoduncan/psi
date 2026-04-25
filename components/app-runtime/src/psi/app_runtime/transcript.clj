@@ -20,10 +20,18 @@
   (or (get block k)
       (get block (name k))))
 
+(defn- block-kind
+  [block]
+  (->kw (or (block-attr block :type)
+            (block-attr block :kind))))
+
 (defn- tool-call-block?
   [block]
-  (= :tool-call (->kw (or (block-attr block :type)
-                          (block-attr block :kind)))))
+  (= :tool-call (block-kind block)))
+
+(defn- thinking-block?
+  [block]
+  (= :thinking (block-kind block)))
 
 (defn- normalize-tool-call-block
   [block]
@@ -33,18 +41,17 @@
                   (some-> (block-attr block :input) pr-str)
                   "")})
 
-(defn- assistant-tool-call-blocks
+(defn- content-blocks
+  "Normalize assistant message content to a flat sequence of block maps.
+   Accepts either a plain vector of blocks or a {:kind :structured :blocks [...]} map."
   [content]
   (cond
     (sequential? content)
-    (->> content
-         (filter map?)
-         (filter tool-call-block?)
-         (mapv normalize-tool-call-block))
+    (filter map? content)
 
     (and (map? content)
          (= :structured (->kw (block-attr content :kind))))
-    (assistant-tool-call-blocks (block-attr content :blocks))
+    (content-blocks (block-attr content :blocks))
 
     :else
     []))
@@ -66,25 +73,37 @@
                                      :text (if (str/blank? text) "[user]" text)}))
 
        "assistant"
-       (let [text        (message->display-text msg)
-             tool-blocks (assistant-tool-call-blocks (:content msg))
-             acc'        (if (str/blank? text)
-                           acc
-                           (update acc :messages conj {:role :assistant :text text}))]
-         (reduce
-          (fn [a block]
-            (let [id (:id block)
-                  tc {:name      (:name block)
-                      :args      (or (:arguments block) "")
-                      :status    :pending
-                      :result    nil
-                      :is-error  false
-                      :expanded? false}]
-              (-> a
-                  (update :tool-calls #(if (contains? % id) % (assoc % id tc)))
-                  (update :tool-order #(if (some #{id} %) % (conj % id))))))
-          acc'
-          tool-blocks))
+       (let [text   (message->display-text msg)
+             blocks (content-blocks (:content msg))
+             ;; single pass: emit thinking + tool entries in block order
+             acc'   (reduce
+                     (fn [a block]
+                       (cond
+                         (thinking-block? block)
+                         (let [t (:text block)]
+                           (if (str/blank? t)
+                             a
+                             (update a :messages conj {:role :thinking :text t})))
+
+                         (tool-call-block? block)
+                         (let [nb (normalize-tool-call-block block)
+                               id (:id nb)
+                               tc {:name      (:name nb)
+                                   :args      (or (:arguments nb) "")
+                                   :status    :pending
+                                   :result    nil
+                                   :is-error  false
+                                   :expanded? false}]
+                           (-> a
+                               (update :tool-calls #(if (contains? % id) % (assoc % id tc)))
+                               (update :tool-order #(if (some #{id} %) % (conj % id)))))
+
+                         :else a))
+                     acc
+                     blocks)]
+         (if (str/blank? text)
+           acc'
+           (update acc' :messages conj {:role :assistant :text text})))
 
        "toolResult"
        (let [id       (:tool-call-id msg)

@@ -365,3 +365,139 @@
               (when-not keep-session-on-failure?
                 (kill-session-if-exists! session-name*))
               result)))))))
+
+(def default-thinking-marker "· ")
+(def default-selector-marker "Enter=confirm")
+
+(defn- encode-path-for-session-dir
+  "Encode a filesystem path the same way persistence/session-dir-for does:
+   strip leading slash, replace / and : with -."
+  [path]
+  (-> (str path)
+      (str/replace #"^[/\\]" "")
+      (str/replace #"[/\\:]" "-")))
+
+(defn- sessions-root
+  []
+  (str (System/getProperty "user.home") "/.psi/agent/sessions"))
+
+(defn write-thinking-fixture!
+  "Write a minimal .ndedn journal file to the session dir for `tmpdir`.
+   Returns the fixture file path string."
+  [tmpdir]
+  (let [encoded     (encode-path-for-session-dir tmpdir)
+        session-dir (io/file (sessions-root) (str "--" encoded "--"))
+        _           (.mkdirs session-dir)
+        session-id  (str (java.util.UUID/randomUUID))
+        ts          "2024-01-01T00:00:00.000-00:00"
+        filename    (str (System/currentTimeMillis) "_" session-id ".ndedn")
+        fixture     (io/file session-dir filename)
+        header      (str "{:type :session :version 4 :id \"" session-id "\""
+                         " :timestamp #inst \"" ts "\""
+                         " :worktree-path \"" tmpdir "\""
+                         " :parent-session-id nil :parent-session nil}")
+        user-id     (str (java.util.UUID/randomUUID))
+        user-entry  (str "{:id \"" user-id "\" :parent-id nil"
+                         " :timestamp #inst \"" ts "\""
+                         " :kind :message"
+                         " :data {:message {:role \"user\" :content [{:type :text :text \"explain recursion\"}]}}}")
+        asst-id     (str (java.util.UUID/randomUUID))
+        asst-entry  (str "{:id \"" asst-id "\" :parent-id \"" user-id "\""
+                         " :timestamp #inst \"" ts "\""
+                         " :kind :message"
+                         " :data {:message {:role \"assistant\""
+                         " :content [{:type :thinking :text \"Let me think about this carefully.\"}"
+                         " {:type :text :text \"Recursion is when a function calls itself.\"}]}}}")]
+    (spit fixture (str header "\n" user-entry "\n" asst-entry "\n"))
+    (str (.getAbsolutePath fixture))))
+
+(defn delete-thinking-fixture!
+  "Delete the fixture file and the session dir if empty."
+  [fixture-path]
+  (when fixture-path
+    (let [f   (io/file fixture-path)
+          dir (.getParentFile f)]
+      (.delete f)
+      (when (and dir (.isDirectory dir) (empty? (.list dir)))
+        (.delete dir)))))
+
+(defn run-thinking-rehydration-scenario!
+  "Prove that thinking rehydration and the · style are observable through a real
+   terminal boundary.
+
+   Scenario: write fixture → boot TUI (working-dir = tmpdir) → ready →
+   /resume → selector → Enter → wait for '· ' → assert → /quit → clean exit."
+  [{:keys [session-name
+           working-dir
+           launch-command
+           startup-timeout-ms
+           step-timeout-ms
+           ready-markers
+           thinking-marker
+           selector-marker
+           keep-session-on-failure?]
+    :or {launch-command (worktree-launch-command)
+         startup-timeout-ms default-startup-timeout-ms
+         step-timeout-ms default-step-timeout-ms
+         ready-markers default-ready-markers
+         thinking-marker default-thinking-marker
+         selector-marker default-selector-marker
+         keep-session-on-failure? false}}]
+  (let [preflight (tmux-preflight-result)]
+    (if (not= :ok (:status preflight))
+      preflight
+      (let [tmpdir       (or working-dir
+                             (str (System/getProperty "java.io.tmpdir")
+                                  "/psi-thinking-it-" (System/currentTimeMillis)))
+            _            (.mkdirs (io/file tmpdir))
+            fixture-path (write-thinking-fixture! tmpdir)
+            session-name* (or session-name (unique-session-name))]
+        (try
+          (let [target (start-session! {:session-name session-name*
+                                        :working-dir tmpdir
+                                        :launch-command launch-command})
+                result (cond
+                         (not (wait-for-any-marker target ready-markers startup-timeout-ms))
+                         (failure-result target :startup-timeout)
+
+                         :else
+                         (do
+                           (send-line! target "/resume")
+                           (cond
+                             (not (wait-for-marker target selector-marker step-timeout-ms))
+                             (failure-result target :selector-timeout)
+
+                             :else
+                             (do
+                               ;; select the first (only) session
+                               (send-key! target "Enter")
+                               (cond
+                                 (not (wait-for-marker target thinking-marker step-timeout-ms))
+                                 (failure-result target :thinking-marker-timeout)
+
+                                 :else
+                                 (do
+                                   (send-line! target "/quit")
+                                   (if (wait-for-java-exit target step-timeout-ms)
+                                     {:status :passed
+                                      :session-name session-name*
+                                      :pane-id (:pane-id target)}
+                                     (failure-result target :quit-timeout))))))))]
+            (when (or (= :passed (:status result))
+                      (not keep-session-on-failure?))
+              (kill-session-if-exists! session-name*))
+            result)
+          (catch Throwable t
+            (let [target {:session-name session-name*
+                          :pane-id (primary-pane-id session-name*)}
+                  result {:status :failed
+                          :reason :exception
+                          :session-name session-name*
+                          :pane-id (:pane-id target)
+                          :error-message (or (ex-message t) (str t))
+                          :pane-snapshot (sanitize-pane-text (capture-pane target))}]
+              (when-not keep-session-on-failure?
+                (kill-session-if-exists! session-name*))
+              result))
+          (finally
+            (delete-thinking-fixture! fixture-path)))))))

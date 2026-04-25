@@ -7,6 +7,7 @@
    [psi.app-runtime.projections :as projections]
    [psi.tui.app :as app]
    [psi.tui.ansi :as ansi]
+   [psi.tui.app.render :as render]
    [psi.ui.state :as ui-state])
   (:import
    [java.util.concurrent LinkedBlockingQueue]))
@@ -238,7 +239,8 @@
           [s1 _]    (update-fn state {:type :agent-event :event-kind :thinking-delta :text "Plan"})
           [s2 _]    (update-fn s1 {:type :agent-event :event-kind :thinking-delta :text "Plan step"})
           out       (app/view s2)]
-      (is (= "Plan step" (:stream-thinking s2)))
+      ;; latest text is stored in active-turn-items, not :stream-thinking (removed)
+      (is (= "Plan step" (get-in s2 [:active-turn-items "thinking/0" :text])))
       (is (= ["thinking/0"] (:active-turn-order s2)))
       (is (str/includes? out "Plan step")))))
 
@@ -268,7 +270,91 @@
           tool-pos   (.indexOf out "a.clj")
           b-pos      (.indexOf out "Plan B")]
       (is (= ["thinking/0" "tool/call-1" "thinking/2"] (:active-turn-order s3)))
-      (is (= [:thinking :tool :thinking] (mapv :item-kind (:active-turn-events s3))))
+      (is (= [:thinking :tool :thinking]
+             (mapv #(get-in s3 [:active-turn-items % :item-kind]) (:active-turn-order s3))))
       (is (< a-pos tool-pos))
       (is (< tool-pos b-pos)))))
 
+;; ── New tests for 054 ──────────────────────────────────────────────────────────
+
+(deftest thinking-dedup-renders-single-line-test
+  (testing "N thinking deltas for the same content-index render as exactly one line"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          ;; send 5 deltas — each carries the full cumulative text so far
+          [s _]     (reduce (fn [[st _] txt]
+                              (update-fn st {:type :agent-event :event-kind :thinking-delta
+                                             :content-index 0 :text txt}))
+                            [state nil]
+                            ["P" "Pl" "Pla" "Plan" "Plan step"])
+          out       (ansi/strip-ansi (app/view s))]
+      ;; only one occurrence of the bullet prefix
+      (is (= 1 (count (re-seq #"· " out))))
+      ;; shows the latest text
+      (is (str/includes? out "Plan step"))
+      ;; does not show earlier partial texts as separate lines
+      (is (not (str/includes? out "· P\n"))))))
+
+(deftest tool-lifecycle-dedup-renders-single-row-test
+  (testing "tool going through all lifecycle stages renders as exactly one row"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          events    [{:type :agent-event :event-kind :tool-call-assembly :phase :start
+                      :content-index 0 :tool-id "t1" :tool-name "read" :arguments "{}"}
+                     {:type :agent-event :event-kind :tool-call-assembly :phase :end
+                      :content-index 0 :tool-id "t1" :tool-name "read" :arguments "{}"}
+                     {:type :agent-event :event-kind :tool-start :tool-id "t1" :tool-name "read"}
+                     {:type :agent-event :event-kind :tool-executing :tool-id "t1" :tool-name "read"
+                      :parsed-args {:path "foo.clj"}}
+                     {:type :agent-event :event-kind :tool-result :tool-id "t1" :tool-name "read"
+                      :content [{:type :text :text "file content"}] :is-error false}]
+          [s _]     (reduce (fn [[st _] ev] (update-fn st ev)) [state nil] events)]
+      ;; single entry in active-turn-order for this tool
+      (is (= ["tool/t1"] (:active-turn-order s)))
+      ;; tool status is :success after :tool-result
+      (is (= :success (get-in s [:tool-calls "tool/t1" :status]))))))
+
+(deftest archive-on-done-thinking-visible-in-messages-test
+  (testing "thinking blocks from result content are archived into messages before assistant reply"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          result    {:role "assistant"
+                     :content [{:type :thinking :text "Let me reason about this."}
+                               {:type :text :text "The answer is 42."}]}
+          [s _]     (update-fn state {:type :agent-result :result result})
+          msgs      (:messages s)]
+      (is (= :idle (:phase s)))
+      ;; thinking message appears before assistant reply
+      (is (some #(= {:role :thinking :text "Let me reason about this."} %) msgs))
+      (is (some #(= {:role :assistant :text "The answer is 42."} %) msgs))
+      (let [thinking-idx (.indexOf msgs {:role :thinking :text "Let me reason about this."})
+            assistant-idx (.indexOf msgs {:role :assistant :text "The answer is 42."})]
+        (is (< thinking-idx assistant-idx))))))
+
+(deftest archive-on-done-no-thinking-unchanged-test
+  (testing "result with no thinking blocks produces only the assistant message"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          result    {:role "assistant"
+                     :content [{:type :text :text "Plain answer."}]}
+          [s _]     (update-fn state {:type :agent-result :result result})
+          msgs      (:messages s)]
+      (is (= [{:role :assistant :text "Plain answer."}] msgs)))))
+
+(deftest render-message-thinking-role-test
+  (testing "render-message with :thinking role uses · prefix and thinking style"
+    (let [rendered (ansi/strip-ansi
+                    (render/render-message {:role :thinking :text "some thought"} 80))]
+      (is (str/includes? rendered "· some thought")))))
+
+(deftest archive-on-done-thinking-visible-in-view-test
+  (testing "archived thinking messages render with · prefix in the view"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          result    {:role "assistant"
+                     :content [{:type :thinking :text "My reasoning here."}
+                               {:type :text :text "Done."}]}
+          [s _]     (update-fn state {:type :agent-result :result result})
+          out       (ansi/strip-ansi (app/view s))]
+      (is (str/includes? out "· My reasoning here."))
+      (is (str/includes? out "Done.")))))

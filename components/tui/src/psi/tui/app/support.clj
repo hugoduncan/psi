@@ -248,13 +248,10 @@
          :width                   80
          :height                  24
          :stream-text             nil
-         :stream-thinking         nil
          :tool-calls              (or (:initial-tool-calls opts) {})
          :tool-order              (vec (or (:initial-tool-order opts) []))
          :active-turn-order       []
          :active-turn-items       {}
-         :active-turn-events      []
-         :active-turn-next-seq    0
          :tool-ui-id-by-tool-id   {}
          :tool-ui-id-by-content-index {}
          :tools-expanded?         (boolean (:tools-expanded? ui-snap))}
