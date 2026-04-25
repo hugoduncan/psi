@@ -99,9 +99,14 @@
   [width]
   (charm/render shared/sep-style (apply str (repeat (max 1 (or width 1)) "─"))))
 
-(def clear-to-end-seq "\u001b[J")
-(def clear-line-end-seq "\u001b[K")
-(def clear-screen-home-seq "\u001b[2J\u001b[H")
+; These sequences are kept for backward-compatibility with any external callers
+; but are no longer emitted in the view string.  JLine's Display.update handles
+; diffing and erasing stale content automatically; embedding raw terminal control
+; sequences (ESC[J, ESC[K, ESC[2J) in the view string corrupts JLine's
+; AttributedString parsing and causes display artefacts.
+(def ^:deprecated clear-to-end-seq "")
+(def ^:deprecated clear-line-end-seq "")
+(def ^:deprecated clear-screen-home-seq "")
 
 (def notify-info-style    shared/dim-style)
 (def notify-warning-style (charm/style :fg charm/yellow))
@@ -204,9 +209,8 @@
 
 (defn render-footer
   [state width]
-  (let [lines         (build-footer-lines state width)
-        cleared-lines (map #(str % clear-line-end-seq) lines)]
-    (str (str/join "\n" cleared-lines) "\n")))
+  (let [lines (build-footer-lines state width)]
+    (str (str/join "\n" lines) "\n")))
 
 (defn render-notifications [ui-snapshot]
   (when ui-snapshot
@@ -427,7 +431,7 @@
                 prompt-templates skills extension-summary ui-snapshot
                 context-session-tree-widget context-session-tree-selected-index
                 tool-calls tool-order
-                active-turn-order session-selector current-session-file width force-clear?]} state
+                active-turn-order session-selector current-session-file width]} state
         spinner-char   (nth shared/spinner-frames (mod spinner-frame (count shared/spinner-frames)))
         dialog-active? (support/has-active-dialog? state)
         has-progress?  (or (seq active-turn-order)
@@ -443,49 +447,43 @@
         (and (= :streaming phase)
              (or (not has-progress?) active-tool-spinner?))
         term-width     (or width 80)]
-    (str
-     (when force-clear?
-       clear-screen-home-seq)
-     (if (= :selecting-session phase)
-       (str (render-banner model-name prompt-templates skills extension-summary)
-            "\n"
-            (selector-render/render-session-selector shared/dim-style render-separator session-selector current-session-file term-width (:session-selector-mode state))
-            clear-to-end-seq)
-       (str (render-banner model-name prompt-templates skills extension-summary)
-            "\n"
-            (render-messages messages term-width)
-            (when (and (not= :streaming phase) (seq tool-order))
-              (str (tool-render/render-tool-calls tool-calls tool-order spinner-char term-width (boolean (:tools-expanded? state)) ui-snapshot)
-                   "\n"))
-            (when context-session-tree-widget
-              (str (render-context-session-tree-widget context-session-tree-widget context-session-tree-selected-index) "\n"))
-            (when (= :streaming phase)
-              (if has-progress?
-                (str (or (render-active-turn state spinner-char term-width)
-                         (tool-render/render-tool-calls tool-calls tool-order spinner-char term-width (boolean (:tools-expanded? state)) ui-snapshot)
-                         "")
-                     "\n")
-                (str "\n" (charm/render shared/assist-style "ψ: ")
-                     spinner-char " thinking…\n")))
-            (when error
-              (str "\n" (charm/render shared/error-style (str "[error: " error "]")) "\n"))
-            (render-widgets ui-snapshot :above-editor)
-            "\n"
-            (render-separator term-width) "\n"
-            (if dialog-active?
-              (render-dialog (support/active-dialog state) (:dialog-selected-index state) (:dialog-input-text state))
-              (str (wrap-text-input-view input term-width)
-                   (render-prompt-autocomplete state term-width)
-                   (when (= :streaming phase)
-                     (str "\n"
-                          (charm/render shared/dim-style
-                                        (if progress-spinner-visible?
-                                          "(Enter queues input • Esc interrupts)"
-                                          (str spinner-char " waiting for response…")))
-                          clear-line-end-seq))))
-            "\n"
-            (render-separator term-width) "\n"
-            (render-widgets ui-snapshot :below-editor)
-            (render-footer state term-width)
-            (render-notifications ui-snapshot)
-            clear-to-end-seq)))))
+    (if (= :selecting-session phase)
+      (str (render-banner model-name prompt-templates skills extension-summary)
+           "\n"
+           (selector-render/render-session-selector shared/dim-style render-separator session-selector current-session-file term-width (:session-selector-mode state)))
+      (str (render-banner model-name prompt-templates skills extension-summary)
+           "\n"
+           (render-messages messages term-width)
+           (when (and (not= :streaming phase) (seq tool-order))
+             (str (tool-render/render-tool-calls tool-calls tool-order spinner-char term-width (boolean (:tools-expanded? state)) ui-snapshot)
+                  "\n"))
+           (when context-session-tree-widget
+             (str (render-context-session-tree-widget context-session-tree-widget context-session-tree-selected-index) "\n"))
+           (when (= :streaming phase)
+             (if has-progress?
+               (str (or (render-active-turn state spinner-char term-width)
+                        (tool-render/render-tool-calls tool-calls tool-order spinner-char term-width (boolean (:tools-expanded? state)) ui-snapshot)
+                        "")
+                    "\n")
+               (str "\n" (charm/render shared/assist-style "ψ: ")
+                    spinner-char " thinking…\n")))
+           (when error
+             (str "\n" (charm/render shared/error-style (str "[error: " error "]")) "\n"))
+           (render-widgets ui-snapshot :above-editor)
+           "\n"
+           (render-separator term-width) "\n"
+           (if dialog-active?
+             (render-dialog (support/active-dialog state) (:dialog-selected-index state) (:dialog-input-text state))
+             (str (wrap-text-input-view input term-width)
+                  (render-prompt-autocomplete state term-width)
+                  (when (= :streaming phase)
+                    (str "\n"
+                         (charm/render shared/dim-style
+                                       (if progress-spinner-visible?
+                                         "(Enter queues input • Esc interrupts)"
+                                         (str spinner-char " waiting for response…")))))))
+           "\n"
+           (render-separator term-width) "\n"
+           (render-widgets ui-snapshot :below-editor)
+           (render-footer state term-width)
+           (render-notifications ui-snapshot)))))

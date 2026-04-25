@@ -10,6 +10,7 @@
    [charm.input.keymap :as keymap]
    [charm.message :as msg]
    [psi.app-runtime.projections :as projections]
+   [psi.tui.ansi :as ansi]
    [psi.tui.app :as app]
    [psi.ui.state :as ui-state])
   (:import
@@ -198,7 +199,7 @@
 ;;;; Window resize
 
 (deftest window-resize-updates-dimensions-test
-  (testing "window-size message updates width and height and requests a hard clear"
+  (testing "window-size message updates width and height and sets force-clear?"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (init-state)
           [s1 _]    (update-fn state (msg/window-size 120 40))
@@ -206,7 +207,10 @@
       (is (= 120 (:width s1)))
       (is (= 40 (:height s1)))
       (is (true? (:force-clear? s1)))
-      (is (str/starts-with? out "\u001b[2J\u001b[H")))))
+      ;; ESC[2J is no longer emitted in the view string — JLine Display handles
+      ;; full repaints via repaint! on resize; the view string stays clean
+      (is (not (str/includes? out "\u001b[2J")))
+      (is (str/includes? (ansi/strip-ansi out) "ψ Psi Agent Session")))))
 
 (deftest external-message-appended-to-transcript-test
   (testing "external-message appends assistant text and keeps polling"

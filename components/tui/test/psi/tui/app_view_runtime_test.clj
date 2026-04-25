@@ -98,8 +98,8 @@
       (is (str/includes? (app/view state) "hello"))
       (is (str/includes? (app/view state) "world")))))
 
-(deftest view-clears-to-end-of-screen-test
-  (testing "view appends clear-to-end sequence after /new to avoid stale lines below footer"
+(deftest view-renders-new-session-message-test
+  (testing "view renders new-session message after /new"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (assoc (init-state)
                            :messages [{:role :assistant :text "line 1"}
@@ -109,7 +109,8 @@
           [s1 _]    (update-fn typed (msg/key-press :enter))
           out       (app/view s1)]
       (is (str/includes? out "[New session started]"))
-      (is (str/ends-with? out "\u001b[J")))))
+      ;; ESC[J (clear-to-end) is no longer emitted — JLine Display handles diffing
+      (is (not (str/includes? out "\u001b[J"))))))
 
 (deftest view-renders-default-footer-from-query-test
   (testing "footer renders path, stats, provider/model, and statuses from footer-model-fn"

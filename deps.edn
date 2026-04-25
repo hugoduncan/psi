@@ -69,6 +69,35 @@
           :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
+  :tui-demo {:extra-paths ["components/tui/src"
+                           "components/tui/test"
+                           "components/app-runtime/src"
+                           "components/agent-session/src"
+                           "components/agent-core/src"
+                           "components/ai/src"
+                           "components/engine/src"
+                           "components/query/src"
+                           "components/history/src"
+                           "components/introspection/src"
+                           "components/memory/src"
+                           "components/recursion/src"
+                           "components/rpc/src"
+                           "components/ui-state/src"
+                           "components/system-bootstrap/src"
+                           "extensions/auto-session-name/src"
+                           "extensions/commit-checks/src"
+                           "extensions/hello-ext/src"
+                           "extensions/lsp/src"
+                           "extensions/mcp-tasks-run/src"
+                           "extensions/mementum/src"
+                           "extensions/munera/src"
+                           "extensions/plan-state-learning/src"
+                           "extensions/work-on/src"
+                           "extensions/workflow-display/src"
+                           "extensions/workflow-loader/src"]
+             :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
+             :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
+             :main-opts   ["-m" "psi.tui.test-harness.tui-demo-main"]}
   :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.5.1"}}}
   :fmt   {:extra-deps {dev.weavejester/cljfmt {:mvn/version "0.13.1"}}
           :exec-fn    cljfmt.main/check
