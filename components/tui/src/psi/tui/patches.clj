@@ -84,17 +84,26 @@
   (alter-var-root
    #'charm.render.core/update-size!
    (constantly
-    (fn [renderer width _height]
-      (let [{:keys [display height old-height]}
-            (assoc @renderer :old-height (:height @renderer))
-            height-changed? (not= old-height height)]
-        (.resize ^org.jline.utils.Display display height width)
+    (fn [renderer width height]
+      (let [{old-width  :width
+             old-height :height
+             ^org.jline.utils.Display display :display
+             terminal   :terminal} @renderer
+            size-changed? (or (not= old-width width) (not= old-height height))]
+        (.resize display height width)
         (swap! renderer assoc :width width :height height)
-        (when height-changed?
-          (.clear ^org.jline.utils.Display display)
-          (let [terminal (:terminal @renderer)]
-            (charm-term/clear-screen terminal)
-            (charm-term/cursor-home terminal)))))))
+        ;; On any size change, call Display.reset() to clear JLine's internal
+        ;; oldLines state. Without this, Display.update() diffs against a
+        ;; reflow-prediction of the old content that may not match what the
+        ;; terminal actually shows, producing corrupted output (stale lines
+        ;; mixed with new content).
+        ;; Display.clear() is a no-op for non-fullscreen displays, so we must
+        ;; call reset() directly. reset() sets oldLines=emptyList(), which
+        ;; causes the next update() to emit clear_screen + full repaint.
+        (when size-changed?
+          (.reset display)
+          (charm-term/clear-screen terminal)
+          (charm-term/cursor-home terminal))))))
 
   (alter-var-root
    #'charm-input-handler/parse-input

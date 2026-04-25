@@ -469,28 +469,43 @@
        {:ok? true}
        {:ok? false :violations violations}))))
 
+(defn- check-resize-step
+  "Check layout invariants for one resize step. Returns a failure-result map
+   on violation, or nil on success."
+  [target label expected-width]
+  (let [snap  (sanitize-pane-text (capture-pane target))
+        check (check-layout-invariants snap expected-width)]
+    (when-not (:ok? check)
+      (assoc (failure-result target (keyword (str "layout-invalid-" label)))
+             :detail     (str "Layout invariants failed " label
+                              " (expected-width=" expected-width ")")
+             :violations (:violations check)))))
+
 (defn run-resize-scenario!
-  "Prove that the TUI repaints correctly after a terminal resize.
+  "Prove that the TUI repaints correctly after terminal resizes, including
+   rapid successive resizes that stress the differential renderer.
 
    Scenario:
-   1. Boot → ready marker; check initial layout invariants
-   2. Record initial pane width W
-   3. Resize pane to W-resize-delta (narrower, floor 40)
-   4. Wait for banner-marker to reappear; check layout invariants at new width
-   5. Resize pane back to W
-   6. Wait for banner-marker again; check layout invariants at restored width
-   7. /quit → clean exit
+   1.  Boot → ready marker; check initial layout invariants
+   2.  Record initial pane width W
+   3.  Single shrink: resize to W-delta; wait; check invariants at new width
+   4.  Single restore: resize back to W; wait; check invariants at W
+   5.  Rapid resizes: cycle through [W-delta, W-delta*2, W-delta, W] four
+       times with no wait between steps, then wait once at the end and check
+       invariants at W — proves the renderer survives a burst of resize events
+       without leaving stale lines or a blank screen
+   6.  /quit → clean exit
 
    Layout invariants checked at each stage (via check-layout-invariants):
-   - 'ψ Psi Agent Session' starts at column 0 (not shifted right)
-   - banner appears exactly once (no double-render artefact)
+   - 'ψ Psi Agent Session' starts at column 0 (no leading-space offset)
+   - banner appears exactly once (no double-render artefact from stale diff)
    - separator '────' starts at column 0
    - separator length matches the current pane width (reflowed, not stale)
    - at least 4 non-blank lines present (screen not blank)
 
-   This exercises the JLine Display WidthChangedRender path: on every
-   width change the renderer clears its internal state and re-renders
-   the full view from scratch."
+   The rapid-resize phase is the key regression test: before the
+   Display.reset() fix in patches.clj, even a single resize could leave
+   stale content from the old width mixed with new content."
   [{:keys [session-name
            working-dir
            launch-command
@@ -499,14 +514,16 @@
            ready-markers
            banner-marker
            resize-delta
+           rapid-resize-count
            keep-session-on-failure?]
-    :or {working-dir      (str (.getCanonicalPath (io/file ".")))
-         launch-command   (worktree-launch-command)
-         startup-timeout-ms default-startup-timeout-ms
-         step-timeout-ms  default-step-timeout-ms
-         ready-markers    default-ready-markers
-         banner-marker    "ESC=interrupt"
-         resize-delta     20
+    :or {working-dir         (str (.getCanonicalPath (io/file ".")))
+         launch-command      (worktree-launch-command)
+         startup-timeout-ms  default-startup-timeout-ms
+         step-timeout-ms     default-step-timeout-ms
+         ready-markers       default-ready-markers
+         banner-marker       "ESC=interrupt"
+         resize-delta        20
+         rapid-resize-count  4
          keep-session-on-failure? false}}]
   (let [preflight (tmux-preflight-result)]
     (if (not= :ok (:status preflight))
@@ -526,55 +543,52 @@
                     (if (nil? initial-width)
                       (assoc (failure-result target :pane-width-unavailable)
                              :detail "Could not read initial pane width")
-                      ;; Check layout before any resize
-                      (let [initial-snap  (sanitize-pane-text (capture-pane target))
-                            initial-check (check-layout-invariants initial-snap initial-width)]
-                        (if-not (:ok? initial-check)
-                          (assoc (failure-result target :layout-invalid-before-resize)
-                                 :detail     "Layout invariants failed before any resize"
-                                 :violations (:violations initial-check))
-                          (let [narrow-width (max 40 (- initial-width resize-delta))]
-                            ;; Step 1: shrink
-                            (resize-pane-width! target narrow-width)
-                            (cond
-                              (not (wait-for-marker target banner-marker step-timeout-ms))
-                              (assoc (failure-result target :banner-missing-after-shrink)
-                                     :detail (str "Banner not visible after resize to "
-                                                  narrow-width " cols"))
+                      (or
+                       ;; 0. Baseline check
+                       (check-resize-step target "before-any-resize" initial-width)
 
-                              :else
-                              (let [narrow-snap  (sanitize-pane-text (capture-pane target))
-                                    narrow-check (check-layout-invariants narrow-snap narrow-width)]
-                                (if-not (:ok? narrow-check)
-                                  (assoc (failure-result target :layout-invalid-after-shrink)
-                                         :detail     (str "Layout invariants failed after resize to "
-                                                          narrow-width " cols")
-                                         :violations (:violations narrow-check))
-                                  ;; Step 2: restore
-                                  (do
-                                    (resize-pane-width! target initial-width)
-                                    (cond
-                                      (not (wait-for-marker target banner-marker step-timeout-ms))
-                                      (assoc (failure-result target :banner-missing-after-restore)
-                                             :detail (str "Banner not visible after resize back to "
-                                                          initial-width " cols"))
+                       (let [narrow-width  (max 40 (- initial-width resize-delta))
+                             narrow-width2 (max 40 (- initial-width (* 2 resize-delta)))]
 
-                                      :else
-                                      (let [restored-snap  (sanitize-pane-text (capture-pane target))
-                                            restored-check (check-layout-invariants
-                                                            restored-snap initial-width)]
-                                        (if-not (:ok? restored-check)
-                                          (assoc (failure-result target :layout-invalid-after-restore)
-                                                 :detail     (str "Layout invariants failed after "
-                                                                  "restore to " initial-width " cols")
-                                                 :violations (:violations restored-check))
-                                          (do
-                                            (send-line! target "/quit")
-                                            (if (wait-for-java-exit target step-timeout-ms)
-                                              {:status       :passed
-                                               :session-name session-name*
-                                               :pane-id      (:pane-id target)}
-                                              (failure-result target :quit-timeout))))))))))))))))]
+                         ;; 1. Single shrink
+                         (resize-pane-width! target narrow-width)
+                         (when-not (wait-for-marker target banner-marker step-timeout-ms)
+                           (failure-result target :banner-missing-after-single-shrink))
+
+                         (or
+                          (check-resize-step target "after-single-shrink" narrow-width)
+
+                          ;; 2. Single restore
+                          (do
+                            (resize-pane-width! target initial-width)
+                            (when-not (wait-for-marker target banner-marker step-timeout-ms)
+                              (failure-result target :banner-missing-after-single-restore)))
+
+                          (or
+                           (check-resize-step target "after-single-restore" initial-width)
+
+                           ;; 3. Rapid resize burst: no wait between steps
+                           (do
+                             (dotimes [_ rapid-resize-count]
+                               (resize-pane-width! target narrow-width)
+                               (resize-pane-width! target narrow-width2)
+                               (resize-pane-width! target narrow-width)
+                               (resize-pane-width! target initial-width))
+                             ;; Single wait after the burst
+                             (when-not (wait-for-marker target banner-marker step-timeout-ms)
+                               (failure-result target :banner-missing-after-rapid-resizes)))
+
+                           (or
+                            (check-resize-step target "after-rapid-resizes" initial-width)
+
+                            ;; All checks passed — exit cleanly
+                            (do
+                              (send-line! target "/quit")
+                              (if (wait-for-java-exit target step-timeout-ms)
+                                {:status       :passed
+                                 :session-name session-name*
+                                 :pane-id      (:pane-id target)}
+                                (failure-result target :quit-timeout)))))))))))]
             (when (or (= :passed (:status result))
                       (not keep-session-on-failure?))
               (kill-session-if-exists! session-name*))
@@ -591,5 +605,4 @@
               (when-not keep-session-on-failure?
                 (kill-session-if-exists! session-name*))
               result)))))))
-
 
