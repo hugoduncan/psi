@@ -6,7 +6,7 @@
    [psi.tui.test-harness.tmux :as tmux]))
 
 (def ^:private default-thinking-marker "· ")
-(def ^:private default-selector-marker "Enter=confirm")
+(def ^:private default-selector-marker "Enter=select")
 
 (defn- encode-path-for-session-dir
   "Encode a filesystem path the same way persistence/session-dir-for does:

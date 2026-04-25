@@ -62,18 +62,24 @@
                     ;; fallback: plain done
                     {:events [] :done {:role "assistant"
                                        :content [{:type :text :text "(no matching step)"}]}})]
-      ;; consume the step so subsequent submits advance through the script
-      (swap! steps* (fn [ss] (if (seq ss) (rest ss) ss)))
-      (future
-        (when-let [d (:delay-ms step)]
-          (Thread/sleep (long d)))
-        (doseq [ev (:events step)]
-          (.put queue ev)
-          (Thread/sleep 40))
+      (if (and (string? text)
+               (contains? #{"/quit" "/exit"} (str/trim text)))
         (.put queue {:kind :done
-                     :result (or (:done step)
-                                 {:role "assistant"
-                                  :content [{:type :text :text "(step complete)"}]})})))))
+                     :result {:role "assistant"
+                              :content [{:type :text :text "(quit)"}]}})
+        (do
+          ;; consume the step so subsequent submits advance through the script
+          (swap! steps* (fn [ss] (if (seq ss) (rest ss) ss)))
+          (future
+            (when-let [d (:delay-ms step)]
+              (Thread/sleep (long d)))
+            (doseq [ev (:events step)]
+              (.put queue ev)
+              (Thread/sleep 40))
+            (.put queue {:kind :done
+                         :result (or (:done step)
+                                     {:role "assistant"
+                                      :content [{:type :text :text "(step complete)"}]})})))))))
 
 (defn -main
   [& _args]
