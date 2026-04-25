@@ -75,12 +75,10 @@
            thinking-marker
            selector-marker
            keep-session-on-failure?]
-    :or {;; Use repo-local-launch-command-abs (absolute path to bb/psi.clj)
-         ;; rather than worktree-launch-command (relative bb/psi.clj path).
-         ;; The TUI is launched with working-dir set to the fixture temp dir
-         ;; so the session scoping is correct, but a relative bb/psi.clj
-         ;; would not be found there.  An absolute path works from any CWD.
-         launch-command     (tmux/repo-local-launch-command-abs)
+    :or {;; Launch from the repo/worktree so babashka picks up the repo bb.edn
+         ;; classpath, but pass --cwd <tmpdir> through the launcher so the TUI
+         ;; session itself is scoped to the fixture directory.
+         launch-command     nil
          startup-timeout-ms tmux/default-startup-timeout-ms
          step-timeout-ms    tmux/default-step-timeout-ms
          ready-markers      tmux/default-ready-markers
@@ -95,11 +93,14 @@
                                    "/psi-thinking-it-" (System/currentTimeMillis)))
             _             (.mkdirs (io/file tmpdir))
             fixture-path  (write-thinking-fixture! tmpdir)
-            session-name* (or session-name (tmux/unique-session-name))]
+            session-name* (or session-name (tmux/unique-session-name))
+            launch        (or launch-command
+                              (str (tmux/worktree-launch-command)
+                                   " --cwd " (pr-str tmpdir)))]
         (try
           (let [target (tmux/start-session! {:session-name   session-name*
-                                             :working-dir    tmpdir
-                                             :launch-command launch-command})
+                                             :working-dir    (str (.getCanonicalPath (io/file ".")))
+                                             :launch-command launch})
                 result (cond
                          (not (tmux/wait-for-any-marker target ready-markers startup-timeout-ms))
                          {:status :failed :reason :startup-timeout
