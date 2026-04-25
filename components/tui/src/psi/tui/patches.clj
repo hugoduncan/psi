@@ -72,16 +72,6 @@
               (.bind keymap event (subs seq-str 1)))))))))
 
   (alter-var-root
-   #'charm.render.core/enter-alt-screen!
-   (constantly
-    (fn [renderer]
-      (let [terminal (:terminal @renderer)]
-        (charm-term/enter-alt-screen terminal)
-        (charm-term/clear-screen terminal)
-        (charm-term/cursor-home terminal))
-      (swap! renderer assoc :alt-screen true))))
-
-  (alter-var-root
    #'charm.render.core/update-size!
    (constantly
     (fn [renderer width height]
