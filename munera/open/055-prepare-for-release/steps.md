@@ -7,7 +7,7 @@
 - [x] Add `psi.version` namespace that reads the resource
 - [x] Expose `--version` flag (parsed in `launcher.clj`, printed in `launcher-main.clj`)
 - [x] Write `bb release:tag` task (reads changelog, stamps version, commits, tags, resets)
-- [ ] Document bbin install-from-tag command in README
+- [x] Document bbin install-from-tag command in README
 
 ## Track A — changelog discipline
 - [x] Decide changelog format — keep-a-changelog, categories: Added/Changed/Fixed/Removed
