@@ -88,6 +88,9 @@ jobs:
       - name: Lint
         run: bb lint
 
+      - name: Changelog check
+        run: bb changelog:check
+
   # ── Clojure tests ─────────────────────────────────────────────────────────
   clojure-test:
     name: Clojure Tests

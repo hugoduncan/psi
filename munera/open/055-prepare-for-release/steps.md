@@ -12,8 +12,8 @@
 ## Track A — changelog discipline
 - [x] Decide changelog format — keep-a-changelog, categories: Added/Changed/Fixed/Removed
 - [x] Replace `CHANGELOG.md` with structured `[Unreleased]` section seeded from recent work
-- [ ] Write `bb changelog:check` task (fails if `[Unreleased]` section is empty)
-- [ ] Add `changelog:check` step to CI `check` job
+- [x] Write `bb changelog:check` task (fails if `[Unreleased]` section is empty)
+- [x] Add `changelog:check` step to CI `check` job
 
 ## Track C — jar build
 - [ ] Add `:build` alias to `deps.edn` with `io.github.clojure/tools.build`

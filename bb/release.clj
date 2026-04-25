@@ -115,8 +115,21 @@
           (-> (version-resource-path) slurp edn/read-string :version))))
 
 ;; ---------------------------------------------------------------------------
-;; Public entry point
+;; Public entry points
 ;; ---------------------------------------------------------------------------
+
+(defn check-changelog!
+  "Assert CHANGELOG.md has a non-empty [Unreleased] section.
+   Exits 0 on success, 1 with a message on failure."
+  [_args]
+  (let [body (unreleased-section (read-changelog))]
+    (if body
+      (println "CHANGELOG.md [Unreleased] section is present.")
+      (do
+        (binding [*out* *err*]
+          (println "CHANGELOG.md [Unreleased] section is empty or missing.")
+          (println "Add an entry under ## [Unreleased] before committing user-visible changes."))
+        (System/exit 1)))))
 
 (defn release!
   "Cut a release: stamp changelog, bake version, commit, tag, reset to unreleased.
