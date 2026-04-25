@@ -454,6 +454,9 @@
        (str (render-banner model-name prompt-templates skills extension-summary)
             "\n"
             (render-messages messages term-width)
+            (when (and (not= :streaming phase) (seq tool-order))
+              (str (tool-render/render-tool-calls tool-calls tool-order spinner-char term-width (boolean (:tools-expanded? state)) ui-snapshot)
+                   "\n"))
             (when context-session-tree-widget
               (str (render-context-session-tree-widget context-session-tree-widget context-session-tree-selected-index) "\n"))
             (when (= :streaming phase)

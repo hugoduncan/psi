@@ -358,3 +358,67 @@
           out       (ansi/strip-ansi (app/view s))]
       (is (str/includes? out "· My reasoning here."))
       (is (str/includes? out "Done.")))))
+
+;; ── Tool rendering post-turn and ctrl+o toggle ────────────────────────────────
+
+(deftest tool-rows-visible-after-turn-completes-test
+  (testing "tool rows remain visible in idle phase after turn completes"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :phase :streaming)
+          ;; assemble a tool during the turn
+          [s1 _]    (update-fn state {:type :agent-event :event-kind :tool-call-assembly
+                                      :phase :end :content-index 0
+                                      :tool-id "t1" :tool-name "read"
+                                      :arguments "{\"path\":\"foo.clj\"}"})
+          [s2 _]    (update-fn s1 {:type :agent-event :event-kind :tool-result
+                                   :tool-id "t1" :tool-name "read"
+                                   :content [{:type :text :text "file content"}]
+                                   :is-error false})
+          ;; complete the turn
+          result    {:role "assistant" :content [{:type :text :text "Done."}]}
+          [s3 _]    (update-fn s2 {:type :agent-result :result result})
+          out       (ansi/strip-ansi (app/view s3))]
+      (is (= :idle (:phase s3)))
+      (is (seq (:tool-order s3)))
+      ;; tool header and result visible in idle view
+      (is (str/includes? out "read"))
+      (is (str/includes? out "foo.clj")))))
+
+(deftest ctrl-o-toggles-tools-expanded-during-streaming-test
+  (testing "ctrl+o expands/collapses tool output during a streaming turn"
+    (let [update-fn  (app/make-update (stub-agent-fn ""))
+          state      (assoc (init-state) :phase :streaming :tools-expanded? false)
+          [s1 _]     (update-fn state {:type :agent-event :event-kind :tool-result
+                                       :tool-id "t1" :tool-name "bash"
+                                       :content [{:type :text :text (str/join "\n" (repeat 20 "output line"))}]
+                                       :is-error false})
+          ;; collapsed view
+          out-before (ansi/strip-ansi (app/view s1))
+          ;; toggle expand
+          [s2 _]     (update-fn s1 (msg/key-press "o" :ctrl true))
+          out-after  (ansi/strip-ansi (app/view s2))]
+      (is (false? (:tools-expanded? s1)))
+      (is (true?  (:tools-expanded? s2)))
+      ;; collapsed shows fewer lines than expanded
+      (is (< (count (str/split-lines out-before))
+             (count (str/split-lines out-after)))))))
+
+(deftest ctrl-o-toggles-tools-expanded-in-idle-test
+  (testing "ctrl+o expands/collapses tool output in idle phase"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state)
+                           :phase :idle
+                           :tools-expanded? false
+                           :tool-order ["t1"]
+                           :tool-calls {"t1" {:name "bash"
+                                              :args "{}"
+                                              :status :success
+                                              :result (str/join "\n" (repeat 20 "output line"))
+                                              :is-error false
+                                              :expanded? false}})
+          out-before (ansi/strip-ansi (app/view state))
+          [s2 _]     (update-fn state (msg/key-press "o" :ctrl true))
+          out-after  (ansi/strip-ansi (app/view s2))]
+      (is (true? (:tools-expanded? s2)))
+      (is (< (count (str/split-lines out-before))
+             (count (str/split-lines out-after)))))))

@@ -87,9 +87,19 @@
 
     :else nil))
 
+(defn- toggle-tools-expanded
+  [state]
+  (let [new-expanded? (not (:tools-expanded? state))]
+    (support/dispatch-ui-event! state :session/ui-set-tools-expanded {:expanded? new-expanded?})
+    [(assoc state :tools-expanded? new-expanded?) nil]))
+
 (defn- handle-streaming-input
   [state m]
   (cond
+    (and (= :streaming (:phase state))
+         (msg/key-match? m "ctrl+o"))
+    (toggle-tools-expanded state)
+
     (and (= :streaming (:phase state))
          (msg/key-match? m "escape"))
     (app-update/handle-streaming-escape state)
@@ -122,12 +132,6 @@
            (:alt m)
            (and (:ctrl m) (:alt m))
            (str/ends-with? (charm/text-input-value (:input state)) "\\"))))
-
-(defn- toggle-tools-expanded
-  [state]
-  (let [new-expanded? (not (:tools-expanded? state))]
-    (support/dispatch-ui-event! state :session/ui-set-tools-expanded {:expanded? new-expanded?})
-    [(assoc state :tools-expanded? new-expanded?) nil]))
 
 (defn- delete-prev-word-update
   [state]
