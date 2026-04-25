@@ -79,7 +79,7 @@ instead of `(seq active-turn-events)`.
 `upsert-thinking-item` and `upsert-text-item` both call `append-active-turn-event`
 as their first step. Remove those calls. Remove `append-active-turn-event` from
 all `handle-agent-event` branches. Remove `:active-turn-events` from
-`clear-live-turn` and state init.
+`clear-live-turn`, state init, and the `render-view` destructuring binding.
 
 Mid-turn ordering falls out naturally: `thinking-item-id` keys on
 `content-index`, so a thinking block that arrives before a tool call
@@ -96,10 +96,10 @@ journal. Its `:content` is a plain vector of typed block maps produced by
 text, then tool-calls. For the final turn (which is what `:done` signals),
 there are no tool-call blocks.
 
-Archive by scanning `:content` for `:thinking` blocks and prepending them to
+Archive by scanning `:content` for `:thinking` blocks and emitting them into
 `messages` before the `:assistant` entry:
 
-- For each block where `(= :thinking (content-kind block))`: emit
+- For each block where `(= :thinking (or (:type block) (:kind block)))`: emit
   `{:role :thinking :text (:text block)}` into `messages`
 - Then emit `{:role :assistant :text (content-text content)}` as today —
   `content-text` already skips thinking blocks, so no change needed there
@@ -121,15 +121,16 @@ with two separate passes over its `:content`: one for text (via
 `assistant-tool-call-blocks`). Replace the `"assistant"` branch with a single
 pass over the content blocks of that message, emitting in block order:
 
-- block where `(= :thinking (content-kind block))` → `{:role :thinking :text (:text block)}` into `messages`
-- text content → `{:role :assistant :text (message->display-text msg)}` into `messages`
-  (emit once, after collecting any thinking blocks; continue using `message->display-text`
-  for text extraction so the existing normalization is preserved)
-- block where `(= :tool-call (content-kind block))` → tool-calls/tool-order entry (unchanged logic)
+- block where `(= :thinking (or (:type block) (:kind block)))` → `{:role :thinking :text (:text block)}` into `messages`
+- block where `(= :tool-call (or (:type block) (:kind block)))` → tool-calls/tool-order entry (unchanged logic)
+- after iterating all blocks, emit `{:role :assistant :text (message->display-text msg)}` into `messages`
+  if non-blank — continue using `message->display-text` for text extraction so the existing
+  normalization is preserved
 
 Content may be a plain vector or a `{:kind :structured :blocks [...]}` map —
 normalize to a block sequence first using the same logic as the existing
-`assistant-tool-call-blocks` helper before iterating.
+`assistant-tool-call-blocks` helper before iterating. This normalization step
+is required before the single pass can proceed.
 
 This is symmetric with the archive approach (step 3) and eliminates the
 fragility of multiple passes.
@@ -146,10 +147,13 @@ construction and must remain text-only.
 - No change to the backend event protocol or shared app-runtime code
 - `active-turn-order` deduplication invariant must be preserved
 - `tool-calls` is the authoritative source for tool status in rendering;
-  `active-turn-items` stores only `{:item-kind :tool :tool-id}` for tool items
+  `active-turn-items` is not used for tool rendering even though it also stores
+  `:status` for tool items as a side-effect of lifecycle event handling
 - `:thinking` message kind must be clearly distinct from `:assistant` in
   `render-message` — archived thinking is read-only display data, not prompt content
-- `content-display-text` returns `""` for thinking blocks — do not change this
+- neither `content-text` nor `content-display-text` return thinking block text —
+  do not change either; the archive path uses `content-text`, rehydration uses
+  `content-display-text` (via `message->display-text`)
 - Archive (step 3) and rehydration (step 4) must read thinking from the same
   canonical content structure so the two paths stay symmetric
 
@@ -159,7 +163,7 @@ construction and must remain text-only.
    (latest text), not N lines
 2. A tool going through all lifecycle stages renders as exactly one row
    (latest status), not one row per stage
-3. Thinking and tool calls interleave in correct content-index arrival order:
+3. Thinking and tool calls interleave in correct arrival order:
    `[thinking-A] [tool] [thinking-B]`
 4. After a tool event arrives, subsequent thinking for a new content-index
    appears below the tool row

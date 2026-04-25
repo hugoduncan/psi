@@ -20,8 +20,9 @@
       `:assistant` message
 - [ ] Add `:thinking` role handling to `render-message`
 
-- [ ] Rewrite `"assistant"` branch of `agent-messages->tui-resume-state` as a
-      single content-block pass emitting `:thinking`, `:assistant`, and tool entries
+- [ ] Rewrite `"assistant"` branch of `agent-messages->tui-resume-state`:
+      normalize content to block sequence (vector or structured map), then single
+      pass emitting `:thinking` and tool entries in block order, `:assistant` after
 
 - [ ] Test: thinking with N deltas → one `· <text>` line (latest text)
 - [ ] Test: tool through all lifecycle stages → one row (latest status)

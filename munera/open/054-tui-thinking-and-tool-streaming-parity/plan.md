@@ -22,14 +22,16 @@
 
 4. **Rehydration** — rewrite the `"assistant"` branch of
    `agent-messages->tui-resume-state` as a single pass over content blocks,
-   emitting `:thinking`, `:assistant`, and tool entries in content order.
+   emitting `:thinking` and tool entries in block order, then `:assistant` after
+   all blocks. Normalize content to a block sequence first (plain vector or
+   structured map) before iterating.
 
 5. **Tests** — add focused tests for each gap; confirm existing ordering tests
    still green; run full suite.
 
 ## Notes
 
-- Steps 2 is one coherent change — render rewrite and event-log removal together
+- Step 2 is one coherent change — render rewrite and event-log removal together
 - Archive (step 3) reads from `result` content, not `active-turn-items` — same
   source as rehydration, keeping the two paths symmetric
 - Rehydration (step 4) is independent and can be done in any order after step 3
