@@ -16,6 +16,14 @@ Launcher realization policy is explicit:
 - default launcher policy is `installed`
 - set `PSI_LAUNCHER_POLICY=development` when running contributor/repo-local launcher flows that should materialize psi and psi-owned extensions from local roots instead of installed git coordinates
 
+## Requirements
+
+- **Java 22+** — required at runtime. The TUI (`--tui`) depends on
+  `jline-terminal-ffm` which uses the Java Foreign Function & Memory API
+  (finalized in Java 21, class-file version 66 = Java 22 minimum).
+  Java 25 is the version used in CI and recommended for production use.
+- **Babashka** — required for the launcher (`bb`).
+
 ## Install
 
 Canonical install path:

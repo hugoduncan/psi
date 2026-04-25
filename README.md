@@ -15,6 +15,11 @@ EQL-queryable, extensible. Inspired by
 
 ## Quick Start
 
+### Requirements
+
+- **Java 22+** (Java 25 recommended) — the TUI requires the Java FFM API
+- **Babashka** — for the launcher
+
 ### Installation
 
 Install the latest release:
