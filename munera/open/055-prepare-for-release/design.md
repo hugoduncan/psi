@@ -89,7 +89,12 @@ Provide `bb smoke:test`. Wire into CI after `clojure-test`.
 3. Run smoke test (`bb smoke:test`)
 4. Extract changelog section for the tag version from `CHANGELOG.md`
 5. Create GitHub Release with changelog body + `psi.jar` + `psi` wrapper attached
-- No Clojars publish for now — git/tag via bbin is sufficient
+- Clojars publish: library jar (`io.github.hugoduncan/psi`) deployed on every release
+  - thin jar: sources + resources, no AOT, no bundled deps
+  - launcher `:jar` policy uses `{:mvn/version "X.Y.Z"}` for psi self-dep and all bundled extensions
+  - auto-detected: when `psi/version.edn` is a release semver (not `"unreleased"`), launcher defaults to `:jar` policy
+  - override: `PSI_LAUNCHER_POLICY=installed` forces git/local path mode; `=development` forces dev mode
+  - third-party extensions: resolved via `clojure -M` as usual; `:jar` policy resolves their `:psi/release-version` placeholder to the actual version
 
 ## Acceptance criteria
 

@@ -1,8 +1,10 @@
 (ns build
-  "tools.build script for psi uberjar.
+  "tools.build script for psi.
 
    Usage:
-     clojure -T:build uber        # build target/psi.jar + target/psi wrapper
+     clojure -T:build lib         # build target/psi-VERSION.jar (library jar for Clojars)
+     clojure -T:build uber        # build target/psi.jar + target/psi wrapper (standalone)
+     clojure -T:build deploy      # deploy library jar to Clojars
      clojure -T:build clean       # remove target/"
   (:require
    [clojure.edn :as edn]
@@ -14,6 +16,7 @@
 ;; Config
 ;; ---------------------------------------------------------------------------
 
+(def psi-lib   'io.github.hugoduncan/psi)
 (def class-dir "target/classes")
 (def jar-file  "target/psi.jar")
 (def wrapper   "target/psi")
@@ -64,10 +67,79 @@
 ;; Tasks
 ;; ---------------------------------------------------------------------------
 
+(defn- lib-jar-file
+  [version]
+  (str "target/psi-" version ".jar"))
+
 (defn clean
   "Remove the target/ directory."
   [_]
   (b/delete {:path "target"}))
+
+(defn lib
+  "Build a library jar for Clojars: target/psi-VERSION.jar.
+   Sources + resources only — no AOT, no bundled deps."
+  [_]
+  (let [version (version-string)
+        jar     (lib-jar-file version)]
+    (println (str "Building library jar " jar " ..."))
+
+    ;; 1. Clean
+    (b/delete {:path "target"})
+
+    ;; 2. Write pom.xml
+    (println "  Writing pom.xml ...")
+    (b/write-pom {:class-dir class-dir
+                  :lib       psi-lib
+                  :version   version
+                  :basis     @basis
+                  :src-dirs  src-dirs
+                  :pom-data  [[:description "Psi — AI coding agent"]
+                              [:url "https://github.com/hugoduncan/psi"]
+                              [:licenses
+                               [:license
+                                [:name "Eclipse Public License 2.0"]
+                                [:url "https://www.eclipse.org/legal/epl-2.0/"]]]
+                              [:scm
+                               [:url "https://github.com/hugoduncan/psi"]
+                               [:connection "scm:git:https://github.com/hugoduncan/psi.git"]
+                               [:developerConnection "scm:git:ssh://git@github.com/hugoduncan/psi.git"]]]})
+
+    ;; 3. Copy sources + resources
+    (println "  Copying sources ...")
+    (b/copy-dir {:src-dirs   src-dirs
+                 :target-dir class-dir})
+
+    ;; 4. Build thin jar (no AOT)
+    (println "  Assembling library jar ...")
+    (b/jar {:class-dir class-dir
+            :jar-file  jar})
+
+    (println)
+    (println (str "Built: " jar))
+    (println (str "       " class-dir "/META-INF/maven/" (namespace psi-lib) "/" (name psi-lib) "/pom.xml"))
+    jar))
+
+(defn deploy
+  "Deploy the library jar to Clojars.
+   Requires CLOJARS_USERNAME and CLOJARS_PASSWORD env vars."
+  [_]
+  (let [version (version-string)
+        jar     (lib-jar-file version)]
+    (when (= "unreleased" version)
+      (throw (ex-info "Cannot deploy: version resource is 'unreleased'. Run bb release:tag first."
+                      {:version version})))
+    (when-not (.exists (io/file jar))
+      (throw (ex-info (str "Library jar not found: " jar ". Run clojure -T:build lib first.")
+                      {:jar jar})))
+    (println (str "Deploying " jar " to Clojars as " psi-lib " " version " ..."))
+    ;; deps-deploy is loaded dynamically so :deploy alias must be active
+    (let [deploy-fn (requiring-resolve 'deps-deploy.deps-deploy/deploy)]
+      (deploy-fn {:installer :remote
+                  :artifact  jar
+                  :pom-file  (b/pom-path {:lib       psi-lib
+                                          :class-dir class-dir})}))
+    (println "Done.")))
 
 (defn uber
   "Build target/psi.jar and target/psi wrapper script.

@@ -365,9 +365,17 @@
                                 "}"
                                 "console.log('Chiasmus check passed');"))]
              (System/exit (:exit result))))}
+  build:lib
+  {:doc  "Build target/psi-VERSION.jar (library jar for Clojars) via tools.build."
+   :task (shell "clojure -T:build lib")}
+
   build:jar
   {:doc  "Build target/psi.jar and target/psi wrapper script via tools.build."
    :task (shell "clojure -T:build uber")}
+
+  deploy
+  {:doc  "Deploy library jar to Clojars. Requires CLOJARS_USERNAME and CLOJARS_PASSWORD."
+   :task (shell "clojure -T:deploy deploy")}
 
   changelog:check
   {:doc  "Fail if CHANGELOG.md has no entries in the [Unreleased] section."

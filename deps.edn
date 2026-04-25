@@ -181,6 +181,9 @@
           :main-opts   ["-m" "kaocha.runner"]}
   :build {:deps      {io.github.clojure/tools.build {:mvn/version "0.10.12"}}
           :ns-default build}
+  :deploy {:deps      {io.github.clojure/tools.build {:mvn/version "0.10.12"}
+                       slipset/deps-deploy            {:mvn/version "0.2.2"}}
+           :ns-default build}
   :coverage {:extra-deps {lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}}}
   :debug-test {:extra-paths ["test"
                              "components/ai/test"

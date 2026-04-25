@@ -4,7 +4,8 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.launcher.extensions :as extensions]))
+   [psi.launcher.extensions :as extensions]
+   [psi.version :as version]))
 
 (defn- blank-path?
   [x]
@@ -88,11 +89,21 @@
   [launcher-root]
   (read-edn-file (io/file launcher-root "deps.edn")))
 
+(defn- release-version
+  "Return the baked version string, or nil if running unreleased."
+  []
+  (let [v (version/version-string)]
+    (when (not= "unreleased" v) v)))
+
 (defn- materialize-self-dep
   [launcher-root policy dep]
   (case policy
     (:development :installed)
     (absolutize-local-root launcher-root dep)
+
+    :jar
+    ;; jar policy: psi self-deps are bundled — replaced by the single mvn coord below
+    dep
 
     (throw (ex-info "Unknown launcher policy"
                     {:stage :basis-construction
@@ -106,11 +117,24 @@
                (:deps repo-config))
    :paths []})
 
+(defn- psi-jar-basis
+  "For :jar policy: single mvn coord replaces all psi local/root self-deps."
+  [version]
+  {:deps {extensions/psi-mvn-lib {:mvn/version version}
+          'nrepl/nrepl            {:mvn/version "1.5.1"}}
+   :paths []})
+
 (defn psi-self-basis
   [launcher-root policy]
-  (-> (repo-basis-config launcher-root)
-      (psi-self-basis-from-repo-config launcher-root policy)
-      (update :deps assoc 'nrepl/nrepl {:mvn/version "1.5.1"})))
+  (if (= :jar policy)
+    (let [v (release-version)]
+      (when-not v
+        (throw (ex-info ":jar policy requires a stamped release version (not 'unreleased')"
+                        {:stage :basis-construction :policy policy})))
+      (psi-jar-basis v))
+    (-> (repo-basis-config launcher-root)
+        (psi-self-basis-from-repo-config launcher-root policy)
+        (update :deps assoc 'nrepl/nrepl {:mvn/version "1.5.1"}))))
 
 (defn manifest-state
   [launcher-root cwd policy]
@@ -155,27 +179,32 @@
                [lib (dissoc dep :psi/init :psi/enabled)]))
         dep-map))
 
-(defn- installed-project-local-lib?
-  [launcher-root cwd dep]
-  (when-let [local-root (:local/root dep)]
-    (let [dep-file      (io/file local-root)
-          dep-path      (.getCanonicalPath (if (.isAbsolute dep-file)
-                                             dep-file
-                                             (io/file cwd local-root)))
-          launcher-path (.getCanonicalPath (io/file launcher-root))]
-      (.startsWith dep-path launcher-path))))
+(defn- resolve-release-version-placeholder
+  "Replace the :psi/release-version sentinel with the actual version string."
+  [dep version]
+  (if (= :psi/release-version (:mvn/version dep))
+    (assoc dep :mvn/version version)
+    dep))
 
 (defn- materialize-manifest-dep
-  [launcher-root cwd policy dep]
-  (let [dep* (absolutize-local-root-dep cwd dep)]
-    (case policy
-      :development dep*
-      :installed (if (installed-project-local-lib? launcher-root cwd dep)
-                   dep*
-                   dep*)
-      (throw (ex-info "Unknown launcher policy"
-                      {:stage :basis-construction
-                       :policy policy})))))
+  [cwd policy dep]
+  (case policy
+    :development
+    (absolutize-local-root-dep cwd dep)
+
+    :installed
+    (absolutize-local-root-dep cwd dep)
+
+    :jar
+    (let [version (release-version)]
+      (when-not version
+        (throw (ex-info ":jar policy requires a stamped release version (not 'unreleased')"
+                        {:stage :basis-construction :policy policy})))
+      (resolve-release-version-placeholder dep version))
+
+    (throw (ex-info "Unknown launcher policy"
+                    {:stage :basis-construction
+                     :policy policy}))))
 
 (defn startup-basis
   [launcher-root cwd policy]
@@ -183,7 +212,7 @@
         manifest-info0   (manifest-state launcher-root cwd policy)
         expanded-deps    (->> (get-in manifest-info0 [:expanded-manifest :deps])
                               (map (fn [[lib dep]]
-                                     [lib (-> (materialize-manifest-dep launcher-root cwd policy dep)
+                                     [lib (-> (materialize-manifest-dep cwd policy dep)
                                               (dissoc :psi/init :psi/enabled))]))
                               (into {}))
         manifest-info    (assoc-in manifest-info0 [:expanded-manifest :deps] expanded-deps)]

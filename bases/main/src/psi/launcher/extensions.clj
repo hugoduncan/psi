@@ -12,66 +12,80 @@
   "Explicit launcher-owned psi source identity for installed mode."
   "https://github.com/hugoduncan/psi.git")
 
+(def psi-mvn-lib
+  "Maven group/artifact for the psi library jar published to Clojars."
+  'io.github.hugoduncan/psi)
+
 (def psi-owned-extension-catalog
   {'psi/auto-session-name
    {:psi/init 'extensions.auto-session-name/init
     :source-policies
     {:development {:local/root "extensions/auto-session-name"}
-     :installed   {:local/root "extensions/auto-session-name"}}}
+     :installed   {:local/root "extensions/auto-session-name"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/commit-checks
    {:psi/init 'extensions.commit-checks/init
     :source-policies
     {:development {:local/root "extensions/commit-checks"}
-     :installed   {:local/root "extensions/commit-checks"}}}
+     :installed   {:local/root "extensions/commit-checks"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/hello-ext
    {:psi/init 'extensions.hello-ext/init
     :source-policies
     {:development {:local/root "extensions/hello-ext"}
-     :installed   {:local/root "extensions/hello-ext"}}}
+     :installed   {:local/root "extensions/hello-ext"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/lsp
    {:psi/init 'extensions.lsp/init
     :source-policies
     {:development {:local/root "extensions/lsp"}
-     :installed   {:local/root "extensions/lsp"}}}
+     :installed   {:local/root "extensions/lsp"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/mcp-tasks-run
    {:psi/init 'extensions.mcp-tasks-run/init
     :source-policies
     {:development {:local/root "extensions/mcp-tasks-run"}
-     :installed   {:local/root "extensions/mcp-tasks-run"}}}
+     :installed   {:local/root "extensions/mcp-tasks-run"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/mementum
    {:psi/init 'extensions.mementum/init
     :source-policies
     {:development {:local/root "extensions/mementum"}
-     :installed   {:local/root "extensions/mementum"}}}
+     :installed   {:local/root "extensions/mementum"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/munera
    {:psi/init 'extensions.munera/init
     :source-policies
     {:development {:local/root "extensions/munera"}
-     :installed   {:local/root "extensions/munera"}}}
+     :installed   {:local/root "extensions/munera"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/plan-state-learning
    {:psi/init 'extensions.plan-state-learning/init
     :source-policies
     {:development {:local/root "extensions/plan-state-learning"}
-     :installed   {:local/root "extensions/plan-state-learning"}}}
+     :installed   {:local/root "extensions/plan-state-learning"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/work-on
    {:psi/init 'extensions.work-on/init
     :source-policies
     {:development {:local/root "extensions/work-on"}
-     :installed   {:local/root "extensions/work-on"}}}
+     :installed   {:local/root "extensions/work-on"}
+     :jar         {:mvn/version :psi/release-version}}}
 
    'psi/workflow-loader
    {:psi/init 'extensions.workflow-loader/init
     :source-policies
     {:development {:local/root "extensions/workflow-loader"}
-     :installed   {:local/root "extensions/workflow-loader"}}}})
+     :installed   {:local/root "extensions/workflow-loader"}
+     :jar         {:mvn/version :psi/release-version}}}})
 
 (defn coordinate-family
   [dep]

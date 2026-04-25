@@ -28,12 +28,22 @@
 - [x] Add `bb smoke:test` task — runs `psi.rpc-smoke-test` + `psi.tui.tmux-integration-harness-test` via `:integration` kaocha suite
 - [x] Wire `smoke-test` CI job — runs after `check`, parallel to `clojure-test`/`emacs-test`, with launcher shim + tmux
 
-## Track E — GitHub release workflow
-- [ ] Create `.github/workflows/release.yml` triggered on `v*` tags
-- [ ] Wire `needs: [check, clojure-test, emacs-test]`
-- [ ] Add build-jar step
-- [ ] Add smoke-test step
-- [ ] Add changelog-extract step (parse section for tag version)
-- [ ] Add GitHub Release creation step with body + jar asset
-- [ ] Decide Clojars publish (yes/no)
-- [ ] End-to-end test: push a `v0.0.1-test` tag, verify release created
+## Track E — GitHub release workflow + Clojars
+- [x] Decide Clojars publish — yes: `io.github.hugoduncan/psi`, thin library jar, sources only
+- [x] Add `:deploy` alias to `deps.edn` (`slipset/deps-deploy`)
+- [x] Add `lib` task to `build.clj` — thin jar + `write-pom`
+- [x] Add `deploy` task to `build.clj` — deploys via `deps-deploy`
+- [x] Add `bb build:lib` and `bb deploy` tasks to `bb.edn`
+- [x] Add `:jar` source policy to all psi-owned extension catalog entries
+- [x] Add `psi-jar-basis` to `launcher.clj` — single mvn coord replaces all local/root self-deps
+- [x] Add `:jar` policy to `materialize-manifest-dep` — resolves `:psi/release-version` placeholder
+- [x] Auto-detect `:jar` policy in `launcher_main.clj` when version is a release semver
+- [x] Create `.github/workflows/release.yml` triggered on `v*` tags
+- [x] Wire `needs: [check, clojure-test, smoke-test, emacs-test]`
+- [x] Add build-lib + deploy-to-Clojars step
+- [x] Add build-jar step (uberjar for GH Release asset)
+- [x] Add smoke-test step
+- [x] Add changelog-extract step (parse section for tag version)
+- [x] Add GitHub Release creation step with body + jar + wrapper assets
+- [ ] Add `CLOJARS_USERNAME` + `CLOJARS_PASSWORD` secrets to GitHub repo
+- [ ] End-to-end test: push a `v0.0.1-test` tag, verify Clojars deploy + GH Release created

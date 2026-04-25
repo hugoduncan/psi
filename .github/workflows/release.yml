@@ -1,0 +1,320 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+
+  # ── fmt + lint + changelog ─────────────────────────────────────────────────
+  check:
+    name: Format & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Cache Maven + Clojure deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.clojure
+          key: clojure-${{ runner.os }}-${{ hashFiles('deps.edn', 'bb.edn') }}
+          restore-keys: clojure-${{ runner.os }}-
+
+      - name: Install Clojure & Babashka
+        uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          cli: latest
+          bb: latest
+
+      - name: Install clj-kondo
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(python3 - <<'PY'
+          import json, os, sys, urllib.request
+
+          fallback = '2026.03.14'
+          url = 'https://api.github.com/repos/clj-kondo/clj-kondo/releases/latest'
+          req = urllib.request.Request(url, headers={
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f"Bearer {os.environ.get('GITHUB_TOKEN', '')}",
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'psi-ci'
+          })
+          try:
+              with urllib.request.urlopen(req) as r:
+                  data = json.load(r)
+              print(data['tag_name'].removeprefix('v'))
+          except Exception:
+              print(fallback)
+          PY
+          )
+          ASSET_URL="https://github.com/clj-kondo/clj-kondo/releases/download/v${VERSION}/clj-kondo-${VERSION}-linux-amd64.zip"
+          curl -fLSs "$ASSET_URL" -o /tmp/clj-kondo.zip
+          sudo unzip -q /tmp/clj-kondo.zip -d /usr/local/bin
+          clj-kondo --version
+
+      - name: Install cljfmt
+        run: |
+          VERSION=$(python3 - <<'PY'
+          import json, urllib.request
+          with urllib.request.urlopen('https://api.github.com/repos/weavejester/cljfmt/releases/latest') as r:
+              print(json.load(r)['tag_name'].removeprefix('v'))
+          PY
+          )
+          curl -fsSL "https://github.com/weavejester/cljfmt/releases/download/${VERSION}/cljfmt-${VERSION}-linux-amd64.tar.gz" \
+            -o /tmp/cljfmt.tar.gz
+          tar -xzf /tmp/cljfmt.tar.gz -C /tmp
+          sudo install /tmp/cljfmt /usr/local/bin/cljfmt
+          cljfmt --version
+
+      - name: Format check
+        run: bb fmt:check
+
+      - name: Lint
+        run: bb lint
+
+      - name: Changelog check
+        run: bb changelog:check
+
+  # ── Clojure tests ──────────────────────────────────────────────────────────
+  clojure-test:
+    name: Clojure Tests
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Cache Maven + Clojure deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.clojure
+          key: clojure-${{ runner.os }}-${{ hashFiles('deps.edn', 'bb.edn') }}
+          restore-keys: clojure-${{ runner.os }}-
+
+      - name: Install Clojure & Babashka
+        uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          cli: latest
+          bb: latest
+
+      - name: Install tmux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux
+          tmux -V
+
+      - name: Install psi launcher shim
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          BB_BIN="$(command -v bb)"
+          echo "BB=$BB_BIN" >> "$GITHUB_ENV"
+          echo "PSI_LAUNCHER_POLICY=development" >> "$GITHUB_ENV"
+          cat > "$HOME/.local/bin/psi" <<EOF
+          #!/usr/bin/env bash
+          export PSI_LAUNCHER_POLICY=development
+          exec "$BB_BIN" bb/psi.clj -- "\$@"
+          EOF
+          chmod +x "$HOME/.local/bin/psi"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/psi" --launcher-debug --help >/dev/null
+
+      - name: Run Clojure tests
+        run: bb clojure:test
+
+      - name: Run Clojure integration tests
+        run: bb clojure:test:integration
+
+  # ── Smoke tests ────────────────────────────────────────────────────────────
+  smoke-test:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Cache Maven + Clojure deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.clojure
+          key: clojure-${{ runner.os }}-${{ hashFiles('deps.edn', 'bb.edn') }}
+          restore-keys: clojure-${{ runner.os }}-
+
+      - name: Install Clojure & Babashka
+        uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          cli: latest
+          bb: latest
+
+      - name: Install tmux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux
+          tmux -V
+
+      - name: Install psi launcher shim
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          BB_BIN="$(command -v bb)"
+          echo "BB=$BB_BIN" >> "$GITHUB_ENV"
+          echo "PSI_LAUNCHER_POLICY=development" >> "$GITHUB_ENV"
+          cat > "$HOME/.local/bin/psi" <<EOF
+          #!/usr/bin/env bash
+          export PSI_LAUNCHER_POLICY=development
+          exec "$BB_BIN" bb/psi.clj -- "\$@"
+          EOF
+          chmod +x "$HOME/.local/bin/psi"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run smoke tests
+        run: bb smoke:test
+
+  # ── Emacs tests ────────────────────────────────────────────────────────────
+  emacs-test:
+    name: Emacs Tests
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Cache Maven + Clojure deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.clojure
+          key: clojure-${{ runner.os }}-${{ hashFiles('deps.edn', 'bb.edn') }}
+          restore-keys: clojure-${{ runner.os }}-
+
+      - name: Install Clojure & Babashka
+        uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          cli: latest
+          bb: latest
+
+      - name: Install Emacs (latest stable)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y emacs-nox
+
+      - name: Run Emacs tests
+        run: bb emacs:check
+
+  # ── Build, deploy, publish ─────────────────────────────────────────────────
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    needs: [check, clojure-test, smoke-test, emacs-test]
+    permissions:
+      contents: write   # create GitHub Release
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so git rev-list count matches bb release:tag
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Cache Maven + Clojure deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.clojure
+          key: clojure-${{ runner.os }}-${{ hashFiles('deps.edn', 'bb.edn') }}
+          restore-keys: clojure-${{ runner.os }}-
+
+      - name: Install Clojure & Babashka
+        uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          cli: latest
+          bb: latest
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build library jar (Clojars)
+        run: bb build:lib
+
+      - name: Deploy to Clojars
+        env:
+          CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+          CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
+        run: bb deploy
+
+      - name: Build uberjar (GitHub Release asset)
+        run: bb build:jar
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          python3 - "${{ steps.version.outputs.version }}" "$GITHUB_OUTPUT" <<'PY'
+          import os, sys, re, pathlib
+
+          version    = sys.argv[1]
+          out_file   = sys.argv[2]
+          text       = pathlib.Path("CHANGELOG.md").read_text()
+
+          pattern = rf"(?m)^## \[{re.escape(version)}\].*\n(.*?)(?=^## \[|\Z)"
+          m = re.search(pattern, text, re.DOTALL)
+          if not m:
+              print(f"No changelog section found for version {version}", file=sys.stderr)
+              sys.exit(1)
+
+          body = m.group(1).strip()
+          with open(out_file, "a") as f:
+              f.write("body<<EOF\n")
+              f.write(body + "\n")
+              f.write("EOF\n")
+          PY
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.body }}
+          files: |
+            target/psi.jar
+            target/psi
