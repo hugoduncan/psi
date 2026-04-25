@@ -1,42 +1,55 @@
 # Plan — 055 prepare-for-release
 
-## Approach
+## Status
 
-Five tracks are largely independent and can be sequenced by dependency:
+- ✅ A — changelog discipline
+- ✅ B — version scheme + files + flag + release task + README
+- ✅ C — jar build
+- ⬜ D — smoke test
+- ⬜ E — GitHub release workflow
+
+## Dependency order
 
 ```
-A (changelog discipline)
-  └─ feeds ─► E (release workflow — needs changelog extraction)
-
-C (jar build)
-  └─ feeds ─► D (smoke test — tests the jar)
-               └─ feeds ─► E (release workflow — runs smoke)
-
-B (launcher version) ─► feeds ─► E (release workflow — tags + embeds version)
+A ✅ → feeds E (changelog extraction)
+B ✅ → feeds E (version tag)
+C ✅ → feeds D (smoke tests the jar)
+D ⬜ → feeds E (release workflow runs smoke)
+E ⬜ — assembles all prior tracks
 ```
 
-Recommended execution order:
+## Track D — smoke test
 
-1. **B** — version scheme decision first; everything else references it.
-2. **A** — changelog format migration; unblocks E.
-3. **C** — jar build; unblocks D.
-4. **D** — smoke test; unblocks E.
-5. **E** — release workflow; assembles all prior tracks.
+Scope (no real LLM key required):
+- bb launcher: `psi --version` exits 0, output matches `psi \d+\.\d+\.\d+` or `psi unreleased`
+- bb launcher: `psi --launcher-debug --version` emits debug summary + version, exits 0
+- jar: `java --enable-native-access=ALL-UNNAMED -jar target/psi.jar --version` exits 0
 
-## Decisions to make before execution
+Implementation options:
+- Clojure test namespace under `bases/main/test/psi/smoke_test.clj` in the `:integration` suite
+- Or a standalone `bb smoke:test` task that shells out
 
-- Version scheme: **decided** — semver `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count`.
-  - `version.edn` stores `{:major 0 :minor 1}`; patch auto-derived at tag time.
-  - First release: `0.1.1985`.
-- Clojars publish: yes/no? (GitHub Releases + bbin is sufficient for now.)
-- Changelog format: keep-a-changelog (`## [Unreleased]`) vs current freeform?
-  - Recommendation: keep-a-changelog; tooling exists.
+Recommendation: bb task shelling out — smoke tests the *artifact* not the source,
+so running inside the JVM test suite is the wrong level. The task runs the built
+jar and the installed/dev launcher as subprocesses.
 
-## Risks
+## Track E — release workflow
 
-- `tools.build` uberjar may conflict with dynamic classpath resolution the
-  launcher does at runtime; needs verification.
-- Smoke test scope: a real end-to-end prompt round-trip requires a mock
-  provider; scope to launcher + dispatch pipeline only for the first slice.
-- CI job time: release workflow runs full suite; keep it fast by reusing
-  cached deps.
+File: `.github/workflows/release.yml`
+Trigger: `push: tags: ['v*']`
+
+Jobs:
+1. Reuse `check` + `clojure-test` + `emacs-test` via `needs` (or re-run inline)
+2. `build` job: `bb build:jar` → upload `target/psi.jar` + `target/psi` as artifacts
+3. `smoke` job: download artifacts, run `bb smoke:test` against the jar
+4. `release` job: extract changelog section for tag, create GitHub Release with assets
+
+Changelog extraction: parse `CHANGELOG.md` for `## [VERSION]` section — can be a
+small Python or bb script, or reuse logic from `bb/release.clj`.
+
+## Risks (resolved)
+
+- ~~tools.build uberjar conflicts with dynamic classpath resolution~~ — resolved:
+  `runtime-root` now returns nil inside jar, extensions are already on classpath
+- ~~Smoke test requires mock provider~~ — scoped to launcher/jar startup only, no LLM needed
+- ~~CI job time~~ — release workflow only runs on tags, not every push

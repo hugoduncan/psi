@@ -7,91 +7,104 @@ tooling, and automation needed to cut and ship a release confidently.
 
 ## Context
 
-Psi is distributed via the bb launcher (bbin install from git). There is no
-versioned jar build, no changelog discipline, no smoke test, and no GitHub
-release workflow. The CI pipeline (`.github/workflows/ci.yml`) runs fmt/lint
-and unit/integration/emacs tests but stops there.
+Psi is distributed via the bb launcher (bbin install from git). The CI
+pipeline (`.github/workflows/ci.yml`) runs fmt/lint and unit/integration/emacs
+tests. Tracks A–C are now complete; D and E remain.
 
-The launcher entry point is `bb/psi.clj` → `psi.launcher-main/-main`, which
-resolves the runtime classpath at startup from a `PSI_LAUNCHER_POLICY`
-(`:development` | `:installed`). The installed policy resolves deps from the
-bbin-installed repo root.
+## Version scheme (decided, implemented)
 
-## Scope
+`MAJOR.MINOR.PATCH` semver:
+- `version.edn` (repo root) stores `{:major 0 :minor 1}` — only thing committed
+- `PATCH = (git rev-list HEAD --count) + 1` — pre-compensates for the release commit
+- `bases/main/resources/psi/version.edn` written at tag time: `{:version "0.1.NNNN"}`
+- Reset to `{:version "unreleased"}` in a follow-up commit immediately after tagging
+- First release will be `0.1.NNNN` where NNNN is the commit count at release time
 
-Five parallel tracks, each a focused sub-task:
+## Java requirement (decided, documented)
 
-### Track A — Changelog discipline
-- Establish a machine-readable changelog format (keep-a-changelog style).
-- Define the update discipline: every PR that changes user-visible behaviour
-  must include a changelog entry.
-- Provide a `bb changelog:check` task that fails CI if no entry is present for
-  the current HEAD (on non-merge commits).
-- Current `CHANGELOG.md` uses a freeform date-header format; migrate to
-  versioned sections (`[Unreleased]`, `[x.y.z]`).
+Java 22+ required at runtime. Driver: `jline-terminal-ffm` (used by charm.clj/TUI)
+compiles to class-file version 66 (Java 22). `--enable-native-access=ALL-UNNAMED`
+is passed unconditionally in the jar wrapper — valid on all Java 22+.
+Documented in `README.md` and `doc/cli.md`.
 
-### Track B — bb launcher release management
-- Version scheme: `MAJOR.MINOR.PATCH` semver where:
-  - `MAJOR.MINOR` is stored in `version.edn` as `{:major 0 :minor 1}` (bumped manually on breaking change or milestone).
-  - `PATCH` is always auto-derived at build/tag time via `(b/git-count-revs nil)` (`git rev-list HEAD --count`); never committed.
-  - First release will be `0.1.1985` (current count).
-- Establish how a release version is embedded: `version.edn` at repo root stores `{:major 0 :minor 1}`; full version string computed at build time and written to `resources/psi/version.edn`.
-- Provide a `bb release:tag` task that:
-  1. Reads `MAJOR.MINOR` from `version.edn`.
-  2. Computes `PATCH` via `git rev-list HEAD --count`.
-  3. Reads the current `[Unreleased]` changelog section.
-  4. Stamps changelog section with the computed version + date.
-  5. Writes full version string to `resources/psi/version.edn`.
-  6. Commits + tags `vMAJOR.MINOR.PATCH`.
-- Document the bbin install command for end-users pointing at a tag.
+## Track A — Changelog discipline (complete)
 
-### Track C — Jar build
-- Add a `:build` alias to `deps.edn` using `io.github.clojure/tools.build`.
-- Write `build.clj` with `uber` task producing a self-contained uberjar.
-- Provide a `bb build:jar` task that delegates to `clojure -T:build uber`.
-- Verify the jar starts correctly (`java -jar psi.jar --help`).
-- Decide whether the jar is a primary distribution artifact or a secondary one
-  (launcher-first, jar as fallback/server mode).
+- Format: keep-a-changelog (`[Unreleased]` → `[MAJOR.MINOR.PATCH] - YYYY-MM-DD`)
+- Categories: Added / Changed / Fixed / Removed
+- Entry required for: user-facing commands, flags, behaviours, breaking changes,
+  user-visible bug fixes, new extension capabilities
+- Entry NOT required for: refactor, test additions, lint fixes, internal convergence
+- `bb changelog:check` enforces non-empty `[Unreleased]` section; wired into CI `check` job
+- Rules encoded in `AGENTS.md` as `λ changelog(δ)` for future ψ sessions
 
-### Track D — Smoke test
-- Define a minimal smoke test suite that exercises the installed artifact
-  end-to-end without requiring a real LLM key:
-  - launcher resolves and prints help (`psi --help` exits 0).
-  - launcher emits `--launcher-debug` output without crashing.
-  - nREPL port discovery works in a temp worktree.
-  - (stretch) a stubbed one-turn prompt round-trip through the dispatch
-    pipeline using a mock provider.
-- Provide a `bb smoke:test` task.
-- Wire smoke test into CI as a separate job that runs after `clojure-test`.
+## Track B — bb launcher release management (complete)
 
-### Track E — GitHub release workflow
-- Add `.github/workflows/release.yml` triggered on `push: tags: ['v*']`.
-- Steps:
-  1. Run full CI suite (reuse existing jobs via `needs`).
-  2. Build uberjar (Track C).
-  3. Run smoke test against the jar (Track D).
-  4. Extract changelog section for the tag version.
-  5. Create GitHub Release with changelog body + jar asset.
-- Decide whether to publish to Clojars in addition to GitHub Releases.
+- `version.edn` at repo root: `{:major 0 :minor 1}`
+- `bases/main/resources/psi/version.edn` placeholder: `{:version "unreleased"}`
+- `psi.version/version-string` reads the resource; works in both bb and JVM
+- `--version` flag handled in both `launcher-main` (bb path) and `psi.main` (jar path)
+- `bb release:tag` in `bb/release.clj`:
+  1. Asserts clean tree + on master
+  2. Reads `{:major :minor}` from `version.edn`
+  3. Computes `PATCH = (git rev-list HEAD --count) + 1`
+  4. Asserts `[Unreleased]` section is non-empty
+  5. Stamps `CHANGELOG.md`: `[Unreleased]` → `[V] - YYYY-MM-DD`, prepends fresh `[Unreleased]`
+  6. Writes `{:version "V"}` to `bases/main/resources/psi/version.edn`
+  7. `git add` + `git commit "release: vV"`
+  8. `git tag vV`
+  9. Resets resource to `{:version "unreleased"}`, commits `"release: post-vV reset version to unreleased"`
+  10. Prints push instructions
+  - Partial-failure recovery: if tag exists but resource not yet reset, completes reset and exits
+- README documents: latest install, pinned `--git/tag vX.Y.Z` install, `--version`, upgrade path
+
+## Track C — Jar build (complete)
+
+- `build.clj` with `uber` task using `tools.build 0.10.12`
+- `:build` alias in `deps.edn`
+- `bb build:jar` → `clojure -T:build uber`
+- Output: `target/psi.jar` (30MB) + `target/psi` wrapper script
+- AOT: only `psi.main` + `psi.app-runtime` (both have `:gen-class`)
+- Source paths mirror `:run` alias exactly — all 11 components + 10 bundled extensions
+- Wrapper: `java --enable-native-access=ALL-UNNAMED -jar psi.jar "$@"`
+- `psi.main/-main` handles `--version` directly (jar bypasses launcher)
+- Fix landed: `runtime-root` in `extension_installs.clj` now guards against `jar:` URLs —
+  returns `nil` when running from uberjar so `local/root` paths are not resolved
+  (extensions are already on the classpath inside the jar)
+
+## Track D — Smoke test (pending)
+
+Define a minimal suite exercising the artifact end-to-end without a real LLM key:
+- `psi --version` exits 0 and prints a version string (both bb launcher and jar)
+- `psi --launcher-debug --version` emits debug output without crashing (bb launcher)
+- jar `--version` exits 0
+- (stretch) nREPL port discovery in a temp worktree
+
+Provide `bb smoke:test`. Wire into CI after `clojure-test`.
+
+## Track E — GitHub release workflow (pending)
+
+`.github/workflows/release.yml` triggered on `push: tags: ['v*']`:
+1. Reuse `check` + `clojure-test` + `emacs-test` jobs via `needs`
+2. Build uberjar (`bb build:jar`)
+3. Run smoke test (`bb smoke:test`)
+4. Extract changelog section for the tag version from `CHANGELOG.md`
+5. Create GitHub Release with changelog body + `psi.jar` + `psi` wrapper attached
+- No Clojars publish for now — git/tag via bbin is sufficient
 
 ## Acceptance criteria
 
-- `bb changelog:check` passes on a branch with a changelog entry, fails
-  without one.
-- `bb build:jar` produces a runnable `psi.jar`.
-- `bb smoke:test` passes against the built jar.
-- Pushing a `vX.Y.Z` tag triggers the release workflow, creates a GitHub
-  Release with the correct changelog body and jar attached.
-- End-user `bbin install` from a tag works and `psi --version` prints the
-  correct version string.
+- `bb changelog:check` passes with entries, fails without. ✅
+- `bb build:jar` produces a runnable `psi.jar`. ✅
+- `psi --version` (bb) and `java -jar psi.jar --version` both print the version. ✅
+- `bb smoke:test` passes against the built jar. ⬜
+- Pushing a `vX.Y.Z` tag triggers the release workflow, creates a GitHub Release
+  with correct changelog body and jar attached. ⬜
+- End-user `bbin install --git/tag vX.Y.Z` works and `psi --version` prints correctly. ⬜
 
 ## Constraints
 
 - Do not break the existing CI pipeline.
-- Launcher-first distribution remains the primary install path; jar is
-  additive.
-- Keep the version scheme consistent across launcher, jar manifest, and
-  GitHub Release tag.
-- `version.edn` stores only `{:major 0 :minor 1}`; patch is never committed.
-- `bb release:tag` must be idempotent (re-running on an already-tagged commit
-  is a no-op or a clear error).
+- Launcher-first distribution remains primary; jar is additive.
+- Version scheme consistent across launcher, jar manifest, and GitHub Release tag.
+- `version.edn` stores only `{:major 0 :minor 1}`; patch never committed.
+- `bb release:tag` partial-failure recovery: re-run completes safely.
