@@ -451,13 +451,27 @@
     (when-not (str/blank? rendered)
       rendered)))
 
+(defn- repaint-marker
+  "Return a zero-width CSI sequence encoding N as the parameter to 'l'
+   (reset mode). Mode numbers in the private range are silently ignored by
+   all terminals; JLine's AttributedString also measures them as zero columns.
+   psi's strip-ansi removes them. When N changes, line 0 of the view string
+   differs from JLine Display's previous-lines, triggering a full repaint
+   from line 0 — necessary after the host environment redraws the terminal
+   (e.g. Emacs switching away from the shell buffer and back)."
+  [n]
+  ;; Encode generation as offset from a base that avoids real mode numbers.
+  ;; 10000+ is well outside any standardised ANSI/VT mode range.
+  (str "\u001b[" (+ 10000 (mod (or n 0) 10000)) "l"))
+
 (defn render-view
   [state]
   (let [{:keys [messages phase error input spinner-frame model-name
                 prompt-templates skills extension-summary ui-snapshot
                 context-session-tree-widget context-session-tree-selected-index
                 tool-calls tool-order
-                active-turn-order session-selector current-session-file width]} state
+                active-turn-order session-selector current-session-file width
+                repaint-generation]} state
         spinner-char   (nth shared/spinner-frames (mod spinner-frame (count shared/spinner-frames)))
         dialog-active? (support/has-active-dialog? state)
         has-progress?  (or (seq active-turn-order)
@@ -474,10 +488,12 @@
              (or (not has-progress?) active-tool-spinner?))
         term-width     (or width 80)]
     (if (= :selecting-session phase)
-      (str (render-banner model-name prompt-templates skills extension-summary)
+      (str (repaint-marker repaint-generation)
+           (render-banner model-name prompt-templates skills extension-summary)
            "\n"
            (selector-render/render-session-selector shared/dim-style render-separator session-selector current-session-file term-width (:session-selector-mode state)))
-      (str (render-banner model-name prompt-templates skills extension-summary)
+      (str (repaint-marker repaint-generation)
+           (render-banner model-name prompt-templates skills extension-summary)
            "\n"
            (render-messages messages term-width
                             {:tool-calls      tool-calls

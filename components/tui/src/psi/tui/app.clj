@@ -39,6 +39,16 @@
             :force-clear? true)
      nil]))
 
+(defn- handle-focus-message
+  "On focus-in, increment :repaint-generation so render-view embeds a new
+   hidden marker at line 0. JLine's Display sees line 0 differ and repaints
+   the full screen — necessary because the terminal content may have been
+   redrawn by the host environment (e.g. Emacs switching buffers) while
+   JLine's internal previous-lines state was stale."
+  [state m]
+  (when (msg/focus? m)
+    [(update state :repaint-generation (fnil inc 0)) nil]))
+
 (defn- external-message-text
   [m]
   (or (some #(when (= :text (:type %)) (:text %)) (get-in m [:message :content]))
@@ -230,6 +240,7 @@
       (or (when (msg/key-match? m "ctrl+c")
             (app-update/handle-ctrl-c state))
           (handle-window-size-message state m)
+          (handle-focus-message state m)
           (when (and (support/has-active-dialog? state)
                      (or (msg/key-press? m)
                          (msg/key-match? m "escape")
@@ -256,8 +267,9 @@
    (start! model-name run-agent-fn! {}))
   ([model-name run-agent-fn! opts]
    (charm/run {:init       (make-init model-name (:query-fn opts) (:ui-read-fn opts) (:ui-dispatch-fn opts) opts)
-               :update     (make-update run-agent-fn!)
-               :view       view
-               :alt-screen (if (contains? opts :alt-screen)
-                             (boolean (:alt-screen opts))
-                             true)})))
+               :update          (make-update run-agent-fn!)
+               :view            view
+               :focus-reporting true
+               :alt-screen      (if (contains? opts :alt-screen)
+                                  (boolean (:alt-screen opts))
+                                  true)})))

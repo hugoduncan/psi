@@ -254,5 +254,6 @@
          :active-turn-items       {}
          :tool-ui-id-by-tool-id   {}
          :tool-ui-id-by-content-index {}
-         :tools-expanded?         (boolean (:tools-expanded? ui-snap))}
+         :tools-expanded?         (boolean (:tools-expanded? ui-snap))
+         :repaint-generation      0}
         (poll-cmd queue)]))))
