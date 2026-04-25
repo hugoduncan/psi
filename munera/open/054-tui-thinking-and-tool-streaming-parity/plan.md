@@ -13,9 +13,11 @@
    `render-active-turn-event`. Remove `append-active-turn-event` calls from
    `upsert-thinking-item`, `upsert-text-item`, and all `handle-agent-event`
    branches. Remove `:active-turn-events` and `:stream-thinking` from
-   `clear-live-turn`, state init, `render-view` destructuring; remove the
-   `:stream-thinking` write from `:thinking-delta` handling. Update
-   `has-progress?` to use `(seq active-turn-order)`.
+   `clear-live-turn` and state init; remove `:active-turn-events` from
+   `render-view` destructuring; remove `:stream-thinking` from
+   `restore-session-view`; remove the `:stream-thinking` write from
+   `:thinking-delta` handling. Update `has-progress?` to use
+   `(seq active-turn-order)`.
 
 3. **Archive on turn complete** — in `handle-agent-result`, iterate the result
    `:content` blocks in order: emit `{:role :thinking :text ...}` for each
@@ -26,7 +28,7 @@
    to normalize content (plain vector or structured map) to a flat block sequence.
    Rewrite the `"assistant"` branch of `agent-messages->tui-resume-state` as a
    single pass over `(content-blocks content)`, emitting `:thinking` and tool
-   entries in block order, then `:assistant` after all blocks.
+   entries in block order, then `:assistant` after all blocks if non-blank.
 
 5. **Tests** — add focused tests for each gap; confirm existing ordering tests
    still green; run full suite.

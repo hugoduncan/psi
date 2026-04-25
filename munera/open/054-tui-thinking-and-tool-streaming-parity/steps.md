@@ -28,7 +28,7 @@
       `assistant-tool-call-blocks` and the new single-pass branch
 - [ ] Rewrite `"assistant"` branch of `agent-messages->tui-resume-state`:
       single pass over `(content-blocks content)` emitting `:thinking` and tool
-      entries in block order, `:assistant` after all blocks
+      entries in block order, `:assistant` after all blocks if non-blank
 
 - [ ] Test: thinking with N deltas → one `· <text>` line (latest text)
 - [ ] Test: tool through all lifecycle stages → one row (latest status)

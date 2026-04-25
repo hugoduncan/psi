@@ -147,8 +147,7 @@ fragility of multiple passes.
 
 In `render.clj`, introduce a `thinking-style` constant and `render-thinking-line`
 helper (`· ` prefix + thinking style). Use it for both live streaming and
-archived rendering. `content-display-text` must not be changed — it is used for
-prompt construction and must remain text-only.
+archived rendering.
 
 ## Constraints
 
