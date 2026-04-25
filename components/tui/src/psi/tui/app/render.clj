@@ -1,6 +1,6 @@
 (ns psi.tui.app.render
   (:require
-   [charm.core :as charm]
+   [charm.style.core :as charm-style]
    [clojure.string :as str]
    [psi.tui.ansi :as ansi]
    [psi.tui.app.shared :as shared]
@@ -12,33 +12,33 @@
 (defn render-banner [model-name prompt-templates skills extension-summary]
   (let [visible-skills (remove :disable-model-invocation skills)
         ext-count      (:extension-count extension-summary 0)]
-    (str (charm/render shared/title-style "ψ Psi Agent Session") "\n"
-         (charm/render shared/dim-style (str "  Model: " model-name)) "\n"
+    (str (charm-style/render shared/title-style "ψ Psi Agent Session") "\n"
+         (charm-style/render shared/dim-style (str "  Model: " model-name)) "\n"
          (when (seq prompt-templates)
-           (str (charm/render shared/dim-style
-                              (str "  Prompts: "
-                                   (str/join ", " (map #(str "/" (:name %)) prompt-templates))))
+           (str (charm-style/render shared/dim-style
+                                    (str "  Prompts: "
+                                         (str/join ", " (map #(str "/" (:name %)) prompt-templates))))
                 "\n"))
          (when (seq visible-skills)
-           (str (charm/render shared/dim-style
-                              (str "  Skills: "
-                                   (str/join ", " (map :name visible-skills))))
+           (str (charm-style/render shared/dim-style
+                                    (str "  Skills: "
+                                         (str/join ", " (map :name visible-skills))))
                 "\n"))
          (when (pos? ext-count)
-           (str (charm/render shared/dim-style
-                              (str "  Exts: " ext-count " loaded"))
+           (str (charm-style/render shared/dim-style
+                                    (str "  Exts: " ext-count " loaded"))
                 "\n"))
-         (charm/render shared/dim-style "  ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty") "\n")))
+         (charm-style/render shared/dim-style "  ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty") "\n")))
 
-(def agent-title-style (charm/style :fg charm/yellow :bold true))
-(def agent-head-style (charm/style :fg charm/cyan :bold true))
-(def psl-title-style (charm/style :fg charm/green :bold true))
-(def thinking-style (charm/style :fg 240 :italic true))
+(def agent-title-style (charm-style/style :fg charm-style/yellow :bold true))
+(def agent-head-style (charm-style/style :fg charm-style/cyan :bold true))
+(def psl-title-style (charm-style/style :fg charm-style/green :bold true))
+(def thinking-style (charm-style/style :fg 240 :italic true))
 
 (defn render-thinking-line
   [text]
   (when (and text (not (str/blank? text)))
-    (str (charm/render thinking-style (str "· " text)) "\n")))
+    (str (charm-style/render thinking-style (str "· " text)) "\n")))
 
 (defn render-agent-result
   [text width]
@@ -52,8 +52,8 @@
         body-lines (if (seq body-text) (str/split-lines body-text) [])]
     (str/join "\n"
               (concat
-               [(str (charm/render agent-title-style "ψ: ⎇ Agent Result"))
-                (str "   " (charm/render agent-head-style heading))]
+               [(str (charm-style/render agent-title-style "ψ: ⎇ Agent Result"))
+                (str "   " (charm-style/render agent-head-style heading))]
                (when (seq body-lines)
                  (cons "   " (map #(str "   " %) body-lines)))))))
 
@@ -61,10 +61,10 @@
   [{:keys [role text custom-type]} width]
   (case role
     :thinking
-    (str (charm/render thinking-style (str "· " text)))
+    (str (charm-style/render thinking-style (str "· " text)))
 
     :user
-    (str (charm/render shared/user-style "刀: ") text)
+    (str (charm-style/render shared/user-style "刀: ") text)
 
     :assistant
     (cond
@@ -72,7 +72,7 @@
       (render-agent-result text width)
 
       (= "plan-state-learning" custom-type)
-      (str (charm/render psl-title-style "ψ: ⟳ Plan/State/Learning")
+      (str (charm-style/render psl-title-style "ψ: ⟳ Plan/State/Learning")
            "\n"
            "   " (or text ""))
 
@@ -81,7 +81,7 @@
                          (- width 3))
             rendered   (or (md/render-markdown text md-width) text)
             lines      (str/split-lines rendered)
-            first-line (str (charm/render shared/assist-style "ψ: ")
+            first-line (str (charm-style/render shared/assist-style "ψ: ")
                             (first lines))
             rest-lines (map #(str "   " %) (rest lines))]
         (str/join "\n" (cons first-line rest-lines))))
@@ -119,7 +119,7 @@
 
 (defn render-separator
   [width]
-  (charm/render shared/sep-style (apply str (repeat (max 1 (or width 1)) "─"))))
+  (charm-style/render shared/sep-style (apply str (repeat (max 1 (or width 1)) "─"))))
 
 ; These sequences are kept for backward-compatibility with any external callers
 ; but are no longer emitted in the view string.  JLine's Display.update handles
@@ -131,7 +131,7 @@
 (def ^:deprecated clear-screen-home-seq "")
 
 (def notify-info-style    shared/dim-style)
-(def notify-warning-style (charm/style :fg charm/yellow))
+(def notify-warning-style (charm-style/style :fg charm-style/yellow))
 (def notify-error-style   shared/error-style)
 
 (defn render-widgets [ui-snapshot placement]
@@ -146,7 +146,7 @@
   [widget selected-index]
   (when (seq (:content-lines widget))
     (let [selected-index (or selected-index 0)]
-      (str (charm/render shared/title-style "Session Context") "\n"
+      (str (charm-style/render shared/title-style "Session Context") "\n"
            (str/join "\n"
                      (map-indexed (fn [idx line]
                                     (let [selected? (= idx selected-index)
@@ -154,7 +154,7 @@
                                       (str prefix (:text line))))
                                   (:content-lines widget)))
            "\n"
-           (charm/render shared/dim-style "  Ctrl+J/K navigate • Alt+Enter activate")
+           (charm-style/render shared/dim-style "  Ctrl+J/K navigate • Alt+Enter activate")
            "\n"))))
 
 (defn middle-truncate
@@ -193,18 +193,18 @@
         model-text     (get-in model [:footer/model :text] "")
         context-style* (context-style (get-in model [:footer/context :fraction]))
         left-parts     (mapv (fn [part]
-                               (charm/render (if (= part context-text)
-                                               context-style*
-                                               shared/dim-style)
-                                             part))
+                               (charm-style/render (if (= part context-text)
+                                                     context-style*
+                                                     shared/dim-style)
+                                                   part))
                              usage-parts)
         left           (str/join " " left-parts)
         right0         model-text
-        path-line      (charm/render shared/dim-style (middle-truncate path-text (max 1 width)))
+        path-line      (charm-style/render shared/dim-style (middle-truncate path-text (max 1 width)))
         stats-line     (let [left*   (if (> (ansi/visible-width left) width)
                                        (trim-right-visible left width)
                                        left)
-                             right   (charm/render shared/dim-style right0)
+                             right   (charm-style/render shared/dim-style right0)
                              left-w  (ansi/visible-width left*)
                              right-w (ansi/visible-width right)
                              min-pad 2]
@@ -214,17 +214,17 @@
 
                            (> (- width left-w min-pad) 3)
                            (let [avail       (- width left-w min-pad)
-                                 right-trunc (charm/render shared/dim-style (trim-right-visible right0 avail))]
+                                 right-trunc (charm-style/render shared/dim-style (trim-right-visible right0 avail))]
                              (str left*
                                   (apply str (repeat (max min-pad (- width left-w (ansi/visible-width right-trunc))) " "))
                                   right-trunc))
 
                            :else left*))
         status-line    (some-> (get-in model [:footer/lines :status-line])
-                               (ansi/truncate-to-width width (charm/render shared/dim-style "...")))
+                               (ansi/truncate-to-width width (charm-style/render shared/dim-style "...")))
         activity-line  (some-> (get-in model [:footer/lines :session-activity-line])
-                               (->> (charm/render shared/dim-style))
-                               (ansi/truncate-to-width width (charm/render shared/dim-style "...")))]
+                               (->> (charm-style/render shared/dim-style))
+                               (ansi/truncate-to-width width (charm-style/render shared/dim-style "...")))]
     (cond-> [path-line stats-line]
       status-line   (conj status-line)
       activity-line (conj activity-line))))
@@ -244,7 +244,7 @@
                                             :warning notify-warning-style
                                             :error   notify-error-style
                                             notify-info-style)]
-                                (charm/render style (str "  " (:message n)))))
+                                (charm-style/render style (str "  " (:message n)))))
                             notes))
              "\n")))))
 
@@ -252,30 +252,30 @@
   (when-let [dialog dialog]
     (case (:kind dialog)
       :confirm
-      (str (charm/render shared/title-style (:title dialog)) "\n"
+      (str (charm-style/render shared/title-style (:title dialog)) "\n"
            "  " (:message dialog) "\n"
-           (charm/render shared/dim-style "  Enter=confirm  Escape=cancel") "\n")
+           (charm-style/render shared/dim-style "  Enter=confirm  Escape=cancel") "\n")
 
       :select
       (let [idx     (or selected-index 0)
             options (:options dialog)]
-        (str (charm/render shared/title-style (:title dialog)) "\n"
+        (str (charm-style/render shared/title-style (:title dialog)) "\n"
              (str/join "\n"
                        (map-indexed
                         (fn [i opt]
                           (if (= i idx)
-                            (str (charm/render shared/user-style (str "▸ " (:label opt)))
+                            (str (charm-style/render shared/user-style (str "▸ " (:label opt)))
                                  (when (:description opt)
-                                   (str "  " (charm/render shared/dim-style (:description opt)))))
+                                   (str "  " (charm-style/render shared/dim-style (:description opt)))))
                             (str "  " (:label opt))))
                         options))
              "\n"
-             (charm/render shared/dim-style "  ↑/↓=navigate  Enter=select  Escape=cancel") "\n"))
+             (charm-style/render shared/dim-style "  ↑/↓=navigate  Enter=select  Escape=cancel") "\n"))
 
       :input
-      (str (charm/render shared/title-style (:title dialog)) "\n"
+      (str (charm-style/render shared/title-style (:title dialog)) "\n"
            "  " (or input-text "") "█" "\n"
-           (charm/render shared/dim-style "  Enter=submit  Escape=cancel") "\n")
+           (charm-style/render shared/dim-style "  Enter=submit  Escape=cancel") "\n")
 
       "")))
 
@@ -321,21 +321,21 @@
   (let [{:keys [prompt value pos focused cursor-style
                 prompt-style placeholder-style placeholder]} input
         prompt-str (if prompt-style
-                     (charm/render prompt-style prompt)
+                     (charm-style/render prompt-style prompt)
                      (or prompt ""))
         prompt-w   (ansi/visible-width (or prompt ""))
         avail      (max 1 (- width prompt-w))
         indent     (apply str (repeat prompt-w \space))
-        cursor-sty (or cursor-style (charm/style :reverse true))]
+        cursor-sty (or cursor-style (charm-style/style :reverse true))]
     (if (and (empty? value) placeholder (not (str/blank? placeholder)))
       (str prompt-str
            (if focused
-             (str (charm/render cursor-sty (subs placeholder 0 1))
+             (str (charm-style/render cursor-sty (subs placeholder 0 1))
                   (if placeholder-style
-                    (charm/render placeholder-style (subs placeholder 1))
+                    (charm-style/render placeholder-style (subs placeholder 1))
                     (subs placeholder 1)))
              (if placeholder-style
-               (charm/render placeholder-style placeholder)
+               (charm-style/render placeholder-style placeholder)
                placeholder)))
       (let [text   (apply str value)
             chunks (wrap-chunks text avail)]
@@ -358,7 +358,7 @@
                                (subs text (inc lp))
                                "")]
                   (str prefix before
-                       (charm/render cursor-sty c-char)
+                       (charm-style/render cursor-sty c-char)
                        after))
                 (str prefix text))))
           chunks))))))
@@ -387,7 +387,7 @@
             effective-width  (max 1 (or width 1))
             selected-offset  (- selected-index start)]
         (str "\n"
-             (charm/render shared/dim-style "Suggestions")
+             (charm-style/render shared/dim-style "Suggestions")
              "\n"
              (str/join
               "\n"
@@ -398,7 +398,7 @@
                                        (seq description) (str " — " description))
                                      (ansi/truncate-to-width effective-width "..."))]
                    (if selected?
-                     (charm/render shared/user-style line)
+                     (charm-style/render shared/user-style line)
                      line)))
                visible)))))))
 
@@ -413,7 +413,7 @@
                        (- width 3))
           rendered   (or (md/render-markdown text md-width) text)
           lines      (str/split-lines rendered)
-          first-line (str (charm/render shared/assist-style "ψ: ")
+          first-line (str (charm-style/render shared/assist-style "ψ: ")
                           (first lines))
           rest-lines (map #(str "   " %) (rest lines))]
       (str (str/join "\n" (cons first-line rest-lines))
@@ -508,10 +508,10 @@
                         (tool-render/render-tool-calls tool-calls tool-order spinner-char term-width (boolean (:tools-expanded? state)) ui-snapshot)
                         "")
                     "\n")
-               (str "\n" (charm/render shared/assist-style "ψ: ")
+               (str "\n" (charm-style/render shared/assist-style "ψ: ")
                     spinner-char " thinking…\n")))
            (when error
-             (str "\n" (charm/render shared/error-style (str "[error: " error "]")) "\n"))
+             (str "\n" (charm-style/render shared/error-style (str "[error: " error "]")) "\n"))
            (render-widgets ui-snapshot :above-editor)
            "\n"
            (render-separator term-width) "\n"
@@ -521,10 +521,10 @@
                   (render-prompt-autocomplete state term-width)
                   (when (= :streaming phase)
                     (str "\n"
-                         (charm/render shared/dim-style
-                                       (if progress-spinner-visible?
-                                         "(Enter queues input • Esc interrupts)"
-                                         (str spinner-char " waiting for response…")))))))
+                         (charm-style/render shared/dim-style
+                                             (if progress-spinner-visible?
+                                               "(Enter queues input • Esc interrupts)"
+                                               (str spinner-char " waiting for response…")))))))
            "\n"
            (render-separator term-width) "\n"
            (render-widgets ui-snapshot :below-editor)

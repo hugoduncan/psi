@@ -1,7 +1,8 @@
 (ns psi.tui.app
   (:require
-   [charm.core :as charm]
+   [charm.components.text-input :as text-input]
    [charm.message :as msg]
+   [charm.program :as charm-program]
    [clojure.string :as str]
    [psi.tui.app.autocomplete :as autocomplete]
    [psi.tui.app.frontend-actions :as frontend-actions]
@@ -120,17 +121,17 @@
 
     (and (= :streaming (:phase state))
          (msg/key-match? m "backspace"))
-    (let [[new-input cmd] (charm/text-input-update (:input state) m)]
+    (let [[new-input cmd] (text-input/text-input-update (:input state) m)]
       [(shared/set-input-model state new-input) cmd])
 
     (and (= :streaming (:phase state))
          (msg/key-match? m "space"))
-    (let [[new-input cmd] (charm/text-input-update (:input state) (msg/key-press " "))]
+    (let [[new-input cmd] (text-input/text-input-update (:input state) (msg/key-press " "))]
       [(shared/set-input-model state new-input) cmd])
 
     (and (= :streaming (:phase state))
          (msg/key-press? m))
-    (let [[new-input cmd] (charm/text-input-update (:input state) m)]
+    (let [[new-input cmd] (text-input/text-input-update (:input state) m)]
       [(shared/set-input-model state new-input) cmd])
 
     :else nil))
@@ -141,13 +142,13 @@
        (or (:shift m)
            (:alt m)
            (and (:ctrl m) (:alt m))
-           (str/ends-with? (charm/text-input-value (:input state)) "\\"))))
+           (str/ends-with? (text-input/value (:input state)) "\\"))))
 
 (defn- delete-prev-word-update
   [state]
-  (let [before    (charm/text-input-value (:input state))
+  (let [before    (text-input/value (:input state))
         new-state (update state :input app-update/delete-prev-word)
-        after     (charm/text-input-value (:input new-state))]
+        after     (text-input/value (:input new-state))]
     (when (support/key-debug-enabled?)
       (println (str "[key-debug] branch=alt+backspace before=" (pr-str before)
                     " after=" (pr-str after)
@@ -156,7 +157,7 @@
 
 (defn- idle-edit-update
   [state update-message next-state-fn]
-  (let [[new-input cmd] (charm/text-input-update (:input state) update-message)]
+  (let [[new-input cmd] (text-input/text-input-update (:input state) update-message)]
     [(next-state-fn (shared/set-input-model state new-input)) cmd]))
 
 (defn- idle-next-state-after-edit
@@ -266,10 +267,10 @@
   ([model-name run-agent-fn!]
    (start! model-name run-agent-fn! {}))
   ([model-name run-agent-fn! opts]
-   (charm/run {:init       (make-init model-name (:query-fn opts) (:ui-read-fn opts) (:ui-dispatch-fn opts) opts)
-               :update          (make-update run-agent-fn!)
-               :view            view
-               :focus-reporting true
-               :alt-screen      (if (contains? opts :alt-screen)
-                                  (boolean (:alt-screen opts))
-                                  true)})))
+   (charm-program/run {:init       (make-init model-name (:query-fn opts) (:ui-read-fn opts) (:ui-dispatch-fn opts) opts)
+                       :update          (make-update run-agent-fn!)
+                       :view            view
+                       :focus-reporting true
+                       :alt-screen      (if (contains? opts :alt-screen)
+                                          (boolean (:alt-screen opts))
+                                          true)})))

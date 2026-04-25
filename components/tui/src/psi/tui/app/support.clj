@@ -1,7 +1,8 @@
 (ns psi.tui.app.support
   (:require
-   [charm.core :as charm]
+   [charm.components.text-input :as text-input]
    [charm.message :as msg]
+   [charm.program :as charm-program]
    [clojure.string :as str])
   (:import
    [java.util.concurrent LinkedBlockingQueue TimeUnit]))
@@ -143,7 +144,7 @@
   ([^LinkedBlockingQueue queue]
    (poll-cmd queue 120))
   ([^LinkedBlockingQueue queue timeout-ms]
-   (charm/cmd
+   (charm-program/cmd
     (fn []
       (if-let [event (.poll queue timeout-ms TimeUnit/MILLISECONDS)]
         (cond
@@ -208,9 +209,9 @@
        [{:messages                (vec (or (:initial-messages opts) []))
          :phase                   :idle
          :error                   nil
-         :input                   (charm/text-input :prompt "刀: "
-                                                    :placeholder "Type a message…"
-                                                    :focused true)
+         :input                   (text-input/text-input :prompt "刀: "
+                                                         :placeholder "Type a message…"
+                                                         :focused true)
          :spinner-frame           0
          :model-name              model-name
          :prompt-templates        (or (:psi.agent-session/prompt-templates introspected) [])

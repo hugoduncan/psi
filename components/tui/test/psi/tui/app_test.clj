@@ -6,8 +6,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [charm.components.text-input :as text-input]
-   [charm.core :as charm]
    [charm.input.keymap :as keymap]
+   [charm.terminal :as charm-terminal]
    [charm.message :as msg]
    [psi.app-runtime.projections :as projections]
    [psi.tui.ansi :as ansi]
@@ -127,7 +127,7 @@
   (testing "keyword :space input inserts a space immediately"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (assoc (init-state)
-                           :input (charm/text-input-set-value (:input (init-state)) "hi"))
+                           :input (text-input/set-value (:input (init-state)) "hi"))
           [s1 _]    (update-fn state (msg/key-press :space))]
       (is (= "hi " (text-input/value (:input s1)))))))
 
@@ -135,7 +135,7 @@
   (testing "alt+backspace deletes previous word"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (-> (init-state)
-                        (assoc :input (charm/text-input-set-value (:input (init-state)) "hello world")))
+                        (assoc :input (text-input/set-value (:input (init-state)) "hello world")))
           [s1 _]    (update-fn state (msg/key-press :backspace :alt true))]
       (is (= "hello " (text-input/value (:input s1)))))))
 
@@ -144,7 +144,7 @@
     (let [submitted (atom nil)
           agent-fn  (fn [text _queue] (reset! submitted text))
           update-fn (app/make-update agent-fn)
-          state     (assoc (init-state) :input (charm/text-input-set-value (:input (init-state)) "line1"))
+          state     (assoc (init-state) :input (text-input/set-value (:input (init-state)) "line1"))
           [s1 _]    (update-fn state (msg/key-press :enter :shift true))]
       (is (= :idle (:phase s1)))
       (is (= "line1\n" (text-input/value (:input s1))))
@@ -155,7 +155,7 @@
     (let [submitted (atom nil)
           agent-fn  (fn [text _queue] (reset! submitted text))
           update-fn (app/make-update agent-fn)
-          state     (assoc (init-state) :input (charm/text-input-set-value (:input (init-state)) "line1\\"))
+          state     (assoc (init-state) :input (text-input/set-value (:input (init-state)) "line1\\"))
           [s1 _]    (update-fn state (msg/key-press :enter))]
       (is (= :idle (:phase s1)))
       (is (= "line1\n" (text-input/value (:input s1))))
@@ -383,7 +383,7 @@
 
 (deftest jline-terminal-keymap-test
   (testing "JLine terminal + keymap creation works (catches JLine API compat bugs)"
-    (let [terminal (charm/create-terminal)]
+    (let [terminal (charm-terminal/create-terminal)]
       (try
         (let [km (keymap/create-keymap terminal)]
           (is (some? km) "keymap created successfully"))

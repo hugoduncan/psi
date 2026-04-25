@@ -1,17 +1,18 @@
 (ns psi.tui.app.shared
   (:require
-   [charm.core :as charm]
+   [charm.components.text-input :as text-input]
+   [charm.style.core :as charm-style]
    [clojure.string :as str]
    [psi.tui.patches :as patches]))
 
 (patches/install!)
 
-(def title-style   (charm/style :fg charm/magenta :bold true))
-(def user-style    (charm/style :fg charm/cyan :bold true))
-(def assist-style  (charm/style :fg charm/green :bold true))
-(def error-style   (charm/style :fg charm/red))
-(def dim-style     (charm/style :fg 240))
-(def sep-style     (charm/style :fg 240))
+(def title-style   (charm-style/style :fg charm-style/magenta :bold true))
+(def user-style    (charm-style/style :fg charm-style/cyan :bold true))
+(def assist-style  (charm-style/style :fg charm-style/green :bold true))
+(def error-style   (charm-style/style :fg charm-style/red))
+(def dim-style     (charm-style/style :fg 240))
+(def sep-style     (charm-style/style :fg 240))
 
 (def spinner-frames
   ["⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"])
@@ -36,7 +37,7 @@
             :last-escape-ms nil}})
 
 (defn input-value [state]
-  (charm/text-input-value (:input state)))
+  (text-input/value (:input state)))
 
 (defn input-pos [state]
   (let [v (input-value state)]
@@ -44,7 +45,7 @@
 
 (defn set-input-value
   [state s]
-  (assoc state :input (charm/text-input-set-value (:input state) s)))
+  (assoc state :input (text-input/set-value (:input state) s)))
 
 (defn clear-history-browse
   [state]

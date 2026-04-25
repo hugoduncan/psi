@@ -1,16 +1,16 @@
 (ns psi.tui.tool-render
   (:require
-   [charm.core :as charm]
+   [charm.style.core :as charm-style]
    [cheshire.core :as json]
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
    [psi.tui.ansi :as ansi]))
 
-(def ^:private tool-style     (charm/style :fg charm/yellow :bold true))
-(def ^:private tool-ok-style  (charm/style :fg charm/green))
-(def ^:private tool-err-style (charm/style :fg charm/red))
-(def ^:private tool-dim-style (charm/style :fg 245))
-(def ^:private dim-style      (charm/style :fg 240))
+(def ^:private tool-style     (charm-style/style :fg charm-style/yellow :bold true))
+(def ^:private tool-ok-style  (charm-style/style :fg charm-style/green))
+(def ^:private tool-err-style (charm-style/style :fg charm-style/red))
+(def ^:private tool-dim-style (charm-style/style :fg 245))
+(def ^:private dim-style      (charm-style/style :fg 240))
 
 (defn- parse-tool-args
   [parsed-args args-str]
@@ -81,15 +81,15 @@
         label        (cond
                        (seq primary) (str primary line-suffix)
                        :else         "…")]
-    (str (charm/render tool-style display-name) " " label)))
+    (str (charm-style/render tool-style display-name) " " label)))
 
 (defn- tool-status-indicator
   [status spinner-char]
   (case status
     :pending (str spinner-char)
     :running (str spinner-char)
-    :success (charm/render tool-ok-style "✓")
-    :error   (charm/render tool-err-style "✗")
+    :success (charm-style/render tool-ok-style "✓")
+    :error   (charm-style/render tool-err-style "✗")
     ""))
 
 (defn- wrap-tool-result-line
@@ -190,7 +190,7 @@
   [lines avail style]
   (mapcat (fn [line]
             (let [wrapped (wrap-tool-result-line line avail)]
-              (map #(str "    " (charm/render style %)) wrapped)))
+              (map #(str "    " (charm-style/render style %)) wrapped)))
           lines))
 
 (defn render-tool-calls

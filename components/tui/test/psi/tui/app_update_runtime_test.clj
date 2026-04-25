@@ -3,7 +3,6 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [charm.components.text-input :as text-input]
-   [charm.core :as charm]
    [charm.message :as msg]
    [psi.app-runtime.projections :as projections]
    [psi.app-runtime.ui-actions :as ui-actions]
@@ -173,7 +172,7 @@
   (testing "first ctrl+c clears input; second ctrl+c within window quits"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (assoc (init-state)
-                           :input (charm/text-input-set-value (:input (init-state)) "hello"))
+                           :input (text-input/set-value (:input (init-state)) "hello"))
           [s1 cmd1] (update-fn state (msg/key-press "c" :ctrl true))
           [_s2 cmd2] (update-fn s1 (msg/key-press "c" :ctrl true))]
       (is (= "" (text-input/value (:input s1))))
@@ -184,10 +183,10 @@
   (testing "ctrl+d exits when input empty and is ignored when input non-empty"
     (let [update-fn   (app/make-update (stub-agent-fn ""))
           non-empty   (assoc (init-state)
-                             :input (charm/text-input-set-value (:input (init-state)) "x"))
+                             :input (text-input/set-value (:input (init-state)) "x"))
           [_s1 cmd1]  (update-fn non-empty (msg/key-press "d" :ctrl true))
           empty-state (assoc (init-state)
-                             :input (charm/text-input-set-value (:input (init-state)) ""))
+                             :input (text-input/set-value (:input (init-state)) ""))
           [_s2 cmd2]  (update-fn empty-state (msg/key-press "d" :ctrl true))]
       (is (nil? cmd1))
       (is (some? cmd2)))))
@@ -200,7 +199,7 @@
                                                             {:queued-text "queued one\nqueued two"
                                                              :message "Interrupted active work."})})
                            :phase :streaming
-                           :input (charm/text-input-set-value (:input (init-state)) "draft"))
+                           :input (text-input/set-value (:input (init-state)) "draft"))
           [s1 _cmd] (update-fn state (msg/key-press :escape))]
       (is (= :idle (:phase s1)))
       (is (= "queued one\nqueued two\ndraft" (text-input/value (:input s1))))
@@ -216,7 +215,7 @@
                                                               (reset! queued text)
                                                               {:message "Queued steering message."})})
                            :phase :streaming
-                           :input (charm/text-input-set-value (:input (init-state)) "steer this"))
+                           :input (text-input/set-value (:input (init-state)) "steer this"))
           [s1 _cmd] (update-fn state (msg/key-press :enter))]
       (is (= :streaming (:phase s1)))
       (is (= "steer this" @queued))
@@ -228,7 +227,7 @@
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (assoc (init-state)
                            :phase :streaming
-                           :input (charm/text-input-set-value (:input (init-state)) "ab"))
+                           :input (text-input/set-value (:input (init-state)) "ab"))
           [s1 _]    (update-fn state (msg/key-press "c"))
           [s2 _]    (update-fn s1 (msg/key-press :backspace))]
       (is (= "abc" (text-input/value (:input s1))))
@@ -268,7 +267,7 @@
   (testing "unsupported double-escape action does not crash and emits status"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (assoc (init-state "test-model" {:double-escape-action :tree})
-                           :input (charm/text-input-set-value (:input (init-state)) ""))
+                           :input (text-input/set-value (:input (init-state)) ""))
           [s1 cmd1] (update-fn state (msg/key-press :escape))
           [s2 cmd2] (update-fn s1 (msg/key-press :escape))]
       (is (nil? cmd1))

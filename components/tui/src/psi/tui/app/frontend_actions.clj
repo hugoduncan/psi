@@ -1,6 +1,6 @@
 (ns psi.tui.app.frontend-actions
   (:require
-   [charm.core :as charm]
+   [charm.components.text-input :as text-input]
    [charm.message :as msg]
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app.shared :as shared]
@@ -31,7 +31,7 @@
                                         ui-action)
                                        :frontend-action? true)
               :session-selector-mode mode)
-       (shared/set-input-model (charm/text-input-reset (:input state))))
+       (shared/set-input-model (text-input/reset (:input state))))
    nil])
 
 (defn clear-frontend-action-state
@@ -64,7 +64,7 @@
                 :frontend-action/dialog (frontend-action-dialog ui-action)
                 :dialog-selected-index nil
                 :dialog-input-text nil)
-         (shared/set-input-model (charm/text-input-reset (:input state))))
+         (shared/set-input-model (text-input/reset (:input state))))
      nil]
 
     [(-> state

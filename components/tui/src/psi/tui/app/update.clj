@@ -1,7 +1,8 @@
 (ns psi.tui.app.update
   (:require
-   [charm.core :as charm]
+   [charm.components.text-input :as text-input]
    [charm.message :as msg]
+   [charm.program :as charm-program]
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
    [psi.agent-session.message-text :as message-text]
@@ -29,7 +30,7 @@
                  :session-selector sel
                  :session-selector-mode mode)
           clear-context-session-tree-selection
-          (shared/set-input-model (charm/text-input-reset (:input state))))
+          (shared/set-input-model (text-input/reset (:input state))))
       nil])))
 
 (defn restored-session-payload
@@ -74,7 +75,7 @@
 
 (defn reset-input-model
   [state]
-  (shared/set-input-model state (charm/text-input-reset (:input state))))
+  (shared/set-input-model state (text-input/reset (:input state))))
 
 (defn append-assistant-message
   [state text]
@@ -213,7 +214,7 @@
   [state result]
   (when result
     (case (:type result)
-      :quit [state charm/quit-cmd]
+      :quit [state charm-program/quit-cmd]
       :resume (open-session-selector state :resume)
       :tree-open (open-session-selector state :tree)
       :tree-switch (handle-tree-switch-result state result)
@@ -322,7 +323,7 @@
         (frontend-actions/cancel-frontend-action state (:frontend-action/ui-action state) handle-dispatch-result)
         (close-session-selector state))
 
-      (msg/key-match? m "ctrl+c") [state charm/quit-cmd]
+      (msg/key-match? m "ctrl+c") [state charm-program/quit-cmd]
       (and (msg/key-match? m "tab")
            (not= :tree (:session-selector-mode state)))
       [(assoc state :session-selector (toggle-selector-scope sel)) nil]
@@ -344,12 +345,12 @@
                 :error         nil
                 :spinner-frame 0)
          clear-live-turn
-         (shared/set-input-model (charm/text-input-reset (:input state))))
+         (shared/set-input-model (text-input/reset (:input state))))
      (support/poll-cmd queue)]))
 
 (defn submit-input
   [state run-agent-fn!]
-  (let [text (str/trim (charm/text-input-value (:input state)))]
+  (let [text (str/trim (text-input/value (:input state)))]
     (cond
       (str/blank? text)
       [state nil]
@@ -364,17 +365,17 @@
 
 (defn continue-input-line
   [state]
-  (let [value       (charm/text-input-value (:input state))
+  (let [value       (text-input/value (:input state))
         backslash?  (str/ends-with? value "\\")
         value'      (if backslash?
                       (subs value 0 (dec (count value)))
                       value)
-        next-input  (charm/text-input-set-value (:input state) (str value' "\n"))]
+        next-input  (text-input/set-value (:input state) (str value' "\n"))]
     [(shared/set-input-model state next-input) nil]))
 
 (defn delete-prev-word
   [input]
-  (let [s   (charm/text-input-value input)
+  (let [s   (text-input/value input)
         pos (long (or (:pos input) (count s)))]
     (if (<= pos 0)
       input
@@ -691,7 +692,7 @@
 
       within?
       (case (:double-escape-action state :none)
-        :quit [state charm/quit-cmd]
+        :quit [state charm-program/quit-cmd]
         [(-> state
              (assoc-in [:prompt-input-state :timing :last-escape-ms] now-ms)
              (append-assistant-message (str "Double-Escape action " (pr-str (:double-escape-action state :none)) " not available in this runtime.")))
@@ -709,7 +710,7 @@
         empty-input? (str/blank? (shared/input-value state))]
     (cond
       within?
-      [state charm/quit-cmd]
+      [state charm-program/quit-cmd]
 
       empty-input?
       [(assoc-in state [:prompt-input-state :timing :last-ctrl-c-ms] now-ms) nil]
@@ -723,5 +724,5 @@
 (defn handle-ctrl-d
   [state]
   (if (str/blank? (shared/input-value state))
-    [state charm/quit-cmd]
+    [state charm-program/quit-cmd]
     [state nil]))

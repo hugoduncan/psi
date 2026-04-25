@@ -4,7 +4,6 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [charm.components.text-input :as text-input]
-   [charm.core :as charm]
    [charm.message :as msg]
    [psi.app-runtime.projections :as projections]
    [psi.tui.app :as app]
@@ -74,7 +73,7 @@
                                                          :result {:content [{:type :text :text "ok"}]}}))
                             submitted)))
           base      (submit-text (submit-text (init-state) "alpha") "beta")
-          state     (assoc base :phase :idle :input (charm/text-input-set-value (:input base) ""))
+          state     (assoc base :phase :idle :input (text-input/set-value (:input base) ""))
           [s1 _]    (update-fn state (msg/key-press :up))]
       (is (= "beta" (text-input/value (:input s1))))
       (is (= 1 (get-in s1 [:prompt-input-state :history :browse-index]))))))
@@ -90,7 +89,7 @@
                                                          :result {:content [{:type :text :text "ok"}]}}))
                             submitted)))
           base      (submit-text (submit-text (init-state) "alpha") "beta")
-          state     (assoc base :phase :idle :input (charm/text-input-set-value (:input base) ""))
+          state     (assoc base :phase :idle :input (text-input/set-value (:input base) ""))
           [s1 _]    (update-fn state (msg/key-press :up))
           [s2 _]    (update-fn s1 (msg/key-press :down))]
       (is (= "" (text-input/value (:input s2))))
@@ -107,7 +106,7 @@
                                                          :result {:content [{:type :text :text "ok"}]}}))
                             submitted)))
           base      (submit-text (submit-text (init-state) "alpha") "beta")
-          state     (assoc base :phase :idle :input (charm/text-input-set-value (:input base) ""))
+          state     (assoc base :phase :idle :input (text-input/set-value (:input base) ""))
           [s1 _]    (update-fn state (msg/key-press :up))
           [s2 _]    (update-fn s1 (msg/key-press "x"))
           [s3 _]    (update-fn s2 (msg/key-press :enter))]
@@ -163,7 +162,7 @@
           _       (spit (io/file root "alpha.txt") "x")
           update-fn (app/make-update (stub-agent-fn ""))
           state     (assoc (init-state) :cwd (.getAbsolutePath root))
-          state     (assoc state :input (charm/text-input-set-value (:input state) "alp"))
+          state     (assoc state :input (text-input/set-value (:input state) "alp"))
           [s1 _]    (update-fn state (msg/key-press :tab))]
       (is (= "alpha.txt" (text-input/value (:input s1))))
       (is (empty? (get-in s1 [:prompt-input-state :autocomplete :candidates]))))))
@@ -196,7 +195,7 @@
   (testing "accepting quoted completion does not duplicate closing quote"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           state     (-> (init-state)
-                        (assoc :input (charm/text-input-set-value (:input (init-state)) "@\"foo\""))
+                        (assoc :input (text-input/set-value (:input (init-state)) "@\"foo\""))
                         (assoc-in [:prompt-input-state :autocomplete]
                                   {:prefix "@\"f"
                                    :candidates [{:value "\"foo\""
@@ -217,7 +216,7 @@
     (let [update-fn (app/make-update (stub-agent-fn ""))
           streaming (-> (init-state)
                         (assoc :phase :streaming)
-                        (assoc :input (charm/text-input-set-value (:input (init-state)) "")))
+                        (assoc :input (text-input/set-value (:input (init-state)) "")))
           [s1 cmd]  (update-fn streaming (msg/key-press "x"))]
       (is (= :streaming (:phase s1)))
       (is (= "x" (text-input/value (:input s1))))

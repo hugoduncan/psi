@@ -1,15 +1,15 @@
 (ns psi.tui.session-selector-render
   (:require
-   [charm.core :as charm]
+   [charm.style.core :as charm-style]
    [clojure.string :as str]
    [psi.tui.ansi :as ansi]
    [psi.tui.session-selector :as session-selector]))
 
-(def ^:private selector-title-style  (charm/style :fg charm/magenta :bold true))
-(def ^:private selector-sel-style    (charm/style :fg charm/cyan :bold true))
-(def ^:private selector-cur-style    (charm/style :fg charm/yellow))
-(def ^:private selector-hint-style   (charm/style :fg 240))
-(def ^:private selector-search-style (charm/style :fg charm/green))
+(def ^:private selector-title-style  (charm-style/style :fg charm-style/magenta :bold true))
+(def ^:private selector-sel-style    (charm-style/style :fg charm-style/cyan :bold true))
+(def ^:private selector-cur-style    (charm-style/style :fg charm-style/yellow))
+(def ^:private selector-hint-style   (charm-style/style :fg 240))
+(def ^:private selector-search-style (charm-style/style :fg charm-style/green))
 
 (def ^:private tree-active-badge "[active]")
 (def ^:private tree-stream-badge "[stream]")
@@ -21,10 +21,10 @@
 (defn- render-tree-status-cell
   [dim-style active? streaming?]
   (let [active-cell (if active?
-                      (charm/render selector-cur-style tree-active-badge)
+                      (charm-style/render selector-cur-style tree-active-badge)
                       (spaces (count tree-active-badge)))
         stream-cell (if streaming?
-                      (charm/render dim-style tree-stream-badge)
+                      (charm-style/render dim-style tree-stream-badge)
                       (spaces (count tree-stream-badge)))]
     (str active-cell " " stream-cell)))
 
@@ -39,8 +39,8 @@
   (if tree-mode?
     ""
     (if (= :current scope)
-      (str (charm/render selector-sel-style "◉ Current") "  ○ All")
-      (str "○ Current  " (charm/render selector-sel-style "◉ All")))))
+      (str (charm-style/render selector-sel-style "◉ Current") "  ○ All")
+      (str "○ Current  " (charm-style/render selector-sel-style "◉ All")))))
 
 (defn- selector-title
   [scope tree-mode?]
@@ -49,9 +49,9 @@
                       "[↑↓=nav Enter=switch Esc=cancel]"
                       "[Tab=scope ↑↓=nav Enter=select Esc=cancel]")
         scope-str   (selector-scope-string scope tree-mode?)]
-    (str (charm/render selector-title-style title-label)
+    (str (charm-style/render selector-title-style title-label)
          (when (seq scope-str) (str "  " scope-str))
-         "  " (charm/render selector-hint-style title-hints))))
+         "  " (charm-style/render selector-hint-style title-hints))))
 
 (defn- selector-label-base
   [info]
@@ -70,16 +70,16 @@
   (let [session-item? (= :session (:item-kind info :session))
         glyph         (when (and session-item?
                                  (zero? (int (or (:tree-depth info) 0))))
-                        (charm/render dim-style "● "))
+                        (charm-style/render dim-style "● "))
         prompt-prefix (when (= :fork-point (:item-kind info))
-                        (charm/render dim-style "⎇ "))
+                        (charm-style/render dim-style "⎇ "))
         worktree      (shorten-path (or (:worktree-path info) (:cwd info)))]
     (str (or (:tree-prefix info) "")
          (or glyph "")
          (or prompt-prefix "")
          (selector-label-base info)
          (when (and session-item? (seq worktree))
-           (charm/render dim-style (str "  " worktree))))))
+           (charm-style/render dim-style (str "  " worktree))))))
 
 (defn- selector-right-cell
   [dim-style sel-state info scope tree-mode?]
@@ -87,7 +87,7 @@
     (if tree-mode?
       (case (:item-kind info :session)
         :fork-point
-        (charm/render dim-style "fork")
+        (charm-style/render dim-style "fork")
 
         (let [sid         (:session-id info)
               sid-str     (some-> sid str)
@@ -95,11 +95,11 @@
               streaming?  (boolean (:is-streaming info))]
           (str (render-tree-status-cell dim-style active? streaming?)
                (when sid-str
-                 (charm/render dim-style
-                               (str "  " (subs sid-str 0 (min 8 (count sid-str)))))))))
-      (str (charm/render dim-style (str (:message-count info) " " (session-selector/format-age (:modified info))))
+                 (charm-style/render dim-style
+                                     (str "  " (subs sid-str 0 (min 8 (count sid-str)))))))))
+      (str (charm-style/render dim-style (str (:message-count info) " " (session-selector/format-age (:modified info))))
            (when (= :all scope)
-             (str " " (charm/render dim-style worktree)))))))
+             (str " " (charm-style/render dim-style worktree)))))))
 
 (defn- selector-entry-line
   [dim-style current-session-file width tree-mode? scope sel-state selected i info]
@@ -119,11 +119,11 @@
                      (ansi/strip-ansi (ansi/truncate-to-width label avail "…"))
                      label)
         cursor     (if is-sel
-                     (charm/render selector-sel-style "▸ ")
+                     (charm-style/render selector-sel-style "▸ ")
                      "  ")
         styled-lbl (cond
-                     is-current (charm/render selector-cur-style label-tr)
-                     is-sel (charm/render selector-sel-style label-tr)
+                     is-current (charm-style/render selector-cur-style label-tr)
+                     is-sel (charm-style/render selector-sel-style label-tr)
                      :else label-tr)
         pad        (str/join (repeat (max 1 (- width 2 (ansi/visible-width label-tr) right-w)) " "))]
     (str cursor styled-lbl pad right)))
@@ -135,14 +135,14 @@
         n          (count filtered)
         tree-mode? (= :tree mode)]
     (str (selector-title scope tree-mode?) "\n"
-         (charm/render selector-search-style (str "Search: " search "█")) "\n"
+         (charm-style/render selector-search-style (str "Search: " search "█")) "\n"
          (render-separator width) "\n"
          (if (zero? n)
-           (charm/render dim-style "  (no sessions found)\n")
+           (charm-style/render dim-style "  (no sessions found)\n")
            (str/join "\n"
                      (map-indexed (fn [i info]
                                     (selector-entry-line dim-style current-session-file width tree-mode? scope sel-state selected i info))
                                   filtered)))
          "\n"
          (when (pos? n)
-           (charm/render dim-style (str "  " (inc selected) "/" n "\n"))))))
+           (charm-style/render dim-style (str "  " (inc selected) "/" n "\n"))))))
