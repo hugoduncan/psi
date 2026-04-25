@@ -42,7 +42,7 @@
    1. Boot → ready marker
    2. Submit 'think' → wait for '· ' (thinking prefix)
    3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓;
-      then wait for 'ψ: Done.' (proves turn complete, tool row collapsed)
+      then wait for idle input prompt (proves active turn cleared, tool collapsed)
       (spinner is transient — may be missed on fast machines before first poll)
    4. Assert content NOT visible in collapsed mode (no 'output-line-1')
    5. Press ctrl+o   → assert expanded content visible ('output-line-10')
@@ -120,12 +120,15 @@
                                  (not (tmux/wait-for-marker target default-tool-done-marker step-timeout-ms))
                                  (failure target :tool-done-marker-not-visible)
 
-                                 ;; Wait for the assistant reply — proves the turn is
-                                 ;; complete and the tool row has collapsed.  Without
-                                 ;; this, the collapsed-content check can fire while
-                                 ;; the active turn is still rendering (tool body visible).
-                                 (not (tmux/wait-for-marker target "ψ: Done." step-timeout-ms))
-                                 (failure target :assistant-reply-timeout)
+                                 ;; Wait for the input prompt to reappear — this proves
+                                 ;; the active turn has been fully cleared and the TUI
+                                 ;; is back at idle.  'ψ: Done.' appears while the active
+                                 ;; turn is still rendering (tool body still visible), so
+                                 ;; it is not a sufficient signal.  The input prompt
+                                 ;; ('Type a message') disappears during streaming and
+                                 ;; reappears only once the turn is fully committed.
+                                 (not (tmux/wait-for-any-marker target ready-markers step-timeout-ms))
+                                 (failure target :idle-prompt-timeout)
 
                                  :else
                                  (let [pane (tmux/sanitize-pane-text (tmux/capture-pane target))]

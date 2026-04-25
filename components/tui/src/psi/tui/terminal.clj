@@ -230,13 +230,17 @@
       (reset! rows-atom rows))
     ;; Register SIGWINCH handler to update dimensions and trigger a repaint
     ;; when the terminal is resized (e.g. via tmux resize-pane).
-    (Signals/register "WINCH"
-                      (reify Runnable
-                        (run [_]
-                          (when-let [{:keys [cols rows]} (query-terminal-size)]
-                            (reset! cols-atom cols)
-                            (reset! rows-atom rows)
-                            (on-resize cols rows)))))
+    ;; Wrapped in try/catch: Signals/register may throw on platforms that
+    ;; do not support SIGWINCH (e.g. Windows), and we must not crash start!.
+    (try
+      (Signals/register "WINCH"
+                        (reify Runnable
+                          (run [_]
+                            (when-let [{:keys [cols rows]} (query-terminal-size)]
+                              (reset! cols-atom cols)
+                              (reset! rows-atom rows)
+                              (on-resize cols rows)))))
+      (catch Exception _))
     ;; Query Kitty protocol + enable bracketed paste + hide cursor
     (.print out kitty-query)
     (.print out paste-enable)
