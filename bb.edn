@@ -201,7 +201,7 @@
 
   smoke:test
   {:doc  "Smoke-test the live runtime: RPC handshake subprocess test + TUI tmux startup scenario."
-   :task (shell "clojure -M:test --focus integration --ns-pattern \"psi.rpc-smoke-test|psi.tui.tmux-integration-harness-test\"")}
+   :task (shell "clojure -M:test --focus integration")}
 
   clojure:test
   {:doc     "Run both Clojure unit and extension test suites."
