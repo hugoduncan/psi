@@ -35,3 +35,11 @@ Designed in conversation 2026-04-25. Key design evolution:
 | 5 | Loop-back input bindings | No special source | Goto target uses normal bindings; reviewer output available via `:step-output` if wired |
 | 6 | Judge retry limit | Fixed at 2 retries (3 total) | Simple; not configurable per judge in first cut |
 | 7 | Judge system prompt | Author-provided | No auto-generation; author controls judge instructions via optional `:judge {:system-prompt ...}`. `:judge {:prompt ...}` is the user-turn question. |
+| 8 | Statechart events Phase B vs A | Phase B = history markers; Phase A = transition events | Phase B adds `:verdict/*` for observability only |
+| 9 | Judge fields placement | On attempt, not step-run | Consistent with `:execution-error`; each attempt gets own judge result |
+| 10 | `:iteration-count` semantics | Starts at 0, incremented on every entry including first | `:max-iterations 3` = at most 3 total entries |
+| 11 | `:on` requires `:judge` | Validation error if `:on` without `:judge` | Avoids confusing half-state |
+| 12 | `:goto :previous` on first step | Fail with `:no-previous-step` | Definition error |
+| 13 | Judge retry mechanism | Multi-turn `prompt-in!` on same session | Session is idle after each response |
+| 14 | Judge tools | None — empty tool-defs | Pure text classification |
+| 15 | Recording actor result (judged steps) | New `record-actor-result` helper | Writes envelope without advancing `current-step-id` |

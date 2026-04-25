@@ -156,9 +156,9 @@ Four orthogonal concerns:
 A step definition gains two optional keys:
 
 - **`:judge`** — an optional signal-producing phase that runs after the actor step completes.
-- **`:on`** — a routing table mapping signals to directives.
+- **`:on`** — a routing table mapping signals to directives. **Requires `:judge`** — `:on` without `:judge` is a validation error.
 
-When `:judge` is absent, the implicit signal is `:ok` and the implicit routing is `{:ok {:goto :next}}`.
+When both `:judge` and `:on` are absent, the step uses implicit routing: advance to next step on success (equivalent to `{:ok {:goto :next}}`).
 
 ### Judge
 
@@ -175,6 +175,8 @@ Separating the judge from the actor keeps actor steps fully reusable — the bui
 ```
 
 The `:prompt` is the **user message** — the specific question the judge must answer (e.g. "Respond exactly: APPROVED or REVISE"). The optional `:system-prompt` sets the judge session's system prompt (e.g. "You are a workflow routing judge. Respond with exactly one word."). When `:system-prompt` is absent, the judge session gets no system prompt — only the projected context and the user prompt.
+
+The judge session gets **no tools** — it is a pure text-in/text-out classification agent. The judge child session is created with an empty tool-defs list explicitly.
 
 #### Projection
 
@@ -194,8 +196,11 @@ The projection extracts from the actor session's message history and produces sy
 #### Judge failure handling
 
 If the judge output doesn't match any key in the `:on` table:
-- Inject the mismatch as feedback into the judge session and continue it (limited retries).
-- If retries are exhausted, fail the workflow.
+- Send a new user message to the **same** judge session via `prompt-in!` with feedback (e.g. "Your response 'XYZ' did not match any expected signal. Expected exactly one of: APPROVED, REVISE"). This is a multi-turn conversation on the same session — the judge retains its prior context plus the correction.
+- Extract the new assistant response and match again.
+- Up to 2 retries (3 total attempts). If retries are exhausted, fail the workflow.
+
+This works because `prompt-in!` is synchronous and blocking — the first call has completed and the session is idle before the retry call is made.
 
 Judge signal matching is **exact string match** (trimmed of leading/trailing whitespace).
 
@@ -217,7 +222,7 @@ Maps signal strings to routing directives:
 
 - `:goto :next` — advance to next step in definition order (current linear behavior). When the current step is the last in order, this completes the workflow (equivalent to `:goto :done`).
 - `:goto :done` — complete the workflow immediately
-- `:goto :previous` — jump to previous step in definition order
+- `:goto :previous` — jump to previous step in definition order. If the current step is the first in order, this is a definition error and returns `{:action :fail :reason :no-previous-step}`.
 - `:goto "step-id"` — jump to a named step
 
 **`:max-iterations`** is declared on the directive but the counter is **per-step** — all gotos targeting the same step share a single counter. If multiple directives target the same step with different `:max-iterations` values, the limit from the directive that fires is checked against the shared counter. The first directive to find the counter exhausted triggers failure.
@@ -228,14 +233,21 @@ When `:on` is absent, the implicit routing table is `{:ok {:goto :next}}` — id
 
 In the `.psi/workflows/*.md` file format, `:goto` values use **workflow names** (e.g. `"builder"`), matching the `:workflow` key on other steps. The compiler resolves these to compiled step-ids (e.g. `"step-2-builder"`) during compilation, using the same name→step-id mapping used for step references. This keeps the file format author-friendly while the runtime operates on canonical step-ids.
 
-### Step run state additions
+### State additions
+
+**Step-run level** (per-step, survives across attempts):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `:iteration-count` | `int` | How many times this step has been entered, starting at 0, incremented on every entry (including the first). `:max-iterations 3` means the step can be entered at most 3 times total. |
+
+**Attempt level** (per-attempt, consistent with existing execution-error placement):
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `:judge-session-id` | `string?` | The judge's execution session |
-| `:judge-output` | `string?` | Raw judge text |
-| `:judge-event` | `string?` | The matched signal |
-| `:iteration-count` | `int` | How many times this step has been entered (per-step) |
+| `:judge-output` | `string?` | Raw judge text (last successful or exhausted response) |
+| `:judge-event` | `string?` | The matched signal (or nil if no match after retries) |
 
 ### Execution flow
 
@@ -267,17 +279,21 @@ In Phase B, `execute-current-step!` is extended with a post-actor judge phase:
 1. Actor step executes → :ok envelope
 2. Step has :judge?
    a. Yes → DO NOT call submit-result-envelope (which would advance to next step)
-          → instead: record :ok result on step-run (without advancing)
+          → instead: call record-actor-result (new helper in workflow_progression.clj)
+            which writes the :ok envelope and :accepted-result onto the step-run
+            without touching current-step-id or run status
           → call execute-judge! → get routing result
-          → apply routing result via new progression path:
-              :goto → set current-step-id to target, increment target iteration count
-              :complete → transition to :completed
-              :fail → transition to :failed
+          → call submit-judged-result (new progression path) which:
+              records judge fields on the attempt,
+              applies routing:
+                :goto → set current-step-id to target, increment target iteration count
+                :complete → transition to :completed
+                :fail → transition to :failed
    b. No  → existing path: call submit-result-envelope (advances to next step)
 3. execute-run! loop unchanged — picks up whatever current-step-id was set
 ```
 
-The key invariant: for judged steps, the judge routing **replaces** the normal `submit-result-envelope` advancement. The actor's `:ok` result is recorded, but `current-step-id` is set by the routing directive, not by `next-step-id-fn`.
+The key invariant: for judged steps, the judge routing **replaces** the normal `submit-result-envelope` advancement. The actor's `:ok` result is recorded via `record-actor-result`, but `current-step-id` is set by the routing directive, not by `next-step-id-fn`.
 
 ### File format
 
@@ -318,6 +334,13 @@ No special loop-feedback binding source in the first cut. The goto target gets i
 6. **Judge retry limit** → **fixed at 2** retries (3 total attempts). Not configurable per judge in the first cut.
 7. **Judge system prompt** → **author-provided** via the optional `:judge {:system-prompt "..."}` field. No auto-generation from `:on` keys. The author is responsible for instructing the judge to produce one of the expected signals. The `:judge {:prompt "..."}` is the user-turn question.
 8. **Statechart events in Phase B vs A** → Phase B adds `:verdict/advance`, `:verdict/goto`, `:verdict/exhausted` as **history markers** for observability. They are appended to the run's history log but do not drive execution (the imperative code does). Phase A will use signal strings as actual statechart events that drive transitions.
+9. **Judge fields placement** → on the **attempt**, not the step-run. Each attempt gets its own judge result. The step-run level holds only `:iteration-count`. This is consistent with how `:execution-error` already lives on attempts.
+10. **`:iteration-count` semantics** → starts at 0, incremented on **every entry** to the step (including the first normal linear entry). `:max-iterations 3` means the step can be entered at most 3 times total.
+11. **`:on` requires `:judge`** → `:on` without `:judge` is a validation error. The implicit advance-on-success routing only applies when both are absent.
+12. **`:goto :previous` on first step** → returns `{:action :fail :reason :no-previous-step}`. This is a definition error.
+13. **Judge retry mechanism** → multi-turn on the same session via `prompt-in!`. The judge session is idle after each response, so a new `prompt-in!` call works. Not a new session.
+14. **Judge tools** → none. Judge session is created with empty tool-defs. Pure text-in/text-out classification.
+15. **Recording actor result for judged steps** → new `record-actor-result` helper in `workflow_progression.clj` writes envelope and accepted-result onto step-run without advancing `current-step-id` or run status. `submit-result-envelope` is not called for judged steps.
 
 ## Open questions
 

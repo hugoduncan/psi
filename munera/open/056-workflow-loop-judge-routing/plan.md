@@ -22,7 +22,8 @@ Add to `workflow_model.clj`:
 - `routing-directive-schema` — `{:goto (:next | :previous | :done | string) :max-iterations pos-int?}`
 - `routing-table-schema` — `{string routing-directive-schema}`
 - Extend `workflow-step-definition-schema` with optional `:judge` and `:on`
-- Extend `workflow-step-run-schema` with `:judge-session-id`, `:judge-output`, `:judge-event`, `:iteration-count`
+- Extend `workflow-step-run-schema` with `:iteration-count`
+- Extend `workflow-step-attempt-schema` with `:judge-session-id`, `:judge-output`, `:judge-event`
 
 Test: schema validation for valid/invalid judge, projection, routing table, step definitions with and without judge.
 
@@ -44,11 +45,11 @@ Test: projection of realistic message sequences — full history, tail-1, tail-3
 
 Pure functions in `workflow_judge.clj`:
 - `match-signal` — given a signal string and a routing table, return the matched directive or nil. Exact match after `str/trim`.
-- `resolve-goto-target` — given a directive's `:goto` value, the current step-id, and the step-order vector, return `{:action :goto :target step-id}` or `{:action :complete}` or `{:action :fail :reason ...}`. The `:done` keyword and `:next` from the last step both return `{:action :complete}`. `:next`, `:previous`, and string step-ids return `{:action :goto :target concrete-step-id}`.
-- `check-iteration-limit` — given a step-run's `:iteration-count` and the directive's `:max-iterations`, return `:within-limit` or `:exhausted`.
-- `evaluate-routing` — compose the above: match signal → resolve target → check limit → return `{:action :goto :target step-id}` or `{:action :complete}` or `{:action :fail :reason ...}` or `{:action :no-match}`. The `:no-match` action is consumed only by `execute-judge!` (slice 4) for its retry loop — it never reaches the progression layer.
+- `resolve-goto-target` — given a directive's `:goto` value, the current step-id, and the step-order vector, return `{:action :goto :target step-id}` or `{:action :complete}` or `{:action :fail :reason ...}`. The `:done` keyword and `:next` from the last step both return `{:action :complete}`. `:next`, `:previous`, and string step-ids return `{:action :goto :target concrete-step-id}`. `:previous` on the first step returns `{:action :fail :reason :no-previous-step}`.
+- `check-iteration-limit` — given the **target** step-run's `:iteration-count` and the directive's `:max-iterations`, return `:within-limit` or `:exhausted`.
+- `evaluate-routing` — signature: `(evaluate-routing signal routing-table current-step-id step-order step-runs)`. Compose the above: match signal → resolve target → look up target step-run's iteration count → check limit → return `{:action :goto :target step-id}` or `{:action :complete}` or `{:action :fail :reason ...}` or `{:action :no-match}`. The `:no-match` action is consumed only by `execute-judge!` (slice 4) for its retry loop — it never reaches the progression layer.
 
-Test: each function individually, plus `evaluate-routing` integration — match, no-match, `:next`/`:previous`/`:done`/named, `:next` from last step (= complete), within-limit, exhausted.
+Test: each function individually, plus `evaluate-routing` integration — match, no-match, `:next`/`:previous`/`:done`/named, `:next` from last step (= complete), `:previous` on first step (= fail), within-limit, exhausted.
 
 ### Slice 4 — Judge session execution
 
@@ -56,11 +57,11 @@ Impure functions in `workflow_judge.clj`:
 - `execute-judge!` — given ctx, parent-session-id, actor-session-id, judge-spec, and routing-table:
   1. Read actor session messages via `prompt-control/messages-from-entries-in` or equivalent
   2. Apply `project-messages` with the judge's projection spec
-  3. Create judge child session with projected messages as preloaded context and optional `:system-prompt` from judge-spec
-  4. Prompt judge with judge `:prompt` (user-turn message)
+  3. Create judge child session with projected messages as preloaded context, optional `:system-prompt` from judge-spec, and **empty tool-defs** (no tools)
+  4. Prompt judge with judge `:prompt` (user-turn message) via `prompt-in!`
   5. Extract judge output text (last assistant message, trimmed)
-  6. Match against routing table via `match-signal`
-  7. On no-match: inject feedback ("Your response did not match any expected signal. Expected one of: ..."), continue judge session, retry (up to 2 retries)
+  6. Match against routing table via `evaluate-routing` (passing step-runs for iteration count lookup)
+  7. On no-match: send a new user message to the **same** judge session via `prompt-in!` with feedback ("Your response 'XYZ' did not match any expected signal. Expected exactly one of: ..."). The session is idle after each response so this is safe. Retry up to 2 times (3 total attempts).
   8. Return `{:judge-session-id :judge-output :judge-event :routing-result}`
 
 Test: with-redefs on session creation and prompting — successful match, no-match with retry then match, no-match exhaustion.
@@ -68,9 +69,10 @@ Test: with-redefs on session creation and prompting — successful match, no-mat
 ### Slice 5 — Progression: iteration tracking and routing
 
 Extend `workflow_progression.clj`:
-- `increment-iteration-count` — bump `:iteration-count` on a step-run when entering a step via goto
+- `record-actor-result` — new helper that writes the `:ok` envelope and `:accepted-result` onto the step-run **without** touching `current-step-id` or run status. Extracted from the recording part of `submit-result-envelope`. Used by slice 6 for judged steps.
+- `increment-iteration-count` — bump `:iteration-count` on a step-run on every entry (including first). Starts at 0.
 - Add a new `submit-judged-result` progression path (does **not** modify `submit-result-envelope`) that:
-  - Records the judge result on the step-run
+  - Records the judge result (`:judge-session-id`, `:judge-output`, `:judge-event`) on the **attempt**
   - Applies the routing result to determine the next step
   - On `:goto` to a named step: set `current-step-id`, increment target step's iteration count
   - On `:complete`: transition to `:completed`
@@ -84,7 +86,7 @@ Test: pure state transitions — judged step with goto, with advance, with done,
 Extend `workflow_execution.clj`:
 - After actor step completes with `:ok` envelope:
   - Check if step definition has `:judge`
-  - If yes: record actor `:ok` result on step-run **without** calling `submit-result-envelope` (which would advance to next step). Then call `execute-judge!`, then apply routing result via the new judged-result progression path. The judge routing **replaces** the normal `submit-result-envelope` advancement.
+  - If yes: call `record-actor-result` (writes envelope + accepted-result on step-run without advancing). Then call `execute-judge!`, then call `submit-judged-result` (records judge fields on attempt, applies routing). The judge routing **replaces** the normal `submit-result-envelope` advancement.
   - If no: existing path — call `submit-result-envelope` (advances to next step)
 - The `execute-run!` loop continues to work — it just sees different `current-step-id` values when gotos fire
 - The loop's terminal/blocked status checks are unchanged
@@ -96,10 +98,11 @@ Test: `execute-current-step!` with judged step — actor completes, judge runs, 
 Extend `workflow_file_compiler.clj`:
 - `compile-multi-step`: when a step config has `:judge`, thread it into the canonical step definition
 - `compile-multi-step`: when a step config has `:on`, resolve `:goto` workflow names to compiled step-ids (using the same workflow-name→step-id mapping built during compilation), then thread the resolved `:on` into the canonical step definition
+- Validate: `:on` without `:judge` is a compilation error
 - Validate resolved `:goto` targets reference known compiled step-ids (extend `validate-step-references`)
 - `:goto :next`, `:goto :previous`, `:goto :done` are keywords and pass through without resolution
 
-Test: compile a workflow file with `:judge` and `:on`, verify `:goto` workflow names resolved to step-ids. Compile without — unchanged. Invalid goto target — validation error.
+Test: compile a workflow file with `:judge` and `:on`, verify `:goto` workflow names resolved to step-ids. Compile without — unchanged. Invalid goto target — validation error. `:on` without `:judge` — validation error.
 
 ### Slice 8 — End-to-end integration and backward compatibility
 
@@ -110,10 +113,16 @@ Test: compile a workflow file with `:judge` and `:on`, verify `:goto` workflow n
 
 ## Decisions captured in plan
 
-- Iteration counts are on `step-run`, not on the routing directive or the run. The limit (`:max-iterations`) is declared on the directive, but the counter is shared per-step.
-- Judge retry feedback is injected into the existing judge session (continue it), not a new session
-- The `execute-run!` loop is unchanged — it already handles arbitrary `current-step-id` progression
-- For judged steps, the judge routing **replaces** the normal `submit-result-envelope` call — the actor result is recorded separately, and `current-step-id` is set by the routing directive, not by `next-step-id-fn`
+- Iteration counts are on `step-run`, not on the routing directive or the run. The limit (`:max-iterations`) is declared on the directive, but the counter is shared per-step. Count starts at 0, incremented on every entry including first. `:max-iterations 3` = at most 3 total entries.
+- Judge fields (`:judge-session-id`, `:judge-output`, `:judge-event`) are on the **attempt**, not the step-run. Consistent with existing `:execution-error` placement.
+- Judge retry feedback is injected into the **same** judge session via `prompt-in!` (multi-turn). Not a new session. Session is idle after each response so this is safe.
+- Judge session gets **no tools** — empty tool-defs explicitly.
+- `:on` **requires** `:judge` — `:on` without `:judge` is a validation error at compilation.
+- `:goto :previous` on first step returns `{:action :fail :reason :no-previous-step}`.
+- `evaluate-routing` takes the full `step-runs` map to look up the **target** step's iteration count.
+- `record-actor-result` is a new helper in `workflow_progression.clj` — writes envelope + accepted-result without advancing. Used for judged steps instead of `submit-result-envelope`.
+- The `execute-run!` loop is unchanged — it already handles arbitrary `current-step-id` progression.
+- For judged steps, the judge routing **replaces** the normal `submit-result-envelope` call — the actor result is recorded via `record-actor-result`, and `current-step-id` is set by the routing directive, not by `next-step-id-fn`.
 - No new statechart events are strictly required for Phase B (status tracking suffices), but adding `:verdict/advance`, `:verdict/goto`, `:verdict/exhausted` to the event catalog as **history markers** for observability is low-cost and done in Slice 5. Phase A will promote these to actual statechart transition events.
 - In the file format, `:goto` values use **workflow names** (e.g. `"builder"`). The compiler resolves these to compiled step-ids (e.g. `"step-2-builder"`). Keywords (`:next`, `:previous`, `:done`) pass through without resolution.
 - Judge `:prompt` is the user-turn message (the decision question). Judge `:system-prompt` is optional and sets the judge session's system prompt.
