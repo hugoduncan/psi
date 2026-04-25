@@ -109,6 +109,20 @@ Bootstrapped on 2026-04-02.
   - child runtime initialization now preserves those preloaded messages in both runtime message state and the child journal seed
 
 ## Current work update
+- Task 054 (TUI thinking and tool streaming parity) is now closed:
+  - switched `render-active-turn` from event-log replay to `active-turn-order` + `active-turn-items` item-map
+  - one rendered block per item-id: thinking deduplication and tool lifecycle deduplication both fixed
+  - added `thinking-style` (italic dim) and `render-thinking-line` (`· ` prefix); `render-stream-thinking` delegates to it
+  - added `:thinking` role to `render-message` with `· ` prefix + thinking-style
+  - removed `append-active-turn-event`, `:active-turn-events`, `:stream-thinking`, `:active-turn-next-seq` from all code paths
+  - `handle-agent-result` now archives thinking blocks from result `:content` into `:messages` before the `:assistant` entry
+  - `transcript/agent-messages->tui-resume-state` rewritten as single pass over `content-blocks`; thinking and tool entries emitted in block order, assistant text appended after
+  - extracted `content-blocks` helper in `transcript.clj` (normalises plain vector or structured map)
+  - 9 new focused tests (dedup, archive-on-done, render-message, rehydration × 3, view-level rendering)
+  - tmux harness: `write-thinking-fixture!`, `delete-thinking-fixture!`, `run-thinking-rehydration-scenario!`, `^:integration tui-tmux-thinking-rehydration-scenario-test`
+  - full unit suite green: 1350 tests, 10271 assertions, 0 failures
+  - commit: c12c4f0f
+
 - Task 050 (TUI live operator-awareness parity) is now closed:
   - wired `footer-model-fn` closure from app-runtime into TUI, replacing the local `footer-data` + `footer-model-from-data` query path with a single code path
   - TUI footer now renders `session-activity-line` when multiple sessions are active (same format as Emacs)
@@ -153,6 +167,7 @@ Bootstrapped on 2026-04-02.
   6. `munera/open/004-lsp-integration-managed-services-post-tool-processing/`
   7. `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
   8. `munera/open/006-agent-tool-skill-prelude-follow-on/`
+  (054 TUI thinking/tool streaming parity is now closed)
 - Highest-value next threads remain:
   1. **026 deterministic workflows**: break or route around the `psi-tool` execution-control load cycle cleanly
   2. **Prompt lifecycle / skill prelude**: refine cache-breakpoint shaping and decide whether prelude/source metadata should surface in introspection
