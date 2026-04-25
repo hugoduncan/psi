@@ -164,6 +164,89 @@ archived rendering.
 - Archive (step 3) and rehydration (step 4) must read thinking from the same
   canonical content structure so the two paths stay symmetric
 
+## 6. Tmux integration scenario
+
+### Goal
+
+Prove that thinking rehydration (fix 4) and the `· ` style (fix 5) are
+observable through a real terminal boundary, without a live LLM.
+
+### Why rehydration is the right target
+
+Live streaming dedup and archive-on-done both require injecting events into a
+running turn, which needs either a live LLM or a mock provider wired through
+the full CLI stack — out of scope for this slice. Rehydration is fully
+provider-independent: the TUI reads a pre-written journal file and reconstructs
+the transcript before any model interaction. It is deterministic, stable, and
+directly proves the most user-visible regression in the current code (thinking
+is invisible after session resume).
+
+### Fixture
+
+The harness writes a minimal `.ndedn` journal file to the correct session
+directory before launching the TUI. The file contains:
+
+- **Header line** — `{:type :session :version 4 :id "<uuid>" :timestamp #inst
+  "..." :worktree-path "<tmpdir>" :parent-session-id nil :parent-session nil}`
+- **User message entry** — `{:id "<uuid>" :parent-id nil :timestamp #inst "..."
+  :kind :message :data {:message {:role "user" :content [{:type :text :text
+  "explain recursion"}]}}}`
+- **Assistant message entry** — same shape; `:content` is a vector with a
+  `:thinking` block first, then a `:text` block:
+  `[{:type :thinking :text "Let me think about this carefully."} {:type :text
+  :text "Recursion is when a function calls itself."}]`
+
+Session directory path: `~/.psi/agent/sessions/--<encoded-tmpdir>--/` where
+encoding strips the leading `/` and replaces `/` and `:` with `-`. The file
+name is `<timestamp>_<uuid>.ndedn` (any timestamp/uuid values work; the
+selector lists by mtime).
+
+The harness creates the temp dir, computes the encoded session dir path, writes
+the fixture file, and registers cleanup to delete both on exit.
+
+### Scenario steps
+
+1. Write fixture to `~/.psi/agent/sessions/--<encoded-tmpdir>--/<ts>_<uuid>.ndedn`
+2. Launch TUI with `working-dir` set to `tmpdir`
+3. Wait for the ready marker
+4. Send `/resume` — opens session selector scoped to `tmpdir`
+5. Wait for a session-selector marker (the fixture session will be the only
+   entry; any stable selector UI text works, e.g. `"Enter=confirm"`)
+6. Send `Enter` to select the first (only) session
+7. Wait for `"· "` to appear in the pane
+8. Assert `"· "` is present (proves thinking rehydration + style)
+9. Send `/quit` and assert clean exit
+
+### Fragility notes
+
+- **Session selector navigation**: with a single fixture session, `Enter` on
+  the pre-selected first item is sufficient. No `Down` key needed.
+- **Selector scope**: `session-selector-init` scopes to `cwd`, so the fixture
+  session is the only entry. No risk of selecting a different session.
+- **Fixture cleanup**: delete the fixture file and the session dir (if empty)
+  after the scenario, regardless of outcome. Do not delete `~/.psi/agent/sessions/`
+  itself — it may contain real user sessions.
+- **ANSI**: assert on `sanitize-pane-text` output; `· ` survives ANSI stripping.
+- **Timestamp**: use `(System/currentTimeMillis)` for the filename prefix and
+  `#inst "2024-01-01T00:00:00.000-00:00"` as a static timestamp in the fixture
+  body — avoids Instant serialization complexity in the harness.
+
+### Harness additions
+
+- `write-thinking-fixture!` — takes `tmpdir` string, writes the `.ndedn` file,
+  returns the fixture file path
+- `delete-thinking-fixture!` — deletes the fixture file and the session dir if
+  empty
+- `run-thinking-rehydration-scenario!` — full scenario function following the
+  same shape as `run-slash-autocomplete-scenario!`; accepts the same
+  `session-name`, `working-dir`, `launch-command`, timeout, and
+  `keep-session-on-failure?` opts; adds `:thinking-marker` (default `"· "`)
+  and `:selector-marker` (default `"Enter=confirm"`)
+
+New `^:integration` test in `tmux_integration_harness_test.clj`:
+`tui-tmux-thinking-rehydration-scenario-test` — calls
+`run-thinking-rehydration-scenario!` and delegates to `assert-scenario-result`.
+
 ## Acceptance criteria
 
 1. A thinking block with N deltas renders as exactly one `· <text>` line

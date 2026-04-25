@@ -51,3 +51,20 @@
       the assistant entry in the reconstructed message list
 - [ ] Run full TUI test suite — green
 - [ ] Commit
+
+## Tmux integration scenario (§6)
+
+- [ ] Add `write-thinking-fixture!` to `test_harness/tmux.clj`:
+      compute encoded session dir path from tmpdir, mkdir, write minimal
+      `.ndedn` with header + user entry + assistant entry (`:thinking` block +
+      `:text` block); return fixture file path
+- [ ] Add `delete-thinking-fixture!` to `test_harness/tmux.clj`:
+      delete fixture file; delete session dir if empty; do not touch parent dirs
+- [ ] Add `run-thinking-rehydration-scenario!` to `test_harness/tmux.clj`:
+      preflight → write fixture → start session (working-dir = tmpdir) →
+      wait for ready marker → send `/resume` → wait for selector marker →
+      send Enter → wait for `"· "` → assert → `/quit` → clean exit;
+      cleanup fixture on both success and failure
+- [ ] Add `tui-tmux-thinking-rehydration-scenario-test` (`^:integration`) to
+      `tmux_integration_harness_test.clj`; delegate to `assert-scenario-result`
+- [ ] Commit
