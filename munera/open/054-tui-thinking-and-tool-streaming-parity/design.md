@@ -82,36 +82,54 @@ all `handle-agent-event` branches. Remove `:active-turn-events` from
 `clear-live-turn` and state init.
 
 Mid-turn ordering falls out naturally: `thinking-item-id` keys on
-`content-index`, so pre-tool thinking (`thinking/0`) and post-tool thinking
-(`thinking/2`) are different items in `active-turn-order` — no explicit freeze
-step needed.
+`content-index`, so a thinking block that arrives before a tool call
+(`thinking/0`) and one that arrives after (`thinking/2`) are different items in
+`active-turn-order`. Tool item-ids are `"tool/<tool-id>"` — they do not use
+content-index — so there is no id collision between thinking and tool items.
+No explicit freeze step is needed.
 
 ### 3. Archive thinking on turn complete
 
-`handle-agent-result` receives the full structured `result` with a `:content`
-array of typed blocks (`:thinking`, `:text`, `:tool-call`, etc.) in their
-canonical order. Archive by iterating those blocks directly:
+`handle-agent-result` receives `result` = the last assistant message from the
+journal. Its `:content` is a plain vector of typed block maps produced by
+`build-final-content`: thinking blocks first (sorted by content-index), then
+text, then tool-calls. For the final turn (which is what `:done` signals),
+there are no tool-call blocks.
 
-- For each `:thinking` block: emit `{:role :thinking :text ...}` into `messages`
-- For the combined text: emit `{:role :assistant :text ...}` as today
+Archive by scanning `:content` for `:thinking` blocks and prepending them to
+`messages` before the `:assistant` entry:
+
+- For each block where `(= :thinking (content-kind block))`: emit
+  `{:role :thinking :text (:text block)}` into `messages`
+- Then emit `{:role :assistant :text (content-text content)}` as today —
+  `content-text` already skips thinking blocks, so no change needed there
+
+If the result has no thinking blocks the behaviour is unchanged: only the
+`:assistant` message is added.
 
 This is simpler than reading from `active-turn-items` (no sorting needed) and
 is symmetric with rehydration — both read the same canonical content structure.
-The `:assistant` message continues to be constructed from `content-text` as
-today; thinking blocks are prepended before it in content order.
 
 Add `:thinking` role handling to `render-message` so archived thinking renders
 with the `· ` prefix and thinking style.
 
 ### 4. Rehydration
 
-`agent-messages->tui-resume-state` currently does two passes over assistant
-content: one for text, one for tool-call blocks. Replace with a single pass
-over content blocks in order, emitting:
+`agent-messages->tui-resume-state` currently handles each assistant message
+with two separate passes over its `:content`: one for text (via
+`message->display-text`) and one for tool-call blocks (via
+`assistant-tool-call-blocks`). Replace the `"assistant"` branch with a single
+pass over the content blocks of that message, emitting in block order:
 
-- `:thinking` block → `{:role :thinking :text ...}` into `messages`
-- text content → `{:role :assistant :text ...}` into `messages` (unchanged)
-- `:tool-call` block → tool-calls/tool-order entry (unchanged)
+- block where `(= :thinking (content-kind block))` → `{:role :thinking :text (:text block)}` into `messages`
+- text content → `{:role :assistant :text (message->display-text msg)}` into `messages`
+  (emit once, after collecting any thinking blocks; continue using `message->display-text`
+  for text extraction so the existing normalization is preserved)
+- block where `(= :tool-call (content-kind block))` → tool-calls/tool-order entry (unchanged logic)
+
+Content may be a plain vector or a `{:kind :structured :blocks [...]}` map —
+normalize to a block sequence first using the same logic as the existing
+`assistant-tool-call-blocks` helper before iterating.
 
 This is symmetric with the archive approach (step 3) and eliminates the
 fragility of multiple passes.
