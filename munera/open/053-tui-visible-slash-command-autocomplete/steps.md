@@ -5,8 +5,8 @@
 - [x] Add focused TUI-facing rendering tests for open/closed slash autocomplete state
 - [x] Add focused test proving selection movement changes the rendered highlighted row
 - [x] Run relevant focused TUI tests and record results
-- [ ] Add `send-text!` and `send-key!` helpers to the tmux harness (no-Enter key delivery)
-- [ ] Add `run-slash-autocomplete-scenario!` to the tmux harness (type `/` → suggestions visible → `▸ ` visible → Down → `▸ ` still visible → Escape → `/quit` → clean exit)
-- [ ] Add `^:integration` test `tui-tmux-slash-autocomplete-scenario-test` in `tmux_integration_harness_test.clj`
-- [ ] Refactor existing basic-scenario test to use shared `assert-scenario-result` helper
+- [x] Add `send-text!` and `send-key!` helpers to the tmux harness (no-Enter key delivery)
+- [x] Add `run-slash-autocomplete-scenario!` to the tmux harness (type `/` → suggestions visible → `▸ ` visible → Down → `▸ ` still visible → Escape → `/quit` → clean exit)
+- [x] Add `^:integration` test `tui-tmux-slash-autocomplete-scenario-test` in `tmux_integration_harness_test.clj`
+- [x] Refactor existing basic-scenario test to use shared `assert-scenario-result` helper
 - [ ] Run `bb clojure:test:integration` (with tmux available) and record results

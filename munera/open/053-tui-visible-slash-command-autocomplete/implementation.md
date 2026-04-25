@@ -20,3 +20,18 @@ Focused verification:
 Broader relevant verification:
 - `clojure -M:test --focus psi.tui.app-projection-test --focus psi.tui.app-input-selector-test --focus psi.tui.app-view-runtime-test`
 - result: `31 tests, 85 assertions, 0 failures`
+
+2026-04-25 — tmux integration proof slice
+- Added `send-text!` to tmux harness: sends literal characters without pressing Enter (uses `-l` flag, no trailing Enter key).
+- Added `send-key!` to tmux harness: sends a named tmux key string (e.g. "Down", "Escape") without literal text or Enter.
+- Added `default-autocomplete-suggestions-marker` ("Suggestions") and `default-autocomplete-selected-marker` ("▸ ") constants matching the render markers from `render-prompt-autocomplete`.
+- Implemented `run-slash-autocomplete-scenario!`:
+  - boot → ready marker
+  - `send-text! "/"` → wait for `"Suggestions"` marker with step-timeout
+  - assert `"▸ "` selected-row marker present immediately after Suggestions appears
+  - `send-key! "Down"` → wait for `"▸ "` still present (selection moved, marker stable)
+  - `send-key! "Escape"` + 200ms pause → `send-line! "/quit"` → wait for java exit
+  - failure modes: `:autocomplete-suggestions-timeout`, `:autocomplete-selected-marker-missing`, `:autocomplete-post-down-marker-missing`, `:quit-timeout`
+- Refactored existing basic-scenario test into a shared `assert-scenario-result` helper to avoid duplication.
+- Added `^:integration tui-tmux-slash-autocomplete-scenario-test` wired through the shared helper.
+- Live run with tmux available not yet recorded — pending next session with tmux on PATH.
