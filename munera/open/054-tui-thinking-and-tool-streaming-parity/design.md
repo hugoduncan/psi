@@ -37,9 +37,9 @@ invisible after a turn completes.
 ### Rehydration: thinking blocks are skipped
 
 `agent-messages->tui-resume-state` in `transcript.clj` processes assistant
-messages by extracting text and tool-call blocks. `:thinking` content blocks
-are explicitly skipped (`message-text/content-text-parts` returns `[]` for
-`:thinking` kind). Thinking is invisible on session resume.
+messages by extracting text first, then tool-call blocks — two separate passes
+over content. `:thinking` content blocks are never visited. Thinking is
+invisible on session resume.
 
 ### Style: no visual distinction
 
@@ -55,23 +55,31 @@ de-emphasized content. Emacs uses `· ` prefix + italic shadow face.
 state and already have the right semantics: one entry per item-id regardless of
 how many lifecycle events arrive.
 
+- `upsert-thinking-item` already merges the latest `:text` into
+  `active-turn-items[thinking/<content-index>]` on every delta.
+- `ensure-tool-row` sets `{:item-kind :tool :tool-id ui-id}` in
+  `active-turn-items`; full tool state lives in `tool-calls`.
+
 Rewrite `render-active-turn` to iterate `active-turn-order` and look up each
 item in `active-turn-items`, dispatching on `:item-kind`:
 
 - `:thinking` → `render-thinking-line(item.text)`
 - `:text` → `render-stream-text(item.text, width)`
 - `:tool` → `render-tool-calls(tool-calls, [item-id], ...)` — use `tool-calls`
-  state, not a snapshot, so the latest status is always shown
+  state (not a snapshot), so the latest status is always shown
 
 This gives one rendered block per item-id. `active-turn-events` no longer
 drives rendering and can be removed.
 
-### 2. Keep item data current on each event
+Update `has-progress?` in `render-view` to use `(seq active-turn-order)`
+instead of `(seq active-turn-events)`.
 
-Audit `handle-agent-event` to ensure every event branch updates
-`active-turn-items[item-id]` with the latest text/status, not just appends to
-`active-turn-events`. Remove `append-active-turn-event` calls and the
-`:active-turn-events` key from state entirely.
+### 2. Remove the event-log
+
+`upsert-thinking-item` and `upsert-text-item` both call `append-active-turn-event`
+as their first step. Remove those calls. Remove `append-active-turn-event` from
+all `handle-agent-event` branches. Remove `:active-turn-events` from
+`clear-live-turn` and state init.
 
 Mid-turn ordering falls out naturally: `thinking-item-id` keys on
 `content-index`, so pre-tool thinking (`thinking/0`) and post-tool thinking
@@ -80,20 +88,33 @@ step needed.
 
 ### 3. Archive thinking on turn complete
 
-In `handle-agent-result`, before `clear-live-turn`, collect all `:thinking`
-items from `active-turn-items` (sorted by content-index) and promote them into
-`messages` as `{:role :thinking :text ...}` entries, interleaved with the
-assistant reply in content-index order.
+`handle-agent-result` receives the full structured `result` with a `:content`
+array of typed blocks (`:thinking`, `:text`, `:tool-call`, etc.) in their
+canonical order. Archive by iterating those blocks directly:
+
+- For each `:thinking` block: emit `{:role :thinking :text ...}` into `messages`
+- For the combined text: emit `{:role :assistant :text ...}` as today
+
+This is simpler than reading from `active-turn-items` (no sorting needed) and
+is symmetric with rehydration — both read the same canonical content structure.
+The `:assistant` message continues to be constructed from `content-text` as
+today; thinking blocks are prepended before it in content order.
 
 Add `:thinking` role handling to `render-message` so archived thinking renders
 with the `· ` prefix and thinking style.
 
 ### 4. Rehydration
 
-Update `agent-messages->tui-resume-state` in `transcript.clj` to collect
-`:thinking` content blocks from assistant messages and emit
-`{:role :thinking :text ...}` entries in the reconstructed message list,
-interleaved with assistant text and tool rows.
+`agent-messages->tui-resume-state` currently does two passes over assistant
+content: one for text, one for tool-call blocks. Replace with a single pass
+over content blocks in order, emitting:
+
+- `:thinking` block → `{:role :thinking :text ...}` into `messages`
+- text content → `{:role :assistant :text ...}` into `messages` (unchanged)
+- `:tool-call` block → tool-calls/tool-order entry (unchanged)
+
+This is symmetric with the archive approach (step 3) and eliminates the
+fragility of multiple passes.
 
 ### 5. Style
 
@@ -106,10 +127,13 @@ construction and must remain text-only.
 
 - No change to the backend event protocol or shared app-runtime code
 - `active-turn-order` deduplication invariant must be preserved
-- `tool-calls` is the authoritative source for tool status in rendering
+- `tool-calls` is the authoritative source for tool status in rendering;
+  `active-turn-items` stores only `{:item-kind :tool :tool-id}` for tool items
 - `:thinking` message kind must be clearly distinct from `:assistant` in
   `render-message` — archived thinking is read-only display data, not prompt content
 - `content-display-text` returns `""` for thinking blocks — do not change this
+- Archive (step 3) and rehydration (step 4) must read thinking from the same
+  canonical content structure so the two paths stay symmetric
 
 ## Acceptance criteria
 
@@ -122,8 +146,9 @@ construction and must remain text-only.
 4. After a tool event arrives, subsequent thinking for a new content-index
    appears below the tool row
 5. After a turn completes, thinking from that turn is visible in the transcript
+   as separate `· ` prefixed lines before the assistant reply
 6. On session resume, past thinking blocks are visible in the reconstructed
-   transcript
+   transcript in content order
 7. Live and archived thinking use `· ` prefix and a visually distinct style
 8. All existing TUI unit tests remain green
 9. New tests cover: dedup (thinking, tool lifecycle), interleaving,
