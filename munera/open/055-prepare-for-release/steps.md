@@ -2,10 +2,10 @@
 
 ## Track B — launcher version scheme
 - [x] Decide version scheme — semver `MAJOR.MINOR.PATCH`, PATCH = git-count-revs, starts at `0.1`
-- [ ] Create `version.edn` at repo root: `{:major 0 :minor 1}`
-- [ ] Create `resources/psi/version.edn` placeholder: `{:version "unreleased"}` (overwritten at tag time)
-- [ ] Add `psi.version` namespace that reads the resource at startup
-- [ ] Expose `--version` flag in `launcher-main`
+- [x] Create `version.edn` at repo root: `{:major 0 :minor 1}`
+- [x] Create `bases/main/resources/psi/version.edn` placeholder: `{:version "unreleased"}`
+- [x] Add `psi.version` namespace that reads the resource
+- [x] Expose `--version` flag (parsed in `launcher.clj`, printed in `launcher-main.clj`)
 - [ ] Write `bb release:tag` task (reads changelog, stamps version, commits, tags)
 - [ ] Document bbin install-from-tag command in README
 
