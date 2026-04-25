@@ -5,6 +5,7 @@
              [clojure.string :as str])
   :init (do
           (load-file "bb/dispatch_architecture_check.clj")
+          (load-file "bb/release.clj")
           (def chiasmus-home
             (str (System/getProperty "user.home") "/src/chiasmus"))
 
@@ -360,6 +361,10 @@
                                 "}"
                                 "console.log('Chiasmus check passed');"))]
              (System/exit (:exit result))))}
+  release:tag
+  {:doc  "Cut a release: stamp changelog, bake version, commit, tag vMAJOR.MINOR.PATCH, reset to unreleased."
+   :task (bb.release/release! *command-line-args*)}
+
   ref-report
   {:doc
    "Report public fns used only by tests and fns that could be private",
