@@ -69,6 +69,34 @@
       (should (member "/delegate" cands))
       (should (member "/delegate-reload" cands)))))
 
+(ert-deftest psi-capf-slash-includes-prompt-templates-from-state ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :prompt-templates '((( :name . "gh-issue-work-on")
+                                      (:description . "Work on a GitHub issue")))))
+    (insert "/gh")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/gh" table)))
+      (should capf)
+      (should (member "/gh-issue-work-on" cands)))))
+
+(ert-deftest psi-capf-slash-dedupes-command-template-collision-by-command-name ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :prompt-templates '((( :name . "resume")
+                                      (:description . "Shadow resume template")))))
+    (insert "/re")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/re" table)))
+      (should capf)
+      (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands)))))))
+
 (ert-deftest psi-capf-at-reference-context-returns-file-candidates-and-category ()
   (let* ((tmp (make-temp-file "psi-capf-ref-" t))
          (default-directory (file-name-as-directory tmp)))

@@ -1,18 +1,18 @@
-- [ ] Inspect the shared command/prompt boundary and identify the smallest backend-owned place to express slash-command → template fallback
-- [ ] Define the canonical resolution order explicitly: built-in command → extension command → prompt template → unknown slash input
-- [ ] Inspect the existing slash autocomplete/completion surfaces and confirm where prompt-template candidates are already sourced vs missing
-- [ ] Implement the fallback without moving ownership into RPC transport code
-- [ ] Preserve the existing command-over-template precedence rule
-- [ ] Ensure loaded prompt templates appear as slash autocomplete/completion candidates on supported surfaces already consuming backend/session prompt-template state
-- [ ] Add focused tests for loaded prompt-template invocation via `/name ...`
-- [ ] Add focused tests proving runtime-registered/reloaded prompt templates participate in slash resolution from loaded session state
-- [ ] Add focused tests proving runtime-registered/reloaded prompt templates appear in slash completion when the relevant surface consumes session prompt-template state
-- [ ] Add focused tests proving loaded prompt templates appear in slash autocomplete/completion
-- [ ] Add focused tests proving real commands still win over same-name templates
-- [ ] Add focused tests proving collision completion does not produce duplicate indistinguishable candidates and remains deterministic
-- [ ] Add focused tests proving true unknown slash-prefixed input still reports unknown/not-a-command
-- [ ] Add focused test or verification proving supported non-RPC prompt-submission paths remain converged on the same backend resolution order
-- [ ] Verify relevant RPC command/prompt tests remain green
-- [ ] Verify relevant TUI/Emacs completion tests remain green
-- [ ] Record which supported surfaces already included prompt-template completion vs which required change
-- [ ] Record implementation notes and any boundary decisions in `implementation.md`
+- [x] Inspect the shared command/prompt boundary and identify the smallest backend-owned place to express slash-command → template fallback
+- [x] Define the canonical resolution order explicitly: built-in command → extension command → prompt template → unknown slash input
+- [x] Inspect the existing slash autocomplete/completion surfaces and confirm where prompt-template candidates are already sourced vs missing
+- [x] Implement the fallback without moving ownership into RPC transport code
+- [x] Preserve the existing command-over-template precedence rule
+- [x] Ensure loaded prompt templates appear as slash autocomplete/completion candidates on supported surfaces already consuming backend/session prompt-template state
+- [x] Add focused tests for loaded prompt-template invocation via `/name ...`
+- [x] Add focused tests proving runtime-registered/reloaded prompt templates participate in slash resolution from loaded session state
+- [x] Add focused tests proving runtime-registered/reloaded prompt templates appear in slash completion when the relevant surface consumes session prompt-template state
+- [x] Add focused tests proving loaded prompt templates appear in slash autocomplete/completion
+- [x] Add focused tests proving real commands still win over same-name templates
+- [x] Add focused tests proving collision completion does not produce duplicate indistinguishable candidates and remains deterministic
+- [x] Add focused tests proving true unknown slash-prefixed input still reports unknown/not-a-command
+- [x] Add focused test or verification proving supported non-RPC prompt-submission paths remain converged on the same backend resolution order
+- [x] Verify relevant RPC command/prompt tests remain green
+- [x] Verify relevant TUI/Emacs completion tests remain green
+- [x] Record which supported surfaces already included prompt-template completion vs which required change
+- [x] Record implementation notes and any boundary decisions in `implementation.md`

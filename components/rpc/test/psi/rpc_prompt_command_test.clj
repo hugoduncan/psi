@@ -532,6 +532,51 @@
                  (get-in user-msg [:data :message :content 0 :text]))
               "journaled user message must contain the slash command text"))))))
 
+(deftest rpc-command-op-template-fallback-test
+  (testing "command op does not emit [not a command] for a loaded prompt template"
+    (let [[ctx session-id] (support/create-session-context)
+          _ (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data]
+                   assoc :prompt-templates [{:name "gh-issue-work-on"
+                                             :description "Work on issue"
+                                             :content "Template body for $1"
+                                             :source :project}])
+          state   (atom {:transport {:ready? true :pending {}}
+                         :connection {:focus-session-id session-id}
+                         :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}})
+          handler (support/make-handler ctx state)
+          input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                       "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"command-result\"]}}\n"
+                       "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/gh-issue-work-on 27\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state 300)
+          frames  (support/parse-frames out-lines)
+          events  (filter #(= :event (:kind %)) frames)
+          command-results (filter #(= "command-result" (:event %)) events)]
+      (is (empty? command-results)
+          "loaded prompt-template fallback should not emit unknown command-result text")
+      (let [journal-entries (persist/all-entries-in ctx session-id)
+            msg-entries     (filterv #(= :message (:kind %)) journal-entries)
+            user-msg        (some #(when (= "user" (get-in % [:data :message :role])) %) msg-entries)]
+        (is (some? user-msg))
+        (is (= "/gh-issue-work-on 27"
+               (get-in user-msg [:data :message :content 0 :text]))))))
+
+  (testing "command op still emits [not a command] for true unknown slash input"
+    (let [[ctx session-id] (support/create-session-context)
+          state   (atom {:transport {:ready? true :pending {}}
+                         :connection {:focus-session-id session-id}
+                         :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}})
+          handler (support/make-handler ctx state)
+          input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                       "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"command-result\"]}}\n"
+                       "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/definitely-unknown\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state 300)
+          frames  (support/parse-frames out-lines)
+          events  (filter #(= :event (:kind %)) frames)
+          text-result (some #(when (= "command-result" (:event %)) %) events)]
+      (is (some? text-result))
+      (is (= "[not a command] /definitely-unknown"
+             (get-in text-result [:data :message]))))))
+
 (deftest rpc-prompt-plain-text-journaled-test
   (testing "plain text prompt user message is journaled on agent-loop path"
     (let [[ctx session-id] (support/create-session-context)

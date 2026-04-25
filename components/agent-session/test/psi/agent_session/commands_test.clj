@@ -456,7 +456,40 @@
       (is (nil? (commands/dispatch-in ctx session-id "/skill:foo" cmd-opts)))))
   (testing "prompt template returns nil (handled by agent)"
     (let [[ctx session-id] (make-test-ctx)]
-      (is (nil? (commands/dispatch-in ctx session-id "/my-template" cmd-opts))))))
+      (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data]
+             assoc :prompt-templates [{:name "my-template"
+                                       :description "Template"
+                                       :content "Expanded template body"
+                                       :source :project}])
+      (is (nil? (commands/dispatch-in ctx session-id "/my-template" cmd-opts)))))
+  (testing "unknown slash input resolves as unknown"
+    (let [[ctx session-id] (make-test-ctx)]
+      (is (= {:kind :unknown}
+             (commands/slash-resolution-in ctx session-id "/no-such-command" cmd-opts))))))
+
+(deftest slash-resolution-prefers-commands-over-templates-test
+  (let [[ctx session-id] (make-test-ctx)]
+    (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data]
+           assoc :prompt-templates [{:name "history"
+                                     :description "Shadow history"
+                                     :content "Template history"
+                                     :source :project}
+                                    {:name "runtime-template"
+                                     :description "Runtime template"
+                                     :content "Expanded runtime template"
+                                     :source :project}])
+    (testing "built-in command wins over same-name template"
+      (let [resolution (commands/slash-resolution-in ctx session-id "/history" cmd-opts)]
+        (is (= :command (:kind resolution)))
+        (is (= :text (get-in resolution [:result :type])))
+        (is (str/includes? (get-in resolution [:result :message]) "Message history"))))
+    (testing "loaded runtime template resolves as template fallback"
+      (let [resolution (commands/slash-resolution-in ctx session-id "/runtime-template")]
+        (is (= :template (:kind resolution)))
+        (is (= "runtime-template"
+               (get-in resolution [:template-match :source-template])))
+        (is (= "Expanded runtime template"
+               (get-in resolution [:template-match :content])))))))
 
 (deftest dispatch-login-no-oauth-test
   (let [[ctx session-id] (make-test-ctx)

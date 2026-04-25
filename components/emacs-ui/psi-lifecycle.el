@@ -80,6 +80,7 @@
    :header-model-label nil
    :status-session-line nil
    :extension-command-names nil
+   :prompt-templates nil
    :transcript-hydrated? nil))
 
 (defun psi-emacs--request-initial-transcript-hydration (buffer state)
@@ -122,8 +123,8 @@
               (let ((hydrated-before (psi-emacs-state-transcript-hydrated? psi-emacs--state)))
                 (psi-emacs--request-initial-transcript-hydration buffer psi-emacs--state)
                 (when (and (not hydrated-before)
-                           (fboundp 'psi-emacs--refresh-extension-command-names))
-                  (psi-emacs--refresh-extension-command-names))))
+                           (fboundp 'psi-emacs--refresh-slash-completion-data))
+                  (psi-emacs--refresh-slash-completion-data))))
             (setq psi-emacs--owned-process (psi-rpc-client-process client))
             (psi-emacs--refresh-header-line)))))))
 

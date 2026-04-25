@@ -94,8 +94,10 @@ A token is delimited by whitespace/newlines."
   (and (stringp token)
        (string-prefix-p "@" token)))
 
+(declare-function psi-emacs--state-prompt-template-specs "psi-session-commands")
+
 (defun psi-emacs--state-slash-command-specs ()
-  "Return merged built-in + backend extension slash command specs."
+  "Return merged built-in + backend extension + prompt-template slash command specs."
   (let* ((base psi-emacs-slash-command-specs)
          (ext-names (and psi-emacs--state
                          (psi-emacs-state-extension-command-names psi-emacs--state)))
@@ -104,8 +106,10 @@ A token is delimited by whitespace/newlines."
                     (let ((cmd (string-trim (format "%s" (or name "")))))
                       (cons (if (string-prefix-p "/" cmd) cmd (concat "/" cmd))
                             "Extension command")))
-                  (or ext-names []))))
-    (seq-uniq (append base ext-specs)
+                  (or ext-names [])))
+         (template-specs (delq nil (and (fboundp 'psi-emacs--state-prompt-template-specs)
+                                        (psi-emacs--state-prompt-template-specs)))))
+    (seq-uniq (append base ext-specs template-specs)
               (lambda (a b) (equal (car a) (car b))))))
 
 (defun psi-emacs--slash-annotation (candidate)

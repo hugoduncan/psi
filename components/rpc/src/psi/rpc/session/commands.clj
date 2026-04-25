@@ -57,10 +57,11 @@
         ai-model   (current-ai-model ctx session-deps session-id)
         oauth-ctx  (:oauth-ctx ctx)
         trimmed    (str/trim text)
-        cmd-result (commands/dispatch-in ctx session-id text {:oauth-ctx oauth-ctx
-                                                              :ai-model ai-model
-                                                              :supports-session-tree? false
-                                                              :on-new-session! (:on-new-session! session-deps)})]
+        resolution (commands/slash-resolution-in ctx session-id text {:oauth-ctx oauth-ctx
+                                                                      :ai-model ai-model
+                                                                      :supports-session-tree? false
+                                                                      :on-new-session! (:on-new-session! session-deps)})
+        cmd-result (:result resolution)]
     (runtime/journal-user-message-in! ctx session-id text nil)
     (cond
       (or (= trimmed "/resume") (str/starts-with? trimmed "/resume "))
@@ -72,8 +73,14 @@
       (or (= trimmed "/model") (= trimmed "/thinking"))
       (command-pickers/handle-picker-command! request-id emit! trimmed)
 
-      cmd-result
+      (= :command (:kind resolution))
       (handle-dispatched-command! ctx state emit-frame! request-id start-daemon-thread! login-handler cmd-result emit!)
+
+      (= :template (:kind resolution))
+      nil
+
+      (= :unknown (:kind resolution))
+      (command-results/emit-text-command-result! emit! (str "[not a command] " text))
 
       :else
       (command-results/emit-text-command-result! emit! (str "[not a command] " text)))

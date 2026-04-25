@@ -664,6 +664,55 @@
     "/project-repl" (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
     nil))
 
+(declare dispatch*)
+
+(def ^:private builtin-command-names
+  #{"quit" "exit" "new" "resume" "status" "history" "help" "?"
+    "prompts" "skills" "worktree" "logout" "reload-models"
+    "reload-extension-installs" "project-repl" "tree" "jobs" "job"
+    "cancel-job" "remember" "model" "thinking" "login"})
+
+(defn loaded-command-names-in
+  "Return the authoritative slash-command name set for `session-id`.
+
+   Names are returned without the leading slash and include built-in plus
+   currently registered extension command names. Prompt templates are
+   intentionally excluded so command precedence can be checked explicitly."
+  [ctx session-id]
+  (let [ext-names (:psi.extension/command-names
+                   (session/query-in ctx session-id [:psi.extension/command-names]))]
+    (into builtin-command-names (remove str/blank? ext-names))))
+
+(defn slash-resolution-in
+  "Resolve slash-prefixed `text` against the shared backend surfaces for
+   `session-id`.
+
+   Resolution order is:
+   1. built-in command
+   2. extension command
+   3. loaded prompt template
+   4. unknown slash input
+
+   Returns one of:
+   - {:kind :command :result command-result}
+   - {:kind :template :template-match template-result}
+   - {:kind :unknown}
+   - nil for non-slash input"
+  ([ctx session-id text]
+   (slash-resolution-in ctx session-id text nil))
+  ([ctx session-id text opts]
+   (let [trimmed (str/trim text)]
+     (when (str/starts-with? trimmed "/")
+       (if-let [result (dispatch* ctx session-id trimmed opts)]
+         {:kind :command :result result}
+         (let [sd             (ss/get-session-data-in ctx session-id)
+               template-match (pt/invoke-template (:prompt-templates sd)
+                                                  (loaded-command-names-in ctx session-id)
+                                                  trimmed)]
+           (if template-match
+             {:kind :template :template-match template-match}
+             {:kind :unknown})))))))
+
 (defn- dispatch*
   "Single command dispatch pipeline.
 
@@ -695,7 +744,7 @@
 (defn dispatch-in
   "Explicit session-targeted command dispatch over the shared pipeline."
   [ctx session-id text opts]
-  (let [result (dispatch* ctx session-id text opts)]
+  (let [result (:result (slash-resolution-in ctx session-id text opts))]
     (when-let [f (:post-command-fn opts)]
       (f ctx session-id result))
     result))
