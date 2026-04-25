@@ -1,7 +1,9 @@
 (ns psi.tui.tmux-integration-harness-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.tui.test-harness.tmux :as tmux]))
+   [psi.tui.test-harness.tmux :as tmux]
+   [psi.tui.test-harness.tmux-rehydration :as tmux-rehydration]
+   [psi.tui.test-harness.tmux-streaming :as tmux-streaming]))
 
 (defn- assert-scenario-result
   "Shared assertion helper for tmux scenario results.
@@ -35,11 +37,11 @@
 
 (deftest ^:integration tui-tmux-thinking-rehydration-scenario-test
   (testing "resuming a session with a thinking block shows '· ' prefix in the transcript"
-    (assert-scenario-result (tmux/run-thinking-rehydration-scenario! {}))))
+    (assert-scenario-result (tmux-rehydration/run-thinking-rehydration-scenario! {}))))
 
 (deftest ^:integration tui-tmux-streaming-display-scenario-test
   (testing "streaming display: thinking prefix visible, tool truncated by default, ctrl+o expands"
-    (assert-scenario-result (tmux/run-streaming-display-scenario! {}))))
+    (assert-scenario-result (tmux-streaming/run-streaming-display-scenario! {}))))
 
 (deftest ^:integration tui-tmux-resize-scenario-test
   (testing "TUI repaints correctly after terminal resize: banner remains visible after shrink and after restore"
