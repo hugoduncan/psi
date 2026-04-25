@@ -81,6 +81,12 @@ as their first step. Remove those calls. Remove `append-active-turn-event` from
 all `handle-agent-event` branches. Remove `:active-turn-events` from
 `clear-live-turn`, state init, and the `render-view` destructuring binding.
 
+With `render-active-turn` rewritten, `render-active-turn-event` becomes dead
+code — remove it. `stream-thinking` is set on each `:thinking-delta` event but
+only read inside `render-active-turn-event` — remove the write in
+`:thinking-delta` handling and the field from `clear-live-turn`, state init,
+and `restore-session-view`.
+
 Mid-turn ordering falls out naturally: `thinking-item-id` keys on
 `content-index`, so a thinking block that arrives before a tool call
 (`thinking/0`) and one that arrives after (`thinking/2`) are different items in
@@ -127,20 +133,22 @@ pass over the content blocks of that message, emitting in block order:
   if non-blank — continue using `message->display-text` for text extraction so the existing
   normalization is preserved
 
-Content may be a plain vector or a `{:kind :structured :blocks [...]}` map —
-normalize to a block sequence first using the same logic as the existing
-`assistant-tool-call-blocks` helper before iterating. This normalization step
-is required before the single pass can proceed.
+Content may be a plain vector or a `{:kind :structured :blocks [...]}` map.
+Extract a private `content-blocks` helper in `transcript.clj` that normalizes
+either shape to a flat sequence of block maps, and call it from both the new
+single-pass `"assistant"` branch and the existing `assistant-tool-call-blocks`
+function (which currently inlines the same normalization). This normalization
+step is required before the single pass can proceed.
 
 This is symmetric with the archive approach (step 3) and eliminates the
 fragility of multiple passes.
 
 ### 5. Style
 
-Introduce a `thinking-style` constant and `render-thinking-line` helper
-(`· ` prefix + thinking style). Use it for both live streaming and archived
-rendering. `content-display-text` must not be changed — it is used for prompt
-construction and must remain text-only.
+In `render.clj`, introduce a `thinking-style` constant and `render-thinking-line`
+helper (`· ` prefix + thinking style). Use it for both live streaming and
+archived rendering. `content-display-text` must not be changed — it is used for
+prompt construction and must remain text-only.
 
 ## Constraints
 
@@ -168,9 +176,10 @@ construction and must remain text-only.
 4. After a tool event arrives, subsequent thinking for a new content-index
    appears below the tool row
 5. After a turn completes, thinking from that turn is visible in the transcript
-   as separate `· ` prefixed lines before the assistant reply
+   as separate `· ` prefixed messages, ordered before the assistant reply
 6. On session resume, past thinking blocks are visible in the reconstructed
-   transcript in content order
+   transcript ordered before the assistant reply and before any tool rows from
+   the same turn
 7. Live and archived thinking use `· ` prefix and a visually distinct style
 8. All existing TUI unit tests remain green
 9. New tests cover: dedup (thinking, tool lifecycle), interleaving,

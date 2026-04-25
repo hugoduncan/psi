@@ -9,10 +9,12 @@
 2. **Switch render source + remove event-log** — rewrite `render-active-turn` to
    iterate `active-turn-order` + `active-turn-items` instead of `active-turn-events`.
    For `:tool` items use `tool-calls` state. For `:thinking` use
-   `render-thinking-line`. For `:text` use `render-stream-text`. Remove
-   `append-active-turn-event` calls from `upsert-thinking-item`, `upsert-text-item`,
-   and all `handle-agent-event` branches. Remove `:active-turn-events` from
-   `clear-live-turn`, state init, `render-view` destructuring. Update
+   `render-thinking-line`. For `:text` use `render-stream-text`. Remove dead
+   `render-active-turn-event`. Remove `append-active-turn-event` calls from
+   `upsert-thinking-item`, `upsert-text-item`, and all `handle-agent-event`
+   branches. Remove `:active-turn-events` and `:stream-thinking` from
+   `clear-live-turn`, state init, `render-view` destructuring; remove the
+   `:stream-thinking` write from `:thinking-delta` handling. Update
    `has-progress?` to use `(seq active-turn-order)`.
 
 3. **Archive on turn complete** — in `handle-agent-result`, iterate the result
@@ -20,11 +22,11 @@
    `:thinking` block before the `:assistant` message. Add `:thinking` role to
    `render-message`.
 
-4. **Rehydration** — rewrite the `"assistant"` branch of
-   `agent-messages->tui-resume-state` as a single pass over content blocks,
-   emitting `:thinking` and tool entries in block order, then `:assistant` after
-   all blocks. Normalize content to a block sequence first (plain vector or
-   structured map) before iterating.
+4. **Rehydration** — extract a private `content-blocks` helper in `transcript.clj`
+   to normalize content (plain vector or structured map) to a flat block sequence.
+   Rewrite the `"assistant"` branch of `agent-messages->tui-resume-state` as a
+   single pass over `(content-blocks content)`, emitting `:thinking` and tool
+   entries in block order, then `:assistant` after all blocks.
 
 5. **Tests** — add focused tests for each gap; confirm existing ordering tests
    still green; run full suite.
