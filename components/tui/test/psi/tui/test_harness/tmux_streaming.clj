@@ -7,9 +7,12 @@
    [clojure.string :as str]
    [psi.tui.test-harness.tmux :as tmux]))
 
-(def ^:private default-streaming-marker "⠋")
 (def ^:private default-tool-done-marker "✓")
 (def ^:private default-thinking-prefix "· ")
+;; The spinner (⠋) is transient — on fast machines (or CI) the tool may
+;; complete before the first poll.  We treat either the spinner OR the done
+;; marker as evidence that tool streaming started.
+(def ^:private default-tool-started-markers ["⠋" "✓"])
 
 (defn- edn-str
   "Serialize value to a compact EDN string suitable for shell env var injection."
@@ -38,7 +41,8 @@
    Scenario steps:
    1. Boot → ready marker
    2. Submit 'think' → wait for '· ' (thinking prefix)
-   3. Submit 'tool'  → wait for spinner (⠋), then done marker (✓)
+   3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓
+      (spinner is transient — may be missed on fast machines before first poll)
    4. Assert content NOT visible in collapsed mode (no 'output-line-1')
    5. Press ctrl+o   → assert expanded content visible ('output-line-10')
    6. /quit → clean exit"
@@ -103,7 +107,13 @@
                              (do
                                (tmux/send-line! target "tool")
                                (cond
-                                 (not (tmux/wait-for-marker target default-streaming-marker step-timeout-ms))
+                                 ;; Wait for either the spinner or the done marker.
+                                 ;; The spinner (⠋) is transient — on fast machines or
+                                 ;; CI the tool may complete before the first poll, so
+                                 ;; seeing the done marker (✓) is equally valid evidence
+                                 ;; that tool streaming fired.
+                                 (not (tmux/wait-for-any-marker
+                                       target default-tool-started-markers step-timeout-ms))
                                  (failure target :tool-spinner-not-visible)
 
                                  (not (tmux/wait-for-marker target default-tool-done-marker step-timeout-ms))

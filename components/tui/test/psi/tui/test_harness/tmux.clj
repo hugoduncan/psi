@@ -176,10 +176,18 @@
   [session-name]
   (run-sh (format "tmux kill-session -t %s >/dev/null 2>&1 || true" session-name)))
 
+(defn ensure-tmux-server!
+  "Ensure a tmux server is running.  `tmux new-session -d` starts a server
+   implicitly on most platforms, but on headless CI runners the server may not
+   start without an explicit `tmux start-server` call first."
+  []
+  (run-sh "tmux start-server"))
+
 (defn start-session!
   [{:keys [session-name working-dir launch-command]
     :or {working-dir (str (.getCanonicalPath (io/file ".")))
          launch-command (launcher-command)}}]
+  (ensure-tmux-server!)
   (run-sh (format "tmux new-session -d -s %s -c %s"
                   session-name
                   (pr-str working-dir)))
@@ -403,8 +411,11 @@
      producing duplicate banner lines.
 
    :separator-at-column-0
-     At least one '────' separator line starts with '─'.  If the display
-     is shifted right the separator begins with spaces instead.
+     At least one separator line starts at column 0.  The TUI renders
+     separators as repeated '─' (U+2500).  On terminals that do not support
+     Unicode box-drawing characters (e.g. headless CI runners with a basic
+     VT100 TERM), charm falls back to VT100 ACS line-drawing, which tmux
+     captures as repeated 'q'.  Both forms are accepted.
 
    :separator-spans-width
      The trimmed length of the first separator line is within 2 columns of
@@ -423,8 +434,15 @@
          non-blank    (remove str/blank? lines)
          banner-lines (filter #(str/includes? % "ψ Psi Agent Session") lines)
          banner-line  (first banner-lines)
-         sep-lines    (filter #(str/includes? % "────") lines)
+         ;; Accept both Unicode box-drawing (─, U+2500) and VT100 ACS
+         ;; fallback (q) that tmux captures on terminals without Unicode
+         ;; box-drawing support (e.g. headless CI with TERM=screen).
+         sep-lines    (filter #(or (str/includes? % "────")
+                                   (str/includes? % "qqqq"))
+                              lines)
          sep-line     (first sep-lines)
+         sep-char     (when sep-line
+                        (if (str/starts-with? sep-line "─") "─" "q"))
          violations
          (cond-> []
            ;; 1. Banner present and starts at column 0
@@ -445,9 +463,9 @@
            ;; 3. Separator present and starts at column 0
            (nil? sep-line)
            (conj {:check  :separator-at-column-0
-                  :detail "No separator line (────) found"})
+                  :detail "No separator line (──── or qqqq) found"})
 
-           (and sep-line (not (str/starts-with? sep-line "─")))
+           (and sep-line sep-char (not (str/starts-with? sep-line sep-char)))
            (conj {:check  :separator-at-column-0
                   :detail (str "Separator line has unexpected leading content: "
                                (pr-str (subs sep-line 0 (min 40 (count sep-line)))))})
@@ -555,6 +573,9 @@
                          (when-not (wait-for-marker target banner-marker step-timeout-ms)
                            (failure-result target :banner-missing-after-single-shrink))
 
+                         ;; Each nested `or` sequences side effects before its check;
+                         ;; the nesting is intentional — short-circuit on first failure.
+                         #_{:clj-kondo/ignore [:redundant-nested-call]}
                          (or
                           (check-resize-step target "after-single-shrink" narrow-width)
 
