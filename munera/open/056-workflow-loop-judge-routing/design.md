@@ -2,7 +2,7 @@
 
 ## Intent
 
-Extend the deterministic workflow runtime with looping capability, driven by a judge/routing model that cleanly separates actor execution, result classification, and transition routing.
+Extend the deterministic workflow runtime with looping capability, driven by a judge/routing model that cleanly separates actor execution, result classification, and transition routing — grounded in a rigorous statechart model where the chart drives execution rather than merely tracking status.
 
 ## Context
 
@@ -10,9 +10,129 @@ The current workflow model is a fixed linear pipeline: steps execute in definiti
 
 Real workflows need loops — the canonical case being plan→build→review where the reviewer can send work back to the builder. Today this must be encoded in prose instructions to a single agent session, losing the composability and observability of the step model.
 
+The current statechart is a **status tracker** — it records that the run is `:pending`, `:running`, `:blocked`, etc. The actual execution logic lives in an imperative loop (`execute-run!` calling `execute-current-step!` repeatedly). The statechart doesn't drive execution, it reflects it.
+
 ## Core insight
 
 Every step already has an implicit routing rule: "on success, go to the next step." Making that routing explicit — and optionally driven by a judge agent — gives us loops, conditional branching, and early termination as a natural extension of the existing model, with the linear pipeline as the zero-configuration degenerate case.
+
+## Statechart ↔ Workflow correspondence
+
+This is the foundational mapping. The statechart is the execution controller, not a status mirror.
+
+### Concept mapping
+
+| Statechart concept | Workflow counterpart |
+|---|---|
+| **State** | A step in a specific phase (acting, judging) |
+| **Event** | A signal produced by completion of work (`:actor/done`, judge verdict string) |
+| **Action (on-entry)** | Spawn agent session and prompt it (actor or judge) |
+| **Action (on-exit)** | Record result into context, clean up session reference |
+| **Guard** | Iteration count check, signal match against routing table |
+| **Extended state (context)** | Workflow input, step outputs, iteration counts, session references, judge results |
+| **Transition** | Routing directive — which state to enter next, derived from `:on` table |
+
+### Three kinds of state
+
+1. **Workflow context** (statechart extended state) — the accumulated data map: workflow input, each step's accepted output, iteration counts, judge results. Grows as steps complete. Owned by the statechart.
+
+2. **Agent context** (external resource) — the actor session's conversation history. External to the statechart. The statechart holds a *reference* (session-id) in its extended state, not the content. Created by entry actions, read by exit actions and projection functions.
+
+3. **Judge context** (external resource) — the projected view of the agent context, plus the judge session's own conversation. Also external, also referenced. Created by the judging state's entry action from a projection of the actor session.
+
+### Messages and computed parameters
+
+Prompts and projections are **computed functions of context**, not carried state:
+
+- **Prompt materialization**: the entry action for a step computes the prompt from `context[:step-outputs]` and `context[:workflow-input]` via binding resolution. This is the existing `materialize-step-inputs` + `render-prompt-template` — reading from statechart context instead of the workflow-run state map.
+
+- **Projection**: the entry action for a judging sub-state reads the actor session referenced in context, applies the projection spec, and produces preloaded messages for the judge session. The projection spec is definition data, the actor session is an external resource, and the projected messages are a computed parameter — none of these are statechart state.
+
+### Chart structure
+
+A workflow with steps `[plan, build, review]` where review has a judge:
+
+```
+[workflow-run]
+  │
+  ├─ :pending
+  │    on-entry: —
+  │    :start → :step/plan
+  │
+  ├─ :step/plan                            ← leaf state (no judge)
+  │    on-entry: create-actor-session(plan, context), prompt(plan)
+  │    on-exit:  record-result(plan) into context
+  │    :actor/done → :step/build
+  │
+  ├─ :step/build                           ← leaf state (no judge)
+  │    on-entry: create-actor-session(build, context), prompt(build)
+  │    on-exit:  record-result(build) into context
+  │    :actor/done → :step/review
+  │
+  ├─ :step/review                          ← compound state (has judge)
+  │    │
+  │    ├─ :step/review.acting
+  │    │    on-entry: create-actor-session(review, context), prompt(review)
+  │    │    on-exit:  record-result(review) into context
+  │    │    :actor/done → :step/review.judging
+  │    │
+  │    └─ :step/review.judging
+  │         on-entry: project(review-session, projection-spec),
+  │                   create-judge-session(projected-messages),
+  │                   prompt(judge)
+  │         on-exit:  record-judge-result into context,
+  │                   increment-iteration-count
+  │         "APPROVED" → :completed
+  │         "REVISE" [guard: iterations < max] → :step/build
+  │         "REVISE" [guard: iterations >= max] → :failed
+  │         <no-match> [guard: judge-retries < max] → :step/review.judging  (retry judge)
+  │         <no-match> [guard: judge-retries >= max] → :failed
+  │
+  ├─ :completed
+  │    on-entry: record-terminal-outcome(context)
+  │
+  ├─ :failed
+  │    on-entry: record-terminal-outcome(context)
+  │
+  └─ :cancelled
+       on-entry: record-terminal-outcome(context)
+```
+
+### Key structural properties
+
+**Steps without a judge are leaf states.** One event (`:actor/done`), one transition (to next step). The existing linear behavior.
+
+**Steps with a judge are compound states** with two sub-states: `.acting` and `.judging`. The actor produces `:actor/done` → transitions to `.judging`. The judge produces a signal string → the routing table maps it to a transition.
+
+**The imperative execution loop disappears.** There is no `execute-run!` loop. The statechart drives execution: entering a state fires its entry action (spawn agent), agent completes and emits an event, event fires a transition, next state entered, next entry action fires. The loop is the statechart's event-processing loop.
+
+**Context accumulation is explicit.** Each exit action writes to the extended state:
+
+```clojure
+context = {:workflow-input    {...}
+           :step-outputs      {"plan"   {:text "..."}
+                               "build"  {:text "..."}
+                               "review" {:text "..."}}
+           :iteration-counts  {"review" 2}
+           :judge-results     {"review" {:output "REVISE" :event "REVISE"}}
+           :sessions          {"plan"         "sid-1"
+                               "build"        "sid-2"
+                               "review"       "sid-3"
+                               "review-judge" "sid-4"}}
+```
+
+### Correspondence to current code
+
+| Current code | Statechart equivalent |
+|---|---|
+| `workflow-run` state map | Statechart extended state (context) |
+| `execute-current-step!` | Entry action on a step state |
+| `submit-result-envelope` | Exit action + event emission |
+| `execute-run!` loop | Statechart event-processing loop |
+| `next-step-id-fn` | Transition target (static for leaf states) |
+| routing table `:on` | Transition table with guards |
+| projection spec | Computed action parameter (context + session → messages) |
+| prompt template + bindings | Computed action parameter (context → string) |
 
 ## Design
 
@@ -55,7 +175,7 @@ Separating the judge from the actor keeps actor steps fully reusable — the bui
 
 #### Projection
 
-A projection controls what the judge sees from the actor session. It is a strategy, not inline keys:
+A projection controls what the judge sees from the actor session. It is a named strategy:
 
 | Value | Meaning |
 |-------|---------|
@@ -67,6 +187,14 @@ A projection controls what the judge sees from the actor session. It is a strate
 Default when `:projection` is absent: `:full`.
 
 The projection extracts from the actor session's message history and produces synthetic preloaded messages for the judge session, using the existing child-session prelude mechanism.
+
+#### Judge failure handling
+
+If the judge output doesn't match any key in the `:on` table:
+- Inject the mismatch as feedback into the judge session and continue it (limited retries).
+- If retries are exhausted, fail the workflow.
+
+Judge signal matching is **exact string match** (trimmed of leading/trailing whitespace).
 
 ### Routing table (`:on`)
 
@@ -82,25 +210,17 @@ Maps signal strings to routing directives:
 | Key | Type | Meaning |
 |-----|------|---------|
 | `:goto` | `:next`, `:previous`, `:done`, or step-id string | Where to route |
-| `:max-iterations` | `pos-int?` | Bound on how many times this directive can fire |
+| `:max-iterations` | `pos-int?` | Bound on how many times this step can be looped to |
 
 - `:goto :next` — advance to next step in definition order (current linear behavior)
 - `:goto :done` — complete the workflow immediately
 - `:goto :previous` — jump to previous step in definition order
 - `:goto "step-id"` — jump to a named step
-- `:max-iterations` — when the iteration count for this goto is exhausted, the workflow blocks or fails (TBD: which)
+- `:max-iterations` — per-step iteration count; when exhausted, the workflow **fails**
 
 When `:on` is absent, the implicit routing table is `{:ok {:goto :next}}` — identical to today's behavior.
 
-### Statechart additions
-
-New events:
-
-- `:verdict/advance` — judge says advance (maps to `:goto :next` or `:goto :done`)
-- `:verdict/goto` — judge says loop to a specific step
-- `:verdict/exhausted` — max-iterations reached on a goto directive
-
-These are `:running → :running` transitions (like `:workflow/retry`), except `:verdict/goto` changes `current-step-id`.
+Iteration counting is **per-step** — all gotos targeting the same step share a single counter.
 
 ### Step run state additions
 
@@ -109,20 +229,26 @@ These are `:running → :running` transitions (like `:workflow/retry`), except `
 | `:judge-session-id` | `string?` | The judge's execution session |
 | `:judge-output` | `string?` | Raw judge text |
 | `:judge-event` | `string?` | The matched signal |
-| `:iteration-counts` | `{string int}` | Per-goto-target iteration counts for this step |
+| `:iteration-count` | `int` | How many times this step has been entered (per-step) |
 
-### Execution flow
+### Execution flow (statechart-driven)
 
 ```
-1. Actor step executes → :ok envelope recorded
-2. Step has :judge?
-   a. Yes → apply projection to actor session → projected messages
-          → create judge child session (preloaded with projected messages)
-          → prompt judge with judge :prompt
-          → match judge output against :on keys → routing directive
-          → apply directive (advance, goto, done)
-   b. No  → apply implicit {:ok {:goto :next}} routing
-3. Progression updates run state, statechart validates transition
+1. Statechart enters step state
+2. Entry action: compute prompt from context, create actor session, prompt it
+3. Actor completes → emit :actor/done event
+4. Step has :judge?
+   a. Yes → transition to .judging sub-state
+          → entry action: project actor session, create judge session, prompt it
+          → judge completes → emit signal string as event
+          → match signal against :on table:
+              → matched directive with :goto → guard checks iteration count
+                  → within limit → transition to target step state
+                  → exhausted → transition to :failed
+              → no match → retry judge (inject feedback, continue session)
+                  → retries exhausted → transition to :failed
+   b. No  → transition to next step state (implicit {:ok {:goto :next}})
+5. Exit action: record result + judge result into context
 ```
 
 ### File format
@@ -143,9 +269,9 @@ A linear workflow (no `:judge`, no `:on`) is unchanged from today.
 
 ### Input binding on loop-back
 
-When a `:goto` directive routes back to a previous step, the step re-executes. Its `:input-bindings` resolve as normal — `:workflow-input` still available, `:step-output` from prior accepted results still available. The key question is whether the *new* output from the judge/reviewer should be available to the target step.
+When a `:goto` directive routes back to a previous step, the step re-executes. Its `:input-bindings` resolve as normal — `:workflow-input` still available, `:step-output` from prior accepted results still available (and now updated with the latest outputs from the judged step).
 
-Design decision (to refine): the judge's matched signal and the actor's output text from the judged step should be available as a binding source for the goto target. Candidate binding source: `:loop-input` or `:judge-output`, resolving from the most recent judge result that triggered the goto.
+Open question: whether the judge's output / the reviewing actor's feedback should be available as an explicit additional binding source for the goto target. Candidate: `:judge-output` binding source resolving from the most recent judge result that triggered the goto.
 
 ### Backward compatibility
 
@@ -154,13 +280,46 @@ Design decision (to refine): the judge's matched signal and the actor's output t
 - Existing workflow files, definitions, and tests are unaffected.
 - The result envelope schema is unchanged — actors still produce `{:outcome :ok :outputs {:text ...}}`.
 
+## Resolved decisions
+
+1. **`:max-iterations` exhaustion** → **fail** the workflow. Predictable; human intervention can restart.
+2. **Judge signal matching** → **exact string match** (trimmed). Predictable; workflow authors control the judge prompt.
+3. **Judge failure (no match)** → **limited retries** (inject mismatch feedback into judge session and continue), then **fail**.
+4. **Iteration counting** → **per-step**. All gotos targeting the same step share one counter.
+
 ## Open questions
 
-1. **`:max-iterations` exhaustion** — should it block (for human decision) or fail the workflow? Blocking is more forgiving; failing is more predictable.
-2. **`:goto :previous` input bindings** — should the previous step receive the reviewer's feedback as input, or re-execute with its original inputs? Likely needs a `:loop-input` binding source.
-3. **Judge signal matching** — exact string match, or case-insensitive / trimmed? Exact is simpler and more predictable; trimmed+case-insensitive is more tolerant of model variation.
-4. **Judge failure** — if the judge output doesn't match any `:on` key, should it retry the judge, block, or fail? A default/fallback directive (`:else`) could handle this.
-5. **Per-directive vs per-step iteration counting** — `:max-iterations` on the directive means different gotos from the same step have independent counters. Is that the right granularity?
+1. **`:goto :previous` input bindings** — should the previous step receive the reviewer's feedback as input, or re-execute with its original inputs? Likely needs a `:judge-output` or `:loop-feedback` binding source.
+2. **Judge retry limit** — how many retries before failing? Likely 2-3. Should this be configurable per judge, or a fixed default?
+3. **Judge system prompt** — should the judge get a minimal system prompt ("You are a workflow routing judge. Respond with exactly one of the following signals: ...") auto-generated from the `:on` keys, or should the workflow author provide the full judge system prompt?
+
+## Implementation strategy
+
+### Phase B: Progression-layer extension (first cut)
+
+Keep the imperative `execute-run!` loop. Add judge + routing as new branches in the existing progression logic. The statechart remains a status tracker. This ships the user-facing capability quickly.
+
+Changes:
+- Model: judge schema, projection schema, routing directive schema, step-run judge fields, iteration count
+- New namespace `workflow_judge.clj`: projection extraction, judge session creation, signal matching
+- Progression: wire judge+routing into post-actor phase in `execute-current-step!`
+- Compiler: thread `:judge` and `:on` from workflow file config to canonical step definitions
+- Statechart: add verdict events for observability (status tracking)
+- Tests: model, projection, judge, routing, progression, compiler, end-to-end loop
+
+### Phase A: Statechart-driven execution (follow-on)
+
+Migrate the execution layer so the compiled statechart drives step execution. Entry actions spawn agents, events carry results, guards evaluate routing conditions. The imperative loop disappears. The statechart correspondence documented above becomes the literal implementation.
+
+Changes:
+- Compile workflow definitions into hierarchical statecharts (leaf states for simple steps, compound states for judged steps)
+- Entry/exit actions own session creation, prompting, result recording
+- Extended state (context) replaces the workflow-run state map as the accumulator
+- `execute-run!` becomes "start statechart, process events until quiescent"
+- The progression layer becomes thin — just context updates and event emission
+- Existing tests refactored to drive the statechart directly
+
+Phase A is the target architecture. Phase B is the pragmatic path to get looping capability shipped, with Phase A immediately following.
 
 ## Acceptance criteria
 
@@ -168,8 +327,9 @@ Design decision (to refine): the judge's matched signal and the actor's output t
 - [ ] Steps without `:judge`/`:on` behave identically to today (linear advance)
 - [ ] Projection controls what the judge sees from the actor session
 - [ ] `:goto` directives route to named steps, `:next`, `:previous`, `:done`
-- [ ] `:max-iterations` bounds loop count per directive
+- [ ] `:max-iterations` bounds loop count per step
 - [ ] Iteration state is tracked in step-run state and observable via introspection
+- [ ] Judge failure triggers limited retries with feedback injection, then fails
 - [ ] Workflow file compiler threads `:judge` and `:on` from config to canonical definitions
 - [ ] Existing workflow files and tests pass without modification
-- [ ] New tests prove: linear (no judge), single loop, multi-loop with exhaustion, projection variants
+- [ ] New tests prove: linear (no judge), single loop, multi-loop with exhaustion, projection variants, judge retry on no-match
