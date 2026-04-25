@@ -199,6 +199,10 @@
   {:doc  "Run Clojure integration tests (slow, requires tmux etc)."
    :task (shell "clojure -M:test --focus integration")}
 
+  smoke:test
+  {:doc  "Smoke-test the live runtime: RPC handshake subprocess test + TUI tmux startup scenario."
+   :task (shell "clojure -M:test --focus integration --ns-pattern \"psi.rpc-smoke-test|psi.tui.tmux-integration-harness-test\"")}
+
   clojure:test
   {:doc     "Run both Clojure unit and extension test suites."
    :depends [clojure:test:unit clojure:test:extensions]}
