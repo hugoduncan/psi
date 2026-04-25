@@ -502,6 +502,117 @@
           (finally
             (delete-thinking-fixture! fixture-path)))))))
 
+;; ── Resize scenario ──────────────────────────────────────────────────────────
+
+(defn pane-width
+  "Return the current width of the pane in columns, or nil on failure."
+  [target]
+  (let [{:keys [exit out]}
+        (run-sh (format "tmux display-message -p -t %s '#{pane_width}'"
+                        (pane-target target)))]
+    (when (zero? exit)
+      (try (Long/parseLong (str/trim out))
+           (catch Exception _ nil)))))
+
+(defn resize-pane-width!
+  "Resize the pane to COLS columns."
+  [target cols]
+  (run-sh (format "tmux resize-pane -t %s -x %d"
+                  (pane-target target) cols)))
+
+(defn run-resize-scenario!
+  "Prove that the TUI repaints correctly after a terminal resize.
+
+   Scenario:
+   1. Boot → ready marker
+   2. Capture initial pane width W
+   3. Resize pane to W-20 (narrower)
+   4. Wait for banner to remain visible (WidthChangedRender repainted)
+   5. Resize pane back to W
+   6. Wait for banner to remain visible after second resize
+   7. /quit → clean exit
+
+   This exercises the JLine Display WidthChangedRender path: on every
+   width change the renderer calls Display.resize then re-renders the
+   full view, so the terminal is never left blank."
+  [{:keys [session-name
+           working-dir
+           launch-command
+           startup-timeout-ms
+           step-timeout-ms
+           ready-markers
+           banner-marker
+           resize-delta
+           keep-session-on-failure?]
+    :or {working-dir (str (.getCanonicalPath (io/file ".")))
+         launch-command (worktree-launch-command)
+         startup-timeout-ms default-startup-timeout-ms
+         step-timeout-ms default-step-timeout-ms
+         ready-markers default-ready-markers
+         ;; A stable string always present in the banner
+         banner-marker "ESC=interrupt"
+         ;; How many columns to shrink by
+         resize-delta 20
+         keep-session-on-failure? false}}]
+  (let [preflight (tmux-preflight-result)]
+    (if (not= :ok (:status preflight))
+      preflight
+      (let [session-name* (or session-name (unique-session-name))]
+        (try
+          (let [target (start-session! {:session-name session-name*
+                                        :working-dir working-dir
+                                        :launch-command launch-command})
+                result (cond
+                         (not (wait-for-any-marker target ready-markers startup-timeout-ms))
+                         (failure-result target :startup-timeout)
+
+                         :else
+                         (let [initial-width (pane-width target)]
+                           (if (nil? initial-width)
+                             (assoc (failure-result target :pane-width-unavailable)
+                                    :detail "Could not read initial pane width")
+                             (let [narrow-width (max 40 (- initial-width resize-delta))]
+                               ;; Step 1: shrink the pane
+                               (resize-pane-width! target narrow-width)
+                               (cond
+                                 (not (wait-for-marker target banner-marker step-timeout-ms))
+                                 (assoc (failure-result target :banner-missing-after-shrink)
+                                        :detail (str "Banner not visible after resize to " narrow-width " cols"))
+
+                                 :else
+                                 ;; Step 2: restore original width
+                                 (do
+                                   (resize-pane-width! target initial-width)
+                                   (cond
+                                     (not (wait-for-marker target banner-marker step-timeout-ms))
+                                     (assoc (failure-result target :banner-missing-after-restore)
+                                            :detail (str "Banner not visible after resize back to " initial-width " cols"))
+
+                                     :else
+                                     (do
+                                       (send-line! target "/quit")
+                                       (if (wait-for-java-exit target step-timeout-ms)
+                                         {:status :passed
+                                          :session-name session-name*
+                                          :pane-id (:pane-id target)}
+                                         (failure-result target :quit-timeout))))))))))]
+            (when (or (= :passed (:status result))
+                      (not keep-session-on-failure?))
+              (kill-session-if-exists! session-name*))
+            result)
+          (catch Throwable t
+            (let [target {:session-name session-name*
+                          :pane-id (primary-pane-id session-name*)}
+                  result {:status :failed
+                          :reason :exception
+                          :session-name session-name*
+                          :pane-id (:pane-id target)
+                          :error-message (or (ex-message t) (str t))
+                          :pane-snapshot (sanitize-pane-text (capture-pane target))}]
+              (when-not keep-session-on-failure?
+                (kill-session-if-exists! session-name*))
+              result)))))))
+
 ;; ── Scripted streaming scenario ───────────────────────────────────────────────
 
 (def default-streaming-marker "⠋")

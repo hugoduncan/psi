@@ -40,3 +40,7 @@
 (deftest ^:integration tui-tmux-streaming-display-scenario-test
   (testing "streaming display: thinking prefix visible, tool truncated by default, ctrl+o expands"
     (assert-scenario-result (tmux/run-streaming-display-scenario! {}))))
+
+(deftest ^:integration tui-tmux-resize-scenario-test
+  (testing "TUI repaints correctly after terminal resize: banner remains visible after shrink and after restore"
+    (assert-scenario-result (tmux/run-resize-scenario! {}))))
