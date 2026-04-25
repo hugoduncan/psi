@@ -32,3 +32,6 @@ Designed in conversation 2026-04-25. Key design evolution:
 | 2 | Judge signal matching | Exact (trimmed) | Predictable; author controls judge prompt |
 | 3 | Judge failure (no match) | Limited retries with feedback injection, then fail | Gives the judge a chance to correct; bounded |
 | 4 | Iteration counting | Per-step | All gotos to same step share one counter; simpler mental model |
+| 5 | Loop-back input bindings | No special source | Goto target uses normal bindings; reviewer output available via `:step-output` if wired |
+| 6 | Judge retry limit | Fixed at 2 retries (3 total) | Simple; not configurable per judge in first cut |
+| 7 | Judge system prompt | Author-provided | No auto-generation; author controls judge instructions via `:judge {:prompt ...}` |

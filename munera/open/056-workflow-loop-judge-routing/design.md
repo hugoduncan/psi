@@ -271,7 +271,7 @@ A linear workflow (no `:judge`, no `:on`) is unchanged from today.
 
 When a `:goto` directive routes back to a previous step, the step re-executes. Its `:input-bindings` resolve as normal — `:workflow-input` still available, `:step-output` from prior accepted results still available (and now updated with the latest outputs from the judged step).
 
-Open question: whether the judge's output / the reviewing actor's feedback should be available as an explicit additional binding source for the goto target. Candidate: `:judge-output` binding source resolving from the most recent judge result that triggered the goto.
+No special loop-feedback binding source in the first cut. The goto target gets its normal bindings. Since `:step-output` resolves from accepted results, and the reviewing step's output is recorded before the judge runs, the goto target *can* access the reviewer's output via `:step-output` if its bindings reference it. This may be sufficient; a dedicated `:loop-feedback` source can be added later if needed.
 
 ### Backward compatibility
 
@@ -284,14 +284,15 @@ Open question: whether the judge's output / the reviewing actor's feedback shoul
 
 1. **`:max-iterations` exhaustion** → **fail** the workflow. Predictable; human intervention can restart.
 2. **Judge signal matching** → **exact string match** (trimmed). Predictable; workflow authors control the judge prompt.
-3. **Judge failure (no match)** → **limited retries** (inject mismatch feedback into judge session and continue), then **fail**.
+3. **Judge failure (no match)** → **limited retries** (inject mismatch feedback into judge session and continue), then **fail**. Fixed limit: **2 retries**.
 4. **Iteration counting** → **per-step**. All gotos targeting the same step share one counter.
+5. **Loop-back input bindings** → **no** for now. The goto target re-executes with its normal input bindings (`:workflow-input`, `:step-output` from prior accepted results). No special `:loop-feedback` binding source. Can be added later if needed.
+6. **Judge retry limit** → **fixed at 2** retries (3 total attempts). Not configurable per judge in the first cut.
+7. **Judge system prompt** → **author-provided** via the `:judge {:prompt "..."}` field. No auto-generation from `:on` keys. The author is responsible for instructing the judge to produce one of the expected signals.
 
 ## Open questions
 
-1. **`:goto :previous` input bindings** — should the previous step receive the reviewer's feedback as input, or re-execute with its original inputs? Likely needs a `:judge-output` or `:loop-feedback` binding source.
-2. **Judge retry limit** — how many retries before failing? Likely 2-3. Should this be configurable per judge, or a fixed default?
-3. **Judge system prompt** — should the judge get a minimal system prompt ("You are a workflow routing judge. Respond with exactly one of the following signals: ...") auto-generated from the `:on` keys, or should the workflow author provide the full judge system prompt?
+None remaining — all resolved. See "Resolved decisions" below.
 
 ## Implementation strategy
 
