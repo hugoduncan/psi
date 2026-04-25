@@ -579,10 +579,18 @@
 
       [state nil])))
 
-(defn- thinking-block?
+(defn- block-type-kw
   [block]
   (let [t (or (:type block) (:kind block))]
-    (= :thinking (if (keyword? t) t (keyword t)))))
+    (if (keyword? t) t (some-> t keyword))))
+
+(defn- thinking-block?
+  [block]
+  (= :thinking (block-type-kw block)))
+
+(defn- tool-call-block?
+  [block]
+  (= :tool-call (block-type-kw block)))
 
 (defn handle-agent-result
   [state result]
@@ -591,17 +599,34 @@
         errors   (message-text/content-error-parts content)
         error    (first errors)
         display  (if (seq (or text "")) text "(no response)")
-        blocks   (if (sequential? content) content
-                     (if (and (map? content)
-                              (= :structured (or (:kind content) (:type content))))
-                       (:blocks content)
-                       []))
-        thinking-msgs (keep (fn [b]
-                              (when (thinking-block? b)
-                                {:role :thinking :text (:text b)}))
-                            blocks)]
+        blocks   (cond
+                   (sequential? content) content
+                   (and (map? content)
+                        (= :structured (or (:kind content) (:type content))))
+                   (:blocks content)
+                   :else [])
+        ;; Emit thinking and tool-call blocks in content order, then assistant text.
+        ;; Tool-call blocks become {:role :tool :tool-id ui-id} messages so they
+        ;; render inline with the transcript in the correct position.
+        ;; Resolve the provider tool-id to the ui-id used in tool-calls
+        ;; (ensure-tool-row prefixes with "tool/").
+        resolve-tool-ui-id (fn [provider-id]
+                             (or (get-in state [:tool-ui-id-by-tool-id provider-id])
+                                 (when (contains? (:tool-calls state) provider-id) provider-id)
+                                 (str "tool/" provider-id)))
+        ordered-msgs (keep (fn [b]
+                             (cond
+                               (thinking-block? b)
+                               {:role :thinking :text (:text b)}
+
+                               (tool-call-block? b)
+                               (let [id (or (:id b) (get b "id"))]
+                                 (when id {:role :tool :tool-id (resolve-tool-ui-id id)}))
+
+                               :else nil))
+                           blocks)]
     [(-> state
-         (update :messages into thinking-msgs)
+         (update :messages into ordered-msgs)
          (update :messages conj {:role :assistant :text display})
          (assoc :phase :idle
                 :error error)

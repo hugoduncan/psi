@@ -385,7 +385,9 @@
                    :content [{:type :text :text "done"}]}]
         {:keys [messages tool-calls tool-order]}
         (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
+    ;; tool-call block emits a :tool message before the assistant text summary
     (is (= [{:role :user :text "read file"}
+            {:role :tool :tool-id "call-1"}
             {:role :assistant :text "Sure"}
             {:role :assistant :text "done"}]
            messages))
@@ -411,7 +413,9 @@
                              :blocks [{:kind :text :text "done"}]}}]
         {:keys [messages tool-calls tool-order]}
         (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
-    (is (= [{:role :assistant :text "planning"}
+    ;; tool-call block emits a :tool message before the assistant text summary
+    (is (= [{:role :tool :tool-id "call-2"}
+            {:role :assistant :text "planning"}
             {:role :assistant :text "done"}]
            messages))
     (is (= ["call-2"] tool-order))
@@ -448,10 +452,11 @@
                      :is-error false}]
           {:keys [messages tool-order]}
           (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
-      ;; thinking A, tool-call row, thinking B, then assistant text
+      ;; thinking A, :tool message, thinking B, then assistant text — in block order
       (is (= {:role :thinking :text "Plan A"} (nth messages 0)))
-      (is (= {:role :thinking :text "Plan B"} (nth messages 1)))
-      (is (= {:role :assistant :text "Done."} (nth messages 2)))
+      (is (= {:role :tool :tool-id "call-3"} (nth messages 1)))
+      (is (= {:role :thinking :text "Plan B"} (nth messages 2)))
+      (is (= {:role :assistant :text "Done."} (nth messages 3)))
       (is (= ["call-3"] tool-order)))))
 
 (deftest agent-messages->tui-resume-state-structured-content-with-thinking-test

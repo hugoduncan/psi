@@ -75,7 +75,12 @@
        "assistant"
        (let [text   (message->display-text msg)
              blocks (content-blocks (:content msg))
-             ;; single pass: emit thinking + tool entries in block order
+             ;; Single pass over content blocks in order:
+             ;; - :thinking → {:role :thinking :text t}
+             ;; - :tool-call → register in tool-calls/tool-order + {:role :tool :tool-id id}
+             ;; - other (text) blocks → skip (text is appended after all blocks)
+             ;; Assistant text is appended last so it follows all inline blocks.
+             ;; This preserves the relative order of thinking and tool rows.
              acc'   (reduce
                      (fn [a block]
                        (cond
@@ -96,7 +101,8 @@
                                    :expanded? false}]
                            (-> a
                                (update :tool-calls #(if (contains? % id) % (assoc % id tc)))
-                               (update :tool-order #(if (some #{id} %) % (conj % id)))))
+                               (update :tool-order #(if (some #{id} %) % (conj % id)))
+                               (update :messages conj {:role :tool :tool-id id})))
 
                          :else a))
                      acc

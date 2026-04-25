@@ -86,14 +86,36 @@
             rest-lines (map #(str "   " %) (rest lines))]
         (str/join "\n" (cons first-line rest-lines))))
 
+    ;; :tool messages are handled by render-tool-message before reaching here;
+    ;; this branch is a safety fallback only.
+    :tool
+    (str "  [tool " (:tool-id text) "]")
+
     (str "[" (name role) "] " text)))
 
+(defn render-tool-message
+  "Render a {:role :tool :tool-id id} message entry from the tool-calls map.
+   Returns nil when the tool-id is not found."
+  [{:keys [tool-id]} tool-calls spinner-char width tools-expanded? ui-snapshot]
+  (when (and tool-id (get tool-calls tool-id))
+    (tool-render/render-tool-calls tool-calls [tool-id] spinner-char width tools-expanded? ui-snapshot)))
+
 (defn render-messages
-  [messages width]
-  (when (seq messages)
-    (str (str/join "\n\n"
-                   (map #(render-message % width) messages))
-         "\n")))
+  "Render all messages, threading tool-call context for :tool role entries."
+  ([messages width]
+   (render-messages messages width nil))
+  ([messages width tool-ctx]
+   (when (seq messages)
+     (let [{:keys [tool-calls spinner-char tools-expanded? ui-snapshot]} tool-ctx
+           render-one (fn [msg]
+                        (if (= :tool (:role msg))
+                          (or (render-tool-message msg tool-calls spinner-char width tools-expanded? ui-snapshot)
+                              ;; tool-id not in tool-calls yet (streaming): skip
+                              nil)
+                          (render-message msg width)))
+           rendered (keep render-one messages)]
+       (when (seq rendered)
+         (str (str/join "\n\n" rendered) "\n"))))))
 
 (defn render-separator
   [width]
@@ -397,30 +419,34 @@
       (str (str/join "\n" (cons first-line rest-lines))
            "\n"))))
 
+(defn- render-active-turn-item
+  [state item spinner-char width]
+  (case (:item-kind item)
+    :thinking
+    (render-thinking-line (:text item))
+
+    :text
+    (render-stream-text (:text item) width)
+
+    :tool
+    (when-let [s (tool-render/render-tool-calls
+                  (:tool-calls state)
+                  [(:tool-id item)]
+                  spinner-char
+                  width
+                  (boolean (:tools-expanded? state))
+                  (:ui-snapshot state))]
+      ;; ensure each tool row ends with exactly one newline
+      (if (str/ends-with? s "\n") s (str s "\n")))
+
+    nil))
+
 (defn render-active-turn
   [state spinner-char width]
   (let [order    (:active-turn-order state)
         items    (:active-turn-items state)
         rendered (->> order
-                      (keep (fn [item-id]
-                              (let [item (get items item-id)]
-                                (case (:item-kind item)
-                                  :thinking
-                                  (render-thinking-line (:text item))
-
-                                  :text
-                                  (render-stream-text (:text item) width)
-
-                                  :tool
-                                  (tool-render/render-tool-calls
-                                   (:tool-calls state)
-                                   [(:tool-id item)]
-                                   spinner-char
-                                   width
-                                   (boolean (:tools-expanded? state))
-                                   (:ui-snapshot state))
-
-                                  nil))))
+                      (keep #(render-active-turn-item state (get items %) spinner-char width))
                       (apply str))]
     (when-not (str/blank? rendered)
       rendered)))
@@ -453,10 +479,11 @@
            (selector-render/render-session-selector shared/dim-style render-separator session-selector current-session-file term-width (:session-selector-mode state)))
       (str (render-banner model-name prompt-templates skills extension-summary)
            "\n"
-           (render-messages messages term-width)
-           (when (and (not= :streaming phase) (seq tool-order))
-             (str (tool-render/render-tool-calls tool-calls tool-order spinner-char term-width (boolean (:tools-expanded? state)) ui-snapshot)
-                  "\n"))
+           (render-messages messages term-width
+                            {:tool-calls      tool-calls
+                             :spinner-char    spinner-char
+                             :tools-expanded? (boolean (:tools-expanded? state))
+                             :ui-snapshot     ui-snapshot})
            (when context-session-tree-widget
              (str (render-context-session-tree-widget context-session-tree-widget context-session-tree-selected-index) "\n"))
            (when (= :streaming phase)
