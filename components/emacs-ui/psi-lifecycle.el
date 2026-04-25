@@ -81,6 +81,7 @@
    :status-session-line nil
    :extension-command-names nil
    :prompt-templates nil
+   :slash-completion-token nil
    :transcript-hydrated? nil))
 
 (defun psi-emacs--request-initial-transcript-hydration (buffer state)

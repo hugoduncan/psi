@@ -24,6 +24,7 @@
 (declare-function psi-emacs--assistant-delta "psi-assistant-render" (text))
 (declare-function psi-emacs--dispatch-request "psi-compose" (op params &optional callback))
 (declare-function psi-emacs--append-assistant-message "psi-compose" (text))
+(declare-function psi-emacs--apply-slash-completion-data "psi-session-commands" (names templates))
 (declare-function psi-emacs--refresh-slash-completion-data "psi-session-commands")
 (declare-function psi-emacs--request-switch-session-by-id "psi-session-commands" (state session-id))
 (declare-function psi-emacs--request-frontend-exit "psi-session-commands")
@@ -75,12 +76,43 @@ payloads can seed state before the first canonical session-targeted update."
     (or (null current-session-id)
         (equal event-session-id current-session-id))))
 
+(defun psi-emacs--slash-completion-data-changed-p (data)
+  "Return non-nil when session update DATA carries changed slash completion state."
+  (when psi-emacs--state
+    (let* ((raw-command-names (psi-emacs--event-data-get data '(:extension-command-names extension-command-names)))
+           (raw-templates (psi-emacs--event-data-get data '(:prompt-templates prompt-templates)))
+           (has-command-names (not (null raw-command-names)))
+           (has-templates (not (null raw-templates)))
+           (command-names (cond
+                           ((vectorp raw-command-names) (append raw-command-names nil))
+                           ((listp raw-command-names) raw-command-names)
+                           (t nil)))
+           (templates (cond
+                       ((vectorp raw-templates) (append raw-templates nil))
+                       ((listp raw-templates) raw-templates)
+                       (t nil)))
+           (next-token (and (or has-command-names has-templates)
+                            (list :commands (mapcar (lambda (name)
+                                                      (string-trim (format "%s" (or name ""))))
+                                                    (or command-names []))
+                                  :templates (mapcar (lambda (tpl)
+                                                       (list (psi-emacs--non-blank-text
+                                                              (psi-emacs--event-data-get tpl '(:name name)))
+                                                             (psi-emacs--non-blank-text
+                                                              (psi-emacs--event-data-get tpl '(:description description)))))
+                                                     (or templates [])))))
+           (current-token (psi-emacs-state-slash-completion-token psi-emacs--state)))
+      (when next-token
+        (unless (equal current-token next-token)
+          (when (fboundp 'psi-emacs--apply-slash-completion-data)
+            (psi-emacs--apply-slash-completion-data command-names templates))
+          t)))))
+
 (defun psi-emacs--handle-session-updated-event (data)
   "Project `session/updated` DATA into frontend session/header state."
   (when (and psi-emacs--state
              (psi-emacs--event-session-matches-current-p data))
-    (when (fboundp 'psi-emacs--refresh-slash-completion-data)
-      (psi-emacs--refresh-slash-completion-data))
+    (psi-emacs--slash-completion-data-changed-p data)
     (let* ((session-id (psi-emacs--session-normalize-text
                         (psi-emacs--event-data-get data '(:session-id session-id))))
            (phase (psi-emacs--session-normalize-text

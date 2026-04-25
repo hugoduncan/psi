@@ -42,3 +42,21 @@ Follow-on implementation landed:
 - Emacs slash completion refresh is now triggered from canonical `session/updated` handling in addition to startup hydration, so runtime prompt-template state changes can refresh cached completion data without reconnect.
 - Command-name drift risk was reduced by deriving `builtin-command-names` from the actual built-in exact/prefixed command catalogs instead of maintaining a duplicate manual set.
 - Focused backend precedence coverage now also guards that `loaded-command-names-in` still contains built-in names needed for command-over-template precedence.
+
+Code-shaper review follow-up to address:
+- `run-command!` in `components/rpc/src/psi/rpc/session/commands.clj` now carries repeated snapshot/response scaffolding and should be shaped into smaller helpers without changing ownership boundaries.
+- Emacs slash-completion refresh currently triggers from every matching `session/updated`; this is acceptable but broader than ideal and should be narrowed if a canonical command/template-state invalidation trigger exists.
+- The added Emacs slash-path regression test proves the real frontend send/render path but is not a fully transport-backed end-to-end test; task wording should reflect that distinction unless a stronger full-stack proof is added.
+- Task artifacts should be kept coherent with actual verification state, including rerun/checklist completion.
+
+Code-shaper follow-up implementation landed:
+- `components/rpc/src/psi/rpc/session/commands.clj` was reshaped so `run-command!` now delegates repeated branch mechanics to small helpers (`command-response`, command branch helpers, unknown/template handlers, snapshot helper) while preserving the existing backend-owned `slash-resolution-in` authority.
+- Template fallback ownership remains unchanged: RPC consumes the shared slash-resolution result and still routes template execution through canonical `session/prompt-in!` / prepared-request expansion rather than introducing transport-local matching or execution.
+- Emacs slash-completion refresh invalidation was narrowed from "refresh on every matching `session/updated`" to "apply new slash-completion state only when `session/updated` carries changed `:extension-command-names` / `:prompt-templates` data".
+- RPC `session/updated` payloads now include `:extension-command-names` and `:prompt-templates`, giving the frontend a canonical narrow invalidation surface for slash completion without an extra refresh query.
+- Focused Emacs proof now covers both sides of the narrowed invalidation strategy:
+  - changed inline slash-completion state updates frontend completion caches
+  - unrelated session updates leave slash-completion state untouched
+- Focused RPC coverage now also guards that `session/updated` carries prompt-template/command completion state needed by the narrowed frontend invalidation path.
+- The task wording remains intentionally precise: current Emacs coverage is a real frontend slash-path regression proof, not a full transport-backed end-to-end test. A stronger transport-backed proof was considered but not added in this slice because the current focused backend + frontend proofs already cover the highest-risk behavior with lower maintenance burden.
+- Verification/task artifact coherence was updated so the rerun step now matches completed test execution.

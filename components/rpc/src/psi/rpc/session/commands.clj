@@ -50,6 +50,53 @@
             :tool-order (or (:tool-order rehydrate) [])})))
       (command-results/handle-command-result! request-id cmd-result emit!))))
 
+(defn- command-response
+  ([request-id]
+   (command-response request-id nil))
+  ([request-id extra]
+   (response-frame request-id "command" true (merge {:accepted true
+                                                     :handled true}
+                                                    extra))))
+
+(defn- emit-command-snapshots!
+  [emit! ctx state session-id]
+  (emit/emit-session-snapshots! emit! ctx state session-id))
+
+(defn- handle-resume-command!
+  [ctx state request-id emit! trimmed session-id]
+  (command-resume/handle-resume-command! ctx state request-id emit! trimmed session-id)
+  (command-response request-id))
+
+(defn- handle-tree-command!
+  [ctx state request-id emit! trimmed session-id]
+  (command-tree/handle-tree-command! ctx state request-id emit! trimmed session-id)
+  (command-response request-id))
+
+(defn- handle-picker-command!
+  [request-id emit! trimmed]
+  (command-pickers/handle-picker-command! request-id emit! trimmed)
+  (command-response request-id))
+
+(defn- handle-template-command!
+  [ctx emit! request-id session-id ai-model text]
+  (let [session-model {:provider  (some-> (:provider ai-model) name)
+                       :id        (:id ai-model)
+                       :reasoning (boolean (:supports-reasoning ai-model))}
+        _           (session/set-model-in! ctx session-id session-model)
+        api-key     (runtime/resolve-api-key-in ctx session-id ai-model)
+        _           (session/prompt-in! ctx session-id text nil
+                                        {:runtime-opts (cond-> {}
+                                                         api-key (assoc :api-key api-key))})
+        assistant   (session/last-assistant-message-in ctx session-id)]
+    (when assistant
+      (emit/emit-assistant-message! emit! session-id assistant))
+    (command-response request-id {:fallback :template})))
+
+(defn- handle-unknown-command!
+  [emit! request-id text]
+  (command-results/emit-text-command-result! emit! (str "[not a command] " text))
+  (command-response request-id))
+
 (defn run-command!
   [{:keys [ctx request emit-frame! state session-id session-deps current-ai-model start-daemon-thread! login-handler]}]
   (let [text       (get-in request [:params :text])
@@ -64,63 +111,29 @@
                                                                       :on-new-session! (:on-new-session! session-deps)})
         cmd-result (:result resolution)]
     (runtime/journal-user-message-in! ctx session-id text nil)
-    (cond
-      (or (= trimmed "/resume") (str/starts-with? trimmed "/resume "))
-      (do
-        (command-resume/handle-resume-command! ctx state request-id emit! trimmed session-id)
-        (emit/emit-session-snapshots! emit! ctx state session-id)
-        (response-frame (:id request) "command" true {:accepted true
-                                                      :handled true}))
+    (let [response
+          (cond
+            (or (= trimmed "/resume") (str/starts-with? trimmed "/resume "))
+            (handle-resume-command! ctx state request-id emit! trimmed session-id)
 
-      (or (= trimmed "/tree") (str/starts-with? trimmed "/tree "))
-      (do
-        (command-tree/handle-tree-command! ctx state request-id emit! trimmed session-id)
-        (emit/emit-session-snapshots! emit! ctx state session-id)
-        (response-frame (:id request) "command" true {:accepted true
-                                                      :handled true}))
+            (or (= trimmed "/tree") (str/starts-with? trimmed "/tree "))
+            (handle-tree-command! ctx state request-id emit! trimmed session-id)
 
-      (or (= trimmed "/model") (= trimmed "/thinking"))
-      (do
-        (command-pickers/handle-picker-command! request-id emit! trimmed)
-        (emit/emit-session-snapshots! emit! ctx state session-id)
-        (response-frame (:id request) "command" true {:accepted true
-                                                      :handled true}))
+            (or (= trimmed "/model") (= trimmed "/thinking"))
+            (handle-picker-command! request-id emit! trimmed)
 
-      (= :command (:kind resolution))
-      (do
-        (handle-dispatched-command! ctx state emit-frame! request-id start-daemon-thread! login-handler cmd-result emit!)
-        (emit/emit-session-snapshots! emit! ctx state session-id)
-        (response-frame (:id request) "command" true {:accepted true
-                                                      :handled true}))
+            (= :command (:kind resolution))
+            (do
+              (handle-dispatched-command! ctx state emit-frame! request-id start-daemon-thread! login-handler cmd-result emit!)
+              (command-response request-id))
 
-      (= :template (:kind resolution))
-      (let [session-model {:provider  (some-> (:provider ai-model) name)
-                           :id        (:id ai-model)
-                           :reasoning (boolean (:supports-reasoning ai-model))}
-            _           (emit/emit-session-snapshots! emit! ctx state session-id)
-            _           (session/set-model-in! ctx session-id session-model)
-            api-key     (runtime/resolve-api-key-in ctx session-id ai-model)
-            _           (session/prompt-in! ctx session-id text nil
-                                            {:runtime-opts (cond-> {}
-                                                             api-key (assoc :api-key api-key))})
-            assistant   (session/last-assistant-message-in ctx session-id)]
-        (when assistant
-          (emit/emit-assistant-message! emit! session-id assistant))
-        (emit/emit-session-snapshots! emit! ctx state session-id)
-        (response-frame (:id request) "command" true {:accepted true
-                                                      :handled true
-                                                      :fallback :template}))
+            (= :template (:kind resolution))
+            (handle-template-command! ctx emit! request-id session-id ai-model text)
 
-      (= :unknown (:kind resolution))
-      (do
-        (command-results/emit-text-command-result! emit! (str "[not a command] " text))
-        (emit/emit-session-snapshots! emit! ctx state session-id)
-        (response-frame (:id request) "command" true {:accepted true
-                                                      :handled true}))
+            (= :unknown (:kind resolution))
+            (handle-unknown-command! emit! request-id text)
 
-      :else
-      (do
-        (command-results/emit-text-command-result! emit! (str "[not a command] " text))
-        (emit/emit-session-snapshots! emit! ctx state session-id)
-        (response-frame (:id request) "command" true {:accepted true
-                                                      :handled true})))))
+            :else
+            (handle-unknown-command! emit! request-id text))]
+      (emit-command-snapshots! emit! ctx state session-id)
+      response)))

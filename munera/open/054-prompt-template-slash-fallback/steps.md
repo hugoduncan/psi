@@ -26,4 +26,13 @@ Follow-on review steps:
 - [x] Add a focused Emacs test proving runtime-added/reloaded prompt templates appear in slash completion after state refresh
 - [x] Reduce command-name drift risk by replacing or justifying the duplicated `builtin-command-names` authority set in `psi.agent-session.commands`
 - [x] Add a focused test guarding command/template precedence against future builtin-command catalog drift
-- [ ] Re-run focused Clojure + Emacs tests after the follow-on fixes
+- [x] Re-run focused Clojure + Emacs tests after the follow-on fixes
+
+Code-shaper follow-up steps:
+- [x] Refactor `components/rpc/src/psi/rpc/session/commands.clj` to extract small helpers from `run-command!` and reduce repeated snapshot/response scaffolding across command/template/unknown branches
+- [x] Preserve current backend-owned slash resolution semantics while simplifying `run-command!`; do not reintroduce transport-local template matching or a second template expansion path
+- [x] Tighten Emacs slash-completion refresh invalidation so `psi-emacs--refresh-slash-completion-data` is not triggered on every matching `session/updated` when a narrower canonical command/template-state change trigger is available
+- [x] Add focused proof for the chosen Emacs refresh trigger so runtime prompt-template/command changes still become discoverable without reconnect
+- [x] Update task artifact coherence: mark verification/rerun steps to match the work already completed and keep `steps.md` synchronized with actual verification state
+- [x] Clarify wording in task notes/tests/docs where the new Emacs regression test is described, distinguishing a real frontend slash-path regression proof from a full transport-backed end-to-end test
+- [x] Consider whether a true transport-backed end-to-end test for prompt-template slash fallback is warranted; if yes, add one focused proof instead of further event-injection-only coverage

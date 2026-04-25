@@ -116,7 +116,7 @@
                                                                                    :steering-messages [{:content "a"}]
                                                                                    :follow-up-messages [{:content "b"}])))
           payload   (rpc.events/session-updated-payload ctx sid)]
-      (is (= #{:session-id :session-file :session-name :session-display-name :phase :is-streaming :is-compacting :pending-message-count :retry-attempt :interrupt-pending :model-provider :model-id :model-reasoning :thinking-level :effective-reasoning-effort :header-model-label :status-session-line}
+      (is (= #{:session-id :session-file :session-name :session-display-name :phase :is-streaming :is-compacting :pending-message-count :retry-attempt :interrupt-pending :model-provider :model-id :model-reasoning :thinking-level :effective-reasoning-effort :header-model-label :status-session-line :extension-command-names :prompt-templates}
              (set (keys payload))))
       (is (= sid (:session-id payload)))
       (is (= "openai" (:model-provider payload)))

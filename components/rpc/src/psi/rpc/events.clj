@@ -2,6 +2,7 @@
   "RPC event topics and payload projection helpers."
   (:require
    [clojure.string :as str]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.session-state :as ss]
    [psi.app-runtime.context :as app-context]
@@ -113,24 +114,28 @@
   ([ctx]
    (session-updated-payload ctx (default-session-id-in ctx)))
   ([ctx session-id]
-   (let [summary (session-summary/session-summary ctx session-id)]
-     (select-keys summary [:session-id
-                           :session-file
-                           :session-name
-                           :session-display-name
-                           :phase
-                           :is-streaming
-                           :is-compacting
-                           :pending-message-count
-                           :retry-attempt
-                           :interrupt-pending
-                           :model-provider
-                           :model-id
-                           :model-reasoning
-                           :thinking-level
-                           :effective-reasoning-effort
-                           :header-model-label
-                           :status-session-line]))))
+   (let [summary (session-summary/session-summary ctx session-id)
+         command-names (ext/command-names-in (:extension-registry ctx))
+         prompt-templates (:prompt-templates (ss/get-session-data-in ctx session-id))]
+     (assoc (select-keys summary [:session-id
+                                  :session-file
+                                  :session-name
+                                  :session-display-name
+                                  :phase
+                                  :is-streaming
+                                  :is-compacting
+                                  :pending-message-count
+                                  :retry-attempt
+                                  :interrupt-pending
+                                  :model-provider
+                                  :model-id
+                                  :model-reasoning
+                                  :thinking-level
+                                  :effective-reasoning-effort
+                                  :header-model-label
+                                  :status-session-line])
+            :extension-command-names (vec (or command-names []))
+            :prompt-templates (vec (or prompt-templates []))))))
 
 (defn focus-session-id
   [state]

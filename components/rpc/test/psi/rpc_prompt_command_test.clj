@@ -568,6 +568,11 @@
              (get-in assistant-msg [:data :content 0 :text])))
       (is (= :template
              (get-in command-response [:data :fallback])))
+      (let [session-updated (some #(when (= "session/updated" (:event %)) %) events)]
+        (is (= ["gh-issue-work-on"]
+               (mapv #(get % :name)
+                     (get-in session-updated [:data :prompt-templates]))))
+        (is (vector? (get-in session-updated [:data :extension-command-names]))))
       (let [journal-entries (persist/all-entries-in ctx session-id)
             msg-entries     (filterv #(= :message (:kind %)) journal-entries)
             user-msg        (some #(when (= "user" (get-in % [:data :message :role])) %) msg-entries)]
