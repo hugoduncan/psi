@@ -76,6 +76,13 @@
 - [x] Harden `evaluate-routing` iteration-count lookup: replaced `(:iteration-count target-run 0)` with explicit `(get target-run :iteration-count 0)` so intent is clear when `target-run` is nil
 - [x] Run full suite green after fixes (1397 unit tests / 10577 assertions, 142 extension tests / 563 assertions)
 
+### Slice 10 — Code shaper fixes
+
+- [ ] Remove redundant `str/trim` on `:judge-event` in `execute-judge!` — `last-output` is already trimmed at extraction
+- [ ] Extract shared step-result-map helper in `workflow_execution.clj` to reduce duplication across judged/non-judged/error branches
+- [ ] Replace `(some #{goto} step-order)` with `(contains? (set step-order) goto)` in `resolve-goto-target` for idiomatic membership check
+- [ ] Run full suite green after fixes
+
 ## Phase A: Statechart-driven execution (follow-on task)
 
 - [ ] Compile definitions into hierarchical statecharts (leaf states for simple steps, compound `.acting`/`.judging` for judged steps)
