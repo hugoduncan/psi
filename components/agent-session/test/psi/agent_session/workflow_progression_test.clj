@@ -154,23 +154,45 @@
           run    (get-in state' [:workflows :runs run-id])]
       (is (= 2 (get-in run [:step-runs "plan" :iteration-count]))))))
 
+(deftest record-step-result-test
+  (testing "record-step-result records envelope without advancing or changing run status/current-step-id"
+    (let [[state run-id] (base-state-with-run)
+          state' (-> state
+                     (workflow-progression/start-latest-attempt run-id "plan")
+                     (workflow-progression/record-step-result run-id "plan"
+                                                              {:outcome :ok :outputs {:text "plan output"}}))
+          run    (get-in state' [:workflows :runs run-id])]
+      (is (= "plan" (:current-step-id run)))
+      (is (= {:outcome :ok :outputs {:text "plan output"}}
+             (get-in run [:step-runs "plan" :accepted-result])))
+      (is (= :succeeded (get-in run [:step-runs "plan" :attempts 0 :status])))
+      (is (= :running (:status run))))))
+
 (deftest record-actor-result-test
-  (testing "records envelope and accepted-result without advancing current-step-id"
+  (testing "record-actor-result remains an explicit alias for judged-step success recording"
     (let [[state run-id] (base-state-with-run)
           state' (-> state
                      (workflow-progression/start-latest-attempt run-id "plan")
                      (workflow-progression/record-actor-result run-id "plan"
                                                                {:outcome :ok :outputs {:text "plan output"}}))
           run    (get-in state' [:workflows :runs run-id])]
-      ;; current-step-id unchanged
       (is (= "plan" (:current-step-id run)))
-      ;; accepted-result recorded
       (is (= {:outcome :ok :outputs {:text "plan output"}}
              (get-in run [:step-runs "plan" :accepted-result])))
-      ;; attempt marked succeeded
       (is (= :succeeded (get-in run [:step-runs "plan" :attempts 0 :status])))
-      ;; run status not changed to completed
       (is (= :running (:status run))))))
+
+(deftest record-attempt-execution-failure-test
+  (testing "record-attempt-execution-failure updates attempt failure metadata without owning run control flow"
+    (let [[state run-id] (base-state-with-run)
+          state' (-> state
+                     (workflow-progression/start-latest-attempt run-id "plan")
+                     (workflow-progression/record-attempt-execution-failure run-id "plan" {:message "boom"}))
+          run    (get-in state' [:workflows :runs run-id])]
+      (is (= :running (:status run)))
+      (is (= "plan" (:current-step-id run)))
+      (is (= :execution-failed (get-in run [:step-runs "plan" :attempts 0 :status])))
+      (is (= "boom" (get-in run [:step-runs "plan" :attempts 0 :execution-error :message]))))))
 
 (def judged-definition
   {:definition-id "plan-build-review"
@@ -213,6 +235,22 @@
                    (workflow-progression/record-actor-result run-id "review"
                                                              {:outcome :ok :outputs {:text "review output"}}))]
     [state3 run-id]))
+
+(deftest record-judge-result-test
+  (testing "record-judge-result writes judge metadata without changing run status/current-step-id"
+    (let [[state run-id] (judged-state-at-review)
+          judge-result {:judge-session-id "judge-r"
+                        :judge-output "REVISE"
+                        :judge-event "REVISE"
+                        :routing-result {:action :goto :target "build"}}
+          state' (workflow-progression/record-judge-result state run-id "review" judge-result)
+          run    (get-in state' [:workflows :runs run-id])
+          attempt (get-in run [:step-runs "review" :attempts 0])]
+      (is (= :running (:status run)))
+      (is (= "review" (:current-step-id run)))
+      (is (= "judge-r" (:judge-session-id attempt)))
+      (is (= "REVISE" (:judge-output attempt)))
+      (is (= "REVISE" (:judge-event attempt))))))
 
 (deftest submit-judged-result-goto-test
   (testing "judge REVISE routes to build step"

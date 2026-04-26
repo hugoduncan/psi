@@ -13,15 +13,11 @@
    - resume a blocked run and continue execution with a fresh attempt"
   (:require
    [clojure.string :as str]
-   [psi.agent-session.prompt-control :as prompt-control]
-   [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]
-   [psi.agent-session.workflow-judge :as workflow-judge]
-   [psi.agent-session.workflow-progression :as workflow-progression]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.agent-session.workflow-statechart-runtime :as workflow-statechart-runtime]))
 
 (defn- get-path*
   [m path]
@@ -72,50 +68,6 @@
         step-inputs  (materialize-step-inputs workflow-run step-id)]
     {:step-inputs step-inputs
      :prompt     (render-prompt-template (:prompt-template step-def) step-inputs)}))
-
-(defn assistant-message-text
-  "Extract the text content from an assistant message.
-   Handles both string content and structured content blocks."
-  [assistant-message]
-  (or (some->> (:content assistant-message)
-               (filter map?)
-               (keep (fn [block]
-                       (when (= :text (:type block))
-                         (:text block))))
-               seq
-               (clojure.string/join "\n"))
-      (when (string? (:content assistant-message))
-        (:content assistant-message))
-      ""))
-
-(defn- assistant-error-message
-  [assistant-message]
-  (or (:error-message assistant-message)
-      (some->> (:content assistant-message)
-               (filter map?)
-               (keep (fn [block]
-                       (when (= :error (:type block))
-                         (:text block))))
-               seq
-               (clojure.string/join "\n"))
-      "Assistant turn ended in error"))
-
-(defn- assistant-turn-classification
-  [assistant-message]
-  (prompt-recording/classify-assistant-message assistant-message))
-
-(defn- execution-failure-payload
-  [execution-session-id assistant-message]
-  (let [{:keys [turn/outcome]} (assistant-turn-classification assistant-message)]
-    (cond-> {:message (assistant-error-message assistant-message)}
-      (:stop-reason assistant-message)
-      (assoc :stop-reason (:stop-reason assistant-message))
-
-      (= :turn.outcome/error outcome)
-      (assoc :turn-outcome outcome)
-
-      execution-session-id
-      (assoc :session-id execution-session-id))))
 
 (defn- compose-system-prompt
   [base-system-prompt framing-prompt]
@@ -197,124 +149,37 @@
       :skills         (resolve-step-skills ctx parent-session-id (:skills step-meta))
       :model          (:model step-meta)})))
 
-(defn- step-result-map
-  "Build the common step execution result map."
-  [ctx run-id step-id attempt execution-session]
-  {:run-id               run-id
-   :step-id              step-id
-   :attempt-id           (:attempt-id attempt)
-   :execution-session-id (:session-id execution-session)
-   :status               (get-in @(:state* ctx) [:workflows :runs run-id :status])})
-
-(defn execute-current-step!
-  "Execute the current workflow step as one bounded child-session attempt.
-
-   Returns {:run-id ... :step-id ... :attempt-id ... :execution-session-id ... :status ...}
-   after creating the attempt, prompting the child session, and recording the
-   resulting canonical text envelope.
-
-   Current slice treats the last assistant message text as canonical step output
-   under `{:outcome :ok :outputs {:text ...}}`."
-  [ctx parent-session-id run-id]
-  (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-        step-id      (:current-step-id workflow-run)
-        {:keys [prompt]} (step-prompt workflow-run step-id)
-        step-config  (resolve-step-session-config ctx parent-session-id workflow-run step-id)
-        {:keys [attempt execution-session]}
-        (workflow-attempts/create-step-attempt-session!
-         ctx
-         parent-session-id
-         (cond-> {:workflow-run-id run-id
-                  :workflow-step-id step-id
-                  :session-name (str "workflow " step-id " attempt")
-                  :tool-defs (:tool-defs step-config)
-                  :thinking-level (:thinking-level step-config)}
-           (:system-prompt step-config)
-           (assoc :system-prompt (:system-prompt step-config))
-
-           (:skills step-config)
-           (assoc :skills (:skills step-config))
-
-           (:model step-config)
-           (assoc :model (:model step-config))))]
-    (swap! (:state* ctx)
-           (fn [state]
-             (-> state
-                 (update-in [:workflows :runs run-id]
-                            #(workflow-attempts/append-attempt-to-run % step-id attempt))
-                 (workflow-progression/start-latest-attempt run-id step-id)
-                 (workflow-progression/increment-iteration-count run-id step-id))))
-    (try
-      (prompt-control/prompt-in! ctx (:session-id execution-session) prompt)
-      (let [assistant-message (prompt-control/last-assistant-message-in ctx (:session-id execution-session))
-            {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
-            failure-payload   (when (= :turn.outcome/error outcome)
-                                (execution-failure-payload (:session-id execution-session) assistant-message))]
-        (if failure-payload
-          (do
-            (swap! (:state* ctx) workflow-progression/record-execution-failure run-id step-id failure-payload)
-            (assoc (step-result-map ctx run-id step-id attempt execution-session)
-                   :error (:message failure-payload)))
-          (let [envelope   {:outcome :ok
-                            :outputs {:text (assistant-message-text assistant-message)}}
-                step-def   (get-in workflow-run [:effective-definition :steps step-id])
-                judge-spec (:judge step-def)]
-            (if judge-spec
-              ;; Judged step: record actor result, execute judge, apply routing
-              (let [routing-table (or (:on step-def) {})
-                    step-order    (get-in workflow-run [:effective-definition :step-order])
-                    _             (swap! (:state* ctx) workflow-progression/record-actor-result run-id step-id envelope)
-                    step-runs     (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])
-                    judge-result  (workflow-judge/execute-judge!
-                                   ctx parent-session-id (:session-id execution-session)
-                                   judge-spec routing-table
-                                   {:current-step-id step-id
-                                    :step-order      step-order
-                                    :step-runs       step-runs})]
-                (swap! (:state* ctx) workflow-progression/submit-judged-result run-id step-id judge-result)
-                (assoc (step-result-map ctx run-id step-id attempt execution-session)
-                       :judge-result judge-result))
-              ;; Non-judged step: existing path
-              (do
-                (swap! (:state* ctx) workflow-progression/submit-result-envelope run-id step-id envelope)
-                (step-result-map ctx run-id step-id attempt execution-session))))))
-      (catch Exception e
-        (swap! (:state* ctx) workflow-progression/record-execution-failure run-id step-id {:message (ex-message e)})
-        (assoc (step-result-map ctx run-id step-id attempt execution-session)
-               :error (ex-message e))))))
+(defn- execution-result
+  [run-id workflow-run]
+  {:run-id run-id
+   :status (:status workflow-run)
+   :steps-executed (->> (:step-order (:effective-definition workflow-run))
+                        (mapcat (fn [step-id]
+                                  (map (fn [attempt]
+                                         {:step-id step-id
+                                          :attempt-id (:attempt-id attempt)
+                                          :execution-session-id (:execution-session-id attempt)
+                                          :status (:status attempt)
+                                          :error (get-in attempt [:execution-error :message])})
+                                       (get-in workflow-run [:step-runs step-id :attempts]))))
+                        vec)
+   :terminal? (contains? #{:completed :failed :cancelled} (:status workflow-run))
+   :blocked? (= :blocked (:status workflow-run))})
 
 (defn execute-run!
-  "Execute a sequential workflow run until it reaches a terminal or blocked status.
+  "Execute a workflow run via the Phase A hierarchical statechart runtime.
 
    Returns {:run-id ... :status ... :steps-executed [...] :terminal? bool :blocked? bool}."
   [ctx parent-session-id run-id]
-  (loop [steps-executed []]
-    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-          status (:status run)]
-      (cond
-        (contains? #{:completed :failed :cancelled} status)
-        {:run-id run-id
-         :status status
-         :steps-executed steps-executed
-         :terminal? true
-         :blocked? false}
-
-        (= :blocked status)
-        {:run-id run-id
-         :status status
-         :steps-executed steps-executed
-         :terminal? false
-         :blocked? true}
-
-        :else
-        (let [step-result (execute-current-step! ctx parent-session-id run-id)]
-          (recur (conj steps-executed (select-keys step-result [:step-id :attempt-id :execution-session-id :status :error]))))))))
+  (let [wf-ctx (workflow-statechart-runtime/create-workflow-context ctx parent-session-id run-id)
+        _ (workflow-statechart-runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
+        workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+    (execution-result run-id workflow-run)))
 
 (defn resume-and-execute-run!
-  "Resume a blocked run and continue sequential execution.
-
-   Resuming clears blocked state via pure progression; the next loop iteration
-   creates a fresh attempt for the current step before executing it."
+  "Resume a blocked run and continue execution via the Phase A statechart runtime."
   [ctx parent-session-id run-id]
-  (swap! (:state* ctx) workflow-progression/resume-blocked-run run-id)
-  (execute-run! ctx parent-session-id run-id))
+  (let [wf-ctx (workflow-statechart-runtime/create-workflow-context ctx parent-session-id run-id)
+        _ (workflow-statechart-runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/resume nil)
+        workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+    (execution-result run-id workflow-run)))

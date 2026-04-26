@@ -219,6 +219,49 @@
                                               :step-id step-id
                                               :attempt-id (:attempt-id latest)}))))))))))
 
+(defn record-step-result
+  "Record a successful step result on the latest attempt without owning control flow.
+
+   Used by Phase A statechart-driven execution for non-judged acting success.
+   Does not mutate run status or current-step-id."
+  [state run-id step-id envelope]
+  (update-in state (run-path run-id)
+             (fn [workflow-run]
+               (-> workflow-run
+                   (update-attempt step-id #(assoc %
+                                                   :status :succeeded
+                                                   :result-envelope envelope
+                                                   :validation-outcome {:accepted? true}
+                                                   :updated-at (now)
+                                                   :finished-at (now)))
+                   (assoc-in [:step-runs step-id :accepted-result] envelope)
+                   (assoc :updated-at (now))
+                   (append-history :workflow/result-received
+                                   {:run-id run-id
+                                    :step-id step-id
+                                    :envelope envelope})))))
+
+(defn record-attempt-execution-failure
+  "Record execution failure on the latest attempt without owning control flow.
+
+   Used by Phase A statechart-driven execution for acting failure exits.
+   Does not mutate run status or current-step-id."
+  [state run-id step-id execution-error]
+  (update-in state (run-path run-id)
+             (fn [workflow-run]
+               (-> workflow-run
+                   (update-attempt step-id #(assoc %
+                                                   :status :execution-failed
+                                                   :execution-error execution-error
+                                                   :updated-at (now)
+                                                   :finished-at (now)))
+                   (assoc :updated-at (now))
+                   (append-history :workflow/execution-failure-recorded
+                                   {:run-id run-id
+                                    :step-id step-id
+                                    :attempt-id (:attempt-id (latest-attempt workflow-run step-id))
+                                    :execution-error execution-error})))))
+
 (defn record-execution-failure
   "Record execution failure for the latest attempt of `step-id`.
 
@@ -301,23 +344,36 @@
   "Record the actor's ok envelope and accepted-result on the step-run without advancing.
 
    Used for judged steps where the judge routing determines the next step,
-   not the normal submit-result-envelope advancement path."
+   not the normal submit-result-envelope advancement path.
+
+   This is currently an alias of `record-step-result`; it remains named separately
+   so Phase A callers can stay semantically explicit about judged-vs-linear usage."
   [state run-id step-id envelope]
-  (update-in state (run-path run-id)
-             (fn [workflow-run]
-               (-> workflow-run
-                   (update-attempt step-id #(assoc %
-                                                   :status :succeeded
-                                                   :result-envelope envelope
-                                                   :validation-outcome {:accepted? true}
-                                                   :updated-at (now)
-                                                   :finished-at (now)))
-                   (assoc-in [:step-runs step-id :accepted-result] envelope)
-                   (assoc :updated-at (now))
-                   (append-history :workflow/result-received
-                                   {:run-id run-id
-                                    :step-id step-id
-                                    :envelope envelope})))))
+  (record-step-result state run-id step-id envelope))
+
+(defn record-judge-result
+  "Record judge metadata on the latest attempt without owning control flow.
+
+   Used by Phase A judged exits before the chart-owned routing transition is
+   projected externally. Does not mutate run status or current-step-id."
+  [state run-id step-id judge-result]
+  (let [{:keys [judge-session-id judge-output judge-event]} judge-result]
+    (update-in state (run-path run-id)
+               (fn [workflow-run]
+                 (-> workflow-run
+                     (update-attempt step-id
+                                     #(assoc %
+                                             :judge-session-id judge-session-id
+                                             :judge-output judge-output
+                                             :judge-event judge-event
+                                             :updated-at (now)))
+                     (assoc :updated-at (now))
+                     (append-history :workflow/judge-recorded
+                                     {:run-id run-id
+                                      :step-id step-id
+                                      :attempt-id (:attempt-id (latest-attempt workflow-run step-id))
+                                      :judge-event judge-event
+                                      :judge-output judge-output}))))))
 
 (defn submit-judged-result
   "Apply judge routing result to the workflow run.
@@ -328,22 +384,14 @@
    - :fail → transition to :failed
    - :no-match (judge retries exhausted) → transition to :failed"
   [state run-id step-id judge-result]
-  (let [{:keys [judge-session-id judge-output judge-event routing-result]} judge-result
+  (let [{:keys [judge-output judge-event routing-result]} judge-result
         {:keys [action target]} routing-result]
-    (update-in state (run-path run-id)
+    (update-in (record-judge-result state run-id step-id judge-result) (run-path run-id)
                (fn [workflow-run]
-                 (let [latest    (latest-attempt workflow-run step-id)
-                       base-run  (-> workflow-run
-                                     (update-attempt step-id
-                                                     #(assoc %
-                                                             :judge-session-id judge-session-id
-                                                             :judge-output judge-output
-                                                             :judge-event judge-event
-                                                             :updated-at (now)))
-                                     (assoc :updated-at (now)))]
+                 (let [latest (latest-attempt workflow-run step-id)]
                    (case action
                      :goto
-                     (-> base-run
+                     (-> workflow-run
                          (assoc :current-step-id target
                                 :status :running)
                          (append-history :verdict/goto
@@ -354,7 +402,7 @@
                                           :judge-event judge-event}))
 
                      :complete
-                     (-> base-run
+                     (-> workflow-run
                          (assoc :status :completed
                                 :current-step-id nil
                                 :finished-at (now)
@@ -369,7 +417,7 @@
                                           :judge-event judge-event}))
 
                      ;; :fail or :no-match
-                     (-> base-run
+                     (-> workflow-run
                          (assoc :status :failed
                                 :finished-at (now)
                                 :terminal-outcome {:outcome :failed
