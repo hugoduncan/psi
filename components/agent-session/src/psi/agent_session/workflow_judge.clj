@@ -5,7 +5,9 @@
    Routing functions evaluate judge signals against routing tables.
    Impure execution functions create and prompt judge sessions."
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [psi.agent-session.persistence :as persist]
+   [psi.agent-session.prompt-control :as prompt-control]))
 
 ;;; Projection — pure functions
 
@@ -151,3 +153,79 @@
         ;; :complete or :fail — pass through
         resolved))
     {:action :no-match}))
+
+;;; Judge session execution — impure
+
+(def ^:private max-judge-retries 2)
+
+(defn- extract-assistant-text
+  "Extract the text from the last assistant message in a session."
+  [ctx session-id]
+  (when-let [msg (prompt-control/last-assistant-message-in ctx session-id)]
+    (cond
+      (string? (:content msg))
+      (str/trim (:content msg))
+
+      (sequential? (:content msg))
+      (some->> (:content msg)
+               (keep (fn [block]
+                       (when (and (map? block) (= :text (:type block)))
+                         (:text block))))
+               seq
+               (str/join "\n")
+               str/trim)
+
+      :else nil)))
+
+(defn- judge-retry-feedback
+  "Build a feedback message for a judge retry when no signal matched."
+  [judge-output expected-signals]
+  (str "Your response '" judge-output "' did not match any expected signal. "
+       "Expected exactly one of: " (str/join ", " (sort expected-signals)) ". "
+       "Respond with exactly one of those words, nothing else."))
+
+(defn execute-judge!
+  "Execute the judge phase for a workflow step.
+
+   Creates a judge child session with projected actor messages as preloaded context,
+   prompts it, and matches the response against the routing table.
+   Retries up to `max-judge-retries` times on no-match with feedback injection.
+
+   Returns {:judge-session-id :judge-output :judge-event :routing-result}."
+  [ctx parent-session-id actor-session-id judge-spec routing-table
+   current-step-id step-order step-runs]
+  (let [projection    (or (:projection judge-spec) :full)
+        actor-msgs    (vec (persist/messages-from-entries-in ctx actor-session-id))
+        projected     (project-messages actor-msgs projection)
+        judge-sid     (str (java.util.UUID/randomUUID))
+        expected-sigs (keys routing-table)
+        _             ((:create-workflow-child-session-fn ctx)
+                       ctx
+                       parent-session-id
+                       {:child-session-id           judge-sid
+                        :session-name               "workflow judge"
+                        :system-prompt              (:system-prompt judge-spec)
+                        :tool-defs                  []
+                        :thinking-level             :off
+                        :preloaded-messages         projected
+                        :workflow-owned?            true})]
+    ;; First attempt
+    (prompt-control/prompt-in! ctx judge-sid (:prompt judge-spec))
+    (loop [attempt 0
+           last-output (extract-assistant-text ctx judge-sid)]
+      (let [routing-result (evaluate-routing last-output routing-table
+                                             current-step-id step-order step-runs)]
+        (if (and (= :no-match (:action routing-result))
+                 (< attempt max-judge-retries))
+          ;; Retry: inject feedback into the same judge session
+          (do
+            (prompt-control/prompt-in! ctx judge-sid
+                                       (judge-retry-feedback last-output expected-sigs))
+            (recur (inc attempt)
+                   (extract-assistant-text ctx judge-sid)))
+          ;; Matched, or retries exhausted
+          {:judge-session-id judge-sid
+           :judge-output     last-output
+           :judge-event      (when (not= :no-match (:action routing-result))
+                               (str/trim (or last-output "")))
+           :routing-result   routing-result})))))
