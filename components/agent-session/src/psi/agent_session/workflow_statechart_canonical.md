@@ -19,9 +19,9 @@ This note documents the authoritative workflow execution/compiler/runtime surfac
 
 ## Remaining compatibility / legacy surface
 
-- `psi.agent-session.workflow-progression`
-  - Legacy sequential progression helpers retained only for compatibility-oriented tests and migration cleanup.
-  - Not used by active Phase A runtime execution paths.
+- `psi.agent-session.workflow-sequential-compat-test-support`
+  - Test-only sequential progression helpers retained for compatibility-oriented proofs during cleanup.
+  - Not used by production/runtime execution paths.
 
 ## Public wrapper surface
 

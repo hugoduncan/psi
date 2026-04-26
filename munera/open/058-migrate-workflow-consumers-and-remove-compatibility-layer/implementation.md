@@ -196,9 +196,9 @@ Remaining execution order:
 
 Best current interpretation:
 - **full removal remains realistic** for `workflow_statechart_compat.clj`, and migration is now far enough along that namespace deletion should be next
-- `workflow_progression.clj` is no longer part of the active Phase A runtime path
+- `workflow_progression.clj` is no longer part of the active Phase A runtime path and has now been reduced to an explicit removed-boundary trap
 - canonical ownership is now clearer in code:
   - `workflow_runtime` owns pure run lifecycle operations
   - `workflow_progression_recording` owns record/update helpers used by Phase A runtime
   - `workflow_statechart_runtime` owns execution/statechart control
-- remaining work is concentrated in compatibility-oriented tests and the final deletion/shrink step for legacy sequential helpers
+- remaining compatibility-era sequential proofs now live in test-only support code rather than production namespaces

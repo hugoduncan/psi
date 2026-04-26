@@ -5,8 +5,8 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
-   [psi.agent-session.workflow-progression :as workflow-progression]
-   [psi.agent-session.workflow-runtime]))
+   [psi.agent-session.workflow-runtime]
+   [psi.agent-session.workflow-sequential-compat-test-support :as workflow-seq-compat]))
 
 (defn- execute-run-nullable
   [state*]
@@ -33,7 +33,7 @@
           (let [step-id (:current-step-id run)
                 next-step-id (second (drop-while #(not= step-id %) (get-in run [:effective-definition :step-order])))
                 envelope {:outcome :ok :outputs {:text (str step-id " output")}}]
-            (swap! state* workflow-progression/submit-result-envelope run-id step-id envelope)
+            (swap! state* workflow-seq-compat/submit-result-envelope run-id step-id envelope)
             (recur (conj steps-executed {:step-id step-id
                                          :attempt-id (str step-id "-attempt")
                                          :execution-session-id (str step-id "-session")

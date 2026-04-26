@@ -3,9 +3,9 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.agent-session.workflow-sequential-compat-test-support :as workflow-seq-compat]))
 
 (def definition
   {:definition-id "plan-build-review"
@@ -45,9 +45,9 @@
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
                              (workflow-recording/start-latest-attempt run-id "plan")
-                             (workflow-progression/submit-result-envelope run-id "plan"
-                                                                          {:outcome :ok
-                                                                           :outputs {:plan "do it"}}))
+                             (workflow-seq-compat/submit-result-envelope run-id "plan"
+                                                                         {:outcome :ok
+                                                                          :outputs {:plan "do it"}}))
           run            (get-in state' [:workflows :runs run-id])]
       (is (= :running (:status run)))
       (is (= "build" (:current-step-id run)))
@@ -67,9 +67,9 @@
                                                                        :execution-session-id "child-2"})])
           state'            (-> state4
                                 (workflow-recording/start-latest-attempt run-id "build")
-                                (workflow-progression/submit-result-envelope run-id "build"
-                                                                             {:outcome :ok
-                                                                              :outputs {:review "approved"}}))
+                                (workflow-seq-compat/submit-result-envelope run-id "build"
+                                                                            {:outcome :ok
+                                                                             :outputs {:review "approved"}}))
           run               (get-in state' [:workflows :runs run-id])]
       (is (= :completed (:status run)))
       (is (nil? (:current-step-id run)))
@@ -80,9 +80,9 @@
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
                              (workflow-recording/start-latest-attempt run-id "plan")
-                             (workflow-progression/submit-result-envelope run-id "plan"
-                                                                          {:outcome :blocked
-                                                                           :blocked {:question "need approval"}}))
+                             (workflow-seq-compat/submit-result-envelope run-id "plan"
+                                                                         {:outcome :blocked
+                                                                          :blocked {:question "need approval"}}))
           run            (get-in state' [:workflows :runs run-id])]
       (is (= :blocked (:status run)))
       (is (= {:question "need approval"} (:blocked run)))
@@ -93,9 +93,9 @@
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
                              (workflow-recording/start-latest-attempt run-id "plan")
-                             (workflow-progression/submit-result-envelope run-id "plan"
-                                                                          {:outcome :ok
-                                                                           :outputs "wrong-shape"}))
+                             (workflow-seq-compat/submit-result-envelope run-id "plan"
+                                                                         {:outcome :ok
+                                                                          :outputs "wrong-shape"}))
           run            (get-in state' [:workflows :runs run-id])]
       (is (= :running (:status run)))
       (is (= :validation-failed (get-in run [:step-runs "plan" :attempts 0 :status])))))
@@ -104,8 +104,8 @@
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
                              (workflow-recording/start-latest-attempt run-id "plan")
-                             (workflow-progression/submit-result-envelope run-id "plan"
-                                                                          {:outputs {:plan "missing outcome"}}))
+                             (workflow-seq-compat/submit-result-envelope run-id "plan"
+                                                                         {:outputs {:plan "missing outcome"}}))
           run            (get-in state' [:workflows :runs run-id])]
       (is (= :running (:status run)))
       (is (= :validation-failed (get-in run [:step-runs "plan" :attempts 0 :status]))))))
@@ -120,7 +120,7 @@
                                       [(workflow-attempts/new-attempt {:attempt-id "b1"
                                                                        :status :running
                                                                        :execution-session-id "child-2"})])
-          state'            (workflow-progression/record-execution-failure state4 run-id "build" {:message "provider error"})
+          state'            (workflow-seq-compat/record-execution-failure state4 run-id "build" {:message "provider error"})
           run               (get-in state' [:workflows :runs run-id])]
       (is (= :failed (:status run)))
       (is (= :execution-failed (get-in run [:step-runs "build" :attempts 0 :status]))))))
@@ -130,9 +130,9 @@
     (let [[state run-id] (base-state-with-run)
           blocked-state   (-> state
                               (workflow-recording/start-latest-attempt run-id "plan")
-                              (workflow-progression/submit-result-envelope run-id "plan"
-                                                                           {:outcome :blocked
-                                                                            :blocked {:question "need approval"}}))
+                              (workflow-seq-compat/submit-result-envelope run-id "plan"
+                                                                          {:outcome :blocked
+                                                                           :blocked {:question "need approval"}}))
           [resumed-state resumed-run] (workflow-runtime/resume-run blocked-state run-id)
           run             (get-in resumed-state [:workflows :runs run-id])]
       (is (= :running (:status resumed-run)))
@@ -261,7 +261,7 @@
                         :judge-output "REVISE"
                         :judge-event "REVISE"
                         :routing-result {:action :goto :target "build"}}
-          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          state' (workflow-seq-compat/submit-judged-result state run-id "review" judge-result)
           run    (get-in state' [:workflows :runs run-id])]
       ;; Routed to build
       (is (= "build" (:current-step-id run)))
@@ -283,7 +283,7 @@
                         :judge-output "APPROVED"
                         :judge-event "APPROVED"
                         :routing-result {:action :complete}}
-          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          state' (workflow-seq-compat/submit-judged-result state run-id "review" judge-result)
           run    (get-in state' [:workflows :runs run-id])]
       (is (= :completed (:status run)))
       (is (nil? (:current-step-id run)))
@@ -299,7 +299,7 @@
                         :judge-output "REVISE"
                         :judge-event "REVISE"
                         :routing-result {:action :fail :reason :iteration-exhausted :step-id "build"}}
-          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          state' (workflow-seq-compat/submit-judged-result state run-id "review" judge-result)
           run    (get-in state' [:workflows :runs run-id])]
       (is (= :failed (:status run)))
       (is (some? (:finished-at run)))
@@ -315,7 +315,7 @@
                         :judge-output "hmm not sure"
                         :judge-event nil
                         :routing-result {:action :no-match}}
-          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          state' (workflow-seq-compat/submit-judged-result state run-id "review" judge-result)
           run    (get-in state' [:workflows :runs run-id])]
       (is (= :failed (:status run)))
       (is (= :judge-no-match (get-in run [:terminal-outcome :reason]))))))

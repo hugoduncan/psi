@@ -4,9 +4,9 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
-   [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.agent-session.workflow-sequential-compat-test-support :as workflow-seq-compat]))
 
 (defn- create-session-context
   ([]
@@ -78,14 +78,14 @@
           run-id           (install-definition-and-run! ctx)
           plan-run         (create-and-start-attempt! ctx session-id run-id "plan" "plan-1")
           _                (swap! (:state* ctx)
-                                  workflow-progression/submit-result-envelope
+                                  workflow-seq-compat/submit-result-envelope
                                   run-id
                                   "plan"
                                   {:outcome :ok
                                    :outputs {:plan {:summary "do it" :files ["src/x.clj"]}}})
           build-run        (create-and-start-attempt! ctx session-id run-id "build" "build-1")
           _                (swap! (:state* ctx)
-                                  workflow-progression/submit-result-envelope
+                                  workflow-seq-compat/submit-result-envelope
                                   run-id
                                   "build"
                                   {:outcome :ok
@@ -93,7 +93,7 @@
                                                      :files ["src/x.clj" "test/x_test.clj"]}}})
           review-run       (create-and-start-attempt! ctx session-id run-id "review" "review-1")
           _                (swap! (:state* ctx)
-                                  workflow-progression/submit-result-envelope
+                                  workflow-seq-compat/submit-result-envelope
                                   run-id
                                   "review"
                                   {:outcome :ok
@@ -150,7 +150,7 @@
           run-id           (install-definition-and-run! ctx)
           first-run        (create-and-start-attempt! ctx session-id run-id "plan" "plan-1")
           _                (swap! (:state* ctx)
-                                  workflow-progression/submit-result-envelope
+                                  workflow-seq-compat/submit-result-envelope
                                   run-id
                                   "plan"
                                   {:outcome :blocked
@@ -159,7 +159,7 @@
                                                   (first (workflow-runtime/resume-run state run-id))))
           second-run       (create-and-start-attempt! ctx session-id run-id "plan" "plan-2")
           _                (swap! (:state* ctx)
-                                  workflow-progression/submit-result-envelope
+                                  workflow-seq-compat/submit-result-envelope
                                   run-id
                                   "plan"
                                   {:outcome :ok
