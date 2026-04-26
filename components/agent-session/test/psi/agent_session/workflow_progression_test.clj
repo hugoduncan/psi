@@ -4,6 +4,7 @@
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-model :as workflow-model]
    [psi.agent-session.workflow-progression :as workflow-progression]
+   [psi.agent-session.workflow-progression-recording :as workflow-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
 (def definition
@@ -34,7 +35,7 @@
 (deftest start-latest-attempt-test
   (testing "latest attempt can be marked running and run status enters running"
     (let [[state run-id] (base-state-with-run)
-          state'         (workflow-progression/start-latest-attempt state run-id "plan")
+          state'         (workflow-recording/start-latest-attempt state run-id "plan")
           run            (get-in state' [:workflows :runs run-id])]
       (is (= :running (:status run)))
       (is (= :running (get-in run [:step-runs "plan" :attempts 0 :status]))))))
@@ -43,7 +44,7 @@
   (testing "valid ok envelope succeeds step and advances workflow to next step"
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
-                             (workflow-progression/start-latest-attempt run-id "plan")
+                             (workflow-recording/start-latest-attempt run-id "plan")
                              (workflow-progression/submit-result-envelope run-id "plan"
                                                                           {:outcome :ok
                                                                            :outputs {:plan "do it"}}))
@@ -65,7 +66,7 @@
                                                                        :status :pending
                                                                        :execution-session-id "child-2"})])
           state'            (-> state4
-                                (workflow-progression/start-latest-attempt run-id "build")
+                                (workflow-recording/start-latest-attempt run-id "build")
                                 (workflow-progression/submit-result-envelope run-id "build"
                                                                              {:outcome :ok
                                                                               :outputs {:review "approved"}}))
@@ -78,7 +79,7 @@
   (testing "blocked envelope moves attempt and run into blocked state"
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
-                             (workflow-progression/start-latest-attempt run-id "plan")
+                             (workflow-recording/start-latest-attempt run-id "plan")
                              (workflow-progression/submit-result-envelope run-id "plan"
                                                                           {:outcome :blocked
                                                                            :blocked {:question "need approval"}}))
@@ -91,7 +92,7 @@
   (testing "step-schema validation failure retries when retry policy allows it"
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
-                             (workflow-progression/start-latest-attempt run-id "plan")
+                             (workflow-recording/start-latest-attempt run-id "plan")
                              (workflow-progression/submit-result-envelope run-id "plan"
                                                                           {:outcome :ok
                                                                            :outputs "wrong-shape"}))
@@ -102,7 +103,7 @@
   (testing "generic envelope validation failure also retries when retry policy allows it"
     (let [[state run-id] (base-state-with-run)
           state'         (-> state
-                             (workflow-progression/start-latest-attempt run-id "plan")
+                             (workflow-recording/start-latest-attempt run-id "plan")
                              (workflow-progression/submit-result-envelope run-id "plan"
                                                                           {:outputs {:plan "missing outcome"}}))
           run            (get-in state' [:workflows :runs run-id])]
@@ -124,17 +125,18 @@
       (is (= :failed (:status run)))
       (is (= :execution-failed (get-in run [:step-runs "build" :attempts 0 :status]))))))
 
-(deftest resume-blocked-run-test
-  (testing "resuming a blocked run clears blocked payload and returns to running"
+(deftest resume-run-test
+  (testing "workflow-runtime/resume-run clears blocked payload and returns to running"
     (let [[state run-id] (base-state-with-run)
           blocked-state   (-> state
-                              (workflow-progression/start-latest-attempt run-id "plan")
+                              (workflow-recording/start-latest-attempt run-id "plan")
                               (workflow-progression/submit-result-envelope run-id "plan"
                                                                            {:outcome :blocked
                                                                             :blocked {:question "need approval"}}))
-          resumed-state   (workflow-progression/resume-blocked-run blocked-state run-id)
+          [resumed-state resumed-run] (workflow-runtime/resume-run blocked-state run-id)
           run             (get-in resumed-state [:workflows :runs run-id])]
-      (is (= :running (:status run)))
+      (is (= :running (:status resumed-run)))
+      (is (= resumed-run run))
       (is (nil? (:blocked run))))))
 
 ;;; Judge-aware progression
@@ -142,15 +144,15 @@
 (deftest increment-iteration-count-test
   (testing "increments from nil (0) to 1"
     (let [[state run-id] (base-state-with-run)
-          state' (workflow-progression/increment-iteration-count state run-id "plan")
+          state' (workflow-recording/increment-iteration-count state run-id "plan")
           run    (get-in state' [:workflows :runs run-id])]
       (is (= 1 (get-in run [:step-runs "plan" :iteration-count])))))
 
   (testing "increments from 1 to 2"
     (let [[state run-id] (base-state-with-run)
           state' (-> state
-                     (workflow-progression/increment-iteration-count run-id "plan")
-                     (workflow-progression/increment-iteration-count run-id "plan"))
+                     (workflow-recording/increment-iteration-count run-id "plan")
+                     (workflow-recording/increment-iteration-count run-id "plan"))
           run    (get-in state' [:workflows :runs run-id])]
       (is (= 2 (get-in run [:step-runs "plan" :iteration-count]))))))
 
@@ -158,9 +160,9 @@
   (testing "record-step-result records envelope without advancing or changing run status/current-step-id"
     (let [[state run-id] (base-state-with-run)
           state' (-> state
-                     (workflow-progression/start-latest-attempt run-id "plan")
-                     (workflow-progression/record-step-result run-id "plan"
-                                                              {:outcome :ok :outputs {:text "plan output"}}))
+                     (workflow-recording/start-latest-attempt run-id "plan")
+                     (workflow-recording/record-step-result run-id "plan"
+                                                            {:outcome :ok :outputs {:text "plan output"}}))
           run    (get-in state' [:workflows :runs run-id])]
       (is (= "plan" (:current-step-id run)))
       (is (= {:outcome :ok :outputs {:text "plan output"}}
@@ -172,9 +174,9 @@
   (testing "record-actor-result remains an explicit alias for judged-step success recording"
     (let [[state run-id] (base-state-with-run)
           state' (-> state
-                     (workflow-progression/start-latest-attempt run-id "plan")
-                     (workflow-progression/record-actor-result run-id "plan"
-                                                               {:outcome :ok :outputs {:text "plan output"}}))
+                     (workflow-recording/start-latest-attempt run-id "plan")
+                     (workflow-recording/record-actor-result run-id "plan"
+                                                             {:outcome :ok :outputs {:text "plan output"}}))
           run    (get-in state' [:workflows :runs run-id])]
       (is (= "plan" (:current-step-id run)))
       (is (= {:outcome :ok :outputs {:text "plan output"}}
@@ -186,8 +188,8 @@
   (testing "record-attempt-execution-failure updates attempt failure metadata without owning run control flow"
     (let [[state run-id] (base-state-with-run)
           state' (-> state
-                     (workflow-progression/start-latest-attempt run-id "plan")
-                     (workflow-progression/record-attempt-execution-failure run-id "plan" {:message "boom"}))
+                     (workflow-recording/start-latest-attempt run-id "plan")
+                     (workflow-recording/record-attempt-execution-failure run-id "plan" {:message "boom"}))
           run    (get-in state' [:workflows :runs run-id])]
       (is (= :running (:status run)))
       (is (= "plan" (:current-step-id run)))
@@ -231,9 +233,9 @@
                    (assoc-in [:workflows :runs run-id :step-runs "build" :iteration-count] 1)
                    (update-in [:workflows :runs run-id]
                               #(workflow-attempts/append-attempt-to-run % "review" attempt))
-                   (workflow-progression/start-latest-attempt run-id "review")
-                   (workflow-progression/record-actor-result run-id "review"
-                                                             {:outcome :ok :outputs {:text "review output"}}))]
+                   (workflow-recording/start-latest-attempt run-id "review")
+                   (workflow-recording/record-actor-result run-id "review"
+                                                           {:outcome :ok :outputs {:text "review output"}}))]
     [state3 run-id]))
 
 (deftest record-judge-result-test
@@ -243,7 +245,7 @@
                         :judge-output "REVISE"
                         :judge-event "REVISE"
                         :routing-result {:action :goto :target "build"}}
-          state' (workflow-progression/record-judge-result state run-id "review" judge-result)
+          state' (workflow-recording/record-judge-result state run-id "review" judge-result)
           run    (get-in state' [:workflows :runs run-id])
           attempt (get-in run [:step-runs "review" :attempts 0])]
       (is (= :running (:status run)))

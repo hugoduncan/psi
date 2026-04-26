@@ -1,10 +1,9 @@
 (ns psi.agent-session.workflow-progression
-  "Compatibility / legacy control-plane progression helpers for deterministic workflows.
+  "Compatibility / legacy sequential progression helpers for deterministic workflows.
 
-   Phase A statechart-driven execution should prefer record-only helpers from
-   `psi.agent-session.workflow-progression-recording`. This namespace remains as
-   the compatibility home for legacy sequential progression helpers that still own
-   control-flow transitions."
+   Active Phase A execution should use `workflow-runtime`, `workflow-statechart-runtime`,
+   and `workflow-progression-recording` directly. This namespace remains only for
+   compatibility-oriented sequential helper tests pending final cleanup."
   (:require
    [malli.core :as m]
    [psi.agent-session.workflow-model :as workflow-model]
@@ -217,42 +216,6 @@
                                       :attempt-id (:attempt-id latest)
                                       :reason :execution-failed
                                       :execution-error execution-error}))))))
-
-(defn resume-blocked-run
-  "Resume a blocked run, clearing blocked payload and returning to :running on the same step.
-
-   Resume does not mutate the blocked attempt; callers should create a new attempt afterwards."
-  [state run-id]
-  (update-in state (run-path run-id)
-             (fn [workflow-run]
-               (-> workflow-run
-                   (assoc :status :running
-                          :blocked nil
-                          :updated-at (now))
-                   (append-history :workflow/resume
-                                   {:run-id run-id
-                                    :step-id (:current-step-id workflow-run)})))))
-
-(defn cancel-run
-  "Cancel a non-terminal workflow run.
-
-   Cancellation is runtime-owned and records a terminal outcome plus history entry."
-  [state run-id reason]
-  (update-in state (run-path run-id)
-             (fn [workflow-run]
-               (-> workflow-run
-                   (assoc :status :cancelled
-                          :blocked nil
-                          :current-step-id (:current-step-id workflow-run)
-                          :updated-at (now)
-                          :finished-at (now)
-                          :terminal-outcome {:outcome :cancelled
-                                             :reason reason
-                                             :step-id (:current-step-id workflow-run)})
-                   (append-history :workflow/cancel
-                                   {:run-id run-id
-                                    :step-id (:current-step-id workflow-run)
-                                    :reason reason})))))
 
 ;;; Judge-aware compatibility progression
 
