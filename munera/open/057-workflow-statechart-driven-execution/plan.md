@@ -2,122 +2,145 @@
 
 ## Approach
 
-Bottom-up, test-first. Each slice proves one architectural layer before the next builds on it. The existing Phase B tests serve as the behavioral specification — Phase A must produce identical observable behavior.
+Bottom-up, test-first. Each slice proves one architectural layer before the next builds on it. The existing Phase B tests serve as the behavioral specification — Phase A must preserve observable parity while shifting control ownership into the chart.
 
-The key constraint: fulcrologic statecharts `process-event!` is synchronous. Entry actions that call `prompt-in!` (blocking) can synchronously send completion events back into the chart. This means the entire execution cascade is a single synchronous call chain rooted in the initial `:workflow/start` event.
+The execution mechanism is settled: re-entrant `process-event!` is not viable with fulcrologic statecharts for this use case. Phase A uses an **event-queue + drain loop** with FIFO semantics.
 
 ## Risks
 
-- **~~Synchronous cascade~~**: ✅ Verified. Re-entrant `process-event!` does NOT work (reads stale working memory). Solution: **event-queue + drain loop**. Entry actions enqueue events into an external atom; after each `process-event!`, a drain loop processes enqueued events until quiescent. Proven in REPL with full 3-step judge loop.
-- **Working memory mutation during processing**: entry actions use an external atom for mutable state (workflow context, iteration counts, session refs). Guards read from this atom. Proven in REPL.
-- **Blocked state representation**: the current `:blocked` status is a workflow-run-level concept. The statechart needs a representation that allows the chart to pause and resume.
+- **Event-pump correctness**: the drain loop must preserve ordering, drop queued events after terminal entry, and quiesce cleanly in blocked states.
+- **Working memory / projection drift**: entry/exit actions dual-write working memory and workflow-run projection; tests must prove they stay aligned.
+- **Chart-size growth**: compiling `.blocked` for every executable step increases chart size; the uniform shape must remain testable and understandable.
+- **Record-only helper extraction**: progression helpers that currently combine recording + control-flow must be cleanly split so the chart remains the sole control owner.
 
 ## Slice order
 
-### Slice 1 — Verify re-entrant event processing + chart compiler skeleton
+### Slice 1 — FIFO event pump proof + canonical chart compiler skeleton
 
-**Goal**: Prove that fulcrologic statecharts support the synchronous cascade pattern, and build the chart compiler skeleton.
+**Goal**: Prove the queue-and-drain execution model and the canonical per-step chart shape.
 
 Verify:
-- Create a minimal 2-state chart where the entry action of state B sends an event that transitions to state C
-- Confirm `process-event!` handles this correctly (state ends up in C, not stuck in B)
-- If re-entrant processing doesn't work, design an alternative (external event queue drained in a loop)
+- Create a minimal chart where an entry action enqueues a completion event and the drain loop advances to the next state
+- Confirm re-entrant `process-event!` is not the mechanism used
+- Confirm FIFO ordering, terminal queue discard, and blocked-state quiescence semantics
 
 Chart compiler:
 - New function `compile-hierarchical-chart` in `workflow_statechart.clj`
 - Input: workflow definition (same shape as today)
-- Output: fulcrologic statechart definition with per-step states
-- For non-judged steps: leaf states with `:actor/done` → next step transitions
-- For judged steps: compound states with `.acting` and `.judging` sub-states
-- Terminal states: `:completed`, `:failed`, `:cancelled`
-- Initial state: `:pending` with `:workflow/start` → first step
+- Output: fulcrologic statechart definition with canonical step-local states
+- Every executable step gets `.acting` and `.blocked`
+- Judged steps additionally get `.judging`
+- Initial state: `:pending` with `:workflow/start` → first step `.acting`
+- Resume transitions always target the same step's `.acting`
 
-Test: compile a 3-step definition (plan/build/review with judge on review), verify the chart structure has the expected states and transitions. Verify the re-entrant cascade works.
+Test: compile a 3-step definition (plan/build/review with judge on review), verify exact state shape and transition pattern.
 
-### Slice 2 — Actions-fn and workflow turn context
+### Slice 2 — Workflow context, attempt identity, authority rules, and actions-fn
 
-**Goal**: Build the actions dispatch model and the workflow execution context.
+**Goal**: Build the working-memory model and the action dispatch boundary.
 
-- `create-workflow-context` — creates statechart env, session, working-memory with context data + actions-fn atom
-- `make-workflow-actions` — creates an actions-fn that dispatches on action keywords:
-  - `:step/enter` — increment iteration count, create actor session, prompt, send `:actor/done` or `:actor/failed`
-  - `:step/record-result` — record actor output onto workflow-run
-  - `:judge/enter` — project, create judge session, prompt, evaluate routing, send signal event
-  - `:judge/record` — record judge result onto attempt
-  - `:judge/retry` — inject feedback, re-prompt, re-evaluate
-  - `:terminal/record` — record terminal outcome
-- Wire script elements in the chart to call the actions-fn
+- `create-workflow-context` — creates statechart env, session, working memory, FIFO event queue, and actions-fn
+- Working memory includes:
+  - execution context
+  - attempt ids
+  - actor/judge retry counts
+  - pending actor/judge/routing buffers
+  - blocked-step metadata
+- Attempt identity rules:
+  - entering `.acting` allocates fresh attempt id
+  - `.judging` records onto the same attempt id
+  - actor retry and resume allocate fresh attempt ids on `.acting` re-entry
+  - judge retry keeps same attempt id and same judge session
+- Authority rules:
+  - working memory is authoritative for execution
+  - workflow-run atom is projection for introspection/persistence
+  - guards read only working-memory snapshots
+  - run status is projected from active chart state after each event
+- `make-workflow-actions` — dispatches on `:step/enter`, `:step/record-result`, `:step/record-failure`, `:judge/enter`, `:judge/record`, `:judge/retry`, `:step/block`, `:terminal/record`
 
-Test: with a mock actions-fn that records calls, verify that starting the chart and sending `:workflow/start` triggers the expected action sequence for a 2-step linear workflow.
+Test: verify attempt allocation, dual-write sync expectations, and projection-of-status policy.
 
-### Slice 3 — Leaf step execution through statechart
+### Slice 3 — Linear-step execution with explicit outcome ownership
 
-**Goal**: Non-judged steps execute through statechart entry actions.
+**Goal**: Non-judged steps execute through `.acting` / `.blocked` with unambiguous recording ownership.
 
-- Wire `make-workflow-actions` with real session creation and prompting
-- Entry action for leaf step: `increment-iteration-count` → `create-step-attempt-session!` → `prompt-in!` → classify result → send `:actor/done` or `:actor/failed`
-- Exit action: `record-actor-result` or `submit-result-envelope`
-- New `execute-run!` implementation: create context → start chart → send `:workflow/start` → return result
+- `.acting` entry: increment iteration count → allocate attempt → create actor session → `prompt-in!` → classify outcome → buffer transient result → enqueue `:actor/done` / `:actor/failed` / `:actor/blocked`
+- `.acting` exit on success: `:step/record-result`
+- `.acting` exit on failure: `:step/record-failure`
+- `.blocked` entry: `:step/block`
+- `.blocked` → `.acting` on `:workflow/resume`
 
-Test: execute a 2-step linear workflow (plan→build) through the statechart. Verify same observable behavior as Phase B: step-runs populated, accepted-results recorded, status :completed.
+Test: linear success, retrying failure, terminal failure, blocked/resume.
 
-### Slice 4 — Compound step execution (judge)
+### Slice 4 — Judged compound steps and same-attempt judging
 
-**Goal**: Judged steps execute through compound statechart states.
+**Goal**: Judged steps execute through `.acting` / `.judging` / `.blocked` with same-attempt judge recording.
 
-- `.acting` sub-state entry action: same as leaf step entry
-- `.acting` → `.judging` transition on `:actor/done`
-- `.judging` entry action: project actor session, create judge session, prompt, evaluate routing
-- Signal transitions with guards for iteration limits
-- Judge retry as internal transition (no exit/entry)
+- `.acting` behavior matches linear steps
+- `.acting` success transitions to `.judging`
+- `.judging` entry: projection, judge session creation, judge prompt, routing evaluation, transient judge/routing buffering
+- `.judging` exit on matched signal: `:judge/record`
+- Judge emits `:judge/signal` with signal in event payload
+- Judge no-match retry remains internal and keeps same attempt id and judge session
+- Judge execution does not block in Phase A
 
-Test: execute a 3-step workflow with judge loop (plan→build→review→REVISE→build→review→APPROVED). Verify same observable behavior as Phase B.
+Test: plan→build→review→REVISE→build→review→APPROVED, same attempt id across acting/judging, retry stays on same attempt.
 
-### Slice 5 — Guard functions and iteration limits
+### Slice 5 — Guard purity and routing/retry rules
 
-**Goal**: Guards evaluate routing conditions correctly.
+**Goal**: Guards encode routing and retry rules without hidden state access.
 
-- Guard for iteration limit: check target step's iteration count against directive's `:max-iterations`
-- Guard for retry availability: check attempt count against retry policy
-- Guards are pure functions of statechart context
+- Guards are pure functions of working-memory snapshot + event payload + compiled metadata
+- Iteration guard checks target step iteration count from working memory
+- Actor retry guard checks actor retry metadata from working memory
+- Judge retry guard checks judge retry metadata from working memory
 
-Test: iteration exhaustion causes `:failed`. Retry-available guard allows re-entry. Retry-exhausted guard causes `:failed`.
+Test: iteration exhaustion, actor retry available/exhausted, judge retry available/exhausted, no external atom reads.
 
-### Slice 6 — Blocked/resume semantics
+### Slice 6 — Phase B helper decomposition under chart ownership
 
-**Goal**: Blocked runs pause the statechart and resume correctly.
+**Goal**: Split Phase B progression helpers so recording survives but control-flow ownership moves fully into the chart.
 
-- `:blocked` outcome from actor → chart enters a blocked sub-state
-- `:workflow/resume` event → chart re-enters the step state for a new attempt
-- Resume creates a fresh attempt (same as today)
+- Reuse `record-actor-result` for acting success where suitable
+- Reuse `record-execution-failure` for acting failure
+- Extract record-only subset from `submit-result-envelope` if needed
+- Extract record-only subset from `submit-judged-result` for judged exits
+- Ensure no helper mutates `current-step-id` or determines next step in Phase A
 
-Test: blocked run pauses, resume continues execution.
+Test: helper-level tests proving recording works without imperative transition side-effects.
 
-### Slice 7 — Cancel and error handling
+### Slice 7 — Cancel, terminal projection, and queue semantics
 
-**Goal**: Cancel and error paths work through the statechart.
+**Goal**: Cancel and terminal behavior are fully deterministic.
 
-- `:workflow/cancel` transitions from any non-terminal state to `:cancelled`
-- Exception in entry action → catch → send `:actor/failed`
-- Terminal state entry actions record outcome
+- `:workflow/cancel` transitions from `.acting`, `.judging`, and `.blocked` to `:cancelled`
+- External cancel is enqueued FIFO and does not interrupt an already-running entry action
+- Terminal entry projects terminal status and discards queued tail events
+- `send-and-drain!` stops when queue is empty; blocked means quiescent in `.blocked`
 
-Test: cancel from various states. Exception during execution records failure.
+Test: cancel ordering, cancel from blocked/judging, terminal queue discard semantics.
 
 ### Slice 8 — Test migration and cleanup
 
-**Goal**: All existing tests pass, dead code removed.
+**Goal**: All existing tests pass, imperative orchestration removed.
 
-- Migrate existing `workflow_execution_test.clj` tests to drive the new statechart-based execution
+- Migrate existing `workflow_execution_test.clj` tests to drive the statechart-based execution
 - Remove the imperative loop code
-- Remove `execute-current-step!` (absorbed into actions-fn)
-- Remove `step-result-map` helper
+- Remove `execute-current-step!`
+- Replace `step-result-map` helper with explicit pending-result buffers
+- Remove `next-step-id-fn` from execution usage
 - Verify full suite green
 - Update `compile-definition` to produce the hierarchical chart by default
 
 ## Decisions
 
-- **Actions-fn pattern**: follow `turn_statechart.clj` — single callback dispatched from `ele/script` elements. External atom for mutable state (workflow-run map in ctx state atom).
-- **Event cascade vs event queue**: prefer synchronous cascade if fulcrologic supports it. Fall back to external event queue if not. Verified in slice 1.
-- **Workflow-run state synchronization**: actions-fn writes to both statechart context and workflow-run atom (Option A from design). Statechart context is authoritative for execution flow; run map is authoritative for introspection/persistence.
-- **Chart compilation**: `compile-definition` produces the hierarchical chart. The flat status-tracker chart is retained only if needed for backward compatibility (unlikely).
-- **Progression functions survive**: `increment-iteration-count`, `record-actor-result`, `submit-judged-result`, `record-execution-failure` continue to exist as pure state-update functions called by the actions-fn. They are not removed — only the imperative orchestration that called them is replaced.
+- **Canonical chart shape**: every executable step gets `.acting` and `.blocked`; judged steps additionally get `.judging`.
+- **Blocking scope**: only actor execution can block in Phase A; judge execution does not block.
+- **Event model**: use `:judge/signal` plus event payload, not dynamic event names.
+- **Execution mechanism**: FIFO event-queue + drain loop, not re-entrant `process-event!`.
+- **Attempt identity**: `.acting` allocates attempt id; `.judging` shares it; actor retry/resume allocate fresh attempt ids; judge retry keeps same attempt id.
+- **Authority split**: working memory is authoritative for execution; workflow-run atom is authoritative for external projection. Guards read only working memory.
+- **Status projection**: workflow-run `:status` is derived from active chart state after each event.
+- **Recording ownership**: entry actions do work; acting/judging exits record success/failure data; blocked entry records blocked data.
+- **Helper reuse**: progression helpers survive only as record/update substrate, not as transition owners.
+- **Observable parity**: parity means matching run status, current-step-id behavior, step-run/attempt shape, accepted results, iteration counts, judge fields, blocked/resume behavior, and terminal outcome.

@@ -1,10 +1,10 @@
 # 057 — Steps
 
-- [ ] Slice 1: Chart compiler — compile workflow definition to hierarchical statechart
-- [ ] Slice 2: Actions dispatch model — actions-fn callback pattern for entry/exit side-effects
-- [ ] Slice 3: Leaf step execution — non-judged steps driven by statechart entry actions
-- [ ] Slice 4: Compound step execution — judged steps with .acting/.judging sub-states
-- [ ] Slice 5: Execution loop replacement — `execute-run!` becomes start-chart + send-start
-- [ ] Slice 6: Blocked/resume through statechart
-- [ ] Slice 7: Error handling and cancel
-- [ ] Slice 8: Existing test migration + full suite green
+- [ ] Slice 1: FIFO event pump proof + canonical `.acting` / `.blocked` / optional `.judging` chart compiler skeleton
+- [ ] Slice 2: Workflow context, attempt identity rules, authority rules, and actions-fn dispatch model
+- [ ] Slice 3: Linear-step execution with explicit success/failure/blocked recording ownership
+- [ ] Slice 4: Judged compound-step execution with same-attempt judging and `:judge/signal` routing
+- [ ] Slice 5: Guard purity and routing/retry rules from working-memory snapshots only
+- [ ] Slice 6: Phase B helper decomposition so recording survives but chart owns control flow
+- [ ] Slice 7: Cancel, terminal projection, and FIFO queue semantics
+- [ ] Slice 8: Existing test migration, imperative loop removal, and full suite green
