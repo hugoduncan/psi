@@ -157,6 +157,21 @@ Bootstrapped on 2026-04-02.
   - attempted `psi-tool` exposure for execution controls hit a namespace load cycle (`psi_tool -> workflow_execution -> prompt_control/core -> context/... -> psi_tool`)
   - next 026 slice should avoid forcing execution controls through the current `psi_tool` load graph without first breaking that cycle
 
+## Task 056 — workflow loop, judge, and routing (Phase B complete)
+- All 8 Phase B slices are landed and green:
+  - Slice 1: model schemas (projection, judge, routing directive, routing table)
+  - Slice 2: projection extraction (`project-messages` with `:none`, `:full`, `{:type :tail}` + tool stripping)
+  - Slice 3: routing evaluation (`match-signal`, `resolve-goto-target`, `check-iteration-limit`, `evaluate-routing`)
+  - Slice 4: judge session execution (`execute-judge!` with retry — max 2 retries, feedback injection)
+  - Slice 5: progression (`increment-iteration-count`, `record-actor-result`, `submit-judged-result` with verdict history)
+  - Slice 6: execution wiring (judge branch in `execute-current-step!`, loop test proving plan→build→review→REVISE→build→review→APPROVED)
+  - Slice 7: compiler (threads `:judge`/`:on` from file format, resolves goto workflow names to step-ids, `validate-judge-routing`)
+  - Slice 8: full suite green (1397 unit tests / 10499 assertions, 142 extension tests / 563 assertions)
+- Key implementation decision: iteration count incremented only in `execute-current-step!` (on step entry), not in `submit-judged-result` (on goto routing), to avoid double-counting
+- New namespace: `workflow_judge.clj` (projection, routing, judge execution)
+- Phase A (statechart-driven execution) remains as follow-on work
+- Task 056 can be closed once Phase B is accepted; Phase A would be a new task
+
 ## Suggested next step
 - Active munera tasks are now:
   1. `munera/open/047-tui-feature-parity-with-emacs-ui/` (parent umbrella for TUI parity)
