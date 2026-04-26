@@ -114,7 +114,7 @@
         {:action :goto :target (nth step-order (dec idx))})
 
       (string? goto)
-      (if (some #{goto} step-order)
+      (if (contains? (set step-order) goto)
         {:action :goto :target goto}
         {:action :fail :reason :unknown-step :step-id goto})
 
@@ -226,5 +226,5 @@
           {:judge-session-id judge-sid
            :judge-output     last-output
            :judge-event      (when (not= :no-match (:action routing-result))
-                               (str/trim (or last-output "")))
+                               last-output)
            :routing-result   routing-result})))))

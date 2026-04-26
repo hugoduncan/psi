@@ -197,6 +197,15 @@
       :skills         (resolve-step-skills ctx parent-session-id (:skills step-meta))
       :model          (:model step-meta)})))
 
+(defn- step-result-map
+  "Build the common step execution result map."
+  [ctx run-id step-id attempt execution-session]
+  {:run-id               run-id
+   :step-id              step-id
+   :attempt-id           (:attempt-id attempt)
+   :execution-session-id (:session-id execution-session)
+   :status               (get-in @(:state* ctx) [:workflows :runs run-id :status])})
+
 (defn execute-current-step!
   "Execute the current workflow step as one bounded child-session attempt.
 
@@ -244,12 +253,8 @@
         (if failure-payload
           (do
             (swap! (:state* ctx) workflow-progression/record-execution-failure run-id step-id failure-payload)
-            {:run-id run-id
-             :step-id step-id
-             :attempt-id (:attempt-id attempt)
-             :execution-session-id (:session-id execution-session)
-             :status (get-in @(:state* ctx) [:workflows :runs run-id :status])
-             :error (:message failure-payload)})
+            (assoc (step-result-map ctx run-id step-id attempt execution-session)
+                   :error (:message failure-payload)))
           (let [envelope   {:outcome :ok
                             :outputs {:text (assistant-message-text assistant-message)}}
                 step-def   (get-in workflow-run [:effective-definition :steps step-id])
@@ -267,28 +272,16 @@
                                     :step-order      step-order
                                     :step-runs       step-runs})]
                 (swap! (:state* ctx) workflow-progression/submit-judged-result run-id step-id judge-result)
-                {:run-id run-id
-                 :step-id step-id
-                 :attempt-id (:attempt-id attempt)
-                 :execution-session-id (:session-id execution-session)
-                 :status (get-in @(:state* ctx) [:workflows :runs run-id :status])
-                 :judge-result judge-result})
+                (assoc (step-result-map ctx run-id step-id attempt execution-session)
+                       :judge-result judge-result))
               ;; Non-judged step: existing path
               (do
                 (swap! (:state* ctx) workflow-progression/submit-result-envelope run-id step-id envelope)
-                {:run-id run-id
-                 :step-id step-id
-                 :attempt-id (:attempt-id attempt)
-                 :execution-session-id (:session-id execution-session)
-                 :status (get-in @(:state* ctx) [:workflows :runs run-id :status])})))))
+                (step-result-map ctx run-id step-id attempt execution-session))))))
       (catch Exception e
         (swap! (:state* ctx) workflow-progression/record-execution-failure run-id step-id {:message (ex-message e)})
-        {:run-id run-id
-         :step-id step-id
-         :attempt-id (:attempt-id attempt)
-         :execution-session-id (:session-id execution-session)
-         :status (get-in @(:state* ctx) [:workflows :runs run-id :status])
-         :error (ex-message e)}))))
+        (assoc (step-result-map ctx run-id step-id attempt execution-session)
+               :error (ex-message e))))))
 
 (defn execute-run!
   "Execute a sequential workflow run until it reaches a terminal or blocked status.

@@ -78,10 +78,10 @@
 
 ### Slice 10 — Code shaper fixes
 
-- [ ] Remove redundant `str/trim` on `:judge-event` in `execute-judge!` — `last-output` is already trimmed at extraction
-- [ ] Extract shared step-result-map helper in `workflow_execution.clj` to reduce duplication across judged/non-judged/error branches
-- [ ] Replace `(some #{goto} step-order)` with `(contains? (set step-order) goto)` in `resolve-goto-target` for idiomatic membership check
-- [ ] Run full suite green after fixes
+- [x] Remove redundant `str/trim` on `:judge-event` in `execute-judge!` — `last-output` is already trimmed at extraction
+- [x] Extract shared `step-result-map` helper in `workflow_execution.clj` — reduces 3 result-map constructions to `assoc` on shared base
+- [x] Replace `(some #{goto} step-order)` with `(contains? (set step-order) goto)` in `resolve-goto-target` for idiomatic membership check
+- [x] Run full suite green after fixes (1398 unit tests / 10579 assertions, 0 failures)
 
 ## Phase A: Statechart-driven execution (follow-on task)
 
