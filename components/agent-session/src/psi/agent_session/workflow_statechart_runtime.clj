@@ -23,7 +23,6 @@
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-judge :as workflow-judge]
-   [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-progression-recording :as workflow-progression-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
@@ -274,8 +273,8 @@
                    (-> state
                        (update-in [:workflows :runs run-id]
                                   #(workflow-attempts/append-attempt-to-run % step-id attempt))
-                       (workflow-progression/start-latest-attempt run-id step-id)
-                       (workflow-progression/increment-iteration-count run-id step-id))))
+                       (workflow-progression-recording/start-latest-attempt run-id step-id)
+                       (workflow-progression-recording/increment-iteration-count run-id step-id))))
           (try
             (prompt-control/prompt-in! ctx (:session-id execution-session) prompt)
             (let [assistant-message (prompt-control/last-assistant-message-in ctx (:session-id execution-session))
@@ -316,7 +315,7 @@
               judged-step? (some? (get-in workflow-run [:effective-definition :steps step-id :judge]))]
           (if judged-step?
             (swap! (:state* ctx)
-                   workflow-progression/record-actor-result run-id step-id payload)
+                   workflow-progression-recording/record-actor-result run-id step-id payload)
             (swap! (:state* ctx)
                    workflow-progression-recording/record-step-result run-id step-id payload))
           (swap! working-memory*
@@ -390,7 +389,7 @@
                                              :finished-at (or (:finished-at workflow-run) (now))
                                              :terminal-outcome {:outcome :completed
                                                                 :step-id step-id
-                                                                :attempt-id (:attempt-id (workflow-progression/latest-attempt workflow-run step-id))
+                                                                :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
                                                                 :result-envelope (get-in workflow-run [:step-runs step-id :accepted-result])}))
 
                                   (-> workflow-run
@@ -399,7 +398,7 @@
                                              :terminal-outcome {:outcome :failed
                                                                 :reason (or (:reason routing-result) :judge-no-match)
                                                                 :step-id step-id
-                                                                :attempt-id (:attempt-id (workflow-progression/latest-attempt workflow-run step-id))
+                                                                :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
                                                                 :judge-output (:judge-output judge-result)})))))))
           (swap! working-memory*
                  (fn [wm]

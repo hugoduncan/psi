@@ -4,8 +4,7 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
-   [psi.agent-session.workflow-statechart :as workflow-sc]
-   [psi.agent-session.workflow-statechart-compat :as workflow-compat]))
+   [psi.agent-session.workflow-statechart :as workflow-sc]))
 
 (def sample-definition
   {:definition-id "plan-build-review"
@@ -24,7 +23,7 @@
   [events]
   (let [env        (simple/simple-env)
         session-id (java.util.UUID/randomUUID)]
-    (simple/register! env :workflow-run workflow-compat/workflow-run-chart)
+    (simple/register! env :workflow-run workflow-sc/workflow-run-chart)
     (let [wm0 (sp/start! (::sc/processor env) env :workflow-run {::sc/session-id session-id})
           wmN (reduce (fn [wm event]
                         (sp/process-event! (::sc/processor env)
@@ -36,13 +35,10 @@
       (first (::sc/configuration wmN)))))
 
 (deftest workflow-definition-compilation-test
-  (testing "compatibility compilation derives sequential execution metadata"
-    (let [compiled (workflow-compat/compile-definition sample-definition)]
-      (is (= :sequential (:execution-model compiled)))
-      (is (= ["plan" "build" "review"] (:step-order compiled)))
-      (is (= "plan" (:initial-step-id compiled)))))
+  (testing "canonical initial-step-id follows workflow definition order"
+    (is (= "plan" (workflow-sc/initial-step-id sample-definition))))
 
-  (testing "next-step-id remains the explicit compatibility sequential helper"
+  (testing "next-step-id follows workflow definition order"
     (is (= "build" (workflow-sc/next-step-id sample-definition "plan")))
     (is (= "review" (workflow-sc/next-step-id sample-definition "build")))
     (is (nil? (workflow-sc/next-step-id sample-definition "review")))))
