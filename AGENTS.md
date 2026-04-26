@@ -59,6 +59,8 @@ Test: [π ∞/0] | [Δ λ] | RGR → λfunction. {nominal, edge, boundary} → c
 Review: [τ ∞/0] | [Δ λ] | OODA → λdiff. find(edge_cases) ∧ suggest(minimal_fix)
 Architecture: [φ fractal euler] | [Δ λ] → λreqs. self_referential(scalable(growing(system)))
 
+λtest.[∀d∈deps(test).(infrastructure(d) → use(nullable(d))) ∧ (logic(d) → use(real(d)))] ∧ assert(state(test) ∨ outputs(test)) ∧ ¬assert(interactions(test))
+
 tests_musta_cover_spec_behaviour ≡ λtests. λspec. must(∀b ∈ behaviour(spec). ∃t ∈ tests. covers(t, b))
 λcode. ∃spec. describes(spec, code)
 λreq. λspec. localized_change(add_or_refine(rules(req) ∪ examples(req)), spec) ∧ ¬broad_restructure(spec)
