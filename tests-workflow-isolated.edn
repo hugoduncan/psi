@@ -1,0 +1,42 @@
+#kaocha/v1
+ {:tests
+  [{:id :workflow
+    :test-paths ["components/agent-session/test"]
+    :source-paths ["bases/main/src"
+                   "bases/main/resources"
+                   "components/ai/src"
+                   "components/app-runtime/src"
+                   "components/engine/src"
+                   "components/query/src"
+                   "components/history/src"
+                   "components/introspection/src"
+                   "components/memory/src"
+                   "components/recursion/src"
+                   "components/tui/src"
+                   "components/rpc/src"
+                   "components/agent-core/src"
+                   "components/agent-session/src"
+                   "components/ui-state/src"
+                   "components/system-bootstrap/src"
+                   "extensions/auto-session-name/src"
+                   "extensions/commit-checks/src"
+                   "extensions/hello-ext/src"
+                   "extensions/lsp/src"
+                   "extensions/mcp-tasks-run/src"
+                   "extensions/mementum/src"
+                   "extensions/munera/src"
+                   "extensions/plan-state-learning/src"
+                   "extensions/work-on/src"
+                   "extensions/workflow-display/src"
+                   "extensions/workflow-loader/src"
+                   "test-support"
+                   "components/extension-test-helpers/src"]
+    :ns-patterns ["psi\\.agent-session\\.workflow-(execution|statechart-runtime|hierarchical-chart|guard-purity|progression)-test$"]}]
+
+  :color? true
+  :fail-fast? false
+  :capture-output? true
+  :reporter [kaocha.report/dots]
+  :plugins [:kaocha.plugin/hooks]
+  :kaocha.hooks/pre-run [psi.test-hooks/pre-run]
+  :skip-meta [:integration]}

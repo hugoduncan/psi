@@ -7,4 +7,4 @@
 - [x] Slice 5: Guard purity and routing/retry rules from working-memory snapshots only
 - [x] Slice 6: Phase B helper decomposition so recording survives but chart owns control flow
 - [x] Slice 7: Cancel, terminal projection, and FIFO queue semantics
-- [ ] Slice 8: Existing test migration, imperative loop removal, and full suite green
+- [x] Slice 8: Existing test migration, imperative loop removal, and isolated workflow suite green

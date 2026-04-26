@@ -36,18 +36,45 @@
     (sp/process-event! (::sc/processor env) env wm'
                        (evts/new-event {:name event-kw :data (or event-data {})}))))
 
+(def ^:private max-test-drain-events 200)
+
+(defn- terminal-config?
+  [wm]
+  (boolean (some (::sc/configuration wm) [:completed :failed :cancelled])))
+
 (defn- drain-events!
-  "Drain the event queue, processing each event and recursing until empty."
+  "Drain the event queue, processing each event and recursing until empty.
+
+   A hard bound turns accidental infinite test churn into a concrete failure."
   [ctx wm event-queue*]
-  (loop [wm wm]
-    (let [events @event-queue*]
-      (if (empty? events)
-        wm
-        (do
-          (reset! event-queue* [])
-          (recur (reduce (fn [wm {:keys [event data]}]
-                           (process-event ctx wm event data))
-                         wm events)))))))
+  (loop [wm wm
+         processed 0]
+    (cond
+      (terminal-config? wm)
+      (do
+        (reset! event-queue* [])
+        wm)
+
+      (>= processed max-test-drain-events)
+      (throw (ex-info "Hierarchical chart test event drain exceeded safety bound"
+                      {:processed-events processed
+                       :max-test-drain-events max-test-drain-events
+                       :configuration (::sc/configuration wm)
+                       :queued-events @event-queue*}))
+
+      :else
+      (let [events @event-queue*]
+        (if (empty? events)
+          wm
+          (do
+            (reset! event-queue* [])
+            (let [wm' (reduce (fn [wm {:keys [event data]}]
+                                (if (terminal-config? wm)
+                                  wm
+                                  (process-event ctx wm event data)))
+                              wm
+                              events)]
+              (recur wm' (+ processed (count events))))))))))
 
 (defn- send-and-drain!
   "Send an event and drain any enqueued follow-on events."
@@ -323,10 +350,7 @@
                        (let [step-id (:step-id data)]
                          (case action-kw
                            :step/enter
-                           (let [counts (swap! iteration-counts* update step-id (fnil inc 0))]
-                             (swap! trace* conj [:step/enter step-id])
-                             ;; Simulate failure
-                             (swap! event-queue* conj {:event :actor/failed :data {:iteration-counts counts}}))
+                           (swap! trace* conj [:step/enter step-id])
                            :step/exit
                            (swap! trace* conj [:step/exit step-id])
                            :terminal/enter
@@ -334,7 +358,10 @@
                            nil)))
           chart (workflow-sc/compile-hierarchical-chart linear-definition)
           ctx (create-chart-context chart actions-fn iteration-counts* event-queue*)
-          wm-final (send-and-drain! ctx (:wm ctx) :workflow/start event-queue*)]
+          wm1 (process-event ctx (:wm ctx) :workflow/start nil)
+          wm-final (process-event ctx wm1 :actor/failed {:iteration-counts {"step-1-planner" 1}
+                                                         :attempt-counts {"step-1-planner" 1}
+                                                         :actor-retry-limits {"step-1-planner" 1}})]
       (is (= #{:failed} (config wm-final)))
       (is (= [[:step/enter "step-1-planner"] [:step/exit "step-1-planner"] [:terminal "failed"]]
              @trace*)))))

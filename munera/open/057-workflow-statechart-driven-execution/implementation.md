@@ -490,6 +490,44 @@ The updated progression tests prove:
 - `record-judge-result` records judge metadata without changing run status/current-step-id
 - existing `submit-judged-result` behavior remains green
 
+## 2026-04-26 — Slice 8 isolated workflow test migration landed
+
+Completed a focused test reshaping pass under the testing-without-mocks / nullable-infrastructure approach.
+
+### What changed
+
+- Added an isolated Kaocha config:
+  - `tests-workflow-isolated.edn`
+- Reshaped workflow tests to keep:
+  - real chart/runtime/progression logic
+  - nullable infrastructure seams for prompt/judge/session creation
+  - state/output assertions instead of interaction choreography
+- Fixed `workflow_execution_test.clj` to use schema-valid nullable child sessions when stubbing attempt-session creation
+- Simplified `resume-and-execute-run-test` to assert wrapper/result behavior rather than forcing queue internals
+- Fixed `workflow_statechart_runtime_test.clj` expectations:
+  - REVISE runtime test now asserts judged recording path only
+  - terminal-tail semantics now correctly distinguish FIFO pre-start cancel from post-terminal discard
+- Added a hard safety bound to the focused hierarchical-chart test drain loop so accidental churn becomes a concrete failure
+- Fixed the hierarchical actor no-retry failure test to drive the failure event directly with explicit retry snapshot data instead of self-reenqueuing forever
+
+### Validation
+
+Ran the isolated workflow suite only:
+
+- `psi.agent-session.workflow-hierarchical-chart-test`
+- `psi.agent-session.workflow-statechart-runtime-test`
+- `psi.agent-session.workflow-progression-test`
+- `psi.agent-session.workflow-execution-test`
+- `psi.agent-session.workflow-guard-purity-test`
+
+Result:
+
+- `51 tests, 177 assertions, 0 failures`
+
+### Outcome
+
+This does not prove the full repository unit suite is green yet, but it does prove the Phase A workflow slice is internally coherent under an isolated workflow-only harness and removes the earlier ambiguous hanging diagnosis from this slice.
+
 ## Next slice
 
-Slice 7: cancel, terminal projection, and FIFO queue semantics.
+Follow-on from Slice 8 is now repository-wide reintegration / full-suite reconciliation rather than more workflow-slice-local design work.

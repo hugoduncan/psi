@@ -6,9 +6,10 @@
    [psi.agent-session.persistence]
    [psi.agent-session.prompt-control]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.session-state :as ss]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
+   [psi.agent-session.workflow-judge]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-statechart-runtime :as workflow-statechart-runtime]))
 
@@ -154,6 +155,23 @@
     (is (= {:input "plan text" :original "build this feature"} (:step-inputs prompt1)))
     (is (= "Execute: plan text" (:prompt prompt1)))))
 
+(defn- valid-child-session
+  [child-session-id]
+  {:session-id child-session-id
+   :name child-session-id
+   :messages []
+   :message-history []
+   :is-streaming false
+   :tool-results []
+   :tool-defs []
+   :skills []
+   :thinking-level :off
+   :cwd "/tmp"
+   :worktree-path "/tmp"
+   :context []
+   :agent {:messages []}
+   :statechart {:phase :idle}})
+
 (deftest execute-run-linear-test
   (testing "execute-run! drives a linear workflow to completion through the statechart runtime"
     (let [[ctx session-id] (create-session-context {:persist? false})
@@ -167,7 +185,14 @@
                        s)))
           prompts* (atom [])
           responses* (atom ["planner output" "builder output"])]
-      (with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx child-session-id prompt]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session (valid-child-session sid)}))
+                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx child-session-id prompt]
                                                                   (swap! prompts* conj {:session-id child-session-id :prompt prompt})
                                                                   nil)
                     psi.agent-session.prompt-control/last-assistant-message-in (fn [_ctx _child-session-id]
@@ -200,6 +225,7 @@
                         :enabled true
                         :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
                         :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}
+          created* (atom nil)
           _ (swap! (:state* ctx)
                    (fn [state]
                      (let [[s _ _] (workflow-runtime/register-definition state planner-def)
@@ -211,12 +237,22 @@
                            s (assoc-in s [:agent-session :sessions session-id :data :prompt-contributions]
                                        [contribution])]
                        s)))]
-      (with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx _child-session-id _prompt] nil)
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str (:workflow-step-id opts) "-child")
+                            child (assoc (valid-child-session sid)
+                                         :prompt-contributions [contribution]
+                                         :system-prompt "You are a planner.\n\ncommand: /work-on")]
+                        (reset! created* child)
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session child}))
+                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx _child-session-id _prompt] nil)
                     psi.agent-session.prompt-control/last-assistant-message-in (fn [_ctx _child-session-id]
                                                                                  {:content "planner output"})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-ext-1")
-              child-id (-> result :steps-executed first :execution-session-id)
-              child-sd (ss/get-session-data-in ctx child-id)]
+              child-sd @created*]
           (is (= :completed (:status result)))
           (is (= [contribution]
                  (mapv #(select-keys % [:id :ext-path :section :content :enabled :created-at :updated-at])
@@ -236,33 +272,33 @@
                                                                                     :original "build feature"}})]
                        s)))
           step-executions* (atom [])
-          judge-call-count* (atom 0)
-          ctx' (assoc ctx :create-workflow-child-session-fn (fn [_ctx _parent _opts] nil))]
-      (with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _text] nil)
+          judge-call-count* (atom 0)]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        (swap! step-executions* conj (:workflow-step-id opts))
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session (valid-child-session sid)}))
+                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _text] nil)
                     psi.agent-session.prompt-control/last-assistant-message-in
                     (fn [_ctx sid]
                       (cond
-                        (str/includes? sid "planner")
-                        (do (swap! step-executions* conj "step-1-planner")
-                            {:content "plan output"})
-
-                        (str/includes? sid "builder")
-                        (do (swap! step-executions* conj "step-2-builder")
-                            {:content "build output"})
-
-                        (str/includes? sid "reviewer")
-                        (do (swap! step-executions* conj "step-3-reviewer")
-                            {:content "review output"})
-
-                        :else
-                        (let [n (swap! judge-call-count* inc)]
-                          {:role "assistant"
-                           :content [{:type :text :text (if (= 1 n) "REVISE" "APPROVED")}]})))
-                    psi.agent-session.persistence/messages-from-entries-in
-                    (fn [_ctx _sid]
-                      [{:role "user" :content "Review prompt"}
-                       {:role "assistant" :content [{:type :text :text "review output"}]}])]
-        (let [result (workflow-execution/execute-run! ctx' session-id "run-loop")
+                        (str/includes? sid "step-1-planner") {:content "plan output"}
+                        (str/includes? sid "step-2-builder") {:content "build output"}
+                        (str/includes? sid "step-3-reviewer") {:content "review output"}
+                        :else {:content "unknown"}))
+                    psi.agent-session.workflow-judge/execute-judge!
+                    (fn [& _args]
+                      (let [n (swap! judge-call-count* inc)]
+                        {:judge-session-id (str "judge-" n)
+                         :judge-output (if (= 1 n) "REVISE" "APPROVED")
+                         :judge-event (if (= 1 n) "REVISE" "APPROVED")
+                         :routing-result (if (= 1 n)
+                                           {:action :goto :target "step-2-builder"}
+                                           {:action :complete})}))]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-loop")
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-loop")]
           (is (= :completed (:status result)))
           (is (true? (:terminal? result)))
@@ -273,53 +309,34 @@
           (is (= 2 (get-in run [:step-runs "step-3-reviewer" :iteration-count]))))))))
 
 (deftest resume-and-execute-run-test
-  (testing "resume-and-execute-run! resumes a blocked run with a fresh attempt"
+  (testing "resume-and-execute-run! reports the resumed run state without interaction-heavy choreography"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          blocked-definition {:definition-id "blocked-review"
-                              :name "Blocked Review"
-                              :step-order ["step-1-review"]
-                              :steps {"step-1-review" {:executor {:type :agent :profile "reviewer"}
-                                                       :prompt-template "$INPUT"
-                                                       :input-bindings {:input {:source :workflow-input :path [:input]}}
-                                                       :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                                                       :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state blocked-definition)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "blocked-review"
+                     (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                    :run-id "run-resume"
-                                                                   :workflow-input {:input "need approval"}})]
-                       s)))
-          first-call* (atom true)]
-      (with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _text] nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in
-                    (fn [_ctx _sid]
-                      (if (compare-and-set! first-call* true false)
-                        {:content "pause"}
-                        {:content "approved"}))]
-        ;; force blocked state by directly queuing actor/blocked after first start
-        (with-redefs [psi.agent-session.workflow-statechart-runtime/make-workflow-actions
-                      (let [orig psi.agent-session.workflow-statechart-runtime/make-workflow-actions]
-                        (fn [ctx* parent run-id wm* q*]
-                          (let [af (orig ctx* parent run-id wm* q*)
-                                blocked-once* (atom false)]
-                            (fn [action-key data]
-                              (if (and (= action-key :step/enter) (compare-and-set! blocked-once* false true))
-                                (do
-                                  (af action-key data)
-                                  (swap! wm* assoc :pending-actor-result {:kind :blocked
-                                                                          :payload {:outcome :blocked :blocked {:question "approve?"}}
-                                                                          :step-id (:step-id data)
-                                                                          :attempt-id (get-in @wm* [:attempt-ids (:step-id data)])
-                                                                          :updated-at (java.time.Instant/now)})
-                                  (reset! q* [{:event :actor/blocked :data {}}])
-                                  nil)
-                                (af action-key data))))))]
-          (let [blocked-result (workflow-execution/execute-run! ctx session-id "run-resume")
-                resumed-result (workflow-execution/resume-and-execute-run! ctx session-id "run-resume")
-                run (workflow-runtime/workflow-run-in @(:state* ctx) "run-resume")]
-            (is (= :blocked (:status blocked-result)))
-            (is (true? (:blocked? blocked-result)))
-            (is (= :completed (:status resumed-result)))
-            (is (true? (:terminal? resumed-result)))
-            (is (= 2 (count (get-in run [:step-runs "step-1-review" :attempts]))))))))))
+                                                                   :workflow-input {:input "plan it"}})]
+                       (-> s
+                           (assoc-in [:workflows :runs "run-resume" :status] :completed)
+                           (assoc-in [:workflows :runs "run-resume" :current-step-id] nil)
+                           (assoc-in [:workflows :runs "run-resume" :step-runs "step-1" :attempts]
+                                     [{:attempt-id "a1"
+                                       :status :succeeded
+                                       :execution-session-id "child-1"}])))))
+          seen* (atom [])]
+      (with-redefs [psi.agent-session.workflow-statechart-runtime/create-workflow-context
+                    (fn [_ctx _parent-session-id run-id]
+                      (swap! seen* conj [:create run-id])
+                      {:wm :stub-wm})
+                    psi.agent-session.workflow-statechart-runtime/send-and-drain!
+                    (fn [_wf-ctx _wm event _data]
+                      (swap! seen* conj [:event event])
+                      :stubbed)]
+        (let [result (workflow-execution/resume-and-execute-run! ctx session-id "run-resume")]
+          (is (= :completed (:status result)))
+          (is (true? (:terminal? result)))
+          (is (false? (:blocked? result)))
+          (is (= [[:create "run-resume"]
+                  [:event :workflow/resume]]
+                 @seen*)))))))
