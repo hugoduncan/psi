@@ -4,11 +4,10 @@ Open tasks in suggested execution order:
 
 Queue:
 
-`munera/open/057-workflow-statechart-driven-execution/`
+`munera/open/058-migrate-workflow-consumers-and-remove-compatibility-layer/`
 
 Backlog:
 
-`munera/open/058-migrate-workflow-consumers-and-remove-compatibility-layer/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
