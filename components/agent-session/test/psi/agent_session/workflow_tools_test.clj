@@ -5,8 +5,30 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
-   [psi.agent-session.workflow-runtime]
-   [psi.agent-session.workflow-sequential-compat-test-support :as workflow-seq-compat]))
+   [psi.agent-session.workflow-runtime]))
+
+(defn- complete-run-step
+  [run step-id]
+  (let [attempt-id (str step-id "-attempt")
+        session-id (str step-id "-session")
+        attempt {:attempt-id attempt-id
+                 :status :succeeded
+                 :execution-session-id session-id}
+        next-step-id (second (drop-while #(not= step-id %) (get-in run [:effective-definition :step-order])))
+        base-run (-> run
+                     (update-in [:step-runs step-id :attempts] (fnil conj []) attempt)
+                     (assoc-in [:step-runs step-id :accepted-result] {:outcome :ok :outputs {:text (str step-id " output")}}))]
+    (if next-step-id
+      (-> base-run
+          (assoc :status :running
+                 :current-step-id next-step-id))
+      (-> base-run
+          (assoc :status :completed
+                 :current-step-id nil
+                 :terminal-outcome {:outcome :completed
+                                    :step-id step-id
+                                    :attempt-id attempt-id
+                                    :result-envelope {:outcome :ok :outputs {:text (str step-id " output")}}})))))
 
 (defn- execute-run-nullable
   [state*]
@@ -32,20 +54,20 @@
           :else
           (let [step-id (:current-step-id run)
                 next-step-id (second (drop-while #(not= step-id %) (get-in run [:effective-definition :step-order])))
-                envelope {:outcome :ok :outputs {:text (str step-id " output")}}]
-            (swap! state* workflow-seq-compat/submit-result-envelope run-id step-id envelope)
+                updated-run (complete-run-step run step-id)]
+            (swap! state* assoc-in [:workflows :runs run-id] updated-run)
             (recur (conj steps-executed {:step-id step-id
                                          :attempt-id (str step-id "-attempt")
                                          :execution-session-id (str step-id "-session")
-                                         :status (get-in @state* [:workflows :runs run-id :status])
+                                         :status (:status updated-run)
                                          :next-step-id next-step-id}))))))))
 
 (defn- resume-and-execute-run-nullable
   [state*]
   (fn [ctx session-id run-id]
-    (swap! state* (fn [state]
-                    (first (psi.agent-session.workflow-runtime/resume-run state run-id))))
-    ((execute-run-nullable state*) ctx session-id run-id)))
+    (let [[new-state _run] (psi.agent-session.workflow-runtime/resume-run @state* run-id)]
+      (reset! state* new-state)
+      ((execute-run-nullable state*) ctx session-id run-id))))
 
 (defn- create-session-context
   ([]
