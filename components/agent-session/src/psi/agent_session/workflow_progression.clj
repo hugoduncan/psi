@@ -346,7 +346,6 @@
                      (-> base-run
                          (assoc :current-step-id target
                                 :status :running)
-                         (update-in [:step-runs target :iteration-count] (fnil inc 0))
                          (append-history :verdict/goto
                                          {:run-id run-id
                                           :step-id step-id

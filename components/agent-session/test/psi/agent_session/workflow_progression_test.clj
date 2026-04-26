@@ -226,8 +226,8 @@
       ;; Routed to build
       (is (= "build" (:current-step-id run)))
       (is (= :running (:status run)))
-      ;; Build iteration count incremented
-      (is (= 2 (get-in run [:step-runs "build" :iteration-count])))
+      ;; Build iteration count NOT incremented here — that happens in execute-current-step!
+      (is (= 1 (get-in run [:step-runs "build" :iteration-count])))
       ;; Judge fields on attempt
       (let [attempt (get-in run [:step-runs "review" :attempts 0])]
         (is (= "judge-1" (:judge-session-id attempt)))

@@ -2,8 +2,10 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.persistence]
    [psi.agent-session.prompt-control]
    [psi.agent-session.workflow-attempts]
+   [psi.agent-session.workflow-judge]
    [psi.agent-session.workflow-progression]
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-request :as prompt-request]
@@ -634,3 +636,141 @@
           (is (true? (:terminal? result)))
           (is (= :completed (:status run)))
           (is (nil? (:blocked run))))))))
+
+;;; Judge-aware execution
+
+(def judged-definition
+  {:definition-id "plan-build-review-judged"
+   :name "plan-build-review-judged"
+   :step-order ["step-1-planner" "step-2-builder" "step-3-reviewer"]
+   :steps {"step-1-planner"  {:executor {:type :agent :profile "planner" :mode :sync}
+                              :prompt-template "$INPUT"
+                              :input-bindings {:input {:source :workflow-input :path [:input]}
+                                               :original {:source :workflow-input :path [:original]}}
+                              :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}}
+           "step-2-builder"  {:executor {:type :agent :profile "builder" :mode :sync}
+                              :prompt-template "Execute: $INPUT\nOriginal: $ORIGINAL"
+                              :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :text]}
+                                               :original {:source :workflow-input :path [:original]}}
+                              :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}}
+           "step-3-reviewer" {:executor {:type :agent :profile "reviewer" :mode :sync}
+                              :prompt-template "Review: $INPUT\nOriginal: $ORIGINAL"
+                              :input-bindings {:input {:source :step-output :path ["step-2-builder" :outputs :text]}
+                                               :original {:source :workflow-input :path [:original]}}
+                              :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}
+                              :judge {:prompt "APPROVED or REVISE?"
+                                      :system-prompt "You are a routing judge."
+                                      :projection {:type :tail :turns 1}}
+                              :on {"APPROVED" {:goto :next}
+                                   "REVISE"   {:goto "step-2-builder" :max-iterations 3}}}}})
+
+(deftest execute-current-step-with-judge-test
+  (testing "judged step executes actor then judge, applies routing"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/register-definition state judged-definition)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build-review-judged"
+                                                                   :run-id "run-j1"
+                                                                   :workflow-input {:input "ship it"
+                                                                                    :original "build feature"}})]
+                       ;; Fast-forward to review step with prior results
+                       (-> s
+                           (assoc-in [:workflows :runs "run-j1" :current-step-id] "step-3-reviewer")
+                           (assoc-in [:workflows :runs "run-j1" :step-runs "step-1-planner" :accepted-result]
+                                     {:outcome :ok :outputs {:text "plan output"}})
+                           (assoc-in [:workflows :runs "run-j1" :step-runs "step-2-builder" :accepted-result]
+                                     {:outcome :ok :outputs {:text "build output"}})
+                           (assoc-in [:workflows :runs "run-j1" :step-runs "step-2-builder" :iteration-count] 1)))))
+          judge-sessions-created* (atom [])
+          ;; Provide ctx with judge child session creation fn
+          ctx' (assoc ctx :create-workflow-child-session-fn
+                      (fn [_ctx _parent opts]
+                        (swap! judge-sessions-created* conj opts)
+                        nil))]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id _opts]
+                      {:attempt {:attempt-id "rev-a1" :status :pending :execution-session-id "child-review"}
+                       :execution-session {:session-id "child-review"}})
+                    psi.agent-session.prompt-control/prompt-in!
+                    (fn [_ctx _sid _text] nil)
+                    psi.agent-session.prompt-control/last-assistant-message-in
+                    (fn [_ctx sid]
+                      (if (= sid "child-review")
+                        {:content "review output"}
+                        ;; Judge session
+                        {:role "assistant" :content [{:type :text :text "APPROVED"}]}))
+                    psi.agent-session.persistence/messages-from-entries-in
+                    (fn [_ctx _sid]
+                      [{:role "user" :content "Review: build output"}
+                       {:role "assistant" :content [{:type :text :text "review output"}]}])]
+        (let [result (workflow-execution/execute-current-step! ctx' session-id "run-j1")
+              run    (workflow-runtime/workflow-run-in @(:state* ctx) "run-j1")]
+          ;; Judge routed APPROVED → complete (review is last step, :next = complete)
+          (is (= :completed (:status run)))
+          (is (some? (:judge-result result)))
+          (is (= "APPROVED" (get-in result [:judge-result :judge-event])))
+          ;; Actor result recorded
+          (is (= {:outcome :ok :outputs {:text "review output"}}
+                 (get-in run [:step-runs "step-3-reviewer" :accepted-result])))
+          ;; Judge session was created with no tools
+          (is (= 1 (count @judge-sessions-created*)))
+          (is (= [] (:tool-defs (first @judge-sessions-created*)))))))))
+
+(deftest execute-run-with-loop-test
+  (testing "execute-run! handles a judge loop: plan→build→review→REVISE→build→review→APPROVED→done"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/register-definition state judged-definition)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build-review-judged"
+                                                                   :run-id "run-loop"
+                                                                   :workflow-input {:input "ship it"
+                                                                                    :original "build feature"}})]
+                       s)))
+          ;; Track step execution order
+          step-executions* (atom [])
+          ;; Judge responses: first REVISE, then APPROVED
+          judge-call-count* (atom 0)
+          ctx' (assoc ctx :create-workflow-child-session-fn
+                      (fn [_ctx _parent _opts] nil))]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str "child-" (:workflow-step-id opts) "-" (count @step-executions*))]
+                        (swap! step-executions* conj (:workflow-step-id opts))
+                        {:attempt {:attempt-id (str "a-" (count @step-executions*))
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session {:session-id sid}}))
+                    psi.agent-session.prompt-control/prompt-in!
+                    (fn [_ctx _sid _text] nil)
+                    psi.agent-session.prompt-control/last-assistant-message-in
+                    (fn [_ctx sid]
+                      (cond
+                        (str/includes? sid "planner") {:content "plan output"}
+                        (str/includes? sid "builder") {:content "build output"}
+                        (str/includes? sid "reviewer") {:content "review output"}
+                        ;; Judge session — alternate REVISE then APPROVED
+                        :else (let [n (swap! judge-call-count* inc)]
+                                {:role "assistant"
+                                 :content [{:type :text :text (if (= 1 n) "REVISE" "APPROVED")}]})))
+                    psi.agent-session.persistence/messages-from-entries-in
+                    (fn [_ctx _sid]
+                      [{:role "user" :content "Review prompt"}
+                       {:role "assistant" :content [{:type :text :text "review output"}]}])]
+        (let [result (workflow-execution/execute-run! ctx' session-id "run-loop")
+              run    (workflow-runtime/workflow-run-in @(:state* ctx) "run-loop")]
+          ;; Should complete after: plan, build, review(REVISE), build, review(APPROVED)
+          (is (= :completed (:status result)))
+          (is (true? (:terminal? result)))
+          (is (= 5 (count (:steps-executed result))))
+          ;; Step execution order
+          (is (= ["step-1-planner" "step-2-builder" "step-3-reviewer" "step-2-builder" "step-3-reviewer"]
+                 @step-executions*))
+          ;; Build was entered twice (iteration count = 2)
+          (is (= 2 (get-in run [:step-runs "step-2-builder" :iteration-count])))
+          ;; Review was entered twice
+          (is (= 2 (get-in run [:step-runs "step-3-reviewer" :iteration-count]))))))))

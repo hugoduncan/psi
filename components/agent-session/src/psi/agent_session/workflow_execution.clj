@@ -19,6 +19,7 @@
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
+   [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
@@ -230,7 +231,8 @@
              (-> state
                  (update-in [:workflows :runs run-id]
                             #(workflow-attempts/append-attempt-to-run % step-id attempt))
-                 (workflow-progression/start-latest-attempt run-id step-id))))
+                 (workflow-progression/start-latest-attempt run-id step-id)
+                 (workflow-progression/increment-iteration-count run-id step-id))))
     (try
       (prompt-control/prompt-in! ctx (:session-id execution-session) prompt)
       (let [assistant-message (prompt-control/last-assistant-message-in ctx (:session-id execution-session))
@@ -246,14 +248,35 @@
              :execution-session-id (:session-id execution-session)
              :status (get-in @(:state* ctx) [:workflows :runs run-id :status])
              :error (:message failure-payload)})
-          (let [envelope {:outcome :ok
-                          :outputs {:text (assistant-message-text assistant-message)}}]
-            (swap! (:state* ctx) workflow-progression/submit-result-envelope run-id step-id envelope)
-            {:run-id run-id
-             :step-id step-id
-             :attempt-id (:attempt-id attempt)
-             :execution-session-id (:session-id execution-session)
-             :status (get-in @(:state* ctx) [:workflows :runs run-id :status])})))
+          (let [envelope   {:outcome :ok
+                            :outputs {:text (assistant-message-text assistant-message)}}
+                step-def   (get-in workflow-run [:effective-definition :steps step-id])
+                judge-spec (:judge step-def)]
+            (if judge-spec
+              ;; Judged step: record actor result, execute judge, apply routing
+              (let [routing-table (or (:on step-def) {})
+                    step-order    (get-in workflow-run [:effective-definition :step-order])
+                    _             (swap! (:state* ctx) workflow-progression/record-actor-result run-id step-id envelope)
+                    step-runs     (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])
+                    judge-result  (workflow-judge/execute-judge!
+                                   ctx parent-session-id (:session-id execution-session)
+                                   judge-spec routing-table
+                                   step-id step-order step-runs)]
+                (swap! (:state* ctx) workflow-progression/submit-judged-result run-id step-id judge-result)
+                {:run-id run-id
+                 :step-id step-id
+                 :attempt-id (:attempt-id attempt)
+                 :execution-session-id (:session-id execution-session)
+                 :status (get-in @(:state* ctx) [:workflows :runs run-id :status])
+                 :judge-result judge-result})
+              ;; Non-judged step: existing path
+              (do
+                (swap! (:state* ctx) workflow-progression/submit-result-envelope run-id step-id envelope)
+                {:run-id run-id
+                 :step-id step-id
+                 :attempt-id (:attempt-id attempt)
+                 :execution-session-id (:session-id execution-session)
+                 :status (get-in @(:state* ctx) [:workflows :runs run-id :status])})))))
       (catch Exception e
         (swap! (:state* ctx) workflow-progression/record-execution-failure run-id step-id {:message (ex-message e)})
         {:run-id run-id
