@@ -144,7 +144,7 @@
         :goto
         (let [target (:target resolved)
               target-run (get step-runs target)
-              iter-count (:iteration-count target-run 0)
+              iter-count (get target-run :iteration-count 0)
               limit-check (check-iteration-limit iter-count (:max-iterations directive))]
           (if (= :exhausted limit-check)
             {:action :fail :reason :iteration-exhausted :step-id target :iteration-count iter-count}
@@ -158,24 +158,21 @@
 
 (def ^:private max-judge-retries 2)
 
-(defn- extract-assistant-text
-  "Extract the text from the last assistant message in a session."
-  [ctx session-id]
-  (when-let [msg (prompt-control/last-assistant-message-in ctx session-id)]
-    (cond
-      (string? (:content msg))
-      (str/trim (:content msg))
-
-      (sequential? (:content msg))
-      (some->> (:content msg)
+(defn- assistant-message-text
+  "Extract text content from an assistant message.
+   Handles both string content and structured content blocks.
+   Mirrors workflow-execution/assistant-message-text (cannot share due to dep direction)."
+  [assistant-message]
+  (or (some->> (:content assistant-message)
+               (filter map?)
                (keep (fn [block]
-                       (when (and (map? block) (= :text (:type block)))
+                       (when (= :text (:type block))
                          (:text block))))
                seq
-               (str/join "\n")
-               str/trim)
-
-      :else nil)))
+               (str/join "\n"))
+      (when (string? (:content assistant-message))
+        (:content assistant-message))
+      ""))
 
 (defn- judge-retry-feedback
   "Build a feedback message for a judge retry when no signal matched."
@@ -191,10 +188,12 @@
    prompts it, and matches the response against the routing table.
    Retries up to `max-judge-retries` times on no-match with feedback injection.
 
+   `routing-context` is {:current-step-id :step-order :step-runs}.
+
    Returns {:judge-session-id :judge-output :judge-event :routing-result}."
-  [ctx parent-session-id actor-session-id judge-spec routing-table
-   current-step-id step-order step-runs]
-  (let [projection    (or (:projection judge-spec) :full)
+  [ctx parent-session-id actor-session-id judge-spec routing-table routing-context]
+  (let [{:keys [current-step-id step-order step-runs]} routing-context
+        projection    (or (:projection judge-spec) :full)
         actor-msgs    (vec (persist/messages-from-entries-in ctx actor-session-id))
         projected     (project-messages actor-msgs projection)
         judge-sid     (str (java.util.UUID/randomUUID))
@@ -212,7 +211,7 @@
     ;; First attempt
     (prompt-control/prompt-in! ctx judge-sid (:prompt judge-spec))
     (loop [attempt 0
-           last-output (extract-assistant-text ctx judge-sid)]
+           last-output (str/trim (assistant-message-text (prompt-control/last-assistant-message-in ctx judge-sid)))]
       (let [routing-result (evaluate-routing last-output routing-table
                                              current-step-id step-order step-runs)]
         (if (and (= :no-match (:action routing-result))
@@ -222,7 +221,7 @@
             (prompt-control/prompt-in! ctx judge-sid
                                        (judge-retry-feedback last-output expected-sigs))
             (recur (inc attempt)
-                   (extract-assistant-text ctx judge-sid)))
+                   (str/trim (assistant-message-text (prompt-control/last-assistant-message-in ctx judge-sid)))))
           ;; Matched, or retries exhausted
           {:judge-session-id judge-sid
            :judge-output     last-output

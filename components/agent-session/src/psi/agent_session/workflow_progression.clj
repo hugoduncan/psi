@@ -323,7 +323,7 @@
   "Apply judge routing result to the workflow run.
 
    Records judge fields on the attempt, then applies the routing action:
-   - :goto → set current-step-id to target, increment target iteration count
+   - :goto → set current-step-id to target (iteration count incremented by execute-current-step! on entry)
    - :complete → transition to :completed
    - :fail → transition to :failed
    - :no-match (judge retries exhausted) → transition to :failed"

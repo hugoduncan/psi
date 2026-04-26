@@ -112,6 +112,24 @@
             (is (contains? definitions "planner"))
             (is (= 1 (count errors)))))))))
 
+(deftest load-workflow-definitions-judge-validation-test
+  (testing ":on without :judge surfaces as a load error"
+    (let [bad-judge-md (str "---\nname: bad-chain\ndescription: Bad chain\n---\n"
+                            "{:steps [{:workflow \"planner\" :prompt \"$INPUT\"}\n"
+                            "         {:workflow \"reviewer\" :prompt \"Review: $INPUT\"\n"
+                            "          :on {\"OK\" {:goto :next}}}]}\n\n"
+                            "Bad chain.")]
+      (with-temp-workflow-dir
+        {"planner.md" planner-md
+         "reviewer.md" reviewer-md
+         "bad-chain.md" bad-judge-md}
+        (fn [dir]
+          (with-redefs [loader/global-workflow-dirs (constantly [])
+                        loader/project-workflow-dir (constantly dir)]
+            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
+              (is (seq errors))
+              (is (some #(re-find #"no `:judge`" (:error %)) errors)))))))))
+
 (deftest directory-precedence-test
   (testing "project definitions override global definitions with same name"
     (let [global-planner "---\nname: planner\ndescription: Global planner\n---\nGlobal."

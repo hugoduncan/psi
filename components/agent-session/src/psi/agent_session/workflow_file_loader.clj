@@ -99,6 +99,8 @@
         ref-result (compiler/validate-step-references definitions)
         ;; Validate name collisions (should be resolved by merge, but check compiled output)
         collision-result (compiler/validate-no-name-collisions definitions)
+        ;; Validate judge/routing constraints
+        judge-result (compiler/validate-judge-routing definitions)
         ;; Build definition map keyed by name
         def-map (into {} (map (juxt :name identity)) definitions)
         ;; Collect all errors
@@ -109,11 +111,22 @@
                                        :source-path (:source-path p)})
                                     errored)
                                errors))
-                         (when-not (:valid? ref-result)
-                           (mapv (fn [{:keys [definition step missing]}]
-                                   {:name definition
-                                    :error (str "Step `" step "` references unknown workflow `" missing "`")})
-                                 (:errors ref-result))))
+                         (concat
+                          (when-not (:valid? ref-result)
+                            (mapv (fn [{:keys [definition step missing]}]
+                                    {:name definition
+                                     :error (str "Step `" step "` references unknown workflow `" missing "`")})
+                                  (:errors ref-result)))
+                          (when-not (:valid? judge-result)
+                            (mapv (fn [{:keys [definition step error target]}]
+                                    {:name definition
+                                     :error (case error
+                                              :on-without-judge
+                                              (str "Step `" step "` has `:on` routing table but no `:judge`")
+                                              :unknown-goto-target
+                                              (str "Step `" step "` has `:goto` target `" target "` which is not a known step")
+                                              (str "Step `" step "` has judge/routing error: " error))})
+                                  (:errors judge-result)))))
         ;; Warnings for collisions (shouldn't happen after merge, but defensive)
         warnings (when-not (:valid? collision-result)
                    (mapv (fn [dup-name]

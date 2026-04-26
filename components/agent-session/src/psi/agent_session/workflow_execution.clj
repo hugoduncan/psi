@@ -73,7 +73,9 @@
     {:step-inputs step-inputs
      :prompt     (render-prompt-template (:prompt-template step-def) step-inputs)}))
 
-(defn- assistant-message-text
+(defn assistant-message-text
+  "Extract the text content from an assistant message.
+   Handles both string content and structured content blocks."
   [assistant-message]
   (or (some->> (:content assistant-message)
                (filter map?)
@@ -261,7 +263,9 @@
                     judge-result  (workflow-judge/execute-judge!
                                    ctx parent-session-id (:session-id execution-session)
                                    judge-spec routing-table
-                                   step-id step-order step-runs)]
+                                   {:current-step-id step-id
+                                    :step-order      step-order
+                                    :step-runs       step-runs})]
                 (swap! (:state* ctx) workflow-progression/submit-judged-result run-id step-id judge-result)
                 {:run-id run-id
                  :step-id step-id

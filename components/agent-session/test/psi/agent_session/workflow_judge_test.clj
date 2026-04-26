@@ -252,7 +252,9 @@
                       {:role "assistant" :content [{:type :text :text "APPROVED"}]})]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
-                      "step-3-review" step-order step-runs)]
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs step-runs})]
           (is (string? (:judge-session-id result)))
           (is (= "APPROVED" (:judge-output result)))
           (is (= "APPROVED" (:judge-event result)))
@@ -288,7 +290,9 @@
                         {:role "assistant" :content [{:type :text :text "APPROVED"}]}))]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
-                      "step-3-review" ["step-2-build" "step-3-review"] step-runs)]
+                      {:current-step-id "step-3-review"
+                       :step-order ["step-2-build" "step-3-review"]
+                       :step-runs step-runs})]
           (is (= "APPROVED" (:judge-output result)))
           (is (= "APPROVED" (:judge-event result)))
           (is (= {:action :complete} (:routing-result result)))
@@ -317,7 +321,9 @@
                       {:role "assistant" :content [{:type :text :text "hmm not sure"}]})]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
-                      "step-3-review" ["step-2-build" "step-3-review"] step-runs)]
+                      {:current-step-id "step-3-review"
+                       :step-order ["step-2-build" "step-3-review"]
+                       :step-runs step-runs})]
           (is (= "hmm not sure" (:judge-output result)))
           (is (nil? (:judge-event result)))
           (is (= {:action :no-match} (:routing-result result)))

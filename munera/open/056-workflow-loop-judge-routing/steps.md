@@ -69,12 +69,12 @@
 
 ### Slice 9 — Review fixes
 
-- [ ] Fix `submit-judged-result` docstring: remove "increment target iteration count" from `:goto` description (iteration count is owned by `execute-current-step!` only)
-- [ ] Wire `validate-judge-routing` into `workflow_file_loader/load-workflow-files` alongside existing `validate-step-references` and `validate-no-name-collisions` calls; add loader test proving `:on` without `:judge` surfaces as a load error
-- [ ] Eliminate `extract-assistant-text` duplication: make `workflow-execution/assistant-message-text` public (or extract to shared ns), use it in `execute-judge!` instead of the private duplicate
-- [ ] Reduce `execute-judge!` positional params: group routing context (`current-step-id`, `step-order`, `step-runs`) into a map parameter
-- [ ] Harden `evaluate-routing` iteration-count lookup: replace `(:iteration-count target-run 0)` with explicit `(get target-run :iteration-count 0)` so intent is clear when `target-run` is nil
-- [ ] Run full suite green after fixes
+- [x] Fix `submit-judged-result` docstring: remove "increment target iteration count" from `:goto` description (iteration count is owned by `execute-current-step!` only)
+- [x] Wire `validate-judge-routing` into `workflow_file_loader/load-workflow-files` alongside existing `validate-step-references` and `validate-no-name-collisions` calls; add loader test proving `:on` without `:judge` surfaces as a load error
+- [x] Eliminate `extract-assistant-text` duplication: made `workflow-execution/assistant-message-text` public; aligned `workflow-judge` private copy to same shape with dep-direction comment; `execute-judge!` now separates retrieval from extraction
+- [x] Reduce `execute-judge!` positional params: grouped routing context (`current-step-id`, `step-order`, `step-runs`) into a `routing-context` map parameter
+- [x] Harden `evaluate-routing` iteration-count lookup: replaced `(:iteration-count target-run 0)` with explicit `(get target-run :iteration-count 0)` so intent is clear when `target-run` is nil
+- [x] Run full suite green after fixes (1397 unit tests / 10577 assertions, 142 extension tests / 563 assertions)
 
 ## Phase A: Statechart-driven execution (follow-on task)
 
