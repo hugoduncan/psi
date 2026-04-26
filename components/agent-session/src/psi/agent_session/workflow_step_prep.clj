@@ -125,11 +125,14 @@
                     (or run-meta {}))
         framing-prompt (when delegated-workflow? (:framing-prompt run-meta))
         parent-session-id (or parent-session-id
-                              (some->> (session-state/list-context-sessions-in ctx) first :session-id))]
+                              (some->> (session-state/list-context-sessions-in ctx) first :session-id))
+        parent-session-model (some-> (session-state/get-session-data-in ctx parent-session-id) :model)]
     {:base-system-prompt (:system-prompt step-meta)
      :framing-prompt framing-prompt
      :system-prompt (compose-system-prompt (:system-prompt step-meta) framing-prompt)
      :tool-defs (resolve-step-tool-defs ctx parent-session-id (:tools step-meta))
      :thinking-level (or (:thinking-level step-meta) :off)
      :skills (resolve-step-skills ctx parent-session-id (:skills step-meta))
-     :model (:model step-meta)}))
+     :model (or (:model step-meta)
+                (:model run-meta)
+                parent-session-model)}))

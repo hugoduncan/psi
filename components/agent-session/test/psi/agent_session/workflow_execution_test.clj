@@ -118,7 +118,7 @@
 
 (deftest resolve-step-session-config-multi-step-test
   (testing "multi-step workflow composes referenced workflow prompt with framing prompt"
-    (let [[ctx _] (create-session-context {:persist? false})
+    (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
                      (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
@@ -129,13 +129,17 @@
                                                                    :workflow-input {:input "build it"
                                                                                     :original "build this"}})]
                        s)))
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
+                   {:provider "openai" :id "gpt-test"})
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-2")
           planner-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-1-planner")
           builder-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-2-builder")]
       (is (= "You are a planner.\n\nCoordinate a plan-build cycle." (:system-prompt planner-config)))
       (is (= "You are a builder.\n\nCoordinate a plan-build cycle." (:system-prompt builder-config)))
       (is (= ["read" "bash"] (mapv :name (:tool-defs planner-config))))
-      (is (= ["read" "bash" "edit" "write"] (mapv :name (:tool-defs builder-config)))))))
+      (is (= ["read" "bash" "edit" "write"] (mapv :name (:tool-defs builder-config))))
+      (is (= {:provider "openai" :id "gpt-test"} (:model planner-config)))
+      (is (= {:provider "openai" :id "gpt-test"} (:model builder-config))))))
 
 (deftest materialize-step-inputs-and-prompt-test
   (let [[state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
