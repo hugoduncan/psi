@@ -192,13 +192,31 @@ Remaining execution order:
 8. Shrink or delete remaining legacy control helpers in `workflow_progression.clj`
 9. Run full verification rings and record final retained-vs-removed summary
 
+## Final retained-vs-removed summary
+
+Removed from production code:
+- `components/agent-session/src/psi/agent_session/workflow_statechart_compat.clj`
+- `components/agent-session/src/psi/agent_session/workflow_progression.clj`
+
+Canonical production ownership after task 058:
+- `workflow_runtime` owns pure run lifecycle operations
+- `workflow_progression_recording` owns record/update helpers used by Phase A runtime
+- `workflow_statechart_runtime` owns execution/statechart control
+- `workflow_statechart` owns canonical run-lifecycle chart and definition-order helpers
+
+Intentional retained compatibility support:
+- `components/agent-session/test/psi/agent_session/workflow_sequential_compat_test_support.clj`
+  - test-only
+  - retains old sequential progression semantics for compatibility-era proof coverage
+  - not used by runtime/production execution paths
+
+Verification after final cleanup:
+- full unit suite green (`1422 tests, 10639 assertions, 0 failures`)
+- full `bb test` green
+
 ## Current judgment
 
 Best current interpretation:
-- **full removal remains realistic** for `workflow_statechart_compat.clj`, and migration is now far enough along that namespace deletion should be next
-- `workflow_progression.clj` is no longer part of the active Phase A runtime path and has now been reduced to an explicit removed-boundary trap
-- canonical ownership is now clearer in code:
-  - `workflow_runtime` owns pure run lifecycle operations
-  - `workflow_progression_recording` owns record/update helpers used by Phase A runtime
-  - `workflow_statechart_runtime` owns execution/statechart control
-- remaining compatibility-era sequential proofs now live in test-only support code rather than production namespaces
+- full removal of production compatibility namespaces is now complete
+- canonical ownership is clearer in both code and docs
+- remaining compatibility-era sequential proofs live only in test-only support code rather than production namespaces
