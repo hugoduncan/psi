@@ -162,28 +162,31 @@ Judge signal events use a single `:judge/signal` event with the signal string in
 
 ### Execution loop replacement
 
+Re-entrant `process-event!` does not work with fulcrologic statecharts (reads stale working memory). Instead, use an **event-queue + drain loop** pattern:
+
 ```clojure
 (defn execute-run! [ctx parent-session-id run-id]
-  (let [turn-ctx (create-workflow-turn-context ctx parent-session-id run-id)
+  (let [wf-ctx (create-workflow-context ctx parent-session-id run-id)
         ;; Start the statechart — enters :pending
-        _ (start-chart! turn-ctx)
+        _ (start-chart! wf-ctx)
         ;; Send :workflow/start — enters first step, fires entry action
         ;; Entry action is synchronous: creates session, prompts, waits for completion
-        ;; On completion, actions-fn sends :actor/done or :actor/failed back into the chart
-        ;; Chart processes transition, enters next step, fires its entry action...
-        ;; This continues until a terminal state is reached
-        _ (send-event! turn-ctx :workflow/start)]
-    ;; After start event processing is complete, the chart has run to quiescence
+        ;; On completion, actions-fn enqueues :actor/done or :actor/failed
+        ;; drain-events! processes the queue, which may enqueue more events...
+        ;; This continues until no more events are enqueued (quiescence)
+        _ (send-and-drain! wf-ctx :workflow/start)]
+    ;; After drain completes, the chart has run to quiescence
     (workflow-run-result ctx run-id)))
 ```
 
-The key insight: because actor execution is **synchronous** (`prompt-in!` blocks), the entry action for a step can:
-1. Create the session and prompt it (blocking)
-2. On return, send the completion event back into the chart
-3. The chart processes the event, fires the transition, enters the next state, fires its entry action
-4. This recurse continues until terminal
+The pattern:
+1. Entry actions perform side-effects (create session, prompt, block for completion)
+2. On completion, entry actions **enqueue** the next event into an external atom
+3. After each `process-event!` returns, a drain loop checks the queue
+4. If events are queued, they are processed one at a time, each potentially enqueuing more
+5. This continues until the queue is empty (terminal state reached, or blocked)
 
-This is a **synchronous event cascade** — each entry action synchronously sends the next event. No external loop needed.
+This is an **event-queue drain loop** — structurally similar to the imperative loop it replaces, but driven by the statechart's own actions rather than external orchestration logic. The statechart owns the control flow; the drain loop is just the mechanical event pump.
 
 ### Synchronization with workflow-run state
 
@@ -233,7 +236,7 @@ Two options:
 
 ## Risks
 
-1. **Synchronous event cascade depth**: A 10-step workflow produces 10+ nested event processings. Stack depth should be fine for realistic workflows but worth monitoring.
+1. **~~Synchronous event cascade depth~~**: Resolved. Re-entrant `process-event!` doesn't work; using event-queue + drain loop instead. No stack depth concern — the loop is iterative, not recursive.
 
 2. **Error handling in entry actions**: If an entry action throws, the statechart may be in an inconsistent state. Need to catch exceptions in the actions-fn and emit `:actor/failed` instead.
 

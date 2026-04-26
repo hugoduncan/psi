@@ -8,8 +8,8 @@ The key constraint: fulcrologic statecharts `process-event!` is synchronous. Ent
 
 ## Risks
 
-- **Synchronous cascade**: entry actions that send events create nested `process-event!` calls. The fulcrologic statecharts library may or may not support re-entrant event processing. **Must verify in slice 1** with a minimal test before committing to the architecture.
-- **Working memory mutation during processing**: if entry actions need to update the working-memory data model (e.g., to record which session was created), this must happen between event processings, not during. The `turn_statechart.clj` pattern uses an external atom for mutable state — follow the same approach.
+- **~~Synchronous cascade~~**: ✅ Verified. Re-entrant `process-event!` does NOT work (reads stale working memory). Solution: **event-queue + drain loop**. Entry actions enqueue events into an external atom; after each `process-event!`, a drain loop processes enqueued events until quiescent. Proven in REPL with full 3-step judge loop.
+- **Working memory mutation during processing**: entry actions use an external atom for mutable state (workflow context, iteration counts, session refs). Guards read from this atom. Proven in REPL.
 - **Blocked state representation**: the current `:blocked` status is a workflow-run-level concept. The statechart needs a representation that allows the chart to pause and resume.
 
 ## Slice order
