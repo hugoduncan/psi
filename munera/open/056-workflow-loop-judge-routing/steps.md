@@ -67,6 +67,15 @@
 - [x] Run extension test suite — zero regressions (142 tests, 563 assertions, 0 failures)
 - [x] Verify existing workflow files compile and validate without modification
 
+### Slice 9 — Review fixes
+
+- [ ] Fix `submit-judged-result` docstring: remove "increment target iteration count" from `:goto` description (iteration count is owned by `execute-current-step!` only)
+- [ ] Wire `validate-judge-routing` into `workflow_file_loader/load-workflow-files` alongside existing `validate-step-references` and `validate-no-name-collisions` calls; add loader test proving `:on` without `:judge` surfaces as a load error
+- [ ] Eliminate `extract-assistant-text` duplication: make `workflow-execution/assistant-message-text` public (or extract to shared ns), use it in `execute-judge!` instead of the private duplicate
+- [ ] Reduce `execute-judge!` positional params: group routing context (`current-step-id`, `step-order`, `step-runs`) into a map parameter
+- [ ] Harden `evaluate-routing` iteration-count lookup: replace `(:iteration-count target-run 0)` with explicit `(get target-run :iteration-count 0)` so intent is clear when `target-run` is nil
+- [ ] Run full suite green after fixes
+
 ## Phase A: Statechart-driven execution (follow-on task)
 
 - [ ] Compile definitions into hierarchical statecharts (leaf states for simple steps, compound `.acting`/`.judging` for judged steps)
