@@ -136,3 +136,146 @@
           run             (get-in resumed-state [:workflows :runs run-id])]
       (is (= :running (:status run)))
       (is (nil? (:blocked run))))))
+
+;;; Judge-aware progression
+
+(deftest increment-iteration-count-test
+  (testing "increments from nil (0) to 1"
+    (let [[state run-id] (base-state-with-run)
+          state' (workflow-progression/increment-iteration-count state run-id "plan")
+          run    (get-in state' [:workflows :runs run-id])]
+      (is (= 1 (get-in run [:step-runs "plan" :iteration-count])))))
+
+  (testing "increments from 1 to 2"
+    (let [[state run-id] (base-state-with-run)
+          state' (-> state
+                     (workflow-progression/increment-iteration-count run-id "plan")
+                     (workflow-progression/increment-iteration-count run-id "plan"))
+          run    (get-in state' [:workflows :runs run-id])]
+      (is (= 2 (get-in run [:step-runs "plan" :iteration-count]))))))
+
+(deftest record-actor-result-test
+  (testing "records envelope and accepted-result without advancing current-step-id"
+    (let [[state run-id] (base-state-with-run)
+          state' (-> state
+                     (workflow-progression/start-latest-attempt run-id "plan")
+                     (workflow-progression/record-actor-result run-id "plan"
+                                                               {:outcome :ok :outputs {:text "plan output"}}))
+          run    (get-in state' [:workflows :runs run-id])]
+      ;; current-step-id unchanged
+      (is (= "plan" (:current-step-id run)))
+      ;; accepted-result recorded
+      (is (= {:outcome :ok :outputs {:text "plan output"}}
+             (get-in run [:step-runs "plan" :accepted-result])))
+      ;; attempt marked succeeded
+      (is (= :succeeded (get-in run [:step-runs "plan" :attempts 0 :status])))
+      ;; run status not changed to completed
+      (is (= :running (:status run))))))
+
+(def judged-definition
+  {:definition-id "plan-build-review"
+   :name "Plan Build Review"
+   :step-order ["plan" "build" "review"]
+   :steps {"plan"   {:executor {:type :agent :profile "planner" :mode :sync}
+                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
+           "build"  {:executor {:type :agent :profile "builder" :mode :sync}
+                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
+           "review" {:executor {:type :agent :profile "reviewer" :mode :sync}
+                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
+                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
+                     :judge {:prompt "APPROVED or REVISE?"}
+                     :on {"APPROVED" {:goto :next}
+                          "REVISE"   {:goto "build" :max-iterations 3}}}}})
+
+(defn- judged-state-at-review
+  "Set up a workflow run that has reached the review step with accepted results for plan and build."
+  []
+  (let [[state1 _ _] (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                           judged-definition)
+        [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "plan-build-review"
+                                                               :run-id "run-j1"
+                                                               :workflow-input {:task "ship it"}})
+        attempt (workflow-attempts/new-attempt {:attempt-id "r-a1"
+                                                :status :pending
+                                                :execution-session-id "child-review"})
+        state3 (-> state2
+                   (assoc-in [:workflows :runs run-id :current-step-id] "review")
+                   (assoc-in [:workflows :runs run-id :step-runs "plan" :accepted-result]
+                             {:outcome :ok :outputs {:text "plan output"}})
+                   (assoc-in [:workflows :runs run-id :step-runs "build" :accepted-result]
+                             {:outcome :ok :outputs {:text "build output"}})
+                   (assoc-in [:workflows :runs run-id :step-runs "build" :iteration-count] 1)
+                   (update-in [:workflows :runs run-id]
+                              #(workflow-attempts/append-attempt-to-run % "review" attempt))
+                   (workflow-progression/start-latest-attempt run-id "review")
+                   (workflow-progression/record-actor-result run-id "review"
+                                                             {:outcome :ok :outputs {:text "review output"}}))]
+    [state3 run-id]))
+
+(deftest submit-judged-result-goto-test
+  (testing "judge REVISE routes to build step"
+    (let [[state run-id] (judged-state-at-review)
+          judge-result {:judge-session-id "judge-1"
+                        :judge-output "REVISE"
+                        :judge-event "REVISE"
+                        :routing-result {:action :goto :target "build"}}
+          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          run    (get-in state' [:workflows :runs run-id])]
+      ;; Routed to build
+      (is (= "build" (:current-step-id run)))
+      (is (= :running (:status run)))
+      ;; Build iteration count incremented
+      (is (= 2 (get-in run [:step-runs "build" :iteration-count])))
+      ;; Judge fields on attempt
+      (let [attempt (get-in run [:step-runs "review" :attempts 0])]
+        (is (= "judge-1" (:judge-session-id attempt)))
+        (is (= "REVISE" (:judge-output attempt)))
+        (is (= "REVISE" (:judge-event attempt))))
+      ;; History has :verdict/goto
+      (is (some #(= :verdict/goto (:event %)) (:history run))))))
+
+(deftest submit-judged-result-complete-test
+  (testing "judge APPROVED completes the workflow"
+    (let [[state run-id] (judged-state-at-review)
+          judge-result {:judge-session-id "judge-2"
+                        :judge-output "APPROVED"
+                        :judge-event "APPROVED"
+                        :routing-result {:action :complete}}
+          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          run    (get-in state' [:workflows :runs run-id])]
+      (is (= :completed (:status run)))
+      (is (nil? (:current-step-id run)))
+      (is (some? (:finished-at run)))
+      (is (= :completed (get-in run [:terminal-outcome :outcome])))
+      ;; History has :verdict/advance
+      (is (some #(= :verdict/advance (:event %)) (:history run))))))
+
+(deftest submit-judged-result-fail-test
+  (testing "iteration exhaustion fails the workflow"
+    (let [[state run-id] (judged-state-at-review)
+          judge-result {:judge-session-id "judge-3"
+                        :judge-output "REVISE"
+                        :judge-event "REVISE"
+                        :routing-result {:action :fail :reason :iteration-exhausted :step-id "build"}}
+          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          run    (get-in state' [:workflows :runs run-id])]
+      (is (= :failed (:status run)))
+      (is (some? (:finished-at run)))
+      (is (= :failed (get-in run [:terminal-outcome :outcome])))
+      (is (= :iteration-exhausted (get-in run [:terminal-outcome :reason])))
+      ;; History has :verdict/exhausted
+      (is (some #(= :verdict/exhausted (:event %)) (:history run))))))
+
+(deftest submit-judged-result-no-match-test
+  (testing "judge no-match (retries exhausted) fails the workflow"
+    (let [[state run-id] (judged-state-at-review)
+          judge-result {:judge-session-id "judge-4"
+                        :judge-output "hmm not sure"
+                        :judge-event nil
+                        :routing-result {:action :no-match}}
+          state' (workflow-progression/submit-judged-result state run-id "review" judge-result)
+          run    (get-in state' [:workflows :runs run-id])]
+      (is (= :failed (:status run)))
+      (is (= :judge-no-match (get-in run [:terminal-outcome :reason]))))))

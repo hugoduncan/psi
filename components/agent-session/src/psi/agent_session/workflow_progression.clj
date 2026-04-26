@@ -288,3 +288,99 @@
                                    {:run-id run-id
                                     :step-id (:current-step-id workflow-run)
                                     :reason reason})))))
+
+;;; Judge-aware progression
+
+(defn increment-iteration-count
+  "Increment the iteration count on a step-run. Starts at 0, incremented on every entry."
+  [state run-id step-id]
+  (update-in state (conj (run-path run-id) :step-runs step-id :iteration-count)
+             (fnil inc 0)))
+
+(defn record-actor-result
+  "Record the actor's ok envelope and accepted-result on the step-run without advancing.
+
+   Used for judged steps where the judge routing determines the next step,
+   not the normal submit-result-envelope advancement path."
+  [state run-id step-id envelope]
+  (update-in state (run-path run-id)
+             (fn [workflow-run]
+               (-> workflow-run
+                   (update-attempt step-id #(assoc %
+                                                   :status :succeeded
+                                                   :result-envelope envelope
+                                                   :validation-outcome {:accepted? true}
+                                                   :updated-at (now)
+                                                   :finished-at (now)))
+                   (assoc-in [:step-runs step-id :accepted-result] envelope)
+                   (assoc :updated-at (now))
+                   (append-history :workflow/result-received
+                                   {:run-id run-id
+                                    :step-id step-id
+                                    :envelope envelope})))))
+
+(defn submit-judged-result
+  "Apply judge routing result to the workflow run.
+
+   Records judge fields on the attempt, then applies the routing action:
+   - :goto → set current-step-id to target, increment target iteration count
+   - :complete → transition to :completed
+   - :fail → transition to :failed
+   - :no-match (judge retries exhausted) → transition to :failed"
+  [state run-id step-id judge-result]
+  (let [{:keys [judge-session-id judge-output judge-event routing-result]} judge-result
+        {:keys [action target]} routing-result]
+    (update-in state (run-path run-id)
+               (fn [workflow-run]
+                 (let [latest    (latest-attempt workflow-run step-id)
+                       base-run  (-> workflow-run
+                                     (update-attempt step-id
+                                                     #(assoc %
+                                                             :judge-session-id judge-session-id
+                                                             :judge-output judge-output
+                                                             :judge-event judge-event
+                                                             :updated-at (now)))
+                                     (assoc :updated-at (now)))]
+                   (case action
+                     :goto
+                     (-> base-run
+                         (assoc :current-step-id target
+                                :status :running)
+                         (update-in [:step-runs target :iteration-count] (fnil inc 0))
+                         (append-history :verdict/goto
+                                         {:run-id run-id
+                                          :step-id step-id
+                                          :attempt-id (:attempt-id latest)
+                                          :target target
+                                          :judge-event judge-event}))
+
+                     :complete
+                     (-> base-run
+                         (assoc :status :completed
+                                :current-step-id nil
+                                :finished-at (now)
+                                :terminal-outcome {:outcome :completed
+                                                   :step-id step-id
+                                                   :attempt-id (:attempt-id latest)
+                                                   :result-envelope (get-in workflow-run [:step-runs step-id :accepted-result])})
+                         (append-history :verdict/advance
+                                         {:run-id run-id
+                                          :step-id step-id
+                                          :attempt-id (:attempt-id latest)
+                                          :judge-event judge-event}))
+
+                     ;; :fail or :no-match
+                     (-> base-run
+                         (assoc :status :failed
+                                :finished-at (now)
+                                :terminal-outcome {:outcome :failed
+                                                   :reason (or (:reason routing-result) :judge-no-match)
+                                                   :step-id step-id
+                                                   :attempt-id (:attempt-id latest)
+                                                   :judge-output judge-output})
+                         (append-history :verdict/exhausted
+                                         {:run-id run-id
+                                          :step-id step-id
+                                          :attempt-id (:attempt-id latest)
+                                          :reason (or (:reason routing-result) :judge-no-match)
+                                          :judge-output judge-output}))))))))
