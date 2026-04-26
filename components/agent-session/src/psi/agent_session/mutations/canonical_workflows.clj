@@ -6,7 +6,6 @@
    extension API's `mutate!`."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
 (pco/defmutation register-workflow-definition
@@ -159,9 +158,9 @@
         (throw (ex-info "Workflow run not found" {:run-id run-id})))
       (when (contains? #{:completed :failed :cancelled} (:status workflow-run))
         (throw (ex-info "Workflow run is already terminal" {:run-id run-id :status (:status workflow-run)})))
-      (let [new-state (workflow-progression/cancel-run @(:state* agent-session-ctx) run-id
-                                                       (or reason "cancelled"))
-            cancelled-run (workflow-runtime/workflow-run-in new-state run-id)]
+      (let [[new-state cancelled-run]
+            (workflow-runtime/cancel-run @(:state* agent-session-ctx) run-id
+                                         (or reason "cancelled"))]
         (reset! (:state* agent-session-ctx) new-state)
         {:psi.workflow/run-id run-id
          :psi.workflow/status (:status cancelled-run)

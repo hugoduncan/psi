@@ -90,6 +90,41 @@
       (is (= updated-run (workflow-runtime/workflow-run-in state3 run-id)))
       (is (= :workflow/input-updated (-> updated-run :history last :event))))))
 
+(deftest resume-run-test
+  (testing "resume-run clears blocked payload and returns the run to :running"
+    (let [[state1 definition-id _]
+          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                registered-definition)
+          [state2 run-id _]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "run-1"
+                                               :workflow-input {:input "x"}})
+          state3 (-> state2
+                     (assoc-in [:workflows :runs run-id :status] :blocked)
+                     (assoc-in [:workflows :runs run-id :blocked] {:question "ship it?"}))
+          [state4 resumed-run]
+          (workflow-runtime/resume-run state3 run-id)]
+      (is (= :running (:status resumed-run)))
+      (is (nil? (:blocked resumed-run)))
+      (is (= resumed-run (workflow-runtime/workflow-run-in state4 run-id)))
+      (is (= :workflow/resume (-> resumed-run :history last :event))))))
+
+(deftest cancel-run-test
+  (testing "cancel-run marks a run cancelled and records terminal outcome/history"
+    (let [[state1 definition-id _]
+          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                registered-definition)
+          [state2 run-id _]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "run-1"
+                                               :workflow-input {:input "x"}})
+          [state3 cancelled-run]
+          (workflow-runtime/cancel-run state2 run-id "operator request")]
+      (is (= :cancelled (:status cancelled-run)))
+      (is (= "operator request" (get-in cancelled-run [:terminal-outcome :reason])))
+      (is (= cancelled-run (workflow-runtime/workflow-run-in state3 run-id)))
+      (is (= :workflow/cancel (-> cancelled-run :history last :event))))))
+
 (deftest remove-run-test
   (testing "remove-run removes the run from runs and run-order"
     (let [[state1 definition-id _]

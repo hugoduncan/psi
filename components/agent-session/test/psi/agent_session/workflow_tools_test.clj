@@ -43,7 +43,8 @@
 (defn- resume-and-execute-run-nullable
   [state*]
   (fn [ctx session-id run-id]
-    (swap! state* workflow-progression/resume-blocked-run run-id)
+    (swap! state* (fn [state]
+                    (first (psi.agent-session.workflow-runtime/resume-run state run-id))))
     ((execute-run-nullable state*) ctx session-id run-id)))
 
 (defn- create-session-context

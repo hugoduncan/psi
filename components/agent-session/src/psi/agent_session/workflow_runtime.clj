@@ -8,7 +8,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-statechart-compat :as workflow-statechart-compat]))
+   [psi.agent-session.workflow-statechart :as workflow-statechart]))
 
 (defn- now []
   (java.time.Instant/now))
@@ -101,23 +101,23 @@
   [state {:keys [run-id workflow-input] :as opts}]
   (let [{:keys [effective-definition source-definition-id]}
         (resolve-effective-definition state opts)
-        compiled (psi.agent-session.workflow-statechart-compat/compile-definition effective-definition)
-        run-id'  (normalize-id run-id)
-        ts       (now)
-        run      {:run-id run-id'
-                  :status :pending
-                  :effective-definition effective-definition
-                  :source-definition-id source-definition-id
-                  :workflow-input (or workflow-input {})
-                  :current-step-id (:initial-step-id compiled)
-                  :step-runs (initial-step-runs effective-definition)
-                  :history [{:event :workflow/run-created
-                             :timestamp ts
-                             :data {:run-id run-id'
-                                    :source-definition-id source-definition-id
-                                    :current-step-id (:initial-step-id compiled)}}]
-                  :created-at ts
-                  :updated-at ts}]
+        initial-step-id (workflow-statechart/initial-step-id effective-definition)
+        run-id'         (normalize-id run-id)
+        ts              (now)
+        run             {:run-id run-id'
+                         :status :pending
+                         :effective-definition effective-definition
+                         :source-definition-id source-definition-id
+                         :workflow-input (or workflow-input {})
+                         :current-step-id initial-step-id
+                         :step-runs (initial-step-runs effective-definition)
+                         :history [{:event :workflow/run-created
+                                    :timestamp ts
+                                    :data {:run-id run-id'
+                                           :source-definition-id source-definition-id
+                                           :current-step-id initial-step-id}}]
+                         :created-at ts
+                         :updated-at ts}]
     (when-not (workflow-model/valid-workflow-run? run)
       (throw (ex-info "Invalid workflow run"
                       {:explanation (workflow-model/explain-workflow-run run)})))
@@ -146,6 +146,51 @@
                                           :workflow-input (or workflow-input {})}}))]
       [(assoc-in state (run-path run-id) updated-run)
        updated-run])))
+
+(defn resume-run
+  "Return [state resumed-run] after clearing a blocked run back to :running.
+
+   Resume does not mutate the blocked attempt; callers should create a new attempt
+   afterwards before re-executing the current step."
+  [state run-id]
+  (let [run (workflow-run-in state run-id)]
+    (when-not run
+      (throw (ex-info "Workflow run not found" {:run-id run-id})))
+    (let [resumed-run (-> run
+                          (assoc :status :running
+                                 :blocked nil
+                                 :updated-at (now))
+                          (update :history (fnil conj [])
+                                  {:event :workflow/resume
+                                   :timestamp (now)
+                                   :data {:run-id run-id
+                                          :step-id (:current-step-id run)}}))]
+      [(assoc-in state (run-path run-id) resumed-run)
+       resumed-run])))
+
+(defn cancel-run
+  "Return [state cancelled-run] after cancelling a non-terminal workflow run."
+  [state run-id reason]
+  (let [run (workflow-run-in state run-id)]
+    (when-not run
+      (throw (ex-info "Workflow run not found" {:run-id run-id})))
+    (let [cancelled-run (-> run
+                            (assoc :status :cancelled
+                                   :blocked nil
+                                   :current-step-id (:current-step-id run)
+                                   :updated-at (now)
+                                   :finished-at (now)
+                                   :terminal-outcome {:outcome :cancelled
+                                                      :reason reason
+                                                      :step-id (:current-step-id run)})
+                            (update :history (fnil conj [])
+                                    {:event :workflow/cancel
+                                     :timestamp (now)
+                                     :data {:run-id run-id
+                                            :step-id (:current-step-id run)
+                                            :reason reason}}))]
+      [(assoc-in state (run-path run-id) cancelled-run)
+       cancelled-run])))
 
 (defn remove-run
   "Return [state removed-run] after removing a workflow run from canonical state."

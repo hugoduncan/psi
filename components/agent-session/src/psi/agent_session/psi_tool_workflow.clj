@@ -2,7 +2,6 @@
   "Workflow action handler for psi-tool: parse, summarise, and execute workflow ops."
   (:require
    [clojure.edn :as edn]
-   [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
 ;; ── Helpers (local copies of private psi_tool utilities) ────────────────────
@@ -203,9 +202,9 @@
                   (throw (ex-info "Workflow run is already terminal"
                                   {:phase :validate :action "workflow" :op op :run-id run-id
                                    :status (:status workflow-run)})))
-                (let [new-state     (workflow-progression/cancel-run @(:state* ctx) run-id
-                                                                     (or reason "cancelled by psi-tool"))
-                      cancelled-run (workflow-runtime/workflow-run-in new-state run-id)]
+                (let [[new-state cancelled-run]
+                      (workflow-runtime/cancel-run @(:state* ctx) run-id
+                                                   (or reason "cancelled by psi-tool"))]
                   ((:apply-root-state-update-fn ctx) ctx (constantly new-state))
                   {:psi-tool/action         :workflow
                    :psi-tool/workflow-op    :cancel-run
