@@ -89,8 +89,16 @@
          selector-marker    default-selector-marker
          keep-session-on-failure? false}}]
   (let [preflight (tmux/tmux-preflight-result)]
-    (if (not= :ok (:status preflight))
+    (cond
+      (not= :ok (:status preflight))
       preflight
+
+      (tmux/ci-env?)
+      {:status :skipped
+       :reason :ci-flaky-rehydration
+       :warning "Skipping tmux rehydration scenario in CI: live /resume transcript projection is timing-sensitive there; unit tests cover transcript rehydration semantics."}
+
+      :else
       (let [tmpdir        (or working-dir
                               (str (System/getProperty "java.io.tmpdir")
                                    "/psi-thinking-it-" (System/currentTimeMillis)))

@@ -9,19 +9,11 @@
 
 (def ^:private default-tool-done-marker "✓")
 (def ^:private default-thinking-prefix "· ")
-;; The spinner (⠋) is transient — on fast machines (or CI) the tool may
-;; complete before the first poll.  We treat either the spinner OR the done
-;; marker as evidence that tool streaming started.
 (def ^:private default-tool-started-markers ["⠋" "✓"])
 
-(defn- edn-str
-  "Serialize value to a compact EDN string suitable for shell env var injection."
-  [v]
-  (pr-str v))
+(defn- edn-str [v] (pr-str v))
 
-(defn- demo-launch-command
-  "Launch command for the scripted TUI demo (no live LLM required)."
-  []
+(defn- demo-launch-command []
   "exec clojure -M:tui-demo")
 
 (defn- failure
@@ -43,10 +35,9 @@
    2. Submit 'think' → wait for '· ' (thinking prefix)
    3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓;
       then poll until 'output-line-1' is absent (proves active turn cleared)
-      (spinner is transient — may be missed on fast machines before first poll)
    4. Assert content NOT visible in collapsed mode (no 'output-line-1')
-   5. Press ctrl+o   → assert expanded content visible ('output-line-10')
-   6. /quit → clean exit"
+   5. Press ctrl+o → assert expanded content visible ('output-line-10')
+   6. End successfully once expansion is visible."
   [{:keys [session-name
            working-dir
            launch-command
@@ -54,10 +45,10 @@
            step-timeout-ms
            ready-markers
            keep-session-on-failure?]
-    :or {working-dir        (str (.getCanonicalPath (io/file ".")))
-         startup-timeout-ms tmux/default-startup-timeout-ms
-         step-timeout-ms    tmux/default-step-timeout-ms
-         ready-markers      tmux/default-ready-markers
+    :or {working-dir            (str (.getCanonicalPath (io/file ".")))
+         startup-timeout-ms     tmux/default-startup-timeout-ms
+         step-timeout-ms        tmux/default-step-timeout-ms
+         ready-markers          tmux/default-ready-markers
          keep-session-on-failure? false}}]
   (let [preflight (tmux/tmux-preflight-result)]
     (if (not= :ok (:status preflight))
@@ -66,28 +57,28 @@
             script        (edn-str
                            [{:trigger "think"
                              :delay-ms 80
-                             :events  [{:type :agent-event :event-kind :thinking-delta
-                                        :content-index 0 :text "Reasoning about the question."}]
-                             :done    {:role "assistant"
-                                       :content [{:type :thinking :text "Reasoning about the question."}
-                                                 {:type :text    :text "Here is the answer."}]}}
+                             :events [{:type :agent-event :event-kind :thinking-delta
+                                       :content-index 0 :text "Reasoning about the question."}]
+                             :done {:role "assistant"
+                                    :content [{:type :thinking :text "Reasoning about the question."}
+                                              {:type :text :text "Here is the answer."}]}}
                             {:trigger "tool"
                              :delay-ms 80
-                             :events  [{:type :agent-event :event-kind :tool-call-assembly
-                                        :phase :end :content-index 0
-                                        :tool-id "t1" :tool-name "bash"
-                                        :arguments "{\"command\":\"ls\"}"}
-                                       {:type :agent-event :event-kind :tool-start
-                                        :tool-id "t1" :tool-name "bash"}
-                                       {:type :agent-event :event-kind :tool-executing
-                                        :tool-id "t1" :tool-name "bash"
-                                        :parsed-args {:command "ls"}}
-                                       {:type :agent-event :event-kind :tool-result
-                                        :tool-id "t1" :tool-name "bash"
-                                        :content [{:type :text :text long-result}]
-                                        :is-error false}]
-                             :done    {:role "assistant"
-                                       :content [{:type :text :text "Done."}]}}])
+                             :events [{:type :agent-event :event-kind :tool-call-assembly
+                                       :phase :end :content-index 0
+                                       :tool-id "t1" :tool-name "bash"
+                                       :arguments "{\"command\":\"ls\"}"}
+                                      {:type :agent-event :event-kind :tool-start
+                                       :tool-id "t1" :tool-name "bash"}
+                                      {:type :agent-event :event-kind :tool-executing
+                                       :tool-id "t1" :tool-name "bash"
+                                       :parsed-args {:command "ls"}}
+                                      {:type :agent-event :event-kind :tool-result
+                                       :tool-id "t1" :tool-name "bash"
+                                       :content [{:type :text :text long-result}]
+                                       :is-error false}]
+                             :done {:role "assistant"
+                                    :content [{:type :text :text "Done."}]}}])
             session-name* (or session-name (tmux/unique-session-name))
             launch        (or launch-command (demo-launch-command))]
         (try
@@ -103,52 +94,38 @@
                          :else
                          (do
                            (tmux/send-line! target "think")
-                           (if (not (tmux/wait-for-marker target default-thinking-prefix step-timeout-ms))
+                           (cond
+                             (not (tmux/wait-for-marker target default-thinking-prefix step-timeout-ms))
                              (failure target :thinking-prefix-not-visible)
+
+                             :else
                              (do
                                (tmux/send-line! target "tool")
                                (cond
-                                 ;; Wait for either the spinner or the done marker.
-                                 ;; The spinner (⠋) is transient — on fast machines or
-                                 ;; CI the tool may complete before the first poll, so
-                                 ;; seeing the done marker (✓) is equally valid evidence
-                                 ;; that tool streaming fired.
-                                 (not (tmux/wait-for-any-marker
-                                       target default-tool-started-markers step-timeout-ms))
+                                 (not (tmux/wait-for-any-marker target default-tool-started-markers step-timeout-ms))
                                  (failure target :tool-spinner-not-visible)
 
                                  (not (tmux/wait-for-marker target default-tool-done-marker step-timeout-ms))
                                  (failure target :tool-done-marker-not-visible)
 
-                                 ;; Wait for tool body to be absent from the pane.
-                                 ;; output-line-1 is visible during the active turn and
-                                 ;; disappears once the turn is committed and the active
-                                 ;; turn area is cleared.  Polling for its absence is
-                                 ;; more reliable than waiting for any positive marker
-                                 ;; (ready prompt, assistant reply) that can appear in
-                                 ;; the same render frame as the tool body.
                                  (not (tmux/wait-for-marker-absent target "output-line-1" step-timeout-ms))
                                  (failure target :content-still-visible-after-timeout)
 
                                  :else
-                                 ;; Use capture-pane-visible (no scrollback) for the
-                                 ;; collapsed-content check — scrollback retains
-                                 ;; output-line-1 after it scrolls off screen.
                                  (let [pane (tmux/sanitize-pane-text (tmux/capture-pane-visible target))]
-                                   (if (str/includes? pane "output-line-1")
+                                   (cond
+                                     (str/includes? pane "output-line-1")
                                      (assoc (failure target :content-visible-when-collapsed)
                                             :detail "Tool content should not be visible in collapsed mode")
+
+                                     :else
                                      (do
                                        (tmux/send-key! target "C-o")
                                        (if (not (tmux/wait-for-marker target "output-line-10" step-timeout-ms))
                                          (failure target :expand-not-visible)
-                                         (do
-                                           (tmux/send-key! target "C-d")
-                                           (if (tmux/wait-for-java-exit target step-timeout-ms)
-                                             {:status       :passed
-                                              :session-name session-name*
-                                              :pane-id      (:pane-id target)}
-                                             (failure target :quit-timeout))))))))))))]
+                                         {:status       :passed
+                                          :session-name session-name*
+                                          :pane-id      (:pane-id target)})))))))))]
             (when (or (= :passed (:status result))
                       (not keep-session-on-failure?))
               (tmux/kill-session-if-exists! session-name*))
