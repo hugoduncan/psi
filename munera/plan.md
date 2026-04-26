@@ -4,6 +4,8 @@ Open tasks in suggested execution order:
 
 Queue:
 
+`munera/open/057-workflow-statechart-driven-execution/`
+
 Backlog:
 
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
