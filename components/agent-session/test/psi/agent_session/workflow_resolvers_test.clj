@@ -4,7 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
-   [psi.agent-session.workflow-progression :as workflow-progression]
+   [psi.agent-session.workflow-progression-recording :as workflow-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
 (defn- create-session-context
@@ -61,7 +61,7 @@
              (-> state
                  (update-in [:workflows :runs run-id]
                             #(workflow-attempts/append-attempt-to-run % "plan" attempt))
-                 (workflow-progression/start-latest-attempt run-id "plan"))))
+                 (workflow-recording/start-latest-attempt run-id "plan"))))
     {:run-id run-id
      :attempt attempt
      :execution-session execution-session}))

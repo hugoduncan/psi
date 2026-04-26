@@ -1,26 +1,27 @@
 # Workflow canonical surfaces
 
-This note documents the authoritative workflow execution/compiler/runtime surfaces after task 057.
+This note documents the authoritative workflow execution/compiler/runtime surfaces after task 058 compatibility removal convergence.
 
 ## Canonical Phase A surfaces
 
 - `psi.agent-session.workflow-statechart/compile-hierarchical-chart`
   - Canonical execution chart compiler for deterministic workflow runs.
+- `psi.agent-session.workflow-statechart`
+  - Canonical run lifecycle chart plus workflow definition-order helpers such as `initial-step-id` and `next-step-id`.
 - `psi.agent-session.workflow-statechart-runtime`
   - Canonical statechart-driven runtime boundary.
 - `psi.agent-session.workflow-step-prep`
   - Canonical shared step input/prompt/session-config preparation helpers.
 - `psi.agent-session.workflow-progression-recording`
   - Canonical record/update substrate used by the Phase A runtime.
+- `psi.agent-session.workflow-runtime`
+  - Canonical pure root-state lifecycle operations for definitions and runs, including run creation, resume, cancellation, input updates, and removal.
 
-## Compatibility / legacy surfaces
+## Remaining compatibility / legacy surface
 
-- `psi.agent-session.workflow-statechart/compile-definition`
-  - Compatibility Phase B metadata compiler retained for run creation and legacy sequential helpers.
-- `psi.agent-session.workflow-statechart/workflow-run-chart`
-  - Compatibility flat status-tracker chart.
 - `psi.agent-session.workflow-progression`
-  - Transitional namespace that still exposes compatibility progression/control helpers while delegating Phase A record-only helpers to `workflow-progression-recording`.
+  - Legacy sequential progression helpers retained only for compatibility-oriented tests and migration cleanup.
+  - Not used by active Phase A runtime execution paths.
 
 ## Public wrapper surface
 

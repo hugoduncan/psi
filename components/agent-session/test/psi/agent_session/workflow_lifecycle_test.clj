@@ -5,6 +5,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-progression :as workflow-progression]
+   [psi.agent-session.workflow-progression-recording :as workflow-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
 (defn- create-session-context
@@ -67,7 +68,7 @@
              (-> state
                  (update-in [:workflows :runs run-id]
                             #(workflow-attempts/append-attempt-to-run % step-id attempt))
-                 (workflow-progression/start-latest-attempt run-id step-id))))
+                 (workflow-recording/start-latest-attempt run-id step-id))))
     {:attempt attempt
      :execution-session execution-session}))
 
@@ -154,7 +155,8 @@
                                   "plan"
                                   {:outcome :blocked
                                    :blocked {:question "ship it?" :choices [:yes :no]}})
-          _                (swap! (:state* ctx) workflow-progression/resume-blocked-run run-id)
+          _                (swap! (:state* ctx) (fn [state]
+                                                  (first (workflow-runtime/resume-run state run-id))))
           second-run       (create-and-start-attempt! ctx session-id run-id "plan" "plan-2")
           _                (swap! (:state* ctx)
                                   workflow-progression/submit-result-envelope

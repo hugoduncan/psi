@@ -30,8 +30,9 @@ Namespace/doc references discovered:
   - disposition: **final doc update required**
 
 Current conclusion:
-- no active runtime execution path appears to require the compatibility compiler except run creation
-- `workflow_statechart_compat.clj` currently looks removable once `workflow_runtime/create-run` is migrated and the direct compatibility test is reshaped
+- `workflow_runtime/create-run` has now been migrated to canonical `workflow-statechart/initial-step-id`
+- the direct compatibility test has been reshaped onto canonical `workflow-statechart` surfaces
+- no remaining runtime or test callers of `workflow_statechart_compat.clj` are expected after final namespace deletion
 
 ### `psi.agent-session.workflow-progression`
 
@@ -47,10 +48,10 @@ Callers in `workflow_statechart_runtime.clj`:
 
 These are not good deletion targets as-is because the statechart runtime currently uses them on the active canonical path.
 
-Disposition hypothesis:
-- these should likely stop being reached through the mixed `workflow_progression` namespace
-- final home should be the record-only/canonical side, primarily `workflow_progression_recording`
-- `latest-attempt` may remain a small shared query helper if that is the simplest canonical home
+Status:
+- active Phase A runtime has now been repointed away from `workflow_progression` and onto `workflow_progression_recording` for these helpers
+- remaining references are test-side only
+- `latest-attempt` remains available in `workflow_progression_recording` as the canonical shared query helper
 
 #### B. Legacy/lifecycle helpers still called outside the statechart runtime
 
@@ -59,7 +60,7 @@ Production callers:
   - `components/agent-session/src/psi/agent_session/psi_tool_workflow.clj`
   - `components/agent-session/src/psi/agent_session/mutations/canonical_workflows.clj`
   - current responsibility: pure run lifecycle transition to terminal cancelled state
-  - disposition hypothesis: **canonicalize into `workflow_runtime.clj`** as a pure run lifecycle operation
+  - status: **done** — canonicalized into `workflow_runtime.clj` as a pure run lifecycle operation
 
 Test-only callers or transitional helpers:
 - `submit-result-envelope`
@@ -73,13 +74,11 @@ Test-only callers or transitional helpers:
   - current role: sequential compatibility control helper for execution failure → retry/fail ownership
   - disposition hypothesis: **compatibility/test seam** unless another production caller appears
 - `resume-blocked-run`
-  - used in `workflow_tools_test.clj`
-  - used in `workflow_lifecycle_test.clj`
-  - not currently found in production runtime/tool code; `resume-run` tool delegates to execute wrapper rather than this helper directly
+  - was used in `workflow_tools_test.clj`
+  - was used in `workflow_lifecycle_test.clj`
+  - not found in production runtime/tool code; `resume-run` tool delegates to execute wrapper rather than this helper directly
   - current responsibility: clear blocked payload and return run to `:running`
-  - disposition hypothesis: either:
-    - move to `workflow_runtime.clj` as canonical lifecycle op if resume remains part of public pure run-state transitions, or
-    - keep only if the public tool/mutation layer truly needs an explicit pre-execution resume helper
+  - status: **decision made** — canonicalized as `workflow_runtime/resume-run`; test callers have started moving to that runtime surface
 - `submit-judged-result`
   - used in `workflow_progression_test.clj` only
   - current role: pre-Phase-A compatibility helper for judge routing application
@@ -180,27 +179,26 @@ Why:
 
 ## Recommended next implementation order
 
-1. Migrate `workflow_runtime/create-run` off `workflow_statechart_compat/compile-definition`
-2. Move `cancel-run` into `workflow_runtime.clj` and repoint:
-   - `psi_tool_workflow.clj`
-   - `mutations/canonical_workflows.clj`
-3. Decide whether `resume-blocked-run` is a canonical pure lifecycle op
-   - if yes, move it to `workflow_runtime.clj`
-   - if no, remove it after test/tool harness reshaping
-4. Repoint `workflow_statechart_runtime.clj` to `workflow_progression_recording` for canonical helpers now imported through `workflow_progression`
-5. Rewrite tests so they prove final canonical surfaces
-6. Delete `workflow_statechart_compat.clj` if consumer count reaches zero
-7. Shrink or delete remaining legacy control helpers in `workflow_progression.clj`
-8. Update `workflow_statechart_canonical.md` to reflect the final surface map
+Completed so far:
+1. `workflow_runtime/create-run` migrated off `workflow_statechart_compat/compile-definition`
+2. `cancel-run` moved into `workflow_runtime.clj` and callers repointed
+3. `resume-blocked-run` decided as a canonical lifecycle operation and represented as `workflow_runtime/resume-run`
+4. `workflow_statechart_runtime.clj` repointed to `workflow_progression_recording` for active Phase A helpers
+5. canonical workflow-surface docs updated to reflect the new ownership split
+
+Remaining execution order:
+6. Rewrite remaining compatibility-oriented tests so they prove final canonical surfaces or are explicitly isolated as legacy-seam tests
+7. Delete `workflow_statechart_compat.clj` now that consumer count is expected to be zero
+8. Shrink or delete remaining legacy control helpers in `workflow_progression.clj`
+9. Run full verification rings and record final retained-vs-removed summary
 
 ## Current judgment
 
 Best current interpretation:
-- **full removal remains realistic** for `workflow_statechart_compat.clj`
-- `workflow_progression.clj` should probably stop being a mixed surface
-- some functions currently living there are not "compatibility" in substance; they are canonical record or lifecycle helpers and should move to their proper homes
-- the most likely final architecture is:
+- **full removal remains realistic** for `workflow_statechart_compat.clj`, and migration is now far enough along that namespace deletion should be next
+- `workflow_progression.clj` is no longer part of the active Phase A runtime path
+- canonical ownership is now clearer in code:
   - `workflow_runtime` owns pure run lifecycle operations
   - `workflow_progression_recording` owns record/update helpers used by Phase A runtime
   - `workflow_statechart_runtime` owns execution/statechart control
-  - `workflow_progression` either disappears or shrinks to a very small, explicitly named legacy compatibility seam pending complete deletion
+- remaining work is concentrated in compatibility-oriented tests and the final deletion/shrink step for legacy sequential helpers

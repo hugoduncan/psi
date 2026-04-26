@@ -4,10 +4,8 @@
    Public canonical surfaces:
    - workflow-facing definitions remain data in `workflow-model`
    - `compile-hierarchical-chart` produces the Phase A execution chart
-   - `next-step-id` remains a small compatibility sequential helper used by
-     legacy progression surfaces
-
-   Compatibility compiler surfaces live in `psi.agent-session.workflow-statechart-compat`."
+   - `initial-step-id` and `next-step-id` expose canonical workflow definition order helpers
+   - `workflow-run-chart` and run event/status helpers describe the canonical run lifecycle surface."
   (:require
    [com.fulcrologic.statecharts.chart :as chart]
    [com.fulcrologic.statecharts.elements :as ele]
