@@ -1,17 +1,17 @@
 (ns psi.agent-session.workflow-statechart
-  "Workflow execution statechart + compilation boundary for slice-one deterministic workflows.
+  "Workflow execution statechart + compilation boundary for deterministic workflows.
+
+   Two chart models:
+   1. **Status-tracker** (`workflow-run-chart`) — flat :pending/:running/:validating
+      states used by Phase B imperative execution. Still used by `compile-definition`.
+   2. **Hierarchical** (`compile-hierarchical-chart`) — per-step states compiled from
+      workflow definitions. Entry actions drive execution; event-queue drain loop
+      replaces the imperative `execute-run!` loop. Phase A target architecture.
 
    Public surface:
    - workflow-facing definitions remain data in `workflow-model`
-   - execution is normalized onto a generic workflow-run statechart
-   - sequential workflow compilation derives execution metadata from the definition
-
-   Slice-one execution phases:
-   :pending -> :running -> :validating -> (:running | :blocked | :completed | :failed | :cancelled)
-
-   The statechart owns legal transition structure.
-   Runtime code will later decide when to emit each event based on step execution,
-   validation, retry exhaustion, resume, and cancellation semantics."
+   - `compile-definition` produces Phase B execution metadata (flat chart)
+   - `compile-hierarchical-chart` produces Phase A statechart (per-step states)"
   (:require
    [com.fulcrologic.statecharts.chart :as chart]
    [com.fulcrologic.statecharts.elements :as ele]
@@ -124,7 +124,7 @@
    (ele/state {:id :cancelled})))
 
 (defn compile-definition
-  "Compile a slice-one sequential workflow definition into execution metadata.
+  "Compile a sequential workflow definition into Phase B execution metadata.
 
    The compiled artifact deliberately keeps workflow-facing authoring data intact,
    while attaching the generic run chart and derived sequential helpers needed by
@@ -140,3 +140,191 @@
    :step-order (:step-order definition)
    :steps (:steps definition)
    :next-step-id-fn (fn [step-id] (next-step-id definition step-id))})
+
+;;; ============================================================
+;;; Phase A — Hierarchical chart compiler
+;;; ============================================================
+
+(defn- step-state-id
+  "Canonical statechart state id for a step."
+  [step-id]
+  (keyword (str "step/" step-id)))
+
+(defn- step-acting-state-id
+  "Canonical statechart state id for the acting sub-state of a judged step."
+  [step-id]
+  (keyword (str "step/" step-id ".acting")))
+
+(defn- step-judging-state-id
+  "Canonical statechart state id for the judging sub-state of a judged step."
+  [step-id]
+  (keyword (str "step/" step-id ".judging")))
+
+(defn- judged-step?
+  "True if a step definition has a judge."
+  [step-def]
+  (some? (:judge step-def)))
+
+(defn- dispatch-action
+  "Create a script element that calls the actions-fn with the given action keyword
+   and step-id merged into the data model."
+  [action-kw step-id]
+  (ele/script {:expr (fn [_env data]
+                       (when-let [af (:actions-fn data)]
+                         (af action-kw (assoc data :step-id step-id))))}))
+
+(defn- make-cancel-transition
+  "Create a :workflow/cancel transition to :cancelled."
+  []
+  (ele/transition {:event :workflow/cancel :target :cancelled}))
+
+(defn- make-fail-transition
+  "Create an :actor/failed transition to :failed (no retry guard)."
+  []
+  (ele/transition {:event :actor/failed :target :failed}))
+
+(defn- next-step-target
+  "Resolve the target state id for the step after `step-id`, or :completed if last."
+  [step-order step-id]
+  (let [idx (.indexOf ^java.util.List step-order step-id)]
+    (if (>= idx (dec (count step-order)))
+      :completed
+      (step-state-id (nth step-order (inc idx))))))
+
+(defn- compile-routing-transitions
+  "Compile judge routing table `:on` into statechart transitions with guards.
+
+   Each signal in the routing table becomes a guarded transition on `:judge/signal`.
+   The guard checks that the signal string in the event data matches."
+  [routing-table step-order current-step-id]
+  (let [transitions
+        (mapv (fn [[signal directive]]
+                (let [{:keys [goto max-iterations]} directive
+                      target (case goto
+                               :next (next-step-target step-order current-step-id)
+                               :done :completed
+                               :previous (let [idx (.indexOf ^java.util.List step-order current-step-id)]
+                                           (if (<= idx 0)
+                                             :failed
+                                             (step-state-id (nth step-order (dec idx)))))
+                               ;; string step-id
+                               (step-state-id goto))]
+                  (if max-iterations
+                    ;; Guarded: check iteration limit
+                    (ele/transition {:event :judge/signal
+                                     :target target
+                                     :cond (fn [_env data]
+                                             (let [signal-str (:signal data)
+                                                   iter-counts (:iteration-counts data)
+                                                   target-step (case goto
+                                                                 :next (let [idx (.indexOf ^java.util.List step-order current-step-id)]
+                                                                         (when (< idx (dec (count step-order)))
+                                                                           (nth step-order (inc idx))))
+                                                                 :done nil
+                                                                 :previous (let [idx (.indexOf ^java.util.List step-order current-step-id)]
+                                                                             (when (> idx 0)
+                                                                               (nth step-order (dec idx))))
+                                                                ;; string
+                                                                 goto)
+                                                   iter-count (get iter-counts target-step 0)]
+                                               (and (= signal-str signal)
+                                                    (< iter-count max-iterations))))})
+                    ;; Unguarded: just match signal
+                    (ele/transition {:event :judge/signal
+                                     :target target
+                                     :cond (fn [_env data]
+                                             (= (:signal data) signal))}))))
+              routing-table)]
+    transitions))
+
+(defn- compile-leaf-step
+  "Compile a non-judged step into a leaf statechart state."
+  [step-id _step-def step-order]
+  (let [next-target (next-step-target step-order step-id)]
+    (ele/state {:id (step-state-id step-id)}
+               (ele/on-entry {}
+                             (dispatch-action :step/enter step-id))
+               (ele/on-exit {}
+                            (dispatch-action :step/exit step-id))
+               (ele/transition {:event :actor/done :target next-target})
+               (ele/transition {:event :actor/failed :target (step-state-id step-id)
+                                :cond (fn [_env data]
+                                        (let [af (:actions-fn data)]
+                                          (when af (af :retry-available? (assoc data :step-id step-id)))))})
+               (make-fail-transition)
+               (make-cancel-transition))))
+
+(defn- compile-judged-step
+  "Compile a judged step into a compound statechart state with .acting and .judging sub-states."
+  [step-id step-def step-order]
+  (let [routing-table (or (:on step-def) {})
+        routing-transitions (compile-routing-transitions routing-table step-order step-id)
+        ;; Fallback: if no signal matches and judge retries exhausted → fail
+        no-match-fail (ele/transition {:event :judge/no-match :target :failed})]
+    (ele/state {:id (step-state-id step-id)}
+               ;; Acting sub-state
+               (ele/state {:id (step-acting-state-id step-id)}
+                          (ele/on-entry {}
+                                        (dispatch-action :step/enter step-id))
+                          (ele/on-exit {}
+                                       (dispatch-action :step/exit step-id))
+                          (ele/transition {:event :actor/done :target (step-judging-state-id step-id)})
+                          (ele/transition {:event :actor/failed :target (step-acting-state-id step-id)
+                                           :cond (fn [_env data]
+                                                   (let [af (:actions-fn data)]
+                                                     (when af (af :retry-available? (assoc data :step-id step-id)))))})
+                          (make-fail-transition)
+                          (make-cancel-transition))
+               ;; Judging sub-state
+               (apply ele/state {:id (step-judging-state-id step-id)}
+                      (ele/on-entry {}
+                                    (dispatch-action :judge/enter step-id))
+                      (ele/on-exit {}
+                                   (dispatch-action :judge/exit step-id))
+                      (concat routing-transitions
+                              [no-match-fail
+                               (make-cancel-transition)])))))
+
+(defn- compile-step
+  "Compile a single step into its statechart state(s)."
+  [step-id step-def step-order]
+  (if (judged-step? step-def)
+    (compile-judged-step step-id step-def step-order)
+    (compile-leaf-step step-id step-def step-order)))
+
+(defn compile-hierarchical-chart
+  "Compile a workflow definition into a hierarchical statechart.
+
+   Each step becomes a state (leaf for non-judged, compound for judged).
+   Entry actions dispatch to an actions-fn for side-effects.
+   Guards read from external workflow context atoms.
+
+   Returns a fulcrologic statechart definition suitable for `simple/register!`."
+  [definition]
+  (when-not (workflow-model/valid-workflow-definition? definition)
+    (throw (ex-info "Invalid workflow definition"
+                    {:explanation (workflow-model/explain-workflow-definition definition)})))
+  (let [step-order (:step-order definition)
+        steps      (:steps definition)
+        step-states (mapv (fn [step-id]
+                            (compile-step step-id (get steps step-id) step-order))
+                          step-order)
+        first-step (first step-order)]
+    (apply chart/statechart {:id :workflow-run}
+           ;; Pending state
+           (ele/state {:id :pending}
+                      (ele/transition {:event :workflow/start
+                                       :target (step-state-id first-step)})
+                      (make-cancel-transition))
+           ;; Terminal states
+           (ele/state {:id :completed}
+                      (ele/on-entry {}
+                                    (dispatch-action :terminal/enter "completed")))
+           (ele/state {:id :failed}
+                      (ele/on-entry {}
+                                    (dispatch-action :terminal/enter "failed")))
+           (ele/state {:id :cancelled}
+                      (ele/on-entry {}
+                                    (dispatch-action :terminal/enter "cancelled")))
+           ;; Step states
+           step-states)))
