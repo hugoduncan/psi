@@ -113,7 +113,13 @@
                                           [(list op (cond-> (assoc params :psi/agent-session-ctx ctx)
                                                       (not (contains? params :session-id))
                                                       (assoc :session-id session-id)))])
-                          op))]
+                          op))
+        latest-rpc-trace-entry
+        (fn [before-count]
+          (->> (dispatch/event-log-entries)
+               (drop before-count)
+               (filter #(= :session/set-rpc-trace (:event-type %)))
+               last))]
     (session/register-resolvers-in! qctx false)
     (session/register-mutations-in! qctx mutations/all-mutations true)
 
@@ -123,25 +129,31 @@
            (session/query-in ctx session-id [:psi.agent-session/rpc-trace-enabled
                                              :psi.agent-session/rpc-trace-file])))
 
-    (let [r1 (mutate 'psi.extension/set-rpc-trace
+    (dispatch/clear-event-log!)
+    (let [before-count (count (dispatch/event-log-entries))
+          r1 (mutate 'psi.extension/set-rpc-trace
                      {:session-id session-id
                       :enabled true
                       :file "/tmp/psi-rpc-trace-from-mutation.ndedn"})]
       (is (= true (:psi.agent-session/rpc-trace-enabled r1)))
       (is (= "/tmp/psi-rpc-trace-from-mutation.ndedn"
              (:psi.agent-session/rpc-trace-file r1)))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (latest-rpc-trace-entry before-count)]
+        (is (some? entry))
         (is (= :session/set-rpc-trace (:event-type entry)))
         (is (= :mutations (:origin entry)))
         (is (= {:enabled? true
                 :file "/tmp/psi-rpc-trace-from-mutation.ndedn"}
                (dissoc (:event-data entry) :session-id)))))
 
-    (let [r2 (mutate 'psi.extension/set-rpc-trace {:session-id session-id :enabled false})]
+    (dispatch/clear-event-log!)
+    (let [before-count (count (dispatch/event-log-entries))
+          r2 (mutate 'psi.extension/set-rpc-trace {:session-id session-id :enabled false})]
       (is (= false (:psi.agent-session/rpc-trace-enabled r2)))
       (is (= "/tmp/psi-rpc-trace-from-mutation.ndedn"
              (:psi.agent-session/rpc-trace-file r2)))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (latest-rpc-trace-entry before-count)]
+        (is (some? entry))
         (is (= :session/set-rpc-trace (:event-type entry)))
         (is (= :mutations (:origin entry)))
         (is (= {:enabled? false

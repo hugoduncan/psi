@@ -14,6 +14,10 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 057 Slice 8 repository-wide reintegration is now green:
+  - isolated workflow suite remains green via `clojure -M:test -c tests-workflow-isolated.edn` (`51 tests, 177 assertions, 0 failures`)
+  - full unit suite is green again via `bb clojure:test:unit` (`1420 tests, 10554 assertions, 0 failures`)
+  - follow-on fix was test hardening in `query_graph_test.clj`: RPC trace mutation assertions no longer assume the global dispatch event log's last entry belongs to the mutation under test; they now clear the log, snapshot pre-count, and inspect newly appended `:session/set-rpc-trace` events only
 - Compatibility scaffold removal has advanced materially.
 - Session directory semantics were tightened into an explicit invariant:
   - runtime sessions now require `:worktree-path`

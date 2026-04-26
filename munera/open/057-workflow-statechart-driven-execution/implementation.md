@@ -528,6 +528,47 @@ Result:
 
 This does not prove the full repository unit suite is green yet, but it does prove the Phase A workflow slice is internally coherent under an isolated workflow-only harness and removes the earlier ambiguous hanging diagnosis from this slice.
 
+## 2026-04-26 — Slice 8 repository-wide reintegration follow-on landed
+
+Completed the immediate full-suite reconciliation after the isolated workflow slice turned green.
+
+### What changed
+
+- Hardened `query_graph_test.clj` RPC trace mutation assertions against global dispatch-event-log interleaving.
+- The test now:
+  - clears the global dispatch event log before each mutation assertion block
+  - records the pre-mutation event-log count
+  - inspects only newly appended entries
+  - selects the latest `:session/set-rpc-trace` event rather than assuming `(last event-log)` belongs to the mutation under test
+- This preserves the test's behavioral intent while removing a brittle ordering assumption that became invalid under broader suite activity.
+
+### Validation
+
+Ran the focused query-graph suite:
+
+- `clojure -M:test --focus psi.agent-session.query-graph-test`
+
+Result:
+
+- `8 tests, 55 assertions, 0 failures`
+
+Ran the full unit suite:
+
+- `bb clojure:test:unit`
+
+Result:
+
+- `1420 tests, 10554 assertions, 0 failures`
+
+### Outcome
+
+Slice 8 is now confirmed both:
+
+- locally/isolated for workflow-specific suites, and
+- repository-wide for the unit suite
+
+The remaining workflow cleanup is now structural/architectural follow-on (for example, retiring residual compatibility helpers like `next-step-id-fn` from non-Phase-A paths where still present), not test-red reconciliation.
+
 ## Next slice
 
-Follow-on from Slice 8 is now repository-wide reintegration / full-suite reconciliation rather than more workflow-slice-local design work.
+Follow-on from Slice 8 is now structural cleanup and task closure preparation rather than workflow-slice-local debugging.
