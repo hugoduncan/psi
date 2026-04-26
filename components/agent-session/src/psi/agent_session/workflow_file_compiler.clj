@@ -76,18 +76,42 @@
 
 ;;; Multi-step compilation
 
+(defn- workflow-name->step-id-map
+  "Build a map from workflow names to compiled step-ids for goto resolution."
+  [steps step-order]
+  (into {}
+        (map-indexed (fn [idx step]
+                       [(:workflow step) (nth step-order idx)]))
+        steps))
+
+(defn- resolve-routing-table
+  "Resolve :goto workflow names in a routing table to compiled step-ids.
+   Keywords (:next, :previous, :done) pass through without resolution."
+  [on-table name->step-id]
+  (when on-table
+    (into {}
+          (map (fn [[signal directive]]
+                 [signal
+                  (if (and (string? (:goto directive))
+                           (contains? name->step-id (:goto directive)))
+                    (assoc directive :goto (get name->step-id (:goto directive)))
+                    directive)]))
+          on-table)))
+
 (defn compile-multi-step
   "Compile a parsed workflow file with `:steps` into an N-step canonical definition."
   [{:keys [name description config body]}]
   (let [steps (:steps config)
         step-order (mapv multi-step-id (range) steps)
+        name->step-id (workflow-name->step-id-map steps step-order)
         step-map (into {}
                        (map-indexed
                         (fn [idx step]
                           (let [step-id (nth step-order idx)
                                 previous-step-id (when (pos? idx)
                                                    (nth step-order (dec idx)))
-                                workflow-name (:workflow step)]
+                                workflow-name (:workflow step)
+                                resolved-on (resolve-routing-table (:on step) name->step-id)]
                             [step-id
                              (cond-> {:label (or workflow-name step-id)
                                       :description (str "Delegate to workflow `" workflow-name "`.")
@@ -104,7 +128,11 @@
                                         (assoc :input {:source :workflow-input
                                                        :path [:input]}))
                                       :result-schema default-result-schema
-                                      :retry-policy default-retry-policy})])))
+                                      :retry-policy default-retry-policy}
+                               (:judge step)
+                               (assoc :judge (:judge step))
+                               resolved-on
+                               (assoc :on resolved-on))])))
                        steps)]
     {:definition-id name
      :name name
@@ -183,4 +211,43 @@
         dups (into [] (comp (filter #(> (val %) 1)) (map key)) freqs)]
     (if (seq dups)
       {:valid? false :duplicates dups}
+      {:valid? true})))
+
+(defn validate-judge-routing
+  "Validate judge/routing constraints across definitions.
+   Checks:
+   - :on without :judge is an error
+   - :goto string targets reference known step-ids within the definition
+   Returns {:valid? true} or {:valid? false :errors [...]}."
+  [definitions]
+  (let [errors (into []
+                     (mapcat
+                      (fn [definition]
+                        (let [step-ids (set (:step-order definition))]
+                          (mapcat
+                           (fn [[step-id step-def]]
+                             (let [has-on? (some? (:on step-def))
+                                   has-judge? (some? (:judge step-def))
+                                   on-table (:on step-def)]
+                               (concat
+                                ;; :on without :judge
+                                (when (and has-on? (not has-judge?))
+                                  [{:definition (:name definition)
+                                    :step step-id
+                                    :error :on-without-judge}])
+                                ;; :goto string targets must be known step-ids
+                                (when on-table
+                                  (keep (fn [[signal directive]]
+                                          (when (and (string? (:goto directive))
+                                                     (not (contains? step-ids (:goto directive))))
+                                            {:definition (:name definition)
+                                             :step step-id
+                                             :signal signal
+                                             :error :unknown-goto-target
+                                             :target (:goto directive)}))
+                                        on-table)))))
+                           (:steps definition)))))
+                     definitions)]
+    (if (seq errors)
+      {:valid? false :errors errors}
       {:valid? true})))
