@@ -632,6 +632,50 @@ The review feedback is now implemented:
 - dead/no-op chart hooks removed
 - naming drift aligned
 
+## 2026-04-26 — Optional shaping follow-on landed
+
+Executed the remaining optional code-shaper follow-up items.
+
+### What changed
+
+- Added `workflow_progression_recording.clj` as the canonical Phase A record/update substrate.
+- Trimmed `workflow_progression.clj` into a clearer compatibility/legacy control-plane namespace that delegates record-only helpers to `workflow_progression_recording`.
+- Added `workflow_statechart_compat.clj` for compatibility compiler surfaces:
+  - compatibility `compile-definition`
+  - compatibility `workflow-run-chart`
+  - related sequential compatibility metadata
+- Simplified `workflow_statechart.clj` so it now presents the canonical Phase A compiler surface more clearly.
+- Added a canonical-surfaces note:
+  - `components/agent-session/src/psi/agent_session/workflow_statechart_canonical.md`
+- Updated runtime/tests to consume the new split surfaces cleanly.
+
+### Validation
+
+Focused progression/statechart/execution checks:
+
+- `clojure -M:test --focus psi.agent-session.workflow-statechart-test --focus psi.agent-session.workflow-progression-test --focus psi.agent-session.workflow-execution-test`
+  - `26 tests, 112 assertions, 0 failures`
+- `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.workflow-guard-purity-test --focus psi.agent-session.workflow-hierarchical-chart-test`
+  - `28 tests, 87 assertions, 0 failures`
+
+Workflow isolated suite:
+
+- `clojure -M:test -c tests-workflow-isolated.edn`
+  - `51 tests, 177 assertions, 0 failures`
+
+Full unit suite:
+
+- `bb clojure:test:unit`
+  - `1420 tests, 10632 assertions, 0 failures`
+
+### Outcome
+
+The optional shaping work is now complete:
+
+- progression surface split
+- compatibility compiler surface isolated
+- canonical workflow surfaces documented
+
 ## Next slice
 
-Follow-on from Slice 8 is now task closure preparation rather than workflow-slice-local debugging.
+Follow-on from 057 is now task closure only, unless a separate new task is desired for broader workflow API polish.

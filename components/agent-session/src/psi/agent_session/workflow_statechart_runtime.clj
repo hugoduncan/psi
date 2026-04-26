@@ -24,6 +24,7 @@
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-progression :as workflow-progression]
+   [psi.agent-session.workflow-progression-recording :as workflow-progression-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
    [psi.agent-session.workflow-step-prep :as workflow-step-prep]))
@@ -317,7 +318,7 @@
             (swap! (:state* ctx)
                    workflow-progression/record-actor-result run-id step-id payload)
             (swap! (:state* ctx)
-                   workflow-progression/record-step-result run-id step-id payload))
+                   workflow-progression-recording/record-step-result run-id step-id payload))
           (swap! working-memory*
                  (fn [wm]
                    (-> wm
@@ -329,7 +330,7 @@
         :step/record-failure
         (let [{:keys [payload]} (:pending-actor-result @working-memory*)]
           (swap! (:state* ctx)
-                 workflow-progression/record-attempt-execution-failure run-id step-id payload)
+                 workflow-progression-recording/record-attempt-execution-failure run-id step-id payload)
           (swap! working-memory*
                  (fn [wm]
                    (-> wm
@@ -371,7 +372,7 @@
         (let [judge-result (:pending-judge-result @working-memory*)
               routing-result (:routing-result judge-result)]
           (swap! (:state* ctx)
-                 workflow-progression/record-judge-result run-id step-id judge-result)
+                 workflow-progression-recording/record-judge-result run-id step-id judge-result)
           (swap! (:state* ctx)
                  (fn [state]
                    (update-in state [:workflows :runs run-id]

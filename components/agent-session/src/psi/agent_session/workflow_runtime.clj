@@ -8,7 +8,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]))
+   [psi.agent-session.workflow-statechart-compat :as workflow-statechart-compat]))
 
 (defn- now []
   (java.time.Instant/now))
@@ -101,7 +101,7 @@
   [state {:keys [run-id workflow-input] :as opts}]
   (let [{:keys [effective-definition source-definition-id]}
         (resolve-effective-definition state opts)
-        compiled (workflow-statechart/compile-definition effective-definition)
+        compiled (psi.agent-session.workflow-statechart-compat/compile-definition effective-definition)
         run-id'  (normalize-id run-id)
         ts       (now)
         run      {:run-id run-id'

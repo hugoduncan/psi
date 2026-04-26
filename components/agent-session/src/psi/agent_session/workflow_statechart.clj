@@ -1,22 +1,46 @@
 (ns psi.agent-session.workflow-statechart
-  "Workflow execution statechart + compilation boundary for deterministic workflows.
+  "Canonical Phase A workflow execution chart compiler for deterministic workflows.
 
-   Two chart models:
-   1. **Status-tracker** (`workflow-run-chart`) — flat :pending/:running/:validating
-      states used by Phase B imperative execution. Still used by `compile-definition`.
-   2. **Hierarchical** (`compile-hierarchical-chart`) — per-step states compiled from
-      workflow definitions. Entry actions drive execution; event-queue drain loop
-      replaces the imperative `execute-run!` loop. Phase A target architecture.
-
-   Public surface:
+   Public canonical surfaces:
    - workflow-facing definitions remain data in `workflow-model`
-   - `compile-definition` is the compatibility Phase B metadata compiler
-   - `compile-hierarchical-chart` produces the Phase A canonical execution chart
-   - `next-step-id` is the compatibility sequential step helper for legacy progression"
+   - `compile-hierarchical-chart` produces the Phase A execution chart
+   - `next-step-id` remains a small compatibility sequential helper used by
+     legacy progression surfaces
+
+   Compatibility compiler surfaces live in `psi.agent-session.workflow-statechart-compat`."
   (:require
    [com.fulcrologic.statecharts.chart :as chart]
    [com.fulcrologic.statecharts.elements :as ele]
    [psi.agent-session.workflow-model :as workflow-model]))
+
+(def workflow-run-chart
+  (chart/statechart
+   {:id :workflow-run}
+   (ele/state {:id :pending}
+              (ele/transition {:event :workflow/start :target :running})
+              (ele/transition {:event :workflow/cancel :target :cancelled}))
+   (ele/state {:id :running}
+              (ele/transition {:event :workflow/attempt-started :target :running})
+              (ele/transition {:event :workflow/result-received :target :validating})
+              (ele/transition {:event :workflow/retry :target :running})
+              (ele/transition {:event :workflow/block :target :blocked})
+              (ele/transition {:event :workflow/complete :target :completed})
+              (ele/transition {:event :workflow/fail :target :failed})
+              (ele/transition {:event :workflow/cancel :target :cancelled}))
+   (ele/state {:id :validating}
+              (ele/transition {:event :workflow/step-succeeded :target :running})
+              (ele/transition {:event :workflow/retry :target :running})
+              (ele/transition {:event :workflow/block :target :blocked})
+              (ele/transition {:event :workflow/complete :target :completed})
+              (ele/transition {:event :workflow/fail :target :failed})
+              (ele/transition {:event :workflow/cancel :target :cancelled}))
+   (ele/state {:id :blocked}
+              (ele/transition {:event :workflow/resume :target :running})
+              (ele/transition {:event :workflow/fail :target :failed})
+              (ele/transition {:event :workflow/cancel :target :cancelled}))
+   (ele/state {:id :completed})
+   (ele/state {:id :failed})
+   (ele/state {:id :cancelled})))
 
 (def run-events
   [{:event :workflow/start
@@ -94,55 +118,6 @@
   "Return the first step id in definition order, or nil for empty definitions."
   [definition]
   (first (:step-order definition)))
-
-(def workflow-run-chart
-  (chart/statechart
-   {:id :workflow-run}
-   (ele/state {:id :pending}
-              (ele/transition {:event :workflow/start :target :running})
-              (ele/transition {:event :workflow/cancel :target :cancelled}))
-   (ele/state {:id :running}
-              (ele/transition {:event :workflow/attempt-started :target :running})
-              (ele/transition {:event :workflow/result-received :target :validating})
-              (ele/transition {:event :workflow/retry :target :running})
-              (ele/transition {:event :workflow/block :target :blocked})
-              (ele/transition {:event :workflow/complete :target :completed})
-              (ele/transition {:event :workflow/fail :target :failed})
-              (ele/transition {:event :workflow/cancel :target :cancelled}))
-   (ele/state {:id :validating}
-              (ele/transition {:event :workflow/step-succeeded :target :running})
-              (ele/transition {:event :workflow/retry :target :running})
-              (ele/transition {:event :workflow/block :target :blocked})
-              (ele/transition {:event :workflow/complete :target :completed})
-              (ele/transition {:event :workflow/fail :target :failed})
-              (ele/transition {:event :workflow/cancel :target :cancelled}))
-   (ele/state {:id :blocked}
-              (ele/transition {:event :workflow/resume :target :running})
-              (ele/transition {:event :workflow/fail :target :failed})
-              (ele/transition {:event :workflow/cancel :target :cancelled}))
-   (ele/state {:id :completed})
-   (ele/state {:id :failed})
-   (ele/state {:id :cancelled})))
-
-(defn compile-definition
-  "Compatibility compiler for the legacy Phase B sequential execution metadata.
-
-   Phase A statechart-driven execution does not use this compiled artifact for
-   control flow; it remains as a compatibility surface for run creation and
-   legacy progression helpers that still reason in sequential next-step terms.
-
-   New execution paths should prefer `compile-hierarchical-chart`."
-  [definition]
-  (when-not (workflow-model/valid-workflow-definition? definition)
-    (throw (ex-info "Invalid workflow definition"
-                    {:explanation (workflow-model/explain-workflow-definition definition)})))
-  {:execution-model :sequential
-   :chart workflow-run-chart
-   :run-events run-events
-   :initial-step-id (initial-step-id definition)
-   :step-order (:step-order definition)
-   :steps (:steps definition)
-   :next-step-id-fn (fn [step-id] (next-step-id definition step-id))})
 
 ;;; ============================================================
 ;;; Phase A — Hierarchical chart compiler

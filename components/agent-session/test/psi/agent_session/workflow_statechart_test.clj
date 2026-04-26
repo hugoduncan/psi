@@ -4,7 +4,8 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
-   [psi.agent-session.workflow-statechart :as workflow-sc]))
+   [psi.agent-session.workflow-statechart :as workflow-sc]
+   [psi.agent-session.workflow-statechart-compat :as workflow-compat]))
 
 (def sample-definition
   {:definition-id "plan-build-review"
@@ -23,7 +24,7 @@
   [events]
   (let [env        (simple/simple-env)
         session-id (java.util.UUID/randomUUID)]
-    (simple/register! env :workflow-run workflow-sc/workflow-run-chart)
+    (simple/register! env :workflow-run workflow-compat/workflow-run-chart)
     (let [wm0 (sp/start! (::sc/processor env) env :workflow-run {::sc/session-id session-id})
           wmN (reduce (fn [wm event]
                         (sp/process-event! (::sc/processor env)
@@ -36,7 +37,7 @@
 
 (deftest workflow-definition-compilation-test
   (testing "compatibility compilation derives sequential execution metadata"
-    (let [compiled (workflow-sc/compile-definition sample-definition)]
+    (let [compiled (workflow-compat/compile-definition sample-definition)]
       (is (= :sequential (:execution-model compiled)))
       (is (= ["plan" "build" "review"] (:step-order compiled)))
       (is (= "plan" (:initial-step-id compiled)))))

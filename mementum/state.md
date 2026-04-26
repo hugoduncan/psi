@@ -14,6 +14,13 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 057 optional shaping follow-on is now green:
+  - added `workflow_progression_recording.clj` as the canonical Phase A record/update substrate
+  - split compatibility compiler concerns into `workflow_statechart_compat.clj`
+  - added `workflow_statechart_canonical.md` documenting authoritative workflow surfaces
+  - focused progression/statechart checks green (`26 tests, 112 assertions, 0 failures` and `28 tests, 87 assertions, 0 failures`)
+  - isolated workflow suite green (`51 tests, 177 assertions, 0 failures`)
+  - full unit suite green (`1420 tests, 10632 assertions, 0 failures`)
 - Task 057 post-review cleanup is now green:
   - added shared `workflow_step_prep.clj` and removed duplicated step preparation logic from `workflow_execution.clj` and `workflow_statechart_runtime.clj`
   - clarified `compile-definition` as a compatibility Phase B compiler while keeping `compile-hierarchical-chart` as the Phase A canonical execution compiler

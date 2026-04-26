@@ -15,3 +15,8 @@ Follow-up cleanup from task review:
 - [x] Extract shared workflow step-preparation helpers from `workflow_execution.clj` and `workflow_statechart_runtime.clj`
 - [x] Remove or explicitly implement no-op statechart action hooks like `:step/exit` and `:judge/exit`
 - [x] Align action naming/documentation drift between design and implementation (for example `:terminal/record` vs `:terminal/enter`)
+
+Optional post-closure polish:
+- [x] Split `workflow_progression.clj` into compatibility-era control helpers vs Phase A record-only helpers if ongoing workflow work makes the mixed surface burdensome
+- [x] Consider separating compatibility compiler concerns from canonical hierarchical execution compiler concerns in `workflow_statechart.clj` if Phase B surfaces continue to shrink
+- [x] Add a concise canonical-surfaces note across workflow namespaces documenting which execution/compiler/runtime surfaces are authoritative now
