@@ -569,6 +569,69 @@ Slice 8 is now confirmed both:
 
 The remaining workflow cleanup is now structural/architectural follow-on (for example, retiring residual compatibility helpers like `next-step-id-fn` from non-Phase-A paths where still present), not test-red reconciliation.
 
+## 2026-04-26 — Post-review cleanup landed
+
+Addressed the follow-up cleanup items surfaced by task review.
+
+### What changed
+
+- Added shared step-preparation namespace:
+  - `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
+- Extracted shared helpers from both execution/runtime paths into that namespace:
+  - binding source resolution
+  - step input materialization
+  - prompt rendering
+  - step prompt shaping
+  - child session config shaping
+- Made `workflow_execution.clj` delegate to shared step-prep helpers instead of carrying duplicate logic.
+- Made `workflow_statechart_runtime.clj` delegate to the same shared step-prep helpers.
+- Clarified compiler surface in `workflow_statechart.clj`:
+  - `compile-definition` is now explicitly documented as a compatibility Phase B compiler
+  - `compile-hierarchical-chart` remains the canonical Phase A execution compiler
+- Removed residual non-Phase-A `next-step-id-fn` dependence from `workflow_progression.clj` by using `workflow_statechart/next-step-id` directly.
+- Removed no-op statechart hooks from the compiled hierarchical chart:
+  - removed `:step/exit`
+  - removed `:judge/exit`
+- Aligned terminal action naming with the design:
+  - renamed chart/runtime terminal hook usage from `:terminal/enter` to `:terminal/record`
+- Updated focused hierarchical-chart tests to match the slimmer action surface.
+
+### Validation
+
+Focused workflow/statechart regression set:
+
+- `clojure -M:test --focus psi.agent-session.workflow-hierarchical-chart-test --focus psi.agent-session.workflow-statechart-test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-progression-test`
+
+Result:
+
+- `36 tests, 137 assertions, 0 failures`
+
+Workflow isolated suite:
+
+- `clojure -M:test -c tests-workflow-isolated.edn`
+
+Result:
+
+- `51 tests, 177 assertions, 0 failures`
+
+Full unit suite:
+
+- `bb clojure:test:unit`
+
+Result:
+
+- `1420 tests, 10632 assertions, 0 failures`
+
+### Outcome
+
+The review feedback is now implemented:
+
+- compile surface clarified
+- legacy next-step compatibility usage reduced
+- duplicate preparation logic extracted
+- dead/no-op chart hooks removed
+- naming drift aligned
+
 ## Next slice
 
-Follow-on from Slice 8 is now structural cleanup and task closure preparation rather than workflow-slice-local debugging.
+Follow-on from Slice 8 is now task closure preparation rather than workflow-slice-local debugging.

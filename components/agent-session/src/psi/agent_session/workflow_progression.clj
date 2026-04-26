@@ -90,7 +90,7 @@
 
 (defn- next-step-id
   [workflow-run step-id]
-  ((:next-step-id-fn (workflow-statechart/compile-definition (:effective-definition workflow-run))) step-id))
+  (workflow-statechart/next-step-id (:effective-definition workflow-run) step-id))
 
 (defn submit-result-envelope
   "Submit a structured result envelope for the latest attempt of `step-id`.

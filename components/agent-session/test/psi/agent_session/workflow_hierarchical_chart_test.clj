@@ -168,8 +168,6 @@
                            (swap! trace* conj [:step/block step-id])
                            :judge/enter
                            (swap! trace* conj [:judge/enter step-id])
-                           :judge/exit
-                           (swap! trace* conj [:judge/exit step-id])
                            nil)))
           ctx (create-chart-context chart actions-fn iteration-counts* event-queue*)
           wm1 (send-and-drain! ctx (:wm ctx) :workflow/start event-queue*)
@@ -196,9 +194,7 @@
                            (let [counts (swap! iteration-counts* update step-id (fnil inc 0))]
                              (swap! trace* conj [:step/enter step-id])
                              (swap! event-queue* conj {:event :actor/done :data {:iteration-counts counts}}))
-                           :step/exit
-                           (swap! trace* conj [:step/exit step-id])
-                           :terminal/enter
+                           :terminal/record
                            (swap! trace* conj [:terminal step-id])
                            nil)))
           chart (workflow-sc/compile-hierarchical-chart linear-definition)
@@ -206,9 +202,7 @@
           wm-final (send-and-drain! ctx (:wm ctx) :workflow/start event-queue*)]
       (is (= #{:completed} (config wm-final)))
       (is (= [[:step/enter "step-1-planner"]
-              [:step/exit "step-1-planner"]
               [:step/enter "step-2-builder"]
-              [:step/exit "step-2-builder"]
               [:terminal "completed"]]
              @trace*))
       (is (= {"step-1-planner" 1 "step-2-builder" 1} @iteration-counts*)))))
@@ -269,8 +263,6 @@
                            (let [counts (swap! iteration-counts* update step-id (fnil inc 0))]
                              (swap! trace* conj [:step/enter step-id])
                              (swap! event-queue* conj {:event :actor/done :data {:iteration-counts counts}}))
-                           :step/exit
-                           (swap! trace* conj [:step/exit step-id])
                            :judge/enter
                            (do
                              (swap! trace* conj [:judge/enter step-id])
@@ -278,9 +270,7 @@
                              (swap! event-queue* conj {:event :judge/signal
                                                        :data {:signal "REVISE"
                                                               :iteration-counts @iteration-counts*}}))
-                           :judge/exit
-                           (swap! trace* conj [:judge/exit step-id])
-                           :terminal/enter
+                           :terminal/record
                            (swap! trace* conj [:terminal step-id])
                            nil)))
           chart (workflow-sc/compile-hierarchical-chart judged-definition)
@@ -303,7 +293,7 @@
           iteration-counts* (atom {})
           actions-fn (fn [action-kw data]
                        (case action-kw
-                         :terminal/enter (swap! trace* conj [:terminal (:step-id data)])
+                         :terminal/record (swap! trace* conj [:terminal (:step-id data)])
                          nil))
           chart (workflow-sc/compile-hierarchical-chart linear-definition)
           ctx (create-chart-context chart actions-fn iteration-counts* event-queue*)
@@ -324,9 +314,7 @@
                              ;; Do NOT enqueue :actor/done — simulate "still running"
                              ;; Instead, we'll send cancel externally
                              nil)
-                           :step/exit
-                           (swap! trace* conj [:step/exit step-id])
-                           :terminal/enter
+                           :terminal/record
                            (swap! trace* conj [:terminal step-id])
                            nil)))
           chart (workflow-sc/compile-hierarchical-chart linear-definition)
@@ -351,9 +339,7 @@
                          (case action-kw
                            :step/enter
                            (swap! trace* conj [:step/enter step-id])
-                           :step/exit
-                           (swap! trace* conj [:step/exit step-id])
-                           :terminal/enter
+                           :terminal/record
                            (swap! trace* conj [:terminal step-id])
                            nil)))
           chart (workflow-sc/compile-hierarchical-chart linear-definition)
@@ -363,7 +349,7 @@
                                                          :attempt-counts {"step-1-planner" 1}
                                                          :actor-retry-limits {"step-1-planner" 1}})]
       (is (= #{:failed} (config wm-final)))
-      (is (= [[:step/enter "step-1-planner"] [:step/exit "step-1-planner"] [:terminal "failed"]]
+      (is (= [[:step/enter "step-1-planner"] [:terminal "failed"]]
              @trace*)))))
 
 (deftest actor-failure-with-retry-test
@@ -384,9 +370,7 @@
                                (swap! event-queue* conj {:event :actor/failed :data {:iteration-counts counts}})
                                ;; Second attempt succeeds
                                (swap! event-queue* conj {:event :actor/done :data {:iteration-counts counts}})))
-                           :step/exit
-                           (swap! trace* conj [:step/exit step-id])
-                           :terminal/enter
+                           :terminal/record
                            (swap! trace* conj [:terminal step-id])
                            nil)))
           ;; Use judged-definition which has retry on builder
@@ -401,9 +385,7 @@
       (is (= #{:completed} (config wm-final)))
       (is (= 2 @attempt-count*))
       (is (= [[:step/enter "step-1" 1]
-              [:step/exit "step-1"]
               [:step/enter "step-1" 2]
-              [:step/exit "step-1"]
               [:terminal "completed"]]
              @trace*)))))
 
@@ -422,14 +404,12 @@
                            :step/enter
                            (let [counts (swap! iteration-counts* update step-id (fnil inc 0))]
                              (swap! event-queue* conj {:event :actor/done :data {:iteration-counts counts}}))
-                           :step/exit nil
                            :judge/enter
                            (do
                              (swap! trace* conj [:judge/enter step-id])
                              ;; Signal doesn't match any routing table entry
                              (swap! event-queue* conj {:event :judge/no-match}))
-                           :judge/exit nil
-                           :terminal/enter
+                           :terminal/record
                            (swap! trace* conj [:terminal step-id])
                            nil)))
           chart (workflow-sc/compile-hierarchical-chart judged-definition)

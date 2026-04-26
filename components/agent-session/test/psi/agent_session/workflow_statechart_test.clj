@@ -35,14 +35,16 @@
       (first (::sc/configuration wmN)))))
 
 (deftest workflow-definition-compilation-test
-  (testing "compilation derives sequential execution metadata"
+  (testing "compatibility compilation derives sequential execution metadata"
     (let [compiled (workflow-sc/compile-definition sample-definition)]
       (is (= :sequential (:execution-model compiled)))
       (is (= ["plan" "build" "review"] (:step-order compiled)))
-      (is (= "plan" (:initial-step-id compiled)))
-      (is (= "build" ((:next-step-id-fn compiled) "plan")))
-      (is (= "review" ((:next-step-id-fn compiled) "build")))
-      (is (nil? ((:next-step-id-fn compiled) "review"))))))
+      (is (= "plan" (:initial-step-id compiled)))))
+
+  (testing "next-step-id remains the explicit compatibility sequential helper"
+    (is (= "build" (workflow-sc/next-step-id sample-definition "plan")))
+    (is (= "review" (workflow-sc/next-step-id sample-definition "build")))
+    (is (nil? (workflow-sc/next-step-id sample-definition "review")))))
 
 (deftest workflow-run-statechart-test
   (testing "happy path phases"

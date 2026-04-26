@@ -21,14 +21,12 @@
    [com.fulcrologic.statecharts.simple :as simple]
    [psi.agent-session.prompt-control :as prompt-control]
    [psi.agent-session.prompt-recording :as prompt-recording]
-   [psi.agent-session.session-state :as session-state]
-   [psi.agent-session.skills :as skills]
-   [psi.agent-session.tool-defs :as tool-defs]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-progression :as workflow-progression]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]))
+   [psi.agent-session.workflow-statechart :as workflow-statechart]
+   [psi.agent-session.workflow-step-prep :as workflow-step-prep]))
 
 (defn- now []
   (java.time.Instant/now))
@@ -156,126 +154,6 @@
                (contains? #{:completed :failed :cancelled} status)
                (assoc :finished-at (or (:finished-at workflow-run) (now))))))))
 
-(defn- get-path*
-  [m path]
-  (reduce (fn [acc k]
-            (when (some? acc)
-              (get acc k)))
-          m
-          path))
-
-(defn- binding-source-value
-  [workflow-run {:keys [source path]}]
-  (case source
-    :workflow-input
-    (get-path* (:workflow-input workflow-run) path)
-
-    :step-output
-    (let [[step-id & more] path
-          accepted-result (get-in workflow-run [:step-runs step-id :accepted-result])]
-      (get-path* accepted-result more))
-
-    :workflow-runtime
-    (get-path* {:run-id (:run-id workflow-run)
-                :current-step-id (:current-step-id workflow-run)
-                :status (:status workflow-run)}
-               path)
-
-    nil))
-
-(defn- materialize-step-inputs
-  [workflow-run step-id]
-  (let [bindings (get-in workflow-run [:effective-definition :steps step-id :input-bindings])]
-    (reduce-kv (fn [acc k ref]
-                 (assoc acc k (binding-source-value workflow-run ref)))
-               {}
-               (or bindings {}))))
-
-(defn- render-prompt-template
-  [prompt-template step-inputs]
-  (let [input-text (or (:input step-inputs) "")
-        original-text (or (:original step-inputs) "")]
-    (-> (or prompt-template "$INPUT")
-        (str/replace "$INPUT" (str input-text))
-        (str/replace "$ORIGINAL" (str original-text)))))
-
-(defn- step-prompt
-  [workflow-run step-id]
-  (let [step-def (get-in workflow-run [:effective-definition :steps step-id])
-        step-inputs (materialize-step-inputs workflow-run step-id)]
-    {:step-inputs step-inputs
-     :prompt (render-prompt-template (:prompt-template step-def) step-inputs)}))
-
-(defn- compose-system-prompt
-  [base-system-prompt framing-prompt]
-  (cond
-    (and (seq base-system-prompt) (seq framing-prompt))
-    (str base-system-prompt "\n\n" framing-prompt)
-
-    (seq base-system-prompt)
-    base-system-prompt
-
-    (seq framing-prompt)
-    framing-prompt
-
-    :else nil))
-
-(defn- resolve-step-skills
-  [ctx parent-session-id skill-config]
-  (let [session-skills (vec (or (:skills (session-state/get-session-data-in ctx parent-session-id)) []))]
-    (when (some? skill-config)
-      (mapv (fn [skill]
-              (cond
-                (map? skill) skill
-                (string? skill)
-                (or (skills/find-skill session-skills skill)
-                    {:name skill
-                     :description ""
-                     :file-path ""
-                     :base-dir ""
-                     :source :project
-                     :disable-model-invocation false})
-                :else skill))
-            skill-config))))
-
-(defn- resolve-step-tool-defs
-  [ctx parent-session-id tool-config]
-  (let [session-tool-defs (vec (or (:tool-defs (session-state/get-session-data-in ctx parent-session-id)) []))]
-    (when (some? tool-config)
-      (mapv (fn [tool]
-              (cond
-                (map? tool)
-                (tool-defs/normalize-tool-def tool)
-
-                (string? tool)
-                (or (some #(when (= tool (:name %)) %) session-tool-defs)
-                    (tool-defs/normalize-tool-def {:name tool}))
-
-                :else tool))
-            tool-config))))
-
-(defn- resolve-step-session-config
-  [ctx parent-session-id workflow-run step-id]
-  (let [step-def (get-in workflow-run [:effective-definition :steps step-id])
-        profile (get-in step-def [:executor :profile])
-        run-meta (get-in workflow-run [:effective-definition :workflow-file-meta])
-        delegated-workflow? (and profile
-                                 (not= profile (:definition-id (:effective-definition workflow-run))))
-        step-meta (if delegated-workflow?
-                    (let [ref-def (get-in @(:state* ctx) [:workflows :definitions profile])]
-                      (or (:workflow-file-meta ref-def) {}))
-                    (or run-meta {}))
-        framing-prompt (when delegated-workflow? (:framing-prompt run-meta))
-        parent-session-id (or parent-session-id
-                              (some->> (session-state/list-context-sessions-in ctx) first :session-id))]
-    {:base-system-prompt (:system-prompt step-meta)
-     :framing-prompt framing-prompt
-     :system-prompt (compose-system-prompt (:system-prompt step-meta) framing-prompt)
-     :tool-defs (resolve-step-tool-defs ctx parent-session-id (:tools step-meta))
-     :thinking-level (or (:thinking-level step-meta) :off)
-     :skills (resolve-step-skills ctx parent-session-id (:skills step-meta))
-     :model (:model step-meta)}))
-
 (defn assistant-message-text
   [assistant-message]
   (or (some->> (:content assistant-message)
@@ -359,8 +237,8 @@
         :step/enter
         (let [attempt-id (str (java.util.UUID/randomUUID))
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              step-config (resolve-step-session-config ctx parent-session-id workflow-run step-id)
-              {:keys [prompt]} (step-prompt workflow-run step-id)
+              step-config (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id)
+              {:keys [prompt]} (workflow-step-prep/step-prompt workflow-run step-id)
               {:keys [attempt execution-session]}
               (workflow-attempts/create-step-attempt-session!
                ctx
@@ -540,7 +418,7 @@
                               :updated-at (now)))))
           nil)
 
-        :terminal/enter
+        :terminal/record
         (do
           (swap! working-memory* assoc :updated-at (now))
           nil)

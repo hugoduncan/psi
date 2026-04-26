@@ -14,6 +14,15 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 057 post-review cleanup is now green:
+  - added shared `workflow_step_prep.clj` and removed duplicated step preparation logic from `workflow_execution.clj` and `workflow_statechart_runtime.clj`
+  - clarified `compile-definition` as a compatibility Phase B compiler while keeping `compile-hierarchical-chart` as the Phase A canonical execution compiler
+  - removed residual `next-step-id-fn` dependence from `workflow_progression.clj`
+  - removed no-op chart hooks `:step/exit` and `:judge/exit`
+  - aligned terminal hook naming to `:terminal/record`
+  - focused workflow/statechart regression set green (`36 tests, 137 assertions, 0 failures`)
+  - isolated workflow suite green (`51 tests, 177 assertions, 0 failures`)
+  - full unit suite green (`1420 tests, 10632 assertions, 0 failures`)
 - Task 057 Slice 8 repository-wide reintegration is now green:
   - isolated workflow suite remains green via `clojure -M:test -c tests-workflow-isolated.edn` (`51 tests, 177 assertions, 0 failures`)
   - full unit suite is green again via `bb clojure:test:unit` (`1420 tests, 10554 assertions, 0 failures`)

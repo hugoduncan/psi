@@ -8,3 +8,10 @@
 - [x] Slice 6: Phase B helper decomposition so recording survives but chart owns control flow
 - [x] Slice 7: Cancel, terminal projection, and FIFO queue semantics
 - [x] Slice 8: Existing test migration, imperative loop removal, and isolated workflow suite green
+
+Follow-up cleanup from task review:
+- [x] Decide and implement the canonical future of `workflow_statechart/compile-definition` (hierarchical default vs explicit compatibility surface)
+- [x] Remove or quarantine residual `next-step-id-fn` compatibility usage from non-Phase-A paths
+- [x] Extract shared workflow step-preparation helpers from `workflow_execution.clj` and `workflow_statechart_runtime.clj`
+- [x] Remove or explicitly implement no-op statechart action hooks like `:step/exit` and `:judge/exit`
+- [x] Align action naming/documentation drift between design and implementation (for example `:terminal/record` vs `:terminal/enter`)

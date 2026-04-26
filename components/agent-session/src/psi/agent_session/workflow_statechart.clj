@@ -10,8 +10,9 @@
 
    Public surface:
    - workflow-facing definitions remain data in `workflow-model`
-   - `compile-definition` produces Phase B execution metadata (flat chart)
-   - `compile-hierarchical-chart` produces Phase A statechart (per-step states)"
+   - `compile-definition` is the compatibility Phase B metadata compiler
+   - `compile-hierarchical-chart` produces the Phase A canonical execution chart
+   - `next-step-id` is the compatibility sequential step helper for legacy progression"
   (:require
    [com.fulcrologic.statecharts.chart :as chart]
    [com.fulcrologic.statecharts.elements :as ele]
@@ -124,11 +125,13 @@
    (ele/state {:id :cancelled})))
 
 (defn compile-definition
-  "Compile a sequential workflow definition into Phase B execution metadata.
+  "Compatibility compiler for the legacy Phase B sequential execution metadata.
 
-   The compiled artifact deliberately keeps workflow-facing authoring data intact,
-   while attaching the generic run chart and derived sequential helpers needed by
-   runtime orchestration."
+   Phase A statechart-driven execution does not use this compiled artifact for
+   control flow; it remains as a compatibility surface for run creation and
+   legacy progression helpers that still reason in sequential next-step terms.
+
+   New execution paths should prefer `compile-hierarchical-chart`."
   [definition]
   (when-not (workflow-model/valid-workflow-definition? definition)
     (throw (ex-info "Invalid workflow definition"
@@ -293,8 +296,6 @@
      step-id
      [(ele/on-entry {}
                     (dispatch-action :step/enter step-id))
-      (ele/on-exit {}
-                   (dispatch-action :step/exit step-id))
       (ele/transition {:event :actor/done :target next-target}
                       (dispatch-action :step/record-result step-id))
       (ele/transition {:event :actor/failed
@@ -332,8 +333,6 @@
      step-id
      [(ele/on-entry {}
                     (dispatch-action :step/enter step-id))
-      (ele/on-exit {}
-                   (dispatch-action :step/exit step-id))
       (ele/transition {:event :actor/done :target (step-judging-state-id step-id)}
                       (dispatch-action :step/record-result step-id))
       (ele/transition {:event :actor/failed
@@ -348,8 +347,6 @@
      [(apply ele/state {:id (step-judging-state-id step-id)}
              (ele/on-entry {}
                            (dispatch-action :judge/enter step-id))
-             (ele/on-exit {}
-                          (dispatch-action :judge/exit step-id))
              (concat routing-transitions
                      [no-match-fail
                       (make-cancel-transition)]))])))
@@ -389,12 +386,12 @@
            ;; Terminal states
            (ele/state {:id :completed}
                       (ele/on-entry {}
-                                    (dispatch-action :terminal/enter "completed")))
+                                    (dispatch-action :terminal/record "completed")))
            (ele/state {:id :failed}
                       (ele/on-entry {}
-                                    (dispatch-action :terminal/enter "failed")))
+                                    (dispatch-action :terminal/record "failed")))
            (ele/state {:id :cancelled}
                       (ele/on-entry {}
-                                    (dispatch-action :terminal/enter "cancelled")))
+                                    (dispatch-action :terminal/record "cancelled")))
            ;; Step states
            step-states)))
