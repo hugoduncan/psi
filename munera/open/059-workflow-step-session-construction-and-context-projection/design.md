@@ -121,9 +121,11 @@ Illustrative shape:
 
 The session block is the high-level authoring surface. Prompt bindings are subordinate to it.
 
-### Phase 1 concrete syntax target
+### Child-task anchor examples
 
-The first implementation slice should still use `:session`, even if narrowly. Preferred starting shape:
+The umbrella keeps a few anchor examples so the child tasks share one intended authoring direction.
+
+Example shape for explicit current-input source selection (implemented by task `060`):
 
 ```clojure
 {:workflow "gh-bug-request-more-info"
@@ -143,7 +145,7 @@ Equivalent explicit workflow-input example:
  :prompt "$INPUT"}
 ```
 
-This gives Phase 1 a stable home for explicit source selection without committing the task to a prompt-binding-centric design.
+These examples are design anchors for the child tasks, not a claim that task 059 itself implements them directly.
 
 ### Session-shaping concerns
 
@@ -161,12 +163,12 @@ The implementation may land these incrementally rather than all at once, but the
 
 A reference-context source should target a closed, explicit set of workflow-visible data.
 
-Phase 1 supported source set should be:
+Child task `060` should support the first-cut source set:
 - `:workflow-input`
 - `:workflow-original`
 - `{:step "<step-name>" :kind :accepted-result}`
 
-Later phases may add:
+Later child tasks may add:
 - `{:step "<step-name>" :kind :session-transcript}`
 - narrowly justified workflow runtime metadata sources if a concrete need emerges
 
@@ -174,9 +176,9 @@ Preferred author-facing references use stable step names/workflow names from the
 
 ### Source-direction rule
 
-For the first implementation cut, explicit step references should target only earlier steps in definition order.
+For the first implementation cut, child task `060` should enforce that explicit step references target only earlier steps in definition order.
 
-Forward references should be rejected as load-time/compile-time errors. This avoids cyclic or speculative data-flow semantics and keeps Phase 1 deterministic.
+Forward references should be rejected as load-time/compile-time errors. This avoids cyclic or speculative data-flow semantics and keeps the first implementation slice deterministic.
 
 ### Projection surface
 
@@ -186,12 +188,12 @@ This task should include a projection model that is useful for both:
 
 The projection vocabulary should stay constrained.
 
-Phase 2 minimum vocabulary should be:
+Child task `061` should provide the minimum projection vocabulary:
 - `:text`
 - `:full`
 - `:path [...]`
 
-Later phases may add:
+Later child tasks may add:
 - transcript-tail projection like `{:type :tail :turns N}`
 - optional tool-output stripping for transcript projections
 
@@ -298,9 +300,9 @@ This task should unify and expose those more deliberately in workflow-file autho
 
 ### Transcript/message projection source of truth
 
-When transcript/message projection lands, it should read from one canonical step-session message source of truth rather than from ad hoc reconstructed values.
+When transcript/message projection lands, child task `063` should read from one canonical step-session message source of truth rather than from ad hoc reconstructed values.
 
-This task should settle and document that source explicitly during implementation. Current bias:
+That child task should settle and document the source explicitly. Current bias:
 - prefer the same canonical message/transcript source used elsewhere for workflow/session reconstruction and deterministic behavior
 - do not let different workflow paths project from different transcript representations implicitly
 

@@ -34,71 +34,18 @@ The implementation is now split into child tasks:
 - `063` — reference message/transcript projection
 - `064` — workflow authoring convergence and examples
 
-## Implementation phases
+## Child-task responsibilities
 
-### Phase 1 — Explicit source selection for step inputs
+Task `059` owns the overall design and the intended end-state authoring model.
 
-Goal: solve the immediate non-adjacent data-flow problem without waiting for the whole session model.
+Concrete implementation responsibilities are delegated as follows:
+- `060` — explicit source selection for current working input/reference channels
+- `061` — minimum projection vocabulary (`:text`, `:full`, `:path [...]`)
+- `062` — per-step session shaping overrides for system prompt / tools / skills / model / thinking
+- `063` — constrained reference/preloaded message or transcript projection plus canonical source-of-truth decision
+- `064` — examples, docs, validation clarity, and final authoring convergence
 
-Deliverables:
-- add a minimal `:session`-based authoring surface for explicit source selection on step input/reference channels
-- support the closed first-cut source set:
-  - `:workflow-input`
-  - `:workflow-original`
-  - `{:step "<step-name>" :kind :accepted-result}`
-- restrict step references to earlier steps in definition order
-- compile to canonical `:input-bindings`
-- preserve current defaults when absent
-- add compile/load validation and tests
-
-This phase is intentionally narrower than the whole task but aligned with the session-first design.
-
-### Phase 2 — Minimal projection vocabulary
-
-Goal: make source selection genuinely useful.
-
-Deliverables:
-- support constrained projections `:text`, `:full`, and `:path [...]`
-- keep the projection surface under the `:session`-first authoring model rather than introducing a temporary throwaway syntax
-- add validation for unsupported projection forms and malformed paths
-- add tests covering structured-field extraction and branch-safe non-adjacent source use
-
-### Phase 3 — Step-level session shaping
-
-Goal: expose already-existing session-construction concerns in workflow authoring.
-
-Deliverables:
-- step-level authoring for selected session-shaping metadata:
-  - system prompt
-  - tools
-  - skills
-  - thinking level
-  - model
-- route these through `workflow_step_prep.clj`
-- preserve delegated-workflow defaults when no override is supplied
-- add tests showing per-step override behavior
-
-### Phase 4 — Reference message/transcript projection
-
-Goal: allow steps to preload projected context into the child session, not just bind prompt variables.
-
-Deliverables:
-- define a constrained reference/preload authoring surface under `:session`
-- support at least one projected message/transcript form, likely reusing concepts from judge projection
-- support optional tool-output stripping and tail selection if feasible
-- settle one canonical source of truth for step-session message/transcript projection
-- feed this into child-session creation/preloading paths
-- add focused execution tests proving the preloaded context is visible to the step session
-
-### Phase 5 — Authoring convergence and examples
-
-Goal: make the final workflow authoring model coherent and proven.
-
-Deliverables:
-- update docs/examples
-- revisit `gh-bug-triage-modular` and related modular workflow candidates
-- decide whether a separate `:bind` convenience surface remains worth keeping or whether the `:session` model should own most author intent
-- add any final validation/error-shaping needed for clarity
+The umbrella should not duplicate the implementation checklists from those child tasks. It should instead ensure they continue to fit one coherent session-first authoring story.
 
 ## Likely implementation surfaces
 
@@ -143,11 +90,12 @@ Likely test areas:
 
 ## Verification plan
 
-For each phase:
-1. focused compiler/loader tests
-2. focused execution/runtime tests for the new behavior
-3. isolated workflow suite if applicable
-4. full unit suite at meaningful checkpoints
+The umbrella task should verify design coherence across child tasks, while each child task owns its direct implementation verification.
+
+Umbrella-level verification should include:
+1. checking that 060–064 preserve one compatible authoring model
+2. checking that default session-construction semantics remain consistent as slices land
+3. checking that docs/examples/convergence work in 064 still matches the lower-level implementation tasks
 
 ## Completion rule
 

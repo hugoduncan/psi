@@ -58,10 +58,10 @@ This preserves immediate value while keeping the architecture pointed at the rig
 - Which existing helpers or seams should own synthetic preloaded messages for workflow steps?
 - Whether a later explicit system-prompt replace mode is needed beyond the current composition default
 
-## Initial decisions now fixed by task design
+## Initial decisions now fixed by umbrella design
 
-- first implementation cut uses `:session` as the authoring surface
-- explicit step references target prior steps only
-- forward references are compile/load errors
-- first projection vocabulary is `:text`, `:full`, and `:path [...]`
+- child task `060` uses `:session` as the first implementation authoring surface
+- child task `060` restricts explicit step references to prior steps only
+- child task `060` rejects forward references as compile/load errors
+- child task `061` introduces the first projection vocabulary: `:text`, `:full`, and `:path [...]`
 - arbitrary named prompt variables are out of scope for the first cut
