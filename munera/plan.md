@@ -8,6 +8,8 @@ Queue:
 
 Backlog:
 
+`munera/open/059-workflow-step-session-construction-and-context-projection/`
+
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
