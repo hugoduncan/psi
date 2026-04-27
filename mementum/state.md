@@ -192,6 +192,18 @@ Bootstrapped on 2026-04-02.
 - Phase A (statechart-driven execution) remains as follow-on work
 - Task 056 can be closed once Phase B is accepted; Phase A would be a new task
 
+- Modular GitHub bug-triage workflow exploration has now landed in `.psi/workflows/`:
+  - added reusable workflow slices `gh-bug-discover-and-read`, `gh-issue-create-worktree`, `gh-bug-reproduce`, `gh-bug-request-more-info`, `gh-bug-fix-and-pr`, and `gh-bug-post-repro`
+  - added `gh-bug-triage-modular` as the orchestrator
+  - real loader verification showed the first non-linear cut compiled cleanly but had incorrect branch-target data flow because multi-step workflow-file compilation still wires later-step input from previous file-order step output
+  - safe workaround landed by making the orchestrator linear and moving the reproduction branch decision into `gh-bug-post-repro`
+  - this established that current `.psi/workflows` authoring is more expressive for control flow than for data/context flow
+- New munera task `059-workflow-step-session-construction-and-context-projection` is now open:
+  - initial narrow "explicit input bindings" framing was replaced with a session-first design
+  - task now targets explicit workflow-step child-session construction, reference-context projection, and step-level session shaping
+  - design now makes the default step-session construction explicit: delegated workflow/default profile shape, prompt composition, inherited tools/skills/model/thinking plus runtime extension/workflow environment, existing default data-flow bindings, and no extra reference preload unless explicitly requested
+  - implementation plan is intentionally incremental: explicit source selection -> minimal projections -> step-level session shaping -> reference message/transcript projection -> examples/docs convergence
+
 ## Suggested next step
 - Active munera tasks are now:
   1. `munera/open/047-tui-feature-parity-with-emacs-ui/` (parent umbrella for TUI parity)
