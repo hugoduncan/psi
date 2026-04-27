@@ -6,10 +6,24 @@
 (defn extension-command-output
   [cmd-result]
   (try
-    (let [out (with-out-str
-                ((:handler cmd-result) (:args cmd-result)))]
-      (when-not (str/blank? out)
-        out))
+    (let [result* (atom nil)
+          out     (with-out-str
+                    (reset! result* ((:handler cmd-result) (:args cmd-result))))
+          result  @result*]
+      (cond
+        (and (string? result) (not (str/blank? result)))
+        result
+
+        (and (map? result)
+             (string? (:message result))
+             (not (str/blank? (:message result))))
+        (:message result)
+
+        (not (str/blank? out))
+        out
+
+        :else
+        nil))
     (catch Throwable e
       (str "[extension command error: " (ex-message e) "]"))))
 

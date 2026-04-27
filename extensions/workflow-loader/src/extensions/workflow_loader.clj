@@ -33,7 +33,15 @@
 (defn- query-fn [] (:query-fn @state))
 (defn- mutate! [sym params] ((:mutate-fn @state) sym params))
 (defn- log! [msg] ((:log-fn @state) msg))
-(defn- notify! [msg level] ((:notify-fn @state) msg level))
+(defn- notify!
+  [msg level]
+  (let [notify-fn (:notify-fn @state)]
+    (try
+      (notify-fn msg {:role "assistant"
+                      :custom-type "workflow-loader"
+                      :level level})
+      (catch clojure.lang.ArityException _
+        (notify-fn msg level)))))
 (defn- ui-notify! [msg level]
   (if-let [notify-fn (some-> @state :ui :notify)]
     (notify-fn msg level)
@@ -390,6 +398,7 @@
          :mutate-session-fn (:mutate-session api)
          :log-fn (or (:log api) println)
          :notify-fn (or (:notify api) (fn [m _] (println m)))
+         :append-message-fn (:append-message api)
          :ui (:ui api)
          :register-prompt-contribution
          (when-let [rpc (:register-prompt-contribution api)]
@@ -442,23 +451,23 @@
                                        (let [{:keys [workflow prompt]} (text/parse-delegate-command args)]
                                          (cond
                                            (nil? workflow)
-                                           (log! (str "Available workflows:\n"
-                                                      (text/available-workflows-text
-                                                       (:loaded-definitions @state))))
+                                           (str "Available workflows:\n"
+                                                (text/available-workflows-text
+                                                 (:loaded-definitions @state)))
 
                                            (= "list" workflow)
-                                           (log! (delegate-list))
+                                           (delegate-list)
 
                                            (nil? prompt)
-                                           (log! (str "Usage: /delegate " workflow " <prompt>"))
+                                           (str "Usage: /delegate " workflow " <prompt>")
 
                                            :else
                                            (let [result (delegate-run {:workflow workflow
                                                                        :prompt prompt
                                                                        :mode "async"})]
                                              (if (:error result)
-                                               (log! (str "Error: " (:error result)))
-                                               (log! (str "Delegated to " workflow " — run " (:run-id result))))))))})
+                                               (str "Error: " (:error result))
+                                               (str "Delegated to " workflow " — run " (:run-id result)))))))})
 
   ;; Register /delegate-reload command
   ((:register-command api) "delegate-reload"
@@ -474,4 +483,5 @@
   ;; Session lifecycle cleanup
   ((:on api) "session_switch"
              (fn [_event]
-               (reload-definitions!))))
+               (reload-definitions!)
+               nil)))

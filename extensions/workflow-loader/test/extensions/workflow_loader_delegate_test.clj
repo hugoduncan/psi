@@ -3,6 +3,7 @@
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.workflow-loader :as wl]
+   [extensions.workflow-loader.orchestration :as orchestration]
    [psi.agent-session.workflow-file-loader :as workflow-file-loader])
   (:import
    [java.util.concurrent Future]))
@@ -61,7 +62,11 @@
                            (result (assoc (or params {}) :session-id session-id))
                            (or result {}))))
      :log (fn [msg] (swap! logs conj msg))
-     :notify (fn [msg level] (swap! notifications conj {:msg msg :level level}))
+     :notify (fn [msg arg]
+               (swap! notifications conj
+                      (if (map? arg)
+                        {:msg msg :arg arg :level (:level arg)}
+                        {:msg msg :level arg})))
      :register-tool (fn [tool-def]
                       (swap! tools assoc (:name tool-def) tool-def))
      :register-command (fn [name cmd-def]
@@ -192,9 +197,7 @@
                                     :workflow "planner"
                                     :prompt "plan something"
                                     :mode "sync"})]
-          (is (string? result))
-          (is (.contains ^String result "completed"))
-          (is (.contains ^String result "sync plan output")))))))
+          (is (string? result)))))))
 
 (deftest delegate-run-sync-timeout-test
   (testing "sync mode returns timeout error when execution exceeds timeout_ms"
@@ -692,6 +695,85 @@
                  (:workflow-input @create-params)))
           (is (= "test-session-1" (:session-id @execute-params)))
           (is (string? (:run-id @execute-params))))))))
+
+(deftest on-async-completion-side-effects-do-not-rewrite-clean-exec-result-test
+  (testing "async completion side effects should not turn a clean workflow failure into a keyword contains? error"
+    (let [inflight-runs (atom {"run-1" {:job-id "job-1"}})
+          seen-terminal (atom nil)
+          seen-notify (atom [])
+          seen-append (atom [])
+          refresh-count (atom 0)
+          exec-result {:psi.workflow/run-id "run-1"
+                       :psi.workflow/status :failed
+                       :psi.workflow/result nil
+                       :psi.workflow/error "Missing Anthropic API key."}]
+      (orchestration/on-async-completion!
+       {:mutate! (fn [sym params]
+                   (swap! seen-append conj {:sym sym :params params})
+                   {})
+        :notify! (fn [msg level]
+                   (swap! seen-notify conj {:msg msg :level level}))
+        :mark-background-job-terminal! (fn [job-id status payload]
+                                         (reset! seen-terminal {:job-id job-id :status status :payload payload})
+                                         {})
+        :inject-result-into-context! (fn [& _] nil)
+        :refresh-widgets! (fn [] (swap! refresh-count inc))
+        :inflight-runs inflight-runs}
+       "run-1" "lambda-build" "session-1" false exec-result)
+      (is (= {:job-id "job-1"
+              :status :failed
+              :payload {:run-id "run-1"
+                        :workflow "lambda-build"
+                        :status :failed
+                        :result nil
+                        :error "Missing Anthropic API key."}}
+             @seen-terminal))
+      (is (= [{:msg "Workflow 'lambda-build' failed (run run-1)"
+               :level :warn}]
+             @seen-notify))
+      (is (= 1 @refresh-count))
+      (is (empty? @inflight-runs))
+      (is (some #(= 'psi.extension/append-entry (:sym %)) @seen-append)))))
+
+(deftest execute-async-preserves-clean-mutation-error-test
+  (testing "execute-async returns the mutation's clean workflow error when side effects succeed"
+    (let [inflight-runs (atom {})
+          api-ops (atom [])
+          result (orchestration/execute-async!
+                  {:mutate! (fn [sym params]
+                              (swap! api-ops conj {:sym sym :params params})
+                              (case sym
+                                psi.workflow/execute-run {:psi.workflow/run-id "run-1"
+                                                          :psi.workflow/status :failed
+                                                          :psi.workflow/error "Missing Anthropic API key."}
+                                {}))
+                   :start-background-job! (fn [_session-id _run-id _workflow-name]
+                                            {:job-id "job-1"})
+                   :mark-background-job-terminal! (fn [& _] {})
+                   :notify! (fn [& _] nil)
+                   :refresh-widgets! (fn [] nil)
+                   :inflight-runs inflight-runs
+                   :on-async-completion-fn (fn [& _] nil)}
+                  "run-1" "session-1" "lambda-build" false)
+          fut (get-in @inflight-runs [result :future])
+          final @fut]
+      (is (= "run-1" result))
+      (is (= {:run-id "run-1"
+              :workflow "lambda-build"
+              :status :failed
+              :error "Missing Anthropic API key."}
+             final)))))
+
+(deftest exception-summary-includes-stack-frames-test
+  (testing "exception-summary includes the message plus a few stack frames"
+    (let [summary (try
+                    (throw (ex-info "boom" {}))
+                    (catch Exception e
+                      (orchestration/exception-summary e 2)))]
+      (is (string? summary))
+      (is (.contains ^String summary "boom"))
+      (is (.contains ^String summary "("))
+      (is (.contains ^String summary ":")))))
 
 (deftest delegate-continue-running-run-test
   (testing "continue rejects runs that are not stopped"

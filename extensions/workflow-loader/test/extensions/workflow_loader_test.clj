@@ -255,11 +255,10 @@
                        :errors []
                        :warnings []})]
         (wl/init api)
-        ((:handler (get @commands "delegate")) "list")
-        (let [log-lines @logs]
-          (is (= 1 (count log-lines)))
-          (is (.contains ^String (first log-lines) "Available workflows:"))
-          (is (.contains ^String (first log-lines) "explore")))))))
+        (let [result ((:handler (get @commands "delegate")) "list")]
+          (is (.contains ^String result "Available workflows:"))
+          (is (.contains ^String result "explore"))
+          (is (= [] @logs)))))))
 
 (deftest reload-preserves-extension-state-atom-test
   (testing "namespace reload preserves workflow-loader state so registered command handlers keep working"
@@ -294,3 +293,20 @@
         (is (= ["complexity-reduction-pr"]
                (sort (keys (:loaded-definitions @@#'wl/state)))))
         (is (= 2 (count (filter #(= 'psi.workflow/register-definition (:sym %)) @mutate-calls))))))))
+
+(deftest session-switch-handler-returns-nil-test
+  (testing "workflow-loader session_switch handler returns nil (safe for extension dispatch)"
+    (let [{:keys [api]} (make-loader-api
+                         {'psi.workflow/register-definition (fn [_] {:psi.workflow/registered? true})})]
+      (with-redefs [loader/load-workflow-definitions
+                    (fn [_]
+                      {:definitions {}
+                       :errors []
+                       :warnings []})]
+        (let [handlers (atom {})
+              api* (assoc api :on (fn [event-name handler]
+                                    (swap! handlers update event-name (fnil conj []) {:handler handler})
+                                    nil))]
+          (wl/init api*)
+          (let [handler (-> @handlers (get "session_switch") first :handler)]
+            (is (nil? (handler {:reason :new})))))))))

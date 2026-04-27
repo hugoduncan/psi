@@ -459,8 +459,20 @@ Available: " (str/join ", " (map name (keys all))))
     (do
       (try
         (when-let [handler (:handler result)]
-          (let [captured (with-out-str (handler (:args result)))]
-            (when-not (str/blank? captured)
+          (let [result*  (atom nil)
+                captured (with-out-str
+                           (reset! result* (handler (:args result))))
+                returned @result*]
+            (cond
+              (and (string? returned) (not (str/blank? returned)))
+              (output/print-command-message! returned)
+
+              (and (map? returned)
+                   (string? (:message returned))
+                   (not (str/blank? (:message returned))))
+              (output/print-command-message! (:message returned))
+
+              (not (str/blank? captured))
               (output/print-command-message! (str/trimr captured)))))
         (catch Exception e
           (println (str "\n[Command error: " (ex-message e) "]\n"))))

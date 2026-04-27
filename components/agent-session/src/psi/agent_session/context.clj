@@ -112,6 +112,10 @@
                       (cond-> {:session-id parent-session-id
                                :child-session-id child-session-id
                                :session-name session-name
+                               :worktree-path (or (some-> parent-session-id (ss/get-session-data-in ctx) :worktree-path)
+                                                  (some-> (ss/list-context-sessions-in ctx) first :worktree-path)
+                                                  (:worktree-path (:session-defaults ctx))
+                                                  (:cwd ctx))
                                :system-prompt system-prompt
                                :tool-defs tool-defs
                                :thinking-level thinking-level}

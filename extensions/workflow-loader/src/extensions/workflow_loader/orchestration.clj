@@ -1,5 +1,6 @@
 (ns extensions.workflow-loader.orchestration
   (:require
+   [clojure.string :as str]
    [extensions.workflow-loader.text :as text])
   (:import
    (java.util UUID)
@@ -44,6 +45,35 @@
   [prompt-text]
   {:input prompt-text
    :original prompt-text})
+
+(defn- uninteresting-stack-frame?
+  [^StackTraceElement ste]
+  (let [cn (.getClassName ste)]
+    (or (str/starts-with? cn "clojure.lang.")
+        (str/starts-with? cn "clojure.core$")
+        (str/starts-with? cn "java.")
+        (str/starts-with? cn "javax.")
+        (str/starts-with? cn "jdk.")
+        (str/starts-with? cn "sun."))))
+
+(defn exception-summary
+  ([e] (exception-summary e 4))
+  ([e n]
+   (let [msg (or (ex-message e) (.getMessage e) (str e))
+         stack (.getStackTrace e)
+         preferred (->> stack
+                        (remove uninteresting-stack-frame?)
+                        (take n))
+         chosen (if (seq preferred)
+                  preferred
+                  (take n stack))
+         frames (map (fn [^StackTraceElement ste]
+                       (str (.getClassName ste) "/" (.getMethodName ste)
+                            " (" (.getFileName ste) ":" (.getLineNumber ste) ")"))
+                     chosen)]
+     (if (seq frames)
+       (str msg " | " (str/join " <= " frames))
+       msg))))
 
 (defn on-async-completion!
   "Handle async workflow completion — notify, inject results, update canonical job state, and clean up waits."
@@ -97,7 +127,15 @@
                                            {:run-id run-id
                                             :session-id session-id})]
                   (on-async-completion-fn run-id workflow-name parent-session-id include-result? exec-result)
-                  exec-result)
+                  (if (:psi.workflow/error exec-result)
+                    {:run-id run-id
+                     :workflow workflow-name
+                     :status :failed
+                     :error (:psi.workflow/error exec-result)}
+                    {:run-id run-id
+                     :workflow workflow-name
+                     :status (:psi.workflow/status exec-result)
+                     :result (:psi.workflow/result exec-result)}))
                 (catch Exception e
                   (when job-id
                     (try
@@ -107,13 +145,13 @@
                        {:run-id run-id
                         :workflow workflow-name
                         :status :failed
-                        :error (ex-message e)})
+                        :error (exception-summary e)})
                       (catch Exception _ nil)))
-                  (notify! (str "Workflow '" workflow-name "' failed: " (ex-message e)) :error)
+                  (notify! (str "Workflow '" workflow-name "' failed: " (exception-summary e)) :error)
                   (swap! inflight-runs dissoc run-id)
                   (refresh-widgets!)
                   {:psi.workflow/status :failed
-                   :psi.workflow/error (ex-message e)})))]
+                   :psi.workflow/error (exception-summary e)})))]
     (swap! inflight-runs assoc run-id
            {:future fut
             :job-id job-id})
@@ -158,7 +196,15 @@
                                        :workflow-input (continue-workflow-input prompt-text)})]
                   (when-not (:psi.workflow/error result)
                     (on-async-completion-fn run-id workflow-name parent-session-id include? result))
-                  result)
+                  (if (:psi.workflow/error result)
+                    {:run-id run-id
+                     :workflow workflow-name
+                     :status :failed
+                     :error (:psi.workflow/error result)}
+                    {:run-id run-id
+                     :workflow workflow-name
+                     :status (:psi.workflow/status result)
+                     :result (:psi.workflow/result result)}))
                 (catch Exception e
                   (when job-id
                     (try
@@ -168,13 +214,13 @@
                        {:run-id run-id
                         :workflow workflow-name
                         :status :failed
-                        :error (ex-message e)})
+                        :error (exception-summary e)})
                       (catch Exception _ nil)))
-                  (notify! (str "Resume of run '" run-id "' failed: " (ex-message e)) :error)
+                  (notify! (str "Resume of run '" run-id "' failed: " (exception-summary e)) :error)
                   (swap! inflight-runs dissoc run-id)
                   (refresh-widgets!)
                   {:psi.workflow/status :failed
-                   :psi.workflow/error (ex-message e)})))]
+                   :psi.workflow/error (exception-summary e)})))]
     (swap! inflight-runs assoc run-id
            {:future fut
             :job-id job-id})

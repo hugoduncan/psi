@@ -4,6 +4,18 @@
    [psi.rpc.session.command-results :as sut]))
 
 (deftest extension-command-output-test
+  (testing "string return is preferred when present"
+    (let [result (sut/extension-command-output
+                  {:handler (fn [_] "returned text")
+                   :args ""})]
+      (is (= "returned text" result))))
+
+  (testing "map return message is used when present"
+    (let [result (sut/extension-command-output
+                  {:handler (fn [_] {:message "message text"})
+                   :args ""})]
+      (is (= "message text" result))))
+
   (testing "stdout is returned when present"
     (let [result (sut/extension-command-output
                   {:handler (fn [_] (println "hello"))
@@ -23,7 +35,7 @@
       (is (= "[extension command error: boom]" result)))))
 
 (deftest handle-command-result-extension-command-test
-  (testing "extension command with no stdout emits no command-result placeholder"
+  (testing "extension command with no stdout or return emits no command-result placeholder"
     (let [events (atom [])
           emit!  (fn [event data]
                    (swap! events conj [event data]))]
@@ -35,6 +47,22 @@
         :handler (fn [_] nil)}
        emit!)
       (is (= [] @events))))
+
+  (testing "extension command with string return emits text command-result"
+    (let [events (atom [])
+          emit!  (fn [event data]
+                   (swap! events conj [event data]))]
+      (sut/handle-command-result!
+       "req-1"
+       {:type :extension-cmd
+        :name "delegate"
+        :args ""
+        :handler (fn [_] "Delegated to lambda-build — run run-1")}
+       emit!)
+      (is (= [["command-result"
+               {:type "text"
+                :message "Delegated to lambda-build — run run-1"}]]
+             @events))))
 
   (testing "extension command with stdout emits text command-result"
     (let [events (atom [])

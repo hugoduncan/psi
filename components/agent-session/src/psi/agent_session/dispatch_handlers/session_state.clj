@@ -202,7 +202,9 @@
                          :tool-defs                 tool-defs
                          :skills                    skills
                          :system-prompt-build-opts  system-prompt-build-opts
-                         :cache-breakpoints         (or cache-breakpoints (:cache-breakpoints parent-sd))
+                         :cache-breakpoints         (or cache-breakpoints
+                                                        (:cache-breakpoints parent-sd)
+                                                        (:cache-breakpoints (session-data-ns/initial-session)))
                          :prompt-component-selection prompt-component-selection
                          :prompt-contributions      (vec (or (:prompt-contributions parent-sd) []))
                          :model                     (or model (:model parent-sd))
