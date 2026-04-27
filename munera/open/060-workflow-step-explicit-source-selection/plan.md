@@ -2,8 +2,12 @@
 
 Implement the narrowest useful slice first.
 
-1. Define the first-cut `:session` source-selection syntax.
-2. Extend `workflow_file_compiler.clj` to compile that syntax to canonical `:input-bindings`.
-3. Validate source forms and prior-step-only references.
-4. Add compiler/loader tests proving branch-safe non-adjacent data flow.
-5. Keep all existing workflow files working unchanged when the new syntax is absent.
+1. Define the first-cut `:session` source-selection syntax for `:input` and `:reference`.
+2. Define the task-local default source meanings clearly:
+   - workflow input -> canonical `[:input]`
+   - workflow original -> canonical `[:original]`
+   - selected prior-step accepted result -> current accepted-result text path by default
+3. Extend `workflow_file_compiler.clj` to compile that syntax to canonical `:input-bindings`.
+4. Validate malformed source forms, unknown step names, and forward references by definition order.
+5. Add compiler/loader tests proving branch-safe non-adjacent data flow and partial-override behavior.
+6. Keep all existing workflow files working unchanged when the new syntax is absent.
