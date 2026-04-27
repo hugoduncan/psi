@@ -198,11 +198,16 @@ Bootstrapped on 2026-04-02.
   - real loader verification showed the first non-linear cut compiled cleanly but had incorrect branch-target data flow because multi-step workflow-file compilation still wires later-step input from previous file-order step output
   - safe workaround landed by making the orchestrator linear and moving the reproduction branch decision into `gh-bug-post-repro`
   - this established that current `.psi/workflows` authoring is more expressive for control flow than for data/context flow
-- New munera task `059-workflow-step-session-construction-and-context-projection` is now open:
-  - initial narrow "explicit input bindings" framing was replaced with a session-first design
-  - task now targets explicit workflow-step child-session construction, reference-context projection, and step-level session shaping
-  - design now makes the default step-session construction explicit: delegated workflow/default profile shape, prompt composition, inherited tools/skills/model/thinking plus runtime extension/workflow environment, existing default data-flow bindings, and no extra reference preload unless explicitly requested
-  - implementation plan is intentionally incremental: explicit source selection -> minimal projections -> step-level session shaping -> reference message/transcript projection -> examples/docs convergence
+- New workflow-authoring initiative is now organized as an umbrella plus child tasks:
+  - `059-workflow-step-session-construction-and-context-projection` is now the umbrella/orchestration task for the session-first workflow authoring model
+  - its design settled several key early decisions: use `:session` as the primary authoring surface from the first cut, restrict first-cut step references to prior steps only, keep first-cut projections to `:text`/`:full`/`:path [...]`, treat prompt bindings as convenience rather than the primary abstraction, and make default step-session construction/override semantics explicit
+  - implementation is now split into:
+    - `060` explicit source selection
+    - `061` minimal projections
+    - `062` step-level session shaping overrides
+    - `063` reference message/transcript projection
+    - `064` workflow authoring convergence and examples
+  - default step-session construction is now explicitly documented as: delegated workflow/default profile shape, prompt composition, inherited tools/skills/model/thinking plus runtime extension/workflow environment, existing default data-flow bindings, and no extra reference preload unless explicitly requested
 
 ## Suggested next step
 - Active munera tasks are now:

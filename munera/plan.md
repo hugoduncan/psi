@@ -9,6 +9,11 @@ Queue:
 Backlog:
 
 `munera/open/059-workflow-step-session-construction-and-context-projection/`
+`munera/open/060-workflow-step-explicit-source-selection/`
+`munera/open/061-workflow-step-minimal-projections/`
+`munera/open/062-workflow-step-session-shaping-overrides/`
+`munera/open/063-workflow-step-reference-message-projection/`
+`munera/open/064-workflow-authoring-convergence-and-examples/`
 
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`

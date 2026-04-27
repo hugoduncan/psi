@@ -25,6 +25,15 @@ Target end-state for a multi-step workflow step:
 
 The compiler should resolve author-facing names to canonical step ids and runtime-consumable structures.
 
+## Child tasks
+
+The implementation is now split into child tasks:
+- `060` — explicit source selection
+- `061` — minimal projections
+- `062` — step-level session shaping overrides
+- `063` — reference message/transcript projection
+- `064` — workflow authoring convergence and examples
+
 ## Implementation phases
 
 ### Phase 1 — Explicit source selection for step inputs
@@ -32,8 +41,12 @@ The compiler should resolve author-facing names to canonical step ids and runtim
 Goal: solve the immediate non-adjacent data-flow problem without waiting for the whole session model.
 
 Deliverables:
-- add a minimal authoring surface for explicit source selection on step input/reference channels
-- support workflow input, workflow original, and named prior step accepted result sources
+- add a minimal `:session`-based authoring surface for explicit source selection on step input/reference channels
+- support the closed first-cut source set:
+  - `:workflow-input`
+  - `:workflow-original`
+  - `{:step "<step-name>" :kind :accepted-result}`
+- restrict step references to earlier steps in definition order
 - compile to canonical `:input-bindings`
 - preserve current defaults when absent
 - add compile/load validation and tests
@@ -45,8 +58,8 @@ This phase is intentionally narrower than the whole task but aligned with the se
 Goal: make source selection genuinely useful.
 
 Deliverables:
-- support constrained projections such as `:text`, `:full`, and `:path [...]`
-- settle whether source-selection and projections live in a temporary `:bind` surface or an initial `:session` subform that can grow forward cleanly
+- support constrained projections `:text`, `:full`, and `:path [...]`
+- keep the projection surface under the `:session`-first authoring model rather than introducing a temporary throwaway syntax
 - add validation for unsupported projection forms and malformed paths
 - add tests covering structured-field extraction and branch-safe non-adjacent source use
 
@@ -73,6 +86,7 @@ Deliverables:
 - define a constrained reference/preload authoring surface under `:session`
 - support at least one projected message/transcript form, likely reusing concepts from judge projection
 - support optional tool-output stripping and tail selection if feasible
+- settle one canonical source of truth for step-session message/transcript projection
 - feed this into child-session creation/preloading paths
 - add focused execution tests proving the preloaded context is visible to the step session
 
@@ -100,23 +114,32 @@ Likely test areas:
 - workflow execution/runtime tests
 - modular workflow examples where useful
 
-## Key design decisions to settle early
+## Key design decisions settled for initial implementation
 
 1. **Authoring syntax shape**
-   - whether to begin with a small `:bind` surface and later nest it under `:session`, or define `:session` immediately and let `:bind` remain optional convenience
+   - begin with `:session` immediately
+   - do not begin with a throwaway prompt-binding-only syntax
+   - `:bind` may remain a later convenience surface, but is not the primary first-cut design
 
 2. **Reference naming**
    - use author-facing workflow-step names in files, compile to canonical step ids internally
 
 3. **Allowed source directions**
-   - whether explicit references may target only prior steps in definition order, or any named step with additional runtime safeguards
-   - current bias: prior-step-only unless a stronger case emerges
+   - explicit step references target only prior steps in definition order in the first implementation cut
+   - forward references are compile/load errors
 
 4. **Projection vocabulary**
-   - keep it small and declarative
+   - first-cut vocabulary is `:text`, `:full`, and `:path [...]`
+   - richer transcript-tail/tool-filter projection is later-phase work
 
 5. **Prompt-binding role**
-   - explicitly document that prompt bindings are convenience channels, not the primary abstraction
+   - prompt bindings are convenience channels, not the primary abstraction
+   - arbitrary named prompt variables are out of scope for the first implementation cut
+
+6. **Override semantics**
+   - step-specified tools/skills/model/thinking replace delegated/default values
+   - system prompt follows current composition rules unless a later explicit replace mode is introduced
+   - runtime extension/workflow environment remains inherited by default
 
 ## Verification plan
 

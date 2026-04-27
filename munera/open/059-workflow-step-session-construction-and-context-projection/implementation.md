@@ -40,19 +40,28 @@ The goal is not to replace the canonical runtime but to expose and shape it more
 
 ## Early implementation recommendation
 
-Even though the task is large, start with the smallest slice that fixes the concrete data-flow problem:
-- explicit source selection for current working input/reference channels
-- compile to canonical input bindings
-- validate clearly
+The work is now split into child tasks so the umbrella can stay focused on coherence rather than direct implementation.
 
-Then grow upward into the broader session-shaping model.
+Recommended execution order:
+- `060` explicit source selection for current working input/reference channels
+- `061` minimal projections
+- `062` step-level session shaping overrides
+- `063` reference message/transcript projection
+- `064` convergence/examples
 
-This gives immediate value while keeping the architecture pointed at the right abstraction.
+This preserves immediate value while keeping the architecture pointed at the right abstraction.
 
-## Open questions to settle during implementation
+## Remaining open questions during implementation
 
-- What exact first-phase authoring form is the cleanest on the path toward a full `:session` block?
-- Should workflow-file references be restricted to prior steps only in the first cut?
-- What canonical representation should message/transcript preload projections compile to?
+- What exact canonical representation should message/transcript preload projections compile to?
 - How should prompt-binding convenience relate to richer session preloading once both exist?
 - Which existing helpers or seams should own synthetic preloaded messages for workflow steps?
+- Whether a later explicit system-prompt replace mode is needed beyond the current composition default
+
+## Initial decisions now fixed by task design
+
+- first implementation cut uses `:session` as the authoring surface
+- explicit step references target prior steps only
+- forward references are compile/load errors
+- first projection vocabulary is `:text`, `:full`, and `:path [...]`
+- arbitrary named prompt variables are out of scope for the first cut

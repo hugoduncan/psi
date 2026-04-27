@@ -2,6 +2,8 @@
 
 ## Goal
 
+Act as the umbrella/orchestration task for the workflow session-first authoring initiative.
+
 Raise workflow-step authoring from narrow prompt-input wiring to explicit child-session construction.
 
 A workflow author should be able to declare, per step:
@@ -58,15 +60,19 @@ This separates:
 ## Scope
 
 In scope:
-- add step-level workflow-file authoring for child-session construction/shaping
-- add step-level authoring for reference-context projection/preloading
-- support explicit source selection independent of file-order adjacency
-- retain backward compatibility for existing workflow files that do not use the new surface
-- compile new authoring syntax into canonical runtime/session-preparation semantics
-- validate source references and projection specs clearly at load time where possible
-- add tests covering linear and branched workflows with explicit context projection
-- update workflow docs/examples, including modular GitHub workflow examples
-- define an incremental implementation plan so the large scope can land safely in slices
+- define the umbrella design and boundaries for the session-first workflow authoring initiative
+- split implementation into concrete child tasks
+- keep the cross-task design consistent as the slices land
+- retain backward compatibility requirements across all child tasks
+- track the end-state authoring model, defaults, and constraints
+- update umbrella guidance as design decisions sharpen
+
+The concrete implementation work is expected to land through child tasks:
+- `060` explicit source selection
+- `061` minimal projections
+- `062` step-level session shaping overrides
+- `063` reference message/transcript projection
+- `064` authoring convergence and examples
 
 Out of scope:
 - replacing the canonical workflow runtime/statechart model
@@ -95,7 +101,9 @@ Examples that should become straightforward and unsurprising:
 
 ## Proposed authoring model
 
-Each step may gain an optional session-shaping block, tentatively named `:session`.
+Each step may gain an optional session-shaping block named `:session`.
+
+This task should treat `:session` as the primary authoring surface from the first implementation slice onward. A separate `:bind` surface may still exist as a convenience later, but the task should not begin with a throwaway prompt-binding-only syntax that has to be replaced immediately.
 
 Illustrative shape:
 
@@ -113,6 +121,30 @@ Illustrative shape:
 
 The session block is the high-level authoring surface. Prompt bindings are subordinate to it.
 
+### Phase 1 concrete syntax target
+
+The first implementation slice should still use `:session`, even if narrowly. Preferred starting shape:
+
+```clojure
+{:workflow "gh-bug-request-more-info"
+ :session {:input {:from {:step "gh-bug-reproduce"
+                          :kind :accepted-result}
+                   :project :text}
+           :reference {:from :workflow-original}}
+ :prompt "$INPUT"}
+```
+
+Equivalent explicit workflow-input example:
+
+```clojure
+{:workflow "reporter"
+ :session {:input {:from :workflow-input}
+           :reference {:from :workflow-original}}
+ :prompt "$INPUT"}
+```
+
+This gives Phase 1 a stable home for explicit source selection without committing the task to a prompt-binding-centric design.
+
 ### Session-shaping concerns
 
 At minimum, the design should account for step-level control of:
@@ -127,14 +159,24 @@ The implementation may land these incrementally rather than all at once, but the
 
 ### Reference context sources
 
-A reference-context source should be able to target explicit workflow-visible data such as:
-- workflow input
-- workflow original request/context
-- accepted result of a named prior step
-- projected transcript/messages of a named prior step session
-- possibly workflow runtime metadata when clearly justified
+A reference-context source should target a closed, explicit set of workflow-visible data.
+
+Phase 1 supported source set should be:
+- `:workflow-input`
+- `:workflow-original`
+- `{:step "<step-name>" :kind :accepted-result}`
+
+Later phases may add:
+- `{:step "<step-name>" :kind :session-transcript}`
+- narrowly justified workflow runtime metadata sources if a concrete need emerges
 
 Preferred author-facing references use stable step names/workflow names from the file, not compiled step ids.
+
+### Source-direction rule
+
+For the first implementation cut, explicit step references should target only earlier steps in definition order.
+
+Forward references should be rejected as load-time/compile-time errors. This avoids cyclic or speculative data-flow semantics and keeps Phase 1 deterministic.
 
 ### Projection surface
 
@@ -142,10 +184,14 @@ This task should include a projection model that is useful for both:
 - prompt/input extraction
 - preloaded/reference conversation shaping
 
-The projection vocabulary should stay constrained. Likely supported forms, potentially in staged delivery:
+The projection vocabulary should stay constrained.
+
+Phase 2 minimum vocabulary should be:
 - `:text`
 - `:full`
 - `:path [...]`
+
+Later phases may add:
 - transcript-tail projection like `{:type :tail :turns N}`
 - optional tool-output stripping for transcript projections
 
@@ -159,6 +205,13 @@ Near-term expectation:
 - keep built-in prompt channels such as current working input and original/reference context
 - allow them to be derived from explicit sources/projections
 - do not center the whole design around `$INPUT`/`$ORIGINAL`
+- do not introduce arbitrary named prompt variables in the first implementation cut
+
+Prompt bindings and preloaded context should have distinct roles:
+- session/reference projection shapes what context is present in the child session
+- prompt bindings shape only prompt-template interpolation
+- a step may use one, the other, or both
+- prompt bindings do not implicitly preload context, and preloaded context does not implicitly populate prompt bindings unless the authoring model says so explicitly
 
 This may mean a step eventually has both:
 - `:session` for session construction
@@ -189,6 +242,13 @@ If a step has no explicit `:session` block, the default construction should be u
      - thinking level
      - extensions available in the runtime/session environment
      - workflow definitions available in the runtime/session environment
+   - inheritance/override semantics should be explicit in the implementation:
+     - `:system-prompt` => compose using current default rules unless the new authoring surface explicitly introduces replace semantics
+     - `:tools` => replace delegated/default tool selection when explicitly specified by the step
+     - `:skills` => replace delegated/default skill selection when explicitly specified by the step
+     - `:model` => replace when explicitly specified by the step
+     - `:thinking-level` => replace when explicitly specified by the step
+     - extensions/workflow environment => inherited from the runtime/session environment by default; not replaced by ordinary step-level shaping
    - parent-session or runtime fallbacks should remain in force where they exist today unless a step explicitly overrides them
 
 4. **Use the current default data-flow bindings when no explicit source/projection is supplied**
@@ -235,6 +295,14 @@ This task should unify and expose those more deliberately in workflow-file autho
 - [ ] Branched workflow examples can express correct context/data flow directly
 - [ ] Workflow compiler/loader/runtime tests cover backward compatibility plus new session/context-projection behavior
 - [ ] Workflow docs/examples are updated to explain the new authoring model clearly
+
+### Transcript/message projection source of truth
+
+When transcript/message projection lands, it should read from one canonical step-session message source of truth rather than from ad hoc reconstructed values.
+
+This task should settle and document that source explicitly during implementation. Current bias:
+- prefer the same canonical message/transcript source used elsewhere for workflow/session reconstruction and deterministic behavior
+- do not let different workflow paths project from different transcript representations implicitly
 
 ## Risks and traps to avoid
 
