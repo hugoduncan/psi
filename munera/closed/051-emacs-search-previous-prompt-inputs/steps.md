@@ -1,5 +1,17 @@
 # Steps: Emacs search previous prompt inputs
 
+## Follow-on (post-review)
+
+- [ ] Switch `completing-read` → `psi-emacs--ordered-completing-read` to
+      preserve recency order with all completion UIs
+- [ ] Add comment on `(not (string-empty-p chosen))` guard explaining it
+      defends against frameworks returning `""` on cancel despite REQUIRE-MATCH
+- [ ] Update design AC4 to accurately describe actual stash/M-n semantics:
+      M-n immediately after search-selection errors (index is nil); M-n only
+      recovers a draft after M-p has been pressed at least once
+
+
+
 - [ ] Add `psi-emacs-search-input-history` to `psi-compose.el`
   - guard: `psi-emacs--state` present, history non-empty
   - `completing-read` over `psi-emacs-state-input-history` as-is (no dedup)
