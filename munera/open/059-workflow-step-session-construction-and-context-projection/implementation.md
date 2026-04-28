@@ -82,3 +82,13 @@ Terse review after `060`–`064`:
 - replaced the old unnamed-step compatibility test with a failure test proving missing multi-step step names are rejected clearly
 - reran focused workflow authoring/compiler/loader/migration verification after the enforcement change (`22 tests, 183 assertions, 0 failures`)
 - reran full unit verification after the spec-completion change (`1456 tests, 10806 assertions, 0 failures`)
+
+## Code-shaper review note
+
+Terse code-shaper review after `059`–`064`:
+- the implementation is now well-shaped as a coherent session-first workflow authoring subsystem rather than a series of workflow-file patches
+- the strongest design choice is compiling author-facing `:session` syntax into canonical runtime-facing forms (`:input-bindings`, `:session-overrides`, `:session-preload`) while keeping runtime materialization in `workflow_step_prep.clj`
+- separation of concerns is good: source/projection/overrides, preload, routing, compilation, and runtime prep each have a clearer owner
+- the spec is now singular: multi-step authoring, source references, preload references, and named routing all converge on explicit step `:name`
+- main remaining shaping caution: do not let `workflow_file_compiler.clj` become the next oversized policy hub; if this surface grows further, consider extracting more multi-step assembly/validation helpers
+- smaller shaping caution: `workflow_file_authoring_resolution.clj` now behaves mostly as façade glue; later either keep it intentionally as a stable façade or remove it
