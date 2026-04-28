@@ -2,11 +2,11 @@
 
 ## Follow-on (post-review)
 
-- [ ] Switch `completing-read` → `psi-emacs--ordered-completing-read` to
+- [x] Switch `completing-read` → `psi-emacs--ordered-completing-read` to
       preserve recency order with all completion UIs
-- [ ] Add comment on `(not (string-empty-p chosen))` guard explaining it
+- [x] Add comment on `(not (string-empty-p chosen))` guard explaining it
       defends against frameworks returning `""` on cancel despite REQUIRE-MATCH
-- [ ] Update design AC4 to accurately describe actual stash/M-n semantics:
+- [x] Update design AC4 to accurately describe actual stash/M-n semantics:
       M-n immediately after search-selection errors (index is nil); M-n only
       recovers a draft after M-p has been pressed at least once
 
