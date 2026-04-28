@@ -8,7 +8,8 @@
    - task 062 per-step session-shaping override compilation"
   (:require
    [malli.core :as m]
-   [psi.agent-session.session :as session]))
+   [psi.agent-session.session :as session]
+   [psi.agent-session.workflow-file-authoring-errors :as authoring-errors]))
 
 (def ^:private binding-session-keys
   #{:input :reference})
@@ -27,21 +28,6 @@
 
 (def ^:private source-map-keys
   #{:step :kind})
-
-(defn- invalid
-  [message]
-  {:error message})
-
-(defn- invalid-in
-  [scope message]
-  (invalid (str message " in `" scope "`")))
-
-(defn- unexpected-keys-error
-  [scope allowed-keys actual-map]
-  (when-let [unknown-keys (seq (remove allowed-keys (keys actual-map)))]
-    (invalid-in scope
-                (str "unexpected keys "
-                     (pr-str (vec unknown-keys))))))
 
 (defn- default-binding
   [binding-key previous-step-id]
@@ -70,28 +56,33 @@
 
     (map? source)
     (let [{:keys [step kind] :as source-map} source]
-      (or (unexpected-keys-error ":session source"
-                                 source-map-keys
-                                 source-map)
+      (or (authoring-errors/unexpected-keys-error ":session source"
+                                                  source-map-keys
+                                                  source-map)
           (cond
             (not (string? step))
-            (invalid "Malformed `:session source` form: expected `{:step \"...\" :kind :accepted-result}`")
+            (authoring-errors/invalid-in ":session source"
+                                         "expected `{:step \"...\" :kind :accepted-result}`")
 
             (not= kind :accepted-result)
-            (invalid (str "Malformed `:session source` form: unsupported step source kind `"
-                          kind "`"))
+            (authoring-errors/invalid-in ":session source"
+                                         (str "unsupported step source kind `"
+                                              kind "`"))
 
             :else
             (if-let [{:keys [step-id idx]} (get step-name->step-ref step)]
               (if (< idx current-step-idx)
                 {:ok {:source :step-output
                       :path [step-id]}}
-                (invalid (str "Forward step reference: `" step "` must refer to an earlier step")))
-              (invalid (str "Unknown step name: `" step "`"))))))
+                (authoring-errors/invalid (str "Forward step reference: `"
+                                               step
+                                               "` must refer to an earlier step")))
+              (authoring-errors/invalid (str "Unknown step name: `" step "`"))))))
 
     :else
-    (invalid (str "Malformed `:session source` form: unsupported `:from` value "
-                  (pr-str source)))))
+    (authoring-errors/invalid-in ":session source"
+                                 (str "unsupported `:from` value "
+                                      (pr-str source)))))
 
 (defn- projection-relative-path
   [binding-key source projection]
@@ -107,27 +98,29 @@
 
     (map? projection)
     (let [path (:path projection)]
-      (or (unexpected-keys-error ":projection"
-                                 #{:path}
-                                 projection)
+      (or (authoring-errors/unexpected-keys-error ":projection"
+                                                  #{:path}
+                                                  projection)
           (cond
             (not (contains? projection :path))
-            (invalid "Malformed `:projection`: expected `:text`, `:full`, or `{:path [...]}`")
+            (authoring-errors/invalid-in ":projection"
+                                         "expected `:text`, `:full`, or `{:path [...]}`")
 
             (not (vector? path))
-            (invalid "Malformed `:projection {:path ...}`: expected vector path")
+            (authoring-errors/invalid-in ":projection"
+                                         "expected vector path")
 
             (not-every? #(or (keyword? %) (string? %) (int? %)) path)
-            (invalid "Malformed `:projection {:path ...}`: path entries must be keyword, string, or int")
+            (authoring-errors/invalid-in ":projection"
+                                         "path entries must be keyword, string, or int")
 
             :else
             path)))
 
     :else
-    (invalid (str "Unsupported `:projection` for `:session "
-                  (name binding-key)
-                  "`: "
-                  (pr-str projection)))))
+    (authoring-errors/invalid-in (str ":session " (name binding-key))
+                                 (str "unsupported `:projection` "
+                                      (pr-str projection)))))
 
 (defn- combine-paths
   [root-path relative-path]
@@ -135,7 +128,7 @@
 
 (defn- binding-error
   [binding-key message]
-  (invalid-in (str ":session " (name binding-key)) message))
+  (authoring-errors/invalid-in (str ":session " (name binding-key)) message))
 
 (defn- source+projection->binding
   [binding-key source projection step-name->step-ref current-step-idx]
@@ -158,19 +151,19 @@
       {:ok (default-binding binding-key previous-step-id)}
 
       (not (map? entry))
-      (invalid-in scope "expected map")
+      (authoring-errors/invalid-in scope "expected map")
 
       (empty? entry)
-      (invalid-in scope "expected non-empty map with `:from`")
+      (authoring-errors/invalid-in scope "expected non-empty map with `:from`")
 
       (contains? entry :project)
-      (invalid (str "Unsupported `" scope " :project`; use `:projection`"))
+      (authoring-errors/invalid-in scope "use `:projection`, not `:project`")
 
       (not (contains? entry :from))
-      (invalid-in scope "expected non-empty map with `:from`")
+      (authoring-errors/invalid-in scope "expected non-empty map with `:from`")
 
       :else
-      (or (unexpected-keys-error scope projection-entry-keys entry)
+      (or (authoring-errors/unexpected-keys-error scope projection-entry-keys entry)
           (source+projection->binding binding-key
                                       (:from entry)
                                       (get entry :projection :text)
@@ -187,7 +180,7 @@
       {:ok defaults}
 
       (not (map? session))
-      (invalid "Malformed `:session`: expected map")
+      (authoring-errors/invalid-in ":session" "expected map")
 
       (empty? session)
       {:ok defaults}
@@ -211,15 +204,17 @@
       (compile-session-bindings step previous-step-id step-name->step-ref current-step-idx)
 
       (not (map? session))
-      (invalid "Malformed `:session`: expected map")
+      (authoring-errors/invalid-in ":session" "expected map")
 
       (empty? session)
       (compile-session-bindings step previous-step-id step-name->step-ref current-step-idx)
 
       :else
       (if-let [unsupported-keys (seq (remove supported-session-keys (keys session)))]
-        (invalid (str "Unsupported `:session` keys for tasks 060-062: "
-                      (pr-str (vec unsupported-keys))))
+        (authoring-errors/invalid-in ":session"
+                                     (str "unsupported keys "
+                                          (pr-str (vec unsupported-keys))
+                                          " for tasks 060-062"))
         (compile-session-bindings step previous-step-id step-name->step-ref current-step-idx)))))
 
 (defn- vector-of-strings?
@@ -233,7 +228,7 @@
     (let [tools (:tools session)]
       (if (vector-of-strings? tools)
         {:ok tools}
-        (invalid "Malformed `:session tools`: expected vector of strings")))
+        (authoring-errors/invalid-in ":session tools" "expected vector of strings")))
     {:ok ::absent}))
 
 (defn- compile-skills-override
@@ -242,7 +237,7 @@
     (let [skills (:skills session)]
       (if (vector-of-strings? skills)
         {:ok skills}
-        (invalid "Malformed `:session skills`: expected vector of strings")))
+        (authoring-errors/invalid-in ":session skills" "expected vector of strings")))
     {:ok ::absent}))
 
 (defn- compile-system-prompt-override
@@ -251,7 +246,7 @@
     (let [system-prompt (:system-prompt session)]
       (if (string? system-prompt)
         {:ok system-prompt}
-        (invalid "Malformed `:session system-prompt`: expected string")))
+        (authoring-errors/invalid-in ":session system-prompt" "expected string")))
     {:ok ::absent}))
 
 (defn- compile-model-override
@@ -261,7 +256,8 @@
       (if (or (string? model)
               (m/validate session/model-schema model))
         {:ok model}
-        (invalid "Malformed `:session model`: expected model string or canonical model map")))
+        (authoring-errors/invalid-in ":session model"
+                                     "expected model string or canonical model map")))
     {:ok ::absent}))
 
 (defn- compile-thinking-level-override
@@ -270,8 +266,29 @@
     (let [level (:thinking-level session)]
       (if (contains? canonical-thinking-levels level)
         {:ok level}
-        (invalid "Malformed `:session thinking-level`: expected one of :off, :minimal, :low, :medium, :high, :xhigh")))
+        (authoring-errors/invalid-in ":session thinking-level"
+                                     "expected one of :off, :minimal, :low, :medium, :high, :xhigh")))
     {:ok ::absent}))
+
+(defn- compile-session-overrides
+  [session]
+  (let [{system-prompt :ok system-prompt-error :error} (compile-system-prompt-override session)
+        {tools :ok tools-error :error} (compile-tools-override session)
+        {skills :ok skills-error :error} (compile-skills-override session)
+        {model :ok model-error :error} (compile-model-override session)
+        {thinking-level :ok thinking-level-error :error} (compile-thinking-level-override session)]
+    (cond
+      system-prompt-error {:error system-prompt-error}
+      tools-error {:error tools-error}
+      skills-error {:error skills-error}
+      model-error {:error model-error}
+      thinking-level-error {:error thinking-level-error}
+      :else {:ok (cond-> {}
+                   (not= system-prompt ::absent) (assoc :system-prompt system-prompt)
+                   (not= tools ::absent) (assoc :tools tools)
+                   (not= skills ::absent) (assoc :skills skills)
+                   (not= model ::absent) (assoc :model model)
+                   (not= thinking-level ::absent) (assoc :thinking-level thinking-level))})))
 
 (defn compile-step-session-overrides
   [step]
@@ -281,32 +298,18 @@
       {:ok nil}
 
       (not (map? session))
-      (invalid "Malformed `:session`: expected map")
+      (authoring-errors/invalid-in ":session" "expected map")
 
       (empty? session)
       {:ok nil}
 
       :else
       (if-let [unsupported-keys (seq (remove supported-session-keys (keys session)))]
-        (invalid (str "Unsupported `:session` keys for tasks 060-062: "
-                      (pr-str (vec unsupported-keys))))
-        (let [{system-prompt :ok system-prompt-error :error} (compile-system-prompt-override session)
-              {tools :ok tools-error :error} (compile-tools-override session)
-              {skills :ok skills-error :error} (compile-skills-override session)
-              {model :ok model-error :error} (compile-model-override session)
-              {thinking-level :ok thinking-level-error :error} (compile-thinking-level-override session)]
-          (cond
-            system-prompt-error {:error system-prompt-error}
-            tools-error {:error tools-error}
-            skills-error {:error skills-error}
-            model-error {:error model-error}
-            thinking-level-error {:error thinking-level-error}
-            :else {:ok (cond-> {}
-                         (not= system-prompt ::absent) (assoc :system-prompt system-prompt)
-                         (not= tools ::absent) (assoc :tools tools)
-                         (not= skills ::absent) (assoc :skills skills)
-                         (not= model ::absent) (assoc :model model)
-                         (not= thinking-level ::absent) (assoc :thinking-level thinking-level))}))))))
+        (authoring-errors/invalid-in ":session"
+                                     (str "unsupported keys "
+                                          (pr-str (vec unsupported-keys))
+                                          " for tasks 060-062"))
+        (compile-session-overrides session)))))
 
 (defn step-source-reference-map
   "Source-selection references are intentionally stricter than routing refs:

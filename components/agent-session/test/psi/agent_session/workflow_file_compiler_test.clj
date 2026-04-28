@@ -371,7 +371,7 @@
                             :session {:input {:from :workflow-input
                                               :projection :tail}}
                             :prompt "$INPUT"}
-              :expected-re #"Unsupported `:projection`"}
+              :expected-re #"unsupported `:projection`"}
              {:label "malformed path projection"
               :config-step {:name "plan"
                             :workflow "planner"
@@ -405,57 +405,9 @@
                               :session {:preload [{:from :workflow-input}]}
                               :prompt "$INPUT"}]}
             :body "Frame."})]
-      (is (re-find #"Unsupported `:session` keys for tasks 060-062" error))))
+      (is (re-find #"unsupported keys \[:preload\] for tasks 060-062 in `:session`" error))))
 
-  (testing "malformed tools override fails clearly"
-    (let [{:keys [error]}
-          (compiler/compile-workflow-file
-           {:name "bad-tools-override"
-            :description "Bad tools override"
-            :config {:steps [{:name "plan"
-                              :workflow "planner"
-                              :session {:tools ["read" :bash]}
-                              :prompt "$INPUT"}]}
-            :body "Frame."})]
-      (is (re-find #"Malformed `:session tools`" error))))
-
-  (testing "malformed skills override fails clearly"
-    (let [{:keys [error]}
-          (compiler/compile-workflow-file
-           {:name "bad-skills-override"
-            :description "Bad skills override"
-            :config {:steps [{:name "plan"
-                              :workflow "planner"
-                              :session {:skills "testing-best-practices"}
-                              :prompt "$INPUT"}]}
-            :body "Frame."})]
-      (is (re-find #"Malformed `:session skills`" error))))
-
-  (testing "malformed system-prompt override fails clearly"
-    (let [{:keys [error]}
-          (compiler/compile-workflow-file
-           {:name "bad-system-prompt-override"
-            :description "Bad system prompt override"
-            :config {:steps [{:name "plan"
-                              :workflow "planner"
-                              :session {:system-prompt :strict}
-                              :prompt "$INPUT"}]}
-            :body "Frame."})]
-      (is (re-find #"Malformed `:session system-prompt`" error))))
-
-  (testing "malformed model override fails clearly"
-    (let [{:keys [error]}
-          (compiler/compile-workflow-file
-           {:name "bad-model-override"
-            :description "Bad model override"
-            :config {:steps [{:name "plan"
-                              :workflow "planner"
-                              :session {:model 42}
-                              :prompt "$INPUT"}]}
-            :body "Frame."})]
-      (is (re-find #"Malformed `:session model`" error))))
-
-  (testing "malformed thinking-level override fails clearly"
+  (testing "one representative malformed override still surfaces clearly through compiler"
     (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:name "bad-thinking-override"
@@ -465,7 +417,7 @@
                               :session {:thinking-level :ultra}
                               :prompt "$INPUT"}]}
             :body "Frame."})]
-      (is (re-find #"Malformed `:session thinking-level`" error))))
+      (is (re-find #"expected one of :off, :minimal, :low, :medium, :high, :xhigh in `:session thinking-level`" error))))
 
   (testing "duplicate author-facing step names fail clearly"
     (let [{:keys [error]}

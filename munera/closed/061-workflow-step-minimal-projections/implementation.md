@@ -42,3 +42,15 @@ Review feedback execution:
 - split authoring concerns into `workflow_file_authoring_session.clj` and `workflow_file_authoring_routing.clj`, leaving `workflow_file_authoring_resolution.clj` as a thin compatibility façade
 - standardized local authoring error shaping around shared helpers for invalid/unexpected-key cases
 - consolidated representative malformed projection/source validation into a table-driven authoring-session test while keeping compiler-facing validation coverage
+
+Code-shaper terse review note:
+- accepted: seams are now clearer, the compile-to-binding-ref architecture remains intact, and validation/proof coverage is strong
+- non-blocking follow-on: if `:session` authoring grows further, split `workflow_file_authoring_session.clj` internally by source/projection vs override compilation
+- non-blocking follow-on: make authoring error text fully uniform and watch for test duplication drift between authoring-session and compiler-facing suites
+
+Code-shaper feedback execution:
+- extracted shared authoring error helpers to `workflow_file_authoring_errors.clj`
+- tightened authoring-session internal separation by isolating override compilation behind `compile-session-overrides`
+- made validation text more uniform around `invalid-in`-shaped messages and scope-specific wording
+- expanded table-driven authoring-session tests to cover both source/projection and override validation
+- reduced compiler-facing validation overlap to one representative malformed override proof while keeping integration-level signal

@@ -12,3 +12,6 @@
 - [x] If workflow authoring surface grows further, split `workflow_file_authoring_resolution.clj` by concern (source/projection vs overrides vs routing)
 - [x] Standardize authoring error-shaping style across the whole authoring-resolution surface
 - [x] Consider consolidating repetitive malformed-projection validation tests with table-driven coverage
+- [x] If `:session` authoring grows further, split `workflow_file_authoring_session.clj` internally by source/projection vs override compilation
+- [x] Make authoring error text fully uniform across authoring-session validation paths
+- [x] Watch for and reduce overlapping test intent between authoring-session and compiler-facing validation suites if duplication grows
