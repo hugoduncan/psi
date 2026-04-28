@@ -323,5 +323,83 @@
         (insert "draft"))
       (should (equal "draft" (psi-emacs--tail-draft-text))))))
 
+(ert-deftest psi-search-input-history-signals-error-when-not-psi-buffer ()
+  (with-temp-buffer
+    (should-error (psi-emacs-search-input-history) :type 'user-error)))
+
+(ert-deftest psi-search-input-history-signals-error-when-history-empty ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (should-error (psi-emacs-search-input-history) :type 'user-error)))
+
+(ert-deftest psi-search-input-history-cancel-leaves-input-and-nav-state-unchanged ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--history-record-input "first")
+    (psi-emacs--history-record-input "second")
+    (psi-emacs--ensure-input-area)
+    (psi-emacs--replace-input-text "draft")
+    ;; Simulate C-g / empty-string cancel: completing-read returns "".
+    (cl-letf (((symbol-function 'completing-read)
+               (lambda (_prompt _collection &rest _args) "")))
+      (psi-emacs-search-input-history))
+    (should (equal "draft" (psi-emacs--tail-draft-text)))
+    (should (null (psi-emacs-state-input-history-stash psi-emacs--state)))
+    (should (null (psi-emacs-state-input-history-index psi-emacs--state)))))
+
+(ert-deftest psi-search-input-history-selection-replaces-input-and-stashes-draft ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--history-record-input "first")
+    (psi-emacs--history-record-input "second")
+    (psi-emacs--ensure-input-area)
+    (psi-emacs--replace-input-text "my draft")
+    (cl-letf (((symbol-function 'completing-read)
+               (lambda (_prompt _collection &rest _args) "first")))
+      (psi-emacs-search-input-history))
+    (should (equal "first" (psi-emacs--tail-draft-text)))
+    (should (equal "my draft" (psi-emacs-state-input-history-stash psi-emacs--state)))
+    ;; Navigation index reset to nil so M-p starts from top of history.
+    (should (null (psi-emacs-state-input-history-index psi-emacs--state)))))
+
+(ert-deftest psi-search-input-history-m-n-immediately-after-selection-errors ()
+  "M-n with nil index (no navigation started) signals user-error."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--history-record-input "first")
+    (psi-emacs--history-record-input "second")
+    (psi-emacs--ensure-input-area)
+    (psi-emacs--replace-input-text "my draft")
+    (cl-letf (((symbol-function 'completing-read)
+               (lambda (_prompt _collection &rest _args) "first")))
+      (psi-emacs-search-input-history))
+    ;; index is nil after selection; M-n has no history position to step back from.
+    (should-error (psi-emacs-next-input) :type 'user-error)))
+
+(ert-deftest psi-search-input-history-m-p-then-m-n-recovers-selected-entry ()
+  "After search-selection, M-p steps into history; M-n returns to selected entry."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--history-record-input "first")
+    (psi-emacs--history-record-input "second")
+    (psi-emacs--ensure-input-area)
+    (psi-emacs--replace-input-text "my draft")
+    (cl-letf (((symbol-function 'completing-read)
+               (lambda (_prompt _collection &rest _args) "first")))
+      (psi-emacs-search-input-history))
+    ;; Input is now "first"; stash is "my draft"; index is nil.
+    (should (equal "first" (psi-emacs--tail-draft-text)))
+    ;; M-p: stashes "first", steps to index 0 = "second".
+    (psi-emacs-previous-input)
+    (should (equal "second" (psi-emacs--tail-draft-text)))
+    ;; M-n: recovers M-p stash = "first", resets navigation.
+    (psi-emacs-next-input)
+    (should (equal "first" (psi-emacs--tail-draft-text)))))
+
 (provide 'psi-streaming-history-test)
 ;;; psi-streaming-history-test.el ends here

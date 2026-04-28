@@ -374,6 +374,29 @@ legacy draft end behavior."
     (goto-char (+ start (length text*)))
     (psi-emacs--set-draft-anchor-to-end)))
 
+(defun psi-emacs-search-input-history ()
+  "Search input history via completing-read and populate the input area.
+
+Opens a minibuffer completion over all entries in the current buffer's input
+history.  Selecting an entry stashes the current draft (as `M-p' does),
+replaces the input area with the selected text, and resets the navigation
+index to nil so subsequent `M-p'/`M-n' steps from the top of history.
+
+`C-g' or empty-string submission cancels without modifying the input area or
+navigation state."
+  (interactive)
+  (unless psi-emacs--state
+    (user-error "Not a psi buffer"))
+  (let ((history (psi-emacs-state-input-history psi-emacs--state)))
+    (unless (consp history)
+      (user-error "No previous inputs"))
+    (let ((chosen (completing-read "Previous input: " history nil t)))
+      (when (and chosen (not (string-empty-p chosen)))
+        (setf (psi-emacs-state-input-history-stash psi-emacs--state)
+              (psi-emacs--tail-draft-text))
+        (setf (psi-emacs-state-input-history-index psi-emacs--state) nil)
+        (psi-emacs--replace-input-text chosen)))))
+
 (defun psi-emacs-previous-input ()
   "Navigate to older input history entry in dedicated input area."
   (interactive)
