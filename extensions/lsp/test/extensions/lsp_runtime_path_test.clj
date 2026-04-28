@@ -339,7 +339,8 @@
                                                          :startup-timeout-ms startup-ms
                                                          :diagnostics-timeout-ms diagnostics-ms-slow}})
           root (:workspace-root second-result)
-          finding (await-diagnostic-finding api root file-path await-ms)
+          finding (or (get (:diagnostics-by-path second-result) file-path)
+                      (await-diagnostic-finding api root file-path await-ms))
           svc (services/service-in ctx (sut/workspace-key root))
           debug @(:debug-atom svc)]
       (try
