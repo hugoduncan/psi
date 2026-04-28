@@ -12,5 +12,5 @@
 - [x] Close 004 as superseded and 065 as completed
 
 Optional follow-up:
-- [ ] Decide whether remaining tooling-only `clojure-lsp` metadata/comments should be renamed or left as editor-specific implementation detail
-- [ ] If future protocol-specific subprocess integrations are added, codify the pattern in docs/tests as integration-local adapters rather than expansions of the generic managed-service core
+- [x] Decide whether remaining tooling-only `clojure-lsp` metadata/comments should be renamed or left as editor-specific implementation detail
+- [x] If future protocol-specific subprocess integrations are added, codify the pattern in docs/tests as integration-local adapters rather than expansions of the generic managed-service core

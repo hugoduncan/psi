@@ -140,8 +140,9 @@
 
 (defn- provider-entry
   [provider]
-  ;; Keep protocol operation vars referenced in this namespace so clojure-lsp
-  ;; doesn't flag contract methods as unused before phase-2 routing lands.
+  ;; Keep protocol operation vars referenced in this namespace so editor/tooling
+  ;; unused-var analysis doesn't flag contract methods as unused before phase-2
+  ;; routing lands.
   (let [_protocol-method-vars [close-provider!
                                provider-write!
                                provider-query!

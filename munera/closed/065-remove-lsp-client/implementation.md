@@ -59,3 +59,11 @@ Pending user clarification on scope and relationship to existing task 004 before
 - optional non-blocking follow-up only:
   - remaining `clojure-lsp` references are tooling/editor metadata rather than product LSP support
   - if a future protocol-specific integration appears, it should be added as an integration-local adapter rather than by re-expanding the generic service core
+
+2026-04-28 — optional follow-up executed
+- decided to leave `:clojure-lsp/ignore` metadata in place as editor/tooling implementation detail, not product LSP support
+- renamed one lingering explanatory comment in `components/memory/src/psi/memory/store.clj` so it now refers to editor/tooling unused-var analysis generically rather than to `clojure-lsp` specifically
+- codified the future adapter guidance in `doc/extensions.md` under managed services:
+  - generic managed-service core owns lifecycle/transport
+  - protocol semantics should live in integration-local adapters
+  - future JSON-RPC-like integrations should prove their behavior with integration-local tests rather than by expanding the shared core

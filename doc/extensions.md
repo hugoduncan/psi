@@ -281,6 +281,23 @@ patterns.
 | `:switch-session` | `(fn [session-id])`      | Switch to an existing context session by id     |
 | `:get-api-key` | `(fn [provider])`           | Resolve provider API key (narrow capability) |
 
+#### Managed services
+
+Extensions can use the managed-service surface for long-lived subprocesses or
+similar runtime-owned helpers:
+
+- `(:ensure-service api) {:key ... :type :subprocess :spec ...}`
+- `(:stop-service api) service-key`
+- `(:service-request api) {:key ... :request-id ... :payload ... :timeout-ms ...}`
+- `(:service-notify api) {:key ... :payload ...}`
+- `(:list-services api)`
+
+Design guidance:
+- treat the managed-service core as protocol-agnostic lifecycle and transport ownership
+- prefer integration-local adapters for protocol semantics layered on top of this core
+- do not expand the generic managed-service core with protocol-specific behavior unless there is clear multi-integration justification
+- if a future integration needs JSON-RPC or similar framing/projection behavior, implement that adapter in the integration layer and prove it with integration-local tests
+
 `(:mutate api)` is extension-scoped for `psi.extension/*` mutations:
 
 - If `op-sym` is in the `psi.extension` namespace (or a sub-namespace like
