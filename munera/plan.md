@@ -3,7 +3,6 @@
 Open tasks in suggested execution order:
 
 Queue:
-`munera/open/051-emacs-search-previous-prompt-inputs/`
 
 Backlog:
 
