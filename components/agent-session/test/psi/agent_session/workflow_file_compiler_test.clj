@@ -363,45 +363,37 @@
             :body "Frame."})]
       (is (re-find #"expected non-empty map with `:from`" error))))
 
-  (testing "unsupported projection operator fails clearly"
-    (let [{:keys [error]}
-          (compiler/compile-workflow-file
-           {:name "bad-projection-operator"
-            :description "Bad projection operator"
-            :config {:steps [{:name "plan"
-                              :workflow "planner"
-                              :session {:input {:from :workflow-input
-                                                :projection :tail}}
-                              :prompt "$INPUT"}]}
-            :body "Frame."})]
-      (is (re-find #"Unsupported `:projection`" error))))
-
-  (testing "malformed path projection fails clearly"
-    (let [{:keys [error]}
-          (compiler/compile-workflow-file
-           {:name "bad-projection-path"
-            :description "Bad projection path"
-            :config {:steps [{:name "plan"
-                              :workflow "planner"
-                              :session {:input {:from :workflow-input
-                                                :projection {:path :not-a-vector}}}
-                              :prompt "$INPUT"}]}
-            :body "Frame."})]
-      (is (re-find #"expected vector path" error))))
-
-  (testing "projection with unexpected keys fails clearly"
-    (let [{:keys [error]}
-          (compiler/compile-workflow-file
-           {:name "bad-projection-shape"
-            :description "Bad projection shape"
-            :config {:steps [{:name "plan"
-                              :workflow "planner"
-                              :session {:input {:from :workflow-input
-                                                :projection {:path [:task]
-                                                             :extra true}}}
-                              :prompt "$INPUT"}]}
-            :body "Frame."})]
-      (is (re-find #"unexpected keys" error))))
+  (testing "projection validation errors surface clearly through compiler"
+    (doseq [{:keys [label config-step expected-re]}
+            [{:label "unsupported projection operator"
+              :config-step {:name "plan"
+                            :workflow "planner"
+                            :session {:input {:from :workflow-input
+                                              :projection :tail}}
+                            :prompt "$INPUT"}
+              :expected-re #"Unsupported `:projection`"}
+             {:label "malformed path projection"
+              :config-step {:name "plan"
+                            :workflow "planner"
+                            :session {:input {:from :workflow-input
+                                              :projection {:path :not-a-vector}}}
+                            :prompt "$INPUT"}
+              :expected-re #"expected vector path"}
+             {:label "projection with unexpected keys"
+              :config-step {:name "plan"
+                            :workflow "planner"
+                            :session {:input {:from :workflow-input
+                                              :projection {:path [:task]
+                                                           :extra true}}}
+                            :prompt "$INPUT"}
+              :expected-re #"unexpected keys"}]]
+      (let [{:keys [error]}
+            (compiler/compile-workflow-file
+             {:name (str "projection-validation-" (name (gensym "case-")))
+              :description label
+              :config {:steps [config-step]}
+              :body "Frame."})]
+        (is (re-find expected-re error) label))))
 
   (testing "unsupported session keys fail clearly for tasks 060-062"
     (let [{:keys [error]}

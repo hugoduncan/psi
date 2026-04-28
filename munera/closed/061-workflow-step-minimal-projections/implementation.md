@@ -32,3 +32,13 @@ Follow-on review execution:
 - simplified `source-root` by removing the unused binding-key parameter
 - normalized one local source/projection compile error path through a shared `binding-error` helper
 - re-checked `.psi/workflows/gh-bug-triage-modular.md`: it still documents the current linear-by-definition-order limitation and is a plausible future consumer of explicit projection/source authoring, but no example change was required for task 061 itself
+
+Terse review note:
+- accepted: matches the design, preserves the compile-to-binding-ref architecture, and now has the missing execution-level proof test
+- non-blocking follow-on: `workflow_file_authoring_resolution.clj` is becoming multi-concern; split by authoring concern if this surface grows further
+- non-blocking follow-on: standardize authoring error-shaping style and consider consolidating repetitive malformed-projection tests
+
+Review feedback execution:
+- split authoring concerns into `workflow_file_authoring_session.clj` and `workflow_file_authoring_routing.clj`, leaving `workflow_file_authoring_resolution.clj` as a thin compatibility façade
+- standardized local authoring error shaping around shared helpers for invalid/unexpected-key cases
+- consolidated representative malformed projection/source validation into a table-driven authoring-session test while keeping compiler-facing validation coverage

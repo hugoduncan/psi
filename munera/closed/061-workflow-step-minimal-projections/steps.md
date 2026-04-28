@@ -9,3 +9,6 @@
 - [x] Re-check at least one real `.psi/workflows/` example for improved structured extraction authoring
 - [x] Simplify any now-unused helper parameters/contracts in `workflow_file_authoring_resolution.clj` if still warranted after the runtime-proof test
 - [x] Normalize error-shaping style in projection/source compilation if this area is touched again
+- [x] If workflow authoring surface grows further, split `workflow_file_authoring_resolution.clj` by concern (source/projection vs overrides vs routing)
+- [x] Standardize authoring error-shaping style across the whole authoring-resolution surface
+- [x] Consider consolidating repetitive malformed-projection validation tests with table-driven coverage
