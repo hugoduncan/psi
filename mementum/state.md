@@ -59,6 +59,14 @@ Bootstrapped on 2026-04-02.
   - moved `/skill:` and template invocation expansion canonically into request preparation
   - removed the remaining caller-local preview expansion path from app-runtime, RPC, and extension run-fn submission paths
   - prompt text memory recovery now runs from dispatch-owned prepared-request effects instead of caller-local pre-submit hooks
+- Built-in LSP client removal landed:
+  - removed the `extensions/lsp` built-in extension and its tests
+  - removed the stdio JSON-RPC runtime adapter and its dedicated tests/fixtures because it no longer had a non-LSP consumer
+  - preserved generic managed-service registry/request/notification infrastructure while simplifying it back to protocol-agnostic semantics
+  - removed LSP install/build/test wiring from launcher/runtime catalogs and project aliases
+  - updated shared fixture/docs surfaces so they no longer imply built-in LSP support
+  - focused verification green (`80 tests, 305 assertions, 0 failures`)
+  - full unit suite green again via `bb clojure:test:unit` (`1447 tests, 10787 assertions, 0 failures`)
 - Follow-on test cleanup landed so the full unit suite is green again (`1112 tests, 6425 assertions, 0 failures`):
   - extension API tests now match the richer list-services query shape and current explicit-session mutate behavior
   - git default-branch fallback test now stubs symbolic-ref + config lookup explicitly so `:fallback` is deterministic

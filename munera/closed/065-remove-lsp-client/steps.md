@@ -8,5 +8,5 @@
 - [x] Remove LSP extension, commands, wiring, tests, fixtures, and helpers
 - [x] Update active docs/meta/task surfaces and stop advertising LSP support
 - [x] Mark task 004 superseded by 065 during implementation
-- [ ] Run verification and remove residual misleading active references
-- [ ] Close 004 as superseded and 065 as completed
+- [x] Run verification and remove residual misleading active references
+- [x] Close 004 as superseded and 065 as completed
