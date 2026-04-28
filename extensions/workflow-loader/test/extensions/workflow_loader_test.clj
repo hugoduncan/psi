@@ -26,9 +26,21 @@
 
 (def chain-raw
   (str "---\nname: plan-build-review\ndescription: Plan, build, and review\n---\n"
-       "{:steps [{:workflow \"planner\" :prompt \"$INPUT\"}\n"
-       "         {:workflow \"builder\" :prompt \"Execute: $INPUT\\nOriginal: $ORIGINAL\"}\n"
-       "         {:workflow \"reviewer\" :prompt \"Review: $INPUT\\nOriginal: $ORIGINAL\"}]}\n\n"
+       "{:steps [{:name \"plan\"\n"
+       "          :workflow \"planner\"\n"
+       "          :session {:input {:from :workflow-input}\n"
+       "                    :reference {:from :workflow-original}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"build\"\n"
+       "          :workflow \"builder\"\n"
+       "          :session {:input {:from {:step \"plan\" :kind :accepted-result}}\n"
+       "                    :reference {:from :workflow-original}}\n"
+       "          :prompt \"Execute: $INPUT\\nOriginal: $ORIGINAL\"}\n"
+       "         {:name \"review\"\n"
+       "          :workflow \"reviewer\"\n"
+       "          :session {:input {:from {:step \"build\" :kind :accepted-result}}\n"
+       "                    :reference {:from :workflow-original}}\n"
+       "          :prompt \"Review: $INPUT\\nOriginal: $ORIGINAL\"}]}\n\n"
        "Coordinate a plan-build-review cycle."))
 
 (defn reset-extension-state [f]
