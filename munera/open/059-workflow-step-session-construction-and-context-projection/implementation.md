@@ -65,3 +65,11 @@ This preserves immediate value while keeping the architecture pointed at the rig
 - child task `060` rejects forward references as compile/load errors
 - child task `061` introduces the first projection vocabulary: `:text`, `:full`, and `:path [...]`
 - arbitrary named prompt variables are out of scope for the first cut
+
+## Review note
+
+Terse review after `060`–`064`:
+- the implementation is architecturally strong and converges well on compiler-first, session-first workflow authoring
+- the main remaining drift is that the umbrella spec says multi-step steps require author-facing unique `:name`, but implementation still preserves compatibility for unnamed multi-step steps
+- because we are aiming to complete the spec rather than preserve compatibility, the next follow-on should remove that drift and make the authoring/documentation/tests tell one story
+- smaller follow-on: update the umbrella task state so `059` reflects the landed child-task convergence and any intentional remaining gaps explicitly
