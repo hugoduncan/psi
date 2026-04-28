@@ -1,6 +1,7 @@
 Approach:
 - Continue converging any remaining prompt semantics into request preparation.
-- Use the agent skill-prelude follow-on as the concrete driver for cache-breakpoint shaping.
+- Use the agent skill-prelude follow-on (`006`) as the concrete driver for cache-breakpoint shaping and any associated prelude-contract decisions.
+- Keep this task (`003`) as the broader umbrella for prompt-lifecycle ownership/convergence rather than duplicating the detailed implementation checklist from `006`.
 - Keep shared-session lifecycle paths canonical; leave isolated workflow runtimes alone.
 
 Likely steps:

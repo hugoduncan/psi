@@ -177,20 +177,24 @@ Why:
 - active Phase A runtime no longer appears to depend on them for real execution
 - keeping them expands the number of "authoritative" workflow paths unnecessarily
 
-## Recommended next implementation order
+## Historical implementation order
 
-Completed so far:
+Completed migration sequence:
 1. `workflow_runtime/create-run` migrated off `workflow_statechart_compat/compile-definition`
 2. `cancel-run` moved into `workflow_runtime.clj` and callers repointed
 3. `resume-blocked-run` decided as a canonical lifecycle operation and represented as `workflow_runtime/resume-run`
 4. `workflow_statechart_runtime.clj` repointed to `workflow_progression_recording` for active Phase A helpers
 5. canonical workflow-surface docs updated to reflect the new ownership split
+6. remaining compatibility-oriented tests were rewritten to prove final canonical surfaces or isolated as legacy-seam tests
+7. `workflow_statechart_compat.clj` was deleted once consumer count reached zero
+8. remaining legacy control helpers in `workflow_progression.clj` were deleted with the namespace removal
+9. verification rings were rerun and the final retained-vs-removed summary recorded
 
-Remaining execution order:
-6. Rewrite remaining compatibility-oriented tests so they prove final canonical surfaces or are explicitly isolated as legacy-seam tests
-7. Delete `workflow_statechart_compat.clj` now that consumer count is expected to be zero
-8. Shrink or delete remaining legacy control helpers in `workflow_progression.clj`
-9. Run full verification rings and record final retained-vs-removed summary
+## Closure note
+
+This compatibility-removal task is complete.
+
+Later workflow authoring convergence work in tasks `059`–`064` built on the cleaned-up canonical runtime surface and completed the session-first workflow authoring model. That later work did not reopen the removed production compatibility layer; it sharpened the authoring/documentation surface that now sits on top of the canonical runtime ownership established here.
 
 ## Final retained-vs-removed summary
 

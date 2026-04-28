@@ -211,15 +211,15 @@ Bootstrapped on 2026-04-02.
 
 ## Suggested next step
 - Active munera tasks are now:
-  1. `munera/open/047-tui-feature-parity-with-emacs-ui/` (parent umbrella for TUI parity)
-  2. `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
-  3. `munera/open/001-post-wave-b-gordian-follow-on/`
-  4. `munera/open/002-compatibility-scaffold-removal/`
-  5. `munera/open/003-prompt-lifecycle-architectural-convergence/`
-  6. `munera/open/004-lsp-integration-managed-services-post-tool-processing/`
-  7. `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
-  8. `munera/open/006-agent-tool-skill-prelude-follow-on/`
-  (054 TUI thinking/tool streaming parity is now closed)
+  1. `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
+  2. `munera/open/001-post-wave-b-gordian-follow-on/`
+  3. `munera/open/002-compatibility-scaffold-removal/`
+  4. `munera/open/003-prompt-lifecycle-architectural-convergence/`
+  5. `munera/open/004-lsp-integration-managed-services-post-tool-processing/`
+  6. `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
+  7. `munera/open/006-agent-tool-skill-prelude-follow-on/`
+- TUI parity umbrella `047` and discoverable navigation slice `049` are now closed.
+- Workflow-authoring umbrella `059` and convergence task `064` are now closed.
 - Highest-value next threads remain:
   1. **026 deterministic workflows**: break or route around the `psi-tool` execution-control load cycle cleanly
   2. **Prompt lifecycle / skill prelude**: refine cache-breakpoint shaping and decide whether prelude/source metadata should surface in introspection

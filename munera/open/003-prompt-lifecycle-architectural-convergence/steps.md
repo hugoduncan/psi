@@ -1,5 +1,6 @@
 - [x] Inspect current request preparation and skill-prelude composition
 - [ ] Implement intended cache-breakpoint shaping
+  - concrete execution lives in `006-agent-tool-skill-prelude-follow-on`
 - [x] Remove/simplify residual prompt-path seams and hooks
 - [x] Add or tighten focused proof
   - [x] prove `prompt-in!` owns post-turn git-head sync

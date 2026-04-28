@@ -22,6 +22,12 @@ Initialized from the prior active planning tracker on 2026-04-17.
   - `psi.app-runtime-test`
   - `psi.rpc-prompt-test`
 
+Coordination note
+
+- `003` is now best understood as the prompt-lifecycle convergence umbrella.
+- The remaining unfinished acceptance here is the intended cache-breakpoint shaping for skill preludes.
+- That concrete implementation work is tracked in `006-agent-tool-skill-prelude-follow-on` so the detailed prelude/cache-breakpoint checklist lives in one place.
+
 2026-04-22 — system-prompt refresh correctness for incrementally registered skills
 
 - Reproduced that incrementally registering a skill could leave the rebuilt system prompt stale even after refresh, so newly added skills were absent from the prompt-visible skills section.

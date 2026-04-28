@@ -1,5 +1,5 @@
 Approach:
-- Treat this as a concrete prompt-lifecycle follow-on centered on child-session seeding.
+- Treat this as the concrete implementation slice for the remaining open prompt-lifecycle convergence work in `003`, centered on child-session skill-prelude seeding.
 - First fix the cache-breakpoint shape, then decide whether the synthetic prelude markers need stronger structure.
 - Add introspection exposure only if it clearly helps debugging.
 
