@@ -36,8 +36,8 @@
     (doseq [d definitions]
       (swap! (:state* ctx) assoc-in [:workflows :definitions (:definition-id d)] d))))
 
-(deftest delegate-async-path-reproduces-keyword-contains-error-test
-  (testing "workflow-loader delegate async path still produces the keyword contains? failure in a TUI-like context"
+(deftest delegate-async-path-avoids-keyword-contains-error-test
+  (testing "workflow-loader delegate async path no longer produces the keyword contains? failure in a TUI-like context"
     (let [[ctx session-id] (create-context+session)]
       (register-workflow-loader! ctx session-id)
       (try
@@ -55,8 +55,8 @@
                 failed-job (first (filter #(= :failed (:psi.background-job/status %)) delegate-jobs))]
             (is (seq delegate-jobs))
             (is (some? failed-job))
-            (is (str/includes? (pr-str failed-job)
-                               "contains? not supported on type: clojure.lang.Keyword"))))
+            (is (not (str/includes? (pr-str failed-job)
+                                    "contains? not supported on type: clojure.lang.Keyword")))))
         (finally
           (context/shutdown-context! ctx))))))
 

@@ -31,7 +31,7 @@
     api))
 
 (deftest direct-workflow-execution-vs-extension-mutation-test
-  (testing "direct workflow execution and extension mutation execution diverge on lambda-build in TUI-like context"
+  (testing "direct workflow execution and extension mutation execution both avoid the keyword contains? failure on lambda-build in TUI-like context"
     (let [[ctx session-id] (create-context+session)]
       (register-workflow-loader! ctx session-id)
       (try
@@ -53,7 +53,8 @@
           (is (not (str/includes? (pr-str direct-result) "contains? not supported on type: clojure.lang.Keyword")))
           (is (map? mutation-result))
           (is (not (nil? (:psi.workflow/run-id mutation-result))))
-          (is (str/includes? (pr-str mutation-result) "contains? not supported on type: clojure.lang.Keyword")))
+          (is (not (str/includes? (pr-str mutation-result)
+                                  "contains? not supported on type: clojure.lang.Keyword"))))
         (finally
           (context/shutdown-context! ctx))))))
 

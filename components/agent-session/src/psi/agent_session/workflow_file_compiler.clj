@@ -22,6 +22,9 @@
   {:max-attempts 1
    :retry-on #{:execution-failed :validation-failed}})
 
+(def ^:private supported-session-keys
+  #{:input :reference})
+
 ;;; Step ID generation
 
 (defn- kebab-fragment
@@ -37,6 +40,159 @@
   "Generate a canonical step-id for multi-step workflows."
   [idx {:keys [workflow]}]
   (str "step-" (inc idx) "-" (kebab-fragment (or workflow "agent"))))
+
+(defn- step-label
+  [step]
+  (or (:name step)
+      (:workflow step)))
+
+(defn- duplicate-step-names
+  [steps]
+  (->> steps
+       (keep :name)
+       frequencies
+       (keep (fn [[step-name n]]
+               (when (> n 1)
+                 step-name)))
+       vec))
+
+(defn- default-binding
+  [binding-key previous-step-id]
+  (case binding-key
+    :input
+    (if previous-step-id
+      {:source :step-output
+       :path [previous-step-id :outputs :text]}
+      {:source :workflow-input
+       :path [:input]})
+
+    :reference
+    {:source :workflow-input
+     :path [:original]}))
+
+(defn- workflow-input-binding
+  [binding-key]
+  {:source :workflow-input
+   :path [(case binding-key
+            :input :input
+            :reference :original)]})
+
+(defn- source->binding
+  [binding-key source step-name->step-ref current-step-idx]
+  (cond
+    (= source :workflow-input)
+    {:ok (workflow-input-binding binding-key)}
+
+    (= source :workflow-original)
+    {:ok {:source :workflow-input
+          :path [:original]}}
+
+    (map? source)
+    (let [{:keys [step kind] :as source-map} source
+          unknown-keys (seq (remove #{:step :kind} (keys source-map)))]
+      (cond
+        unknown-keys
+        {:error (str "Malformed `:session " (name binding-key)
+                     "` source form: unexpected keys "
+                     (pr-str (vec unknown-keys)))}
+
+        (not (string? step))
+        {:error (str "Malformed `:session " (name binding-key)
+                     "` source form: expected `{:step \"...\" :kind :accepted-result}`")}
+
+        (not= kind :accepted-result)
+        {:error (str "Malformed `:session " (name binding-key)
+                     "` source form: unsupported step source kind `"
+                     kind "`")}
+
+        :else
+        (if-let [{:keys [step-id idx]} (get step-name->step-ref step)]
+          (if (< idx current-step-idx)
+            {:ok {:source :step-output
+                  :path [step-id :outputs :text]}}
+            {:error (str "Forward step reference in `:session " (name binding-key)
+                         "`: `" step "` must refer to an earlier step")})
+          {:error (str "Unknown step name in `:session " (name binding-key)
+                       "`: `" step "`")})))
+
+    :else
+    {:error (str "Malformed `:session " (name binding-key)
+                 "` source form: unsupported `:from` value "
+                 (pr-str source))}))
+
+(defn- compile-session-binding
+  [binding-key previous-step-id session step-name->step-ref current-step-idx]
+  (let [entry (get session binding-key ::missing)]
+    (cond
+      (= entry ::missing)
+      {:ok (default-binding binding-key previous-step-id)}
+
+      (not (map? entry))
+      {:error (str "Malformed `:session " (name binding-key) "`: expected map")}
+
+      (empty? entry)
+      {:error (str "Malformed `:session " (name binding-key)
+                   "`: expected non-empty map with `:from`")}
+
+      (contains? entry :projection)
+      {:error (str "Unsupported `:session " (name binding-key)
+                   " :projection` before task 061")}
+
+      (contains? entry :project)
+      {:error (str "Unsupported `:session " (name binding-key)
+                   " :project` before task 061")}
+
+      (not= #{:from} (set (keys entry)))
+      {:error (str "Malformed `:session " (name binding-key)
+                   "`: expected only `:from`")}
+
+      :else
+      (source->binding binding-key (:from entry) step-name->step-ref current-step-idx))))
+
+(defn- compile-step-input-bindings
+  [step previous-step-id step-name->step-ref current-step-idx]
+  (let [session (:session step)
+        defaults {:input (default-binding :input previous-step-id)
+                  :original (default-binding :reference previous-step-id)}]
+    (cond
+      (nil? session)
+      {:ok defaults}
+
+      (not (map? session))
+      {:error "Malformed `:session`: expected map"}
+
+      (empty? session)
+      {:ok defaults}
+
+      :else
+      (let [unsupported-keys (seq (remove supported-session-keys (keys session)))]
+        (if unsupported-keys
+          {:error (str "Unsupported `:session` keys for task 060: "
+                       (pr-str (vec unsupported-keys)))}
+          (let [{input-binding :ok input-error :error}
+                (compile-session-binding :input previous-step-id session step-name->step-ref current-step-idx)
+                {reference-binding :ok reference-error :error}
+                (compile-session-binding :reference previous-step-id session step-name->step-ref current-step-idx)]
+            (cond
+              input-error
+              {:error input-error}
+
+              reference-error
+              {:error reference-error}
+
+              :else
+              {:ok {:input input-binding
+                    :original reference-binding}})))))))
+
+(defn- multi-step-reference-map
+  [steps step-order]
+  (into {}
+        (keep-indexed (fn [idx step]
+                        (when-let [step-name (:name step)]
+                          [step-name
+                           {:step-id (nth step-order idx)
+                            :idx idx}])))
+        steps))
 
 ;;; Single-step compilation
 
@@ -67,7 +223,6 @@
      :description description
      :step-order [step-id]
      :steps {step-id step-def}
-     ;; Carry source metadata for execution bridge
      :workflow-file-meta (cond-> {:system-prompt body}
                            (:tools config) (assoc :tools (:tools config))
                            (:skills config) (assoc :skills (:skills config))
@@ -77,15 +232,28 @@
 ;;; Multi-step compilation
 
 (defn- workflow-name->step-id-map
-  "Build a map from workflow names to compiled step-ids for goto resolution."
+  "Build a map for goto resolution.
+   Explicit `:name` values are authoritative. For backward compatibility,
+   unique delegated workflow names are also accepted when unambiguous."
   [steps step-order]
-  (into {}
-        (map-indexed (fn [idx step]
-                       [(:workflow step) (nth step-order idx)]))
-        steps))
+  (let [workflow-name-freqs (frequencies (keep :workflow steps))]
+    (into {}
+          (keep-indexed
+           (fn [idx step]
+             (cond
+               (:name step)
+               [(:name step) (nth step-order idx)]
+
+               (and (:workflow step)
+                    (= 1 (get workflow-name-freqs (:workflow step))))
+               [(:workflow step) (nth step-order idx)]
+
+               :else
+               nil))
+           steps))))
 
 (defn- resolve-routing-table
-  "Resolve :goto workflow names in a routing table to compiled step-ids.
+  "Resolve :goto step names in a routing table to compiled step-ids.
    Keywords (:next, :previous, :done) pass through without resolution."
   [on-table name->step-id]
   (when on-table
@@ -98,54 +266,65 @@
                     directive)]))
           on-table)))
 
+(defn- compile-multi-step-entry
+  [workflow-name step-order name->step-id step-ref-map idx step]
+  (let [step-id (nth step-order idx)
+        previous-step-id (when (pos? idx)
+                           (nth step-order (dec idx)))
+        delegated-workflow-name (:workflow step)
+        step-label (step-label step)
+        resolved-on (resolve-routing-table (:on step) name->step-id)
+        {input-bindings :ok binding-error :error}
+        (compile-step-input-bindings step previous-step-id step-ref-map idx)]
+    (when binding-error
+      (throw (ex-info (str "Workflow `" workflow-name "` step `" step-label "`: " binding-error)
+                      {:workflow workflow-name
+                       :step step-label
+                       :error binding-error})))
+    [step-id
+     (cond-> {:label (or step-label delegated-workflow-name step-id)
+              :description (str "Delegate to workflow `" delegated-workflow-name "`.")
+              :executor {:type :agent
+                         :profile delegated-workflow-name}
+              :prompt-template (:prompt step)
+              :input-bindings input-bindings
+              :result-schema default-result-schema
+              :retry-policy default-retry-policy}
+       (:judge step)
+       (assoc :judge (:judge step))
+
+       resolved-on
+       (assoc :on resolved-on))]))
+
 (defn compile-multi-step
   "Compile a parsed workflow file with `:steps` into an N-step canonical definition."
   [{:keys [name description config body]}]
   (let [steps (:steps config)
-        step-order (mapv multi-step-id (range) steps)
-        name->step-id (workflow-name->step-id-map steps step-order)
-        step-map (into {}
-                       (map-indexed
-                        (fn [idx step]
-                          (let [step-id (nth step-order idx)
-                                previous-step-id (when (pos? idx)
-                                                   (nth step-order (dec idx)))
-                                workflow-name (:workflow step)
-                                resolved-on (resolve-routing-table (:on step) name->step-id)]
-                            [step-id
-                             (cond-> {:label (or workflow-name step-id)
-                                      :description (str "Delegate to workflow `" workflow-name "`.")
-                                      :executor {:type :agent
-                                                 :profile workflow-name}
-                                      :prompt-template (:prompt step)
-                                      :input-bindings
-                                      (cond-> {:original {:source :workflow-input
-                                                          :path [:original]}}
-                                        previous-step-id
-                                        (assoc :input {:source :step-output
-                                                       :path [previous-step-id :outputs :text]})
-                                        (nil? previous-step-id)
-                                        (assoc :input {:source :workflow-input
-                                                       :path [:input]}))
-                                      :result-schema default-result-schema
-                                      :retry-policy default-retry-policy}
-                               (:judge step)
-                               (assoc :judge (:judge step))
-                               resolved-on
-                               (assoc :on resolved-on))])))
-                       steps)]
-    {:definition-id name
-     :name name
-     :summary description
-     :description description
-     :step-order step-order
-     :steps step-map
-     ;; Carry source metadata
-     :workflow-file-meta (cond-> {:framing-prompt body}
-                           (:tools config) (assoc :tools (:tools config))
-                           (:skills config) (assoc :skills (:skills config))
-                           (:thinking-level config) (assoc :thinking-level (:thinking-level config))
-                           (:model config) (assoc :model (:model config)))}))
+        duplicate-names (duplicate-step-names steps)]
+    (when (seq duplicate-names)
+      (throw (ex-info (str "Duplicate workflow step names: " (pr-str duplicate-names))
+                      {:duplicate-step-names duplicate-names})))
+    (let [step-order (mapv multi-step-id (range) steps)
+          name->step-id (workflow-name->step-id-map steps step-order)
+          step-ref-map (multi-step-reference-map steps step-order)
+          step-map (into {}
+                         (map-indexed (partial compile-multi-step-entry
+                                               name
+                                               step-order
+                                               name->step-id
+                                               step-ref-map)
+                                      steps))]
+      {:definition-id name
+       :name name
+       :summary description
+       :description description
+       :step-order step-order
+       :steps step-map
+       :workflow-file-meta (cond-> {:framing-prompt body}
+                             (:tools config) (assoc :tools (:tools config))
+                             (:skills config) (assoc :skills (:skills config))
+                             (:thinking-level config) (assoc :thinking-level (:thinking-level config))
+                             (:model config) (assoc :model (:model config)))})))
 
 ;;; Top-level compilation
 
@@ -157,18 +336,21 @@
 
    Returns {:definition <map>} on success, {:error <string>} on failure."
   [{:keys [name config error] :as parsed}]
-  (cond
-    error
-    {:error error}
+  (try
+    (cond
+      error
+      {:error error}
 
-    (nil? name)
-    {:error "Cannot compile: missing workflow name"}
+      (nil? name)
+      {:error "Cannot compile: missing workflow name"}
 
-    (seq (:steps config))
-    {:definition (compile-multi-step parsed)}
+      (seq (:steps config))
+      {:definition (compile-multi-step parsed)}
 
-    :else
-    {:definition (compile-single-step parsed)}))
+      :else
+      {:definition (compile-single-step parsed)})
+    (catch clojure.lang.ExceptionInfo e
+      {:error (.getMessage e)})))
 
 (defn compile-workflow-files
   "Compile a seq of parsed workflow files into canonical definitions.
@@ -218,7 +400,7 @@
    Checks:
    - :on without :judge is an error
    - :goto string targets reference known step-ids within the definition
-   Returns {:valid? true} or {:valid? false :errors [...]}."
+   Returns {:valid? true} or {:valid? false :errors [...]}"
   [definitions]
   (let [errors (into []
                      (mapcat
@@ -230,12 +412,10 @@
                                    has-judge? (some? (:judge step-def))
                                    on-table (:on step-def)]
                                (concat
-                                ;; :on without :judge
                                 (when (and has-on? (not has-judge?))
                                   [{:definition (:name definition)
                                     :step step-id
                                     :error :on-without-judge}])
-                                ;; :goto string targets must be known step-ids
                                 (when on-table
                                   (keep (fn [[signal directive]]
                                           (when (and (string? (:goto directive))

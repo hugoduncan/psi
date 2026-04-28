@@ -39,6 +39,29 @@
        "         {:workflow \"reviewer\" :prompt \"Review: $INPUT\\nOriginal: $ORIGINAL\"}]}\n\n"
        "Coordinate a plan-build-review cycle."))
 
+(def explicit-source-chain-md
+  (str "---\nname: bug-triage\ndescription: Modular bug triage\n---\n"
+       "{:steps [{:name \"discover\"\n"
+       "          :workflow \"planner\"\n"
+       "          :session {:input {:from :workflow-input}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"reproduce\"\n"
+       "          :workflow \"builder\"\n"
+       "          :session {:input {:from {:step \"discover\" :kind :accepted-result}}\n"
+       "                    :reference {:from :workflow-original}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"request-more-info\"\n"
+       "          :workflow \"reviewer\"\n"
+       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}}\n"
+       "                    :reference {:from :workflow-original}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"fix\"\n"
+       "          :workflow \"reviewer\"\n"
+       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}}\n"
+       "                    :reference {:from :workflow-original}}\n"
+       "          :prompt \"$INPUT\"}]}\n\n"
+       "Coordinate modular bug triage."))
+
 (def bad-md
   "---\nname: broken\n---\nNo description.")
 
@@ -64,7 +87,6 @@
       {"planner.md" planner-md
        "builder.md" builder-md}
       (fn [dir]
-        ;; Override scanning to use only our temp dir
         (with-redefs [loader/global-workflow-dirs (constantly [])
                       loader/project-workflow-dir (constantly dir)]
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
@@ -88,6 +110,32 @@
             (is (= 3 (count (get-in definitions ["plan-build-review" :step-order]))))
             (is (empty? errors)))))))
 
+  (testing "explicit named prior-step source selection loads and compiles"
+    (with-temp-workflow-dir
+      {"planner.md" planner-md
+       "builder.md" builder-md
+       "reviewer.md" reviewer-md
+       "bug-triage.md" explicit-source-chain-md}
+      (fn [dir]
+        (with-redefs [loader/global-workflow-dirs (constantly [])
+                      loader/project-workflow-dir (constantly dir)]
+          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
+                definition (get definitions "bug-triage")
+                [discover-id reproduce-id request-more-info-id fix-id] (:step-order definition)]
+            (is (empty? errors))
+            (is (= {:input {:source :workflow-input :path [:input]}
+                    :original {:source :workflow-input :path [:original]}}
+                   (get-in definition [:steps discover-id :input-bindings])))
+            (is (= {:input {:source :step-output :path [discover-id :outputs :text]}
+                    :original {:source :workflow-input :path [:original]}}
+                   (get-in definition [:steps reproduce-id :input-bindings])))
+            (is (= {:input {:source :step-output :path [reproduce-id :outputs :text]}
+                    :original {:source :workflow-input :path [:original]}}
+                   (get-in definition [:steps request-more-info-id :input-bindings])))
+            (is (= {:input {:source :step-output :path [reproduce-id :outputs :text]}
+                    :original {:source :workflow-input :path [:original]}}
+                   (get-in definition [:steps fix-id :input-bindings]))))))))
+
   (testing "unresolved step references reported as errors"
     (with-temp-workflow-dir
       {"plan-build-review.md" chain-md}
@@ -95,7 +143,6 @@
         (with-redefs [loader/global-workflow-dirs (constantly [])
                       loader/project-workflow-dir (constantly dir)]
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
-            ;; Definition still compiled, but errors reported for missing refs
             (is (= 1 (count definitions)))
             (is (seq errors))
             (is (some #(re-find #"unknown workflow" (:error %)) errors)))))))
@@ -129,6 +176,28 @@
             (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
               (is (seq errors))
               (is (some #(re-find #"no `:judge`" (:error %)) errors)))))))))
+
+(deftest load-workflow-definitions-session-source-validation-test
+  (testing "forward step references surface as load errors"
+    (let [bad-forward-md (str "---\nname: bad-forward\ndescription: Bad forward\n---\n"
+                              "{:steps [{:name \"plan\"\n"
+                              "          :workflow \"planner\"\n"
+                              "          :session {:input {:from {:step \"review\" :kind :accepted-result}}}\n"
+                              "          :prompt \"$INPUT\"}\n"
+                              "         {:name \"review\"\n"
+                              "          :workflow \"reviewer\"\n"
+                              "          :prompt \"$INPUT\"}]}\n\n"
+                              "Bad forward chain.")]
+      (with-temp-workflow-dir
+        {"planner.md" planner-md
+         "reviewer.md" reviewer-md
+         "bad-forward.md" bad-forward-md}
+        (fn [dir]
+          (with-redefs [loader/global-workflow-dirs (constantly [])
+                        loader/project-workflow-dir (constantly dir)]
+            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
+              (is (seq errors))
+              (is (some #(re-find #"Forward step reference" (:error %)) errors)))))))))
 
 (deftest directory-precedence-test
   (testing "project definitions override global definitions with same name"

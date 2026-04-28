@@ -34,6 +34,35 @@
    :config {:tools ["read"]}
    :body nil})
 
+(def multi-step-with-names-and-session-sources
+  {:name "gh-bug-triage-modular"
+   :description "Bug triage with explicit source selection"
+   :config {:steps [{:name "discover"
+                     :workflow "gh-bug-discover-and-read"
+                     :session {:input {:from :workflow-input}}
+                     :prompt "$INPUT"}
+                    {:name "worktree"
+                     :workflow "gh-issue-create-worktree"
+                     :session {:input {:from {:step "discover" :kind :accepted-result}}
+                               :reference {:from :workflow-original}}
+                     :prompt "$INPUT"}
+                    {:name "reproduce"
+                     :workflow "gh-bug-reproduce"
+                     :session {:input {:from {:step "worktree" :kind :accepted-result}}
+                               :reference {:from :workflow-original}}
+                     :prompt "$INPUT"}
+                    {:name "request-more-info"
+                     :workflow "gh-bug-request-more-info"
+                     :session {:input {:from {:step "reproduce" :kind :accepted-result}}
+                               :reference {:from :workflow-original}}
+                     :prompt "$INPUT"}
+                    {:name "fix"
+                     :workflow "gh-bug-fix-and-pr"
+                     :session {:input {:from {:step "reproduce" :kind :accepted-result}}
+                               :reference {:from :workflow-original}}
+                     :prompt "$INPUT"}]}
+   :body "Coordinate bug triage."})
+
 ;;; Single-step compilation
 
 (deftest compile-single-step-test
@@ -46,16 +75,12 @@
       (is (= ["step-1"] (:step-order definition)))
       (is (= 1 (count (:steps definition))))
       (is (workflow-model/valid-workflow-definition? definition))
-      ;; Executor carries the profile name
       (is (= {:type :agent :profile "planner"}
              (get-in definition [:steps "step-1" :executor])))
-      ;; Prompt template is passthrough
       (is (= "$INPUT" (get-in definition [:steps "step-1" :prompt-template])))
-      ;; Input bindings wire workflow-input
       (is (= {:input {:source :workflow-input :path [:input]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps "step-1" :input-bindings])))
-      ;; Source metadata carries system prompt
       (is (= "You are a planner." (get-in definition [:workflow-file-meta :system-prompt])))))
 
   (testing "single-step with config carries tools and skills in metadata"
@@ -85,23 +110,18 @@
       (is (= "plan-build-review" (:name definition)))
       (is (= 3 (count (:step-order definition))))
       (is (workflow-model/valid-workflow-definition? definition))
-      ;; Step 1: input from workflow-input
       (is (= {:input {:source :workflow-input :path [:input]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps plan-id :input-bindings])))
-      ;; Step 2: input from step 1 output
       (is (= {:input {:source :step-output :path [plan-id :outputs :text]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps build-id :input-bindings])))
-      ;; Step 3: input from step 2 output
       (is (= {:input {:source :step-output :path [build-id :outputs :text]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps review-id :input-bindings])))
-      ;; Prompt templates preserved
       (is (= "$INPUT" (get-in definition [:steps plan-id :prompt-template])))
       (is (= "Execute: $INPUT\nOriginal: $ORIGINAL"
              (get-in definition [:steps build-id :prompt-template])))
-      ;; Framing prompt in metadata
       (is (= "Coordinate a plan-build-review cycle."
              (get-in definition [:workflow-file-meta :framing-prompt])))))
 
@@ -111,6 +131,66 @@
       (is (= "planner" (get-in definition [:steps plan-id :executor :profile])))
       (is (= "builder" (get-in definition [:steps build-id :executor :profile])))
       (is (= "reviewer" (get-in definition [:steps review-id :executor :profile]))))))
+
+(deftest compile-multi-step-session-source-selection-test
+  (testing "explicit named prior-step source selection compiles to canonical input bindings"
+    (let [{:keys [definition error]} (compiler/compile-workflow-file multi-step-with-names-and-session-sources)
+          [discover-id worktree-id reproduce-id request-more-info-id fix-id] (:step-order definition)]
+      (is (nil? error))
+      (is (workflow-model/valid-workflow-definition? definition))
+      (is (= {:input {:source :workflow-input :path [:input]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps discover-id :input-bindings])))
+      (is (= {:input {:source :step-output :path [discover-id :outputs :text]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps worktree-id :input-bindings])))
+      (is (= {:input {:source :step-output :path [worktree-id :outputs :text]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps reproduce-id :input-bindings])))
+      (is (= {:input {:source :step-output :path [reproduce-id :outputs :text]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps request-more-info-id :input-bindings])))
+      (is (= {:input {:source :step-output :path [reproduce-id :outputs :text]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps fix-id :input-bindings])))))
+
+  (testing "partial session override preserves current defaults"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:name "partial-override"
+            :description "Partial override"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :prompt "$INPUT"}
+                             {:name "build"
+                              :workflow "builder"
+                              :session {:reference {:from :workflow-original}}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})
+          [plan-id build-id] (:step-order definition)]
+      (is (nil? error))
+      (is (= {:input {:source :step-output :path [plan-id :outputs :text]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps build-id :input-bindings])))))
+
+  (testing "empty session map is equivalent to absent session block"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:name "empty-session"
+            :description "Empty session"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :prompt "$INPUT"}
+                             {:name "build"
+                              :workflow "builder"
+                              :session {}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})
+          [plan-id build-id] (:step-order definition)]
+      (is (nil? error))
+      (is (= {:input {:source :step-output :path [plan-id :outputs :text]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps build-id :input-bindings]))))))
 
 ;;; Error handling
 
@@ -122,6 +202,88 @@
   (testing "missing name returns error"
     (let [{:keys [error]} (compiler/compile-workflow-file {:name nil :description "x" :config nil :body "x"})]
       (is (string? error)))))
+
+(deftest compile-session-source-validation-test
+  (testing "unknown step name fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-source"
+            :description "Bad source"
+            :config {:steps [{:name "plan" :workflow "planner" :prompt "$INPUT"}
+                             {:name "build"
+                              :workflow "builder"
+                              :session {:input {:from {:step "missing" :kind :accepted-result}}}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Unknown step name" error))))
+
+  (testing "forward step reference fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "forward-source"
+            :description "Forward source"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:input {:from {:step "review" :kind :accepted-result}}}
+                              :prompt "$INPUT"}
+                             {:name "review" :workflow "reviewer" :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Forward step reference" error))))
+
+  (testing "present but empty input map is malformed"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "empty-input"
+            :description "Empty input"
+            :config {:steps [{:name "plan" :workflow "planner" :session {:input {}} :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"expected non-empty map with `:from`" error))))
+
+  (testing "unsupported projection keys fail clearly before task 061"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "projection-too-early"
+            :description "Projection too early"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:input {:from :workflow-input
+                                                :projection :text}}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Unsupported `:session input :projection` before task 061" error))))
+
+  (testing "unsupported session keys fail clearly for task 060"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "unsupported-session-key"
+            :description "Unsupported session key"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:preload [{:from :workflow-input}]}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Unsupported `:session` keys for task 060" error))))
+
+  (testing "duplicate author-facing step names fail clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "duplicate-step-names"
+            :description "Duplicate step names"
+            :config {:steps [{:name "build" :workflow "planner" :prompt "$INPUT"}
+                             {:name "build" :workflow "reviewer" :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Duplicate workflow step names" error))))
+
+  (testing "repeated delegated workflow names remain valid without explicit step names"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:name "repeat-workflow"
+            :description "Repeated delegated workflow"
+            :config {:steps [{:workflow "lambda-compiler" :prompt "$INPUT"}
+                             {:workflow "lambda-compiler" :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (nil? error))
+      (is (= 2 (count (:step-order definition)))))))
 
 ;;; Batch compilation
 
@@ -152,7 +314,6 @@
 
   (testing "missing reference detected"
     (let [defs [(-> (compiler/compile-workflow-file single-step-no-config) :definition)
-                ;; Multi-step references "builder" and "reviewer" which are not defined
                 (-> (compiler/compile-workflow-file multi-step-parsed) :definition)]
           result (compiler/validate-step-references defs)]
       (is (false? (:valid? result)))
@@ -193,17 +354,14 @@
           [_plan-id build-id review-id] (:step-order definition)]
       (is (nil? error))
       (is (workflow-model/valid-workflow-definition? definition))
-      ;; Judge threaded onto review step
       (is (= {:prompt "APPROVED or REVISE?"
               :system-prompt "You are a routing judge."
               :projection {:type :tail :turns 1}}
              (get-in definition [:steps review-id :judge])))
-      ;; :on threaded with goto "builder" resolved to compiled step-id
       (let [on-table (get-in definition [:steps review-id :on])]
         (is (= {:goto :next} (get on-table "APPROVED")))
         (is (= build-id (get-in on-table ["REVISE" :goto])))
         (is (= 3 (get-in on-table ["REVISE" :max-iterations]))))
-      ;; Steps without judge have no :judge or :on
       (is (nil? (get-in definition [:steps _plan-id :judge])))
       (is (nil? (get-in definition [:steps _plan-id :on]))))))
 
