@@ -5,9 +5,11 @@
    prompt/config semantics stay aligned across workflow paths."
   (:require
    [clojure.string :as str]
+   [psi.agent-session.persistence :as persistence]
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
-   [psi.agent-session.tool-defs :as tool-defs]))
+   [psi.agent-session.tool-defs :as tool-defs]
+   [psi.agent-session.workflow-judge :as workflow-judge]))
 
 (defn- get-path*
   [m path]
@@ -43,6 +45,42 @@
                  (assoc acc k (binding-source-value workflow-run ref)))
                {}
                (or bindings {}))))
+
+(defn materialize-step-session-preload
+  "Materialize compiled `:session-preload` entries into canonical child-session
+   preloaded messages.
+
+   Canonical transcript/message source of truth:
+   - value preload entries read from the workflow run's canonical binding sources
+   - transcript preload entries read from the step execution session's canonical
+     persisted journal via `persistence/messages-from-entries-in`
+   - transcript projection is delegated to `workflow-judge/project-messages` so
+     workflow judge and workflow step preload share one deterministic projection
+     implementation"
+  [ctx workflow-run step-id]
+  (let [preload-spec (get-in workflow-run [:effective-definition :steps step-id :session-preload])]
+    (when (seq preload-spec)
+      (->> preload-spec
+           (mapcat (fn [entry]
+                     (case (:kind entry)
+                       :value
+                       (let [value (binding-source-value workflow-run (:binding entry))]
+                         (if (some? value)
+                           [{:role (:role entry)
+                             :content (str value)}]
+                           []))
+
+                       :session-transcript
+                       (let [attempts (get-in workflow-run [:step-runs (:step-id entry) :attempts])
+                             session-id (some-> attempts last :execution-session-id)
+                             messages (if session-id
+                                        (vec (persistence/messages-from-entries-in ctx session-id))
+                                        [])]
+                         (workflow-judge/project-messages messages (:projection entry)))
+
+                       [])))
+           vec
+           not-empty))))
 
 (defn render-prompt-template
   [prompt-template step-inputs]

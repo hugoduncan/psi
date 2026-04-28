@@ -112,6 +112,17 @@
    [:capability-policy {:optional true} workflow-capability-policy-schema]
    [:judge {:optional true} [:maybe judge-schema]]
    [:on {:optional true} [:maybe routing-table-schema]]
+   [:session-preload {:optional true}
+    [:vector
+     [:or
+      [:map
+       [:kind [:= :value]]
+       [:role :string]
+       [:binding workflow-binding-ref-schema]]
+      [:map
+       [:kind [:= :session-transcript]]
+       [:step-id workflow-step-id-schema]
+       [:projection {:optional true} [:maybe projection-schema]]]]]]
    [:session-overrides {:optional true}
     [:map
      [:system-prompt {:optional true} :string]

@@ -102,7 +102,9 @@
         {input-bindings :ok binding-error :error}
         (authoring-resolution/compile-step-input-bindings step previous-step-id step-source-ref-map idx)
         {session-overrides :ok override-error :error}
-        (authoring-resolution/compile-step-session-overrides step)]
+        (authoring-resolution/compile-step-session-overrides step)
+        {session-preload :ok preload-error :error}
+        (authoring-resolution/compile-step-session-preload step step-source-ref-map idx)]
     (when binding-error
       (throw (ex-info (str "Workflow `" workflow-name "` step `" step-label "`: " binding-error)
                       {:workflow workflow-name
@@ -113,6 +115,11 @@
                       {:workflow workflow-name
                        :step step-label
                        :error override-error})))
+    (when preload-error
+      (throw (ex-info (str "Workflow `" workflow-name "` step `" step-label "`: " preload-error)
+                      {:workflow workflow-name
+                       :step step-label
+                       :error preload-error})))
     [step-id
      (cond-> {:label (or step-label delegated-workflow-name step-id)
               :description (str "Delegate to workflow `" delegated-workflow-name "`.")
@@ -129,7 +136,10 @@
        (assoc :on resolved-on)
 
        (seq session-overrides)
-       (assoc :session-overrides session-overrides))]))
+       (assoc :session-overrides session-overrides)
+
+       (seq session-preload)
+       (assoc :session-preload session-preload))]))
 
 (defn compile-multi-step
   "Compile a parsed workflow file with `:steps` into an N-step canonical definition."

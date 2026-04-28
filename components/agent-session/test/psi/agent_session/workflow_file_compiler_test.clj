@@ -395,17 +395,52 @@
               :body "Frame."})]
         (is (re-find expected-re error) label))))
 
-  (testing "unsupported session keys fail clearly for tasks 060-062"
-    (let [{:keys [error]}
+  (testing "session preload compiles for task 063 surfaces"
+    (let [{:keys [definition error]}
           (compiler/compile-workflow-file
-           {:name "unsupported-session-key"
-            :description "Unsupported session key"
+           {:name "session-preload"
+            :description "Session preload"
             :config {:steps [{:name "plan"
                               :workflow "planner"
-                              :session {:preload [{:from :workflow-input}]}
+                              :prompt "$INPUT"}
+                             {:name "review"
+                              :workflow "reviewer"
+                              :session {:input {:from {:step "plan" :kind :accepted-result}}
+                                        :preload [{:from :workflow-original}
+                                                  {:from {:step "plan" :kind :accepted-result}
+                                                   :projection :full}
+                                                  {:from {:step "plan" :kind :session-transcript}
+                                                   :projection {:type :tail :turns 2 :tool-output false}}]}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})
+          [_plan-id review-id] (:step-order definition)]
+      (is (nil? error))
+      (is (= [{:kind :value
+               :role "user"
+               :binding {:source :workflow-input :path [:original]}}
+              {:kind :value
+               :role "assistant"
+               :binding {:source :step-output :path [_plan-id]}}
+              {:kind :session-transcript
+               :step-id _plan-id
+               :projection {:type :tail :turns 2 :tool-output false}}]
+             (get-in definition [:steps review-id :session-preload])))))
+
+  (testing "malformed preload validation errors surface clearly through compiler"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-preload"
+            :description "Bad preload"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :prompt "$INPUT"}
+                             {:name "review"
+                              :workflow "reviewer"
+                              :session {:preload [{:from {:step "plan" :kind :session-transcript}
+                                                   :projection {:type :head :turns 1}}]}
                               :prompt "$INPUT"}]}
             :body "Frame."})]
-      (is (re-find #"unsupported keys \[:preload\] for tasks 060-062 in `:session`" error))))
+      (is (re-find #"unsupported transcript/message projection" error))))
 
   (testing "one representative malformed override still surfaces clearly through compiler"
     (let [{:keys [error]}

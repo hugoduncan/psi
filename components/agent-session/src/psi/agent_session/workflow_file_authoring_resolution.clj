@@ -10,6 +10,7 @@
 
 (def compile-step-input-bindings session/compile-step-input-bindings)
 (def compile-step-session-overrides session/compile-step-session-overrides)
+(def compile-step-session-preload session/compile-step-session-preload)
 (def step-source-reference-map session/step-source-reference-map)
 (def routing-target->step-id-map routing/routing-target->step-id-map)
 (def resolve-routing-table routing/resolve-routing-table)

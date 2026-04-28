@@ -239,6 +239,7 @@
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
               step-config (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id)
               {:keys [prompt]} (workflow-step-prep/step-prompt workflow-run step-id)
+              preloaded-messages (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id)
               {:keys [attempt execution-session]}
               (workflow-attempts/create-step-attempt-session!
                ctx
@@ -256,7 +257,10 @@
                  (assoc :skills (:skills step-config))
 
                  (:model step-config)
-                 (assoc :model (:model step-config))))]
+                 (assoc :model (:model step-config))
+
+                 preloaded-messages
+                 (assoc :preloaded-messages preloaded-messages)))]
           (swap! working-memory*
                  (fn [wm]
                    (-> wm

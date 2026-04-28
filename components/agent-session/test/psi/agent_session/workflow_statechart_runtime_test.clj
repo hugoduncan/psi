@@ -5,6 +5,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-control]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-judge]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-statechart-runtime :as runtime]))
@@ -215,6 +216,53 @@
       (is (= "judge-r" (:judge-session-id review-attempt)))
       (is (nil? (:pending-judge-result @(:working-memory* wf-ctx))))
       (is (nil? (:pending-routing @(:working-memory* wf-ctx)))))))
+
+(deftest step-entry-preloads-compiled-session-context-test
+  (let [[ctx session-id] (create-session-context)
+        definition {:definition-id "preload-run"
+                    :step-order ["plan" "review"]
+                    :steps {"plan" {:executor {:type :agent :profile "planner"}
+                                    :prompt-template "$INPUT"
+                                    :input-bindings {:input {:source :workflow-input :path [:input]}}
+                                    :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                    :retry-policy {:max-attempts 1 :retry-on #{}}}
+                            "review" {:executor {:type :agent :profile "reviewer"}
+                                      :prompt-template "$INPUT"
+                                      :input-bindings {:input {:source :step-output :path ["plan" :outputs :text]}}
+                                      :session-preload [{:kind :value
+                                                         :role "user"
+                                                         :binding {:source :workflow-input :path [:original]}}]
+                                      :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                      :retry-policy {:max-attempts 1 :retry-on #{}}}}}
+        created* (atom nil)]
+    (install-run! ctx definition "run-preload")
+    (swap! (:state* ctx)
+           (fn [state]
+             (-> state
+                 (assoc-in [:workflows :runs "run-preload" :workflow-input]
+                           {:input "go" :original "Original request"})
+                 (assoc-in [:workflows :runs "run-preload" :current-step-id] "review")
+                 (assoc-in [:workflows :runs "run-preload" :step-runs "plan" :accepted-result]
+                           {:outcome :ok :outputs {:text "plan text"}})
+                 (assoc-in [:workflows :runs "run-preload" :step-runs "plan" :attempts]
+                           [{:attempt-id "a1" :status :succeeded :execution-session-id session-id}]))))
+    (let [wf-ctx (runtime/create-workflow-context ctx session-id "run-preload")]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (reset! created* opts)
+                      {:attempt {:attempt-id (:attempt-id opts)
+                                 :status :pending
+                                 :execution-session-id "review-child"}
+                       :execution-session {:session-id "review-child"}})
+                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _prompt] nil)
+                    psi.agent-session.prompt-control/last-assistant-message-in
+                    (fn [_ctx _sid]
+                      {:role "assistant"
+                       :content [{:type :text :text "reviewed"}]
+                       :stop-reason :stop})]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (is (= [{:role "user" :content "Original request"}]
+             (:preloaded-messages @created*))))))
 
 (deftest judged-review-revise-routes-to-build-test
   (testing "REVISE routing belongs in workflow_execution/integration shape; runtime test only asserts judged recording path here"

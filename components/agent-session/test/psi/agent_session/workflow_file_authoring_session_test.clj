@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-file-authoring-session :as authoring-session]))
 
-(def ^:private step-name->step-ref
+(def ^:private default-step-name->step-ref
   {"discover" {:step-id "step-1-discover" :idx 0}})
 
 (def ^:private input-validation-cases
@@ -49,6 +49,30 @@
     :step {:session {:thinking-level :ultra}}
     :expected-re #"expected one of :off, :minimal, :low, :medium, :high, :xhigh in `:session thinking-level`"}])
 
+(def ^:private preload-validation-cases
+  [{:label "preload requires vector"
+    :step {:session {:preload {:from :workflow-input}}}
+    :expected-re #"expected vector in `:session preload`"}
+   {:label "preload entry requires map"
+    :step {:session {:preload [:bad]}}
+    :expected-re #"expected map entries in `:session preload`"}
+   {:label "preload transcript projection rejects unsupported operator"
+    :step {:session {:preload [{:from {:step "discover" :kind :session-transcript}
+                                :projection {:type :head :turns 1}}]}}
+    :expected-re #"unsupported transcript/message projection"}
+   {:label "preload transcript projection requires positive turns"
+    :step {:session {:preload [{:from {:step "discover" :kind :session-transcript}
+                                :projection {:type :tail :turns 0}}]}}
+    :expected-re #"expected positive `:turns`"}
+   {:label "preload rejects unknown step names"
+    :step {:session {:preload [{:from {:step "missing" :kind :accepted-result}}]}}
+    :expected-re #"Unknown step name"}
+   {:label "preload rejects forward step references"
+    :step {:session {:preload [{:from {:step "discover" :kind :accepted-result}}]}}
+    :step-name->step-ref {}
+    :current-step-idx 0
+    :expected-re #"Unknown step name|Forward step reference"}])
+
 (deftest compile-step-input-bindings-validation-table-test
   (testing "malformed projection/source validation remains clear across representative cases"
     (doseq [{:keys [label step expected-re]} input-validation-cases]
@@ -56,7 +80,7 @@
             (authoring-session/compile-step-input-bindings
              step
              "step-0"
-             step-name->step-ref
+             default-step-name->step-ref
              1)]
         (is (string? error) label)
         (is (re-find expected-re error) label)))))
@@ -66,5 +90,16 @@
     (doseq [{:keys [label step expected-re]} override-validation-cases]
       (let [{:keys [error]}
             (authoring-session/compile-step-session-overrides step)]
+        (is (string? error) label)
+        (is (re-find expected-re error) label)))))
+
+(deftest compile-step-session-preload-validation-table-test
+  (testing "preload validation remains clear across representative cases"
+    (doseq [{:keys [label step expected-re step-name->step-ref current-step-idx]} preload-validation-cases]
+      (let [{:keys [error]}
+            (authoring-session/compile-step-session-preload
+             step
+             (or step-name->step-ref default-step-name->step-ref)
+             (or current-step-idx 1))]
         (is (string? error) label)
         (is (re-find expected-re error) label)))))
