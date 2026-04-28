@@ -41,8 +41,9 @@ Task 060 should introduce a narrow `:session` source-selection form.
 Preferred initial shape:
 
 ```clojure
-{:workflow "gh-bug-request-more-info"
- :session {:input {:from {:step "gh-bug-reproduce" :kind :accepted-result}}
+{:name "request-more-info"
+ :workflow "gh-bug-request-more-info"
+ :session {:input {:from {:step "reproduce" :kind :accepted-result}}
            :reference {:from :workflow-original}}
  :prompt "$INPUT"}
 ```
@@ -50,28 +51,38 @@ Preferred initial shape:
 Equivalent workflow-input example:
 
 ```clojure
-{:workflow "reporter"
+{:name "report"
+ :workflow "reporter"
  :session {:input {:from :workflow-input}
            :reference {:from :workflow-original}}
  :prompt "$INPUT"}
 ```
 
+In task `060`, `{:step "<step-name>" ...}` refers to the author-facing step `:name`, not the delegated `:workflow` name.
+
 Task-060-specific semantics:
 - `:input` controls the current working input channel only
 - `:reference` controls the built-in reference/original prompt channel only
+- `:session :input` determines the canonical binding consumed by `$INPUT`
+- `:session :reference` determines the canonical binding consumed by `$ORIGINAL`
 - neither field preloads transcript/message context into the child session; that later capability belongs to task `063`
+- task `060` introduces source selection only; it does not introduce a projection key such as `:project` on `:input` or `:reference`
+- projection vocabulary is deferred to task `061`
 - unspecified source-selection fields preserve existing defaults
+- empty `:session {}` is equivalent to an absent `:session` block for this task
 
 ### Default source meanings in task 060
 
 For this task, source selection should compile with explicit default meanings:
 - `{:from :workflow-input}` under `:session :input`
-  - compiles to canonical workflow-input binding at path `[:input]`
+  - compiles to the existing canonical workflow-input binding at path `[:input]`
 - `{:from :workflow-original}` under `:session :reference`
-  - compiles to canonical workflow-input binding at path `[:original]`
+  - compiles to the existing canonical workflow-input binding at path `[:original]`
 - `{:from {:step "<step-name>" :kind :accepted-result}}` under `:session :input`
-  - defaults to the same accepted-result text path the current compiler uses for previous-step chaining
-  - i.e. this task should preserve current linear semantics by default when the selected prior step is used as the source
+  - compiles to the existing canonical accepted-result binding shape/path already used for previous-step chaining
+  - i.e. this task preserves current linear accepted-result semantics while allowing the author to select a named earlier step explicitly
+
+Task `060` does not redefine the canonical `:input-bindings` structure. It reuses the existing canonical binding shapes and makes the source-selection authoring explicit.
 
 Task 060 changes source-selection authoring only. Prompt rendering semantics remain unchanged and continue to consume canonical `:input-bindings`.
 
@@ -81,11 +92,13 @@ Task 060 changes source-selection authoring only. Prompt rendering semantics rem
 - partial overrides are allowed:
   - specifying only `:input` leaves `:reference` at its current default
   - specifying only `:reference` leaves `:input` at its current default
+- present-but-empty `:input {}` or `:reference {}` is malformed
 - validation errors should distinguish at least:
   - malformed source form
   - unknown step name
   - forward reference to a later-defined step
-- unsupported `:session` keys for this task should fail clearly rather than being silently ignored
+  - use of projection-oriented keys such as `:project` before task `061` lands
+- unsupported `:session` keys for this task should fail clearly rather than being silently ignored while task `060` alone defines the implemented `:session` surface
 
 ## Acceptance
 

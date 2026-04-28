@@ -9,5 +9,5 @@ Implement the narrowest useful slice first.
    - selected prior-step accepted result -> current accepted-result text path by default
 3. Extend `workflow_file_compiler.clj` to compile that syntax to canonical `:input-bindings`.
 4. Validate malformed source forms, unknown step names, and forward references by definition order.
-5. Add compiler/loader tests proving branch-safe non-adjacent data flow and partial-override behavior.
+5. Add compiler/loader tests proving named prior-step non-adjacent source selection and partial-override behavior.
 6. Keep all existing workflow files working unchanged when the new syntax is absent.

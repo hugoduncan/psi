@@ -105,10 +105,33 @@ Each step may gain an optional session-shaping block named `:session`.
 
 This task should treat `:session` as the primary authoring surface from the first implementation slice onward. A separate `:bind` surface may still exist as a convenience later, but the task should not begin with a throwaway prompt-binding-only syntax that has to be replaced immediately.
 
+### Step identity and references
+
+For multi-step workflows, each step should have an author-facing `:name`.
+
+`059` should treat `:name` as the canonical step reference surface for:
+- `{:step "..."}` source references under `:session`
+- named `:goto` targets under `:on`
+- docs/examples that need to talk about a specific step independent of compiled step ids
+
+Rules:
+- `:name` is required for multi-step workflow steps
+- `:name` must be unique within the workflow file
+- repeated use of the same `:workflow` is allowed; `:name` is what disambiguates distinct step instances
+- compiled/runtime step ids remain internal; author-facing workflow files should reference `:name`
+- `:goto` may still use control keywords such as `:next`, `:previous`, and `:done`, but any named target should refer to a step `:name`
+
+This removes ambiguity for cases such as:
+- repeated `lambda-compiler` usage in a chain
+- loop-back routing to a prior step
+- branching to one of several later steps
+- explicit source selection from a non-adjacent upstream step
+
 Illustrative shape:
 
 ```clojure
-{:workflow "reviewer"
+{:name "review"
+ :workflow "reviewer"
  :session {:system-prompt "...optional override..."
            :tools ["read" "bash"]
            :skills ["review-skill"]
@@ -121,6 +144,31 @@ Illustrative shape:
 
 The session block is the high-level authoring surface. Prompt bindings are subordinate to it.
 
+### Canonical authoring shapes
+
+Single-step workflows may continue to use today's top-level workflow form.
+
+Multi-step workflows should continue to use `{:steps [...]}` with each step carrying its own `:name`.
+
+Illustrative multi-step shape:
+
+```clojure
+{:steps [{:name "plan"
+          :workflow "planner"
+          :prompt "$INPUT"}
+         {:name "build"
+          :workflow "builder"
+          :prompt "Execute this plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"}
+         {:name "review"
+          :workflow "reviewer"
+          :prompt "Review the following implementation:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+          :judge {:prompt "Reply with exactly APPROVED or REVISE."}
+          :on {"APPROVED" {:goto :done}
+               "REVISE" {:goto "build" :max-iterations 3}}}]}
+```
+
+This task does not need to redesign the top-level single-step workflow surface. It does need to make the multi-step step identity and reference rules explicit and consistent.
+
 ### Child-task anchor examples
 
 The umbrella keeps a few anchor examples so the child tasks share one intended authoring direction.
@@ -128,10 +176,10 @@ The umbrella keeps a few anchor examples so the child tasks share one intended a
 Example shape for explicit current-input source selection (implemented by task `060`):
 
 ```clojure
-{:workflow "gh-bug-request-more-info"
- :session {:input {:from {:step "gh-bug-reproduce"
-                          :kind :accepted-result}
-                   :project :text}
+{:name "request-more-info"
+ :workflow "gh-bug-request-more-info"
+ :session {:input {:from {:step "reproduce"
+                          :kind :accepted-result}}
            :reference {:from :workflow-original}}
  :prompt "$INPUT"}
 ```
@@ -139,10 +187,86 @@ Example shape for explicit current-input source selection (implemented by task `
 Equivalent explicit workflow-input example:
 
 ```clojure
-{:workflow "reporter"
+{:name "report"
+ :workflow "reporter"
  :session {:input {:from :workflow-input}
            :reference {:from :workflow-original}}
  :prompt "$INPUT"}
+```
+
+Representative chain example:
+
+```clojure
+{:steps [{:name "compile-1"
+          :workflow "lambda-compiler"
+          :session {:input {:from :workflow-input}
+                    :reference {:from :workflow-original}}
+          :prompt "compile a lambda for: $INPUT"}
+         {:name "decompile"
+          :workflow "lambda-decompiler"
+          :session {:input {:from {:step "compile-1" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "decompile the lambda expression: $INPUT"}
+         {:name "compile-2"
+          :workflow "lambda-compiler"
+          :session {:input {:from {:step "decompile" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "compile a lambda for: $INPUT"}]}
+```
+
+Representative loop example:
+
+```clojure
+{:steps [{:name "plan"
+          :workflow "planner"
+          :session {:input {:from :workflow-input}
+                    :reference {:from :workflow-original}}
+          :prompt "$INPUT"}
+         {:name "build"
+          :workflow "builder"
+          :session {:input {:from {:step "plan" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "Execute this plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"}
+         {:name "review"
+          :workflow "reviewer"
+          :session {:input {:from {:step "build" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "Review the following implementation:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+          :judge {:prompt "Reply with exactly APPROVED or REVISE."}
+          :on {"APPROVED" {:goto :done}
+               "REVISE" {:goto "build" :max-iterations 3}}}]}
+```
+
+Representative fork example:
+
+```clojure
+{:steps [{:name "discover"
+          :workflow "gh-bug-discover-and-read"
+          :session {:input {:from :workflow-input}}
+          :prompt "$INPUT"}
+         {:name "worktree"
+          :workflow "gh-issue-create-worktree"
+          :session {:input {:from {:step "discover" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "$INPUT"}
+         {:name "reproduce"
+          :workflow "gh-bug-reproduce"
+          :session {:input {:from {:step "worktree" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "$INPUT"
+          :judge {:prompt "Reply with exactly REPRODUCIBLE or NOT_REPRODUCIBLE."}
+          :on {"REPRODUCIBLE" {:goto "fix"}
+               "NOT_REPRODUCIBLE" {:goto "request-more-info"}}}
+         {:name "request-more-info"
+          :workflow "gh-bug-request-more-info"
+          :session {:input {:from {:step "reproduce" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "$INPUT"}
+         {:name "fix"
+          :workflow "gh-bug-fix-and-pr"
+          :session {:input {:from {:step "reproduce" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "$INPUT"}]}
 ```
 
 These examples are design anchors for the child tasks, not a claim that task 059 itself implements them directly.
@@ -172,7 +296,7 @@ Later child tasks may add:
 - `{:step "<step-name>" :kind :session-transcript}`
 - narrowly justified workflow runtime metadata sources if a concrete need emerges
 
-Preferred author-facing references use stable step names/workflow names from the file, not compiled step ids.
+Preferred author-facing references use stable step `:name` values from the file, not delegated `:workflow` names or compiled step ids.
 
 ### Source-direction rule
 
@@ -187,6 +311,10 @@ This task should include a projection model that is useful for both:
 - preloaded/reference conversation shaping
 
 The projection vocabulary should stay constrained.
+
+Authoring should keep source selection and projection as separate concerns:
+- child task `060` introduces source selection only via `{:from ...}` under `:session :input` and `:session :reference`
+- child task `061` introduces projection vocabulary as a separate layer under those source-selection entries, rather than overloading task-060 source forms with ad hoc projection keys
 
 Child task `061` should provide the minimum projection vocabulary:
 - `:text`
@@ -284,6 +412,137 @@ The runtime already has session-shaping concepts such as:
 - access to the parent/runtime extension and workflow environment
 
 This task should unify and expose those more deliberately in workflow-file authoring.
+
+## Compact syntax cheat sheet
+
+This section is a concise authoring summary for the intended `059`–`064` workflow-file surface.
+
+### Top-level shapes
+
+Single-step workflows may continue to use the existing top-level workflow form.
+
+Multi-step workflows use:
+
+```clojure
+{:steps [step ...]}
+```
+
+### Step shape
+
+```clojure
+{:name "step-name"
+ :workflow "delegated-workflow"
+ :session {...optional session shaping...}
+ :prompt "...optional prompt template..."
+ :judge {...optional judge...}
+ :on {...optional routing...}}
+```
+
+Rules:
+- multi-step steps use required unique `:name`
+- `:workflow` selects the delegated workflow/executor
+- author-facing references target step `:name`, not `:workflow` and not compiled step ids
+
+### Source selection
+
+Current working input and original/reference binding are selected under `:session`:
+
+```clojure
+:session {:input {:from source}
+          :reference {:from source}}
+```
+
+First-cut source forms:
+- `:workflow-input`
+- `:workflow-original`
+- `{:step "<step-name>" :kind :accepted-result}`
+- later: `{:step "<step-name>" :kind :session-transcript}`
+
+Rules:
+- `{:step "<step-name>" ...}` targets step `:name`
+- first-cut explicit step references may target only earlier steps in definition order
+- `$INPUT` is owned by `:session :input`
+- `$ORIGINAL` is owned by `:session :reference`
+
+### Projection
+
+Projection layers on top of source selection rather than replacing it:
+
+```clojure
+:session {:input {:from source
+                  :projection projection}
+          :reference {:from source
+                      :projection projection}}
+```
+
+Minimal projection vocabulary:
+- `:projection :text`
+- `:projection :full`
+- `:projection {:path [...]}`
+- later: transcript-specific forms such as `{:type :tail :turns N}`
+
+### Session-shaping overrides
+
+Per-step session-shaping keys are peer keys in the same `:session` map:
+
+```clojure
+:session {:input {...}
+          :reference {...}
+          :system-prompt "..."
+          :tools ["read" "bash"]
+          :skills ["review-skill"]
+          :model "..."
+          :thinking-level :high}
+```
+
+Rules:
+- `:tools`, `:skills`, `:model`, and `:thinking-level` replace delegated/default values when explicitly present
+- `:system-prompt` follows current composition rules unless explicit replace semantics are introduced later
+- absent override keys preserve inherited defaults
+- `:tools []` and `:skills []` are meaningful explicit overrides
+
+### Preloaded message/transcript context
+
+Preloaded context is distinct from prompt bindings:
+
+```clojure
+:session {:input {...}
+          :reference {...}
+          :preload [{:from source
+                     :projection projection}
+                    ...]}
+```
+
+Rules:
+- `:session :preload` shapes what context/messages are present in the child session before prompt submission
+- preload uses the same source-then-projection layering model as `:input` and `:reference`
+- preload does not implicitly populate `$INPUT` or `$ORIGINAL`
+
+### Routing and control flow
+
+Judge/routing remains the control-flow surface:
+
+```clojure
+:judge {:prompt "..."
+        :system-prompt "...optional..."
+        :projection projection}
+:on {"SIGNAL" {:goto :next}
+     "OTHER" {:goto "named-step" :max-iterations 3}}
+```
+
+Rules:
+- named `:goto` targets refer to step `:name`
+- control keywords such as `:next`, `:previous`, and `:done` remain valid
+- loops and forks are expressed through `:judge` + `:on`
+
+### Separation of concerns
+
+- source selection chooses where data comes from
+- projection chooses which view of that data is used
+- session shaping chooses how the child session is configured
+- preload chooses what extra context is present in the child session
+- prompt bindings interpolate prompt text only
+- prompt bindings do not implicitly preload context, and preload does not implicitly populate prompt bindings
 
 ## Acceptance criteria
 
