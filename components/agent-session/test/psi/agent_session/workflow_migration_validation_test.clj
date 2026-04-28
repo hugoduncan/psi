@@ -67,3 +67,36 @@
       (is (= 3 (count (:step-order (get by-name "prompt-build")))))
       ;; lambda-build: 3 steps
       (is (= 3 (count (:step-order (get by-name "lambda-build"))))))))
+
+(deftest migrated-session-first-authoring-examples-test
+  (testing "converged workflow examples use explicit session-first authoring surfaces"
+    (let [parsed (loader/scan-directory ".psi/workflows")
+          {:keys [definitions]} (compiler/compile-workflow-files parsed)
+          by-name (into {} (map (juxt :name identity)) definitions)
+          plan-build-review (get by-name "plan-build-review")
+          prompt-build (get by-name "prompt-build")
+          gh-bug-triage-modular (get by-name "gh-bug-triage-modular")]
+      (is (= ["step-1-planner" "step-2-builder" "step-3-reviewer"]
+             (:step-order plan-build-review)))
+      (is (= "step-1-planner"
+             (get-in plan-build-review [:steps "step-2-builder" :input-bindings :input :path 0])))
+      (is (= [:original]
+             (get-in plan-build-review [:steps "step-2-builder" :input-bindings :original :path])))
+      (is (= "step-2-prompt-decompiler"
+             (get-in prompt-build [:steps "step-3-prompt-compiler" :input-bindings :input :path 0])))
+      (is (= [{:kind :value
+               :role "user"
+               :binding {:source :workflow-input
+                         :path [:original]}}
+              {:kind :value
+               :role "assistant"
+               :binding {:source :step-output
+                         :path ["step-1-gh-bug-discover-and-read" :outputs :text]}}
+              {:kind :value
+               :role "assistant"
+               :binding {:source :step-output
+                         :path ["step-2-gh-issue-create-worktree" :outputs :text]}}
+              {:kind :session-transcript
+               :step-id "step-3-gh-bug-reproduce"
+               :projection {:type :tail :turns 4 :tool-output false}}]
+             (get-in gh-bug-triage-modular [:steps "step-4-gh-bug-post-repro" :session-preload]))))))

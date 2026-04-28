@@ -103,6 +103,11 @@ single-step profiles and multi-step orchestrations.
   - `/delegate-reload` — reloads workflow definitions and retires removed definitions
 - Config:
   - `.psi/workflows/*.md`
+  - multi-step workflow files now author cross-step data flow through `:session`
+    - `:session :input` owns `$INPUT`
+    - `:session :reference` owns `$ORIGINAL`
+    - `:session :preload` adds child-session context without implicitly changing `$INPUT` or `$ORIGINAL`
+    - `{:step "..." ...}` references author-facing step `:name`, not delegated workflow names
 
 ### `extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj` (`extensions.mcp-tasks-run`)
 
