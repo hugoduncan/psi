@@ -9,7 +9,7 @@ Queue:
 `munera/open/002-compatibility-scaffold-removal/`
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
-`munera/open/004-lsp-integration-managed-services-post-tool-processing/`
+`munera/open/065-remove-lsp-client/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 
 Notes:
