@@ -20,6 +20,7 @@
 (declare-function psi-emacs--clear-assistant-render-state "psi-assistant-render")
 (declare-function psi-emacs--clear-thinking-line "psi-assistant-render")
 (declare-function psi-emacs--disarm-stream-watchdog "psi-run-state" (state))
+(declare-function psi-emacs--ordered-completing-read "psi-events" (prompt candidates &optional default))
 
 (defvar psi-emacs--allow-protected-input-edit nil
   "Non-nil while psi performs internal rewrites of the editable input area.")
@@ -390,7 +391,12 @@ navigation state."
   (let ((history (psi-emacs-state-input-history psi-emacs--state)))
     (unless (consp history)
       (user-error "No previous inputs"))
-    (let ((chosen (completing-read "Previous input: " history nil t)))
+    ;; Use ordered-completing-read to preserve recency order; bare completing-read
+    ;; allows UIs such as vertico/ivy to re-sort alphabetically.
+    (let ((chosen (psi-emacs--ordered-completing-read "Previous input: " history)))
+      ;; REQUIRE-MATCH is t inside ordered-completing-read, so chosen is always a
+      ;; member of history.  The empty-string guard defends against completion
+      ;; frameworks that return "" on cancel despite REQUIRE-MATCH.
       (when (and chosen (not (string-empty-p chosen)))
         (setf (psi-emacs-state-input-history-stash psi-emacs--state)
               (psi-emacs--tail-draft-text))
