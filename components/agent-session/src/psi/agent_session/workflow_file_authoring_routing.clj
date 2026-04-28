@@ -5,25 +5,15 @@
    step ids for deterministic workflow definitions.")
 
 (defn routing-target->step-id-map
-  "Build a map for goto resolution. Explicit `:name` values are authoritative.
-   For backward compatibility, unique delegated workflow names are also accepted
-   when unambiguous."
+  "Build a map for goto resolution. Multi-step workflow routing is now fully
+   spec-first: explicit step `:name` values are required and authoritative."
   [steps step-order]
-  (let [workflow-name-freqs (frequencies (keep :workflow steps))]
-    (into {}
-          (keep-indexed
-           (fn [idx step]
-             (cond
-               (:name step)
-               [(:name step) (nth step-order idx)]
-
-               (and (:workflow step)
-                    (= 1 (get workflow-name-freqs (:workflow step))))
-               [(:workflow step) (nth step-order idx)]
-
-               :else
-               nil))
-           steps))))
+  (into {}
+        (keep-indexed
+         (fn [idx step]
+           (when-let [step-name (:name step)]
+             [step-name (nth step-order idx)]))
+         steps)))
 
 (defn resolve-routing-table
   "Resolve :goto step names in a routing table to compiled step-ids.

@@ -34,9 +34,9 @@
 
 (def chain-md
   (str "---\nname: plan-build-review\ndescription: Plan, build, and review\n---\n"
-       "{:steps [{:workflow \"planner\" :prompt \"$INPUT\"}\n"
-       "         {:workflow \"builder\" :prompt \"Execute: $INPUT\\nOriginal: $ORIGINAL\"}\n"
-       "         {:workflow \"reviewer\" :prompt \"Review: $INPUT\\nOriginal: $ORIGINAL\"}]}\n\n"
+       "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}\n"
+       "         {:name \"build\" :workflow \"builder\" :prompt \"Execute: $INPUT\\nOriginal: $ORIGINAL\"}\n"
+       "         {:name \"review\" :workflow \"reviewer\" :prompt \"Review: $INPUT\\nOriginal: $ORIGINAL\"}]}\n\n"
        "Coordinate a plan-build-review cycle."))
 
 (def explicit-source-chain-md
@@ -256,8 +256,8 @@
 (deftest load-workflow-definitions-judge-validation-test
   (testing ":on without :judge surfaces as a load error"
     (let [bad-judge-md (str "---\nname: bad-chain\ndescription: Bad chain\n---\n"
-                            "{:steps [{:workflow \"planner\" :prompt \"$INPUT\"}\n"
-                            "         {:workflow \"reviewer\" :prompt \"Review: $INPUT\"\n"
+                            "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}\n"
+                            "         {:name \"review\" :workflow \"reviewer\" :prompt \"Review: $INPUT\"\n"
                             "          :on {\"OK\" {:goto :next}}}]}\n\n"
                             "Bad chain.")]
       (with-temp-workflow-dir
@@ -272,6 +272,22 @@
               (is (some #(re-find #"no `:judge`" (:error %)) errors)))))))))
 
 (deftest load-workflow-definitions-session-source-validation-test
+  (testing "missing multi-step step names surface as load errors"
+    (let [bad-missing-name-md (str "---\nname: bad-missing-name\ndescription: Bad missing name\n---\n"
+                                   "{:steps [{:workflow \"planner\" :prompt \"$INPUT\"}\n"
+                                   "         {:name \"review\" :workflow \"reviewer\" :prompt \"$INPUT\"}]}\n\n"
+                                   "Bad missing-name chain.")]
+      (with-temp-workflow-dir
+        {"planner.md" planner-md
+         "reviewer.md" reviewer-md
+         "bad-missing-name.md" bad-missing-name-md}
+        (fn [dir]
+          (with-redefs [loader/global-workflow-dirs (constantly [])
+                        loader/project-workflow-dir (constantly dir)]
+            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
+              (is (seq errors))
+              (is (some #(re-find #"Multi-step workflow steps must have unique string `:name`" (:error %)) errors))))))))
+
   (testing "forward step references surface as load errors"
     (let [bad-forward-md (str "---\nname: bad-forward\ndescription: Bad forward\n---\n"
                               "{:steps [{:name \"plan\"\n"

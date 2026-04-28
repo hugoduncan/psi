@@ -23,9 +23,9 @@
 (def multi-step-parsed
   {:name "plan-build-review"
    :description "Plan, build, and review"
-   :config {:steps [{:workflow "planner" :prompt "$INPUT"}
-                    {:workflow "builder" :prompt "Execute: $INPUT\nOriginal: $ORIGINAL"}
-                    {:workflow "reviewer" :prompt "Review: $INPUT\nOriginal: $ORIGINAL"}]}
+   :config {:steps [{:name "plan" :workflow "planner" :prompt "$INPUT"}
+                    {:name "build" :workflow "builder" :prompt "Execute: $INPUT\nOriginal: $ORIGINAL"}
+                    {:name "review" :workflow "reviewer" :prompt "Review: $INPUT\nOriginal: $ORIGINAL"}]}
    :body "Coordinate a plan-build-review cycle."})
 
 (def single-step-config-only
@@ -479,16 +479,15 @@
             :body "Frame."})]
       (is (re-find #"Duplicate workflow step names" error))))
 
-  (testing "repeated delegated workflow names remain valid without explicit step names"
-    (let [{:keys [definition error]}
+  (testing "missing multi-step step names fail clearly"
+    (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:name "repeat-workflow"
             :description "Repeated delegated workflow"
             :config {:steps [{:workflow "lambda-compiler" :prompt "$INPUT"}
                              {:workflow "lambda-compiler" :prompt "$INPUT"}]}
             :body "Frame."})]
-      (is (nil? error))
-      (is (= 2 (count (:step-order definition)))))))
+      (is (re-find #"Multi-step workflow steps must have unique string `:name`" error)))))
 
 ;;; Batch compilation
 
@@ -543,14 +542,14 @@
 (def multi-step-with-judge
   {:name "plan-build-review"
    :description "Plan, build, and review with judge"
-   :config {:steps [{:workflow "planner" :prompt "$INPUT"}
-                    {:workflow "builder" :prompt "Execute: $INPUT\nOriginal: $ORIGINAL"}
-                    {:workflow "reviewer" :prompt "Review: $INPUT\nOriginal: $ORIGINAL"
+   :config {:steps [{:name "plan" :workflow "planner" :prompt "$INPUT"}
+                    {:name "build" :workflow "builder" :prompt "Execute: $INPUT\nOriginal: $ORIGINAL"}
+                    {:name "review" :workflow "reviewer" :prompt "Review: $INPUT\nOriginal: $ORIGINAL"
                      :judge {:prompt "APPROVED or REVISE?"
                              :system-prompt "You are a routing judge."
                              :projection {:type :tail :turns 1}}
                      :on {"APPROVED" {:goto :next}
-                          "REVISE"   {:goto "builder" :max-iterations 3}}}]}
+                          "REVISE"   {:goto "build" :max-iterations 3}}}]}
    :body "Coordinate a plan-build-review cycle."})
 
 (deftest compile-multi-step-with-judge-test

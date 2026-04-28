@@ -54,6 +54,14 @@
                  step-name)))
        vec))
 
+(defn- missing-step-names
+  [steps]
+  (->> steps
+       (keep-indexed (fn [idx step]
+                       (when-not (string? (:name step))
+                         (inc idx))))
+       vec))
+
 ;;; Single-step compilation
 
 (defn compile-single-step
@@ -145,7 +153,12 @@
   "Compile a parsed workflow file with `:steps` into an N-step canonical definition."
   [{:keys [name description config body]}]
   (let [steps (:steps config)
+        missing-names (missing-step-names steps)
         duplicate-names (duplicate-step-names steps)]
+    (when (seq missing-names)
+      (throw (ex-info (str "Multi-step workflow steps must have unique string `:name`; missing or invalid at positions "
+                           (pr-str missing-names))
+                      {:missing-step-names missing-names})))
     (when (seq duplicate-names)
       (throw (ex-info (str "Duplicate workflow step names: " (pr-str duplicate-names))
                       {:duplicate-step-names duplicate-names})))

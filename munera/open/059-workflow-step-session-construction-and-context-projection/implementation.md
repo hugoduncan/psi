@@ -73,3 +73,11 @@ Terse review after `060`–`064`:
 - the main remaining drift is that the umbrella spec says multi-step steps require author-facing unique `:name`, but implementation still preserves compatibility for unnamed multi-step steps
 - because we are aiming to complete the spec rather than preserve compatibility, the next follow-on should remove that drift and make the authoring/documentation/tests tell one story
 - smaller follow-on: update the umbrella task state so `059` reflects the landed child-task convergence and any intentional remaining gaps explicitly
+
+## 2026-04-28 follow-on
+
+- enforced the spec-first rule that all multi-step workflow steps must provide a unique string `:name`
+- removed routing compatibility fallback from delegated workflow names to step ids; named routing is now step-`:name` only
+- updated compiler, loader, and parser tests to use explicit step names in multi-step fixtures
+- replaced the old unnamed-step compatibility test with a failure test proving missing multi-step step names are rejected clearly
+- reran focused workflow authoring/compiler/loader/migration verification after the enforcement change (`22 tests, 183 assertions, 0 failures`)

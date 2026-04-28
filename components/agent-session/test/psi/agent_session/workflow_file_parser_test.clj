@@ -37,13 +37,14 @@
   (testing "multi-step with steps in EDN config"
     ;; Multi-step workflow with steps array
     (let [raw (str "---\nname: plan-build-review\ndescription: Plan, build, and review\n---\n"
-                   "{:steps [{:workflow \"planner\" :prompt \"$INPUT\"}\n"
-                   "         {:workflow \"builder\" :prompt \"Execute: $INPUT\"}]}\n\n"
+                   "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}\n"
+                   "         {:name \"build\" :workflow \"builder\" :prompt \"Execute: $INPUT\"}]}\n\n"
                    "Coordinate a plan-build-review cycle.")
           result (parser/parse-workflow-file raw)]
       (is (= "plan-build-review" (:name result)))
       (is (= "Plan, build, and review" (:description result)))
       (is (= 2 (count (get-in result [:config :steps]))))
+      (is (= "plan" (get-in result [:config :steps 0 :name])))
       (is (= "planner" (get-in result [:config :steps 0 :workflow])))
       (is (= "Coordinate a plan-build-review cycle." (:body result)))))
 
@@ -111,9 +112,9 @@
 (deftest parse-edn-prefix-edge-cases
   (testing "config with nested maps"
     (let [raw (str "---\nname: x\ndescription: X\n---\n"
-                   "{:steps [{:workflow \"a\" :prompt \"$INPUT\"}]}\n\nBody")
+                   "{:steps [{:name \"a-step\" :workflow \"a\" :prompt \"$INPUT\"}]}\n\nBody")
           result (parser/parse-workflow-file raw)]
-      (is (= [{:workflow "a" :prompt "$INPUT"}] (get-in result [:config :steps])))
+      (is (= [{:name "a-step" :workflow "a" :prompt "$INPUT"}] (get-in result [:config :steps])))
       (is (= "Body" (:body result)))))
 
   (testing "config with keywords, sets, vectors"

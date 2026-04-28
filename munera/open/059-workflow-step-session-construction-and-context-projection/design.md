@@ -548,13 +548,14 @@ Rules:
 
 - [ ] Workflow-file authoring supports a step-level session-construction surface
 - [ ] Existing workflows with no session block continue to compile and behave as they do today
+- [ ] Multi-step workflow steps require unique author-facing `:name` values; author-facing step references use `:name` only
 - [ ] A step can explicitly select non-adjacent upstream sources without relying on file-order adjacency
 - [ ] A step can project accepted-result text or other supported fields from a named prior step
 - [ ] A step can project reference conversation/message context in at least one constrained supported form
 - [ ] A step can override at least one session-shaping concern (for example tools/skills/system prompt/model/thinking) through workflow-file authoring
 - [ ] Invalid source references and malformed projections fail with clear load-time or compile-time errors
 - [ ] Branched workflow examples can express correct context/data flow directly
-- [ ] Workflow compiler/loader/runtime tests cover backward compatibility plus new session/context-projection behavior
+- [ ] Workflow compiler/loader/runtime tests cover the spec-complete session/context-projection behavior
 - [ ] Workflow docs/examples are updated to explain the new authoring model clearly
 
 ### Transcript/message projection source of truth
