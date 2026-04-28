@@ -71,7 +71,11 @@
     :step {:session {:preload [{:from {:step "discover" :kind :accepted-result}}]}}
     :step-name->step-ref {}
     :current-step-idx 0
-    :expected-re #"Unknown step name|Forward step reference"}])
+    :expected-re #"Unknown step name|Forward step reference"}
+   {:label "value preload rejects :full projection"
+    :step {:session {:preload [{:from {:step "discover" :kind :accepted-result}
+                                :projection :full}]}}
+    :expected-re #"value preload supports only `:projection :text`"}])
 
 (deftest compile-step-input-bindings-validation-table-test
   (testing "malformed projection/source validation remains clear across representative cases"

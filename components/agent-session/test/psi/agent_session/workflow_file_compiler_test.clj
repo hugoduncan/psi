@@ -407,8 +407,7 @@
                               :workflow "reviewer"
                               :session {:input {:from {:step "plan" :kind :accepted-result}}
                                         :preload [{:from :workflow-original}
-                                                  {:from {:step "plan" :kind :accepted-result}
-                                                   :projection :full}
+                                                  {:from {:step "plan" :kind :accepted-result}}
                                                   {:from {:step "plan" :kind :session-transcript}
                                                    :projection {:type :tail :turns 2 :tool-output false}}]}
                               :prompt "$INPUT"}]}
@@ -420,7 +419,7 @@
                :binding {:source :workflow-input :path [:original]}}
               {:kind :value
                :role "assistant"
-               :binding {:source :step-output :path [_plan-id]}}
+               :binding {:source :step-output :path [_plan-id :outputs :text]}}
               {:kind :session-transcript
                :step-id _plan-id
                :projection {:type :tail :turns 2 :tool-output false}}]
@@ -441,6 +440,22 @@
                               :prompt "$INPUT"}]}
             :body "Frame."})]
       (is (re-find #"unsupported transcript/message projection" error))))
+
+  (testing "value preload rejects :full projection clearly through compiler"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-value-preload"
+            :description "Bad value preload"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :prompt "$INPUT"}
+                             {:name "review"
+                              :workflow "reviewer"
+                              :session {:preload [{:from {:step "plan" :kind :accepted-result}
+                                                   :projection :full}]}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"value preload supports only `:projection :text`" error))))
 
   (testing "one representative malformed override still surfaces clearly through compiler"
     (let [{:keys [error]}

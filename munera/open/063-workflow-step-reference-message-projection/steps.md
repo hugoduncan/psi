@@ -10,3 +10,8 @@
 
 Progress notes
 - investigating current canonical transcript surfaces: `workflow_judge/project-messages` already provides deterministic transcript projection and `persistence/messages-from-entries-in` is the canonical session journal message source
+
+Follow-on shaping
+- [x] decide whether value preload should be constrained to text-like projections in the first cut
+- [x] if constrained, reject or normalize `:projection :full` for value preload sources so non-text values are not silently stringified
+- [x] document the remaining synthetic-message semantics for value preload explicitly

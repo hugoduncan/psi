@@ -32,6 +32,9 @@
 (def ^:private transcript-projection-entry-keys
   #{:type :turns :tool-output})
 
+(def ^:private value-preload-projections
+  #{:text})
+
 (def ^:private source-map-keys
   #{:step :kind})
 
@@ -331,6 +334,19 @@
   [message]
   (authoring-errors/invalid-in ":session preload" message))
 
+(defn- compile-value-preload-binding
+  [entry step-name->step-ref current-step-idx]
+  (let [projection (get entry :projection :text)]
+    (if (contains? value-preload-projections projection)
+      (source+projection->binding :preload
+                                  (:from entry)
+                                  projection
+                                  step-name->step-ref
+                                  current-step-idx)
+      (authoring-errors/invalid-in ":session preload"
+                                   (str "value preload supports only `:projection :text`; got "
+                                        (pr-str projection))))))
+
 (defn- preload-source-entry
   [source step-name->step-ref current-step-idx]
   (cond
@@ -416,11 +432,7 @@
 
               :value
               (let [{binding :ok binding-error :error}
-                    (source+projection->binding :preload
-                                                (:from entry)
-                                                (get entry :projection :text)
-                                                step-name->step-ref
-                                                current-step-idx)]
+                    (compile-value-preload-binding entry step-name->step-ref current-step-idx)]
                 (if binding-error
                   (preload-entry-error binding-error)
                   {:ok {:kind :value

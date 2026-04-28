@@ -50,6 +50,11 @@
   "Materialize compiled `:session-preload` entries into canonical child-session
    preloaded messages.
 
+   Semantics:
+   - value preload entries become synthetic messages using the compiled preload role
+   - value preload is intentionally constrained to text-like projections (`:text`)
+     so non-text values are not silently stringified from broader structures
+
    Canonical transcript/message source of truth:
    - value preload entries read from the workflow run's canonical binding sources
    - transcript preload entries read from the step execution session's canonical

@@ -19,3 +19,8 @@ Focused proof:
 - authoring-session tests cover preload validation surfaces
 - step-prep tests cover materialization from canonical workflow bindings + canonical persisted transcript journal
 - statechart runtime test covers forwarding materialized preload into child-session creation
+
+Review note:
+- implementation matches the task design and existing workflow architecture
+- good reuse of canonical journal + `workflow-judge/project-messages`
+- follow-on feedback was executed: value preload is now constrained to text-like projection only (`:projection :text`), and synthetic-message semantics are documented explicitly
