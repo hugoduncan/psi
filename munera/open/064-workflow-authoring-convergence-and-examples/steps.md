@@ -6,4 +6,4 @@
 - [ ] Land final validation/error-shaping improvements if needed
 - [x] Run focused workflow tests
 - [x] Run isolated workflow suite if applicable
-- [ ] Run full unit suite
+- [x] Run full unit suite
