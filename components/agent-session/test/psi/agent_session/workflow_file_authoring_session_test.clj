@@ -1,6 +1,7 @@
 (ns psi.agent-session.workflow-file-authoring-session-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.workflow-file-authoring-preload :as authoring-preload]
    [psi.agent-session.workflow-file-authoring-session :as authoring-session]))
 
 (def ^:private default-step-name->step-ref
@@ -101,7 +102,7 @@
   (testing "preload validation remains clear across representative cases"
     (doseq [{:keys [label step expected-re step-name->step-ref current-step-idx]} preload-validation-cases]
       (let [{:keys [error]}
-            (authoring-session/compile-step-session-preload
+            (authoring-preload/compile-step-session-preload
              step
              (or step-name->step-ref default-step-name->step-ref)
              (or current-step-idx 1))]

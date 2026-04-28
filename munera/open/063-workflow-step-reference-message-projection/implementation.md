@@ -21,6 +21,6 @@ Focused proof:
 - statechart runtime test covers forwarding materialized preload into child-session creation
 
 Review note:
-- implementation matches the task design and existing workflow architecture
+- implementation is now well-shaped: simpler, more consistent, and safer after constraining value preload to text-only projection
 - good reuse of canonical journal + `workflow-judge/project-messages`
-- follow-on feedback was executed: value preload is now constrained to text-like projection only (`:projection :text`), and synthetic-message semantics are documented explicitly
+- follow-on feedback was executed: preload compilation helpers now live in a narrower namespace and preload role-synthesis policy is now explicit in that authoring surface

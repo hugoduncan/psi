@@ -15,3 +15,5 @@ Follow-on shaping
 - [x] decide whether value preload should be constrained to text-like projections in the first cut
 - [x] if constrained, reject or normalize `:projection :full` for value preload sources so non-text values are not silently stringified
 - [x] document the remaining synthetic-message semantics for value preload explicitly
+- [x] consider extracting preload compilation helpers from `workflow_file_authoring_session.clj` if additional preload surface area lands
+- [x] decide whether preload role synthesis (`user` for workflow/original, `assistant` for accepted-result) should remain implicit policy or become a more explicit author-facing contract
