@@ -387,8 +387,8 @@ index to nil so subsequent `M-p'/`M-n' steps from the top of history.
 navigation state."
   (interactive)
   (unless psi-emacs--state
-    (user-error "Not a psi buffer"))
-  (let ((history (psi-emacs-state-input-history psi-emacs--state)))
+    (user-error "psi buffer is not initialized"))
+  (let ((history (or (psi-emacs-state-input-history psi-emacs--state) '())))
     (unless (consp history)
       (user-error "No previous inputs"))
     ;; Use ordered-completing-read to preserve recency order; bare completing-read
