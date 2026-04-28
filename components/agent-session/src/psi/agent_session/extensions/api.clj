@@ -10,10 +10,7 @@
                            :psi.service/cwd
                            :psi.service/transport
                            :psi.service/ext-path
-                           :psi.service/notification-count
-                           {:psi.service/published-diagnostics
-                            [:psi.service.diagnostic/uri
-                             :psi.service.diagnostic/diagnostics]}]}])
+                           :psi.service/notification-count]}])
 
 (defn- runtime-not-initialized
   [action]

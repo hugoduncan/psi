@@ -36,12 +36,12 @@
                      :log-fn (fn [_] nil)}
         ext-api (ext/create-extension-api reg "/ext/test.clj" runtime-fns)]
     ((:ensure-service ext-api)
-     {:key [:lsp "/repo"]
+     {:key [:svc "/repo"]
       :type :subprocess
-      :spec {:command ["clojure-lsp"] :cwd "/repo" :transport :stdio}})
-    (is (= [{:key [:lsp "/repo"]
+      :spec {:command ["generic-service"] :cwd "/repo" :transport :stdio}})
+    (is (= [{:key [:svc "/repo"]
              :type :subprocess
-             :spec {:command ["clojure-lsp"] :cwd "/repo" :transport :stdio}}]
+             :spec {:command ["generic-service"] :cwd "/repo" :transport :stdio}}]
            (:services @state)))
-    ((:stop-service ext-api) [:lsp "/repo"])
+    ((:stop-service ext-api) [:svc "/repo"])
     (is (= [] (:services @state)))))

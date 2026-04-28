@@ -78,26 +78,3 @@
       (is (= [:svc "repo"] (:service-key result)))
       (is (= {:y 2} (:payload result))))))
 
-(deftest jsonrpc-helpers-test
-  (testing "jsonrpc-request! preserves protocol fields"
-    (let [sent* (atom [])
-          ctx   (make-ctx-with-service sent*)]
-      (protocol/jsonrpc-request! ctx [:svc "repo"] {:id "1" :method "m" :params {:a 1}} {:timeout-ms 321})
-      (is (= [{"jsonrpc" "2.0" "id" "1" "method" "m" "params" {:a 1}}]
-             @sent*)))))
-
-(deftest await-jsonrpc-result-test
-  (testing "await-jsonrpc-result unwraps jsonrpc result payload"
-    (is (= {"items" []}
-           (protocol/await-jsonrpc-result {:response {:payload {"result" {"items" []}}}})))
-    (is (= {:raw true}
-           (protocol/await-jsonrpc-result {:response {:payload {:raw true}}})))
-    (is (nil? (protocol/await-jsonrpc-result {:response nil})))))
-
-(deftest jsonrpc-notify-helper-test
-  (testing "jsonrpc-notify! preserves protocol fields"
-    (let [sent* (atom [])
-          ctx   (make-ctx-with-service sent*)]
-      (protocol/jsonrpc-notify! ctx [:svc "repo"] {:method "n" :params {:b 2}})
-      (is (= [{"jsonrpc" "2.0" "method" "n" "params" {:b 2}}]
-             @sent*)))))

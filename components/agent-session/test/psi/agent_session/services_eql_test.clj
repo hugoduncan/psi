@@ -18,12 +18,12 @@
     (let [[ctx session-id] (create-session-context)
           _ (services/ensure-service-in!
              ctx
-             {:key [:lsp "/repo"]
+             {:key [:svc "/repo"]
               :type :subprocess
               :spec {:command ["bash" "-lc" "sleep 5"]
                      :cwd "/tmp"
                      :transport :stdio}
-              :ext-path "/ext/lsp.clj"})
+              :ext-path "/ext/service.clj"})
           result (session/query-in ctx session-id [:psi.service/count
                                                    :psi.service/keys
                                                    {:psi.service/services
@@ -35,16 +35,16 @@
                                                      :psi.service/ext-path]}])]
       (try
         (is (= 1 (:psi.service/count result)))
-        (is (= [[:lsp "/repo"]] (:psi.service/keys result)))
-        (is (= [{:psi.service/key [:lsp "/repo"]
+        (is (= [[:svc "/repo"]] (:psi.service/keys result)))
+        (is (= [{:psi.service/key [:svc "/repo"]
                  :psi.service/status :running
                  :psi.service/command ["bash" "-lc" "sleep 5"]
                  :psi.service/cwd "/tmp"
                  :psi.service/transport :stdio
-                 :psi.service/ext-path "/ext/lsp.clj"}]
+                 :psi.service/ext-path "/ext/service.clj"}]
                (:psi.service/services result)))
         (finally
-          (services/stop-service-in! ctx [:lsp "/repo"]))))))
+          (services/stop-service-in! ctx [:svc "/repo"]))))))
 
 (deftest post-tool-eql-introspection-test
   (testing "query-in resolves post-tool processor and telemetry attrs"
@@ -52,7 +52,7 @@
       (post-tool/register-processor-in!
        ctx
        {:name "lint"
-        :ext-path "/ext/lsp.clj"
+        :ext-path "/ext/service.clj"
         :match {:tools #{"write"}}
         :timeout-ms 100
         :handler (fn [_] {:content/append "\nlint"})})
@@ -86,7 +86,7 @@
                                                        :psi.post-tool/duration-ms]}])]
         (is (= 1 (:psi.post-tool-processor/count result)))
         (is (= [{:psi.post-tool-processor/name "lint"
-                 :psi.post-tool-processor/ext-path "/ext/lsp.clj"
+                 :psi.post-tool-processor/ext-path "/ext/service.clj"
                  :psi.post-tool-processor/tools ["write"]
                  :psi.post-tool-processor/timeout-ms 100}]
                (:psi.post-tool-processors result)))

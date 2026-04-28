@@ -38,13 +38,6 @@
      :installed   {:local/root "extensions/hello-ext"}
      :jar         {:mvn/version :psi/release-version}}}
 
-   'psi/lsp
-   {:psi/init 'extensions.lsp/init
-    :source-policies
-    {:development {:local/root "extensions/lsp"}
-     :installed   {:local/root "extensions/lsp"}
-     :jar         {:mvn/version :psi/release-version}}}
-
    'psi/mcp-tasks-run
    {:psi/init 'extensions.mcp-tasks-run/init
     :source-policies

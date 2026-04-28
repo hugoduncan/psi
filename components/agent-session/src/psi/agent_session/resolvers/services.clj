@@ -9,10 +9,6 @@
 (def ^:private service-notification-output
   [:psi.service.notification/payload])
 
-(def ^:private service-diagnostic-output
-  [:psi.service.diagnostic/uri
-   :psi.service.diagnostic/diagnostics])
-
 (def ^:private service-output
   [:psi.service/id
    :psi.service/key
@@ -28,8 +24,7 @@
    :psi.service/restart-count
    :psi.service/last-error
    :psi.service/notification-count
-   {:psi.service/notifications service-notification-output}
-   {:psi.service/published-diagnostics service-diagnostic-output}])
+   {:psi.service/notifications service-notification-output}])
 
 (def ^:private processor-output
   [:psi.post-tool-processor/name
@@ -74,37 +69,26 @@
 (defn- service-notification->eql [msg]
   {:psi.service.notification/payload (:payload msg)})
 
-(defn- service-diagnostic->eql [[uri diagnostics]]
-  {:psi.service.diagnostic/uri uri
-   :psi.service.diagnostic/diagnostics (vec diagnostics)})
-
 (defn- service->eql [svc]
-  (let [notifications*        (:notifications-atom svc)
-        notifications         (if notifications*
-                                (vec (or @notifications* []))
-                                [])
-        published-diags-atom* (:published-diagnostics-atom svc)
-        published-diags       (if published-diags-atom*
-                                @published-diags-atom*
-                                {})]
-    {:psi.service/id                  (:id svc)
-     :psi.service/key                 (:key svc)
-     :psi.service/type                (:type svc)
-     :psi.service/status              (:status svc)
-     :psi.service/command             (:command svc)
-     :psi.service/cwd                 (:cwd svc)
-     :psi.service/transport           (:transport svc)
-     :psi.service/ext-path            (:ext-path svc)
-     :psi.service/pid                 (:pid svc)
-     :psi.service/started-at          (:started-at svc)
-     :psi.service/stopped-at          (:stopped-at svc)
-     :psi.service/restart-count       (:restart-count svc)
-     :psi.service/last-error          (:last-error svc)
-     :psi.service/notification-count  (count notifications)
-     :psi.service/notifications       (mapv service-notification->eql notifications)
-     :psi.service/published-diagnostics (->> published-diags
-                                             (sort-by key)
-                                             (mapv service-diagnostic->eql))}))
+  (let [notifications* (:notifications-atom svc)
+        notifications  (if notifications*
+                         (vec (or @notifications* []))
+                         [])]
+    {:psi.service/id                 (:id svc)
+     :psi.service/key                (:key svc)
+     :psi.service/type               (:type svc)
+     :psi.service/status             (:status svc)
+     :psi.service/command            (:command svc)
+     :psi.service/cwd                (:cwd svc)
+     :psi.service/transport          (:transport svc)
+     :psi.service/ext-path           (:ext-path svc)
+     :psi.service/pid                (:pid svc)
+     :psi.service/started-at         (:started-at svc)
+     :psi.service/stopped-at         (:stopped-at svc)
+     :psi.service/restart-count      (:restart-count svc)
+     :psi.service/last-error         (:last-error svc)
+     :psi.service/notification-count (count notifications)
+     :psi.service/notifications      (mapv service-notification->eql notifications)}))
 
 (defn- processor->eql [p]
   {:psi.post-tool-processor/name       (:name p)

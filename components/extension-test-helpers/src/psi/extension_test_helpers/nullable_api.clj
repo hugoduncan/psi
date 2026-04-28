@@ -412,8 +412,7 @@
                                                 :psi.service/status :running
                                                 :psi.service/command (get-in svc [:spec :command])
                                                 :psi.service/cwd (get-in svc [:spec :cwd])
-                                                :psi.service/transport (get-in svc [:spec :transport])
-                                                :psi.service/published-diagnostics []})
+                                                :psi.service/transport (get-in svc [:spec :transport])})
                                              (:services @state)))
                       :get-api-key get-key*
                       :ui-type (or (:ui-type opts*) :console)

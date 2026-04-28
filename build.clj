@@ -54,7 +54,6 @@
    "extensions/auto-session-name/src"
    "extensions/commit-checks/src"
    "extensions/hello-ext/src"
-   "extensions/lsp/src"
    "extensions/mcp-tasks-run/src"
    "extensions/mementum/src"
    "extensions/munera/src"

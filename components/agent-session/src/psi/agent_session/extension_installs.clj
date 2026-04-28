@@ -84,8 +84,6 @@
                        :source-policies {:installed {:local/root "extensions/commit-checks"}}}
    'psi/hello-ext {:psi/init 'extensions.hello-ext/init
                    :source-policies {:installed {:local/root "extensions/hello-ext"}}}
-   'psi/lsp {:psi/init 'extensions.lsp/init
-             :source-policies {:installed {:local/root "extensions/lsp"}}}
    'psi/mcp-tasks-run {:psi/init 'extensions.mcp-tasks-run/init
                        :source-policies {:installed {:local/root "extensions/mcp-tasks-run"}}}
    'psi/mementum {:psi/init 'extensions.mementum/init

@@ -15,21 +15,21 @@
                      :log-fn (fn [_] nil)}
         ext-api (ext/create-extension-api reg "/ext/test.clj" runtime-fns)]
     ((:service-request ext-api)
-     {:key [:lsp "/repo"]
+     {:key [:svc "/repo"]
       :request-id "r1"
-      :payload {"jsonrpc" "2.0" "id" "r1"}
+      :payload {:op :ping}
       :timeout-ms 123})
     ((:service-notify ext-api)
-     {:key [:lsp "/repo"]
-      :payload {"jsonrpc" "2.0" "method" "initialized"}})
+     {:key [:svc "/repo"]
+      :payload {:op :initialized}})
     (is (= [{:ext-path "/ext/test.clj"
-             :key [:lsp "/repo"]
+             :key [:svc "/repo"]
              :request-id "r1"
-             :payload {"jsonrpc" "2.0" "id" "r1"}
+             :payload {:op :ping}
              :timeout-ms 123}]
            (mapv #(select-keys % [:ext-path :key :request-id :payload :timeout-ms])
                  (:service-requests @state))))
     (is (= [{:ext-path "/ext/test.clj"
-             :key [:lsp "/repo"]
-             :payload {"jsonrpc" "2.0" "method" "initialized"}}]
+             :key [:svc "/repo"]
+             :payload {:op :initialized}}]
            (:service-notifications @state)))))

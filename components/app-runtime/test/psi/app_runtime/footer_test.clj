@@ -24,14 +24,14 @@
                 :psi.agent-session/thinking-level :xhigh
                 :psi.agent-session/effective-reasoning-effort "high"
                 :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
-                                  {:extension-id "a" :text "Clojure-LSP\nclojure-lsp"}]})]
+                                  {:extension-id "a" :text "Formatter\nformatter"}]})]
     (is (= "~/projects/hugoduncan/psi/psi-main (master) • xhig"
            (get-in model [:footer/lines :path-line])))
     (is (= ["↑172k" "↓17k" "CR5.2M" "CW1.2k" "$1.444" "31.9%/272k (auto)"]
            (get-in model [:footer/usage :parts])))
     (is (= "(openai-codex) gpt-5.3-codex • thinking high"
            (get-in model [:footer/model :text])))
-    (is (= "Clojure-LSP clojure-lsp TS+ESL,Prett"
+    (is (= "Formatter formatter TS+ESL,Prett"
            (get-in model [:footer/lines :status-line])))
     (is (= ["a" "b"]
            (mapv :status/extension-id (:footer/statuses model))))))

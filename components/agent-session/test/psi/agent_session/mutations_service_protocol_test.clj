@@ -39,19 +39,19 @@
                         :payload (:payload req)
                         :timeout-ms (:timeout-ms req)}))]
         (let [r (mutate 'psi.extension/service-request
-                        {:ext-path "/ext/lsp.clj"
-                         :key [:lsp "/repo"]
+                        {:ext-path "/ext/service.clj"
+                         :key [:svc "/repo"]
                          :request-id "1"
-                         :payload {"jsonrpc" "2.0"}
+                         :payload {:op :ping}
                          :timeout-ms 250})]
-          (is (= [[ctx [:lsp "/repo"]
+          (is (= [[ctx [:svc "/repo"]
                    {:request-id "1"
-                    :payload {"jsonrpc" "2.0"}
+                    :payload {:op :ping}
                     :timeout-ms 250}
                    {:dispatch-id nil}]]
                  @calls))
-          (is (= "/ext/lsp.clj" (:psi.extension/path r)))
-          (is (= [:lsp "/repo"] (:psi.extension.service/service-key r)))
+          (is (= "/ext/service.clj" (:psi.extension/path r)))
+          (is (= [:svc "/repo"] (:psi.extension.service/service-key r)))
           (is (= "1" (:psi.extension.service/request-id r)))
           (is (= 250 (:psi.extension.service/timeout-ms r))))))))
 
@@ -78,12 +78,12 @@
                        {:service-key key
                         :payload payload}))]
         (let [r (mutate 'psi.extension/service-notify
-                        {:ext-path "/ext/lsp.clj"
-                         :key [:lsp "/repo"]
-                         :payload {"method" "initialized"}})]
-          (is (= [[ctx [:lsp "/repo"] {"method" "initialized"} {:dispatch-id nil}]]
+                        {:ext-path "/ext/service.clj"
+                         :key [:svc "/repo"]
+                         :payload {:op :initialized}})]
+          (is (= [[ctx [:svc "/repo"] {:op :initialized} {:dispatch-id nil}]]
                  @calls))
-          (is (= "/ext/lsp.clj" (:psi.extension/path r)))
-          (is (= [:lsp "/repo"] (:psi.extension.service/service-key r)))
-          (is (= {"method" "initialized"}
+          (is (= "/ext/service.clj" (:psi.extension/path r)))
+          (is (= [:svc "/repo"] (:psi.extension.service/service-key r)))
+          (is (= {:op :initialized}
                  (:psi.extension.service/payload r))))))))

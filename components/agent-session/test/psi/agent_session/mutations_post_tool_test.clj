@@ -24,12 +24,12 @@
     (session/register-resolvers-in! qctx false)
     (session/register-mutations-in! qctx mutations/all-mutations true)
     (let [r (mutate 'psi.extension/register-post-tool-processor
-                    {:ext-path "/ext/lsp.clj"
+                    {:ext-path "/ext/service.clj"
                      :name "lint"
                      :match {:tools #{"write"}}
                      :timeout-ms 100
                      :handler (fn [_] {:content/append "x"})})]
-      (is (= "/ext/lsp.clj" (:psi.extension/path r)))
+      (is (= "/ext/service.clj" (:psi.extension/path r)))
       (is (= 1 (post-tool/processor-count-in ctx))))))
 
 (deftest ensure-and-stop-service-mutations-test
@@ -43,14 +43,14 @@
     (session/register-resolvers-in! qctx false)
     (session/register-mutations-in! qctx mutations/all-mutations true)
     (let [r1 (mutate 'psi.extension/ensure-service
-                     {:ext-path "/ext/lsp.clj"
-                      :key [:lsp "/repo"]
+                     {:ext-path "/ext/service.clj"
+                      :key [:svc "/repo"]
                       :type :subprocess
                       :spec {:command ["bash" "-lc" "sleep 5"]
                              :cwd "/tmp"
                              :transport :stdio}})
           _  (mutate 'psi.extension/stop-service
-                     {:ext-path "/ext/lsp.clj"
-                      :key [:lsp "/repo"]})]
-      (is (= "/ext/lsp.clj" (:psi.extension/path r1)))
-      (is (= :stopped (:status (services/service-in ctx [:lsp "/repo"])))))))
+                     {:ext-path "/ext/service.clj"
+                      :key [:svc "/repo"]})]
+      (is (= "/ext/service.clj" (:psi.extension/path r1)))
+      (is (= :stopped (:status (services/service-in ctx [:svc "/repo"])))))))

@@ -35,7 +35,7 @@
                                    :psi.agent-session/thinking-level :xhigh
                                    :psi.agent-session/effective-reasoning-effort "high"
                                    :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
-                                                     {:extension-id "a" :text "Clojure-LSP\nclojure-lsp"}]})]
+                                                     {:extension-id "a" :text "Formatter\nformatter"}]})]
                     (rpc.events/footer-updated-payload ctx session-id))]
       (is (= "~/projects/hugoduncan/psi/psi-main (master) • xhig"
              (:path-line payload)))
@@ -43,7 +43,7 @@
              (:usage-parts payload)))
       (is (= "(openai-codex) gpt-5.3-codex • thinking high"
              (:model-text payload)))
-      (is (= "Clojure-LSP clojure-lsp TS+ESL,Prett"
+      (is (= "Formatter formatter TS+ESL,Prett"
              (:status-line payload)))
       (is (nil? (:session-activity-line payload))))))
 

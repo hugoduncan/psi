@@ -131,7 +131,7 @@
                        :psi.agent-session/model-reasoning true
                        :psi.agent-session/thinking-level :xhigh
                        :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
-                                         {:extension-id "a" :text "Clojure-LSP\nclojure-lsp"}]}
+                                         {:extension-id "a" :text "Formatter\nformatter"}]}
           model   (footer/footer-model-from-data footer-data {:worktree-path "/repo/project"})
           init-fn (app/make-init "test-model" nil nil nil
                                  {:cwd "/repo/project"
@@ -145,7 +145,7 @@
       (is (str/includes? out "$0.434"))
       (is (str/includes? out "17.6%/400k (auto)"))
       (is (str/includes? out "(openai) gpt-5.3-codex • thinking xhigh"))
-      (is (str/includes? out "Clojure-LSP clojure-lsp TS+ESL,Prett")))))
+      (is (str/includes? out "Formatter formatter TS+ESL,Prett")))))
 
 (deftest view-renders-footer-using-session-display-name-test
   (testing "footer uses derived display name when explicit session name is absent"

@@ -1,5 +1,5 @@
 (ns psi.agent-session.service-protocol
-  "Shared stdio request/response and JSON-RPC helper semantics for managed services."
+  "Shared request/response semantics for managed services."
   (:require [psi.agent-session.dispatch :as dispatch]
             [psi.agent-session.services :as services]))
 
@@ -56,19 +56,6 @@
         :timeout-ms timeout-ms
         :response response}))))
 
-(defn await-jsonrpc-result
-  "Project one service-request response to a JSON-RPC result payload.
-
-   Returns the inner `result` when present, the whole payload when no JSON-RPC
-   envelope/result is present, or nil when no response is available."
-  [request-result]
-  (let [response (:response request-result)
-        payload  (or (:payload response) response)]
-    (cond
-      (nil? payload) nil
-      (contains? payload "result") (get payload "result")
-      :else payload)))
-
 (defn send-service-notification!
   ([ctx service-key payload]
    (send-service-notification! ctx service-key payload nil))
@@ -84,27 +71,3 @@
      {:service-key service-key
       :payload payload})))
 
-(defn jsonrpc-request!
-  ([ctx service-key {:keys [id method params]} {:keys [timeout-ms] :or {timeout-ms 500}}]
-   (jsonrpc-request! ctx service-key {:id id :method method :params params} {:timeout-ms timeout-ms} nil))
-  ([ctx service-key {:keys [id method params]} {:keys [timeout-ms] :or {timeout-ms 500}} trace-opts]
-   (send-service-request!
-    ctx service-key
-    {:request-id id
-     :payload {"jsonrpc" "2.0"
-               "id" id
-               "method" method
-               "params" params}
-     :timeout-ms timeout-ms}
-    trace-opts)))
-
-(defn jsonrpc-notify!
-  ([ctx service-key {:keys [method params]}]
-   (jsonrpc-notify! ctx service-key {:method method :params params} nil))
-  ([ctx service-key {:keys [method params]} trace-opts]
-   (send-service-notification!
-    ctx service-key
-    {"jsonrpc" "2.0"
-     "method" method
-     "params" params}
-    trace-opts)))

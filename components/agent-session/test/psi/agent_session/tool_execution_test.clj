@@ -258,7 +258,7 @@
           (is (some #{:session/tool-record-result} @events))
           (is (some #{:session/tool-execute} @events)))))))
 
-(deftest post-tool-diagnostics-are-in-provider-facing-tool-result-test
+(deftest post-tool-enrichment-is-in-provider-facing-tool-result-test
   (testing "post-tool content append is recorded into the final provider-facing toolResult message"
     (let [agent-ctx   (setup-agent-ctx!)
           [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
@@ -267,14 +267,14 @@
           recorded    (atom nil)]
       (post-tool/register-processor-in!
        session-ctx
-       {:name "lsp-diagnostics"
+       {:name "generic-enrichment"
         :match {:tools #{"write"}}
         :timeout-ms 100
         :handler (fn [_]
-                   {:content/append "\nLSP diagnostics for /tmp/example.clj:\n- unresolved symbol foo"
-                    :details/merge {:lsp {:diagnostic-path-count 1}}
-                    :enrichments [{:type "lsp/diagnostics"
-                                   :label "LSP diagnostics: /tmp/example.clj"}]})})
+                   {:content/append "\nService notes for /tmp/example.clj:\n- follow-up available"
+                    :details/merge {:service {:note-count 1}}
+                    :enrichments [{:type "service/notes"
+                                   :label "Service notes: /tmp/example.clj"}]})})
       (with-redefs [tool-plan/execute-tool-runtime-in!
                     (fn [_ _ _ _]
                       {:content "Successfully wrote 10 bytes to /tmp/example.clj"
@@ -292,12 +292,12 @@
         (#'tool-batch/run-tool-call! session-ctx session-ctx-id tc q)
         (is (= [{:type :text
                  :text (str "Successfully wrote 10 bytes to /tmp/example.clj"
-                            "\nLSP diagnostics for /tmp/example.clj:\n- unresolved symbol foo")}]
+                            "\nService notes for /tmp/example.clj:\n- follow-up available")}]
                (:content @recorded)))
         (is (= (str "Successfully wrote 10 bytes to /tmp/example.clj"
-                    "\nLSP diagnostics for /tmp/example.clj:\n- unresolved symbol foo")
+                    "\nService notes for /tmp/example.clj:\n- follow-up available")
                (:result-text @recorded)))
-        (is (= {:lsp {:diagnostic-path-count 1}}
+        (is (= {:service {:note-count 1}}
                (:details @recorded)))))))
 
 (deftest tool-lifecycle-progress-derived-from-canonical-event-test

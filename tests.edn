@@ -9,7 +9,7 @@
                    "components/ai/src" "components/app-runtime/src" "components/engine/src" "components/query/src" "components/history/src"
                    "components/introspection/src" "components/memory/src" "components/recursion/src" "components/tui/src" "components/rpc/src" "components/agent-core/src"
                    "components/agent-session/src" "components/system-bootstrap/src"
-                   "extensions/auto-session-name/src" "extensions/commit-checks/src" "extensions/hello-ext/src" "extensions/lsp/src"
+                   "extensions/auto-session-name/src" "extensions/commit-checks/src" "extensions/hello-ext/src"
                    "extensions/mcp-tasks-run/src" "extensions/mementum/src" "extensions/munera/src" "extensions/plan-state-learning/src"
                    "extensions/work-on/src" "extensions/workflow-display/src" "extensions/workflow-loader/src"]
     :ns-patterns [".*-test$"]
@@ -19,7 +19,6 @@
     :test-paths ["extensions/auto-session-name/test"
                  "extensions/commit-checks/test"
                  "extensions/hello-ext/test"
-                 "extensions/lsp/test"
                  "extensions/mcp-tasks-run/test"
                  "extensions/plan-state-learning/test"
                  "extensions/work-on/test"
@@ -28,7 +27,6 @@
     :source-paths ["extensions/auto-session-name/src"
                    "extensions/commit-checks/src"
                    "extensions/hello-ext/src"
-                   "extensions/lsp/src"
                    "extensions/mcp-tasks-run/src"
                    "extensions/mementum/src"
                    "extensions/munera/src"
@@ -45,14 +43,14 @@
                  "components/introspection/test" "components/memory/test" "components/recursion/test" "components/tui/test" "components/rpc/test" "components/agent-core/test"
                  "components/agent-session/test"
                  "extensions/auto-session-name/test" "extensions/commit-checks/test"
-                 "extensions/hello-ext/test" "extensions/lsp/test" "extensions/mcp-tasks-run/test" "extensions/plan-state-learning/test"
+                 "extensions/hello-ext/test" "extensions/mcp-tasks-run/test" "extensions/plan-state-learning/test"
                  "extensions/work-on/test" "extensions/workflow-display/test" "extensions/workflow-loader/test"]
     :source-paths ["bases/main/src" "bases/main/resources"
                    "components/ai/src" "components/app-runtime/src" "components/engine/src" "components/query/src" "components/history/src"
                    "components/introspection/src" "components/memory/src" "components/recursion/src" "components/tui/src" "components/rpc/src" "components/agent-core/src"
                    "components/agent-session/src" "components/system-bootstrap/src"
                    "extensions/auto-session-name/src" "extensions/commit-checks/src"
-                   "extensions/hello-ext/src" "extensions/lsp/src" "extensions/mcp-tasks-run/src" "extensions/mementum/src"
+                   "extensions/hello-ext/src" "extensions/mcp-tasks-run/src" "extensions/mementum/src"
                    "extensions/munera/src" "extensions/plan-state-learning/src" "extensions/work-on/src" "extensions/workflow-display/src"
                    "extensions/workflow-loader/src"]
     :ns-patterns [".*-test$"]

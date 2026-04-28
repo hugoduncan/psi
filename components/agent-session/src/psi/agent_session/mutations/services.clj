@@ -3,7 +3,6 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.service-protocol :as service-protocol]
-   [psi.agent-session.service-protocol-stdio-jsonrpc :as stdio-jsonrpc]
    [psi.agent-session.services :as services]))
 
 (pco/defmutation register-post-tool-processor
@@ -26,9 +25,6 @@
   (services/ensure-service-in!
    agent-session-ctx
    {:key key :type type :spec spec :ext-path ext-path})
-  (when (and (= :subprocess (or type :subprocess))
-             (#{:json-rpc :jsonrpc} (:protocol spec)))
-    (stdio-jsonrpc/attach-jsonrpc-runtime-in! agent-session-ctx key))
   {:psi.extension/path ext-path})
 
 (pco/defmutation stop-service

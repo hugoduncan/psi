@@ -568,7 +568,7 @@
   (testing "API :list-services delegates to runtime query fn"
     (let [reg         (ext/create-registry)
           _           (ext/register-extension-in! reg "/ext/test")
-          services    [{:psi.service/key [:lsp "/repo"]
+          services    [{:psi.service/key [:svc "/repo"]
                         :psi.service/status :running}]
           runtime-fns {:query-fn (fn [q]
                                    (is (= [{:psi.service/services [:psi.service/key
@@ -577,10 +577,7 @@
                                                                    :psi.service/cwd
                                                                    :psi.service/transport
                                                                    :psi.service/ext-path
-                                                                   :psi.service/notification-count
-                                                                   {:psi.service/published-diagnostics
-                                                                    [:psi.service.diagnostic/uri
-                                                                     :psi.service.diagnostic/diagnostics]}]}]
+                                                                   :psi.service/notification-count]}]
                                           q))
                                    {:psi.service/services services})}
           api         (ext/create-extension-api reg "/ext/test" runtime-fns)]

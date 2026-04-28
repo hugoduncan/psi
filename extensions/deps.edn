@@ -11,7 +11,6 @@
         psi/auto-session-name       {:local/root "auto-session-name"}
         psi/commit-checks           {:local/root "commit-checks"}
         psi/hello-ext               {:local/root "hello-ext"}
-        psi/lsp                     {:local/root "lsp"}
         psi/mcp-tasks-run           {:local/root "mcp-tasks-run"}
         psi/mementum                {:local/root "mementum"}
         psi/munera                  {:local/root "munera"}
@@ -23,7 +22,6 @@
  {:test {:extra-paths ["auto-session-name/test"
                        "commit-checks/test"
                        "hello-ext/test"
-                       "lsp/test"
                        "mcp-tasks-run/test"
                        "plan-state-learning/test"
                        "work-on/test"
