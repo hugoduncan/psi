@@ -3,10 +3,10 @@
 - [x] Decide relationship to existing LSP task 004
 - [x] Review and remove task ambiguities
 - [x] Create plan after design is complete and unambiguous
-- [ ] Inventory current LSP surface and preserved generic infrastructure
+- [x] Inventory current LSP surface and preserved generic infrastructure
 - [ ] Extract/retain generic sub-process lifecycle/registry infrastructure
 - [ ] Remove LSP extension, commands, wiring, tests, fixtures, and helpers
 - [ ] Update active docs/meta/task surfaces and stop advertising LSP support
-- [ ] Mark task 004 superseded by 065 during implementation
+- [x] Mark task 004 superseded by 065 during implementation
 - [ ] Run verification and remove residual misleading active references
 - [ ] Close 004 as superseded and 065 as completed

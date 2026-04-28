@@ -1,3 +1,5 @@
+SUPERSEDED by `065-remove-lsp-client` on 2026-04-28.
+
 Goal: continue the LSP extension work on top of managed services and post-tool processing.
 
 Context:

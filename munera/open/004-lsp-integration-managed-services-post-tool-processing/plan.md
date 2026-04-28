@@ -1,3 +1,5 @@
+SUPERSEDED by `065-remove-lsp-client` on 2026-04-28.
+
 Approach:
 - Treat this as a confidence and observability follow-on rather than a new architecture slice.
 - Prefer replacing test seams with runtime-backed proof where affordable.
