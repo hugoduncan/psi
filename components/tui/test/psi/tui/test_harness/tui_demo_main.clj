@@ -36,11 +36,15 @@
   (:import
    [java.util.concurrent LinkedBlockingQueue]))
 
-(defn- read-script
-  []
-  (when-let [s (System/getenv "PSI_TUI_DEMO_SCRIPT")]
+(defn- read-edn-env
+  [env-name]
+  (when-let [s (System/getenv env-name)]
     (when-not (str/blank? s)
       (edn/read-string s))))
+
+(defn- read-script
+  []
+  (read-edn-env "PSI_TUI_DEMO_SCRIPT"))
 
 (defn- noop-agent-fn
   "Agent fn used when no script is configured."
@@ -91,10 +95,12 @@
 
 (defn -main
   [& _args]
-  (let [script     (read-script)
-        agent-fn   (if (seq script)
-                     (scripted-agent-fn (atom (vec script)))
-                     noop-agent-fn)
-        model-name (or (System/getenv "PSI_TUI_DEMO_MODEL") "demo-model")]
+  (let [script           (read-script)
+        initial-messages (or (read-edn-env "PSI_TUI_DEMO_INITIAL_MESSAGES") [])
+        agent-fn         (if (seq script)
+                           (scripted-agent-fn (atom (vec script)))
+                           noop-agent-fn)
+        model-name       (or (System/getenv "PSI_TUI_DEMO_MODEL") "demo-model")]
     (app/start! model-name agent-fn {:alt-screen false
-                                     :dispatch-fn dispatch-fn})))
+                                     :dispatch-fn dispatch-fn
+                                     :initial-messages initial-messages})))

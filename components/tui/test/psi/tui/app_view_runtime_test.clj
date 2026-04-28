@@ -348,6 +348,47 @@
                     (render/render-message {:role :thinking :text "some thought"} 80))]
       (is (str/includes? rendered "· some thought")))))
 
+(deftest narrow-width-submitted-user-prompt-wraps-test
+  (testing "submitted user prompts wrap with continuation aligned under content start"
+    (let [state (assoc (init-state)
+                       :width 24
+                       :messages [{:role :user
+                                   :text "this user prompt should wrap cleanly"}])
+          plain (ansi/strip-ansi (app/view state))
+          lines (str/split-lines plain)
+          wrapped (filter #(or (str/includes? % "this user")
+                               (str/starts-with? % "    "))
+                          lines)]
+      (is (some #(str/includes? % "刀: this user") wrapped))
+      (is (> (count wrapped) 1))
+      (is (every? #(<= (count %) 24) wrapped)))))
+
+(deftest narrow-width-assistant-message-wraps-test
+  (testing "assistant paragraph transcript wraps within available width"
+    (let [state (assoc (init-state)
+                       :width 24
+                       :messages [{:role :assistant
+                                   :text "this assistant message should wrap cleanly"}])
+          plain (ansi/strip-ansi (app/view state))
+          lines (str/split-lines plain)
+          wrapped (filter #(or (str/includes? % "this assistant")
+                               (str/starts-with? % "   "))
+                          lines)]
+      (is (some #(str/includes? % "ψ: this assistant") wrapped))
+      (is (> (count wrapped) 1))
+      (is (every? #(<= (count %) 24) wrapped)))))
+
+(deftest narrow-width-thinking-line-wraps-test
+  (testing "thinking transcript wraps after the · prefix budget"
+    (let [rendered (ansi/strip-ansi (render/render-message {:role :thinking
+                                                            :text "thinking text should wrap cleanly"}
+                                                           20))
+          lines    (str/split-lines rendered)]
+      (is (> (count lines) 1))
+      (is (str/starts-with? (first lines) "· "))
+      (is (every? #(<= (count %) 20) lines))
+      (is (some #(str/starts-with? % "  ") (rest lines))))))
+
 (deftest archive-on-done-thinking-visible-in-view-test
   (testing "archived thinking messages render with · prefix in the view"
     (let [update-fn (app/make-update (stub-agent-fn ""))
@@ -561,3 +602,43 @@
                                       :is-error false})
           out       (ansi/strip-ansi (app/view s1))]
       (is (not (str/includes? out "content-line"))))))
+
+(deftest tool-header-truncates-stably-at-narrow-width-test
+  (testing "collapsed tool header truncates to fit narrow width"
+    (let [state (assoc (init-state)
+                       :width 24
+                       :phase :idle
+                       :messages [{:role :tool :tool-id "t1"}]
+                       :tool-order ["t1"]
+                       :tool-calls {"t1" {:name "bash"
+                                          :args "{\"command\":\"printf an-extremely-long-command-name-for-width-testing\"}"
+                                          :status :success}})
+          plain (ansi/strip-ansi (app/view state))
+          line  (some #(when (str/includes? % "$ ") %) (str/split-lines plain))]
+      (is line)
+      (is (<= (count line) 24))
+      (is (or (str/includes? line "...")
+              (str/includes? line "…"))))))
+
+(deftest expanded-tool-body-wraps-at-narrow-width-test
+  (testing "expanded tool body plain text wraps to the indented body width"
+    (let [state (assoc (init-state)
+                       :width 24
+                       :phase :idle
+                       :tools-expanded? true
+                       :messages [{:role :tool :tool-id "t1"}]
+                       :tool-order ["t1"]
+                       :tool-calls {"t1" {:name "bash"
+                                          :args "{\"command\":\"echo wrapped\"}"
+                                          :status :success
+                                          :result "tool body should wrap cleanly across lines"
+                                          :is-error false}})
+          plain (ansi/strip-ansi (app/view state))
+          lines (filter #(or (str/includes? % "tool body")
+                             (str/starts-with? % "    "))
+                        (str/split-lines plain))]
+      (is (> (count lines) 1))
+      (is (every? #(<= (count %) 24) lines))
+      (is (every? #(or (str/includes? % "tool body")
+                       (str/starts-with? % "    "))
+                  lines)))))

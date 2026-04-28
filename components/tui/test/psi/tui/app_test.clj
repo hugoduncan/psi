@@ -309,6 +309,29 @@
       ;; Cursor renders on first char, so check for rest of placeholder
       (is (str/includes? out "ype a message")))))
 
+(deftest startup-banner-metadata-wraps-at-terminal-width-test
+  (testing "startup banner prompt and skill summaries wrap on narrow terminals"
+    (let [state (-> (init-state)
+                    (assoc :width 40
+                           :prompt-templates [{:name "alpha"}
+                                              {:name "beta"}
+                                              {:name "gamma"}
+                                              {:name "delta"}
+                                              {:name "epsilon"}]
+                           :skills [{:name "allium-distill"}
+                                    {:name "workflow-authoring"}
+                                    {:name "session-debugging"}
+                                    {:name "structural-domain-modeling"}]))
+          plain (ansi/strip-ansi (app/view state))
+          lines (str/split-lines plain)
+          prompt-lines (filter #(str/includes? % "Prompts:") lines)
+          skill-lines  (filter #(str/includes? % "Skills:") lines)]
+      (is (seq prompt-lines) "expected prompts summary in startup banner")
+      (is (seq skill-lines) "expected skills summary in startup banner")
+      (is (every? #(<= (count %) 40) lines)
+          (str "expected all startup banner lines to fit within width 40, got:\n"
+               (str/join "\n" lines))))))
+
 ;;;; Extension command output capture
 
 (deftest extension-cmd-println-captured-as-message-test

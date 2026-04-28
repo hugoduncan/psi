@@ -9,26 +9,46 @@
    [psi.tui.session-selector-render :as selector-render]
    [psi.tui.tool-render :as tool-render]))
 
-(defn render-banner [model-name prompt-templates skills extension-summary]
+(defn- prefixed-wrap-lines
+  [prefix text width]
+  (let [prefix      (or prefix "")
+        text        (or text "")
+        prefix-w    (ansi/visible-width prefix)
+        avail       (max 1 (- (or width 80) prefix-w))
+        wrapped     (ansi/word-wrap text avail)
+        indent      (apply str (repeat prefix-w \space))]
+    (map-indexed (fn [idx line]
+                   (str (if (zero? idx) prefix indent) line))
+                 wrapped)))
+
+(defn- render-banner-summary
+  [prefix text width]
+  (when (seq text)
+    (str/join "\n"
+              (map #(charm-style/render shared/dim-style %)
+                   (prefixed-wrap-lines prefix text width)))))
+
+(defn render-banner [model-name prompt-templates skills extension-summary width]
   (let [visible-skills (remove :disable-model-invocation skills)
         ext-count      (:extension-count extension-summary 0)]
     (str (charm-style/render shared/title-style "ψ Psi Agent Session") "\n"
-         (charm-style/render shared/dim-style (str "  Model: " model-name)) "\n"
+         (render-banner-summary "  Model: " model-name width) "\n"
          (when (seq prompt-templates)
-           (str (charm-style/render shared/dim-style
-                                    (str "  Prompts: "
-                                         (str/join ", " (map #(str "/" (:name %)) prompt-templates))))
+           (str (render-banner-summary
+                 "  Prompts: "
+                 (str/join ", " (map #(str "/" (:name %)) prompt-templates))
+                 width)
                 "\n"))
          (when (seq visible-skills)
-           (str (charm-style/render shared/dim-style
-                                    (str "  Skills: "
-                                         (str/join ", " (map :name visible-skills))))
+           (str (render-banner-summary
+                 "  Skills: "
+                 (str/join ", " (map :name visible-skills))
+                 width)
                 "\n"))
          (when (pos? ext-count)
-           (str (charm-style/render shared/dim-style
-                                    (str "  Exts: " ext-count " loaded"))
+           (str (render-banner-summary "  Exts: " (str ext-count " loaded") width)
                 "\n"))
-         (charm-style/render shared/dim-style "  ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty") "\n")))
+         (render-banner-summary "  " "ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty" width) "\n")))
 
 (def agent-title-style (charm-style/style :fg charm-style/yellow :bold true))
 (def agent-head-style (charm-style/style :fg charm-style/cyan :bold true))
@@ -36,9 +56,11 @@
 (def thinking-style (charm-style/style :fg 240 :italic true))
 
 (defn render-thinking-line
-  [text]
+  [text width]
   (when (and text (not (str/blank? text)))
-    (str (charm-style/render thinking-style (str "· " text)) "\n")))
+    (str/join "\n"
+              (map #(charm-style/render thinking-style %)
+                   (prefixed-wrap-lines "· " text width)))))
 
 (defn render-agent-result
   [text width]
@@ -61,10 +83,15 @@
   [{:keys [role text custom-type]} width]
   (case role
     :thinking
-    (str (charm-style/render thinking-style (str "· " text)))
+    (str/join "\n"
+              (map #(charm-style/render thinking-style %)
+                   (prefixed-wrap-lines "· " text width)))
 
     :user
-    (str (charm-style/render shared/user-style "刀: ") text)
+    (str/join "\n"
+              (let [lines (prefixed-wrap-lines "刀: " text width)]
+                (cons (charm-style/render shared/user-style (first lines))
+                      (rest lines))))
 
     :assistant
     (cond
@@ -403,8 +430,8 @@
                visible)))))))
 
 (defn render-stream-thinking
-  [text]
-  (render-thinking-line text))
+  [text width]
+  (render-thinking-line text width))
 
 (defn render-stream-text
   [text width]
@@ -423,7 +450,8 @@
   [state item spinner-char width]
   (case (:item-kind item)
     :thinking
-    (render-thinking-line (:text item))
+    (when-let [s (render-thinking-line (:text item) width)]
+      (str s "\n"))
 
     :text
     (render-stream-text (:text item) width)
@@ -489,11 +517,11 @@
         term-width     (or width 80)]
     (if (= :selecting-session phase)
       (str (repaint-marker repaint-generation)
-           (render-banner model-name prompt-templates skills extension-summary)
+           (render-banner model-name prompt-templates skills extension-summary term-width)
            "\n"
            (selector-render/render-session-selector shared/dim-style render-separator session-selector current-session-file term-width (:session-selector-mode state)))
       (str (repaint-marker repaint-generation)
-           (render-banner model-name prompt-templates skills extension-summary)
+           (render-banner model-name prompt-templates skills extension-summary term-width)
            "\n"
            (render-messages messages term-width
                             {:tool-calls      tool-calls

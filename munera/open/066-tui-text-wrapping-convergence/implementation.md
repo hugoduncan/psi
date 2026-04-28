@@ -1,3 +1,17 @@
 Implementation notes:
-- Empty initially.
-- Use this file to append slice-level discoveries about which render surfaces are truly distinct and which can share a width-policy helper.
+- Slice 1 established `doc/tui-text-width-policy.md` as the canonical width-policy summary artifact.
+- The current surface taxonomy grouped repeated rule shapes into three useful families:
+  - prefixed wrapped line (`刀: `, `ψ: ` paragraph content, `· `)
+  - label+value wrapped summary (startup banner metadata)
+  - compact status/header truncation (tool headers, selector/footer-style rows)
+- Startup banner convergence did not need a new dedicated helper layer outside `app.render`; a small local prefixed wrapping helper was enough once the rule shape was explicit.
+- The first real shared helper candidate is the prefixed wrapped-line rule. Startup-banner label+value wrapping and thinking/user transcript wrapping now share the same structural shape: subtract prefix width, wrap to remaining width, indent continuation to content start.
+- Assistant paragraph transcript already had an explicit width budget via markdown rendering; user and thinking transcript surfaces were the ones still bypassing explicit wrap policy.
+- Tool rendering remains intentionally split by surface:
+  - collapsed header: truncate
+  - expanded plain-text body: wrap within the four-space body indent budget
+  - preformatted/machine-like body: preserve unless an explicit renderer chooses a different presentation
+- Verification status after this slice:
+  - focused width-policy unit proofs are green
+  - full unit suite is green (`1453 tests, 10806 assertions, 0 failures`)
+  - attempted focused integration verification for the new tmux scenarios is currently blocked by an unrelated integration-suite environment failure in `psi.launcher-gordian-integration-test` looking for `/Users/duncan/projects/hugoduncan/psi/fix-extensions/deps.edn`
