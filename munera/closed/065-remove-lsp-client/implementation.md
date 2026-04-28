@@ -67,3 +67,19 @@ Pending user clarification on scope and relationship to existing task 004 before
   - generic managed-service core owns lifecycle/transport
   - protocol semantics should live in integration-local adapters
   - future JSON-RPC-like integrations should prove their behavior with integration-local tests rather than by expanding the shared core
+
+2026-04-28 — code-shaper review note
+- reviewed with the code-shaper skill for simplicity, consistency, and robustness
+- outcome: approved; the removal improved shape rather than merely deleting code
+- simplicity:
+  - `service_protocol.clj` is now narrowly generic
+  - `mutations/services.clj` no longer hides protocol-specific runtime attachment in service creation
+  - the managed-service core now has one job instead of generic lifecycle plus one integration-specific protocol layer
+- consistency:
+  - retained naming and projections now match actual generic ownership
+  - tests and docs were reshaped away from LSP-specific semantics toward true managed-service semantics
+- robustness:
+  - fewer special-case branches and fewer misleading public-ish seams remain
+  - the added adapter guidance reduces the risk of future protocol-specific logic re-expanding the shared core accidentally
+- non-blocking suggestion only:
+  - if helpful later, sharpen the `service_protocol.clj` namespace docstring to state explicitly that protocol framing is out of scope for the generic service layer
