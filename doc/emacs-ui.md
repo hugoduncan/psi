@@ -91,6 +91,11 @@ In `psi-emacs-mode`:
   - while streaming, non-slash input uses steer (`prompt_while_streaming` with `behavior=steer`)
 - `C-u C-c RET` queue override for non-slash streaming input
 - `C-c C-q` queue while streaming for non-slash input; slash-prefixed input still uses backend `command`; fallback to normal send when idle
+- `M-p` navigate to older input history entry
+- `M-n` navigate to newer input history entry (or recover stash after `M-p`)
+- `M-r` search input history via completing-read (`M-x psi-emacs-search-input-history`);
+  selecting an entry stashes the current draft and populates the input area;
+  `C-g` or empty-string cancels without changing input or navigation state
 - `C-c C-k` abort active streaming (`abort`)
 - `C-c C-r` reconnect (prompts before clearing edited buffer)
 - `C-c C-t` toggle tool-output view mode (collapsed ↔ expanded); also available as `M-x psi-emacs-toggle-tool-output-view`
