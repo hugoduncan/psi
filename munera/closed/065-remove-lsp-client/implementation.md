@@ -48,3 +48,14 @@ Pending user clarification on scope and relationship to existing task 004 before
 - focused verification green:
   - `clojure -M:test --focus psi.agent-session.service-protocol-test --focus psi.agent-session.extensions-service-protocol-api-test --focus psi.agent-session.mutations-service-protocol-test --focus psi.agent-session.services-eql-test --focus psi.agent-session.extensions-post-tool-api-test --focus psi.agent-session.mutations-post-tool-test --focus psi.agent-session.tool-execution-test --focus psi.app-runtime.footer-test --focus psi.rpc-test --focus psi.rpc-events-test --focus psi.tui.app-view-runtime-test`
   - result: `80 tests, 305 assertions, 0 failures`
+
+2026-04-28 — post-close review note
+- reviewed against design/plan with the munera-task-review skill
+- outcome: approved; implementation matches the extract-and-remove design, preserves the intended generic managed-service architecture, and does not introduce concerning new patterns
+- strengths:
+  - removal is vertically coherent across code, tests, docs, build wiring, and task surfaces
+  - retained managed-service infrastructure is simpler and more protocol-agnostic after the LSP-specific layer deletion
+  - verification evidence is strong: focused green proof plus full unit suite green
+- optional non-blocking follow-up only:
+  - remaining `clojure-lsp` references are tooling/editor metadata rather than product LSP support
+  - if a future protocol-specific integration appears, it should be added as an integration-local adapter rather than by re-expanding the generic service core

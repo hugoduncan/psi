@@ -10,3 +10,7 @@
 - [x] Mark task 004 superseded by 065 during implementation
 - [x] Run verification and remove residual misleading active references
 - [x] Close 004 as superseded and 065 as completed
+
+Optional follow-up:
+- [ ] Decide whether remaining tooling-only `clojure-lsp` metadata/comments should be renamed or left as editor-specific implementation detail
+- [ ] If future protocol-specific subprocess integrations are added, codify the pattern in docs/tests as integration-local adapters rather than expansions of the generic managed-service core
