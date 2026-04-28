@@ -4,6 +4,6 @@
 - [x] Revisit modular GitHub workflows as proving examples using explicit step `:name`, `{:from ...}`, `:projection ...`, and `:session :preload` where appropriate
 - [x] Decide/document long-term prompt-binding convenience role as subordinate to the `:session`-first model
 - [ ] Land final validation/error-shaping improvements if needed
-- [ ] Run focused workflow tests
-- [ ] Run isolated workflow suite if applicable
+- [x] Run focused workflow tests
+- [x] Run isolated workflow suite if applicable
 - [ ] Run full unit suite
