@@ -63,6 +63,32 @@
                      :prompt "$INPUT"}]}
    :body "Coordinate bug triage."})
 
+(def multi-step-with-projections
+  {:name "projection-chain"
+   :description "Chain with explicit projections"
+   :config {:steps [{:name "discover"
+                     :workflow "planner"
+                     :session {:input {:from :workflow-input
+                                       :projection {:path [:task]}}
+                               :reference {:from :workflow-original
+                                           :projection :full}}
+                     :prompt "$INPUT"}
+                    {:name "reproduce"
+                     :workflow "builder"
+                     :session {:input {:from {:step "discover" :kind :accepted-result}
+                                       :projection {:path [:outputs :text]}}
+                               :reference {:from :workflow-input
+                                           :projection {:path [:ticket :title]}}}
+                     :prompt "$INPUT"}
+                    {:name "request-more-info"
+                     :workflow "reviewer"
+                     :session {:input {:from {:step "reproduce" :kind :accepted-result}
+                                       :projection :full}
+                               :reference {:from :workflow-original
+                                           :projection :text}}
+                     :prompt "$INPUT"}]}
+   :body "Projection chain."})
+
 ;;; Single-step compilation
 
 (deftest compile-single-step-test
@@ -192,6 +218,48 @@
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps build-id :input-bindings]))))))
 
+(deftest compile-multi-step-projection-test
+  (testing "minimal projection forms compile on top of task-060 source selection"
+    (let [{:keys [definition error]} (compiler/compile-workflow-file multi-step-with-projections)
+          [discover-id reproduce-id request-more-info-id] (:step-order definition)]
+      (is (nil? error))
+      (is (workflow-model/valid-workflow-definition? definition))
+      (is (= {:input {:source :workflow-input :path [:task]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps discover-id :input-bindings])))
+      (is (= {:input {:source :step-output :path [discover-id :outputs :text]}
+              :original {:source :workflow-input :path [:ticket :title]}}
+             (get-in definition [:steps reproduce-id :input-bindings])))
+      (is (= {:input {:source :step-output :path [reproduce-id]}
+              :original {:source :workflow-input :path [:original]}}
+             (get-in definition [:steps request-more-info-id :input-bindings])))))
+
+  (testing "named prior-step non-adjacent source use supports structured field extraction"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:name "non-adjacent-projection"
+            :description "Non-adjacent projection"
+            :config {:steps [{:name "discover"
+                              :workflow "planner"
+                              :prompt "$INPUT"}
+                             {:name "review"
+                              :workflow "reviewer"
+                              :session {:input {:from {:step "discover" :kind :accepted-result}
+                                                :projection {:path [:diagnostics :summary]}}}
+                              :prompt "$INPUT"}
+                             {:name "request-more-info"
+                              :workflow "builder"
+                              :session {:input {:from {:step "discover" :kind :accepted-result}
+                                                :projection {:path [:outputs :text]}}}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})
+          [discover-id review-id request-more-info-id] (:step-order definition)]
+      (is (nil? error))
+      (is (= {:source :step-output :path [discover-id :diagnostics :summary]}
+             (get-in definition [:steps review-id :input-bindings :input])))
+      (is (= {:source :step-output :path [discover-id :outputs :text]}
+             (get-in definition [:steps request-more-info-id :input-bindings :input]))))))
+
 ;;; Error handling
 
 (deftest compile-error-test
@@ -248,20 +316,47 @@
             :body "Frame."})]
       (is (re-find #"expected non-empty map with `:from`" error))))
 
-  (testing "unsupported projection keys fail clearly before task 061"
+  (testing "unsupported projection operator fails clearly"
     (let [{:keys [error]}
           (compiler/compile-workflow-file
-           {:name "projection-too-early"
-            :description "Projection too early"
+           {:name "bad-projection-operator"
+            :description "Bad projection operator"
             :config {:steps [{:name "plan"
                               :workflow "planner"
                               :session {:input {:from :workflow-input
-                                                :projection :text}}
+                                                :projection :tail}}
                               :prompt "$INPUT"}]}
             :body "Frame."})]
-      (is (re-find #"Unsupported `:session input :projection` before task 061" error))))
+      (is (re-find #"Unsupported `:projection`" error))))
 
-  (testing "unsupported session keys fail clearly for task 060"
+  (testing "malformed path projection fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-projection-path"
+            :description "Bad projection path"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:input {:from :workflow-input
+                                                :projection {:path :not-a-vector}}}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"expected vector path" error))))
+
+  (testing "projection with unexpected keys fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-projection-shape"
+            :description "Bad projection shape"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:input {:from :workflow-input
+                                                :projection {:path [:task]
+                                                             :extra true}}}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"unexpected keys" error))))
+
+  (testing "unsupported session keys fail clearly for task 061"
     (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:name "unsupported-session-key"
@@ -271,7 +366,7 @@
                               :session {:preload [{:from :workflow-input}]}
                               :prompt "$INPUT"}]}
             :body "Frame."})]
-      (is (re-find #"Unsupported `:session` keys for task 060" error))))
+      (is (re-find #"Unsupported `:session` keys for task 061" error))))
 
   (testing "duplicate author-facing step names fail clearly"
     (let [{:keys [error]}

@@ -62,6 +62,31 @@
        "          :prompt \"$INPUT\"}]}\n\n"
        "Coordinate modular bug triage."))
 
+(def projected-chain-md
+  (str "---\nname: projection-chain\ndescription: Projection chain\n---\n"
+       "{:steps [{:name \"discover\"\n"
+       "          :workflow \"planner\"\n"
+       "          :session {:input {:from :workflow-input\n"
+       "                            :projection {:path [:task]}}\n"
+       "                    :reference {:from :workflow-original\n"
+       "                                :projection :full}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"reproduce\"\n"
+       "          :workflow \"builder\"\n"
+       "          :session {:input {:from {:step \"discover\" :kind :accepted-result}\n"
+       "                            :projection {:path [:outputs :text]}}\n"
+       "                    :reference {:from :workflow-input\n"
+       "                                :projection {:path [:ticket :title]}}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"request-more-info\"\n"
+       "          :workflow \"reviewer\"\n"
+       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}\n"
+       "                            :projection :full}\n"
+       "                    :reference {:from :workflow-original\n"
+       "                                :projection :text}}\n"
+       "          :prompt \"$INPUT\"}]}\n\n"
+       "Projection chain."))
+
 (def bad-md
   "---\nname: broken\n---\nNo description.")
 
@@ -136,6 +161,29 @@
                     :original {:source :workflow-input :path [:original]}}
                    (get-in definition [:steps fix-id :input-bindings]))))))))
 
+  (testing "projected source selection loads and compiles"
+    (with-temp-workflow-dir
+      {"planner.md" planner-md
+       "builder.md" builder-md
+       "reviewer.md" reviewer-md
+       "projection-chain.md" projected-chain-md}
+      (fn [dir]
+        (with-redefs [loader/global-workflow-dirs (constantly [])
+                      loader/project-workflow-dir (constantly dir)]
+          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
+                definition (get definitions "projection-chain")
+                [discover-id reproduce-id request-more-info-id] (:step-order definition)]
+            (is (empty? errors))
+            (is (= {:input {:source :workflow-input :path [:task]}
+                    :original {:source :workflow-input :path [:original]}}
+                   (get-in definition [:steps discover-id :input-bindings])))
+            (is (= {:input {:source :step-output :path [discover-id :outputs :text]}
+                    :original {:source :workflow-input :path [:ticket :title]}}
+                   (get-in definition [:steps reproduce-id :input-bindings])))
+            (is (= {:input {:source :step-output :path [reproduce-id]}
+                    :original {:source :workflow-input :path [:original]}}
+                   (get-in definition [:steps request-more-info-id :input-bindings]))))))))
+
   (testing "unresolved step references reported as errors"
     (with-temp-workflow-dir
       {"plan-build-review.md" chain-md}
@@ -197,7 +245,25 @@
                         loader/project-workflow-dir (constantly dir)]
             (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
               (is (seq errors))
-              (is (some #(re-find #"Forward step reference" (:error %)) errors)))))))))
+              (is (some #(re-find #"Forward step reference" (:error %)) errors))))))))
+
+  (testing "malformed projections surface as load errors"
+    (let [bad-projection-md (str "---\nname: bad-projection\ndescription: Bad projection\n---\n"
+                                 "{:steps [{:name \"plan\"\n"
+                                 "          :workflow \"planner\"\n"
+                                 "          :session {:input {:from :workflow-input\n"
+                                 "                            :projection {:path :oops}}}\n"
+                                 "          :prompt \"$INPUT\"}]}\n\n"
+                                 "Bad projection chain.")]
+      (with-temp-workflow-dir
+        {"planner.md" planner-md
+         "bad-projection.md" bad-projection-md}
+        (fn [dir]
+          (with-redefs [loader/global-workflow-dirs (constantly [])
+                        loader/project-workflow-dir (constantly dir)]
+            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
+              (is (seq errors))
+              (is (some #(re-find #"expected vector path" (:error %)) errors)))))))))
 
 (deftest directory-precedence-test
   (testing "project definitions override global definitions with same name"
