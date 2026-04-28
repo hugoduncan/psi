@@ -87,6 +87,28 @@
        "          :prompt \"$INPUT\"}]}\n\n"
        "Projection chain."))
 
+(def preload-chain-md
+  (str "---\nname: preload-chain\ndescription: Preload chain\n---\n"
+       "{:steps [{:name \"discover\"\n"
+       "          :workflow \"planner\"\n"
+       "          :session {:input {:from :workflow-input}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"reproduce\"\n"
+       "          :workflow \"builder\"\n"
+       "          :session {:input {:from {:step \"discover\" :kind :accepted-result}}\n"
+       "                    :reference {:from :workflow-original}}\n"
+       "          :prompt \"$INPUT\"}\n"
+       "         {:name \"post-repro\"\n"
+       "          :workflow \"reviewer\"\n"
+       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}}\n"
+       "                    :reference {:from :workflow-original}\n"
+       "                    :preload [{:from :workflow-original}\n"
+       "                              {:from {:step \"discover\" :kind :accepted-result}}\n"
+       "                              {:from {:step \"reproduce\" :kind :session-transcript}\n"
+       "                               :projection {:type :tail :turns 4 :tool-output false}}]}\n"
+       "          :prompt \"$INPUT\"}]}\n\n"
+       "Preload chain."))
+
 (def bad-md
   "---\nname: broken\n---\nNo description.")
 
@@ -183,6 +205,30 @@
             (is (= {:input {:source :step-output :path [reproduce-id]}
                     :original {:source :workflow-input :path [:original]}}
                    (get-in definition [:steps request-more-info-id :input-bindings]))))))))
+
+  (testing "session preload loads and compiles"
+    (with-temp-workflow-dir
+      {"planner.md" planner-md
+       "builder.md" builder-md
+       "reviewer.md" reviewer-md
+       "preload-chain.md" preload-chain-md}
+      (fn [dir]
+        (with-redefs [loader/global-workflow-dirs (constantly [])
+                      loader/project-workflow-dir (constantly dir)]
+          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
+                definition (get definitions "preload-chain")
+                [discover-id _reproduce-id post-repro-id] (:step-order definition)]
+            (is (empty? errors))
+            (is (= [{:kind :value
+                     :role "user"
+                     :binding {:source :workflow-input :path [:original]}}
+                    {:kind :value
+                     :role "assistant"
+                     :binding {:source :step-output :path [discover-id :outputs :text]}}
+                    {:kind :session-transcript
+                     :step-id "step-2-builder"
+                     :projection {:type :tail :turns 4 :tool-output false}}]
+                   (get-in definition [:steps post-repro-id :session-preload]))))))))
 
   (testing "unresolved step references reported as errors"
     (with-temp-workflow-dir
