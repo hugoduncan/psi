@@ -111,7 +111,14 @@
    [:retry-policy workflow-retry-policy-schema]
    [:capability-policy {:optional true} workflow-capability-policy-schema]
    [:judge {:optional true} [:maybe judge-schema]]
-   [:on {:optional true} [:maybe routing-table-schema]]])
+   [:on {:optional true} [:maybe routing-table-schema]]
+   [:session-overrides {:optional true}
+    [:map
+     [:system-prompt {:optional true} :string]
+     [:tools {:optional true} [:vector :string]]
+     [:skills {:optional true} [:vector :string]]
+     [:model {:optional true} [:or :string :map]]
+     [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]]]])
 
 (def workflow-definition-schema
   [:map

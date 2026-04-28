@@ -260,6 +260,53 @@
       (is (= {:source :step-output :path [discover-id :outputs :text]}
              (get-in definition [:steps request-more-info-id :input-bindings :input]))))))
 
+(deftest compile-multi-step-session-overrides-test
+  (testing "per-step session-shaping overrides compile under :session"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:name "override-chain"
+            :description "Per-step overrides"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :prompt "$INPUT"}
+                             {:name "review"
+                              :workflow "reviewer"
+                              :session {:input {:from {:step "plan" :kind :accepted-result}}
+                                        :reference {:from :workflow-original}
+                                        :system-prompt "Focus only on correctness, edge cases, and missing tests."
+                                        :tools []
+                                        :skills ["testing-best-practices"]
+                                        :model "gpt-5"
+                                        :thinking-level :high}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})
+          [_plan-id review-id] (:step-order definition)]
+      (is (nil? error))
+      (is (workflow-model/valid-workflow-definition? definition))
+      (is (= {:system-prompt "Focus only on correctness, edge cases, and missing tests."
+              :tools []
+              :skills ["testing-best-practices"]
+              :model "gpt-5"
+              :thinking-level :high}
+             (get-in definition [:steps review-id :session-overrides])))))
+
+  (testing "empty session map remains equivalent to absent session block"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:name "empty-session-overrides"
+            :description "Empty session overrides"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :prompt "$INPUT"}
+                             {:name "review"
+                              :workflow "reviewer"
+                              :session {}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})
+          [_plan-id review-id] (:step-order definition)]
+      (is (nil? error))
+      (is (nil? (get-in definition [:steps review-id :session-overrides]))))))
+
 ;;; Error handling
 
 (deftest compile-error-test
@@ -356,7 +403,7 @@
             :body "Frame."})]
       (is (re-find #"unexpected keys" error))))
 
-  (testing "unsupported session keys fail clearly for task 061"
+  (testing "unsupported session keys fail clearly for tasks 060-062"
     (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:name "unsupported-session-key"
@@ -366,7 +413,67 @@
                               :session {:preload [{:from :workflow-input}]}
                               :prompt "$INPUT"}]}
             :body "Frame."})]
-      (is (re-find #"Unsupported `:session` keys for task 061" error))))
+      (is (re-find #"Unsupported `:session` keys for tasks 060-062" error))))
+
+  (testing "malformed tools override fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-tools-override"
+            :description "Bad tools override"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:tools ["read" :bash]}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Malformed `:session tools`" error))))
+
+  (testing "malformed skills override fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-skills-override"
+            :description "Bad skills override"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:skills "testing-best-practices"}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Malformed `:session skills`" error))))
+
+  (testing "malformed system-prompt override fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-system-prompt-override"
+            :description "Bad system prompt override"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:system-prompt :strict}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Malformed `:session system-prompt`" error))))
+
+  (testing "malformed model override fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-model-override"
+            :description "Bad model override"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:model 42}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Malformed `:session model`" error))))
+
+  (testing "malformed thinking-level override fails clearly"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "bad-thinking-override"
+            :description "Bad thinking override"
+            :config {:steps [{:name "plan"
+                              :workflow "planner"
+                              :session {:thinking-level :ultra}
+                              :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"Malformed `:session thinking-level`" error))))
 
   (testing "duplicate author-facing step names fail clearly"
     (let [{:keys [error]}

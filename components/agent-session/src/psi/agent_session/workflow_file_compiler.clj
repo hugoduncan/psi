@@ -100,12 +100,19 @@
         step-label (step-label step)
         resolved-on (authoring-resolution/resolve-routing-table (:on step) routing-target->step-id)
         {input-bindings :ok binding-error :error}
-        (authoring-resolution/compile-step-input-bindings step previous-step-id step-source-ref-map idx)]
+        (authoring-resolution/compile-step-input-bindings step previous-step-id step-source-ref-map idx)
+        {session-overrides :ok override-error :error}
+        (authoring-resolution/compile-step-session-overrides step)]
     (when binding-error
       (throw (ex-info (str "Workflow `" workflow-name "` step `" step-label "`: " binding-error)
                       {:workflow workflow-name
                        :step step-label
                        :error binding-error})))
+    (when override-error
+      (throw (ex-info (str "Workflow `" workflow-name "` step `" step-label "`: " override-error)
+                      {:workflow workflow-name
+                       :step step-label
+                       :error override-error})))
     [step-id
      (cond-> {:label (or step-label delegated-workflow-name step-id)
               :description (str "Delegate to workflow `" delegated-workflow-name "`.")
@@ -119,7 +126,10 @@
        (assoc :judge (:judge step))
 
        resolved-on
-       (assoc :on resolved-on))]))
+       (assoc :on resolved-on)
+
+       (seq session-overrides)
+       (assoc :session-overrides session-overrides))]))
 
 (defn compile-multi-step
   "Compile a parsed workflow file with `:steps` into an N-step canonical definition."

@@ -141,6 +141,52 @@
       (is (= {:provider "openai" :id "gpt-test"} (:model planner-config)))
       (is (= {:provider "openai" :id "gpt-test"} (:model builder-config))))))
 
+(deftest resolve-step-session-config-step-overrides-test
+  (testing "step overrides replace delegated defaults while system prompt still composes with framing prompt"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          override-definition {:definition-id "plan-build-overrides"
+                               :name "plan-build-overrides"
+                               :step-order ["step-1-planner" "step-2-builder"]
+                               :steps {"step-1-planner" {:executor {:type :agent :profile "planner"}
+                                                         :prompt-template "$INPUT"
+                                                         :input-bindings {:input {:source :workflow-input :path [:input]}}
+                                                         :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                                         :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
+                                       "step-2-builder" {:executor {:type :agent :profile "builder"}
+                                                         :prompt-template "$INPUT"
+                                                         :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :text]}}
+                                                         :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                                         :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
+                                                         :session-overrides {:system-prompt "Focus only on correctness."
+                                                                             :tools []
+                                                                             :skills ["testing-best-practices"]
+                                                                             :model "gpt-5"
+                                                                             :thinking-level :high}}}
+                               :workflow-file-meta {:framing-prompt "Coordinate a plan-build cycle."}}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
+                           [s _ _] (workflow-runtime/register-definition s builder-definition-with-meta)
+                           [s _ _] (workflow-runtime/register-definition s override-definition)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build-overrides"
+                                                                   :run-id "run-overrides"
+                                                                   :workflow-input {:input "build it"}})]
+                       s)))
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :skills]
+                   [{:name "testing-best-practices"
+                     :description "Testing"
+                     :file-path ""
+                     :base-dir ""
+                     :source :project
+                     :disable-model-invocation false}])
+          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-overrides")
+          builder-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-2-builder")]
+      (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:system-prompt builder-config)))
+      (is (= [] (mapv :name (:tool-defs builder-config))))
+      (is (= ["testing-best-practices"] (mapv :name (:skills builder-config))))
+      (is (= "gpt-5" (:model builder-config)))
+      (is (= :high (:thinking-level builder-config))))))
+
 (deftest materialize-step-inputs-and-prompt-test
   (let [[state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
                                                            multi-step-definition-with-meta)

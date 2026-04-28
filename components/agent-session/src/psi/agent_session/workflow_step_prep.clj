@@ -107,6 +107,24 @@
                 :else tool))
             tool-config))))
 
+(defn- step-meta-for
+  [ctx workflow-run step-id]
+  (let [step-def (get-in workflow-run [:effective-definition :steps step-id])
+        profile (get-in step-def [:executor :profile])
+        run-meta (get-in workflow-run [:effective-definition :workflow-file-meta])
+        delegated-workflow? (and profile
+                                 (not= profile (:definition-id (:effective-definition workflow-run))))
+        base-meta (if delegated-workflow?
+                    (let [ref-def (get-in @(:state* ctx) [:workflows :definitions profile])]
+                      (or (:workflow-file-meta ref-def) {}))
+                    (or run-meta {}))
+        framing-prompt (when delegated-workflow? (:framing-prompt run-meta))
+        step-overrides (or (:session-overrides step-def) {})]
+    {:step-def step-def
+     :base-meta base-meta
+     :framing-prompt framing-prompt
+     :step-overrides step-overrides}))
+
 (defn resolve-step-session-config
   "Resolve child session configuration for a workflow step.
 
@@ -114,25 +132,24 @@
    For multi-step workflows, looks up the referenced workflow's definition from
    registered definitions to get that step's :workflow-file-meta."
   [ctx parent-session-id workflow-run step-id]
-  (let [step-def (get-in workflow-run [:effective-definition :steps step-id])
-        profile (get-in step-def [:executor :profile])
-        run-meta (get-in workflow-run [:effective-definition :workflow-file-meta])
-        delegated-workflow? (and profile
-                                 (not= profile (:definition-id (:effective-definition workflow-run))))
-        step-meta (if delegated-workflow?
-                    (let [ref-def (get-in @(:state* ctx) [:workflows :definitions profile])]
-                      (or (:workflow-file-meta ref-def) {}))
-                    (or run-meta {}))
-        framing-prompt (when delegated-workflow? (:framing-prompt run-meta))
+  (let [{:keys [base-meta framing-prompt step-overrides]} (step-meta-for ctx workflow-run step-id)
         parent-session-id (or parent-session-id
                               (some->> (session-state/list-context-sessions-in ctx) first :session-id))
-        parent-session-model (some-> (session-state/get-session-data-in ctx parent-session-id) :model)]
-    {:base-system-prompt (:system-prompt step-meta)
+        parent-session-model (some-> (session-state/get-session-data-in ctx parent-session-id) :model)
+        base-system-prompt (or (:system-prompt step-overrides)
+                               (:system-prompt base-meta))]
+    {:base-system-prompt base-system-prompt
      :framing-prompt framing-prompt
-     :system-prompt (compose-system-prompt (:system-prompt step-meta) framing-prompt)
-     :tool-defs (resolve-step-tool-defs ctx parent-session-id (:tools step-meta))
-     :thinking-level (or (:thinking-level step-meta) :off)
-     :skills (resolve-step-skills ctx parent-session-id (:skills step-meta))
-     :model (or (:model step-meta)
-                (:model run-meta)
+     :system-prompt (compose-system-prompt base-system-prompt framing-prompt)
+     :tool-defs (if (contains? step-overrides :tools)
+                  (resolve-step-tool-defs ctx parent-session-id (:tools step-overrides))
+                  (resolve-step-tool-defs ctx parent-session-id (:tools base-meta)))
+     :thinking-level (if (contains? step-overrides :thinking-level)
+                       (:thinking-level step-overrides)
+                       (or (:thinking-level base-meta) :off))
+     :skills (if (contains? step-overrides :skills)
+               (resolve-step-skills ctx parent-session-id (:skills step-overrides))
+               (resolve-step-skills ctx parent-session-id (:skills base-meta)))
+     :model (or (:model step-overrides)
+                (:model base-meta)
                 parent-session-model)}))

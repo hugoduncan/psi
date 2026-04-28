@@ -9,10 +9,29 @@
    - `:projection :full`
    - `:projection {:path [...]}`
    - routing target resolution compatibility for named `:goto` targets
-   - compile-time validation around those surfaces")
+   - compile-time validation around those surfaces
+
+   Task 062 extends `:session` with per-step session-shaping overrides:
+   - `:system-prompt`
+   - `:tools`
+   - `:skills`
+   - `:model`
+   - `:thinking-level`"
+  (:require
+   [malli.core :as m]
+   [psi.agent-session.session :as session]))
+
+(def ^:private binding-session-keys
+  #{:input :reference})
+
+(def ^:private override-session-keys
+  #{:system-prompt :tools :skills :model :thinking-level})
 
 (def ^:private supported-session-keys
-  #{:input :reference})
+  (into #{} (concat binding-session-keys override-session-keys)))
+
+(def ^:private canonical-thinking-levels
+  #{:off :minimal :low :medium :high :xhigh})
 
 (defn- default-binding
   [binding-key previous-step-id]
@@ -158,7 +177,7 @@
                                       step-name->step-ref
                                       current-step-idx))))))
 
-(defn compile-step-input-bindings
+(defn- compile-session-bindings
   [step previous-step-id step-name->step-ref current-step-idx]
   (let [session (:session step)
         defaults {:input (default-binding :input previous-step-id)
@@ -174,24 +193,128 @@
       {:ok defaults}
 
       :else
+      (let [{input-binding :ok input-error :error}
+            (compile-session-binding :input previous-step-id session step-name->step-ref current-step-idx)
+            {reference-binding :ok reference-error :error}
+            (compile-session-binding :reference previous-step-id session step-name->step-ref current-step-idx)]
+        (cond
+          input-error
+          {:error input-error}
+
+          reference-error
+          {:error reference-error}
+
+          :else
+          {:ok {:input input-binding
+                :original reference-binding}})))))
+
+(defn compile-step-input-bindings
+  [step previous-step-id step-name->step-ref current-step-idx]
+  (let [session (:session step)]
+    (cond
+      (nil? session)
+      (compile-session-bindings step previous-step-id step-name->step-ref current-step-idx)
+
+      (not (map? session))
+      {:error "Malformed `:session`: expected map"}
+
+      (empty? session)
+      (compile-session-bindings step previous-step-id step-name->step-ref current-step-idx)
+
+      :else
       (let [unsupported-keys (seq (remove supported-session-keys (keys session)))]
         (if unsupported-keys
-          {:error (str "Unsupported `:session` keys for task 061: "
+          {:error (str "Unsupported `:session` keys for tasks 060-062: "
                        (pr-str (vec unsupported-keys)))}
-          (let [{input-binding :ok input-error :error}
-                (compile-session-binding :input previous-step-id session step-name->step-ref current-step-idx)
-                {reference-binding :ok reference-error :error}
-                (compile-session-binding :reference previous-step-id session step-name->step-ref current-step-idx)]
+          (compile-session-bindings step previous-step-id step-name->step-ref current-step-idx))))))
+
+(defn- vector-of-strings?
+  [xs]
+  (and (vector? xs)
+       (every? string? xs)))
+
+(defn- compile-tools-override
+  [session]
+  (if (contains? session :tools)
+    (let [tools (:tools session)]
+      (if (vector-of-strings? tools)
+        {:ok tools}
+        {:error "Malformed `:session tools`: expected vector of strings"}))
+    {:ok ::absent}))
+
+(defn- compile-skills-override
+  [session]
+  (if (contains? session :skills)
+    (let [skills (:skills session)]
+      (if (vector-of-strings? skills)
+        {:ok skills}
+        {:error "Malformed `:session skills`: expected vector of strings"}))
+    {:ok ::absent}))
+
+(defn- compile-system-prompt-override
+  [session]
+  (if (contains? session :system-prompt)
+    (let [system-prompt (:system-prompt session)]
+      (if (string? system-prompt)
+        {:ok system-prompt}
+        {:error "Malformed `:session system-prompt`: expected string"}))
+    {:ok ::absent}))
+
+(defn- compile-model-override
+  [session]
+  (if (contains? session :model)
+    (let [model (:model session)]
+      (if (or (string? model)
+              (m/validate session/model-schema model))
+        {:ok model}
+        {:error "Malformed `:session model`: expected model string or canonical model map"}))
+    {:ok ::absent}))
+
+(defn- compile-thinking-level-override
+  [session]
+  (if (contains? session :thinking-level)
+    (let [level (:thinking-level session)]
+      (if (contains? canonical-thinking-levels level)
+        {:ok level}
+        {:error "Malformed `:session thinking-level`: expected one of :off, :minimal, :low, :medium, :high, :xhigh"}))
+    {:ok ::absent}))
+
+(defn compile-step-session-overrides
+  [step]
+  (let [session (:session step)]
+    (cond
+      (nil? session)
+      {:ok nil}
+
+      (not (map? session))
+      {:error "Malformed `:session`: expected map"}
+
+      (empty? session)
+      {:ok nil}
+
+      :else
+      (let [unsupported-keys (seq (remove supported-session-keys (keys session)))]
+        (if unsupported-keys
+          {:error (str "Unsupported `:session` keys for tasks 060-062: "
+                       (pr-str (vec unsupported-keys)))}
+          (let [{system-prompt :ok system-prompt-error :error} (compile-system-prompt-override session)
+                {tools :ok tools-error :error} (compile-tools-override session)
+                {skills :ok skills-error :error} (compile-skills-override session)
+                {model :ok model-error :error} (compile-model-override session)
+                {thinking-level :ok thinking-level-error :error} (compile-thinking-level-override session)]
             (cond
-              input-error
-              {:error input-error}
-
-              reference-error
-              {:error reference-error}
-
+              system-prompt-error {:error system-prompt-error}
+              tools-error {:error tools-error}
+              skills-error {:error skills-error}
+              model-error {:error model-error}
+              thinking-level-error {:error thinking-level-error}
               :else
-              {:ok {:input input-binding
-                    :original reference-binding}})))))))
+              {:ok (cond-> {}
+                     (not= system-prompt ::absent) (assoc :system-prompt system-prompt)
+                     (not= tools ::absent) (assoc :tools tools)
+                     (not= skills ::absent) (assoc :skills skills)
+                     (not= model ::absent) (assoc :model model)
+                     (not= thinking-level ::absent) (assoc :thinking-level thinking-level))})))))))
 
 (defn step-source-reference-map
   "Source-selection references are intentionally stricter than routing refs:
