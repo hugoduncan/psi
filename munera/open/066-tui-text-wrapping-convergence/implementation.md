@@ -14,4 +14,4 @@ Implementation notes:
 - Verification status after this slice:
   - focused width-policy unit proofs are green
   - full unit suite is green (`1453 tests, 10806 assertions, 0 failures`)
-  - attempted focused integration verification for the new tmux scenarios is currently blocked by an unrelated integration-suite environment failure in `psi.launcher-gordian-integration-test` looking for `/Users/duncan/projects/hugoduncan/psi/fix-extensions/deps.edn`
+  - attempted focused integration verification for the new tmux scenarios was initially blocked by an unrelated integration-suite environment failure in `psi.launcher-gordian-integration-test`; that test was then decoupled from machine-local absolute path fixtures by switching it to tempdir + local manifest setup
