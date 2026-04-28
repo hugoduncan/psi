@@ -6,6 +6,12 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- `psi-emacs-search-input-history` command (bound to `M-r`): completing-read
+  search over the current session's prompt input history; selecting an entry
+  stashes the current draft and populates the input area; cancel leaves input
+  and navigation state unchanged.
+
 ## [0.1.2026] - 2026-04-27
 
 ### Added
