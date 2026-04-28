@@ -1,6 +1,11 @@
 # Steps: Emacs search previous prompt inputs
 
-## Follow-on (post-review)
+## Follow-on #2 (code-shaper)
+
+- [ ] `user-error` message: `"Not a psi buffer"` → `"psi buffer is not initialized"`
+- [ ] History access: bare `(psi-emacs-state-input-history ...)` → `(or ... '())` to match sibling idiom
+
+## Follow-on #1 (post-review)
 
 - [x] Switch `completing-read` → `psi-emacs--ordered-completing-read` to
       preserve recency order with all completion UIs

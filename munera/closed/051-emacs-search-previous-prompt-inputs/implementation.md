@@ -1,6 +1,18 @@
 # Implementation: Emacs search previous prompt inputs
 
-## Review notes (post-close, 2026-04-28)
+## Review notes #2 (code-shaper, 2026-04-28)
+
+Two consistency issues with sibling functions `psi-emacs-previous-input` /
+`psi-emacs-next-input`:
+
+1. **`user-error` message wording** — `"Not a psi buffer"` diverges from
+   siblings which use `"psi buffer is not initialized"`.
+
+2. **History access pattern** — siblings use `(or (psi-emacs-state-input-history ...) '())`
+   defensive default; search uses bare access with `consp` guard — safe but
+   inconsistent.
+
+## Review notes #1 (post-close, 2026-04-28)
 
 Three issues found in review:
 
