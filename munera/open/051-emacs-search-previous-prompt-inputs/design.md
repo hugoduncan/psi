@@ -19,7 +19,7 @@ over the history list) would let the user jump directly to any prior input.
 
 **In scope:**
 - A new interactive command `psi-emacs-search-input-history` in `psi-compose.el`
-- A keymap binding in `psi-mode.el` (e.g. `C-c /` or `M-r`)
+- A keymap binding `M-r` in `psi-mode.el`
 - Selecting a candidate populates the input area (same as `M-p` navigation does)
 - Pure Emacs-UI concern — no backend changes, no new RPC ops, no new session state
 
@@ -39,9 +39,10 @@ over the history list) would let the user jump directly to any prior input.
   automatically when installed
 - **`psi-emacs--replace-input-text`** — the canonical setter for the input area;
   already used by `psi-emacs-previous-input` / `psi-emacs-next-input`
-- **navigation state** — `input-history-index` + `input-history-stash`; search
-  selection should reset this (same as recording a new input does) so `M-p`/`M-n`
-  still work coherently after a search pick
+- **navigation state** — `input-history-index` + `input-history-stash`; on
+  search selection the current draft is stashed first (same as `M-p` does), then
+  navigation index is reset to nil (top of history) so subsequent `M-p`/`M-n`
+  steps from the top; `M-n` can recover the pre-search draft
 
 ## Implementation Approaches
 
@@ -50,9 +51,11 @@ over the history list) would let the user jump directly to any prior input.
 ```
 psi-emacs-search-input-history
   → guard: psi-emacs--state exists + history non-empty
-  → completing-read "Previous input: " history-list
+  → stash current draft (as M-p does)
+  → completing-read "Previous input: " history-list  ; history shown as-is, no dedup
+  → C-g / empty-string → leave input unchanged (no error)
   → on selection: psi-emacs--replace-input-text(chosen)
-                  + psi-emacs--history-reset-navigation
+                  + reset navigation index to nil (top of history)
 ```
 
 - Zero new dependencies
@@ -89,13 +92,16 @@ deps, consult/vertico users get the rich experience automatically.
 
 ## Acceptance Criteria
 
-1. `M-r` (or `C-c /`) in a psi buffer invokes `psi-emacs-search-input-history`
+1. `M-r` in a psi buffer invokes `psi-emacs-search-input-history`
 2. The command opens a minibuffer completion over all entries in
-   `psi-emacs-state-input-history` for the current buffer
-3. Selecting an entry replaces the input area with that text (point at end)
-4. After selection, `M-p`/`M-n` navigation works correctly from the new input
-   (navigation index is reset)
-5. The command signals `user-error` when history is empty
-6. The command signals `user-error` when the buffer is not a psi buffer
-7. Cancelling the completing-read leaves the input area unchanged
+   `psi-emacs-state-input-history` for the current buffer; entries are shown
+   as-is with no deduplication
+3. Selecting an entry stashes any current draft, replaces the input area with
+   the selected text, and resets the navigation index to nil (top of history)
+4. After selection, `M-p` steps to the next older entry from the top of history;
+   `M-n` recovers the pre-search draft
+5. `C-g` or empty-string submission cancels without modifying the input area or
+   navigation state
+6. The command signals `user-error` when history is empty
+7. The command signals `user-error` when the buffer is not a psi buffer
 8. The binding is documented alongside the existing `M-p`/`M-n` bindings
