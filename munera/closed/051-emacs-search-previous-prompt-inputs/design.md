@@ -99,9 +99,11 @@ deps, consult/vertico users get the rich experience automatically.
    as-is with no deduplication
 3. Selecting an entry: stashes the current draft, replaces the input area with
    the selected text, and resets the navigation index to nil (top of history)
-4. After selection, `M-p` steps to the next older entry from the top of history;
-   `M-n` recovers the pre-search draft
-   (stash is written only on successful selection — cancel never touches it)
+4. After selection, `M-p` steps to the next older entry from the top of history
+   (stash is overwritten with the selected entry at that point); `M-n`
+   immediately after selection signals `user-error` (no navigation position yet);
+   `M-n` after at least one `M-p` recovers the M-p stash as usual.
+   The pre-search draft is stashed on selection and survives until the first `M-p`.
 5. `C-g` or empty-string submission cancels without modifying the input area or
    navigation state
 6. The command signals `user-error` when history is empty
