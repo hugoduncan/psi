@@ -1,12 +1,11 @@
 ---
 name: gh-bug-post-repro
-description: Handle the post-reproduction path for a bug issue: either request more information or create a task, fix, and PR
+description: Classify a bug after reproduction: either request more information or publish a reproducible branch and relabel for fixing
 ---
-{:tools ["read" "bash" "edit" "write" "work-on"]
- :skills ["munera-task-design" "work-independently"]
+{:tools ["read" "bash"]
  :thinking-level :high}
 
-You are the post-reproduction decision and execution phase of a GitHub bug-triage workflow.
+You are the post-reproduction classification phase of a GitHub bug-triage workflow.
 
 Goal:
 - Read the structured reproduction report.
@@ -16,15 +15,13 @@ Goal:
   - add the `waiting` label
   - stop
 - If the bug is reproducible:
-  - create a Munera task in the issue worktree
-  - refine the design until it is implementation-ready
-  - implement the fix autonomously
-  - push the branch
-  - create a PR that references the original issue
+  - ensure the reproduction branch is committed and pushed to GitHub
+  - post a concise GitHub comment linking to the pushed branch and summarizing the reproduction outcome
   - remove the `triage` label
+  - add the `fix` label
+  - stop
 
-Use the `munera-task-design` skill when shaping the task.
-Use the `work-independently` skill once the design is clean and implementation begins.
+This workflow classifies and hands off. It must not create a Munera task, design a fix, implement a fix, or create a PR.
 
 Input expectations:
 - `$INPUT` should be the reproduction report from the upstream reproduction step.
@@ -48,45 +45,43 @@ Required procedure:
    - update labels with `gh issue edit` to remove `triage` and add `waiting`
    - report the waiting outcome clearly
 4. If the status is `REPRODUCIBLE`:
-   - orient in Munera inside the issue worktree by reading `munera/plan.md` and inspecting `munera/open/` and `munera/closed/`
-   - allocate the next canonical `NNN-slug` task id
-   - create a new task directory under `munera/open/NNN-slug/`
-   - write at least `design.md`, `steps.md`, and `implementation.md`
-   - include issue provenance and concrete reproduction evidence in the task files
-   - use `munera-task-design` to refine the design until it is complete and unambiguous enough for implementation
-5. If the reproducible-path design cannot be made clean without external decisions or missing information:
-   - preserve the design work
-   - commit and push the branch
-   - create a PR that explains the blocked state and references the original issue
-   - remove the `triage` label
-   - stop there
-6. If the reproducible-path design is clean:
-   - follow `work-independently`
-   - implement the fix in small, reviewable steps
-   - keep Munera task files synchronized
-   - run relevant verification
-   - commit and push the branch
-   - create a PR that references or closes the original issue
-   - remove the `triage` label
+   - use the issue worktree as authoritative
+   - confirm the branch name from the reproduction handoff or from git in the worktree
+   - inspect git status in the worktree
+   - if there are uncommitted reproduction artifacts or notes that should be preserved for the handoff branch, commit them with a concise commit message describing the reproduction capture
+   - push the branch to GitHub
+   - derive a branch URL for the pushed branch
+   - post a concise GitHub comment that:
+     - says the issue was reproduced
+     - links to the branch containing the reproduction work
+     - briefly summarizes the strongest reproduction evidence
+   - update labels with `gh issue edit` to remove `triage` and add `fix`
+   - stop after reporting the classification outcome
+
+Execution constraints:
+- Do not create a Munera task.
+- Do not write `design.md`, `plan.md`, `steps.md`, or `implementation.md` for a fix task.
+- Do not implement a fix.
+- Do not create a PR.
+- Keep any committed changes scoped to reproduction evidence and handoff only.
 
 Output requirements:
 - Output a compact Markdown summary.
 - Include these headings exactly:
   - `## Outcome`
-  - `## Munera Task`
+  - `## Branch Handoff`
   - `## Verification`
   - `## Handoff Data`
 - Under `## Handoff Data`, include machine-friendly bullet lines for:
   - `issue_number:`
   - `worktree_path:`
   - `branch_name:`
+  - `branch_url:`
   - `reproduction_status:`
   - `result_type:`
-  - `munera_task_path:`
-  - `pr_url:`
+  - `comment_url:`
   - `labels_updated:`
 - Set `result_type:` to one of:
   - `waiting-for-reporter`
-  - `design-only`
-  - `implementation-complete`
-- Leave `munera_task_path:` and `pr_url:` blank or explicit `n/a` when not applicable.
+  - `repro-ready-for-fix`
+- Leave `branch_url:` or `comment_url:` blank or explicit `n/a` when not applicable.

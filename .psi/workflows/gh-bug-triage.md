@@ -1,9 +1,9 @@
 ---
 name: gh-bug-triage
-description: Find labeled GitHub bug-triage issues, attempt reproduction in an issue worktree, request more information when not reproducible, or fix and PR when reproducible
+description: Find labeled GitHub bug-triage issues, attempt reproduction in an issue worktree, request more information when not reproducible, or publish a repro branch and relabel for fixing when reproducible
 ---
 {:tools ["read" "bash" "edit" "write" "work-on"]
- :skills ["issue-bug-triage" "munera-task-design" "work-independently"]
+ :skills ["issue-bug-triage"]
  :thinking-level :high}
 
 You are executing a focused GitHub bug-triage workflow in this repository.
@@ -13,11 +13,9 @@ Goal:
 - Read the selected issue carefully.
 - Use the `issue-bug-triage` skill to attempt reproduction in an issue-specific worktree created from `origin/master`.
 - If reproduction fails, post a concise reply requesting the minimum information likely to unblock reproduction, remove the `triage` label, and add `waiting`.
-- If reproduction succeeds, create a Munera task in the issue worktree, refine the design with `munera-task-design`, fix the bug autonomously with `work-independently`, push the branch, create a PR mentioning the original issue number, and remove the `triage` label.
+- If reproduction succeeds, preserve and push the reproduction branch, comment on the issue with a link to that branch and a concise reproduction summary, remove the `triage` label, and add `fix`.
 
 Use the `issue-bug-triage` skill during reproduction and evidence gathering.
-Use the `munera-task-design` skill when shaping the Munera bug-fix task.
-Use the `work-independently` skill once the design is clean and implementation begins.
 
 Primary selection rule:
 - Look for open GitHub issues carrying both the `triage` label and the `bug` label.
@@ -57,7 +55,7 @@ Required procedure:
    - Example tool call shape:
      - `{"description":"25 custom llm providers","base_branch":"origin/master"}`
    - Do not use manual `git worktree` shell commands.
-   - After a successful `work-on` tool call, treat the returned worktree path as authoritative for all repository edits, git commands, reproduction attempts, and later PR work.
+   - After a successful `work-on` tool call, treat the returned worktree path as authoritative for all repository edits, git commands, reproduction attempts, and later handoff work.
    - If the `work-on` tool is unavailable or the tool call fails, stop and report that limitation or failure instead of improvising another mechanism.
 
 5. Attempt reproduction.
@@ -69,7 +67,7 @@ Required procedure:
      - attempted reproduction
      - reproduction status
      - missing information needed next
-     - reproduction evidence for implementation handoff
+     - reproduction evidence for handoff
    - Attempt the smallest concrete reproduction that the issue supports.
    - Keep the analysis faithful to the issue and to observed runtime/test evidence.
    - Conclude with exactly one explicit reproduction status: `reproducible` or `not-yet-reproducible`.
@@ -85,48 +83,28 @@ Required procedure:
    - Add the `waiting` label to the issue.
    - Stop after reporting the partial outcome.
 
-7. If reproduction succeeded, create the Munera task.
-   - Orient in Munera inside the issue worktree by reading `munera/plan.md` and inspecting `munera/open/` and `munera/closed/`.
-   - Allocate the next canonical `NNN-slug` task id.
-   - Create a new task directory under `munera/open/NNN-slug/`.
-   - Write at least:
-     - `design.md`
-     - `steps.md`
-     - `implementation.md`
-   - Include issue provenance in the task files, especially the issue number and URL.
-   - Seed the design from the concrete reproduction evidence rather than from speculation.
-
-8. Refine the task design.
-   - Use the `munera-task-design` skill.
-   - Refine until the design is complete and unambiguous enough to pass the Munera design gate.
-   - If the design cannot be made complete and unambiguous without external decisions or new information, stop implementation, preserve the design work, and report that blocked state clearly.
-
-9. If the design is blocked after successful reproduction.
-   - Commit the task-design work in the issue worktree.
+7. If reproduction succeeded.
+   - Use the issue worktree as authoritative.
+   - Preserve any reproduction artifacts or notes that should travel with the handoff branch.
+   - Commit that reproduction-only handoff state if needed.
    - Push the branch.
-   - Create a PR that explains the blocked design state and mentions the original issue number.
+   - Comment on the issue with:
+     - a concise statement that the bug was reproduced
+     - a link to the pushed branch containing the reproduction work
+     - a brief summary of the strongest reproduction evidence
    - Remove the `triage` label from the issue.
-   - Do not add `waiting`; this workflow's requested label change on the reproducible path is only to remove `triage`.
-
-10. If the design is clean, fix the bug autonomously.
-   - Follow the `work-independently` skill.
-   - Add or refine `plan.md` only after the design is complete and unambiguous.
-   - Implement the bug fix in small, reviewable steps.
-   - Keep Munera task files synchronized with what was learned and done.
-   - Run relevant verification for the affected area.
-   - If the bug is fixed successfully, commit the work, push the branch, and create a PR.
-   - The PR must mention the original issue number, for example `Closes #<issue-number>` when appropriate.
-   - Remove the `triage` label from the issue.
+   - Add the `fix` label to the issue.
+   - Stop after reporting the classification outcome.
 
 Execution constraints:
 - Prefer one issue per run unless the input explicitly asks for batch processing.
 - Use `work-on` rather than manual git worktree creation.
 - Reproduction must happen in the issue-specific worktree, not the caller's current checkout.
-- Do not create a Munera task when the issue is not yet reproducible.
-- Do not proceed to implementation on an ambiguous design.
+- Do not create a Munera task.
+- Do not implement a fix.
+- Do not create a PR.
 - Do not invent reproduction evidence, requirements, or bug causes.
-- Keep changes scoped to the selected issue.
-- Preserve Munera protocol distinctions among `design.md`, `plan.md`, `steps.md`, and `implementation.md`.
+- Keep changes scoped to the selected issue and reproduction handoff only.
 
 Suggested GitHub and git command shapes:
 - `gh issue list --state open --label triage --label bug --json number,title,labels,state,url`
@@ -134,13 +112,13 @@ Suggested GitHub and git command shapes:
 - `git fetch origin master`
 - `gh issue comment "$ISSUE" --body-file <path-or-stdin>`
 - `gh issue edit "$ISSUE" --remove-label triage --add-label waiting`
-- `gh issue edit "$ISSUE" --remove-label triage`
-- `gh pr create ...`
+- `gh issue edit "$ISSUE" --remove-label triage --add-label fix`
+- `git push -u origin <branch>`
 
 Final response requirements:
 - Report the selected issue.
 - State whether reproduction succeeded.
 - State whether a worktree was created and give its path when available.
 - If reproduction failed, summarize the information requested and state whether labels were updated from `triage` to `waiting`.
-- If reproduction succeeded, report the created Munera task id/path, whether the result was design-only or implementation-complete, the pushed branch name, and the PR URL if created.
+- If reproduction succeeded, report the pushed branch name, the branch URL if available, the issue comment outcome, and whether labels were updated from `triage` to `fix`.
 - If nothing matched, say so clearly.

@@ -1,6 +1,6 @@
 ---
 name: gh-bug-triage-modular
-description: Discover a triage bug, reproduce it in an issue worktree, then handle either follow-up or fix from the reproduction report
+description: Discover a triage bug, reproduce it in an issue worktree, then classify it for either reporter follow-up or a later fix handoff
 ---
 {:steps [{:name "discover"
           :workflow "gh-bug-discover-and-read"
@@ -33,13 +33,14 @@ Flow:
 - discover and read one bug+triage issue
 - create an issue worktree from origin/master
 - attempt reproduction inside the worktree
-- hand the structured reproduction report to a post-reproduction step
+- hand the structured reproduction report to a post-reproduction classification step
 - the post-reproduction step either:
   - requests the minimum additional information and relabels to waiting, or
-  - creates a Munera task, refines the design, fixes the bug, and creates a PR
+  - publishes the reproduction branch, comments with the branch link, and relabels to fix
 
 Notes:
 - This workflow remains intentionally linear at the orchestration layer.
 - Current dogfood update uses explicit `:session :input` source selection and `:session :preload` reference context rather than relying on implicit file-order-only wiring.
 - `post-repro` now receives the reproduction report as `$INPUT` and also preloads original request, upstream accepted results, and a tail of the reproduction transcript for constrained context.
-- Use the issue worktree as authoritative for all reproduction and implementation activity after creation.
+- Use the issue worktree as authoritative for all reproduction activity after creation.
+- This workflow classifies and hands off; it does not create a Munera task, implement a fix, or create a PR.
