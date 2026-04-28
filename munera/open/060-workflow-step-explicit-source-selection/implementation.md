@@ -46,3 +46,11 @@ Terse review:
 - validation and backward-compatibility handling are strong
 - one documentation drift remains: source-selection references are explicit `:name` only, while legacy compatibility fallback was restored only for unambiguous `:goto` routing
 - small follow-up recommended: document that boundary clearly and add direct negative coverage for malformed `:reference {}`
+
+## Code-shaper review note
+
+Terse review:
+- implementation is well-shaped overall: compiler-local, canonical-output preserving, and validation-heavy in the right places
+- main remaining shaping concern was policy accumulation in `workflow_file_compiler.clj`
+- source-selection resolution, routing compatibility resolution, and compile-time validation now live in extracted authoring-resolution helpers
+- mixed-purpose helper naming was also tightened during that extraction (`routing-target->step-id-map` now names the actual concern)

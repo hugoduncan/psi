@@ -9,3 +9,5 @@
 - [x] Correct implementation notes to distinguish strict source-selection `:name` references from legacy unambiguous `:goto` compatibility
 - [x] Add direct negative test coverage for malformed `:session :reference {}`
 - [x] Add a short compiler comment documenting the source-selection vs routing compatibility boundary
+- [x] In a follow-on slice, consider extracting workflow authoring-resolution helpers from `workflow_file_compiler.clj`
+- [x] In that extraction, reconsider mixed-purpose helper naming such as `workflow-name->step-id-map`
