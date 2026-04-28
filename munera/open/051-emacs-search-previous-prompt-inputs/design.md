@@ -40,9 +40,10 @@ over the history list) would let the user jump directly to any prior input.
 - **`psi-emacs--replace-input-text`** — the canonical setter for the input area;
   already used by `psi-emacs-previous-input` / `psi-emacs-next-input`
 - **navigation state** — `input-history-index` + `input-history-stash`; on
-  search selection the current draft is stashed first (same as `M-p` does), then
+  successful selection the current draft is stashed (same as `M-p` does) and the
   navigation index is reset to nil (top of history) so subsequent `M-p`/`M-n`
-  steps from the top; `M-n` can recover the pre-search draft
+  steps from the top; `M-n` can recover the pre-search draft; on cancel the
+  stash is never written so navigation state is untouched
 
 ## Implementation Approaches
 
@@ -51,10 +52,10 @@ over the history list) would let the user jump directly to any prior input.
 ```
 psi-emacs-search-input-history
   → guard: psi-emacs--state exists + history non-empty
-  → stash current draft (as M-p does)
   → completing-read "Previous input: " history-list  ; history shown as-is, no dedup
-  → C-g / empty-string → leave input unchanged (no error)
-  → on selection: psi-emacs--replace-input-text(chosen)
+  → C-g / empty-string → leave input + navigation state unchanged (no error)
+  → on selection: stash current draft (as M-p does)
+                  + psi-emacs--replace-input-text(chosen)
                   + reset navigation index to nil (top of history)
 ```
 
@@ -96,10 +97,11 @@ deps, consult/vertico users get the rich experience automatically.
 2. The command opens a minibuffer completion over all entries in
    `psi-emacs-state-input-history` for the current buffer; entries are shown
    as-is with no deduplication
-3. Selecting an entry stashes any current draft, replaces the input area with
+3. Selecting an entry: stashes the current draft, replaces the input area with
    the selected text, and resets the navigation index to nil (top of history)
 4. After selection, `M-p` steps to the next older entry from the top of history;
    `M-n` recovers the pre-search draft
+   (stash is written only on successful selection — cancel never touches it)
 5. `C-g` or empty-string submission cancels without modifying the input area or
    navigation state
 6. The command signals `user-error` when history is empty
