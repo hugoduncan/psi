@@ -10,7 +10,15 @@
    - prompt that session
    - record a canonical structured result envelope back onto the workflow run
    - loop execution across sequential steps until terminal or blocked state
-   - resume a blocked run and continue execution with a fresh attempt"
+   - resume a blocked run and continue execution with a fresh attempt
+
+   Canonical execution note:
+   - Phase A statechart execution is the sole canonical workflow-run execution path
+   - workflow step session preload parity is therefore intentionally centralized in
+     `workflow-statechart-runtime` step entry via
+     `workflow-step-prep/materialize-step-session-preload`
+   - if a future canonical runner is introduced, it must route through the same
+     preload materialization semantics rather than re-deriving them locally"
   (:require
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-statechart-runtime :as workflow-statechart-runtime]
