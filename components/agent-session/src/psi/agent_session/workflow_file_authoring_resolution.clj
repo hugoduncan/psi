@@ -29,7 +29,7 @@
      :path [:original]}))
 
 (defn- source-root
-  [_binding-key source step-name->step-ref current-step-idx]
+  [source step-name->step-ref current-step-idx]
   (cond
     (= source :workflow-input)
     {:ok {:source :workflow-input
@@ -108,15 +108,19 @@
   [root-path relative-path]
   (into (vec root-path) relative-path))
 
+(defn- binding-error
+  [binding-key message]
+  {:error (str message " in `:session " (name binding-key) "`")})
+
 (defn- source+projection->binding
   [binding-key source projection step-name->step-ref current-step-idx]
   (let [{root :ok source-error :error}
-        (source-root binding-key source step-name->step-ref current-step-idx)]
+        (source-root source step-name->step-ref current-step-idx)]
     (if source-error
-      {:error (str source-error " in `:session " (name binding-key) "`")}
+      (binding-error binding-key source-error)
       (let [relative-path (projection-relative-path binding-key source projection)]
         (if (map? relative-path)
-          relative-path
+          (binding-error binding-key (:error relative-path))
           {:ok {:source (:source root)
                 :path (combine-paths (:path root) relative-path)}})))))
 

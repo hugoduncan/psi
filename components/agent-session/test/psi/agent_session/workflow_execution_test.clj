@@ -159,6 +159,43 @@
     (is (= {:input "plan text" :original "build this feature"} (:step-inputs prompt1)))
     (is (= "Execute: plan text" (:prompt prompt1)))))
 
+(deftest materialize-step-inputs-and-prompt-with-projections-test
+  (let [definition {:definition-id "projection-proof"
+                    :name "projection-proof"
+                    :step-order ["step-1-discover" "step-2-request-more-info"]
+                    :steps {"step-1-discover" {:executor {:type :agent :profile "planner"}
+                                               :prompt-template "$INPUT"
+                                               :input-bindings {:input {:source :workflow-input :path [:ticket :body]}
+                                                                :original {:source :workflow-input :path [:original]}}
+                                               :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                               :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
+                            "step-2-request-more-info" {:executor {:type :agent :profile "reviewer"}
+                                                        :prompt-template "Need: $INPUT | Original: $ORIGINAL"
+                                                        :input-bindings {:input {:source :step-output
+                                                                                 :path ["step-1-discover" :diagnostics :summary]}
+                                                                         :original {:source :workflow-input
+                                                                                    :path [:original :issue :title]}}
+                                                        :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                                        :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}
+                    :workflow-file-meta {:framing-prompt "Projection proof."}}
+        [state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
+                                                           definition)
+        [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "projection-proof"
+                                                               :run-id "run-projection-proof"
+                                                               :workflow-input {:ticket {:body "repro details"}
+                                                                                :original {:issue {:title "Bug 123"}}}})
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "step-1-discover" :accepted-result]
+                         {:outcome :ok
+                          :outputs {:text "plan text"}
+                          :diagnostics {:summary "need logs"}})
+        run (workflow-runtime/workflow-run-in state3 run-id)
+        prompt (workflow-execution/step-prompt run "step-2-request-more-info")]
+    (is (= {:input "need logs"
+            :original "Bug 123"}
+           (:step-inputs prompt)))
+    (is (= "Need: need logs | Original: Bug 123"
+           (:prompt prompt)))))
+
 (defn- valid-child-session
   [child-session-id]
   {:session-id child-session-id

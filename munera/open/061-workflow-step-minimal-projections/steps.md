@@ -5,3 +5,7 @@
 - [x] Reject malformed/unsupported projections while preserving task-060 source-selection behavior
 - [x] Add focused tests, including named prior-step non-adjacent source selection with projection
 - [x] Run focused workflow tests
+- [x] Add one execution-level workflow test proving projected bindings flow through `materialize-step-inputs` / prompt rendering
+- [x] Re-check at least one real `.psi/workflows/` example for improved structured extraction authoring
+- [x] Simplify any now-unused helper parameters/contracts in `workflow_file_authoring_resolution.clj` if still warranted after the runtime-proof test
+- [x] Normalize error-shaping style in projection/source compilation if this area is touched again
