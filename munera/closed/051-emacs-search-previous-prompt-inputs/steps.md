@@ -2,8 +2,8 @@
 
 ## Follow-on #2 (code-shaper)
 
-- [ ] `user-error` message: `"Not a psi buffer"` → `"psi buffer is not initialized"`
-- [ ] History access: bare `(psi-emacs-state-input-history ...)` → `(or ... '())` to match sibling idiom
+- [x] `user-error` message: `"Not a psi buffer"` → `"psi buffer is not initialized"`
+- [x] History access: bare `(psi-emacs-state-input-history ...)` → `(or ... '())` to match sibling idiom
 
 ## Follow-on #1 (post-review)
 
