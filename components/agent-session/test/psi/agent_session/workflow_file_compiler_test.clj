@@ -239,6 +239,15 @@
             :body "Frame."})]
       (is (re-find #"expected non-empty map with `:from`" error))))
 
+  (testing "present but empty reference map is malformed"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:name "empty-reference"
+            :description "Empty reference"
+            :config {:steps [{:name "plan" :workflow "planner" :session {:reference {}} :prompt "$INPUT"}]}
+            :body "Frame."})]
+      (is (re-find #"expected non-empty map with `:from`" error))))
+
   (testing "unsupported projection keys fail clearly before task 061"
     (let [{:keys [error]}
           (compiler/compile-workflow-file

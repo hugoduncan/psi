@@ -20,7 +20,7 @@ What landed:
   - `:workflow-input`
   - `:workflow-original`
   - `{:step "<step-name>" :kind :accepted-result}`
-- explicit step references resolve via author-facing step `:name`, falling back to `:workflow` when `:name` is absent for compatibility
+- explicit source-selection step references resolve via author-facing step `:name` only
 - explicit step references are restricted to earlier steps in definition order
 - explicit source selection compiles to the existing canonical `:input-bindings` shapes
 - absent or empty `:session` preserves prior defaults
@@ -31,10 +31,18 @@ What landed:
   - unsupported `:projection` / `:project` before task 061
   - unsupported `:session` keys for task 060
   - duplicate author-facing step names in a multi-step workflow
-- named `:goto` routing now also resolves against author-facing step names, matching task 059 direction
+- named `:goto` routing now resolves against author-facing step names, with legacy compatibility for unambiguous delegated workflow names
 
 Test coverage added:
 - compiler tests for explicit non-adjacent named source selection
 - compiler tests for partial override and empty-session default preservation
 - compiler validation tests for bad sources and unsupported keys
 - loader tests for explicit named source selection and forward-reference load errors
+
+## Review note
+
+Terse review:
+- implementation matches 060 intent and fits the compiler-first architecture
+- validation and backward-compatibility handling are strong
+- one documentation drift remains: source-selection references are explicit `:name` only, while legacy compatibility fallback was restored only for unambiguous `:goto` routing
+- small follow-up recommended: document that boundary clearly and add direct negative coverage for malformed `:reference {}`

@@ -185,6 +185,10 @@
                     :original reference-binding}})))))))
 
 (defn- multi-step-reference-map
+  ;; Source-selection references are intentionally stricter than routing refs
+  ;; in task 060: `:session` step sources resolve only explicit author-facing
+  ;; step `:name` values. Legacy compatibility fallback to unambiguous
+  ;; delegated `:workflow` names is preserved only for `:goto` routing.
   [steps step-order]
   (into {}
         (keep-indexed (fn [idx step]
