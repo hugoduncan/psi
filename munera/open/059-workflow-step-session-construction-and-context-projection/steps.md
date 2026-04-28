@@ -7,5 +7,5 @@
 - [x] Remove remaining compatibility drift: require unique author-facing `:name` for all multi-step workflow steps
 - [x] Remove or rewrite tests/examples that still rely on unnamed multi-step compatibility behavior
 - [x] Re-run focused workflow authoring and migration validation after enforcing required multi-step `:name`
-- [ ] Update `059` acceptance/task state to reflect the spec-complete end-state explicitly
+- [x] Update `059` acceptance/task state to reflect the spec-complete end-state explicitly
 - [ ] Close the umbrella only when child tasks collectively satisfy the end-state authoring story

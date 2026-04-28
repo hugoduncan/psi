@@ -81,3 +81,4 @@ Terse review after `060`–`064`:
 - updated compiler, loader, and parser tests to use explicit step names in multi-step fixtures
 - replaced the old unnamed-step compatibility test with a failure test proving missing multi-step step names are rejected clearly
 - reran focused workflow authoring/compiler/loader/migration verification after the enforcement change (`22 tests, 183 assertions, 0 failures`)
+- reran full unit verification after the spec-completion change (`1456 tests, 10806 assertions, 0 failures`)
