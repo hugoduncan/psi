@@ -24,6 +24,13 @@
    :pane-id       (:pane-id target)
    :pane-snapshot (tmux/sanitize-pane-text (tmux/capture-pane target))})
 
+(defn- visible-tool-body-line?
+  [pane marker]
+  (boolean
+   (some #(and (str/starts-with? % "    ")
+               (str/includes? % marker))
+         (str/split-lines pane))))
+
 (defn run-streaming-display-scenario!
   "Prove that the TUI renders thinking blocks, tool streaming, and tool result
    truncation correctly through a real terminal, without a live LLM.
@@ -110,9 +117,9 @@
                                  :else
                                  (let [pane (tmux/sanitize-pane-text (tmux/capture-pane-visible target))]
                                    (cond
-                                     (str/includes? pane "output-line-1")
+                                     (visible-tool-body-line? pane "output-line-1")
                                      (assoc (failure target :content-visible-when-collapsed)
-                                            :detail "Tool content should not be visible in collapsed mode")
+                                            :detail "Tool body should not be visible in collapsed mode")
 
                                      :else
                                      (do
