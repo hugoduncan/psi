@@ -201,47 +201,25 @@
             []
             (:messages conversation))))
 
+;; Extended thinking: budget_tokens per level. Adaptive thinking (Opus 4.7+): effort string.
 (def ^:private thinking-level->budget
-  "Extended thinking budget_tokens map — used for all reasoning models
-   except those with :adaptive-thinking true (e.g. Opus 4.7)."
-  {:off     nil
-   :minimal 1024
-   :low     2048
-   :medium  8000
-   :high    16000
-   :xhigh   32000})
-
+  {:off nil :minimal 1024 :low 2048 :medium 8000 :high 16000 :xhigh 32000})
 (def ^:private thinking-level->effort
-  "Adaptive thinking effort map — used for models with :adaptive-thinking true."
-  {:off     nil
-   :minimal "low"
-   :low     "low"
-   :medium  "medium"
-   :high    "high"
-   :xhigh   "high"})
+  {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "high"})
 
-(defn- adaptive-thinking?
-  "True when the model uses Anthropic adaptive thinking (e.g. Opus 4.7).
-   Adaptive thinking uses output_config.effort rather than budget_tokens,
-   and must not send the interleaved-thinking beta header."
-  [model]
-  (boolean (:adaptive-thinking model)))
+(defn- adaptive-thinking? [model] (boolean (:adaptive-thinking model)))
 
 (defn- thinking-param
-  "Return the :thinking body param for the request, or nil when thinking is off.
-
-   Extended thinking models: {:type \"enabled\" :budget_tokens N}
-   Adaptive thinking models:  {:type \"adaptive\" :display \"summarized\"}"
+  "Extended thinking → {:type \"enabled\" :budget_tokens N}.
+   Adaptive thinking (Opus 4.7+) → {:type \"adaptive\" :display \"summarized\"}."
   [model options]
   (when (:supports-reasoning model)
     (let [level (:thinking-level options)]
       (if (adaptive-thinking? model)
         (when (get thinking-level->effort level)
-          {:type    "adaptive"
-           :display "summarized"})
+          {:type "adaptive" :display "summarized"})
         (when-let [budget (get thinking-level->budget level)]
-          {:type          "enabled"
-           :budget_tokens budget})))))
+          {:type "enabled" :budget_tokens budget})))))
 
 (defn- tool-definitions
   [conversation]
@@ -278,11 +256,7 @@
       (cache-control-present? (:messages conversation))))
 
 (defn- beta-header
-  "Build the anthropic-beta header value.
-
-   Extended thinking adds interleaved-thinking-beta.
-   Adaptive thinking (Opus 4.7+) must NOT add interleaved-thinking-beta —
-   it uses a different protocol and the header causes a 400 error."
+  ;; Adaptive thinking (Opus 4.7+) must NOT include interleaved-thinking-beta.
   [oauth? thinking adaptive? prompt-caching?]
   (let [extended-thinking? (and thinking (not adaptive?))
         betas (cond-> []
@@ -354,25 +328,13 @@
                        :provider :anthropic})))
     api-key))
 
-(defn- adaptive-effort
-  "Return the output_config effort string for an adaptive thinking request, or nil."
-  [model options]
-  (when (adaptive-thinking? model)
-    (get thinking-level->effort (:thinking-level options))))
-
 (defn build-request
-  "Build Anthropic API request map.
-
-   Extended thinking models (e.g. Opus 4.6): thinking={type:enabled,budget_tokens:N}
-     + interleaved-thinking beta header + no temperature.
-   Adaptive thinking models (e.g. Opus 4.7): thinking={type:adaptive,display:summarized}
-     + output_config={effort:\"...\"}  + no interleaved-thinking beta + no temperature.
-   Non-reasoning models: temperature set, no thinking param."
+  "Build Anthropic API request map."
   [conversation model options]
   (let [thinking        (thinking-param model options)
         adaptive?       (adaptive-thinking? model)
         effort          (when (and thinking adaptive?)
-                          (adaptive-effort model options))
+                          (get thinking-level->effort (:thinking-level options)))
         api-key         (resolve-api-key options)
         tool-defs       (tool-definitions conversation)
         system-body     (system-prompt-body conversation)
