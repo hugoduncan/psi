@@ -47,12 +47,12 @@
   - [x] extract shared helpers only where at least two surfaces share the same rule shape
   - [x] avoid abstraction that hides policy decisions
 
-- [ ] Integration proof
-  - [ ] keep the startup-wrap demo harness proof green
-  - [ ] keep the real-launcher narrow-width resume proof green
-  - [ ] add/refine tmux proof for banner metadata if unit proof alone is insufficient
+- [x] Integration proof
+  - [x] keep the startup-wrap demo harness proof green
+  - [x] keep the real-launcher narrow-width resume proof green
+  - [x] add/refine tmux proof for banner metadata if unit proof alone is insufficient
   - [x] avoid adding tmux coverage for surfaces where pure render proof is already authoritative
-  - Note: focused integration run attempted, but completion is currently blocked by unrelated `psi.launcher-gordian-integration-test` environment failure (`fix-extensions/deps.edn` missing)
+  - Focused integration verification is now green after removing the unrelated launcher absolute-path fixture dependency.
 
 - [x] Final review pass
   - [x] review remaining surfaces in the authoritative inventory for undocumented truncation behavior

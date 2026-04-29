@@ -12,7 +12,7 @@ This document is the canonical developer-facing width-policy summary for user-vi
 | Startup banner `Exts:` | label+value summary | wrap | subtract visible width of `"  Exts: "` | continuation aligns under value start | focused unit test in `psi.tui.app-test` |
 | Startup banner controls/help | controls summary | wrap | subtract visible width of `"  "` | continuation aligns under content start after the base indent | focused unit test in `psi.tui.app-test` |
 | Transcript user message | transcript line | wrap | subtract visible width of `"刀: "` | continuation aligns under content start | focused unit test in `psi.tui.app-view-runtime-test` |
-| Transcript assistant message | paragraph-like transcript / markdown | wrap for paragraphs, preserve for code blocks | subtract visible width of `"ψ: "` from paragraph width | continuation aligns under content start; markdown code blocks preserve width intentionally | focused unit test in `psi.tui.app-view-runtime-test` |
+| Transcript assistant message | paragraph-like transcript / markdown | wrap for paragraphs, preserve for code blocks | subtract visible width of `"ψ: "` from paragraph width | continuation aligns under content start; implemented through width-aware markdown paragraph rendering, while markdown code blocks preserve width intentionally | focused unit test in `psi.tui.app-view-runtime-test` |
 | Transcript thinking message | thinking transcript line | wrap | subtract visible width of `"· "` | continuation aligns under content start | focused unit test in `psi.tui.app-view-runtime-test` |
 | Rich transcript variants (`agent-result`, `plan-state-learning`) | heading + indented body | mixed | headings are short labels; body uses the local body indent budget | continuation aligns under the variant body indent | existing variant render tests plus focused narrow-width tests where added |
 | Tool header summary, collapsed | compact tool header | truncate | subtract visible width of `"  <status> "` | none; single-line compact summary | focused unit test in `psi.tui.app-view-runtime-test` |
@@ -34,7 +34,8 @@ This document is the canonical developer-facing width-policy summary for user-vi
 ## Current shared rule shapes
 
 1. Prefixed wrapped line
-   - Used for user transcript, thinking transcript, and assistant paragraph transcript.
+   - Used directly for user transcript and thinking transcript.
+   - The assistant paragraph transcript follows the same visible-width/continuation contract, but is implemented through the markdown renderer rather than this helper shape.
    - Budget: `available-width = terminal-width - visible-width(prefix)`.
    - Continuation: prefix-width spaces.
 
