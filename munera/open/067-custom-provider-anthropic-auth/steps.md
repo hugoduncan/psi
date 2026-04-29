@@ -1,18 +1,18 @@
 - [x] Inspect provider selection and auth resolution for `:anthropic-messages`
   - confirmed the canonical prepared-request path resolves auth by selected provider identity via `model-registry/get-auth`
-  - identified drift in `psi.agent-session.runtime/resolve-api-key-in`, which currently consults OAuth only
+  - identified drift in `psi.agent-session.runtime/resolve-api-key-in`, which originally consulted OAuth only
   - identified runtime/RPC call sites that pre-seed `:runtime-opts` from that narrower helper
-- [ ] Reproduce the failing decision path with focused tests
-  - add a custom `:anthropic-messages` provider case to prove provider-scoped auth reaches prepared request / execution options
-  - add a regression proving built-in Anthropic behavior remains unchanged
-  - add a negative case where a custom anthropic-compatible provider with no auth still fails as today
-- [ ] Implement provider-scoped auth resolution for custom Anthropic-compatible providers
-  - unify auth resolution so runtime-facing helpers and prompt preparation share provider-aware lookup
-  - preserve explicit runtime override precedence
-- [ ] Add regression tests for inline custom-provider auth and built-in Anthropic fallback behaviour
-  - cover auth injection
-  - cover custom `:base-url` preservation at the request boundary
-  - cover unchanged built-in Anthropic fallback semantics
-- [ ] Verify tests pass
-  - run focused AI / prompt-request / affected runtime tests first
-  - then run the broader relevant unit suites
+- [x] Reproduce the failing decision path with focused tests
+  - added a custom `:anthropic-messages` provider case proving provider-scoped auth reaches prepared request options
+  - added runtime-helper regression proving selected-provider auth reaches `resolve-api-key-in`
+  - added request-boundary regression proving custom `:base-url` and provider identity survive Anthropic-compatible transport execution
+- [x] Implement provider-scoped auth resolution for custom Anthropic-compatible providers
+  - updated `psi.agent-session.runtime/resolve-api-key-in` to fall back from OAuth to model-registry provider auth for the selected provider
+  - preserved OAuth precedence and explicit runtime override semantics
+- [x] Add regression tests for inline custom-provider auth and built-in Anthropic fallback behaviour
+  - covered auth injection for custom `:anthropic-messages` providers
+  - covered custom `:base-url` preservation at the Anthropic request boundary
+  - covered unchanged built-in Anthropic no-registry-auth behavior
+- [x] Verify tests pass
+  - focused verification green: `psi.agent-session.prompt-request-test`, `psi.agent-session.runtime-test`, `psi.ai.providers.anthropic-test`
+  - result: `28 tests, 174 assertions, 0 failures`

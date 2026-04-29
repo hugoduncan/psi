@@ -399,19 +399,23 @@
     (assoc "x-api-key"
            (redact-secret (get headers "x-api-key")))))
 
+(defn- capture-provider-id
+  [model]
+  (or (:provider model) :anthropic))
+
 (defn- capture-request!
-  [options url request]
+  [model options url request]
   (safe-call! (:on-provider-request options)
-              {:provider :anthropic
+              {:provider (capture-provider-id model)
                :api :anthropic-messages
                :url url
                :request {:headers (redact-request-headers (:headers request))
                          :body (request-support/parse-json-body-safe (:body request))}}))
 
 (defn- capture-response!
-  [options url event]
+  [model options url event]
   (safe-call! (:on-provider-response options)
-              {:provider :anthropic
+              {:provider (capture-provider-id model)
                :api :anthropic-messages
                :url url
                :event event}))
@@ -683,37 +687,37 @@
        (>= status 400)))
 
 (defn- emit-error!
-  [options url consume-fn err]
-  (capture-response! options url err)
+  [model options url consume-fn err]
+  (capture-response! model options url err)
   (consume-fn err))
 
 (defn- consume-retry-response!
-  [options url consume-fn consume-stream-response! retry-request]
-  (capture-request! options url retry-request)
+  [model options url consume-fn consume-stream-response! retry-request]
+  (capture-request! model options url retry-request)
   (let [retry-response (stream-response url retry-request)
         retry-status   (:status retry-response)]
     (if (error-status? retry-status)
-      (emit-error! options url consume-fn
+      (emit-error! model options url consume-fn
                    (response->error retry-response retry-request))
       (consume-stream-response! retry-response))))
 
 (defn- handle-400-response!
-  [options url request response consume-fn consume-stream-response!]
+  [model options url request response consume-fn consume-stream-response!]
   (if-let [fallback (request-support/fallback-request-for-400
                      request
                      {:prompt-caching-beta prompt-caching-beta
                       :interleaved-thinking-beta interleaved-thinking-beta
                       :oauth-auth-request? oauth-auth-request?})]
     (let [first-error (response->error response request)]
-      (capture-response! options url (assoc first-error
-                                            :retrying-with-compatibility-fallback true
-                                            :retry-fallback-steps (:steps fallback)))
-      (consume-retry-response! options
+      (capture-response! model options url (assoc first-error
+                                                  :retrying-with-compatibility-fallback true
+                                                  :retry-fallback-steps (:steps fallback)))
+      (consume-retry-response! model options
                                url
                                consume-fn
                                consume-stream-response!
                                (:request fallback)))
-    (emit-error! options url consume-fn
+    (emit-error! model options url consume-fn
                  (response->error response request))))
 
 (defn stream-anthropic
@@ -728,12 +732,12 @@
                            :cache-write-tokens 0})
         done?       (atom false)]
     (try
-      (capture-request! options url request)
+      (capture-request! model options url request)
       (letfn [(consume-stream-response! [response]
                 (with-open [reader (io/reader (:body response))]
                   (doseq [line (line-seq reader)]
                     (when-let [event-data (parse-sse-line line)]
-                      (capture-response! options url event-data)
+                      (capture-response! model options url event-data)
                       (case (:type event-data)
                         "message_start"
                         (do
@@ -774,7 +778,7 @@
               status   (:status response)]
           (cond
             (= 400 status)
-            (handle-400-response! options
+            (handle-400-response! model options
                                   url
                                   request
                                   response
@@ -782,14 +786,14 @@
                                   consume-stream-response!)
 
             (error-status? status)
-            (emit-error! options url consume-fn
+            (emit-error! model options url consume-fn
                          (response->error response request))
 
             :else
             (consume-stream-response! response))))
       (catch Exception e
         (let [err (exception->error e)]
-          (capture-response! options url err)
+          (capture-response! model options url err)
           (consume-fn err))))))
 
 (def provider

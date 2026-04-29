@@ -272,6 +272,43 @@
                     (get-in % [:event :type]))
                 @reply-captures))))
 
+  (testing "Anthropic-compatible custom providers preserve provider identity and base-url"
+    (let [model           {:id "MiniMax-M2.7"
+                           :name "MiniMax M2.7"
+                           :provider :minimax
+                           :api :anthropic-messages
+                           :base-url "https://api.minimax.io/anthropic"
+                           :supports-reasoning true
+                           :supports-images false
+                           :supports-text true
+                           :context-window 128000
+                           :max-tokens 16384
+                           :input-cost 0.0
+                           :output-cost 0.0
+                           :cache-read-cost 0.0
+                           :cache-write-cost 0.0}
+          convo           (-> (conv/create "sys")
+                              (conv/add-user-message "hello"))
+          request-capture (atom nil)
+          posted-url      (atom nil)
+          sse             (str (sse-line "message_start" {:type "message_start"})
+                               (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [url _req]
+                                (reset! posted-url url)
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic
+         convo model {:api-key "minimax-inline-key"
+                      :on-provider-request #(reset! request-capture %)}
+         (fn [_] nil)))
+
+      (is (= "https://api.minimax.io/anthropic/v1/messages" @posted-url))
+      (is (= :minimax (:provider @request-capture)))
+      (is (= :anthropic-messages (:api @request-capture)))
+      (is (= "MiniMax-M2.7"
+             (get-in @request-capture [:request :body :model])))
+      (is (= "***REDACTED***"
+             (get-in @request-capture [:request :headers "x-api-key"])))))
+
   (testing "Anthropic error replies capture raw body and headers"
     (let [model           (models/get-model :sonnet-4.6)
           convo           (-> (conv/create "sys")

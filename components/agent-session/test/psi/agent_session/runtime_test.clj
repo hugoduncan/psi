@@ -1,15 +1,29 @@
 (ns psi.agent-session.runtime-test
   (:require
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [psi.ai.model-registry :as model-registry]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
+   [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.test-support :as test-support]
    [psi.recursion.core :as recursion]))
+
+(use-fixtures :each
+  (fn [f]
+    (try
+      (f)
+      (finally
+        (model-registry/init! {})))))
+
+(defn- write-temp-models! [config]
+  (let [tmp (java.io.File/createTempFile "psi-test-models" ".edn")]
+    (spit tmp (pr-str config))
+    (.getAbsolutePath tmp)))
 
 (def ^:private sync-payload
   {:activation {:query-env-built? true
@@ -183,3 +197,39 @@
         (is (= "head-changed" (:reason payload)))
         (is (= :commit-created (get-in payload [:classification :kind])))
         (is (str/includes? (str (:timestamp payload)) "T"))))))
+
+(deftest resolve-api-key-in-prefers-oauth-then-provider-registry-test
+  (testing "custom provider auth is resolved from model registry when oauth is absent"
+    (let [path (write-temp-models!
+                {:version   1
+                 :providers {"minimax"
+                             {:base-url "https://api.minimax.io/anthropic"
+                              :api      :anthropic-messages
+                              :auth     {:api-key "minimax-inline-key"}
+                              :models   [{:id "MiniMax-M2.7"}]}}})]
+      (try
+        (model-registry/init! {:user-models-path path})
+        (is (= "minimax-inline-key"
+               (runtime/resolve-api-key-in {} "sid" {:provider :minimax :id "MiniMax-M2.7"})))
+        (finally
+          (java.io.File/.delete (java.io.File. path))))))
+
+  (testing "oauth for selected provider still wins over provider-registry auth"
+    (let [path (write-temp-models!
+                {:version   1
+                 :providers {"minimax"
+                             {:base-url "https://api.minimax.io/anthropic"
+                              :api      :anthropic-messages
+                              :auth     {:api-key "minimax-inline-key"}
+                              :models   [{:id "MiniMax-M2.7"}]}}})
+          oauth-ctx (oauth/create-null-context {:credentials {:minimax {:type :api-key :key "oauth-key"}}})]
+      (try
+        (model-registry/init! {:user-models-path path})
+        (is (= "oauth-key"
+               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider :minimax :id "MiniMax-M2.7"})))
+        (finally
+          (java.io.File/.delete (java.io.File. path))))))
+
+  (testing "built-in anthropic remains unresolved without oauth or registry auth"
+    (model-registry/init! {})
+    (is (nil? (runtime/resolve-api-key-in {} "sid" {:provider :anthropic :id "claude-sonnet-4-6"})))))

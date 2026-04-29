@@ -117,6 +117,29 @@
       (finally
         (java.io.File/.delete (java.io.File. path))))))
 
+(deftest custom-anthropic-compatible-provider-api-key-injected-test
+  (let [path (write-temp-models!
+              {:version   1
+               :providers {"minimax"
+                           {:base-url "https://api.minimax.io/anthropic"
+                            :api      :anthropic-messages
+                            :auth     {:api-key "minimax-inline-key"}
+                            :models   [{:id "MiniMax-M2.7"}]}}})]
+    (try
+      (model-registry/init! {:user-models-path path})
+
+      (testing "custom anthropic-compatible provider injects provider-scoped api-key"
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    (session-data-for :minimax "MiniMax-M2.7")
+                    {})]
+          (is (= "minimax-inline-key" (:api-key opts)))
+          (is (nil? (:no-auth-header opts)))
+          (is (nil? (:headers opts)))))
+
+      (finally
+        (java.io.File/.delete (java.io.File. path))))))
+
 (deftest built-in-provider-no-auth-injection-test
   (model-registry/init! {})
 

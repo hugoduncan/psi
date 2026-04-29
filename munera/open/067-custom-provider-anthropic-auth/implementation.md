@@ -39,37 +39,68 @@ This means the canonical request-preparation layer already knows how to inject i
 
 ### Drift seam identified
 
-- `psi.agent-session.runtime/resolve-api-key-in` currently checks only OAuth state:
-  - it does not consult `model-registry/get-auth`
-  - it does not see inline custom provider auth from models config
+- `psi.agent-session.runtime/resolve-api-key-in` originally checked only OAuth state:
+  - it did not consult `model-registry/get-auth`
+  - it did not see inline custom provider auth from models config
 - Multiple runtime/RPC call sites pre-seed `:runtime-opts` from that narrower helper:
   - `psi.rpc.session.prompt`
   - `psi.rpc.session.commands`
   - `psi.rpc.session`
   - `psi.agent-session.runtime`
-- This creates auth-resolution drift:
-  - canonical prompt preparation is provider-aware
-  - runtime-side helper paths are narrower and built-in/OAuth-shaped
+- This created auth-resolution drift:
+  - canonical prompt preparation was provider-aware
+  - runtime-side helper paths were narrower and built-in/OAuth-shaped
+
+## Implemented changes
+
+### Provider-aware runtime helper auth resolution
+
+- Updated `psi.agent-session.runtime/resolve-api-key-in` to resolve provider auth in this order:
+  1. OAuth/runtime credential for the selected provider
+  2. model-registry auth for the selected provider when auth headers are enabled
+- This preserves built-in OAuth behavior while allowing runtime-facing helper paths to see inline custom provider auth from models config.
+
+### Anthropic provider capture identity
+
+- Updated Anthropic provider request/response capture payloads to report the selected model provider identity rather than always reporting `:anthropic`.
+- This keeps introspection and request-boundary diagnostics aligned with the selected provider while still using the Anthropic-compatible transport.
+
+## Added regression coverage
+
+### Prompt-request tests
+
+- Added coverage proving a custom `:anthropic-messages` provider injects provider-scoped inline auth into request options.
+- Preserved built-in Anthropic no-registry-auth behavior coverage.
+
+### Runtime helper tests
+
+- Added coverage proving `runtime/resolve-api-key-in`:
+  - falls back to model-registry provider auth for a custom `:anthropic-messages` provider when OAuth is absent
+  - still prefers OAuth when OAuth credentials exist for the selected provider
+  - still returns nil for built-in Anthropic when neither OAuth nor registry auth is configured
+
+### Anthropic transport tests
+
+- Added request-boundary coverage proving a custom anthropic-compatible model:
+  - uses the configured custom `:base-url`
+  - preserves selected provider identity in request capture payloads
+  - still reports `:api :anthropic-messages`
+
+## Verification run
+
+Focused verification passed:
+
+- `psi.agent-session.prompt-request-test`
+- `psi.agent-session.runtime-test`
+- `psi.ai.providers.anthropic-test`
+
+Result:
+- `28 tests, 174 assertions, 0 failures`
 
 ## Working diagnosis
 
-The likely root cause is not Anthropic request building itself, nor provider dispatch by `:api`. The more likely cause is split auth-resolution ownership:
+The root cause was split auth-resolution ownership. The selected provider and model were already being resolved correctly, and transport selection by `:api` was already correct. The failure came from runtime-facing helper paths that reconstructed auth through OAuth-only lookup and therefore dropped inline custom-provider auth before execution reached the Anthropic-compatible transport.
 
-- the selected provider and model are resolved correctly
-- transport selection correctly falls back to the Anthropic-compatible adapter
-- one or more runtime-side seams reconstruct auth through OAuth-only lookup or otherwise fail to carry canonical prepared-request auth through execution
-- the Anthropic transport then throws its built-in missing-key error because final execution options lack `:api-key`
+## Follow-on note
 
-## Intended implementation direction
-
-- Prefer one canonical provider-aware auth resolver shared across prompt preparation and runtime-facing helper paths.
-- Preserve explicit runtime overrides such as `:runtime-opts {:api-key ...}`.
-- Preserve built-in Anthropic OAuth/env fallback behavior.
-- Fix provider/auth resolution drift rather than adding a special-case patch in the Anthropic provider implementation.
-
-## Suggested verification additions
-
-- custom `:anthropic-messages` provider auth injection tests
-- request-boundary regression proving custom auth and custom `:base-url` survive together
-- negative regression for a custom anthropic-compatible provider with no auth
-- unchanged built-in Anthropic behavior coverage
+The remaining runtime/RPC call sites can continue to pass explicit overrides through `:runtime-opts`, but provider-scoped defaults should now be consistent with canonical prompt preparation because the shared runtime helper no longer ignores model-registry provider auth.
