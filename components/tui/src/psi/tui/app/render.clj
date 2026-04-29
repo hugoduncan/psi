@@ -28,27 +28,31 @@
               (map #(charm-style/render shared/dim-style %)
                    (prefixed-wrap-lines prefix text width)))))
 
-(defn render-banner [model-name prompt-templates skills extension-summary width]
+(defn- banner-rows
+  [model-name prompt-templates skills extension-summary]
   (let [visible-skills (remove :disable-model-invocation skills)
         ext-count      (:extension-count extension-summary 0)]
-    (str (charm-style/render shared/title-style "ψ Psi Agent Session") "\n"
-         (render-banner-summary "  Model: " model-name width) "\n"
-         (when (seq prompt-templates)
-           (str (render-banner-summary
-                 "  Prompts: "
-                 (str/join ", " (map #(str "/" (:name %)) prompt-templates))
-                 width)
-                "\n"))
-         (when (seq visible-skills)
-           (str (render-banner-summary
-                 "  Skills: "
-                 (str/join ", " (map :name visible-skills))
-                 width)
-                "\n"))
-         (when (pos? ext-count)
-           (str (render-banner-summary "  Exts: " (str ext-count " loaded") width)
-                "\n"))
-         (render-banner-summary "  " "ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty" width) "\n")))
+    [{:prefix "  Model: "
+      :text model-name}
+     {:prefix "  Prompts: "
+      :text (when (seq prompt-templates)
+              (str/join ", " (map #(str "/" (:name %)) prompt-templates)))}
+     {:prefix "  Skills: "
+      :text (when (seq visible-skills)
+              (str/join ", " (map :name visible-skills)))}
+     {:prefix "  Exts: "
+      :text (when (pos? ext-count)
+              (str ext-count " loaded"))}
+     {:prefix "  "
+      :text "ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty"}]))
+
+(defn render-banner [model-name prompt-templates skills extension-summary width]
+  (str (charm-style/render shared/title-style "ψ Psi Agent Session") "\n"
+       (->> (banner-rows model-name prompt-templates skills extension-summary)
+            (keep (fn [{:keys [prefix text]}]
+                    (render-banner-summary prefix text width)))
+            (str/join "\n"))
+       "\n"))
 
 (def agent-title-style (charm-style/style :fg charm-style/yellow :bold true))
 (def agent-head-style (charm-style/style :fg charm-style/cyan :bold true))

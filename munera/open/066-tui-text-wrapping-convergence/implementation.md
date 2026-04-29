@@ -12,6 +12,7 @@ Implementation notes:
   - collapsed header: truncate
   - expanded plain-text body: wrap within the four-space body indent budget
   - preformatted/machine-like body: preserve unless an explicit renderer chooses a different presentation
+- Optional shaping follow-on was completed by data-driving `render-banner` and tightening policy proof references without forcing false convergence of assistant markdown rendering onto the simpler prefixed-wrap helper path.
 - Verification status after this slice:
   - focused width-policy unit proofs are green
   - full unit suite is green (`1453 tests, 10806 assertions, 0 failures`)
