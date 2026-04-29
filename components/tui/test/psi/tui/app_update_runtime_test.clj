@@ -28,9 +28,8 @@
     nil))
 
 (defn- init-state
-  ([] (init-state "test-model" {}))
-  ([model-name] (init-state model-name {}))
-  ([model-name opts]
+  ([] (init-state {}))
+  ([opts]
    (let [ui-atom      (:ui-state* opts)
          ui-read-fn*  (:ui-read-fn opts)
          opts'        (dissoc opts :ui-state* :ui-read-fn)
@@ -44,7 +43,7 @@
                             :session/ui-set-tools-expanded
                             (ui-state/set-tools-expanded! ui-atom (:expanded? payload))
                             nil)))
-         init-fn      (app/make-init model-name nil ui-read-fn ui-disp-fn
+         init-fn      (app/make-init nil ui-read-fn ui-disp-fn
                                      (merge {:dispatch-fn default-dispatch-fn} opts'))
          [state _cmd] (init-fn)]
      state)))
@@ -97,7 +96,7 @@
                      :widget-id "session-tree"
                      :content-lines [{:text "main [s1] ← current [idle]"}]}
           update-fn (app/make-update (stub-agent-fn ""))
-          state     (init-state "test-model")
+          state     (init-state)
           [s1 _]    (update-fn state {:type :context-updated
                                       :active-session-id "s1"
                                       :session-tree-widget widget})
@@ -128,8 +127,7 @@
                             :dialog-queue {:active nil :pending []}
                             :tools-expanded? false})
           update-fn (app/make-update (stub-agent-fn ""))
-          state     (init-state "test-model"
-                                {:ui-state* ui-atom
+          state     (init-state {:ui-state* ui-atom
                                  :initial-context-session-tree-widget widget})
           [s1 _]    (update-fn state {:type :agent-poll})
           _         (swap! ui-atom assoc-in [:widgets [:ext "w2"]]
@@ -194,8 +192,7 @@
 (deftest escape-streaming-interrupts-and-restores-queued-text-test
   (testing "escape during streaming calls interrupt hook and restores queued input"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          state     (assoc (init-state "test-model"
-                                       {:on-interrupt-fn! (fn [_]
+          state     (assoc (init-state {:on-interrupt-fn! (fn [_]
                                                             {:queued-text "queued one\nqueued two"
                                                              :message "Interrupted active work."})})
                            :phase :streaming
@@ -210,8 +207,7 @@
   (testing "enter during streaming queues draft text via callback and keeps streaming"
     (let [queued    (atom nil)
           update-fn (app/make-update (stub-agent-fn ""))
-          state     (assoc (init-state "test-model"
-                                       {:on-queue-input-fn! (fn [text _]
+          state     (assoc (init-state {:on-queue-input-fn! (fn [text _]
                                                               (reset! queued text)
                                                               {:message "Queued steering message."})})
                            :phase :streaming
@@ -253,9 +249,9 @@
                                       {:text "  child [s2] [running]"
                                        :action {:type "command" :command "/tree s2"}}]}
           update-fn  (app/make-update (stub-agent-fn ""))
-          state      (init-state "test-model" {:dispatch-fn dispatch-fn
-                                               :switch-session-fn! switch-fn
-                                               :initial-context-session-tree-widget widget})
+          state      (init-state {:dispatch-fn dispatch-fn
+                                  :switch-session-fn! switch-fn
+                                  :initial-context-session-tree-widget widget})
           [s1 _]     (update-fn state (msg/key-press "j" :ctrl true))
           [s2 _]     (update-fn s1 (msg/key-press :enter :alt true))]
       (is (= ["/tree s2"] @captured))
@@ -266,7 +262,7 @@
 (deftest double-escape-unsupported-action-is-safe-no-op-with-status-test
   (testing "unsupported double-escape action does not crash and emits status"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          state     (assoc (init-state "test-model" {:double-escape-action :tree})
+          state     (assoc (init-state {:double-escape-action :tree})
                            :input (text-input/set-value (:input (init-state)) ""))
           [s1 cmd1] (update-fn state (msg/key-press :escape))
           [s2 cmd2] (update-fn s1 (msg/key-press :escape))]
@@ -306,7 +302,7 @@
                                                        {:provider "anthropic"
                                                         :id "claude-sonnet"
                                                         :reasoning false}])
-          state       (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          state       (init-state {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
           [opened _]  (app-update/handle-dispatch-result state {:type :frontend-action
                                                                 :request-id "req-1"
                                                                 :ui/action action})
@@ -324,7 +320,7 @@
     (let [captured  (atom nil)
           update-fn (app/make-update (stub-agent-fn ""))
           action    (ui-actions/model-picker-action [{:provider "openai" :id "gpt-5.3" :reasoning true}])
-          state     (init-state "test-model" {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
+          state     (init-state {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
           [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
                                                                :request-id "req-2"
                                                                :ui/action action})
@@ -341,7 +337,7 @@
     (let [captured  (atom [])
           update-fn (app/make-update (stub-agent-fn ""))
           action    (ui-actions/thinking-picker-action)
-          state     (init-state "test-model" {:frontend-action-handler-fn! #(swap! captured conj %)})
+          state     (init-state {:frontend-action-handler-fn! #(swap! captured conj %)})
           [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
                                                                :request-id "req-3"
                                                                :ui/action action})
@@ -408,7 +404,7 @@
                       (let [{:ui.result/keys [status message]} action-result]
                         (when (= :cancelled status)
                           {:type :text :message message})))
-          state     (init-state "test-model" {:frontend-action-handler-fn! handler})
+          state     (init-state {:frontend-action-handler-fn! handler})
           [opened _]  (app-update/handle-dispatch-result state {:type :frontend-action
                                                                 :request-id "req-cancel"
                                                                 :ui/action action})

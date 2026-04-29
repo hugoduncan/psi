@@ -38,9 +38,8 @@
 (defn- init-state
   "Create a fresh state from make-init.
    Accepts legacy :ui-state* atom in opts; wires it into ui-read-fn + ui-dispatch-fn."
-  ([] (init-state "test-model" {}))
-  ([model-name] (init-state model-name {}))
-  ([model-name opts]
+  ([] (init-state {}))
+  ([opts]
    (let [ui-atom      (:ui-state* opts)
          ui-read-fn*  (:ui-read-fn opts)
          opts'        (dissoc opts :ui-state* :ui-read-fn)
@@ -54,7 +53,7 @@
                             :session/ui-set-tools-expanded
                             (ui-state/set-tools-expanded! ui-atom (:expanded? payload))
                             nil)))
-         init-fn      (app/make-init model-name nil ui-read-fn ui-disp-fn
+         init-fn      (app/make-init nil ui-read-fn ui-disp-fn
                                      (merge {:dispatch-fn default-dispatch-fn} opts'))
          [state _cmd] (init-fn)]
      state)))
@@ -79,7 +78,7 @@
 
 (deftest init-test
   (testing "init returns idle state and starts queue polling cmd"
-    (let [init-fn (app/make-init "test-model")
+    (let [init-fn (app/make-init)
           [state cmd] (init-fn)]
       (is (= :idle (:phase state)))
       (is (some? cmd))
@@ -88,7 +87,7 @@
       (is (fn? (:footer-model-fn state)))))
 
   (testing "init includes explicit prompt-input state shape"
-    (let [[state _] ((app/make-init "test-model"))
+    (let [[state _] ((app/make-init))
           input-state (:prompt-input-state state)]
       (is (= {:prefix ""
               :candidates []
@@ -343,7 +342,7 @@
                            :args    ""
                            :handler (fn [_args] (println "Hello from extension!"))}))
           update-fn   (app/make-update (stub-agent-fn ""))
-          state       (init-state "test-model" {:dispatch-fn dispatch-fn})
+          state       (init-state {:dispatch-fn dispatch-fn})
           typed       (type-text update-fn state "/hello")
           [s1 _]      (update-fn typed (msg/key-press :enter))]
       (is (= :idle (:phase s1)))
@@ -361,7 +360,7 @@
                            :args    ""
                            :handler (fn [_args] (reset! called true))}))
           update-fn   (app/make-update (stub-agent-fn ""))
-          state       (init-state "test-model" {:dispatch-fn dispatch-fn})
+          state       (init-state {:dispatch-fn dispatch-fn})
           typed       (type-text update-fn state "/silent")
           [s1 _]      (update-fn typed (msg/key-press :enter))]
       (is @called)
@@ -377,7 +376,7 @@
                            :args    ""
                            :handler (fn [_args] (throw (ex-info "kaboom" {})))}))
           update-fn   (app/make-update (stub-agent-fn ""))
-          state       (init-state "test-model" {:dispatch-fn dispatch-fn})
+          state       (init-state {:dispatch-fn dispatch-fn})
           typed       (type-text update-fn state "/boom")
           [s1 _]      (update-fn typed (msg/key-press :enter))]
       (is (= :idle (:phase s1)))
@@ -395,7 +394,7 @@
                                       (println "Line 1")
                                       (println "Line 2"))}))
           update-fn   (app/make-update (stub-agent-fn ""))
-          state       (init-state "test-model" {:dispatch-fn dispatch-fn})
+          state       (init-state {:dispatch-fn dispatch-fn})
           typed       (type-text update-fn state "/multi")
           [s1 _]      (update-fn typed (msg/key-press :enter))]
       (is (= 1 (count (:messages s1))))

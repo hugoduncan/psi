@@ -27,9 +27,8 @@
     nil))
 
 (defn- init-state
-  ([] (init-state "test-model" {}))
-  ([model-name] (init-state model-name {}))
-  ([model-name opts]
+  ([] (init-state {}))
+  ([opts]
    (let [ui-atom      (:ui-state* opts)
          ui-read-fn*  (:ui-read-fn opts)
          opts'        (dissoc opts :ui-state* :ui-read-fn)
@@ -43,7 +42,7 @@
                             :session/ui-set-tools-expanded
                             (ui-state/set-tools-expanded! ui-atom (:expanded? payload))
                             nil)))
-         init-fn      (app/make-init model-name nil ui-read-fn ui-disp-fn
+         init-fn      (app/make-init nil ui-read-fn ui-disp-fn
                                      (merge {:dispatch-fn default-dispatch-fn} opts'))
          [state _cmd] (init-fn)]
      state)))

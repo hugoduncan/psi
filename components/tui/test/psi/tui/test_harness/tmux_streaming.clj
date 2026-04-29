@@ -86,7 +86,7 @@
                         {:session-name   session-name*
                          :working-dir    working-dir
                          :launch-command (str "PSI_TUI_DEMO_SCRIPT=" (pr-str script)
-                                              " PSI_TUI_DEMO_MODEL=demo " launch)})
+                                              " " launch)})
                 result (cond
                          (not (tmux/wait-for-any-marker target ready-markers startup-timeout-ms))
                          (failure target :startup-timeout)

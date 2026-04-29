@@ -191,11 +191,11 @@
     state))
 
 (defn build-init
-  ([_model-name initial-prompt-input-state-fn] (build-init nil nil nil {} initial-prompt-input-state-fn))
-  ([_model-name query-fn initial-prompt-input-state-fn] (build-init nil query-fn nil nil {} initial-prompt-input-state-fn))
-  ([_model-name query-fn ui-read-fn initial-prompt-input-state-fn] (build-init nil query-fn ui-read-fn nil {} initial-prompt-input-state-fn))
-  ([_model-name query-fn ui-read-fn ui-dispatch-fn initial-prompt-input-state-fn] (build-init nil query-fn ui-read-fn ui-dispatch-fn {} initial-prompt-input-state-fn))
-  ([_model-name query-fn ui-read-fn ui-dispatch-fn opts initial-prompt-input-state-fn]
+  ([initial-prompt-input-state-fn] (build-init nil nil nil {} initial-prompt-input-state-fn))
+  ([query-fn initial-prompt-input-state-fn] (build-init query-fn nil nil {} initial-prompt-input-state-fn))
+  ([query-fn ui-read-fn initial-prompt-input-state-fn] (build-init query-fn ui-read-fn nil {} initial-prompt-input-state-fn))
+  ([query-fn ui-read-fn ui-dispatch-fn initial-prompt-input-state-fn] (build-init query-fn ui-read-fn ui-dispatch-fn {} initial-prompt-input-state-fn))
+  ([query-fn ui-read-fn ui-dispatch-fn opts initial-prompt-input-state-fn]
    (fn []
      (let [introspected (when query-fn
                           (query-fn [:psi.agent-session/prompt-templates

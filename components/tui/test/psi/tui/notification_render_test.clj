@@ -18,7 +18,7 @@
                              :session/ui-dismiss-expired  (ui/dismiss-expired! ui-atom 5000)
                              :session/ui-dismiss-overflow (ui/dismiss-overflow! ui-atom)
                              nil))
-          init-fn       (app/make-init "test-model" nil ui-read-fn ui-dispatch-fn
+          init-fn       (app/make-init nil ui-read-fn ui-dispatch-fn
                                        {:dispatch-fn (constantly nil)})
           [state _]     (init-fn)
           state         (assoc state :width 120)

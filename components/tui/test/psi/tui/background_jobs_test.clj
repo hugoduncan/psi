@@ -8,7 +8,7 @@
 
 (defn- init-state-with-ui-snapshot
   [ui-snapshot]
-  (let [init-fn (app/make-init "test-model" nil (fn [] ui-snapshot) nil {:dispatch-fn (constantly nil)})
+  (let [init-fn (app/make-init nil (fn [] ui-snapshot) nil {:dispatch-fn (constantly nil)})
         [state _] (init-fn)]
     (assoc state :width 120)))
 
@@ -47,7 +47,7 @@
                     :visible-notifications []
                     :tools-expanded? false}
           snap-atom (atom snap-a)
-          init-fn   (app/make-init "test-model" nil (fn [] @snap-atom) nil
+          init-fn   (app/make-init nil (fn [] @snap-atom) nil
                                    {:dispatch-fn (constantly nil)})
           [state _] (init-fn)
           state     (assoc state :width 120)

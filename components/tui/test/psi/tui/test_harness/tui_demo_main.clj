@@ -99,8 +99,7 @@
         initial-messages (or (read-edn-env "PSI_TUI_DEMO_INITIAL_MESSAGES") [])
         agent-fn         (if (seq script)
                            (scripted-agent-fn (atom (vec script)))
-                           noop-agent-fn)
-        model-name       (or (System/getenv "PSI_TUI_DEMO_MODEL") "demo-model")]
-    (app/start! model-name agent-fn {:alt-screen false
-                                     :dispatch-fn dispatch-fn
-                                     :initial-messages initial-messages})))
+                           noop-agent-fn)]
+    (app/start! agent-fn {:alt-screen false
+                          :dispatch-fn dispatch-fn
+                          :initial-messages initial-messages})))

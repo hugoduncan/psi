@@ -64,7 +64,7 @@
             launch        (or launch-command (demo-launch-command))
             initial-msgs  [{:role :assistant :text startup-message}]
             env-prefix    (str "PSI_TUI_DEMO_INITIAL_MESSAGES=" (pr-str (pr-str initial-msgs))
-                               " PSI_TUI_DEMO_MODEL=demo ")]
+                               " ")]
         (try
           (let [target (tmux/start-session!
                         {:session-name   session-name*

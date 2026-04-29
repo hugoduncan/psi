@@ -226,12 +226,12 @@
         (idle-text-edit-update state m autocomplete?))))
 
 (defn make-init
-  ([model-name] (make-init model-name nil nil nil {}))
-  ([model-name query-fn] (make-init model-name query-fn nil nil {}))
-  ([model-name query-fn ui-read-fn] (make-init model-name query-fn ui-read-fn nil {}))
-  ([model-name query-fn ui-read-fn ui-dispatch-fn] (make-init model-name query-fn ui-read-fn ui-dispatch-fn {}))
-  ([model-name query-fn ui-read-fn ui-dispatch-fn opts]
-   (support/build-init model-name query-fn ui-read-fn ui-dispatch-fn opts shared/initial-prompt-input-state)))
+  ([] (make-init nil nil nil {}))
+  ([query-fn] (make-init query-fn nil nil {}))
+  ([query-fn ui-read-fn] (make-init query-fn ui-read-fn nil {}))
+  ([query-fn ui-read-fn ui-dispatch-fn] (make-init query-fn ui-read-fn ui-dispatch-fn {}))
+  ([query-fn ui-read-fn ui-dispatch-fn opts]
+   (support/build-init query-fn ui-read-fn ui-dispatch-fn opts shared/initial-prompt-input-state)))
 
 (defn make-update
   [run-agent-fn!]
@@ -264,10 +264,10 @@
 (def view render/render-view)
 
 (defn start!
-  ([model-name run-agent-fn!]
-   (start! model-name run-agent-fn! {}))
-  ([model-name run-agent-fn! opts]
-   (charm-program/run {:init       (make-init model-name (:query-fn opts) (:ui-read-fn opts) (:ui-dispatch-fn opts) opts)
+  ([run-agent-fn!]
+   (start! run-agent-fn! {}))
+  ([run-agent-fn! opts]
+   (charm-program/run {:init       (make-init (:query-fn opts) (:ui-read-fn opts) (:ui-dispatch-fn opts) opts)
                        :update          (make-update run-agent-fn!)
                        :view            view
                        :focus-reporting true

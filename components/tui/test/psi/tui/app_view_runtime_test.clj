@@ -28,10 +28,10 @@
     nil))
 
 (defn- init-state
-  ([] (init-state "test-model" {}))
-  ([model-name] (init-state model-name {}))
-  ([model-name opts]
-   (let [ui-atom      (:ui-state* opts)
+  ([] (init-state {}))
+  ([opts]
+   (let [launch-model (:launch-model opts)
+         ui-atom      (:ui-state* opts)
          ui-read-fn*  (:ui-read-fn opts)
          opts'        (dissoc opts :ui-state* :ui-read-fn)
          ui-read-fn   (or ui-read-fn*
@@ -44,8 +44,9 @@
                             :session/ui-set-tools-expanded
                             (ui-state/set-tools-expanded! ui-atom (:expanded? payload))
                             nil)))
-         init-fn      (app/make-init model-name nil ui-read-fn ui-disp-fn
+         init-fn      (app/make-init nil ui-read-fn ui-disp-fn
                                      (merge {:dispatch-fn default-dispatch-fn} opts'))
+         _            launch-model
          [state _cmd] (init-fn)]
      state)))
 
@@ -65,8 +66,8 @@
 
 (deftest view-renders-banner-test
   (testing "view includes canonical footer model text"
-    (let [state (init-state "launch-model"
-                            {:footer-model-fn (constantly {:footer/model {:text "effective-model"}})})
+    (let [state (init-state {:launch-model "launch-model"
+                             :footer-model-fn (constantly {:footer/model {:text "effective-model"}})})
           out   (app/view state)]
       (is (string? out))
       (is (str/includes? out "effective-model"))
@@ -75,8 +76,8 @@
 (deftest banner-updates-when-footer-model-changes-test
   (testing "banner follows current canonical footer model without rebuilding init state"
     (let [model* (atom {:footer/model {:text "model-a"}})
-          state  (init-state "launch-model"
-                             {:footer-model-fn (fn [] @model*)})
+          state  (init-state {:launch-model "launch-model"
+                              :footer-model-fn (fn [] @model*)})
           out-a  (ansi/strip-ansi (app/view state))
           _      (reset! model* {:footer/model {:text "model-b"}})
           out-b  (ansi/strip-ansi (app/view state))]
@@ -87,8 +88,8 @@
 
 (deftest banner-renders-default-effective-model-test
   (testing "banner renders effective default model text when provided canonically"
-    (let [state (init-state "launch-model"
-                            {:footer-model-fn (constantly {:footer/model {:text "default-effective-model"}})})
+    (let [state (init-state {:launch-model "launch-model"
+                             :footer-model-fn (constantly {:footer/model {:text "default-effective-model"}})})
           out   (ansi/strip-ansi (app/view state))]
       (is (str/includes? out "default-effective-model")))))
 
@@ -155,7 +156,7 @@
                        :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
                                          {:extension-id "a" :text "Formatter\nformatter"}]}
           model   (footer/footer-model-from-data footer-data {:worktree-path "/repo/project"})
-          init-fn (app/make-init "test-model" nil nil nil
+          init-fn (app/make-init nil nil nil
                                  {:cwd "/repo/project"
                                   :footer-model-fn (constantly model)})
           [state _] (init-fn)
@@ -189,7 +190,7 @@
                        :psi.agent-session/thinking-level :high
                        :psi.ui/statuses []}
           model   (footer/footer-model-from-data footer-data {:worktree-path "/repo/project"})
-          init-fn (app/make-init "test-model" nil nil nil
+          init-fn (app/make-init nil nil nil
                                  {:cwd "/repo/project"
                                   :footer-model-fn (constantly model)})
           [state _] (init-fn)
@@ -218,7 +219,7 @@
                             {:session-id "s2" :display-name "builder" :parent-session-id "s1" :runtime-state "running"}]
           model   (footer/footer-model-from-data footer-data {:worktree-path "/repo/project"
                                                               :context-sessions context-sessions})
-          init-fn (app/make-init "test-model" nil nil nil
+          init-fn (app/make-init nil nil nil
                                  {:cwd "/repo/project"
                                   :footer-model-fn (constantly model)})
           [state _] (init-fn)

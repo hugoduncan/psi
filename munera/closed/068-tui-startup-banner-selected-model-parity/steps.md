@@ -6,3 +6,5 @@
 - [x] Add focused proof that banner output updates when canonical footer model data changes
 - [x] Verify prompt/skill/extension/control banner lines remain present with current startup-snapshot semantics
 - [x] Run relevant TUI tests
+- [x] Follow-up: remove or explicitly deprecate the now-ignored `model-name` parameter from `make-init` / `start!` / `build-init`
+- [x] Follow-up: add or update tests for the chosen API cleanup/deprecation behavior

@@ -2,10 +2,17 @@ Implementation notes:
 - Confirmed root cause in code: `render-banner` was fed from TUI-local `:model-name`, while footer/session model truth already lived behind `:footer-model-fn`.
 - Changed banner rendering to accept full TUI state and derive the model line exactly from `[:footer/model :text]` returned by `(:footer-model-fn state)`.
 - Removed `:model-name` from TUI init state; repo-wide TUI search now shows no remaining `:model-name` usage in `components/tui`.
-- Kept `make-init`/`start!` signatures stable for now to avoid widening this slice; `model-name` is now ignored at init/build time rather than used as banner truth.
+- Initial task cut kept `make-init`/`start!` signatures stable to avoid widening the slice; follow-up cleanup has now removed the ignored `model-name` parameter from `make-init` / `start!` / `build-init`.
 - Added focused view tests proving:
   - canonical footer model text wins over conflicting launch/init model name
   - banner output updates when the footer model source changes without rebuilding init state
   - default/effective model text still renders normally
-- Verification: `bb test:tui` → `214 tests, 719 assertions, 0 failures`.
+- Follow-up cleanup updated app-runtime/demo/test call sites and added API cleanup tests proving the old launch-model argument shape is no longer accepted.
+- Verification:
+  - initial task cut: `bb test:tui` → `214 tests, 719 assertions, 0 failures`
+  - after follow-up cleanup: `bb test:tui` → `217 tests, 722 assertions, 0 failures`
 - Scope remains intentionally limited: only the banner model line is canonical/live in this slice; prompt/skill/extension summaries remain startup snapshots.
+
+Review note:
+- Approved. Design and architecture fit are good.
+- Follow-up completed: removed the misleading dead parameter from `make-init` / `start!` / `build-init` and added tests for the cleanup behavior.

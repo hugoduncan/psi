@@ -8,7 +8,7 @@
 
 (defn- init-state-with-ui-snapshot
   [ui-snapshot]
-  (let [init-fn (app/make-init "test-model" nil (fn [] ui-snapshot) nil {:dispatch-fn (constantly nil)})
+  (let [init-fn (app/make-init nil (fn [] ui-snapshot) nil {:dispatch-fn (constantly nil)})
         [state _] (init-fn)]
     state))
 
@@ -41,7 +41,7 @@
       (is (not (str/includes? plain "first"))))))
 
 (defn- init-state []
-  (let [init-fn (app/make-init "test-model" nil nil nil {:dispatch-fn (constantly nil)})
+  (let [init-fn (app/make-init nil nil nil {:dispatch-fn (constantly nil)})
         [state _] (init-fn)]
     state))
 

@@ -748,7 +748,7 @@ Available: " (str/join ", " (map name (keys all))))
                                  (catch Exception e
                                    (.put queue {:kind :error :message (ex-message e)})))))))]
 
-     (tui-start-fn! (:name ai-model) run-agent-fn!
+     (tui-start-fn! run-agent-fn!
                     {:query-fn             (fn [q] (session/query-in ctx @tui-focus* q))
                      :footer-model-fn      (fn [] (footer/footer-model ctx @tui-focus*))
                      :session-selector-fn  (fn [] (ui-actions/context-session-action
