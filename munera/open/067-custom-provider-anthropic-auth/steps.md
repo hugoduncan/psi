@@ -1,0 +1,18 @@
+- [x] Inspect provider selection and auth resolution for `:anthropic-messages`
+  - confirmed the canonical prepared-request path resolves auth by selected provider identity via `model-registry/get-auth`
+  - identified drift in `psi.agent-session.runtime/resolve-api-key-in`, which currently consults OAuth only
+  - identified runtime/RPC call sites that pre-seed `:runtime-opts` from that narrower helper
+- [ ] Reproduce the failing decision path with focused tests
+  - add a custom `:anthropic-messages` provider case to prove provider-scoped auth reaches prepared request / execution options
+  - add a regression proving built-in Anthropic behavior remains unchanged
+  - add a negative case where a custom anthropic-compatible provider with no auth still fails as today
+- [ ] Implement provider-scoped auth resolution for custom Anthropic-compatible providers
+  - unify auth resolution so runtime-facing helpers and prompt preparation share provider-aware lookup
+  - preserve explicit runtime override precedence
+- [ ] Add regression tests for inline custom-provider auth and built-in Anthropic fallback behaviour
+  - cover auth injection
+  - cover custom `:base-url` preservation at the request boundary
+  - cover unchanged built-in Anthropic fallback semantics
+- [ ] Verify tests pass
+  - run focused AI / prompt-request / affected runtime tests first
+  - then run the broader relevant unit suites
