@@ -7,7 +7,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.oauth.core :as oauth]))
 
-(defn provider-auth
+(defn provider-auth-config
   "Return model-registry auth for `provider` or nil."
   [provider]
   (when provider
@@ -20,7 +20,7 @@
   [ctx provider]
   (or (when-let [oauth-ctx (:oauth-ctx ctx)]
         (oauth/get-api-key oauth-ctx provider))
-      (when-let [auth (provider-auth provider)]
+      (when-let [auth (provider-auth-config provider)]
         (when (:auth-header? auth)
           (:api-key auth)))))
 
@@ -28,7 +28,7 @@
   "Return provider-scoped request options derived from model-registry auth.
    Includes transport hints such as `:no-auth-header` and custom headers."
   [provider]
-  (when-let [auth (provider-auth provider)]
+  (when-let [auth (provider-auth-config provider)]
     (cond-> {}
       (false? (:auth-header? auth))
       (assoc :no-auth-header true)

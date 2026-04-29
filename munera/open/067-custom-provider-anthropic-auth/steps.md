@@ -24,3 +24,7 @@
   - extracted shared provider-auth resolution into `psi.agent-session.provider-auth`
   - updated prompt-request and runtime helper paths to use the shared resolver
   - reran focused tests after unification (`28 tests, 175 assertions, 0 failures`)
+- [x] Address optional code-shaper feedback
+  - renamed `provider-auth/provider-auth` to `provider-auth-config`
+  - inlined the trivial `resolve-custom-provider-options` seam into `session->request-options`
+  - reran focused provider-auth tests (`28 tests, 175 assertions, 0 failures`)

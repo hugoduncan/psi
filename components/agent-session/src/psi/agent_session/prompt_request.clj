@@ -49,20 +49,14 @@
       (and (number? config-timeout) (pos? config-timeout))   (long config-timeout)
       :else nil)))
 
-(defn- resolve-custom-provider-options
-  "Extract provider-scoped request options from shared auth resolution.
-   Returns a map to merge into request options, or nil."
-  [session-data]
-  (some-> (:provider (:model session-data))
-          provider-auth/provider-request-options))
-
 (defn session->request-options
   "Build request/runtime options from canonical session data.
    This is the canonical projection for provider request/runtime shaping."
   [ctx session-data runtime-opts]
   (let [api-key          (resolve-api-key ctx session-data runtime-opts)
         idle-timeout-ms  (resolve-llm-stream-idle-timeout-ms ctx runtime-opts)
-        custom-opts      (resolve-custom-provider-options session-data)]
+        provider-options (some-> (:provider (:model session-data))
+                                 provider-auth/provider-request-options)]
     (cond-> {}
       (contains? session-data :thinking-level)
       (assoc :thinking-level (:thinking-level session-data))
@@ -74,8 +68,8 @@
       (assoc :llm-stream-idle-timeout-ms idle-timeout-ms)
 
       ;; Merge custom provider options (headers, no-auth-header)
-      (some? custom-opts)
-      (merge custom-opts))))
+      (some? provider-options)
+      (merge provider-options))))
 
 (defn- resolve-runtime-model
   [session-model]
