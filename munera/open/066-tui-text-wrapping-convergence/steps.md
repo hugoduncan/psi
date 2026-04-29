@@ -64,5 +64,6 @@
 
 - [ ] Optional shaping follow-on
   - [ ] data-drive `render-banner` to reduce repetition while preserving current width behavior
-  - [ ] add a tiny style-aware wrapped-line helper only if another surface repeats the exact same shape as user/thinking/banner wrapping
   - [ ] tighten proof references in `doc/tui-text-width-policy.md` for secondary rows (`Exts:`, controls/help, preformatted tool-body preserve behavior)
+  - [ ] keep assistant transcript on the markdown-renderer path unless real duplication grows; do not force false convergence with `prefixed-wrap-lines`
+  - [ ] add a tiny style-aware wrapped-line helper only if another surface repeats the exact same shape as user/thinking/banner wrapping

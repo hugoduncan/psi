@@ -1,4 +1,5 @@
 Implementation notes:
+- Terse code-shaper review: good shape overall and closeable. Width behavior is now explicit, surface-led, and well-proven. Main optional follow-on is banner simplification plus tighter proof traceability, not architectural repair.
 - Slice 1 established `doc/tui-text-width-policy.md` as the canonical width-policy summary artifact.
 - The current surface taxonomy grouped repeated rule shapes into three useful families:
   - prefixed wrapped line (`刀: `, `ψ: ` paragraph content, `· `)
