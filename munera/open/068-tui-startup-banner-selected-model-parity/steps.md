@@ -1,0 +1,8 @@
+- [ ] Confirm current banner model rendering still reads from TUI-local `:model-name`
+- [ ] Change banner rendering to use canonical `[:footer/model :text]` from `:footer-model-fn`
+- [ ] Remove `:model-name` from TUI state if it is unused after the rendering change
+- [ ] Update tests to assert canonical visible behavior rather than local `:model-name` state
+- [ ] Add focused proof that the banner displays exactly `[:footer/model :text]`
+- [ ] Add focused proof that banner output updates when canonical footer model data changes
+- [ ] Verify prompt/skill/extension/control banner lines remain present with current startup-snapshot semantics
+- [ ] Run relevant TUI tests
