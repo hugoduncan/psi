@@ -8,3 +8,5 @@
 - [x] Run relevant TUI tests
 - [x] Follow-up: remove or explicitly deprecate the now-ignored `model-name` parameter from `make-init` / `start!` / `build-init`
 - [x] Follow-up: add or update tests for the chosen API cleanup/deprecation behavior
+- [x] Follow-up: add explicit argument validation at `make-init` / `start!` boundaries so old-shape misuse fails fast with a clear error
+- [x] Follow-up: update API cleanup tests to assert deliberate contract errors rather than indirect downstream exceptions

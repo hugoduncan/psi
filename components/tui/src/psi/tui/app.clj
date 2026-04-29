@@ -225,12 +225,36 @@
         (autocomplete-submit-update state m autocomplete? run-agent-fn!)
         (idle-text-edit-update state m autocomplete?))))
 
+(defn- ensure-init-arg-contract!
+  [query-fn ui-read-fn ui-dispatch-fn opts]
+  (when-not (or (nil? query-fn) (ifn? query-fn))
+    (throw (ex-info "make-init expects query-fn to be nil or callable; old launch-model argument shape is no longer supported."
+                    {:query-fn query-fn
+                     :api :psi.tui.app/make-init
+                     :error :invalid-query-fn})))
+  (when-not (or (nil? ui-read-fn) (ifn? ui-read-fn))
+    (throw (ex-info "make-init expects ui-read-fn to be nil or callable."
+                    {:ui-read-fn ui-read-fn
+                     :api :psi.tui.app/make-init
+                     :error :invalid-ui-read-fn})))
+  (when-not (or (nil? ui-dispatch-fn) (ifn? ui-dispatch-fn))
+    (throw (ex-info "make-init expects ui-dispatch-fn to be nil or callable."
+                    {:ui-dispatch-fn ui-dispatch-fn
+                     :api :psi.tui.app/make-init
+                     :error :invalid-ui-dispatch-fn})))
+  (when-not (map? opts)
+    (throw (ex-info "make-init expects opts to be a map."
+                    {:opts opts
+                     :api :psi.tui.app/make-init
+                     :error :invalid-opts}))))
+
 (defn make-init
   ([] (make-init nil nil nil {}))
   ([query-fn] (make-init query-fn nil nil {}))
   ([query-fn ui-read-fn] (make-init query-fn ui-read-fn nil {}))
   ([query-fn ui-read-fn ui-dispatch-fn] (make-init query-fn ui-read-fn ui-dispatch-fn {}))
   ([query-fn ui-read-fn ui-dispatch-fn opts]
+   (ensure-init-arg-contract! query-fn ui-read-fn ui-dispatch-fn opts)
    (support/build-init query-fn ui-read-fn ui-dispatch-fn opts shared/initial-prompt-input-state)))
 
 (defn make-update
@@ -263,10 +287,24 @@
 
 (def view render/render-view)
 
+(defn- ensure-start-arg-contract!
+  [run-agent-fn! opts]
+  (when-not (ifn? run-agent-fn!)
+    (throw (ex-info "start! expects run-agent-fn! to be callable; old launch-model argument shape is no longer supported."
+                    {:run-agent-fn! run-agent-fn!
+                     :api :psi.tui.app/start!
+                     :error :invalid-run-agent-fn})))
+  (when-not (map? opts)
+    (throw (ex-info "start! expects opts to be a map."
+                    {:opts opts
+                     :api :psi.tui.app/start!
+                     :error :invalid-opts}))))
+
 (defn start!
   ([run-agent-fn!]
    (start! run-agent-fn! {}))
   ([run-agent-fn! opts]
+   (ensure-start-arg-contract! run-agent-fn! opts)
    (charm-program/run {:init       (make-init (:query-fn opts) (:ui-read-fn opts) (:ui-dispatch-fn opts) opts)
                        :update          (make-update run-agent-fn!)
                        :view            view
