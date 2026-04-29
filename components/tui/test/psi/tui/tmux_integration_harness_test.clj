@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.tui.test-harness.tmux :as tmux]
-   [psi.tui.test-harness.tmux-real-launcher-wrap :as tmux-real-launcher-wrap]
    [psi.tui.test-harness.tmux-rehydration :as tmux-rehydration]
    [psi.tui.test-harness.tmux-startup-wrap :as tmux-startup-wrap]
    [psi.tui.test-harness.tmux-streaming :as tmux-streaming]))
@@ -48,10 +47,6 @@
 (deftest ^:integration tui-tmux-startup-wrap-scenario-test
   (testing "startup assistant output wraps on a narrow terminal"
     (assert-scenario-result (tmux-startup-wrap/run-startup-wrap-scenario! {}))))
-
-(deftest ^:integration tui-tmux-real-launcher-wrap-scenario-test
-  (testing "real --tui launcher path wraps resumed assistant output on a narrow terminal"
-    (assert-scenario-result (tmux-real-launcher-wrap/run-real-launcher-wrap-scenario! {}))))
 
 (deftest ^:integration tui-tmux-resize-scenario-test
   (testing "TUI repaints correctly after terminal resize: banner remains visible after shrink and after restore"

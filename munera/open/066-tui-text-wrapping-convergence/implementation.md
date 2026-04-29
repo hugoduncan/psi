@@ -16,5 +16,5 @@ Implementation notes:
 - Verification status after this slice:
   - focused width-policy unit proofs are green
   - full unit suite is green (`1453 tests, 10806 assertions, 0 failures`)
-  - focused tmux integration verification is green for both the startup-wrap and real-launcher-wrap scenarios
+  - focused tmux integration verification is green for the stable startup-wrap scenario; the experimental real-launcher resume-wrap scenario was de-scoped because it depended on resume-selection semantics rather than the width policy itself
   - the unrelated integration-suite blocker in `psi.launcher-gordian-integration-test` was removed by replacing machine-local absolute path fixtures with tempdir + local manifest setup

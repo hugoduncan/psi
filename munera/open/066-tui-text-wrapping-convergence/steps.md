@@ -49,10 +49,10 @@
 
 - [x] Integration proof
   - [x] keep the startup-wrap demo harness proof green
-  - [x] keep the real-launcher narrow-width resume proof green
+  - [x] de-scope the real-launcher narrow-width resume proof because it tested resume-selection semantics rather than the width policy itself
   - [x] add/refine tmux proof for banner metadata if unit proof alone is insufficient
   - [x] avoid adding tmux coverage for surfaces where pure render proof is already authoritative
-  - Focused integration verification is now green after removing the unrelated launcher absolute-path fixture dependency.
+  - Focused integration verification is now green on the stable startup-wrap path after removing the unrelated launcher absolute-path fixture dependency.
 
 - [x] Final review pass
   - [x] review remaining surfaces in the authoritative inventory for undocumented truncation behavior
