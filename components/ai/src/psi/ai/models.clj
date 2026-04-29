@@ -533,8 +533,7 @@
     :max-tokens 128000
     :input-cost 5.0
     :output-cost 30.0
-    ;; cache-read cost not published by OpenAI at time of writing
-    :cache-read-cost 0.0
+    :cache-read-cost 0.5
     :cache-write-cost 0.0}})
 
 (def ^:private provider-defaults
