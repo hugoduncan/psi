@@ -21,7 +21,6 @@
 (def ^:private interleaved-thinking-beta "interleaved-thinking-2025-05-14")
 (def ^:private prompt-caching-beta "prompt-caching-2024-07-31")
 (def ^:private prompt-caching-scope-beta "prompt-caching-scope-2026-01-05")
-
 (defn- coerce-str
   "Coerce any value to a string; nil and false become \"\"."
   [x]
