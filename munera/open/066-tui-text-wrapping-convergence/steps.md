@@ -60,3 +60,9 @@
   - [x] confirm tests describe the surface contract clearly
   - [x] confirm width behavior is explicit rather than terminal-accidental
   - [x] record the final width-policy summary artifact in the chosen canonical location
+  - [x] add terse task review artifact
+
+- [ ] Optional shaping follow-on
+  - [ ] data-drive `render-banner` to reduce repetition while preserving current width behavior
+  - [ ] add a tiny style-aware wrapped-line helper only if another surface repeats the exact same shape as user/thinking/banner wrapping
+  - [ ] tighten proof references in `doc/tui-text-width-policy.md` for secondary rows (`Exts:`, controls/help, preformatted tool-body preserve behavior)
