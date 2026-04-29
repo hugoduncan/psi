@@ -146,7 +146,23 @@
     :input-cost 1.0
     :output-cost 5.0
     :cache-read-cost 0.1
-    :cache-write-cost 1.25}})
+    :cache-write-cost 1.25}
+
+   :opus-4.7
+   {:id "claude-opus-4-7"
+    :name "Claude Opus 4.7"
+    :provider :anthropic
+    :api :anthropic-messages
+    :base-url "https://api.anthropic.com"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 1000000
+    :max-tokens 131072
+    :input-cost 5.0
+    :output-cost 25.0
+    :cache-read-cost 0.5
+    :cache-write-cost 6.25}})
 
 (def openai-models
   {:gpt-4o
@@ -483,6 +499,39 @@
     :input-cost 2.5
     :output-cost 15.0
     :cache-read-cost 0.25
+    :cache-write-cost 0.0}
+
+   :gpt-5.4-mini
+   {:id "gpt-5.4-mini"
+    :name "GPT-5.4 Mini"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 400000
+    :max-tokens 128000
+    :input-cost 0.75
+    :output-cost 4.5
+    :cache-read-cost 0.0
+    :cache-write-cost 0.0}
+
+   :gpt-5.5
+   {:id "gpt-5.5"
+    :name "GPT-5.5"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 1000000
+    :max-tokens 128000
+    :input-cost 5.0
+    :output-cost 30.0
+    ;; cache-read cost not published by OpenAI at time of writing
+    :cache-read-cost 0.0
     :cache-write-cost 0.0}})
 
 (def ^:private provider-defaults

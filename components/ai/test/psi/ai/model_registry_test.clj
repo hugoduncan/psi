@@ -48,8 +48,11 @@
   (testing "catalog includes built-in models"
     (let [models (registry/all-models)]
       (is (pos? (count models)))
-      ;; Check a known built-in exists
-      (is (some? (registry/find-model :anthropic "claude-sonnet-4-6")))))
+      ;; Check known built-ins exist
+      (is (some? (registry/find-model :anthropic "claude-sonnet-4-6")))
+      (is (some? (registry/find-model :anthropic "claude-opus-4-7")))
+      (is (some? (registry/find-model :openai "gpt-5.5")))
+      (is (some? (registry/find-model :openai "gpt-5.4-mini")))))
 
   (testing "no auth for built-in providers"
     (is (nil? (registry/get-auth :anthropic)))
