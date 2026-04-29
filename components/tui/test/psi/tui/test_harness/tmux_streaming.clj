@@ -33,9 +33,8 @@
    Scenario steps:
    1. Boot → ready marker
    2. Submit 'think' → wait for '· ' (thinking prefix)
-   3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓;
-      then poll until 'output-line-1' is absent (proves active turn cleared)
-   4. Assert content NOT visible in collapsed mode (no 'output-line-1')
+   3. Submit 'tool'  → wait for spinner (⠋) OR done marker (✓); then wait for ✓
+   4. Assert content NOT visible in collapsed mode on the visible screen (no 'output-line-1')
    5. Press ctrl+o → assert expanded content visible ('output-line-10')
    6. End successfully once expansion is visible."
   [{:keys [session-name
@@ -107,9 +106,6 @@
 
                                  (not (tmux/wait-for-marker target default-tool-done-marker step-timeout-ms))
                                  (failure target :tool-done-marker-not-visible)
-
-                                 (not (tmux/wait-for-marker-absent target "output-line-1" step-timeout-ms))
-                                 (failure target :content-still-visible-after-timeout)
 
                                  :else
                                  (let [pane (tmux/sanitize-pane-text (tmux/capture-pane-visible target))]

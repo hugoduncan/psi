@@ -117,7 +117,7 @@
                                                          (:psi.agent-session/session-id
                                                           ((:query api) [:psi.agent-session/session-id]))))})
                 tui-opts*              (atom nil)
-                tui-start!             (fn [_model-name _run-agent-fn opts]
+                tui-start!             (fn [_run-agent-fn opts]
                                          (reset! tui-opts* opts)
                                          :ok)]
             (with-redefs [app-runtime/create-runtime-session-context
@@ -201,7 +201,7 @@
     (try
       (with-main-bootstrap-stubs
         (fn []
-          (let [mock-tui-start! (fn [_model-name _run-agent-fn opts]
+          (let [mock-tui-start! (fn [_run-agent-fn opts]
                                   (reset! captured opts)
                                   :ok)]
             (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {})))
@@ -219,7 +219,7 @@
     (try
       (with-main-bootstrap-stubs
         (fn []
-          (let [mock-tui-start! (fn [_model-name _run-agent-fn opts]
+          (let [mock-tui-start! (fn [_run-agent-fn opts]
                                   ((:dispatch-fn opts) "/history")
                                   :ok)]
             (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {})))
@@ -342,7 +342,7 @@
                            :execution-result/tool-calls []
                            :execution-result/stop-reason :stop})]
             (let [result (app-runtime/start-tui-runtime!
-                          (fn [_model-name run-agent-fn _opts]
+                          (fn [run-agent-fn _opts]
                             (let [queue (java.util.concurrent.LinkedBlockingQueue.)]
                               (run-agent-fn "hello from tui" queue)
                               (.poll queue 2000 java.util.concurrent.TimeUnit/MILLISECONDS)))
