@@ -7,7 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Fixed
-- TUI startup banner model line now reflects the canonical current session model instead of a stale launch-time label, and the TUI init/start API now rejects obsolete launch-model argument shapes with explicit contract errors.
+- TUI startup banner model line now reflects the canonical current session model.
 
 ## [0.1.2034] - 2026-04-29
 
