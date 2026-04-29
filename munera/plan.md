@@ -6,7 +6,6 @@ Queue:
 
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/066-tui-text-wrapping-convergence/`
-`munera/open/068-tui-startup-banner-selected-model-parity/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
