@@ -60,6 +60,15 @@ This means the canonical request-preparation layer already knows how to inject i
   2. model-registry auth for the selected provider when auth headers are enabled
 - This preserves built-in OAuth behavior while allowing runtime-facing helper paths to see inline custom provider auth from models config.
 
+### Shared provider-auth resolver follow-on
+
+- Added `psi.agent-session.provider-auth` as a small shared helper for provider-scoped auth lookup.
+- Moved shared logic for:
+  - provider auth lookup
+  - provider API key resolution
+  - provider-scoped request option shaping
+- Updated both `prompt-request` and `runtime` to depend on the shared helper so provider-auth precedence no longer has to be maintained in two separate implementations.
+
 ### Anthropic provider capture identity
 
 - Updated Anthropic provider request/response capture payloads to report the selected model provider identity rather than always reporting `:anthropic`.
@@ -85,6 +94,7 @@ This means the canonical request-preparation layer already knows how to inject i
   - uses the configured custom `:base-url`
   - preserves selected provider identity in request capture payloads
   - still reports `:api :anthropic-messages`
+  - still fails with the existing missing-auth error when no auth is configured
 
 ## Verification run
 
@@ -95,7 +105,7 @@ Focused verification passed:
 - `psi.ai.providers.anthropic-test`
 
 Result:
-- `28 tests, 174 assertions, 0 failures`
+- `28 tests, 175 assertions, 0 failures`
 
 ## Working diagnosis
 
@@ -103,4 +113,4 @@ The root cause was split auth-resolution ownership. The selected provider and mo
 
 ## Follow-on note
 
-The remaining runtime/RPC call sites can continue to pass explicit overrides through `:runtime-opts`, but provider-scoped defaults should now be consistent with canonical prompt preparation because the shared runtime helper no longer ignores model-registry provider auth.
+The earlier optional architecture follow-on has now been executed: provider-auth precedence is centralized in `psi.agent-session.provider-auth`, reducing future drift risk between prompt preparation and runtime helper paths.

@@ -7,13 +7,12 @@
    - API key resolution"
   (:require
    [clojure.string :as str]
-   [psi.ai.model-registry :as model-registry]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.persistence :as persist]
+   [psi.agent-session.provider-auth :as provider-auth]
    [psi.recursion.core :as recursion]
    [taoensso.timbre :as timbre]))
 
@@ -46,21 +45,12 @@
 
 (defn resolve-api-key-in
   "Resolve API key for the selected model provider.
-   Precedence mirrors canonical request preparation for the provider-aware sources
-   used by runtime-facing helper paths:
-   1. OAuth/runtime credential for the selected provider
-   2. model-registry auth for the selected provider when auth headers are enabled
-
-   `session-id` is accepted for call-path symmetry; auth lookup itself is not
-   session-scoped here. Explicit per-call overrides still belong in runtime-opts
-   passed to prompt preparation."
+   Shared provider-auth resolution keeps runtime-facing helper paths aligned
+   with canonical request preparation. `session-id` is accepted for call-path
+   symmetry; explicit per-call overrides still belong in runtime-opts passed to
+   prompt preparation."
   [ctx _session-id ai-model]
-  (let [provider (:provider ai-model)]
-    (or (when-let [oauth-ctx (:oauth-ctx ctx)]
-          (oauth/get-api-key oauth-ctx provider))
-        (when-let [auth (model-registry/get-auth provider)]
-          (when (:auth-header? auth)
-            (:api-key auth))))))
+  (provider-auth/provider-api-key ctx (:provider ai-model)))
 
 (defn- sync->recursion-trigger-type
   [sync]
