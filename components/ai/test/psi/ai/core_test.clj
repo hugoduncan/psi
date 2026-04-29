@@ -42,6 +42,13 @@
       (is (= :openai (:provider model)))
       (is (= :openai-completions (:api model)))))
 
+  (testing "Adaptive thinking Anthropic model validation"
+    (let [model (models/get-model :opus-4.7)]
+      (is (schemas/valid? schemas/Model model))
+      (is (= :anthropic (:provider model)))
+      (is (= :anthropic-messages (:api model)))
+      (is (= true (:adaptive-thinking model)))))
+
   (testing "GPT-5 Codex family models are registered"
     (doseq [k [:gpt-5.2-codex :gpt-5.3-codex :gpt-5.3-codex-spark :gpt-5.4]]
       (let [model (models/get-model k)]
