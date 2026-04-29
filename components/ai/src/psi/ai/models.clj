@@ -161,7 +161,7 @@
     :supports-images true
     :supports-text true
     :context-window 1000000
-    :max-tokens 131072
+    :max-tokens 128000
     :input-cost 5.0
     :output-cost 25.0
     :cache-read-cost 0.5

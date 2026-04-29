@@ -142,7 +142,15 @@
           req     (#'anthropic/build-request convo model {:thinking-level :medium
                                                           :api-key "test-key"})
           body    (json/parse-string (:body req) true)]
-      (is (= "medium" (get-in body [:output_config :effort]))))))
+      (is (= "medium" (get-in body [:output_config :effort])))))
+
+  (testing "Opus 4.7 defaults max_tokens to Anthropic's 128000 cap"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :off
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (= 128000 (:max_tokens body))))))
 
 (deftest build-request-normalizes-legacy-string-tool-parameters-test
   (testing "legacy string tool parameters are normalized before Anthropic input_schema validation"
