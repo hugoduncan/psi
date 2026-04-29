@@ -29,11 +29,11 @@
                    (prefixed-wrap-lines prefix text width)))))
 
 (defn- banner-rows
-  [model-name prompt-templates skills extension-summary]
+  [model-text prompt-templates skills extension-summary]
   (let [visible-skills (remove :disable-model-invocation skills)
         ext-count      (:extension-count extension-summary 0)]
     [{:prefix "  Model: "
-      :text model-name}
+      :text model-text}
      {:prefix "  Prompts: "
       :text (when (seq prompt-templates)
               (str/join ", " (map #(str "/" (:name %)) prompt-templates)))}
@@ -46,13 +46,17 @@
      {:prefix "  "
       :text "ESC=interrupt  Ctrl+C=clear/quit  Ctrl+D=exit-empty"}]))
 
-(defn render-banner [model-name prompt-templates skills extension-summary width]
-  (str (charm-style/render shared/title-style "ψ Psi Agent Session") "\n"
-       (->> (banner-rows model-name prompt-templates skills extension-summary)
-            (keep (fn [{:keys [prefix text]}]
-                    (render-banner-summary prefix text width)))
-            (str/join "\n"))
-       "\n"))
+(defn render-banner [state width]
+  (let [model-text (get-in ((:footer-model-fn state)) [:footer/model :text])]
+    (str (charm-style/render shared/title-style "ψ Psi Agent Session") "\n"
+         (->> (banner-rows model-text
+                           (:prompt-templates state)
+                           (:skills state)
+                           (:extension-summary state))
+              (keep (fn [{:keys [prefix text]}]
+                      (render-banner-summary prefix text width)))
+              (str/join "\n"))
+         "\n")))
 
 (def agent-title-style (charm-style/style :fg charm-style/yellow :bold true))
 (def agent-head-style (charm-style/style :fg charm-style/cyan :bold true))
@@ -498,10 +502,9 @@
 
 (defn render-view
   [state]
-  (let [{:keys [messages phase error input spinner-frame model-name
-                prompt-templates skills extension-summary ui-snapshot
-                context-session-tree-widget context-session-tree-selected-index
-                tool-calls tool-order
+  (let [{:keys [messages phase error input spinner-frame
+                ui-snapshot context-session-tree-widget
+                context-session-tree-selected-index tool-calls tool-order
                 active-turn-order session-selector current-session-file width
                 repaint-generation]} state
         spinner-char   (nth shared/spinner-frames (mod spinner-frame (count shared/spinner-frames)))
@@ -521,11 +524,11 @@
         term-width     (or width 80)]
     (if (= :selecting-session phase)
       (str (repaint-marker repaint-generation)
-           (render-banner model-name prompt-templates skills extension-summary term-width)
+           (render-banner state term-width)
            "\n"
            (selector-render/render-session-selector shared/dim-style render-separator session-selector current-session-file term-width (:session-selector-mode state)))
       (str (repaint-marker repaint-generation)
-           (render-banner model-name prompt-templates skills extension-summary term-width)
+           (render-banner state term-width)
            "\n"
            (render-messages messages term-width
                             {:tool-calls      tool-calls

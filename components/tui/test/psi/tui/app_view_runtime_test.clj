@@ -64,11 +64,33 @@
           s))
 
 (deftest view-renders-banner-test
-  (testing "view includes model name"
-    (let [state (init-state "gpt-4o")
+  (testing "view includes canonical footer model text"
+    (let [state (init-state "launch-model"
+                            {:footer-model-fn (constantly {:footer/model {:text "effective-model"}})})
           out   (app/view state)]
       (is (string? out))
-      (is (str/includes? out "gpt-4o")))))
+      (is (str/includes? out "effective-model"))
+      (is (not (str/includes? out "launch-model"))))))
+
+(deftest banner-updates-when-footer-model-changes-test
+  (testing "banner follows current canonical footer model without rebuilding init state"
+    (let [model* (atom {:footer/model {:text "model-a"}})
+          state  (init-state "launch-model"
+                             {:footer-model-fn (fn [] @model*)})
+          out-a  (ansi/strip-ansi (app/view state))
+          _      (reset! model* {:footer/model {:text "model-b"}})
+          out-b  (ansi/strip-ansi (app/view state))]
+      (is (str/includes? out-a "model-a"))
+      (is (not (str/includes? out-a "model-b")))
+      (is (str/includes? out-b "model-b"))
+      (is (not (str/includes? out-b "model-a"))))))
+
+(deftest banner-renders-default-effective-model-test
+  (testing "banner renders effective default model text when provided canonically"
+    (let [state (init-state "launch-model"
+                            {:footer-model-fn (constantly {:footer/model {:text "default-effective-model"}})})
+          out   (ansi/strip-ansi (app/view state))]
+      (is (str/includes? out "default-effective-model")))))
 
 (deftest view-renders-discoverable-context-session-section-when-widget-present-test
   (testing "normal TUI view renders visible session/context section from authoritative context widget"

@@ -85,7 +85,7 @@
       (is (some? cmd))
       (is (empty? (:messages state)))
       (is (nil? (:error state)))
-      (is (= "test-model" (:model-name state)))))
+      (is (fn? (:footer-model-fn state)))))
 
   (testing "init includes explicit prompt-input state shape"
     (let [[state _] ((app/make-init "test-model"))
