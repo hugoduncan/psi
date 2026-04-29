@@ -204,10 +204,13 @@
 ;; Extended thinking: budget_tokens per level. Adaptive thinking (Opus 4.7+): effort string.
 (def ^:private thinking-level->budget
   {:off nil :minimal 1024 :low 2048 :medium 8000 :high 16000 :xhigh 32000})
+
 (def ^:private thinking-level->effort
   {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "high"})
 
-(defn- adaptive-thinking? [model] (boolean (:adaptive-thinking model)))
+(defn- adaptive-thinking?
+  [model]
+  (boolean (:adaptive-thinking model)))
 
 (defn- thinking-param
   "Extended thinking → {:type \"enabled\" :budget_tokens N}.
