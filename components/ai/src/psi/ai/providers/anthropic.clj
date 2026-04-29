@@ -202,6 +202,8 @@
             (:messages conversation))))
 
 (def ^:private thinking-level->budget
+  "Extended thinking budget_tokens map — used for all reasoning models
+   except those with :adaptive-thinking true (e.g. Opus 4.7)."
   {:off     nil
    :minimal 1024
    :low     2048
@@ -209,12 +211,37 @@
    :high    16000
    :xhigh   32000})
 
+(def ^:private thinking-level->effort
+  "Adaptive thinking effort map — used for models with :adaptive-thinking true."
+  {:off     nil
+   :minimal "low"
+   :low     "low"
+   :medium  "medium"
+   :high    "high"
+   :xhigh   "high"})
+
+(defn- adaptive-thinking?
+  "True when the model uses Anthropic adaptive thinking (e.g. Opus 4.7).
+   Adaptive thinking uses output_config.effort rather than budget_tokens,
+   and must not send the interleaved-thinking beta header."
+  [model]
+  (boolean (:adaptive-thinking model)))
+
 (defn- thinking-param
+  "Return the :thinking body param for the request, or nil when thinking is off.
+
+   Extended thinking models: {:type \"enabled\" :budget_tokens N}
+   Adaptive thinking models:  {:type \"adaptive\" :display \"summarized\"}"
   [model options]
   (when (:supports-reasoning model)
-    (when-let [budget (get thinking-level->budget (:thinking-level options))]
-      {:type          "enabled"
-       :budget_tokens budget})))
+    (let [level (:thinking-level options)]
+      (if (adaptive-thinking? model)
+        (when (get thinking-level->effort level)
+          {:type    "adaptive"
+           :display "summarized"})
+        (when-let [budget (get thinking-level->budget level)]
+          {:type          "enabled"
+           :budget_tokens budget})))))
 
 (defn- tool-definitions
   [conversation]
@@ -251,28 +278,34 @@
       (cache-control-present? (:messages conversation))))
 
 (defn- beta-header
-  [oauth? thinking prompt-caching?]
-  (let [betas (cond-> []
-                oauth?          (into [claude-code-beta
-                                       oauth-beta
-                                       context-management-beta
-                                       prompt-caching-scope-beta])
-                thinking        (conj interleaved-thinking-beta)
-                prompt-caching? (conj prompt-caching-beta))]
+  "Build the anthropic-beta header value.
+
+   Extended thinking adds interleaved-thinking-beta.
+   Adaptive thinking (Opus 4.7+) must NOT add interleaved-thinking-beta —
+   it uses a different protocol and the header causes a 400 error."
+  [oauth? thinking adaptive? prompt-caching?]
+  (let [extended-thinking? (and thinking (not adaptive?))
+        betas (cond-> []
+                oauth?               (into [claude-code-beta
+                                            oauth-beta
+                                            context-management-beta
+                                            prompt-caching-scope-beta])
+                extended-thinking?   (conj interleaved-thinking-beta)
+                prompt-caching?      (conj prompt-caching-beta))]
     (when (seq betas)
       (->> betas
            distinct
            (str/join ",")))))
 
 (defn- request-headers
-  [api-key thinking prompt-caching?]
+  [api-key thinking adaptive? prompt-caching?]
   (let [oauth?       (oauth-api-key? api-key)
         base-headers {"Content-Type"      "application/json"
                       "anthropic-version" anthropic-version}
         headers      (if oauth?
                        (assoc base-headers "Authorization" (str "Bearer " api-key))
                        (assoc base-headers "x-api-key" api-key))
-        beta         (beta-header oauth? thinking prompt-caching?)]
+        beta         (beta-header oauth? thinking adaptive? prompt-caching?)]
     (cond-> headers
       beta (assoc "anthropic-beta" beta))))
 
@@ -321,10 +354,25 @@
                        :provider :anthropic})))
     api-key))
 
+(defn- adaptive-effort
+  "Return the output_config effort string for an adaptive thinking request, or nil."
+  [model options]
+  (when (adaptive-thinking? model)
+    (get thinking-level->effort (:thinking-level options))))
+
 (defn build-request
-  "Build Anthropic API request map."
+  "Build Anthropic API request map.
+
+   Extended thinking models (e.g. Opus 4.6): thinking={type:enabled,budget_tokens:N}
+     + interleaved-thinking beta header + no temperature.
+   Adaptive thinking models (e.g. Opus 4.7): thinking={type:adaptive,display:summarized}
+     + output_config={effort:\"...\"}  + no interleaved-thinking beta + no temperature.
+   Non-reasoning models: temperature set, no thinking param."
   [conversation model options]
   (let [thinking        (thinking-param model options)
+        adaptive?       (adaptive-thinking? model)
+        effort          (when (and thinking adaptive?)
+                          (adaptive-effort model options))
         api-key         (resolve-api-key options)
         tool-defs       (tool-definitions conversation)
         system-body     (system-prompt-body conversation)
@@ -334,16 +382,20 @@
                                  :messages   (transform-messages conversation)
                                  :stream     true}
                           (some? system-body) (assoc :system system-body)
-                          ;; temperature is incompatible with extended thinking
-                          (not thinking)      (assoc :temperature (or (:temperature options) 0.7))
+                          ;; temperature is incompatible with extended thinking, and is a 400
+                          ;; error on adaptive-thinking models (Opus 4.7+) even when thinking=off
+                          (and (not thinking)
+                               (not adaptive?)) (assoc :temperature (or (:temperature options) 0.7))
                           thinking            (assoc :thinking thinking)
+                          ;; adaptive thinking uses output_config.effort instead of budget_tokens
+                          effort              (assoc :output_config {:effort effort})
                           (seq tool-defs)     (assoc :tools tool-defs))
         body*           (request-schema/validate-request-body! body)
         base-hdrs       (if (:no-auth-header options)
                           ;; Strip auth headers when explicitly disabled
-                          (dissoc (request-headers api-key thinking prompt-caching?)
+                          (dissoc (request-headers api-key thinking adaptive? prompt-caching?)
                                   "Authorization" "x-api-key")
-                          (request-headers api-key thinking prompt-caching?))
+                          (request-headers api-key thinking adaptive? prompt-caching?))
         headers         (if-let [custom (:headers options)]
                           (merge base-hdrs custom)
                           base-hdrs)]

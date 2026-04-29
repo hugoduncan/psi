@@ -97,6 +97,53 @@
       (is (some? (re-find #"interleaved-thinking" (get headers "anthropic-beta")))
           "oauth requests with thinking must include interleaved-thinking beta"))))
 
+;; ── Adaptive thinking (Opus 4.7+) ───────────────────────────────────────────
+
+(deftest build-request-adaptive-thinking-test
+  (testing "adaptive thinking model emits type=adaptive + output_config, no budget_tokens"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :high
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
+      (is (= "adaptive" (get-in body [:thinking :type])))
+      (is (= "summarized" (get-in body [:thinking :display])))
+      (is (nil? (get-in body [:thinking :budget_tokens]))
+          "budget_tokens must be absent for adaptive thinking")
+      (is (= "high" (get-in body [:output_config :effort])))
+      (is (nil? (:temperature body))
+          "temperature must be absent for adaptive thinking models")
+      (is (nil? (re-find #"interleaved-thinking" (or (get headers "anthropic-beta") "")))
+          "interleaved-thinking beta must NOT be sent for adaptive thinking")))
+
+  (testing "adaptive thinking off — no thinking param, no output_config, no temperature"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :off
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (nil? (:thinking body)))
+      (is (nil? (:output_config body)))
+      (is (nil? (:temperature body))
+          "temperature must be absent even with thinking off on adaptive models")))
+
+  (testing "xhigh effort maps to high for adaptive thinking"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :xhigh
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (= "high" (get-in body [:output_config :effort])))))
+
+  (testing "medium effort level passes through"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :medium
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (= "medium" (get-in body [:output_config :effort]))))))
+
 (deftest build-request-with-cache-breakpoints-test
   (testing "system prompt blocks and tools emit Anthropic cache_control when marked ephemeral"
     (let [model   (models/get-model :sonnet-4.6)

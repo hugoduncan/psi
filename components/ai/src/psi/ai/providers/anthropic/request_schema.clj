@@ -72,10 +72,30 @@
    [:text :string]
    [:cache_control {:optional true} anthropic-cache-control-schema]])
 
-(def ^:private anthropic-thinking-schema
+(def ^:private anthropic-extended-thinking-schema
+  "Extended thinking — used by Opus 4.6 and earlier reasoning models."
   [:map {:closed true}
    [:type [:= "enabled"]]
    [:budget_tokens pos-int?]])
+
+(def ^:private anthropic-adaptive-thinking-schema
+  "Adaptive thinking — used by Opus 4.7+. No budget_tokens; effort is in output_config."
+  [:map {:closed true}
+   [:type [:= "adaptive"]]
+   [:display {:optional true} [:enum "summarized" "omitted"]]])
+
+(def ^:private anthropic-thinking-schema
+  [:or
+   anthropic-extended-thinking-schema
+   anthropic-adaptive-thinking-schema])
+
+(def ^:private anthropic-output-config-schema
+  "output_config — used with adaptive thinking to specify effort level."
+  [:map {:closed true}
+   [:effort [:enum "low" "medium" "high"]]
+   [:task_budget {:optional true} [:map
+                                   [:type [:= "tokens"]]
+                                   [:total pos-int?]]]])
 
 (def ^:private anthropic-request-body-schema
   [:map {:closed true}
@@ -86,6 +106,7 @@
    [:system {:optional true} [:or :string [:sequential anthropic-system-block-schema]]]
    [:temperature {:optional true} number?]
    [:thinking {:optional true} anthropic-thinking-schema]
+   [:output_config {:optional true} anthropic-output-config-schema]
    [:tools {:optional true} [:sequential anthropic-tool-schema]]])
 
 (defn- request-shape-error-message

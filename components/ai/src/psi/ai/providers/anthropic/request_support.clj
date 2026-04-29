@@ -120,7 +120,8 @@
       (-> request
           (update-request-headers #(remove-beta-values %
                                                        #{interleaved-thinking-beta}))
-          (update-request-body #(dissoc % :thinking))))
+          ;; Strip both extended-thinking and adaptive-thinking params
+          (update-request-body #(dissoc % :thinking :output_config))))
 
     :without-all-betas
     #(update-request-headers % clear-beta-header)
@@ -139,6 +140,9 @@
   (beta-present? (:headers request) prompt-caching-beta))
 
 (defn thinking-request?
+  "True when the request has any form of thinking enabled:
+   - extended thinking: interleaved-thinking beta header or :thinking body key
+   - adaptive thinking: :thinking body key with type=adaptive (no beta header)"
   [request interleaved-thinking-beta]
   (or (beta-present? (:headers request) interleaved-thinking-beta)
       (contains? (or (request-body-map request) {}) :thinking)))

@@ -155,6 +155,9 @@
     :api :anthropic-messages
     :base-url "https://api.anthropic.com"
     :supports-reasoning true
+    ;; Opus 4.7 uses adaptive thinking — a different API protocol from
+    ;; extended thinking (budget_tokens). See providers/anthropic.clj.
+    :adaptive-thinking true
     :supports-images true
     :supports-text true
     :context-window 1000000
