@@ -1,4 +1,8 @@
-- [ ] Inspect OpenAI transport capture paths
-- [ ] Add focused regression tests for custom provider capture identity on OpenAI-compatible transports
-- [ ] Implement minimal fix to preserve selected provider identity in captures
-- [ ] Verify focused OpenAI provider tests pass
+- [ ] Inspect OpenAI transport-layer request and response capture paths and compare the seam with the Anthropic-compatible follow-up from task 067
+- [ ] Locate where the resolved selected provider identity is available to OpenAI-compatible transport captures
+- [ ] Add focused regression tests for custom provider capture identity on both request and response captures for `:openai-completions`
+- [ ] Add focused regression tests for custom provider capture identity on both request and response captures for `:openai-codex-responses`
+- [ ] Preserve built-in `:openai` request/response capture behaviour in regression coverage
+- [ ] Check for multiple canonical OpenAI transport capture constructors and update them consistently
+- [ ] Implement minimal fix to preserve selected provider identity in transport-layer captures without widening into auth/routing changes
+- [ ] Verify focused OpenAI provider tests pass and existing execution/auth behavior remains unchanged
