@@ -43,7 +43,28 @@
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
            #"Missing Anthropic API key"
-           (#'anthropic/build-request convo model {:api-key ""}))))))
+           (#'anthropic/build-request convo model {:api-key ""})))))
+
+  (testing "custom anthropic-compatible provider without auth keeps existing missing-auth failure"
+    (let [model {:id "MiniMax-M2.7"
+                 :name "MiniMax M2.7"
+                 :provider :minimax
+                 :api :anthropic-messages
+                 :base-url "https://api.minimax.io/anthropic"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Missing Anthropic API key"
+           (#'anthropic/build-request convo model {}))))))
 
 (deftest anthropic-request-schema-validation-fails-fast-test
   (testing "invalid provider request body is rejected with shape diagnostics"

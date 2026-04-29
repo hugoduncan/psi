@@ -16,3 +16,11 @@
 - [x] Verify tests pass
   - focused verification green: `psi.agent-session.prompt-request-test`, `psi.agent-session.runtime-test`, `psi.ai.providers.anthropic-test`
   - result: `28 tests, 174 assertions, 0 failures`
+- [x] Address required review feedback before closure
+  - added a focused negative regression for a custom `:anthropic-messages` provider with no configured auth still producing the existing missing-auth failure
+  - reran focused Anthropic/provider-auth tests
+  - updated review status to ready to close
+- [ ] Consider optional review follow-ons
+  - assess whether provider-auth resolution duplication between prompt-request and runtime helper paths should be removed now or deferred
+  - if deferred, record why the duplication is acceptable for now and what would trigger later unification
+  - if not deferred, extract or introduce a shared provider-auth resolver with minimal churn and update focused tests accordingly
