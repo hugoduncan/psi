@@ -10,6 +10,7 @@
 
 (def ^:private default-message-marker "This resumed paragraph should wrap")
 (def ^:private default-selector-marker "Enter=select")
+(def ^:private default-selector-search "startup wrap regression")
 (def ^:private default-minimum-wrap-lines 3)
 (def ^:private default-terminal-width 40)
 
@@ -101,7 +102,7 @@
     {:ok? true}))
 
 (defn- scenario-result
-  [target selector-marker step-timeout-ms message-marker minimum-wrap-lines terminal-width session-name*]
+  [target selector-marker selector-search step-timeout-ms message-marker minimum-wrap-lines terminal-width session-name*]
   (tmux/send-line! target "/resume")
   (cond
     (not (tmux/wait-for-marker target selector-marker step-timeout-ms))
@@ -109,6 +110,8 @@
 
     :else
     (do
+      (when (seq selector-search)
+        (tmux/send-text! target selector-search))
       (tmux/send-key! target "Enter")
       (if-not (tmux/wait-for-marker target message-marker step-timeout-ms)
         (failure target :message-marker-timeout)
@@ -135,6 +138,7 @@
            step-timeout-ms
            ready-markers
            selector-marker
+           selector-search
            keep-session-on-failure?
            terminal-width
            assistant-text
@@ -144,6 +148,7 @@
          step-timeout-ms tmux/default-step-timeout-ms
          ready-markers tmux/default-ready-markers
          selector-marker default-selector-marker
+         selector-search default-selector-search
          keep-session-on-failure? false
          terminal-width default-terminal-width
          message-marker default-message-marker
@@ -169,7 +174,7 @@
                          (failure target :startup-timeout)
                          (do
                            (tmux/resize-pane-width! target terminal-width)
-                           (scenario-result target selector-marker step-timeout-ms message-marker minimum-wrap-lines terminal-width session-name*)))]
+                           (scenario-result target selector-marker selector-search step-timeout-ms message-marker minimum-wrap-lines terminal-width session-name*)))]
             (when (or (= :passed (:status result))
                       (not keep-session-on-failure?))
               (tmux/kill-session-if-exists! session-name*))
