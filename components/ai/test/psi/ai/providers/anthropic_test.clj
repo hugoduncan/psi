@@ -144,6 +144,24 @@
           body    (json/parse-string (:body req) true)]
       (is (= "medium" (get-in body [:output_config :effort]))))))
 
+(deftest build-request-normalizes-legacy-string-tool-parameters-test
+  (testing "legacy string tool parameters are normalized before Anthropic input_schema validation"
+    (let [model        (models/get-model :opus-4.7)
+          convo        (-> (conv/create "sys")
+                           (conv/add-tool {:name "read"
+                                           :description "Read a file"
+                                           :parameters "{:type \"object\" :properties {\"path\" {:type \"string\"}} :required [\"path\"]}"}))
+          req          (#'anthropic/build-request convo model {:thinking-level :high
+                                                               :api-key "test-key"})
+          body         (json/parse-string (:body req) true)
+          input-schema (get-in body [:tools 0 :input_schema])]
+      (is (map? input-schema))
+      (is (= "object" (:type input-schema)))
+      (is (= ["path"] (:required input-schema)))
+      (is (= "string"
+             (or (get-in input-schema [:properties "path" :type])
+                 (get-in input-schema [:properties :path :type])))))))
+
 (deftest build-request-with-cache-breakpoints-test
   (testing "system prompt blocks and tools emit Anthropic cache_control when marked ephemeral"
     (let [model   (models/get-model :sonnet-4.6)

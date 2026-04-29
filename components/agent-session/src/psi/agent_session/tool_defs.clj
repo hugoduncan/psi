@@ -4,6 +4,7 @@
    Canonical shape is owned by agent-session and keeps `:parameters` as data.
    Boundary projections adapt that shape for agent-core and provider use."
   (:require
+   [cheshire.core :as json]
    [clojure.edn :as edn]))
 
 (defn- empty-object-schema []
@@ -16,13 +17,19 @@
     (merge (empty-object-schema) parameters)
 
     (string? parameters)
-    (try
-      (let [v (edn/read-string parameters)]
-        (if (map? v)
-          (merge (empty-object-schema) v)
-          (empty-object-schema)))
-      (catch Exception _
-        (empty-object-schema)))
+    (or (try
+          (let [v (json/parse-string parameters true)]
+            (when (map? v)
+              (merge (empty-object-schema) v)))
+          (catch Exception _
+            nil))
+        (try
+          (let [v (edn/read-string parameters)]
+            (when (map? v)
+              (merge (empty-object-schema) v)))
+          (catch Exception _
+            nil))
+        (empty-object-schema))
 
     (nil? parameters) (empty-object-schema)
     :else (empty-object-schema)))
@@ -72,9 +79,11 @@
   "Project a canonical or richer tool map into provider-facing conversation shape."
   [tool]
   (when-let [name (some-> (:name tool) str not-empty)]
-    {:name        name
-     :description (or (some-> (:description tool) str) "")
-     :parameters  (parse-parameters (:parameters tool))}))
+    (cond-> {:name        name
+             :description (or (some-> (:description tool) str) "")
+             :parameters  (parse-parameters (:parameters tool))}
+      (:cache-control tool)
+      (assoc :cache-control (:cache-control tool)))))
 
 (defn provider-tools
   [tools]

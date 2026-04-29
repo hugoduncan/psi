@@ -21,13 +21,24 @@
           normalized (tool-defs/normalize-tool-def {:name "x" :execute exec-fn})]
       (is (identical? exec-fn (:execute normalized)))))
 
-  (testing "string parameters are parsed into canonical data when possible"
+  (testing "EDN string parameters are parsed into canonical data when possible"
     (let [tool {:name "x"
                 :label "X"
                 :description "desc"
                 :parameters "{:type \"object\" :required [\"p\"]}"}
           normalized (tool-defs/normalize-tool-def tool)]
       (is (= {:type "object" :properties {} :required ["p"]}
+             (:parameters normalized)))))
+
+  (testing "JSON string parameters are parsed into canonical data when possible"
+    (let [tool {:name "x"
+                :label "X"
+                :description "desc"
+                :parameters "{\"type\":\"object\",\"properties\":{\"p\":{\"type\":\"string\"}},\"required\":[\"p\"]}"}
+          normalized (tool-defs/normalize-tool-def tool)]
+      (is (= {:type "object"
+              :properties {:p {:type "string"}}
+              :required ["p"]}
              (:parameters normalized)))))
 
   (testing "invalid parameter strings degrade to empty object schema"

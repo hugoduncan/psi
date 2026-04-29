@@ -1,6 +1,7 @@
 (ns psi.ai.conversation
   "Conversation entity and lifecycle management"
-  (:require [psi.ai.schemas :as schemas])
+  (:require [psi.ai.schemas :as schemas]
+            [psi.agent-session.tool-defs :as tool-defs])
   (:import [java.time Instant]
            [java.util UUID]))
 
@@ -135,7 +136,7 @@
   "Add tool to conversation"
   [conversation tool]
   (update-conversation conversation (fn [conversation]
-                                      (update conversation :tools conj tool))))
+                                      (update conversation :tools conj (tool-defs/provider-tool tool)))))
 
 ;; Derived data
 
