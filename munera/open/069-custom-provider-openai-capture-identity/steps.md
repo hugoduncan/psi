@@ -1,0 +1,4 @@
+- [ ] Inspect OpenAI transport capture paths
+- [ ] Add focused regression tests for custom provider capture identity on OpenAI-compatible transports
+- [ ] Implement minimal fix to preserve selected provider identity in captures
+- [ ] Verify focused OpenAI provider tests pass
