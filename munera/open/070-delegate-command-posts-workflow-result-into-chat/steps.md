@@ -1,0 +1,20 @@
+- [x] Inspect the current `/delegate` command handler versus `delegate-run`
+  - current handler calls `(delegate-run {:workflow workflow :prompt prompt :mode "async"})`
+  - inspected async completion path already supports chat injection via `:include_result_in_context true`
+  - inspected fallback path appends custom `delegate-result` entry only when chat injection is disabled
+- [x] Identify the canonical place to opt the command path into result-in-context delivery
+  - smallest fix is in the `/delegate` command handler arguments to `delegate-run`
+- [ ] Implement the `/delegate` result-posting fix without introducing duplicate delivery
+  - pass `:include_result_in_context true` from the command path
+- [ ] Add focused proof for the slash-command path specifically
+  - assert immediate acknowledgement string still returns
+  - assert async completion appends session-targeted messages into the originating session
+  - assert the bridge shape matches current delivery semantics: synthetic user marker plus assistant result text
+  - assert result content lands in the assistant message
+- [ ] Verify fallback `delegate-result` append-entry is suppressed for successful `/delegate` completion
+- [ ] Verify successful `/delegate` completion uses exactly one terminal delivery path for the result
+- [ ] Verify background-job tracking still works as intended
+  - background job starts for the delegated run
+  - background job is marked terminal on completion
+- [ ] Keep scope explicit
+  - do not broaden this task to failed/cancelled/timeout transcript injection unless a tiny adjacent correction is required by the command-path fix
