@@ -137,6 +137,14 @@ Bootstrapped on 2026-04-02.
   - child runtime initialization now preserves those preloaded messages in both runtime message state and the child journal seed
 
 ## Current work update
+- Task 066 (TUI text wrapping convergence) is now closed:
+  - authoritative width-policy summary lives at `doc/tui-text-width-policy.md`
+  - startup banner metadata, transcript user/assistant/thinking surfaces, and tool header/body rendering now have explicit width-policy classifications and proof references
+  - tool rendering policy is now explicit by surface: collapsed headers truncate intentionally, expanded plain-text bodies wrap within indent budget, and preformatted/code-like output preserves width intentionally unless an explicit renderer says otherwise
+  - focused width-policy unit proofs are green
+  - full unit suite green (`1453 tests, 10806 assertions, 0 failures`)
+  - focused tmux integration verification is green for the stable startup-wrap scenario
+
 - Task 054 (TUI thinking and tool streaming parity) is now closed:
   - switched `render-active-turn` from event-log replay to `active-turn-order` + `active-turn-items` item-map
   - one rendered block per item-id: thinking deduplication and tool lifecycle deduplication both fixed

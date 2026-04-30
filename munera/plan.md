@@ -5,12 +5,12 @@ Open tasks in suggested execution order:
 Queue:
 
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
-`munera/open/066-tui-text-wrapping-convergence/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
+`munera/open/067-add-anthropic-4-7-and-openai-5-5-models/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.
