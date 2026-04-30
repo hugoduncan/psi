@@ -24,3 +24,33 @@ Coordination note
 - The lower-level `delegate` tool already supports result injection through `include_result_in_context`; this task should converge the command path onto that existing capability rather than inventing a parallel mechanism.
 - Focus proof on the command handler path so future regressions cannot hide behind tool-only coverage.
 - Best likely regression-test home is alongside existing `/delegate` command tests in `extensions/workflow_loader_test.clj`.
+
+Implementation notes
+
+- Updated the `/delegate` command handler in `extensions/workflow-loader/src/extensions/workflow_loader.clj` so its `delegate-run` call now passes `:include_result_in_context true` together with `:mode "async"`.
+- This keeps the command path on the existing canonical async path:
+  - `delegate-run`
+  - `execute-async!`
+  - `on-async-completion!`
+  - `inject-result-into-context!`
+- Added focused command-path regression coverage in `extensions/workflow-loader/test/extensions/workflow_loader_test.clj`.
+- The new test proves:
+  - `/delegate` still returns its immediate acknowledgement string
+  - successful async completion queries the originating session explicitly
+  - completion appends the existing bridge-shaped user + assistant messages into that originating session
+  - the assistant-side message carries the workflow result text
+  - background-job start and terminal marking still occur
+  - fallback `psi.extension/append-entry` delivery is not used for this successful command-path case
+
+Verification
+
+- `clojure -M:test --focus extensions.workflow-loader-test --focus extensions.workflow-loader-delegate-test`
+- Result: `28 tests, 93 assertions, 0 failures.`
+
+Review note
+
+- Code-shaper review: accept as-is; minor follow-up opportunities only around making the command-path test less brittle and less sleep-based.
+- Follow-up shaping now applied:
+  - command-path test now captures the created run-id directly from mocked `psi.workflow/create-run`
+  - command-path async proof now waits on observed completion conditions via a small local helper instead of fixed sleeping
+  - `/delegate` callsite now carries a short intent comment about conversational result return

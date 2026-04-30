@@ -462,9 +462,12 @@
                                            (str "Usage: /delegate " workflow " <prompt>")
 
                                            :else
+                                           ;; Slash-command delegation is conversational: successful final
+                                           ;; results should be posted back into the originating chat.
                                            (let [result (delegate-run {:workflow workflow
                                                                        :prompt prompt
-                                                                       :mode "async"})]
+                                                                       :mode "async"
+                                                                       :include_result_in_context true})]
                                              (if (:error result)
                                                (str "Error: " (:error result))
                                                (str "Delegated to " workflow " — run " (:run-id result)))))))})

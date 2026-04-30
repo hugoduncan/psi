@@ -76,6 +76,19 @@
      :mutate-calls mutate-calls
      :notifications notifications}))
 
+(defn- wait-until
+  ([pred] (wait-until pred 1000 10))
+  ([pred timeout-ms sleep-ms]
+   (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
+     (loop []
+       (if (pred)
+         true
+         (if (< (System/currentTimeMillis) deadline)
+           (do
+             (Thread/sleep sleep-ms)
+             (recur))
+           false))))))
+
 (deftest end-to-end-single-step-test
   (testing "raw planner file → parse → compile → valid canonical definition"
     (let [parsed (parser/parse-workflow-file planner-raw)
@@ -271,6 +284,83 @@
           (is (.contains ^String result "Available workflows:"))
           (is (.contains ^String result "explore"))
           (is (= [] @logs)))))))
+
+(deftest delegate-command-includes-result-in-chat-test
+  (testing "/delegate posts successful async workflow completion back into the originating chat transcript"
+    (let [commands (atom {})
+          mutate-calls (atom [])
+          mutate-session-calls (atom [])
+          query-session-calls (atom [])
+          created-run-id (atom nil)
+          api {:query (fn [_]
+                        {:psi.agent-session/worktree-path "/tmp/test-worktree"
+                         :psi.agent-session/session-id "origin-session"
+                         :psi.agent-session/background-jobs []})
+               :query-session (fn [session-id _query]
+                                (swap! query-session-calls conj session-id)
+                                {:psi.agent-session/session-entries
+                                 [{:psi.session-entry/data {:role "assistant"}}]})
+               :mutate (fn [sym params]
+                         (swap! mutate-calls conj {:sym sym :params params})
+                         (condp = sym
+                           'psi.workflow/register-definition {:psi.workflow/registered? true}
+                           'psi.workflow/create-run (do
+                                                      (reset! created-run-id (:run-id params))
+                                                      {:psi.workflow/run-id (:run-id params)
+                                                       :psi.workflow/status :pending})
+                           'psi.workflow/execute-run (do
+                                                       (Thread/sleep 25)
+                                                       {:psi.workflow/run-id (:run-id params)
+                                                        :psi.workflow/status :completed
+                                                        :psi.workflow/result "delegated result text"})
+                           'psi.workflow/list-runs {:psi.workflow/runs []}
+                           'psi.extension/start-background-job {:psi.background-job/job-id (:job-id params)
+                                                                :psi.background-job/status :running}
+                           'psi.extension/mark-background-job-terminal {:psi.background-job/job-id (:job-id params)
+                                                                        :psi.background-job/status :completed}
+                           'psi.extension/append-entry {:unexpected true}
+                           {}))
+               :mutate-session (fn [session-id sym params]
+                                 (swap! mutate-session-calls conj {:session-id session-id
+                                                                   :sym sym
+                                                                   :params params})
+                                 {})
+               :log (fn [_] nil)
+               :notify (fn [_ _] nil)
+               :register-tool (fn [_] nil)
+               :register-command (fn [name cmd-def] (swap! commands assoc name cmd-def))
+               :register-prompt-contribution (fn [_] nil)
+               :on (fn [_ _] nil)}]
+      (with-redefs [loader/load-workflow-definitions
+                    (fn [_]
+                      {:definitions {"explore" {:definition-id "explore"
+                                                :name "explore"
+                                                :summary "Explore a topic"
+                                                :step-order ["step-1"]
+                                                :steps {"step-1" {:label "explore"}}}}
+                       :errors []
+                       :warnings []})]
+        (wl/init api)
+        (let [result ((:handler (get @commands "delegate")) "explore investigate this")]
+          (is (.startsWith ^String result "Delegated to explore — run "))
+          (is (wait-until #(and (= 2 (count @mutate-session-calls))
+                                (some (fn [call]
+                                        (= 'psi.extension/mark-background-job-terminal (:sym call)))
+                                      @mutate-calls))))
+          (is (= ["origin-session"] @query-session-calls))
+          (is (some? @created-run-id))
+          (is (= [{:session-id "origin-session"
+                   :sym 'psi.extension/append-message
+                   :params {:role "user"
+                            :content (str "Workflow run " @created-run-id " result:")}}
+                  {:session-id "origin-session"
+                   :sym 'psi.extension/append-message
+                   :params {:role "assistant"
+                            :content "delegated result text"}}]
+                 @mutate-session-calls))
+          (is (some #(= 'psi.extension/start-background-job (:sym %)) @mutate-calls))
+          (is (some #(= 'psi.extension/mark-background-job-terminal (:sym %)) @mutate-calls))
+          (is (not-any? #(= 'psi.extension/append-entry (:sym %)) @mutate-calls)))))))
 
 (deftest reload-preserves-extension-state-atom-test
   (testing "namespace reload preserves workflow-loader state so registered command handlers keep working"

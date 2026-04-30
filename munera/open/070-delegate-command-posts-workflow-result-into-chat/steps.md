@@ -4,17 +4,23 @@
   - inspected fallback path appends custom `delegate-result` entry only when chat injection is disabled
 - [x] Identify the canonical place to opt the command path into result-in-context delivery
   - smallest fix is in the `/delegate` command handler arguments to `delegate-run`
-- [ ] Implement the `/delegate` result-posting fix without introducing duplicate delivery
-  - pass `:include_result_in_context true` from the command path
-- [ ] Add focused proof for the slash-command path specifically
-  - assert immediate acknowledgement string still returns
-  - assert async completion appends session-targeted messages into the originating session
-  - assert the bridge shape matches current delivery semantics: synthetic user marker plus assistant result text
-  - assert result content lands in the assistant message
-- [ ] Verify fallback `delegate-result` append-entry is suppressed for successful `/delegate` completion
-- [ ] Verify successful `/delegate` completion uses exactly one terminal delivery path for the result
-- [ ] Verify background-job tracking still works as intended
-  - background job starts for the delegated run
-  - background job is marked terminal on completion
-- [ ] Keep scope explicit
-  - do not broaden this task to failed/cancelled/timeout transcript injection unless a tiny adjacent correction is required by the command-path fix
+- [x] Implement the `/delegate` result-posting fix without introducing duplicate delivery
+  - passed `:include_result_in_context true` from the command path
+- [x] Add focused proof for the slash-command path specifically
+  - asserted immediate acknowledgement string still returns
+  - asserted async completion appends session-targeted messages into the originating session
+  - asserted the bridge shape matches current delivery semantics: synthetic user marker plus assistant result text
+  - asserted result content lands in the assistant message
+- [x] Verify fallback `delegate-result` append-entry is suppressed for successful `/delegate` completion
+- [x] Verify successful `/delegate` completion uses exactly one terminal delivery path for the result
+- [x] Verify background-job tracking still works as intended
+  - asserted background job starts for the delegated run
+  - asserted background job is marked terminal on completion
+- [x] Keep scope explicit
+  - did not broaden this task to failed/cancelled/timeout transcript injection
+- [x] Reduce command-path test brittleness
+  - captured/asserted the run-id from mocked `psi.workflow/create-run` instead of slicing it from the acknowledgement string
+- [x] Reduce timing sensitivity in the command-path async proof
+  - replaced fixed `Thread/sleep` waiting with a small observed-condition wait helper in the command-path test
+- [x] Consider a tiny intent comment at the `/delegate` callsite
+  - added a short comment noting that slash-command delegation is conversational and successful final results should return to the originating chat transcript
