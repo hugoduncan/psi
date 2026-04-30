@@ -65,6 +65,7 @@ Follow-up implementation notes
 
 - Added `prompt-execution-result-in!` in `components/agent-session/src/psi/agent_session/prompt_control.clj`.
 - Extended `:session/prompt-prepare-request` handling so callers can opt into receiving the executed turn result (`:return-execution-result? true`) while staying on the same canonical dispatch/runtime path.
+- A second live validation exposed one more seam in that opt-in path: the first effect emitted by prompt preparation was still `:memory/recover-query`, so dispatch effect-return semantics were handing workflow callers the memory-recovery result instead of the prompt execution result. Fixed by introducing a combined `:runtime/recover-query-prompt-execute-and-record` effect for the execution-result-returning path so the returned effect result is the actual completed turn.
 - Updated `workflow_statechart_runtime.clj` so workflow step execution now uses `prompt-execution-result-in!` and records the assistant message from `:execution-result/assistant-message` directly.
 - Updated `workflow_judge.clj` so judge prompts and judge retries also use `prompt-execution-result-in!` instead of rereading the journal.
 - Kept the earlier defensive hardening in place:

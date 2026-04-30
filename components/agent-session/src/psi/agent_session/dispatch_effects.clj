@@ -132,6 +132,11 @@
     (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
     execution-result))
 
+(defmethod execute-effect! :runtime/recover-query-prompt-execute-and-record [ctx effect]
+  (when-let [query-text (:query-text effect)]
+    (memory-runtime/recover-for-query! query-text))
+  (execute-effect! ctx (assoc effect :effect/type :runtime/prompt-execute-and-record)))
+
 (defmethod execute-effect! :runtime/prompt-continue-chain [ctx effect]
   ((:continue-prompt-chain-fn ctx) ctx (effect-session-id ctx effect) (:execution-result effect) (:progress-queue effect)))
 

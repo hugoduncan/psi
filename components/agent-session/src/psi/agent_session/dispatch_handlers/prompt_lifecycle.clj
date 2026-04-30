@@ -82,12 +82,19 @@
                :text)))
 
 (defn- prompt-prepare-request-effects
-  [prepared-request progress-queue steering-consumed?]
-  (cond-> [{:effect/type :memory/recover-query
-            :query-text (prepared-request-query-text prepared-request)}
-           {:effect/type      :runtime/prompt-execute-and-record
-            :prepared-request prepared-request
-            :progress-queue   progress-queue}]
+  [prepared-request progress-queue steering-consumed? return-execution-result?]
+  (cond-> (vec (remove nil?
+                       [(if return-execution-result?
+                          {:effect/type      :runtime/recover-query-prompt-execute-and-record
+                           :query-text       (prepared-request-query-text prepared-request)
+                           :prepared-request prepared-request
+                           :progress-queue   progress-queue}
+                          {:effect/type :memory/recover-query
+                           :query-text (prepared-request-query-text prepared-request)})
+                        (when-not return-execution-result?
+                          {:effect/type      :runtime/prompt-execute-and-record
+                           :prepared-request prepared-request
+                           :progress-queue   progress-queue})]))
     steering-consumed?
     (conj {:effect/type :runtime/agent-clear-steering-queue})))
 
@@ -107,7 +114,7 @@
                               (prepared-request-state-summary turn-id prepared-request))
                  api-key            (assoc :runtime-api-key api-key)
                  steering-consumed? (assoc :steering-messages [])))
-             :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed?)
+             :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result?)
              :return-effect-result? true}
       (not return-execution-result?)
       (assoc :return {:prepared-request prepared-request}))))

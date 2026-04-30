@@ -129,6 +129,11 @@
    [:memory/recover-query
     [:map [:effect/type [:= :memory/recover-query]]
      [:query-text [:maybe :string]]]]
+   [:runtime/recover-query-prompt-execute-and-record
+    [:map [:effect/type [:= :runtime/recover-query-prompt-execute-and-record]]
+     [:prepared-request :map]
+     [:progress-queue {:optional true} :any]
+     [:query-text [:maybe :string]]]]
    [:oauth/begin-login
     [:map [:effect/type [:= :oauth/begin-login]]
      [:provider-id :keyword]

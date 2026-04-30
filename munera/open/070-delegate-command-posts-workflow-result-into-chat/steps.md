@@ -35,3 +35,5 @@
 - [x] Add focused regression coverage for the deeper propagation fix
   - updated workflow statechart/judge/execution tests to stub `prompt-execution-result-in!`
   - added canonical workflow + workflow-loader regression coverage for blank-result handling
+- [x] Fix the execution-result return seam in prompt preparation
+  - replaced the split `memory/recover-query` + `runtime/prompt-execute-and-record` effect pair with a combined execution-result-returning effect on the opt-in path so workflow callers receive the actual prompt execution result rather than the memory-recovery effect result
