@@ -1,0 +1,15 @@
+- [x] Inspect `extensions.mementum` and `extensions.munera` to capture exact current protocol-body strings and contribution metadata
+- [x] Identify or add focused test namespaces for `mementum` and `munera` extension prompt registration
+- [x] Create one UTF-8 LF-normalized extension-local resource file for the exact Mementum protocol body text
+- [x] Create one UTF-8 LF-normalized extension-local resource file for the exact Munera protocol body text
+- [x] Replace `mementum` inline protocol-body storage with resource-backed loading while keeping `engage-prefix`, mode branching, and metadata unchanged
+- [x] Replace `munera` inline protocol-body storage with resource-backed loading while keeping `engage-prefix`, mode branching, and metadata unchanged
+- [x] Implement explicit fail-fast `ex-info` for missing or unreadable prompt resources
+- [x] Add/update focused tests proving Mementum lambda-mode registration equals exactly the resource body
+- [x] Add/update focused tests proving Mementum non-lambda-mode registration equals exactly `(str engage-prefix protocol-body)`
+- [x] Add/update focused tests proving Munera lambda-mode registration equals exactly the resource body
+- [x] Add/update focused tests proving Munera non-lambda-mode registration equals exactly `(str engage-prefix protocol-body)`
+- [x] Add/update focused tests proving prompt contribution ids, sections, priorities, and `:enabled true` are unchanged
+- [x] Add at least one focused failure-path test proving missing-resource loading throws explicit `ex-info` naming the resource path
+- [x] Run focused verification for the affected extension tests
+- [x] Update `implementation.md` with decisions/discoveries made during execution
