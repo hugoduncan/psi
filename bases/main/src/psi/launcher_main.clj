@@ -70,9 +70,13 @@
       (System/exit 0))
     (when (:launcher-debug? plan)
       (print-debug-summary! plan))
-    (let [basis-file (doto (fs/file (fs/temp-dir) (str (gensym "psi-basis-")))
-                       (fs/delete-on-exit))]
-      (spit basis-file (:basis-edn plan))
+    (let [basis-edn  (:basis-edn plan)
+          ;; Stable file path keyed on content hash so .cpcache is reused across
+          ;; invocations with the same deps (warm startup, CI cache hits).
+          basis-hash (Integer/toHexString (hash basis-edn))
+          basis-file (fs/file (fs/temp-dir) (str "psi-basis-" basis-hash ".edn"))]
+      (when-not (fs/exists? basis-file)
+        (spit basis-file basis-edn))
       @(apply deps/clojure
               {:inherit true :dir (:cwd plan)}
               (launcher/build-deps-clj-args

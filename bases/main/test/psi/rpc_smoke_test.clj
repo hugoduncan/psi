@@ -33,7 +33,7 @@
 
 ;; ── subprocess helpers ───────────────────────────────────────────────────────
 
-(def ^:private default-handshake-timeout-ms 15000)
+(def ^:private default-handshake-timeout-ms 60000)
 (def ^:private default-exit-timeout-ms 10000)
 
 (defn- read-line-timeout
