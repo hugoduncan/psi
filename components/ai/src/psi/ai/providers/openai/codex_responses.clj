@@ -220,12 +220,12 @@
                     usage-map (assoc :usage usage-map))))))
 
 (defn- emit-codex-error!
-  [{:keys [done?]} consume-fn options url msg http-status]
+  [model {:keys [done?]} consume-fn options url msg http-status]
   (when-not @done?
     (reset! done? true)
     (let [err (cond-> {:type :error :error-message msg}
                 http-status (assoc :http-status http-status))]
-      (transport/capture-response! options :openai-codex-responses url err)
+      (transport/capture-response! model options :openai-codex-responses url err)
       (consume-fn err))))
 
 (defn- emit-codex-thinking-boundary!
@@ -316,7 +316,7 @@
 
 (defn- handle-codex-event!
   [stream-state consume-fn model options url event]
-  (transport/capture-response! options :openai-codex-responses url event)
+  (transport/capture-response! model options :openai-codex-responses url event)
   (let [event-type (:type event)]
     (cond
       (= "response.output_item.added" event-type)
@@ -348,13 +348,13 @@
         (emit-codex-done! stream-state consume-fn model event))
 
       (= "response.failed" event-type)
-      (emit-codex-error! stream-state consume-fn options url
+      (emit-codex-error! model stream-state consume-fn options url
                          (or (get-in event [:response :error :message])
                              "Codex response failed")
                          nil)
 
       (= "error" event-type)
-      (emit-codex-error! stream-state consume-fn options url
+      (emit-codex-error! model stream-state consume-fn options url
                          (or (:message event)
                              (:error event)
                              "Codex stream error")
@@ -368,11 +368,11 @@
         stream-state (make-codex-stream-state)]
     (try
       (let [request  (build-codex-request conversation model options)
-            _        (transport/capture-request! options :openai-codex-responses url request)
+            _        (transport/capture-request! model options :openai-codex-responses url request)
             response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
           (let [{:keys [error-message http-status]} (transport/response->error response)]
-            (emit-codex-error! stream-state consume-fn options url error-message http-status))
+            (emit-codex-error! model stream-state consume-fn options url error-message http-status))
           (do
             (with-open [reader (io/reader (:body response))]
               (doseq [line (line-seq reader)]
@@ -383,4 +383,4 @@
               (emit-codex-done! stream-state consume-fn model {:response {:status "completed"}})))))
       (catch Exception e
         (let [{:keys [error-message http-status]} (transport/exception->error e)]
-          (emit-codex-error! stream-state consume-fn options url error-message http-status))))))
+          (emit-codex-error! model stream-state consume-fn options url error-message http-status))))))

@@ -95,7 +95,7 @@
       (is (some #(= :done (:type %)) @events)))))
 
 (deftest codex-request-and-reply-capture-callbacks-test
-  (testing "captures redacted request payload and reply events via callbacks"
+  (testing "built-in OpenAI codex captures preserve provider and api identity"
     (let [model            (models/get-model :gpt-5.3-codex)
           token            (jwt-with-account-id "acc_test")
           convo            (-> (conv/create "sys")
@@ -128,11 +128,62 @@
       (is (re-find #"\*\*\*REDACTED\*\*\*"
                    (or (get-in @request-capture [:request :headers "Authorization"])
                        "")))
-
       (is (pos? (count @reply-captures)))
+      (is (every? #(= :openai (:provider %)) @reply-captures))
+      (is (every? #(= :openai-codex-responses (:api %)) @reply-captures))
       (is (some #(= "response.completed"
                     (get-in % [:event :type]))
-                @reply-captures)))))
+                @reply-captures)))
+
+    (testing "custom OpenAI-compatible codex captures preserve selected provider identity"
+      (let [model           {:id                 "local-codex"
+                             :name               "Local Codex"
+                             :provider           :local
+                             :api                :openai-codex-responses
+                             :base-url           "http://localhost:8080/v1"
+                             :supports-reasoning true
+                             :supports-images    false
+                             :supports-text      true
+                             :context-window     128000
+                             :max-tokens         16384
+                             :input-cost         0.0
+                             :output-cost        0.0
+                             :cache-read-cost    0.0
+                             :cache-write-cost   0.0}
+            token           (jwt-with-account-id "acc_test")
+            convo           (-> (conv/create "sys")
+                                (conv/add-user-message "hello"))
+            request-capture (atom nil)
+            reply-captures  (atom [])
+            sse             (str
+                             "data: " (json/generate-string
+                                       {:type "response.output_item.added"
+                                        :item {:type "message"
+                                               :id "msg_1"
+                                               :role "assistant"
+                                               :status "in_progress"
+                                               :content []}}) "\n\n"
+                             "data: " (json/generate-string
+                                       {:type "response.completed"
+                                        :response {:status "completed"}}) "\n\n")]
+        (with-redefs [http/post (fn [_url _req]
+                                  {:body (stream-body sse)})]
+          ((:stream openai/provider)
+           convo model {:api-key token
+                        :on-provider-request  #(reset! request-capture %)
+                        :on-provider-response #(swap! reply-captures conj %)}
+           (fn [_ev] nil)))
+
+        (is (= :local (:provider @request-capture)))
+        (is (= :openai-codex-responses (:api @request-capture)))
+        (is (= "local-codex"
+               (get-in @request-capture [:request :body :model])))
+        (is (pos? (count @reply-captures)))
+        (is (every? #(= :local (:provider %)) @reply-captures))
+        (is (every? #(= :openai-codex-responses (:api %)) @reply-captures))
+        (is (some #(= "response.completed"
+                      (get-in % [:event :type]))
+                  @reply-captures))))))
 
 (deftest codex-requires-chatgpt-token-test
   (testing "non-ChatGPT token emits an error event (missing chatgpt_account_id)"
@@ -582,6 +633,52 @@
     (is (= "rate limit exceeded (status 429) [request-id req_oai_429]"
            (:error-message (first @events))))
     (is (= 429 (:http-status (first @events))))))
+
+(deftest completions-custom-provider-request-and-reply-captures-selected-provider-test
+  (let [model           {:id                 "local-completions"
+                         :name               "Local Completions"
+                         :provider           :local
+                         :api                :openai-completions
+                         :base-url           "http://localhost:8080/v1"
+                         :supports-reasoning true
+                         :supports-images    false
+                         :supports-text      true
+                         :context-window     128000
+                         :max-tokens         16384
+                         :input-cost         0.0
+                         :output-cost        0.0
+                         :cache-read-cost    0.0
+                         :cache-write-cost   0.0}
+        convo           (-> (conv/create "sys")
+                            (conv/add-user-message "hello"))
+        request-capture (atom nil)
+        reply-captures  (atom [])
+        sse             (str
+                         "data: " (json/generate-string
+                                   {:choices [{:delta {:role "assistant"}}]}) "\n\n"
+                         "data: " (json/generate-string
+                                   {:choices [{:delta {:content "Hello"}}]}) "\n\n"
+                         "data: " (json/generate-string
+                                   {:choices [{:finish_reason "stop"}]
+                                    :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse)})]
+      ((:stream openai/provider)
+       convo model {:api-key "sk-test"
+                    :on-provider-request  #(reset! request-capture %)
+                    :on-provider-response #(swap! reply-captures conj %)}
+       (fn [_ev] nil)))
+
+    (is (= :local (:provider @request-capture)))
+    (is (= :openai-completions (:api @request-capture)))
+    (is (= "local-completions"
+           (get-in @request-capture [:request :body :model])))
+    (is (pos? (count @reply-captures)))
+    (is (every? #(= :local (:provider %)) @reply-captures))
+    (is (every? #(= :openai-completions (:api %)) @reply-captures))
+    (is (some #(= "Hello"
+                  (get-in % [:event :choices 0 :delta :content]))
+              @reply-captures))))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; Auth header control for custom providers

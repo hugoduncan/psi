@@ -333,7 +333,7 @@
 (defn- process-chat-sse-line!
   [stream-state consume-fn model options url line]
   (when-let [chunk (transport/parse-sse-line line)]
-    (transport/capture-response! options :openai-completions url chunk)
+    (transport/capture-response! model options :openai-completions url chunk)
     (let [choice (first (:choices chunk))
           delta  (:delta choice)]
       (emit-chat-chunk! stream-state consume-fn choice delta)
@@ -345,10 +345,11 @@
         request      (build-request conversation model options)
         stream-state (make-chat-stream-state)]
     (try
-      (transport/capture-request! options :openai-completions url request)
+      (transport/capture-request! model options :openai-completions url request)
       (let [response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
-          (transport/emit-error! options
+          (transport/emit-error! model
+                                 options
                                  :openai-completions
                                  url
                                  consume-fn
@@ -357,7 +358,8 @@
             (doseq [line (line-seq reader)]
               (process-chat-sse-line! stream-state consume-fn model options url line)))))
       (catch Exception e
-        (transport/emit-error! options
+        (transport/emit-error! model
+                               options
                                :openai-completions
                                url
                                consume-fn

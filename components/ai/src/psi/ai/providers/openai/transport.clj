@@ -45,19 +45,23 @@
     (catch Exception _
       (str (or body "")))))
 
+(defn capture-provider-id
+  [model]
+  (or (:provider model) :openai))
+
 (defn capture-request!
-  [options api url request]
+  [model options api url request]
   (safe-call! (:on-provider-request options)
-              {:provider :openai
+              {:provider (capture-provider-id model)
                :api api
                :url url
                :request {:headers (redact-request-headers (:headers request))
                          :body (parse-json-body-safe (:body request))}}))
 
 (defn capture-response!
-  [options api url event]
+  [model options api url event]
   (safe-call! (:on-provider-response options)
-              {:provider :openai
+              {:provider (capture-provider-id model)
                :api api
                :url url
                :event event}))
@@ -174,8 +178,8 @@
                              :body-text (body->text (:body response))}))
 
 (defn emit-error!
-  [options api url consume-fn err]
-  (capture-response! options api url err)
+  [model options api url consume-fn err]
+  (capture-response! model options api url err)
   (consume-fn err))
 
 (defn exception->error
