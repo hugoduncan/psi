@@ -307,7 +307,49 @@
             (is (some #(= "user" %) roles))
             (is (some #(= "assistant" %) roles))
             (is (some #(= "injected output" (get-in % [:params :content])) session-calls)))
-          (is (seq (get-query-session-calls))))))))
+          (is (seq (get-query-session-calls)))))))
+
+  (testing "blank workflow result does not inject an empty assistant message"
+    (let [api (make-mock-api
+               {:query-result {:psi.agent-session/worktree-path "/tmp/test-worktree"
+                               :psi.agent-session/session-id "origin-session"
+                               :psi.agent-session/session-entries []}
+                :query-session-result (fn [_ _]
+                                        {:psi.agent-session/session-entries
+                                         [{:psi.session-entry/data {:role "assistant"}}]})
+                :mutate-results
+                {'psi.workflow/register-definition (fn [_] {:psi.workflow/registered? true})
+                 'psi.workflow/create-run (fn [params]
+                                            {:psi.workflow/run-id (:run-id params)
+                                             :psi.workflow/status :pending})
+                 'psi.extension/start-background-job (fn [params]
+                                                       {:psi.background-job/job-id (:job-id params)
+                                                        :psi.background-job/status :running})
+                 'psi.extension/mark-background-job-terminal (fn [_]
+                                                               {:psi.background-job/job-id "job-blank"
+                                                                :psi.background-job/status :completed})
+                 'psi.workflow/execute-run (fn [_]
+                                             {:psi.workflow/status :completed
+                                              :psi.workflow/result "   "})
+                 'psi.workflow/list-runs (fn [_] {:psi.workflow/runs []})
+                 'psi.extension/append-message (fn [_] {})
+                 'psi.extension/append-entry (fn [_] {})}})]
+      (with-redefs [workflow-file-loader/load-workflow-definitions
+                    (fn [_]
+                      {:definitions {"planner" {:definition-id "planner"
+                                                :name "planner"
+                                                :summary "Plans"
+                                                :step-order ["step-1"]
+                                                :steps {"step-1" {:label "planner"}}}}
+                       :errors []
+                       :warnings []})]
+        (wl/init api)
+        (execute-tool {:action "run"
+                       :workflow "planner"
+                       :prompt "plan it"
+                       :include_result_in_context true})
+        (Thread/sleep 200)
+        (is (empty? (get-mutate-session-calls)) "blank result should not inject transcript bridge messages")))))
 
 (deftest delegate-run-fork-session-test
   (testing "fork_session passes through in workflow-input"

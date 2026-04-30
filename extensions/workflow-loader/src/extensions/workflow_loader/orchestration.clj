@@ -81,7 +81,7 @@
            refresh-widgets! inflight-runs]}
    run-id workflow-name parent-session-id include-result? exec-result]
   (let [status (:psi.workflow/status exec-result)
-        result-text (:psi.workflow/result exec-result)
+        result-text (some-> (:psi.workflow/result exec-result) str/trim not-empty)
         ok? (= :completed status)
         job-id (get-in @inflight-runs [run-id :job-id])]
     (when job-id

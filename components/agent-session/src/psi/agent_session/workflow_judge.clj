@@ -197,34 +197,33 @@
         actor-msgs    (vec (persist/messages-from-entries-in ctx actor-session-id))
         projected     (project-messages actor-msgs projection)
         judge-sid     (str (java.util.UUID/randomUUID))
-        expected-sigs (keys routing-table)
-        _             ((:create-workflow-child-session-fn ctx)
-                       ctx
-                       parent-session-id
-                       {:child-session-id           judge-sid
-                        :session-name               "workflow judge"
-                        :system-prompt              (:system-prompt judge-spec)
-                        :tool-defs                  []
-                        :thinking-level             :off
-                        :preloaded-messages         projected
-                        :workflow-owned?            true})]
+        expected-sigs (keys routing-table)]
+    ((:create-workflow-child-session-fn ctx)
+     ctx
+     parent-session-id
+     {:child-session-id   judge-sid
+      :session-name       "workflow judge"
+      :system-prompt      (:system-prompt judge-spec)
+      :tool-defs          []
+      :thinking-level     :off
+      :preloaded-messages projected
+      :workflow-owned?    true})
     ;; First attempt
-    (prompt-control/prompt-in! ctx judge-sid (:prompt judge-spec))
-    (loop [attempt 0
-           last-output (str/trim (assistant-message-text (prompt-control/last-assistant-message-in ctx judge-sid)))]
-      (let [routing-result (evaluate-routing last-output routing-table
-                                             current-step-id step-order step-runs)]
-        (if (and (= :no-match (:action routing-result))
-                 (< attempt max-judge-retries))
-          ;; Retry: inject feedback into the same judge session
-          (do
-            (prompt-control/prompt-in! ctx judge-sid
-                                       (judge-retry-feedback last-output expected-sigs))
-            (recur (inc attempt)
-                   (str/trim (assistant-message-text (prompt-control/last-assistant-message-in ctx judge-sid)))))
-          ;; Matched, or retries exhausted
-          {:judge-session-id judge-sid
-           :judge-output     last-output
-           :judge-event      (when (not= :no-match (:action routing-result))
-                               last-output)
-           :routing-result   routing-result})))))
+    (let [initial-result (prompt-control/prompt-execution-result-in! ctx judge-sid (:prompt judge-spec))]
+      (loop [attempt 0
+             last-output (str/trim (assistant-message-text (:execution-result/assistant-message initial-result)))]
+        (let [routing-result (evaluate-routing last-output routing-table
+                                               current-step-id step-order step-runs)]
+          (if (and (= :no-match (:action routing-result))
+                   (< attempt max-judge-retries))
+            ;; Retry: inject feedback into the same judge session
+            (let [retry-result (prompt-control/prompt-execution-result-in! ctx judge-sid
+                                                                           (judge-retry-feedback last-output expected-sigs))]
+              (recur (inc attempt)
+                     (str/trim (assistant-message-text (:execution-result/assistant-message retry-result)))))
+            ;; Matched, or retries exhausted
+            {:judge-session-id judge-sid
+             :judge-output     last-output
+             :judge-event      (when (not= :no-match (:action routing-result))
+                                 last-output)
+             :routing-result   routing-result}))))))

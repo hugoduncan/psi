@@ -92,7 +92,7 @@
     (conj {:effect/type :runtime/agent-clear-steering-queue})))
 
 (defn- prompt-prepare-request-handler
-  [ctx {:keys [session-id turn-id user-msg runtime-opts progress-queue]}]
+  [ctx {:keys [session-id turn-id user-msg runtime-opts progress-queue return-execution-result?]}]
   (let [prepared-request   ((:build-prepared-request-fn ctx)
                             ctx session-id {:turn-id turn-id
                                             :user-message user-msg
@@ -100,16 +100,17 @@
                                             :commands (ext/command-names-in (:extension-registry ctx))})
         api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
         steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
-    {:root-state-update
-     (session/session-update
-      session-id
-      #(cond-> (assoc % :last-prepared-request-summary
-                      (prepared-request-state-summary turn-id prepared-request))
-         api-key            (assoc :runtime-api-key api-key)
-         steering-consumed? (assoc :steering-messages [])))
-     :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed?)
-     :return-effect-result? true
-     :return {:prepared-request prepared-request}}))
+    (cond-> {:root-state-update
+             (session/session-update
+              session-id
+              #(cond-> (assoc % :last-prepared-request-summary
+                              (prepared-request-state-summary turn-id prepared-request))
+                 api-key            (assoc :runtime-api-key api-key)
+                 steering-consumed? (assoc :steering-messages [])))
+             :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed?)
+             :return-effect-result? true}
+      (not return-execution-result?)
+      (assoc :return {:prepared-request prepared-request}))))
 
 (defn- execution-usage-tokens
   [execution-result]

@@ -79,12 +79,12 @@
                        :judge-event "APPROVED"
                        :routing-result {:action :complete}}}}
    & body]
-  `(with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx# _sid# _prompt#] nil)
-                 psi.agent-session.prompt-control/last-assistant-message-in
-                 (fn [_ctx# _sid#]
-                   {:role "assistant"
-                    :content [{:type :text :text ~assistant-text}]
-                    :stop-reason :stop})
+  `(with-redefs [psi.agent-session.prompt-control/prompt-execution-result-in!
+                 (fn [_ctx# _sid# _prompt#]
+                   {:execution-result/assistant-message
+                    {:role "assistant"
+                     :content [{:type :text :text ~assistant-text}]
+                     :stop-reason :stop}})
                  psi.agent-session.workflow-judge/execute-judge!
                  (fn [& _args#] ~judge-result)]
      ~@body))
@@ -179,13 +179,13 @@
   (let [[ctx session-id] (create-session-context)
         _ (install-run! ctx linear-definition "run-8")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-8")]
-    (with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _prompt] nil)
-                  psi.agent-session.prompt-control/last-assistant-message-in
-                  (fn [_ctx _sid]
-                    {:role "assistant"
-                     :content [{:type :error :text "boom"}]
-                     :stop-reason :error
-                     :error-message "boom"})]
+    (with-redefs [psi.agent-session.prompt-control/prompt-execution-result-in!
+                  (fn [_ctx _sid _prompt]
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :error :text "boom"}]
+                      :stop-reason :error
+                      :error-message "boom"}})]
       (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-8")]
       (is (= :failed (:status run)))
@@ -254,12 +254,12 @@
                                  :status :pending
                                  :execution-session-id "review-child"}
                        :execution-session {:session-id "review-child"}})
-                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _prompt] nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in
-                    (fn [_ctx _sid]
-                      {:role "assistant"
-                       :content [{:type :text :text "reviewed"}]
-                       :stop-reason :stop})]
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx _sid _prompt]
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text :text "reviewed"}]
+                        :stop-reason :stop}})]
         (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
       (is (= [{:role "user" :content "Original request"}]
              (:preloaded-messages @created*))))))
@@ -317,11 +317,12 @@
     (let [[ctx session-id] (create-session-context)
           _ (install-run! ctx single-step-definition "run-13")
           wf-ctx (runtime/create-workflow-context ctx session-id "run-13")]
-      (with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _prompt] nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in (fn [_ctx _sid]
-                                                                                 {:role "assistant"
-                                                                                  :content [{:type :text :text "done"}]
-                                                                                  :stop-reason :stop})]
+      (with-redefs [psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx _sid _prompt]
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text :text "done"}]
+                        :stop-reason :stop}})]
         (runtime/queue-event! wf-ctx :workflow/cancel nil)
         (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
       (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-13")]
@@ -333,14 +334,14 @@
         _ (install-run! ctx single-step-definition "run-14")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-14")
         seen* (atom [])]
-    (with-redefs [psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _prompt]
-                                                                (swap! seen* conj :entry-work)
-                                                                (runtime/queue-event! wf-ctx :workflow/cancel nil)
-                                                                nil)
-                  psi.agent-session.prompt-control/last-assistant-message-in (fn [_ctx _sid]
-                                                                               {:role "assistant"
-                                                                                :content [{:type :text :text "done"}]
-                                                                                :stop-reason :stop})]
+    (with-redefs [psi.agent-session.prompt-control/prompt-execution-result-in!
+                  (fn [_ctx _sid _prompt]
+                    (swap! seen* conj :entry-work)
+                    (runtime/queue-event! wf-ctx :workflow/cancel nil)
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :text :text "done"}]
+                      :stop-reason :stop}})]
       (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-14")]
       (is (= [:entry-work] @seen*))

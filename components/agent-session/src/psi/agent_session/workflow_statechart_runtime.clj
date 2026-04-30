@@ -280,8 +280,8 @@
                        (workflow-progression-recording/start-latest-attempt run-id step-id)
                        (workflow-progression-recording/increment-iteration-count run-id step-id))))
           (try
-            (prompt-control/prompt-in! ctx (:session-id execution-session) prompt)
-            (let [assistant-message (prompt-control/last-assistant-message-in ctx (:session-id execution-session))
+            (let [execution-result (prompt-control/prompt-execution-result-in! ctx (:session-id execution-session) prompt)
+                  assistant-message (:execution-result/assistant-message execution-result)
                   {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
                   failure-payload (when (= :turn.outcome/error outcome)
                                     (execution-failure-payload (:session-id execution-session) assistant-message))]

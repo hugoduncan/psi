@@ -5,6 +5,7 @@
    resume, and cancellation as Pathom mutations callable through the
    extension API's `mutate!`."
   (:require
+   [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
@@ -88,10 +89,14 @@
     (let [execute-fn (:execute-workflow-run-fn agent-session-ctx)
           exec-result (execute-fn agent-session-ctx session-id run-id)
           final-run (workflow-runtime/workflow-run-in @(:state* agent-session-ctx) run-id)
-          ;; Extract terminal result text from last completed step
+          ;; Extract terminal result text from last completed step, but treat
+          ;; blank accepted-result text as missing so callers can suppress empty
+          ;; transcript injection and still distinguish a real final reply.
           result-text (when (= :completed (:status final-run))
                         (let [last-step-id (last (:step-order (:effective-definition final-run)))]
-                          (get-in final-run [:step-runs last-step-id :accepted-result :outputs :text])))]
+                          (some-> (get-in final-run [:step-runs last-step-id :accepted-result :outputs :text])
+                                  str/trim
+                                  not-empty)))]
       {:psi.workflow/run-id run-id
        :psi.workflow/status (:status exec-result)
        :psi.workflow/steps-executed (:steps-executed exec-result)

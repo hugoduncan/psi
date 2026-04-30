@@ -243,13 +243,11 @@
                     (fn [_ctx _sid]
                       [{:role "user" :content "Build it"}
                        {:role "assistant" :content [{:type :text :text "Done building."}]}])
-                    psi.agent-session.prompt-control/prompt-in!
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
                     (fn [_ctx sid text]
                       (swap! prompts* conj {:session-id sid :text text})
-                      nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in
-                    (fn [_ctx _sid]
-                      {:role "assistant" :content [{:type :text :text "APPROVED"}]})]
+                      {:execution-result/assistant-message
+                       {:role "assistant" :content [{:type :text :text "APPROVED"}]}})]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
                       {:current-step-id "step-3-review"
@@ -279,15 +277,13 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.agent-session.persistence/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.prompt-control/prompt-in!
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
                     (fn [_ctx _sid _text]
                       (swap! prompt-count* inc)
-                      nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in
-                    (fn [_ctx _sid]
-                      (if (<= @prompt-count* 1)
-                        {:role "assistant" :content [{:type :text :text "I think it looks good"}]}
-                        {:role "assistant" :content [{:type :text :text "APPROVED"}]}))]
+                      {:execution-result/assistant-message
+                       (if (<= @prompt-count* 1)
+                         {:role "assistant" :content [{:type :text :text "I think it looks good"}]}
+                         {:role "assistant" :content [{:type :text :text "APPROVED"}]})})]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
                       {:current-step-id "step-3-review"
@@ -311,14 +307,12 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.agent-session.persistence/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.prompt-control/prompt-in!
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
                     (fn [_ctx _sid _text]
                       (swap! prompt-count* inc)
-                      nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in
-                    (fn [_ctx _sid]
-                      ;; Always returns garbage — never matches
-                      {:role "assistant" :content [{:type :text :text "hmm not sure"}]})]
+                      {:execution-result/assistant-message
+                       ;; Always returns garbage — never matches
+                       {:role "assistant" :content [{:type :text :text "hmm not sure"}]}})]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
                       {:current-step-id "step-3-review"

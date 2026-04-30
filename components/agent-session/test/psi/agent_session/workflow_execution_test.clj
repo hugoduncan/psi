@@ -279,13 +279,12 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx child-session-id prompt]
-                                                                  (swap! prompts* conj {:session-id child-session-id :prompt prompt})
-                                                                  nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in (fn [_ctx _child-session-id]
-                                                                                 {:content (let [resp (first @responses*)]
-                                                                                             (swap! responses* subvec 1)
-                                                                                             resp)})]
+                    psi.agent-session.prompt-control/prompt-execution-result-in! (fn [_ctx child-session-id prompt]
+                                                                                   (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                                                                                   {:execution-result/assistant-message
+                                                                                    {:content (let [resp (first @responses*)]
+                                                                                                (swap! responses* subvec 1)
+                                                                                                resp)}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-linear")
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-linear")]
           (is (= :completed (:status result)))
@@ -335,9 +334,9 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session child}))
-                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx _child-session-id _prompt] nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in (fn [_ctx _child-session-id]
-                                                                                 {:content "planner output"})]
+                    psi.agent-session.prompt-control/prompt-execution-result-in! (fn [_ctx _child-session-id _prompt]
+                                                                                   {:execution-result/assistant-message
+                                                                                    {:content "planner output"}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-ext-1")
               child-sd @created*]
           (is (= :completed (:status result)))
@@ -368,14 +367,14 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-in! (fn [_ctx _sid _text] nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in
-                    (fn [_ctx sid]
-                      (cond
-                        (str/includes? sid "step-1-planner") {:content "plan output"}
-                        (str/includes? sid "step-2-builder") {:content "build output"}
-                        (str/includes? sid "step-3-reviewer") {:content "review output"}
-                        :else {:content "unknown"}))
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx sid _text]
+                      {:execution-result/assistant-message
+                       (cond
+                         (str/includes? sid "step-1-planner") {:content "plan output"}
+                         (str/includes? sid "step-2-builder") {:content "build output"}
+                         (str/includes? sid "step-3-reviewer") {:content "review output"}
+                         :else {:content "unknown"})})
                     psi.agent-session.workflow-judge/execute-judge!
                     (fn [& _args]
                       (let [n (swap! judge-call-count* inc)]

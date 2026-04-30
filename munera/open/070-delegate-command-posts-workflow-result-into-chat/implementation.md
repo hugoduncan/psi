@@ -54,3 +54,24 @@ Review note
   - command-path test now captures the created run-id directly from mocked `psi.workflow/create-run`
   - command-path async proof now waits on observed completion conditions via a small local helper instead of fixed sleeping
   - `/delegate` callsite now carries a short intent comment about conversational result return
+
+Follow-up bugfix after live validation
+
+- Live validation showed a deeper propagation bug: `/delegate` had been fixed to inject workflow results into chat, but some successful delegated runs still produced an empty injected assistant message.
+- Root cause was not just delivery. Workflow step execution and workflow judge execution were submitting prompts via `prompt-in!` and then rereading the child-session journal with `last-assistant-message-in` to recover the result text.
+- That journal reread was the wrong boundary for bounded workflow callers. The canonical prompt path already has the exact turn result available as `:execution-result/assistant-message`; workflow/judge code should consume that directly instead of depending on a later journal read.
+
+Follow-up implementation notes
+
+- Added `prompt-execution-result-in!` in `components/agent-session/src/psi/agent_session/prompt_control.clj`.
+- Extended `:session/prompt-prepare-request` handling so callers can opt into receiving the executed turn result (`:return-execution-result? true`) while staying on the same canonical dispatch/runtime path.
+- Updated `workflow_statechart_runtime.clj` so workflow step execution now uses `prompt-execution-result-in!` and records the assistant message from `:execution-result/assistant-message` directly.
+- Updated `workflow_judge.clj` so judge prompts and judge retries also use `prompt-execution-result-in!` instead of rereading the journal.
+- Kept the earlier defensive hardening in place:
+  - canonical workflow result projection trims blank `:outputs :text` to nil
+  - workflow-loader async completion trims blank `:psi.workflow/result` to nil before deciding whether to inject into chat
+
+Follow-up verification
+
+- `clojure -M:test --focus psi.agent-session.workflow-judge-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.mutations.canonical-workflows-test --focus extensions.workflow-loader-delegate-test --focus extensions.workflow-loader-test`
+- Result: `91 tests, 370 assertions, 0 failures.`

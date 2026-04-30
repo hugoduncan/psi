@@ -24,3 +24,14 @@
   - replaced fixed `Thread/sleep` waiting with a small observed-condition wait helper in the command-path test
 - [x] Consider a tiny intent comment at the `/delegate` callsite
   - added a short comment noting that slash-command delegation is conversational and successful final results should return to the originating chat transcript
+- [x] Diagnose blank final-result propagation after observing an empty injected assistant message
+  - confirmed the symptom was deeper than delivery: workflow/judge runtime paths were rereading the journal after `prompt-in!` instead of using the exact assistant message from the completed turn result
+- [x] Route workflow/judge step execution through execution-result-returning prompt submission
+  - added `prompt-execution-result-in!` and a prompt-lifecycle opt-in so bounded workflow callers can stay on the canonical dispatch/runtime path while receiving the actual completed-turn execution result
+- [x] Use execution-result assistant messages directly in workflow step/judge result recording
+  - workflow statechart runtime and workflow judge now consume `:execution-result/assistant-message` directly instead of rereading via `last-assistant-message-in`
+- [x] Keep the transcript bridge defensive against blank results
+  - workflow-loader async completion and canonical workflow result projection now trim blank strings to nil so empty replies are not injected into chat
+- [x] Add focused regression coverage for the deeper propagation fix
+  - updated workflow statechart/judge/execution tests to stub `prompt-execution-result-in!`
+  - added canonical workflow + workflow-loader regression coverage for blank-result handling

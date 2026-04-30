@@ -27,6 +27,32 @@
        distinct
        (str/join "\n")))
 
+(defn- prompt-dispatch!
+  [ctx session-id text images opts]
+  (when-not (ss/idle-in? ctx session-id)
+    (throw (ex-info "Session is not idle" {:phase (ss/sc-phase-in ctx session-id)})))
+  (let [user-msg {:role      "user"
+                  :content   (cond-> [{:type :text :text text}]
+                               images (into images))
+                  :timestamp (java.time.Instant/now)}
+        turn-id  (:turn-id (dispatch/dispatch! ctx :session/prompt-submit
+                                               {:session-id session-id :user-msg user-msg}
+                                               {:origin :core}))
+        _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
+        result   (dispatch/dispatch! ctx :session/prompt-prepare-request
+                                     (cond-> {:session-id session-id
+                                              :turn-id    turn-id
+                                              :user-msg   user-msg}
+                                       (:progress-queue opts)
+                                       (assoc :progress-queue (:progress-queue opts))
+                                       (:runtime-opts opts)
+                                       (assoc :runtime-opts (:runtime-opts opts))
+                                       (:return-execution-result? opts)
+                                       (assoc :return-execution-result? true))
+                                     {:origin :core})]
+    (runtime/safe-maybe-sync-on-git-head-change! ctx session-id)
+    result))
+
 (defn prompt-in!
   "Submit `text` (and optional `images`) to the agent for `session-id`.
   Requires the session to be idle.
@@ -48,27 +74,21 @@
   ([ctx session-id text images]
    (prompt-in! ctx session-id text images nil))
   ([ctx session-id text images opts]
-   (when-not (ss/idle-in? ctx session-id)
-     (throw (ex-info "Session is not idle" {:phase (ss/sc-phase-in ctx session-id)})))
-   (let [user-msg {:role      "user"
-                   :content   (cond-> [{:type :text :text text}]
-                                images (into images))
-                   :timestamp (java.time.Instant/now)}
-         turn-id  (:turn-id (dispatch/dispatch! ctx :session/prompt-submit
-                                                {:session-id session-id :user-msg user-msg}
-                                                {:origin :core}))
-         _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
-         result   (dispatch/dispatch! ctx :session/prompt-prepare-request
-                                      (cond-> {:session-id session-id
-                                               :turn-id    turn-id
-                                               :user-msg   user-msg}
-                                        (:progress-queue opts)
-                                        (assoc :progress-queue (:progress-queue opts))
-                                        (:runtime-opts opts)
-                                        (assoc :runtime-opts (:runtime-opts opts)))
-                                      {:origin :core})]
-     (runtime/safe-maybe-sync-on-git-head-change! ctx session-id)
-     result)))
+   (prompt-dispatch! ctx session-id text images opts)))
+
+(defn prompt-execution-result-in!
+  "Submit `text` to the agent for `session-id` and return the shaped
+   execution-result for the completed turn instead of the prepared-request map.
+
+   This keeps prompt submission on the canonical dispatch/runtime path while
+   giving bounded workflow/judge callers the exact assistant message produced by
+   that turn, avoiding any dependence on later journal rereads."
+  ([ctx session-id text]
+   (prompt-execution-result-in! ctx session-id text nil))
+  ([ctx session-id text images]
+   (prompt-execution-result-in! ctx session-id text images nil))
+  ([ctx session-id text images opts]
+   (prompt-dispatch! ctx session-id text images (assoc (or opts {}) :return-execution-result? true))))
 
 (defn last-assistant-message-in
   "Return the last assistant message from the session journal, or nil."
