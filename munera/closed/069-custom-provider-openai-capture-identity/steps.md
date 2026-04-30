@@ -6,3 +6,6 @@
 - [x] Check for multiple canonical OpenAI transport capture constructors and update them consistently
 - [x] Implement minimal fix to preserve selected provider identity in transport-layer captures without widening into auth/routing changes
 - [x] Verify focused OpenAI provider tests pass and existing execution/auth behavior remains unchanged
+- [x] Add focused built-in `:openai-completions` request/reply capture regression proving `:provider :openai` and `:api :openai-completions`
+- [x] Run focused AI provider tests again after adding the built-in completions regression
+- [x] Decide whether to reopen `069` for the test-only follow-up or address it in a new tiny task

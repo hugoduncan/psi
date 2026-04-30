@@ -20,3 +20,7 @@
   - built-in codex request/reply captures still reporting `:provider :openai`
   - custom `:openai-codex-responses` request/reply captures reporting selected provider identity while keeping `:api :openai-codex-responses`
   - custom `:openai-completions` request/reply captures reporting selected provider identity while keeping `:api :openai-completions`
+
+## Review note
+
+- Review outcome: implementation matched design and architecture; follow-up added the missing built-in `:openai-completions` request/reply capture identity regression. Decision: keep `069` closed and record this as a closed-task test-only follow-up.
