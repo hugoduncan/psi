@@ -78,14 +78,15 @@
         (is (some? ex))
         (is (= :basis-construction (-> ex ex-data :stage)))))))
 
-(deftest build-clojure-command-test
-  (let [command (launcher/build-clojure-command {:basis {:deps {'foo/bar {:mvn/version "1.0.0"}}}
-                                                 :psi-args ["--tui" "--model" "gpt-5"]})]
-    (is (= ["clojure" "-Sdeps"] (subvec command 0 2)))
-    (is (= '{:deps {foo/bar {:mvn/version "1.0.0"}}}
-           (read-string (nth command 2))))
-    (is (= ["-M" "-m" "psi.main" "--tui" "--model" "gpt-5"]
-           (subvec command 3)))))
+(deftest build-deps-clj-args-test
+  (let [args (launcher/build-deps-clj-args {:basis-file "/tmp/psi-basis-123.edn"
+                                            :psi-args   ["--tui" "--model" "gpt-5"]})]
+    (is (= ["-Sdeps-file" "/tmp/psi-basis-123.edn" "-M" "-m" "psi.main" "--tui" "--model" "gpt-5"]
+           args)))
+  (testing "no psi-args"
+    (is (= ["-Sdeps-file" "/tmp/psi-basis-123.edn" "-M" "-m" "psi.main"]
+           (launcher/build-deps-clj-args {:basis-file "/tmp/psi-basis-123.edn"
+                                          :psi-args   []})))))
 
 (deftest manifest-state-test
   (testing "manifest state reports defaulted and inferred libs from expansion results"
@@ -207,14 +208,12 @@
             :psi-args ["--rpc-edn"]
             :policy :development
             :basis {:deps {'foo/bar {:mvn/version "1.0.0"}}}
+            :basis-edn (pr-str {:deps {'foo/bar {:mvn/version "1.0.0"}}})
             :manifest-info {:user-present? false
                             :project-present? true
                             :merged-manifest {:deps {'foo/bar {:mvn/version "1.0.0"}}}
                             :defaulted-libs []
                             :inferred-init-libs []}}
-           (dissoc plan :command)))
-    (is (= ["clojure" "-Sdeps"] (subvec (:command plan) 0 2)))
-    (is (= '{:deps {foo/bar {:mvn/version "1.0.0"}}}
-           (read-string (nth (:command plan) 2))))
-    (is (= ["-M" "-m" "psi.main" "--rpc-edn"]
-           (subvec (:command plan) 3)))))
+           plan))
+    (is (= {:deps {'foo/bar {:mvn/version "1.0.0"}}}
+           (read-string (:basis-edn plan))))))

@@ -227,14 +227,20 @@
      :manifest-info manifest-info
      :policy policy}))
 
-(defn build-clojure-command
-  "Build the clojure CLI argv used for launcher handoff."
-  [{:keys [basis psi-args]}]
-  (into ["clojure" "-Sdeps" (pr-str basis) "-M" "-m" "psi.main"] psi-args))
+(defn build-deps-clj-args
+  "Build the deps.clj args used for launcher handoff.
+   Uses -Sdeps-file so the project's deps.edn in cwd is not merged into psi's
+   classpath. The caller is responsible for writing basis-edn to basis-file
+   before invoking deps.clj."
+  [{:keys [basis-file psi-args]}]
+  (into ["-Sdeps-file" basis-file "-M" "-m" "psi.main"] psi-args))
 
 (defn launch-plan
   "Build a pure launcher execution plan from raw args, process cwd, launcher
-   root, and explicit realization policy."
+   root, and explicit realization policy.
+
+   :basis-edn  — the pr-str'd basis map to write to a temp file at execution time
+   :psi-args   — args forwarded to psi.main after deps.clj flags"
   [args process-cwd launcher-root policy]
   (let [parsed (parse-launcher-args args)
         cwd (resolve-effective-cwd parsed process-cwd)
@@ -246,6 +252,5 @@
      :psi-args (:psi-args parsed)
      :policy policy
      :basis (:basis basis-state)
-     :manifest-info (:manifest-info basis-state)
-     :command (build-clojure-command {:basis (:basis basis-state)
-                                      :psi-args (:psi-args parsed)})}))
+     :basis-edn (pr-str (:basis basis-state))
+     :manifest-info (:manifest-info basis-state)}))

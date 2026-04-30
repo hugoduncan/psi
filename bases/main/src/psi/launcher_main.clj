@@ -1,6 +1,7 @@
 (ns psi.launcher-main
   (:require
-   [babashka.process :as process]
+   [babashka.deps :as deps]
+   [babashka.fs :as fs]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [psi.launcher :as launcher]
@@ -43,7 +44,7 @@
       (throw (ex-info "Unable to determine launcher root" {:stage :launcher-root}))))
 
 (defn- print-debug-summary!
-  [{:keys [cwd psi-args command basis manifest-info policy]}]
+  [{:keys [cwd psi-args basis-edn basis manifest-info policy]}]
   (binding [*out* *err*]
     (println "psi launcher")
     (println (str "  cwd: " cwd))
@@ -55,7 +56,8 @@
     (println (str "  inferred :psi/init libs: " (pr-str (sort (:inferred-init-libs manifest-info)))))
     (println (str "  basis deps count: " (count (:deps basis))))
     (println (str "  forwarded psi args: " (pr-str psi-args)))
-    (println (str "  command: " (str/join " " command)))))
+    (println (str "  command: clojure -Sdeps-file <tmpfile> -M -m psi.main " (str/join " " psi-args)))
+    (println (str "  basis-edn: " basis-edn))))
 
 (defn -main
   [& args]
@@ -68,6 +70,11 @@
       (System/exit 0))
     (when (:launcher-debug? plan)
       (print-debug-summary! plan))
-    @(process/process (:command plan)
-                      {:inherit true
-                       :dir (:cwd plan)})))
+    (let [basis-file (doto (fs/file (fs/temp-dir) (str (gensym "psi-basis-")))
+                       (fs/delete-on-exit))]
+      (spit basis-file (:basis-edn plan))
+      @(apply deps/clojure
+              {:inherit true :dir (:cwd plan)}
+              (launcher/build-deps-clj-args
+               {:basis-file (str basis-file)
+                :psi-args   (:psi-args plan)})))))
