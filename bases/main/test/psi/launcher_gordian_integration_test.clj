@@ -43,5 +43,5 @@
       (is (nil? (get-in manifest-deps ['psi/mementum :psi/init])))
       (is (some #{'psi/workflow-loader} (:defaulted-libs (:manifest-info plan))))
       (is (some #{'psi/workflow-loader} (:inferred-init-libs (:manifest-info plan))))
-      (is (= ["clojure" "-Sdeps"] (subvec (:command plan) 0 2)))
-      (is (= ["-M" "-m" "psi.main"] (subvec (:command plan) 3 6))))))
+      (is (string? (:basis-edn plan)))
+      (is (map? (read-string (:basis-edn plan)))))))
