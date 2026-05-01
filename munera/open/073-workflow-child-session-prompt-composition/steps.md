@@ -1,0 +1,21 @@
+- [ ] Inspect current workflow child-session prompt assembly path end-to-end
+- [ ] Confirm the current child prompt-mode inheritance/override path
+- [ ] Confirm whether any explicit prompt-replacement mechanism already exists for workflow child sessions
+- [ ] Implement default child-session full-prompt rebuilding when `:prompt-component-selection` is nil
+- [ ] Preserve deterministic filtered composition when `:prompt-component-selection` is explicit
+- [ ] Make workflow capability declarations shape rendered prompt visibility coherently
+  - [ ] tools
+  - [ ] skills
+  - [ ] keep extension/workflow prompt-visible treatment coherent where already surfaced
+- [ ] Ensure inherited child prompt mode is visibly materialized in workflow child-session prompt text by default
+- [ ] Keep prompt introspection surfaces aligned with provider-visible prompt assembly
+- [ ] Add focused child-session/workflow prompt composition proof
+  - [ ] nil selection => full/default composition
+  - [ ] explicit selection => filtered composition
+  - [ ] workflow prompt text composes rather than implicitly replaces
+  - [ ] capability narrowing is reflected in rendered prompt sections
+  - [ ] prepared provider-visible system prompt is the authoritative proof target
+- [ ] Add or refine Allium spec coverage for workflow child-session prompt composition
+- [ ] Update at least one existing connected prompt/session/lambda spec file
+- [ ] If a new Allium file is added, explicitly connect it into the existing prompt/session/workflow spec graph
+- [ ] Verify no isolated new Allium file is introduced without graph connection
