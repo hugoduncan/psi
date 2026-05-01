@@ -1,16 +1,16 @@
-Review: partial pass.
+Review: pass with follow-up note.
 
 What landed well:
-- workflow-authored prompt text now composes as a layer instead of implicitly replacing the full prompt
+- workflow-authored prompt text composes as a developer/instruction layer instead of implicitly replacing the full prompt
 - parent prompt mode is propagated into workflow child sessions
+- representative workflow lifecycle proof is now converged onto the canonical `prompt-execution-result-in!` seam
+- workflow step config naming/docs now reflect the composed developer-layer semantics more clearly
 - provider-visible prepared request remains the proof surface
 
-Blocking gaps before close:
-- representative workflow lifecycle proof regressed: `workflow_lifecycle_test` now fails on the canonical execution path
-- workflow execution now depends on `prompt-execution-result-in!`, but broader lifecycle proof still targets the older prompt-control seam
-- workflow step config still names workflow-authored layer text as `:system-prompt` even though runtime now applies it as `:developer-prompt`, which leaves prompt semantics harder to read
+Remaining note:
+- focused workflow lifecycle + execution proof is green for this slice
+- broader unit suite still reports unrelated failures outside task 073 scope
 
 Recommendation:
-- do not close task 073 yet
-- restore or converge the workflow lifecycle proof on the canonical execution seam
-- tighten naming/docs around workflow-authored prompt text as a composed instruction/developer layer
+- task 073 implementation slice is review-pass
+- do not pull unrelated broad-suite failures into this task unless they are shown to share the same causal seam
