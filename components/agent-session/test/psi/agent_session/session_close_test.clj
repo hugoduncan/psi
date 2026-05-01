@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.statechart :as sc]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.session-state :as ss]))
 
@@ -57,3 +58,27 @@
       (is (nil? (:active-session-id result)))
       (is (= [] (ss/list-context-sessions-in ctx)))
       (is (= {} @(:scheduler-timers* ctx))))))
+
+(deftest close-session-idempotent-test
+  (testing "close-session-in! returns {:closed? false} for a session-id not in context"
+    (let [[ctx _] (create-session-context {:persist? false})
+          result  (session/close-session-in! ctx "nonexistent-session-id")]
+      (is (false? (:closed? result)))
+      (is (= "nonexistent-session-id" (:session-id result)))))
+
+  (testing "close-session-in! is idempotent: second call returns {:closed? false}"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          first-result     (session/close-session-in! ctx session-id)
+          second-result    (session/close-session-in! ctx session-id)]
+      (is (true? (:closed? first-result)))
+      (is (false? (:closed? second-result))))))
+
+(deftest close-session-deletes-statechart-working-memory-test
+  (testing "close-session-in! deletes the statechart working memory for the closed session"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          sc-session-id    (ss/sc-session-id-in ctx session-id)]
+      ;; Before close: statechart is running (idle phase)
+      (is (= :idle (sc/sc-phase (:sc-env ctx) sc-session-id)))
+      (session/close-session-in! ctx session-id)
+      ;; After close: working memory is gone, sc-phase returns nil
+      (is (nil? (sc/sc-phase (:sc-env ctx) sc-session-id))))))
