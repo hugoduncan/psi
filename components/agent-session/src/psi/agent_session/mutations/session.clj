@@ -388,6 +388,34 @@
   (core/logout-in! agent-session-ctx session-id provider-ids)
   {:psi.oauth/logged-out? true})
 
+(pco/defmutation close-session
+  "Close a single session by id, detaching it from the in-memory context.
+   The target :session-id is the session to close, not the calling session.
+   Callers must always supply an explicit :session-id.
+   Returns {:closed? bool :session-id sid}."
+  [_ {:keys [psi/agent-session-ctx session-id]}]
+  {::pco/op-name 'psi.extension/close-session
+   ::pco/params  [:psi/agent-session-ctx :session-id]
+   ::pco/output  [:psi.agent-session/close-session-closed?
+                  :psi.agent-session/close-session-id]}
+  (let [result (core/close-session-in! agent-session-ctx session-id)]
+    {:psi.agent-session/close-session-closed? (boolean (:closed? result))
+     :psi.agent-session/close-session-id      (:session-id result)}))
+
+(pco/defmutation close-session-tree
+  "Close a session and all its descendants.
+   The target :session-id is the root of the tree to close, not the calling session.
+   Callers must always supply an explicit :session-id.
+   Returns {:closed-count N :closed-session-ids [...]}."
+  [_ {:keys [psi/agent-session-ctx session-id]}]
+  {::pco/op-name 'psi.extension/close-session-tree
+   ::pco/params  [:psi/agent-session-ctx :session-id]
+   ::pco/output  [:psi.agent-session/close-session-tree-closed-count
+                  :psi.agent-session/close-session-tree-closed-ids]}
+  (let [result (core/close-session-tree-in! agent-session-ctx session-id)]
+    {:psi.agent-session/close-session-tree-closed-count (:closed-count result)
+     :psi.agent-session/close-session-tree-closed-ids   (:closed-session-ids result)}))
+
 (def all-mutations
   [set-session-name
    set-model
@@ -407,4 +435,6 @@
    mark-background-job-terminal
    remember
    login-begin
-   logout])
+   logout
+   close-session
+   close-session-tree])
