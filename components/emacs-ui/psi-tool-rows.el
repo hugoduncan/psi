@@ -402,10 +402,12 @@ sequences in TEXT are converted to Emacs faces."
                   (propertize "\n" 'face 'default 'font-lock-face 'default)))))))
 
 (defun psi-emacs--render-tool-row (tool-summary status accumulated-text mode)
-  "Render tool row using TOOL-SUMMARY STATUS ACCUMULATED-TEXT and MODE."
-  (if (eq mode 'collapsed)
-      (psi-emacs--tool-row-header-string tool-summary status)
-    (psi-emacs--tool-row-string tool-summary status (or accumulated-text ""))))
+  "Render tool row using TOOL-SUMMARY STATUS ACCUMULATED-TEXT and MODE.
+
+MODE nil is treated as collapsed (default)."
+  (if (eq mode 'expanded)
+      (psi-emacs--tool-row-string tool-summary status (or accumulated-text ""))
+    (psi-emacs--tool-row-header-string tool-summary status)))
 
 (defun psi-emacs--upsert-tool-row (tool-id stage text &optional tool-name arguments parsed-args is-error details)
   "Create or update TOOL-ID row for lifecycle STAGE.
@@ -582,7 +584,7 @@ This command is valid even when no tool rows exist."
   (interactive)
   (when psi-emacs--state
     (let* ((current (psi-emacs-state-tool-output-view-mode psi-emacs--state))
-           (new-mode (if (eq current 'collapsed) 'expanded 'collapsed))
+           (new-mode (if (eq current 'expanded) 'collapsed 'expanded))
            (rows (psi-emacs-state-tool-rows psi-emacs--state)))
       (setf (psi-emacs-state-tool-output-view-mode psi-emacs--state) new-mode)
       ;; Re-render all existing tool rows with the new mode.
