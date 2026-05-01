@@ -54,7 +54,7 @@
            ready-markers
            keep-session-on-failure?]
     :or {working-dir (str (.getCanonicalPath (io/file ".")))
-         launch-command (tmux/worktree-launch-command)
+         launch-command (str "PSI_NULLABLE_EXECUTION_MODE=deterministic " (tmux/worktree-launch-command))
          startup-timeout-ms tmux/default-startup-timeout-ms
          step-timeout-ms 20000
          ready-markers tmux/default-ready-markers

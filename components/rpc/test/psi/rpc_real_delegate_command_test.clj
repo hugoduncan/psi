@@ -57,20 +57,17 @@
         (let [{:keys [out-lines]} (support/run-loop input handler state 250)
               frames         (support/parse-frames out-lines)
               events         (filter #(= :event (:kind %)) frames)
-              command-result (some #(when (= "command-result" (:event %)) %) events)
-              assistant-msgs (filter #(= "assistant/message" (:event %)) events)]
+              command-result (some #(when (= "command-result" (:event %)) %) events)]
           (is (= "text" (get-in command-result [:data :type])))
           (is (.startsWith ^String
                (or (get-in command-result [:data :message]) "")
                            "Delegated to lambda-build — run "))
-          ;; This harness closes stdin immediately after the command request.
-          ;; That is sufficient to prove the immediate command-result ack, but it
-          ;; also tears down the transport-owned external-event loop before later
-          ;; async workflow completion bridge events could be emitted.
-          ;; So the absence of assistant/message bridge frames here is a harness
-          ;; limitation, not proof that the live persistent RPC connection fails
-          ;; to surface them.
-          (is (empty? assistant-msgs)))
+          ;; This harness proves only the immediate command-result ack.
+          ;; The transport may still emit later async assistant/message frames
+          ;; before stdin teardown, especially when the delegated workflow
+          ;; completes or fails quickly in the same process.
+          ;; So we intentionally do not assert their absence here.
+          )
         (finally
           (context/shutdown-context! ctx))))))
 
