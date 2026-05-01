@@ -40,7 +40,12 @@
   - add `close-session-tree-in!` passthrough to `core.clj` and `session_lifecycle.clj`
   - output: `[:psi.agent-session/close-session-tree-closed-count :psi.agent-session/close-session-tree-closed-ids]`
 - [ ] Register both mutations in `all-mutations`
+- [ ] Verify neither mutation is added to `session-scoped-extension-mutation-ops` in `runtime_eql.clj`
+  - these mutations target an arbitrary session-id, not the calling session
+  - auto-injection would be incorrect
 - [ ] Test mutations callable through extension API surface
+  - call `psi.extension/close-session` via `(:mutate api)` with explicit `:session-id` targeting a different session than the caller
+  - confirm the target session is closed, not the calling session
 - [ ] Wire auto-session-name cleanup in `infer-session-title`
   - after child session agent loop completes (success or failure), close via `(:mutate api) 'psi.extension/close-session {:session-id child-sid}`
   - only when `child-session-id` is non-nil

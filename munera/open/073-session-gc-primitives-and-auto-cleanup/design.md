@@ -30,6 +30,7 @@ Layer 1 — Core primitives (agent-session component):
 - New mutations exposed on the extension API surface:
   - `psi.extension/close-session` — close a single session by id (wraps `close-session-in!`). Output: `[:psi.agent-session/close-session-closed? :psi.agent-session/close-session-id]`.
   - `psi.extension/close-session-tree` — close a session and all descendants (wraps `close-session-tree-in!`). Output: `[:psi.agent-session/close-session-tree-closed-count :psi.agent-session/close-session-tree-closed-ids]`.
+  - Neither mutation is added to `session-scoped-extension-mutation-ops` in `runtime_eql.clj`. Unlike most session mutations where `:session-id` refers to the calling session, these mutations target an arbitrary session-id (typically a child). Callers must always pass an explicit `:session-id` in params. Auto-injection of the calling session's id would be incorrect.
 
 Layer 2 — Extension self-cleanup (auto-session-name extension):
 

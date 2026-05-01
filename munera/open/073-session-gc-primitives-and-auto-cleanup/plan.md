@@ -29,7 +29,8 @@ Steps:
    - `close-session-tree` wraps `close-session-tree-in!` via a new `core/close-session-tree-in!` passthrough
    - Output attrs as specified in design
    - Register both in `all-mutations`
-   - Test: mutation callable through extension API surface
+   - Neither mutation is added to `session-scoped-extension-mutation-ops` — callers must pass explicit `:session-id` targeting the session to close (not the calling session)
+   - Test: mutation callable through extension API surface, including with a target session-id that differs from the calling session
 
 5. Wire auto-session-name extension cleanup
    - In `infer-session-title`, after the child session completes (success or failure), close it via `(:mutate api) 'psi.extension/close-session {:session-id child-sid}`
