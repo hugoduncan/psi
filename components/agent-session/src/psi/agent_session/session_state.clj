@@ -196,5 +196,5 @@
   [ctx root-id]
   (letfn [(post-order [id]
             (let [children (children-of-in ctx id)]
-              (into (vec (mapcat post-order children)) [id])))]
-    (vec (mapcat post-order (children-of-in ctx root-id)))))
+              (conj (into [] (mapcat post-order children)) id)))]
+    (into [] (mapcat post-order (children-of-in ctx root-id)))))

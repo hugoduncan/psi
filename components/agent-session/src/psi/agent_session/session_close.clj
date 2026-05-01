@@ -30,9 +30,8 @@
       true)))
 
 (defn- cancel-owned-schedules!
-  [ctx session-id]
-  (doseq [[schedule-id schedule]
-          (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules] {})]
+  [ctx session-id sd]
+  (doseq [[schedule-id schedule] (get-in sd [:scheduler :schedules] {})]
     (when (contains? #{:pending :queued} (:status schedule))
       (dispatch/dispatch! ctx
                           :scheduler/cancel
@@ -71,7 +70,7 @@
           owned-schedule-ids (->> (get-in sd [:scheduler :schedules] {})
                                   keys
                                   vec)
-          _                  (cancel-owned-schedules! ctx session-id)
+          _                  (cancel-owned-schedules! ctx session-id sd)
           _                  (doseq [schedule-id owned-schedule-ids]
                                (interrupt-scheduler-timer! ctx schedule-id))
           _                  (when sc-session-id
@@ -93,7 +92,7 @@
     {:closed? false :session-id session-id}))
 
 (defn close-session-tree-in!
-  "Close `root-id` and all its descendants.
+  "Close `session-id` and all its descendants.
 
    Obtains the full descendant list in bottom-up (leaf-first) order via
    `descendants-of-in`, calls `close-session-in!` on each descendant, then
@@ -105,9 +104,9 @@
 
    Returns {:closed-count N :closed-session-ids [...]} where N counts only
    the sessions that were actually open at the time of close."
-  [ctx root-id]
-  (let [descendants (ss/descendants-of-in ctx root-id)
-        all-ids     (conj descendants root-id)
+  [ctx session-id]
+  (let [descendants (ss/descendants-of-in ctx session-id)
+        all-ids     (conj descendants session-id)
         results     (mapv #(close-session-in! ctx %) all-ids)
         closed-ids  (->> results
                          (filter :closed?)
