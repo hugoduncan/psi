@@ -229,7 +229,8 @@
                                                       :data (events/session-updated-payload ctx sid)})
     (events/emit-event! (:emit-frame! request) state {:event "footer/updated"
                                                       :id (:id request)
-                                                      :data (events/footer-updated-payload ctx sid)})
+                                                      :data (assoc (events/footer-updated-payload ctx sid)
+                                                                   :session-id sid)})
     (events/emit-event! (:emit-frame! request) state {:event "context/updated"
                                                       :id (:id request)
                                                       :data (events/context-updated-payload ctx state sid)})

@@ -351,7 +351,8 @@
       ;; a single external assistant message is processed.
       (events/emit-event! emit-frame! state
                           {:event "footer/updated"
-                           :data  (events/footer-updated-payload ctx session-id)}))))
+                           :data  (assoc (events/footer-updated-payload ctx session-id)
+                                         :session-id session-id)}))))
 
 (defn- valid-session-id-param!
   [session-id]
