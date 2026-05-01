@@ -224,25 +224,31 @@
               child-session-id (:psi.agent-session/session-id child)]
           (when child-session-id
             (remember-helper-session! child-session-id)
-            (let [run-result    ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
-                                                       (cond-> {:prompt user-prompt}
-                                                         helper-model
-                                                         (assoc :model helper-model)))
-                  title         (some-> (:psi.agent-session/agent-run-text run-result)
-                                        normalize-title)
-                  current-name  (query-session-name api source-session-id)
-                  rename-result (when (and (true? (:psi.agent-session/agent-run-ok? run-result))
-                                           (valid-title? title)
-                                           (not (stale-checkpoint? source-session-id checkpoint-turn-count))
-                                           (not (manual-override? source-session-id current-name)))
-                                  ((:mutate-session api) source-session-id 'psi.extension/set-session-name
-                                                         {:name title})
-                                  (remember-auto-name! source-session-id title)
-                                  title)]
-              ;; Always close the helper session after use, regardless of rename outcome.
-              ((:mutate api) 'psi.extension/close-session {:session-id child-session-id})
-              (swap! state update :helper-session-ids disj child-session-id)
-              rename-result)))))))
+            (try
+              (let [run-result    ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
+                                                         (cond-> {:prompt user-prompt}
+                                                           helper-model
+                                                           (assoc :model helper-model)))
+                    title         (some-> (:psi.agent-session/agent-run-text run-result)
+                                          normalize-title)
+                    current-name  (query-session-name api source-session-id)
+                    rename-result (when (and (true? (:psi.agent-session/agent-run-ok? run-result))
+                                             (valid-title? title)
+                                             (not (stale-checkpoint? source-session-id checkpoint-turn-count))
+                                             (not (manual-override? source-session-id current-name)))
+                                    ((:mutate-session api) source-session-id 'psi.extension/set-session-name
+                                                           {:name title})
+                                    (remember-auto-name! source-session-id title)
+                                    title)]
+                rename-result)
+              (catch Exception e
+                (when-let [log-fn (:log-fn @state)]
+                  (log-fn (str "auto-session-name: inference error: " (ex-message e))))
+                nil)
+              (finally
+                ;; Always close the helper session after use, regardless of rename outcome or exception.
+                ((:mutate api) 'psi.extension/close-session {:session-id child-session-id})
+                (swap! state update :helper-session-ids disj child-session-id)))))))))
 
 (defn- on-turn-finished [api payload]
   (when-let [session-id (normalize-session-id payload)]

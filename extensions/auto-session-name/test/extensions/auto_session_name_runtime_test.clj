@@ -128,3 +128,45 @@
       ((checkpoint-handler ctx ext-path) {:session-id session-id :turn-count 2})
       (is (= "Manual name"
              (:session-name (ss/get-session-data-in ctx session-id)))))))
+
+(deftest close-session-fires-even-when-agent-loop-throws-test
+  (testing "helper session is closed and removed from helper-session-ids even when run-agent-loop-in-session throws"
+    (let [[ctx session-id] (create-runtime-session)
+          ext-path         "/test/auto_session_name_throw.clj"
+          close-calls*     (atom [])
+          reg              (:extension-registry ctx)
+          runtime-fs       (runtime-fns/make-extension-runtime-fns ctx session-id ext-path)
+          base-mutate      (:mutate-fn runtime-fs)
+          runtime-fs'      (assoc runtime-fs
+                                  :mutate-fn
+                                  (fn [op params]
+                                    (case op
+                                      psi.extension/create-child-session
+                                      {:psi.agent-session/session-id "child-throw"}
+
+                                      psi.extension/run-agent-loop-in-session
+                                      (throw (ex-info "Connection refused" {:cause :network}))
+
+                                      psi.extension/close-session
+                                      (do (swap! close-calls* conj (:session-id params))
+                                          {:psi.agent-session/close-session-closed? true
+                                           :psi.agent-session/close-session-id      (:session-id params)})
+
+                                      (base-mutate op params))))
+          api              (do (ext/register-extension-in! reg ext-path)
+                               (ext/create-extension-api reg ext-path runtime-fs'))]
+      (reset! @#'sut/state {:turn-counts {}
+                            :helper-session-ids #{}
+                            :last-auto-name-by-session {}
+                            :turn-interval 2
+                            :delay-ms 250
+                            :log-fn nil
+                            :ui nil})
+      (seed-conversation! ctx session-id)
+      (sut/init api)
+      ;; Checkpoint fires; agent loop throws — close must still be called and state cleaned up.
+      ((checkpoint-handler ctx ext-path) {:session-id session-id :turn-count 2})
+      (is (= ["child-throw"] @close-calls*)
+          "close-session was called despite agent-loop throwing")
+      (is (not (contains? (:helper-session-ids (deref @#'sut/state)) "child-throw"))
+          "helper-session-ids cleaned up despite agent-loop throwing"))))
