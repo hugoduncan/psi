@@ -219,6 +219,20 @@
   {:doc  "Run Emacs frontend ERT suites (psi-rpc + split psi + widget)."
    :task (shell "emacs -Q --batch -L components/emacs-ui -l components/emacs-ui/test/psi-test-support.el -l components/emacs-ui/test/psi-rpc-test.el -l components/emacs-ui/test/psi-buffer-lifecycle-test.el -l components/emacs-ui/test/psi-dispatch-test.el -l components/emacs-ui/test/psi-draft-end-position-test.el -l components/emacs-ui/test/psi-streaming-transcript-test.el -l components/emacs-ui/test/psi-tool-output-mode-test.el -l components/emacs-ui/test/psi-extension-ui-test.el -l components/emacs-ui/test/psi-capf-test.el -l components/emacs-ui/test/psi-session-tree-test.el -l components/emacs-ui/test/psi-anthropic-rehydrate-regression-test.el -l components/emacs-ui/test/psi-new-anthropic-flow-regression-test.el -l components/emacs-ui/test/psi-widget-renderer-test.el -l components/emacs-ui/test/psi-widget-projection-test.el -f ert-run-tests-batch-and-exit")}
 
+  emacs:reload
+  {:doc  "Reload Emacs frontend modules into the running Emacs session via emacsclient."
+   :task (let [dir   (str (System/getProperty "user.dir") "/components/emacs-ui")
+               files ["psi-globals.el" "psi-regions.el" "psi-rpc.el" "psi-mode.el"
+                      "psi-compose.el" "psi-run-state.el" "psi-assistant-render.el"
+                      "psi-tool-rows.el" "psi-session-commands.el" "psi-projection.el"
+                      "psi-dialogs.el" "psi-events.el" "psi-lifecycle.el"
+                      "psi-entry.el" "psi-completion.el"
+                      "psi-widget-renderer.el" "psi-widget-projection.el"
+                      "psi.el"]
+               loads (str/join " " (map (fn [f] (str "(load \"" dir "/" f "\" nil t t)")) files))
+               expr  (str "(progn " loads " \"reloaded\")")]
+           (shell (str "emacsclient -e " (pr-str expr))))}
+
   emacs:byte-compile
   {:doc  "Byte-compile Emacs frontend modules and clean generated .elc artifacts."
    :task (shell "bash -lc 'set -euo pipefail; trap \"rm -f components/emacs-ui/*.elc\" EXIT; emacs -Q --batch -L components/emacs-ui -f batch-byte-compile components/emacs-ui/psi.el components/emacs-ui/psi-globals.el components/emacs-ui/psi-entry.el components/emacs-ui/psi-lifecycle.el components/emacs-ui/psi-events.el components/emacs-ui/psi-compose.el components/emacs-ui/psi-run-state.el components/emacs-ui/psi-assistant-render.el components/emacs-ui/psi-tool-rows.el components/emacs-ui/psi-session-commands.el components/emacs-ui/psi-projection.el components/emacs-ui/psi-dialogs.el components/emacs-ui/psi-mode.el components/emacs-ui/psi-rpc.el components/emacs-ui/psi-widget-renderer.el components/emacs-ui/psi-widget-projection.el'")}
