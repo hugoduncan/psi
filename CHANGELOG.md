@@ -7,6 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Fixed
+- Emacs: footer content no longer appears inside submitted prompts on longer sessions.
 - TUI startup banner model line now reflects the canonical current session model.
 - Custom Anthropic-compatible model providers now use the selected provider's configured auth and base URL instead of requiring built-in Anthropic credentials.
 
