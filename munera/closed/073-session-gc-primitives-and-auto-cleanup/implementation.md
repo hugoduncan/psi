@@ -18,6 +18,23 @@ Guard `(if-not (ss/get-session-data-in ...))` and `owned-schedule-ids` binding b
 If code throws between `remember-helper-session!` and the close call, the child session
 leaks. Low risk: `run-agent-loop-in-session` catches all `Throwable` internally.
 
+# Code-shaper review note
+
+Three findings:
+
+**1. `descendants-of-in` — `into … [id]` should be `conj`**
+`(into (vec (mapcat post-order children)) [id])` wraps a scalar in `[id]` solely to
+satisfy `into`. `(conj (into [] (mapcat post-order children)) id)` is direct.
+
+**2. `cancel-owned-schedules!` — double-read fix was partial**
+`sd` is used for `owned-schedule-ids` but `cancel-owned-schedules!` still calls
+`get-session-data-in` internally. Accept `sd` as a parameter to complete the fix
+and close the stale-read window.
+
+**3. `close-session-tree-in!` — `root-id` → `session-id`**
+`root-id` borrows tree-algorithm framing. All other public `-in!` functions use
+`session-id`; the tree root is a session-id and callers name it as such.
+
 # Follow-on steps
 
 - [x] Fix `workflows.clj:delete-working-memory!` — no-op: grep truncated the multiline
@@ -26,3 +43,12 @@ leaks. Low risk: `run-agent-loop-in-session` catches all `Throwable` internally.
 - [x] Tighten `close-session-in!` — unified double `get-session-data-in` read:
   `(if-not ...)` guard + separate `owned-schedule-ids` read replaced with a single
   `(if-let [sd (ss/get-session-data-in ctx session-id)]` binding.
+
+- [ ] `descendants-of-in` — replace `(into (vec (mapcat post-order children)) [id])`
+  with `(conj (into [] (mapcat post-order children)) id)`.
+
+- [ ] `cancel-owned-schedules!` — add `sd` parameter, use it instead of calling
+  `get-session-data-in` internally; update `close-session-in!` to pass `sd`.
+
+- [ ] `close-session-tree-in!` — rename parameter `root-id` → `session-id`;
+  update `descendants-of-in` call site and docstring accordingly.
