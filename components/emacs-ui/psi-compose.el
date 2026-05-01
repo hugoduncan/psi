@@ -114,11 +114,17 @@ When START/END are nil, scrub the full current input range."
   "Return end position of editable draft/input region.
 
 When a projection/footer block is present, draft ends at projection start.
-Otherwise, draft ends at `point-max'."
-  (if-let ((bounds (and psi-emacs--state
-                        (psi-emacs--region-bounds 'projection 'main))))
-      (car bounds)
-    (point-max)))
+When the projection region is absent or stale (e.g. during the narrow window
+between unregister and re-register in `psi-emacs--upsert-projection-block'),
+falls back to the last known projection start position stored on state before
+resorting to `point-max'.  This prevents footer content from being captured
+as part of the composed input."
+  (or (when-let ((bounds (and psi-emacs--state
+                              (psi-emacs--region-bounds 'projection 'main))))
+        (car bounds))
+      (and psi-emacs--state
+           (psi-emacs-state-last-projection-start psi-emacs--state))
+      (point-max)))
 
 (defun psi-emacs--input-separator-marker-cache ()
   "Return compatibility marker cache for the input separator region."

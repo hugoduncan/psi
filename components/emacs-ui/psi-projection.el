@@ -543,6 +543,11 @@ tracks transcript growth like a terminal footer."
                    (markerp end)
                    (marker-buffer start)
                    (marker-buffer end))
+          ;; Snapshot projection start before deleting so draft-end-position
+          ;; has a reliable backstop during the gap between unregister and
+          ;; re-register (after-change hooks can fire inside delete-region).
+          (setf (psi-emacs-state-last-projection-start psi-emacs--state)
+                (marker-position start))
           (save-excursion
             (delete-region start end))
           (psi-emacs--region-unregister 'projection 'main)
@@ -570,7 +575,10 @@ tracks transcript growth like a terminal footer."
                 ;; draft/projection boundary so draft text stays outside range.
                 (set-marker-insertion-type new-start t)
                 (set-marker new-end render-end)
-                (psi-emacs--region-register 'projection 'main new-start new-end))))))
+                (psi-emacs--region-register 'projection 'main new-start new-end)
+                ;; Clear the snapshot now that the live region is registered.
+                (setf (psi-emacs-state-last-projection-start psi-emacs--state)
+                      nil))))))
 
       (when follow-anchor
         (psi-emacs--set-draft-anchor-to-end)))))

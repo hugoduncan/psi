@@ -75,6 +75,7 @@ Used to detect stalled streaming runs and transition to deterministic recovery."
   active-assistant-id
   active-thinking-id
   input-separator-marker
+  last-projection-start
   draft-anchor
   input-history
   input-history-index
