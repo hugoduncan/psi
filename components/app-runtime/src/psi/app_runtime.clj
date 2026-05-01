@@ -580,22 +580,19 @@ Available: " (str/join ", " (map name (keys all))))
                                                    :ui-type                 :tui
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
          nullable-execution-mode (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty)
-         ctx                     (if (= "deterministic" nullable-execution-mode)
-                                   (assoc ctx :execute-prepared-request-fn
-                                          (fn [_ai-ctx _ctx sid prepared-request _progress-queue]
-                                            (let [user-text (or (get-in prepared-request [:prepared-request/user-message :content 0 :text])
-                                                                "")]
-                                              {:execution-result/turn-id (or (:prepared-request/id prepared-request)
-                                                                             (str (java.util.UUID/randomUUID)))
-                                               :execution-result/session-id sid
-                                               :execution-result/assistant-message {:role "assistant"
-                                                                                    :content [{:type :text :text user-text}]
-                                                                                    :stop-reason :stop
-                                                                                    :timestamp (java.time.Instant/now)}
-                                               :execution-result/turn-outcome :turn.outcome/stop
-                                               :execution-result/tool-calls []
-                                               :execution-result/stop-reason :stop})))
-                                   ctx)
+         ctx (if (= "deterministic" nullable-execution-mode)
+               (assoc ctx :execute-prepared-request-fn
+                      (fn [_ai-ctx _ctx sid prepared-request _progress-queue]
+                        (let [user-text (or (get-in prepared-request [:prepared-request/user-message :content 0 :text]) "")]
+                          {:execution-result/turn-id (or (:prepared-request/id prepared-request)
+                                                         (str (java.util.UUID/randomUUID)))
+                           :execution-result/session-id sid
+                           :execution-result/assistant-message {:role "assistant" :content [{:type :text :text user-text}]
+                                                                :stop-reason :stop :timestamp (java.time.Instant/now)}
+                           :execution-result/turn-outcome :turn.outcome/stop
+                           :execution-result/tool-calls []
+                           :execution-result/stop-reason :stop})))
+               ctx)
          {:keys [startup-rehydrate]}
          (bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts
                                                               :cwd cwd})
