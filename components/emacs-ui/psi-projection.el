@@ -555,9 +555,10 @@ tracks transcript growth like a terminal footer."
           (set-marker end nil))
 
         ;; Reinsert at current end-of-buffer.
+        ;; rendered already starts with "\n" so no extra newline is needed here.
         (unless (string-empty-p rendered)
           (save-excursion
-            (psi-emacs--ensure-newline-before-projection-append)
+            (goto-char (point-max))
             (let ((new-start (copy-marker (point) nil))
                   ;; Keep insertion-type nil on end marker so appends at the
                   ;; projection tail stay outside the projection range.
