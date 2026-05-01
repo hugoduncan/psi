@@ -32,6 +32,12 @@
                                         {:psi.agent-session/agent-run-ok? true
                                          :psi.agent-session/agent-run-text "Fix footer rendering"})
 
+                                    ;; Stub close-session so it doesn't try to resolve worktree-path
+                                    ;; for the fake "child-1" session that was never actually created.
+                                    psi.extension/close-session
+                                    {:psi.agent-session/close-session-closed? true
+                                     :psi.agent-session/close-session-id (:session-id params)}
+
                                     (base-mutate op params))))]
     (ext/register-extension-in! reg ext-path)
     {:api              (ext/create-extension-api reg ext-path runtime-fs')

@@ -145,13 +145,16 @@
                                                                                         :psi.agent-session/agent-run-text "Fix footer rendering"}
                                                psi.extension/set-session-name {:psi.agent-session/session-name (:name params)}
                                                psi.extension/schedule-event {:psi.extension/scheduled? true}
+                                               psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                            :psi.agent-session/close-session-id (:session-id params)}
                                                {}))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
         (is (nil? (handler {:session-id "s1" :turn-count 2})))
         (is (= ['psi.extension/create-child-session
                 'psi.extension/run-agent-loop-in-session
-                'psi.extension/set-session-name]
+                'psi.extension/set-session-name
+                'psi.extension/close-session]
                (->> @calls
                     (keep (fn [[kind op _]] (when (= kind :mutate) op)))
                     (remove #{'psi.extension/schedule-event})
@@ -186,7 +189,16 @@
                                            (= op 'psi.extension/run-agent-loop-in-session))
                                   (select-keys (:model params) [:provider :id :name]))))
                         first)))
-        (is (true? (contains? (:helper-session-ids @@#'sut/state) "child-1")))))))
+        ;; Helper session closed: removed from helper-session-ids
+        (is (false? (contains? (:helper-session-ids @@#'sut/state) "child-1")))
+        ;; close-session called with the correct child session-id
+        (is (= "child-1"
+               (some->> @calls
+                        (keep (fn [[kind op params]]
+                                (when (and (= kind :mutate)
+                                           (= op 'psi.extension/close-session))
+                                  (:session-id params))))
+                        first)))))))
 
 (deftest checkpoint-handler-prefers-local-helper-when-available-test
   (testing "extension-owned helper policy picks a qualifying local helper when available"
@@ -230,6 +242,8 @@
                                                    psi.extension/run-agent-loop-in-session {:psi.agent-session/agent-run-ok? true
                                                                                             :psi.agent-session/agent-run-text "Fix footer rendering"}
                                                    psi.extension/set-session-name {:psi.agent-session/session-name (:name params)}
+                                                   psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                                :psi.agent-session/close-session-id (:session-id params)}
                                                    {}))})]
           (sut/init api)
           (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
@@ -283,6 +297,8 @@
                                                psi.extension/run-agent-loop-in-session {:psi.agent-session/agent-run-ok? true
                                                                                         :psi.agent-session/agent-run-text ""}
                                                psi.extension/schedule-event {:psi.extension/scheduled? true}
+                                               psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                            :psi.agent-session/close-session-id (:session-id params)}
                                                {}))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
@@ -347,6 +363,8 @@
                                                psi.extension/run-agent-loop-in-session (do (swap! @#'sut/state assoc :turn-counts {"s1" 3})
                                                                                            {:psi.agent-session/agent-run-ok? true
                                                                                             :psi.agent-session/agent-run-text "Fix footer rendering"})
+                                               psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                            :psi.agent-session/close-session-id (:session-id params)}
                                                {}))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
@@ -391,6 +409,8 @@
                                                psi.extension/create-child-session {:psi.agent-session/session-id "child-1"}
                                                psi.extension/run-agent-loop-in-session {:psi.agent-session/agent-run-ok? true
                                                                                         :psi.agent-session/agent-run-text "Fix footer rendering"}
+                                               psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                            :psi.agent-session/close-session-id (:session-id params)}
                                                {}))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
@@ -436,6 +456,8 @@
                                                psi.extension/run-agent-loop-in-session {:psi.agent-session/agent-run-ok? true
                                                                                         :psi.agent-session/agent-run-text "New inferred name"}
                                                psi.extension/set-session-name {:psi.agent-session/session-name (:name params)}
+                                               psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                            :psi.agent-session/close-session-id (:session-id params)}
                                                {}))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
