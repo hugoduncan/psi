@@ -76,3 +76,62 @@ Follow-up verification
 
 - `clojure -M:test --focus psi.agent-session.workflow-judge-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.mutations.canonical-workflows-test --focus extensions.workflow-loader-delegate-test --focus extensions.workflow-loader-test`
 - Result: `91 tests, 370 assertions, 0 failures.`
+
+Persistent live RPC verification
+
+- Added `components/rpc/test/psi/rpc_real_delegate_command_test.clj` proof for the real bootstrapped RPC command path.
+- The immediate-ack test documents an important harness boundary: `support/run-loop` closes stdin after the command request, so it proves the canonical `command-result` ack but cannot prove later async bridge events on that same connection because the transport-owned external-event loop is torn down at EOF.
+- Added a second persistent-connection RPC integration test using `PipedReader`/`PipedWriter` so the same live RPC connection stays subscribed long enough to observe the real async completion bridge sequence.
+- That persistent test proves:
+  - immediate `command-result` ack first
+  - later `assistant/message` user marker `Workflow run <id> result:`
+  - later `assistant/message` assistant result text
+  - no visible `(workflow context bridge)` filler on the live RPC surface
+  - originating session transcript state matches the same semantic sequence
+
+Adapter/live verification additions
+
+- Added TUI-focused rendering and role proofs:
+  - `components/tui/test/psi/tui/app_external_message_role_test.clj`
+  - `components/tui/test/psi/tui/delegate_live_sequence_test.clj`
+  - `components/tui/test/psi/tui/real_delegate_command_path_test.clj`
+- Added Emacs-focused rendering and role proofs:
+  - `components/emacs-ui/test/psi-delegate-transcript-role-test.el`
+  - `components/emacs-ui/test/psi-delegate-command-and-result-test.el`
+  - `components/emacs-ui/test/psi-delegate-live-sequence-test.el`
+- Added no-filler delivery proof:
+  - `components/agent-session/test/psi/agent_session/workflow_loader_delivery_test.clj`
+
+Live end-to-end verification tasks
+
+- Added a real TUI tmux scenario for `/delegate`:
+  - `components/tui/test/psi/tui/test_harness/tmux_delegate.clj`
+  - wired into `components/tui/test/psi/tui/tmux_integration_harness_test.clj`
+- Updated the tmux harness to use `mise exec tmux -- ...` automatically when `mise` is available so live TUI integration checks work in environments where tmux is tool-managed rather than globally on PATH.
+- Added a focused real Emacs `/delegate` end-to-end harness:
+  - `components/emacs-ui/test/psi-delegate-e2e-test.el`
+  - this harness intentionally uses the repo-local backend command (`bb bb/psi.clj -- --rpc-edn`) so the live Emacs check validates the current worktree code rather than an installed `psi` binary.
+
+Canonical verification commands now available
+
+- `bb tui:delegate:e2e`
+  - runs the live TUI tmux `/delegate` scenario against the current worktree
+- `bb emacs:delegate:e2e`
+  - runs the focused Emacs `/delegate` end-to-end harness against the current worktree backend
+- `bb delegate:e2e`
+  - aggregate task that runs both live `/delegate` end-to-end checks
+
+Latest verification results
+
+- `clojure -M:test --focus integration --focus psi.tui.tmux-integration-harness-test/tui-tmux-delegate-live-sequence-scenario-test`
+  - green
+- `emacs -Q --batch -L components/emacs-ui -l components/emacs-ui/test/psi-delegate-e2e-test.el -f psi-delegate-e2e-run`
+  - `psi-delegate-e2e:ok`
+- `bb tui:delegate:e2e`
+  - green
+- `bb emacs:delegate:e2e`
+  - `psi-delegate-e2e:ok`
+- `bb delegate:e2e`
+  - green
+- `clojure -M:test --focus psi.rpc-real-delegate-command-test --focus psi.rpc-delegate-bridge-test --focus psi.rpc-delegate-command-and-bridge-order-test --focus psi.tui.real-delegate-command-path-test --focus psi.tui.delegate_live_sequence_test --focus psi.agent-session.workflow-loader-delivery-test`
+  - green after the live-e2e additions as well

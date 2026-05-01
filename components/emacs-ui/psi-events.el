@@ -24,6 +24,7 @@
 (declare-function psi-emacs--assistant-delta "psi-assistant-render" (text))
 (declare-function psi-emacs--dispatch-request "psi-compose" (op params &optional callback))
 (declare-function psi-emacs--append-assistant-message "psi-compose" (text))
+(declare-function psi-emacs--append-user-message-to-transcript "psi-compose" (text))
 (declare-function psi-emacs--apply-slash-completion-data "psi-session-commands" (names templates))
 (declare-function psi-emacs--refresh-slash-completion-data "psi-session-commands")
 (declare-function psi-emacs--request-switch-session-by-id "psi-session-commands" (state session-id))
@@ -348,7 +349,9 @@ This disables completion UI sort hooks for ordered backend-owned lists such as
           (or (psi-emacs--event-data-get data '(:text text :delta delta)) ""))))
       ("assistant/message"
        (when (psi-emacs--event-session-matches-current-p data)
-         (let* ((explicit-text (psi-emacs--non-blank-text
+         (let* ((role (psi-emacs--session-normalize-text
+                       (psi-emacs--event-data-get data '(:role role))))
+                (explicit-text (psi-emacs--non-blank-text
                                 (psi-emacs--event-data-get data '(:text text :message message))))
                 (content-text  (psi-emacs--non-blank-text
                                 (psi-emacs--assistant-content->text
@@ -363,8 +366,12 @@ This disables completion UI sort hooks for ordered backend-owned lists such as
                 (has-streamed-text (and psi-emacs--state
                                         (psi-emacs--non-blank-text
                                          (psi-emacs-state-assistant-in-progress psi-emacs--state)))))
-           (if (or final-text has-streamed-text)
-               (psi-emacs--assistant-finalize final-text)
+           (cond
+            ((and (equal role "user") final-text)
+             (psi-emacs--append-user-message-to-transcript final-text))
+            ((or final-text has-streamed-text)
+             (psi-emacs--assistant-finalize final-text))
+            (t
              ;; Empty assistant/message payloads (tool-only or provider-edge events)
              ;; should not render a blank `ψ:` line.
              ;; Archive (not clear) any live thinking block — it is part of the
@@ -372,7 +379,7 @@ This disables completion UI sort hooks for ordered backend-owned lists such as
              (when psi-emacs--state
                (psi-emacs--archive-thinking-line)
                (psi-emacs--disarm-stream-watchdog psi-emacs--state)
-               (psi-emacs--set-run-state psi-emacs--state 'idle))))))
+               (psi-emacs--set-run-state psi-emacs--state 'idle)))))))
       ("assistant/thinking-delta"
        (when (psi-emacs--event-session-matches-current-p data)
          (psi-emacs--assistant-thinking-delta

@@ -48,7 +48,9 @@
             :messages msgs
             :tool-calls (or (:tool-calls rehydrate) {})
             :tool-order (or (:tool-order rehydrate) [])})))
-      (command-results/handle-command-result! request-id cmd-result emit!))))
+      (command-results/handle-command-result! request-id cmd-result emit!)
+      (when (= :extension-cmd (:type cmd-result))
+        (Thread/sleep 50)))))
 
 (defn- command-response
   ([request-id]

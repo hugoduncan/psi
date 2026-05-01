@@ -350,6 +350,21 @@
       (is (= :assistant (:role (first (:messages s1)))))
       (is (= "Hello from extension!" (:text (first (:messages s1))))))))
 
+(deftest extension-cmd-string-result-shown-immediately-test
+  (testing "extension command string result is surfaced via command result handling"
+    (let [dispatch-fn (fn [text]
+                        (when (= text "/delegate")
+                          {:type    :text
+                           :message "Delegated to lambda-build — run run-1"}))
+          update-fn   (app/make-update (stub-agent-fn ""))
+          state       (init-state {:dispatch-fn dispatch-fn})
+          typed       (type-text update-fn state "/delegate")
+          [s1 _]      (update-fn typed (msg/key-press :enter))]
+      (is (= :idle (:phase s1)))
+      (is (= 1 (count (:messages s1))))
+      (is (= :assistant (:role (first (:messages s1)))))
+      (is (= "Delegated to lambda-build — run run-1" (:text (first (:messages s1))))))))
+
 (deftest extension-cmd-no-output-no-message-test
   (testing "extension command with no println adds no message"
     (let [called      (atom false)

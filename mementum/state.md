@@ -280,3 +280,12 @@ Bootstrapped on 2026-04-02.
 - Header/status/footer ownership is now split as:
   - backend/app-runtime owns shared semantic fragments
   - adapters own only rendering/layout and transport/process/local-run-state concerns
+- `/delegate` result delivery is now verified end-to-end across live RPC, TUI, and Emacs:
+  - real persistent RPC command-path proof now exists in `components/rpc/test/psi/rpc_real_delegate_command_test.clj`
+  - real TUI tmux delegate scenario now exists in `components/tui/test/psi/tui/test_harness/tmux_delegate.clj`
+  - real Emacs delegate e2e now exists in `components/emacs-ui/test/psi-delegate-e2e-test.el`
+  - canonical verification tasks are now:
+    - `bb tui:delegate:e2e`
+    - `bb emacs:delegate:e2e`
+    - `bb delegate:e2e`
+  - tmux harness now auto-uses `mise exec tmux -- ...` when `mise` is available, so tool-managed tmux environments work without further local patching

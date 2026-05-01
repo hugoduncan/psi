@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.tui.test-harness.tmux :as tmux]
+   [psi.tui.test-harness.tmux-delegate :as tmux-delegate]
    [psi.tui.test-harness.tmux-rehydration :as tmux-rehydration]
    [psi.tui.test-harness.tmux-startup-wrap :as tmux-startup-wrap]
    [psi.tui.test-harness.tmux-streaming :as tmux-streaming]))
@@ -51,3 +52,7 @@
 (deftest ^:integration tui-tmux-resize-scenario-test
   (testing "TUI repaints correctly after terminal resize: banner remains visible after shrink and after restore"
     (assert-scenario-result (tmux/run-resize-scenario! {}))))
+
+(deftest ^:integration tui-tmux-delegate-live-sequence-scenario-test
+  (testing "real /delegate shows ack, user bridge marker, assistant result, and no visible bridge filler"
+    (assert-scenario-result (tmux-delegate/run-delegate-live-sequence-scenario! {}))))

@@ -55,6 +55,14 @@
   (or (some #(when (= :text (:type %)) (:text %)) (get-in m [:message :content]))
       ""))
 
+(defn- external-message-role
+  [m]
+  (let [role (get-in m [:message :role])]
+    (cond
+      (keyword? role) role
+      (= "user" role) :user
+      :else :assistant)))
+
 (defn- handle-agent-message
   [state m]
   (cond
@@ -63,9 +71,10 @@
       [new-state (or cmd (support/poll-cmd (:queue state)))])
 
     (support/external-message? m)
-    (let [text (external-message-text m)]
+    (let [text (external-message-text m)
+          role (external-message-role m)]
       [(cond-> state
-         (seq text) (update :messages conj {:role :assistant
+         (seq text) (update :messages conj {:role role
                                             :text text
                                             :custom-type (:custom-type m)}))
        (support/poll-cmd (:queue state))])

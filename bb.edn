@@ -203,6 +203,10 @@
   {:doc  "Smoke-test the live runtime: RPC handshake subprocess test + TUI tmux startup scenario."
    :task (shell "clojure -M:test --focus integration")}
 
+  tui:delegate:e2e
+  {:doc  "Run the live TUI tmux /delegate scenario against the current worktree."
+   :task (shell "clojure -M:test --focus integration --focus psi.tui.tmux-integration-harness-test/tui-tmux-delegate-live-sequence-scenario-test")}
+
   clojure:test
   {:doc     "Run both Clojure unit and extension test suites."
    :depends [clojure:test:unit clojure:test:extensions]}
@@ -241,6 +245,10 @@
   {:doc  "Run Emacs frontend end-to-end harness against live --rpc-edn backend."
    :task (shell "emacs -Q --batch -L components/emacs-ui -l components/emacs-ui/test/psi-e2e-test.el -f psi-e2e-run")}
 
+  emacs:delegate:e2e
+  {:doc  "Run the focused Emacs frontend /delegate end-to-end harness against the current worktree backend."
+   :task (shell "emacs -Q --batch -L components/emacs-ui -l components/emacs-ui/test/psi-delegate-e2e-test.el -f psi-delegate-e2e-run")}
+
   emacs:check
   {:doc     "Run byte-compile guard and Emacs frontend tests."
    :depends [emacs:byte-compile emacs:test]}
@@ -248,6 +256,10 @@
   test
   {:doc     "Run all repository tests checked in CI."
    :depends [clojure:test emacs:check]}
+
+  delegate:e2e
+  {:doc     "Run both focused live /delegate end-to-end checks: TUI tmux + Emacs frontend."
+   :depends [tui:delegate:e2e emacs:delegate:e2e]}
 
   ;; Component-isolated tests to avoid circular dependencies
   test:agent-core

@@ -336,7 +336,7 @@
 
 (pco/defmutation mark-background-job-terminal
   "Mark a canonical background job as terminal for extension-owned async work."
-  [_ {:keys [psi/agent-session-ctx job-id outcome payload terminal-history-max-per-thread]}]
+  [_ {:keys [psi/agent-session-ctx job-id outcome payload terminal-history-max-per-thread suppress-terminal-message?]}]
   {::pco/op-name 'psi.extension/mark-background-job-terminal
    ::pco/params  [:psi/agent-session-ctx :job-id :outcome]
    ::pco/output  [:psi.background-job/job-id
@@ -348,7 +348,9 @@
                          :outcome outcome
                          :payload payload}
                   terminal-history-max-per-thread
-                  (assoc :terminal-history-max-per-thread terminal-history-max-per-thread)))
+                  (assoc :terminal-history-max-per-thread terminal-history-max-per-thread)
+                  (some? suppress-terminal-message?)
+                  (assoc :suppress-terminal-message? suppress-terminal-message?)))
         job    (bg-jobs/get-job-in state' job-id)]
     (dispatch/dispatch! agent-session-ctx
                         :session/update-background-jobs-state

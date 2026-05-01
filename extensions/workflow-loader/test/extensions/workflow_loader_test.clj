@@ -291,6 +291,7 @@
           mutate-calls (atom [])
           mutate-session-calls (atom [])
           query-session-calls (atom [])
+          notifications (atom [])
           created-run-id (atom nil)
           api {:query (fn [_]
                         {:psi.agent-session/worktree-path "/tmp/test-worktree"
@@ -299,7 +300,7 @@
                :query-session (fn [session-id _query]
                                 (swap! query-session-calls conj session-id)
                                 {:psi.agent-session/session-entries
-                                 [{:psi.session-entry/data {:role "assistant"}}]})
+                                 [{:psi.session-entry/data {:message {:role "assistant"}}}]})
                :mutate (fn [sym params]
                          (swap! mutate-calls conj {:sym sym :params params})
                          (condp = sym
@@ -326,7 +327,7 @@
                                                                    :params params})
                                  {})
                :log (fn [_] nil)
-               :notify (fn [_ _] nil)
+               :notify (fn [msg level] (swap! notifications conj {:msg msg :level level}))
                :register-tool (fn [_] nil)
                :register-command (fn [name cmd-def] (swap! commands assoc name cmd-def))
                :register-prompt-contribution (fn [_] nil)
@@ -347,7 +348,7 @@
                                 (some (fn [call]
                                         (= 'psi.extension/mark-background-job-terminal (:sym call)))
                                       @mutate-calls))))
-          (is (= ["origin-session"] @query-session-calls))
+          (is (empty? @query-session-calls))
           (is (some? @created-run-id))
           (is (= [{:session-id "origin-session"
                    :sym 'psi.extension/append-message
@@ -359,8 +360,13 @@
                             :content "delegated result text"}}]
                  @mutate-session-calls))
           (is (some #(= 'psi.extension/start-background-job (:sym %)) @mutate-calls))
-          (is (some #(= 'psi.extension/mark-background-job-terminal (:sym %)) @mutate-calls))
-          (is (not-any? #(= 'psi.extension/append-entry (:sym %)) @mutate-calls)))))))
+          (is (some #(and (= 'psi.extension/mark-background-job-terminal (:sym %))
+                          (true? (get-in % [:params :suppress-terminal-message?])))
+                    @mutate-calls))
+          (is (not-any? #(= 'psi.extension/append-entry (:sym %)) @mutate-calls))
+          (is (= [{:msg "workflow-loader: 1 workflows loaded"
+                   :level {:role "assistant", :custom-type "workflow-loader", :level :info}}]
+                 @notifications)))))))
 
 (deftest reload-preserves-extension-state-atom-test
   (testing "namespace reload preserves workflow-loader state so registered command handlers keep working"

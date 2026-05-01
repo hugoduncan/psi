@@ -113,6 +113,20 @@
       (is (true? (:terminal-message-emitted job)))
       (is (instance? java.time.Instant (:terminal-message-emitted-at job))))))
 
+(deftest n4b-suppressed-terminal-message-test
+  (testing "N4b: suppressed terminal messages do not remain pending for transcript emission"
+    (let [store (bj/create-store)
+          _     (start-job! store "tc-n4b" "thread-a" "tool-z" "job-n4b")
+          _     (mark-terminal! store {:job-id "job-n4b"
+                                       :outcome :completed
+                                       :payload {:ok true}
+                                       :suppress-terminal-message? true})
+          pending (bj/pending-terminal-jobs-in store "thread-a")
+          job     (bj/get-job-in store "job-n4b")]
+      (is (empty? pending))
+      (is (true? (:terminal-message-emitted job)))
+      (is (instance? java.time.Instant (:terminal-message-emitted-at job))))))
+
 (deftest n5-ordered-multi-job-injection-test
   (testing "N5: terminal injections emitted in completion-time order"
     (let [store (bj/create-store)

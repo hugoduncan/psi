@@ -65,8 +65,10 @@
   (orchestration/start-background-job! mutate! session-id run-id workflow-name))
 
 (defn- mark-background-job-terminal!
-  [job-id status payload]
-  (orchestration/mark-background-job-terminal! mutate! job-id status payload))
+  ([job-id status payload]
+   (orchestration/mark-background-job-terminal! mutate! job-id status payload {}))
+  ([job-id status payload opts]
+   (orchestration/mark-background-job-terminal! mutate! job-id status payload opts)))
 
 ;;; Definition loading and registration
 

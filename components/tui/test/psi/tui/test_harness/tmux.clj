@@ -38,9 +38,18 @@
 (def default-autocomplete-selected-marker "▸ ")
 (def default-capture-lines 3000)
 
-(defn- run-sh
+(defn- shell-sh
   [cmd]
   (shell/sh "bash" "-lc" cmd))
+
+(defn- run-sh
+  [cmd]
+  (let [cmd* (if (and (zero? (:exit (shell-sh "command -v mise >/dev/null 2>&1")))
+                      (or (= cmd "tmux start-server")
+                          (str/starts-with? cmd "tmux ")))
+               (str "mise exec tmux -- " cmd)
+               cmd)]
+    (shell-sh cmd*)))
 
 (defn tmux-available?
   []

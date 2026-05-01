@@ -215,7 +215,7 @@
       state)))
 
 (defn mark-terminal
-  [state {:keys [job-id outcome payload terminal-history-max-per-thread]
+  [state {:keys [job-id outcome payload terminal-history-max-per-thread suppress-terminal-message?]
           :or {terminal-history-max-per-thread default-terminal-history-max-per-thread}}]
   (when-not (terminal-status? outcome)
     (throw (ex-info "Terminal outcome required"
@@ -224,13 +224,16 @@
   (let [job (get-in state [:jobs-by-id job-id])]
     (when-not job
       (throw (ex-info "Job not found" {:job-id job-id})))
-    (let [completed-seq (inc (long (or (:next-terminal-seq state) 0)))]
+    (let [completed-seq (inc (long (or (:next-terminal-seq state) 0)))
+          emitted-at (when suppress-terminal-message? (now))]
       (-> state
           (assoc :next-terminal-seq completed-seq)
           (assoc-in [:jobs-by-id job-id :status] outcome)
           (assoc-in [:jobs-by-id job-id :completed-at] (now))
           (assoc-in [:jobs-by-id job-id :completed-seq] completed-seq)
           (assoc-in [:jobs-by-id job-id :terminal-payload] payload)
+          (assoc-in [:jobs-by-id job-id :terminal-message-emitted] (boolean suppress-terminal-message?))
+          (assoc-in [:jobs-by-id job-id :terminal-message-emitted-at] emitted-at)
           (enforce-terminal-retention* (:thread-id job) terminal-history-max-per-thread)))))
 
 (defn mark-terminal-in!

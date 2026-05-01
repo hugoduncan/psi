@@ -28,7 +28,7 @@
      :status (:psi.background-job/status result)}))
 
 (defn mark-background-job-terminal!
-  [mutate! job-id status payload]
+  [mutate! job-id status payload {:keys [suppress-terminal-message?] :as _opts}]
   (let [outcome (case status
                   :completed :completed
                   :cancelled :cancelled
@@ -37,9 +37,11 @@
                   :failed :failed
                   :failed)]
     (mutate! 'psi.extension/mark-background-job-terminal
-             {:job-id job-id
-              :outcome outcome
-              :payload payload})))
+             (cond-> {:job-id job-id
+                      :outcome outcome
+                      :payload payload}
+               (some? suppress-terminal-message?)
+               (assoc :suppress-terminal-message? suppress-terminal-message?)))))
 
 (defn continue-workflow-input
   [prompt-text]
@@ -83,22 +85,23 @@
   (let [status (:psi.workflow/status exec-result)
         result-text (some-> (:psi.workflow/result exec-result) str/trim not-empty)
         ok? (= :completed status)
+        chat-delivery? (and include-result? ok? (some? result-text))
         job-id (get-in @inflight-runs [run-id :job-id])]
     (when job-id
-      (try
-        (mark-background-job-terminal!
-         job-id
-         status
-         {:run-id run-id
-          :workflow workflow-name
-          :status status
-          :result result-text
-          :error (:psi.workflow/error exec-result)})
-        (catch Exception _ nil)))
-    (when (and include-result? result-text)
+      (mark-background-job-terminal!
+       job-id
+       status
+       {:run-id run-id
+        :workflow workflow-name
+        :status status
+        :result result-text
+        :error (:psi.workflow/error exec-result)}
+       {:suppress-terminal-message? chat-delivery?}))
+    (when chat-delivery?
       (inject-result-into-context! parent-session-id run-id result-text))
-    (notify! (text/completion-notification-text workflow-name status run-id)
-             (if ok? :info :warn))
+    (when-not chat-delivery?
+      (notify! (text/completion-notification-text workflow-name status run-id)
+               (if ok? :info :warn)))
     (when-let [mf mutate!]
       (when-not include-result?
         (try

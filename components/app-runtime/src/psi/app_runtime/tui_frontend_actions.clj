@@ -132,7 +132,22 @@
                              :psi.session-info/modified]}]))}
 
       :else
-      (commands/dispatch-in ctx sid text cmd-opts))))
+      (let [result (commands/dispatch-in ctx sid text cmd-opts)]
+        (if (= :extension-cmd (:type result))
+          (let [output (try
+                         (let [returned ((:handler result) (:args result))]
+                           (cond
+                             (and (string? returned) (not (str/blank? returned))) returned
+                             (and (map? returned)
+                                  (string? (:message returned))
+                                  (not (str/blank? (:message returned)))) (:message returned)
+                             :else nil))
+                         (catch Exception e
+                           (str "[extension command error: " (ex-message e) "]")))]
+            (if output
+              {:type :text :message output}
+              result))
+          result)))))
 
 (defn journal-command-result!
   [{:keys [ctx sid text result]}]
