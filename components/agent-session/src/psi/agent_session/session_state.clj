@@ -178,3 +178,23 @@
 
 (defn list-prompt-contributions-in [ctx session-id]
   (sorted-prompt-contributions (:prompt-contributions (get-session-data-in ctx session-id))))
+
+(defn children-of-in
+  "Return a vec of session-ids whose :parent-session-id equals `parent-id`.
+   Pure scan of the sessions map — O(n) in number of sessions."
+  [ctx parent-id]
+  (->> (vals (get-sessions-map-in ctx))
+       (keep (fn [{:keys [data]}]
+               (when (= parent-id (:parent-session-id data))
+                 (:session-id data))))
+       vec))
+
+(defn descendants-of-in
+  "Return a vec of all descendant session-ids of `root-id` in bottom-up
+   (leaf-first) order, suitable for sequential close without orphaning.
+   `root-id` itself is not included."
+  [ctx root-id]
+  (letfn [(post-order [id]
+            (let [children (children-of-in ctx id)]
+              (into (vec (mapcat post-order children)) [id])))]
+    (vec (mapcat post-order (children-of-in ctx root-id)))))
