@@ -343,7 +343,8 @@
                                                        :data  (events/session-updated-payload ctx target-session-id)})
                                   (events/emit-event! emit-frame! state
                                                       {:event "footer/updated"
-                                                       :data  (events/footer-updated-payload ctx target-session-id)}))))
+                                                       :data  (assoc (events/footer-updated-payload ctx target-session-id)
+                                                                     :session-id target-session-id)}))))
                             (recur))))]
       (rpc.state/set-external-event-loop! state loop-fut)
       ;; Emit an immediate footer snapshot after starting the loop so subscribers
