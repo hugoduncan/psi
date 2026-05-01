@@ -4,6 +4,7 @@ Open tasks in suggested execution order:
 
 Queue:
 
+`munera/open/074-emacs-footer-inclusion-in-prompt/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/066-tui-text-wrapping-convergence/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
@@ -13,6 +14,7 @@ Queue:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 
 Notes:
+- `074` is a focused bug fix: `psi-emacs--draft-end-position` stale-region fallback causes footer content to be included in submitted prompts on longer sessions.
 - `munera/plan.md` is the active project-wide orchestration surface.
 - These munera tasks split the active work into executable task directories.
 - Completed tasks should live under `munera/closed/`; open-task ordering should reflect only directories still active under `munera/open/`.
