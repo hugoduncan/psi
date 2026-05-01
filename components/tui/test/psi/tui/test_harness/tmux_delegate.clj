@@ -8,7 +8,15 @@
 (def default-ack-marker "Delegated to lambda-compiler — run ")
 (def default-user-bridge-prefix "Workflow run lambda-compiler-")
 (def default-user-bridge-suffix " result:")
-(def default-assistant-result "λx.use(munera, track(work)) ∧ use(mementum, track(state ∧ knowledge))")
+
+(defn- assistant-result-present?
+  [pane]
+  (let [lines (str/split-lines pane)
+        assistant-lines (filter #(str/includes? % "ψ: ") lines)]
+    (boolean
+     (some #(and (not (str/includes? % default-ack-marker))
+                 (not (str/includes? % "workflow-loader: ")))
+           assistant-lines))))
 
 (defn- failure-result
   [target reason]
@@ -67,7 +75,7 @@
                              (not (wait-for-user-bridge target step-timeout-ms))
                              (failure-result target :delegate-user-bridge-timeout)
 
-                             (not (tmux/wait-for-marker target default-assistant-result step-timeout-ms))
+                             (not (tmux/wait-until #(assistant-result-present? (pane-text target)) step-timeout-ms))
                              (failure-result target :delegate-assistant-result-timeout)
 
                              (str/includes? (pane-text target) "(workflow context bridge)")

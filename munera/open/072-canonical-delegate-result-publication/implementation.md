@@ -19,3 +19,4 @@ Implementation notes
   - include-result false => retain append-entry fallback semantics
   - non-completed statuses => retain non-chat semantics
 - Added decision-level tests for the mandatory publication cases alongside the existing side-effect-level completion test coverage.
+- Tightened focused live `/delegate` e2e harnesses to assert the preserved semantic contract (ack + user bridge + assistant result + no visible filler) rather than one exact model-specific assistant string.

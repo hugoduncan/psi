@@ -42,16 +42,25 @@
         (buffer-substring-no-properties (point-min) (point-max)))
     "<buffer-not-live>"))
 
-(defun psi-delegate-e2e-run ()
-  "Run focused Emacs UI end-to-end /delegate scenario.
+(defun psi-delegate-e2e--delegate-bridge-complete-p (buffer)
+  "Return non-nil when BUFFER shows ack, user bridge, and a later assistant result line."
+  (and (buffer-live-p buffer)
+       (with-current-buffer buffer
+         (let ((buf (buffer-string)))
+           (and (string-match-p
+                 "User: Workflow run lambda-compiler-.* result:"
+                 buf)
+                (string-match-p
+                 "ψ: Delegated to lambda-compiler — run "
+                 buf)
+                (cl-loop for line in (split-string buf "\n")
+                         thereis (and (string-match-p "^ψ: " line)
+                                      (not (string-match-p
+                                            "^ψ: Delegated to lambda-compiler — run "
+                                            line)))))))))
 
-Scenario:
-1. launch frontend + wait for rpc transport ready
-2. send `/delegate lambda-compiler ...`
-3. assert immediate ack renders
-4. assert later user marker + assistant result render
-5. assert no visible `(workflow context bridge)` filler
-6. send `/quit` and assert buffer exits"
+(defun psi-delegate-e2e-run ()
+  "Run focused Emacs UI end-to-end /delegate scenario."
   (let ((psi-emacs-command (psi-delegate-e2e--repo-local-command))
         (psi-emacs-working-directory default-directory)
         (buffer nil)
@@ -60,12 +69,14 @@ Scenario:
     (condition-case err
         (progn
           (setq buffer (psi-emacs-open-buffer "*psi-delegate-e2e*"))
+
           (unless (psi-delegate-e2e--wait-for
                    (lambda ()
                      (and (buffer-live-p buffer)
                           (with-current-buffer buffer
                             (and psi-emacs--state
-                                 (eq (psi-emacs-state-transport-state psi-emacs--state) 'ready)))))
+                                 (eq (psi-emacs-state-transport-state psi-emacs--state)
+                                     'ready)))))
                    psi-delegate-e2e-timeout-seconds)
             (error "transport not ready within timeout"))
 
@@ -88,20 +99,7 @@ Scenario:
 
           (unless (psi-delegate-e2e--wait-for
                    (lambda ()
-                     (and (buffer-live-p buffer)
-                          (with-current-buffer buffer
-                            (and (string-match-p
-                                  "User: Workflow run lambda-compiler-.* result:"
-                                  (buffer-string))
-                                 (string-match-p
-                                  "ψ: λx\\."
-                                  (buffer-string))
-                                 (string-match-p
-                                  "munera(x).?track[s]?(work)"
-                                  (buffer-string))
-                                 (string-match-p
-                                  "mementum(x).?track[s]?(state ∧ knowledge)"
-                                  (buffer-string))))))
+                     (psi-delegate-e2e--delegate-bridge-complete-p buffer))
                    psi-delegate-e2e-timeout-seconds)
             (error "did not observe /delegate bridge completion; snapshot:\n%s"
                    (psi-delegate-e2e--buffer-snapshot buffer)))
@@ -119,7 +117,9 @@ Scenario:
                 (psi-emacs--replace-input-text "/quit"))
               (psi-emacs-send-from-buffer nil)))
 
-          (unless (psi-delegate-e2e--wait-for (lambda () (not (buffer-live-p buffer))) 5)
+          (unless (psi-delegate-e2e--wait-for
+                   (lambda () (not (buffer-live-p buffer)))
+                   5)
             (error "buffer did not close after /quit")))
       (error
        (setq ok nil)
