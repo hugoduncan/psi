@@ -33,7 +33,7 @@
                               :query         {:type "string" :description "For `action: \"query\"`: EQL query vector as EDN string, e.g. \"[:psi.agent-session/phase :psi.agent-session/session-id]\""}
                               :entity        {:type "string" :description "For `action: \"query\"`: optional EDN root entity map to seed the query, e.g. \"{:psi.agent-session/session-id \\\"sid\\\"}\" for explicit session targeting."}
                               :ns            {:type "string" :description "For `action: \"eval\"`: already loaded namespace string in which to evaluate `form`."}
-                              :form          {:type "string" :description "For `action: \"eval\"`: Clojure form string to read with *read-eval* disabled and evaluate in the named namespace."}
+                              :form          {:type "string" :description "For `action: \"eval\"`: Clojure form string using full Clojure reader syntax (quote, deref, anon-fn, var) read with *read-eval* false and evaluated in the named namespace."}
                               :namespaces    {:type "array" :items {:type "string"}
                                               :description "For `action: \"reload-code\"` namespace mode: ordered vector of already loaded namespace names to reload."}
                               :worktree-path {:type "string" :description "For `action: \"reload-code\"` worktree mode, and `action: \"project-repl\"`: explicit absolute target worktree path. When absent, invoking session worktree may be used."}
@@ -70,6 +70,13 @@
 (defn- parse-edn-string [s]
   (binding [*read-eval* false]
     (edn/read-string s)))
+
+(defn- read-clojure-form
+  "Read a Clojure form string with full reader syntax (quote, deref, anon-fn, var)
+   but with *read-eval* disabled to prevent #=() read-time eval."
+  [s]
+  (binding [*read-eval* false]
+    (read-string s)))
 
 (defn- psi-tool-action [{:strs [action query]}]
   (cond
@@ -399,7 +406,7 @@
   (let [started-at (System/nanoTime)]
     (try
       (let [target-ns (eval-namespace ns)
-            form-value (parse-edn-string form)
+            form-value (read-clojure-form form)
             value (binding [*ns* target-ns] (eval form-value))
             safe-value (sanitize-psi-tool-data value)
             duration-ms (long (/ (- (System/nanoTime) started-at) 1000000))]
