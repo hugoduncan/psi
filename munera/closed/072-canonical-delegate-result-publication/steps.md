@@ -27,3 +27,20 @@
   - [x] confirm no async-completion side-effect branch re-decides publication policy after derivation
 - [x] Run focused workflow-loader and `/delegate` regression tests
 - [x] Document clarified invariants and any remaining intentional boundaries in `implementation.md`
+
+Follow-up steps from review
+
+- [x] Tighten the focused live `/delegate` TUI e2e assistant-result predicate
+  - [x] require the assistant result to appear after the observed user bridge marker
+  - [x] avoid passing on unrelated non-ack assistant output
+  - [x] keep the predicate semantic rather than model-text-specific
+- [x] Tighten the focused live `/delegate` Emacs e2e assistant-result predicate
+  - [x] require the assistant result to appear after the observed user bridge marker
+  - [x] avoid passing on unrelated non-ack assistant output
+  - [x] keep the predicate semantic rather than model-text-specific
+- [x] Re-run focused `/delegate` e2e verification after predicate tightening
+  - [x] TUI focused live delegate scenario
+  - [x] Emacs focused live delegate scenario
+- [x] Reassess the internal `delegated-result-publication` shape if publication modeling spreads further
+  - [x] consider whether a shared `:outcome` plus slimmer action descriptors would reduce duplication
+  - [x] keep current shape unless a concrete reuse pressure appears

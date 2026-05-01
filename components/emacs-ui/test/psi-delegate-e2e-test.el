@@ -46,14 +46,21 @@
   "Return non-nil when BUFFER shows ack, user bridge, and a later assistant result line."
   (and (buffer-live-p buffer)
        (with-current-buffer buffer
-         (let ((buf (buffer-string)))
+         (let* ((buf (buffer-string))
+                (lines (split-string buf "\n"))
+                (bridge-index
+                 (cl-position-if
+                  (lambda (line)
+                    (string-match-p "User: Workflow run lambda-compiler-.* result:" line))
+                  lines)))
            (and (string-match-p
                  "User: Workflow run lambda-compiler-.* result:"
                  buf)
                 (string-match-p
                  "ψ: Delegated to lambda-compiler — run "
                  buf)
-                (cl-loop for line in (split-string buf "\n")
+                bridge-index
+                (cl-loop for line in (nthcdr (1+ bridge-index) lines)
                          thereis (and (string-match-p "^ψ: " line)
                                       (not (string-match-p
                                             "^ψ: Delegated to lambda-compiler — run "

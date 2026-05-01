@@ -9,14 +9,20 @@
 (def default-user-bridge-prefix "Workflow run lambda-compiler-")
 (def default-user-bridge-suffix " result:")
 
-(defn- assistant-result-present?
+(defn- assistant-result-after-user-bridge?
   [pane]
   (let [lines (str/split-lines pane)
-        assistant-lines (filter #(str/includes? % "ψ: ") lines)]
+        bridge-index (first (keep-indexed (fn [idx line]
+                                            (when (and (str/includes? line default-user-bridge-prefix)
+                                                       (str/includes? line default-user-bridge-suffix))
+                                              idx))
+                                          lines))]
     (boolean
-     (some #(and (not (str/includes? % default-ack-marker))
-                 (not (str/includes? % "workflow-loader: ")))
-           assistant-lines))))
+     (when (some? bridge-index)
+       (some #(and (str/includes? % "ψ: ")
+                   (not (str/includes? % default-ack-marker))
+                   (not (str/includes? % "workflow-loader: ")))
+             (drop (inc bridge-index) lines))))))
 
 (defn- failure-result
   [target reason]
@@ -75,7 +81,7 @@
                              (not (wait-for-user-bridge target step-timeout-ms))
                              (failure-result target :delegate-user-bridge-timeout)
 
-                             (not (tmux/wait-until #(assistant-result-present? (pane-text target)) step-timeout-ms))
+                             (not (tmux/wait-until #(assistant-result-after-user-bridge? (pane-text target)) step-timeout-ms))
                              (failure-result target :delegate-assistant-result-timeout)
 
                              (str/includes? (pane-text target) "(workflow context bridge)")
