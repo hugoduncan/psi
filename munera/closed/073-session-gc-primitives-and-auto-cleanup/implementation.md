@@ -20,10 +20,9 @@ leaks. Low risk: `run-agent-loop-in-session` catches all `Throwable` internally.
 
 # Follow-on steps
 
-- [ ] Fix `workflows.clj:delete-working-memory!` — change 2-arg to 3-arg form:
-  `(sp/delete-working-memory! (::sc/working-memory-store (:env reg)) (:env reg) session-id)`
-  Verify workflows tests pass after change.
+- [x] Fix `workflows.clj:delete-working-memory!` — no-op: grep truncated the multiline
+  call; the 3-arg form was already present (`store, (:env reg), session-id`).
 
-- [ ] Tighten `close-session-in!` — unify double `get-session-data-in` read:
-  Replace `(if-not ...)` guard + separate `owned-schedule-ids` read with a single
+- [x] Tighten `close-session-in!` — unified double `get-session-data-in` read:
+  `(if-not ...)` guard + separate `owned-schedule-ids` read replaced with a single
   `(if-let [sd (ss/get-session-data-in ctx session-id)]` binding.
