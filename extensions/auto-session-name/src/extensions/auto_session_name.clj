@@ -197,58 +197,90 @@
                                                            keyword)
                                          :id       (:psi.agent-session/model-id model-ctx)}}})
 
-(defn- select-helper-model [api source-session-id]
+(defn- select-helper-models [api source-session-id]
   (let [model-ctx (query-session-model-context api source-session-id)
         result    (model-selection/resolve-selection
                    {:request (helper-model-selection-request model-ctx)})]
-    (when (= :ok (:outcome result))
-      (:candidate result))))
+    (if (= :ok (:outcome result))
+      (vec (get-in result [:ranking :ranked]))
+      [])))
+
+(defn- helper-attempt-stop-reason
+  [api source-session-id checkpoint-turn-count]
+  (cond
+    (stale-checkpoint? source-session-id checkpoint-turn-count)
+    :stale
+
+    (manual-override? source-session-id (query-session-name api source-session-id))
+    :manual
+
+    :else
+    nil))
+
+(defn- create-helper-child-session [api source-session-id system-prompt]
+  ((:mutate-session api) source-session-id 'psi.extension/create-child-session
+                         {:session-name               "auto-session-name"
+                          :system-prompt              system-prompt
+                          :tool-defs                  []
+                          :thinking-level             :off
+                          :prompt-component-selection {:agents-md? false
+                                                       :extension-prompt-contributions []
+                                                       :tool-names []
+                                                       :skill-names []
+                                                       :components #{}}
+                          :cache-breakpoints          #{}}))
+
+(defn- run-helper-attempt [api source-session-id system-prompt user-prompt helper-model]
+  (let [child            (create-helper-child-session api source-session-id system-prompt)
+        child-session-id (:psi.agent-session/session-id child)]
+    (when child-session-id
+      (remember-helper-session! child-session-id)
+      {:child-session-id child-session-id
+       :attempt-result   (try
+                           (let [run-result ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
+                                                                   (cond-> {:prompt user-prompt}
+                                                                     helper-model
+                                                                     (assoc :model helper-model)))]
+                             {:run-result run-result
+                              :title      (some-> (:psi.agent-session/agent-run-text run-result)
+                                                  normalize-title)})
+                           (catch Exception _
+                             {:run-result nil
+                              :title      nil}))})))
 
 (defn- infer-session-title [api source-session-id checkpoint-turn-count]
   (when-not (stale-checkpoint? source-session-id checkpoint-turn-count)
-    (let [lines          (sanitize-session-entries (query-session-entries api source-session-id))
+    (let [lines                       (sanitize-session-entries (query-session-entries api source-session-id))
           {:keys [system-prompt user-prompt]} (build-rename-prompt lines)
-          helper-model   (select-helper-model api source-session-id)]
+          helper-models               (select-helper-models api source-session-id)]
       (when (seq user-prompt)
-        (let [child ((:mutate-session api) source-session-id 'psi.extension/create-child-session
-                                           {:session-name               "auto-session-name"
-                                            :system-prompt              system-prompt
-                                            :tool-defs                  []
-                                            :thinking-level             :off
-                                            :prompt-component-selection {:agents-md? false
-                                                                         :extension-prompt-contributions []
-                                                                         :tool-names []
-                                                                         :skill-names []
-                                                                         :components #{}}
-                                            :cache-breakpoints          #{}})
-              child-session-id (:psi.agent-session/session-id child)]
-          (when child-session-id
-            (remember-helper-session! child-session-id)
-            (try
-              (let [run-result    ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
-                                                         (cond-> {:prompt user-prompt}
-                                                           helper-model
-                                                           (assoc :model helper-model)))
-                    title         (some-> (:psi.agent-session/agent-run-text run-result)
-                                          normalize-title)
-                    current-name  (query-session-name api source-session-id)
-                    rename-result (when (and (true? (:psi.agent-session/agent-run-ok? run-result))
-                                             (valid-title? title)
-                                             (not (stale-checkpoint? source-session-id checkpoint-turn-count))
-                                             (not (manual-override? source-session-id current-name)))
-                                    ((:mutate-session api) source-session-id 'psi.extension/set-session-name
-                                                           {:name title})
-                                    (remember-auto-name! source-session-id title)
-                                    title)]
-                rename-result)
-              (catch Exception e
-                (when-let [log-fn (:log-fn @state)]
-                  (log-fn (str "auto-session-name: inference error: " (ex-message e))))
-                nil)
-              (finally
-                ;; Always close the helper session after use, regardless of rename outcome or exception.
-                ((:mutate api) 'psi.extension/close-session {:session-id child-session-id})
-                (swap! state update :helper-session-ids disj child-session-id)))))))))
+        (loop [[helper-model & more-models] helper-models]
+          (when helper-model
+            (when-not (helper-attempt-stop-reason api source-session-id checkpoint-turn-count)
+              (let [{:keys [child-session-id attempt-result]}
+                    (run-helper-attempt api source-session-id system-prompt user-prompt helper-model)
+                    {:keys [run-result title]} attempt-result
+                    result
+                    (cond
+                      (helper-attempt-stop-reason api source-session-id checkpoint-turn-count)
+                      nil
+
+                      (and (true? (:psi.agent-session/agent-run-ok? run-result))
+                           (valid-title? title))
+                      (when-not (helper-attempt-stop-reason api source-session-id checkpoint-turn-count)
+                        ((:mutate-session api) source-session-id 'psi.extension/set-session-name
+                                               {:name title})
+                        (remember-auto-name! source-session-id title)
+                        title)
+
+                      :else
+                      ::retry)]
+                (when child-session-id
+                  ((:mutate api) 'psi.extension/close-session {:session-id child-session-id})
+                  (swap! state update :helper-session-ids disj child-session-id))
+                (if (= ::retry result)
+                  (recur more-models)
+                  result)))))))))
 
 (defn- on-turn-finished [api payload]
   (when-let [session-id (normalize-session-id payload)]

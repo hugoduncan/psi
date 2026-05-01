@@ -260,53 +260,56 @@
           (.delete path))))))
 
 (deftest checkpoint-handler-invalid-helper-result-does-not-rename-test
-  (testing "invalid helper result does not rename and falls back to notification"
+  (testing "invalid helper result does not rename and falls back to notification after exhaustion"
     (reset-state!)
-    (let [calls (atom [])
-          {:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/auto_session_name.clj"
-                                :query-fn (fn [req]
-                                            (cond
-                                              (= {:session-id "s1"
-                                                  :query [{:psi.agent-session/session-entries
-                                                           [:psi.session-entry/kind
-                                                            :psi.session-entry/data]}]}
-                                                 req)
-                                              {:psi.agent-session/session-entries
-                                               [{:psi.session-entry/kind :message
-                                                 :psi.session-entry/data {:message {:role "user"
-                                                                                    :content [{:type :text :text "Fix footer rendering"}]}}}]}
+    (with-redefs [sut/select-helper-models (fn [_api _source-session-id]
+                                             [{:provider :local-helper :id "first" :name "First"}])]
+      (let [calls (atom [])
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/auto_session_name.clj"
+                                  :query-fn (fn [req]
+                                              (cond
+                                                (= {:session-id "s1"
+                                                    :query [{:psi.agent-session/session-entries
+                                                             [:psi.session-entry/kind
+                                                              :psi.session-entry/data]}]}
+                                                   req)
+                                                {:psi.agent-session/session-entries
+                                                 [{:psi.session-entry/kind :message
+                                                   :psi.session-entry/data {:message {:role "user"
+                                                                                      :content [{:type :text :text "Fix footer rendering"}]}}}]}
 
-                                              (= {:session-id "s1"
-                                                  :query [:psi.agent-session/session-name]}
-                                                 req)
-                                              {:psi.agent-session/session-name "initial"}
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/session-name]}
+                                                   req)
+                                                {:psi.agent-session/session-name "initial"}
 
-                                              (= {:session-id "s1"
-                                                  :query [:psi.agent-session/model-provider
-                                                          :psi.agent-session/model-id]}
-                                                 req)
-                                              {:psi.agent-session/model-provider "anthropic"
-                                               :psi.agent-session/model-id "claude-sonnet-4-6"}
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/model-provider
+                                                            :psi.agent-session/model-id]}
+                                                   req)
+                                                {:psi.agent-session/model-provider "anthropic"
+                                                 :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
-                                :mutate-fn (fn [op params]
-                                             (swap! calls conj [op params])
-                                             (case op
-                                               psi.extension/create-child-session {:psi.agent-session/session-id "child-1"}
-                                               psi.extension/run-agent-loop-in-session {:psi.agent-session/agent-run-ok? true
-                                                                                        :psi.agent-session/agent-run-text ""}
-                                               psi.extension/schedule-event {:psi.extension/scheduled? true}
-                                               psi.extension/close-session {:psi.agent-session/close-session-closed? true
-                                                                            :psi.agent-session/close-session-id (:session-id params)}
-                                               {}))})]
-      (sut/init api)
-      (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
-        (is (nil? (handler {:session-id "s1" :turn-count 2})))
-        (is (not-any? #(= 'psi.extension/set-session-name (first %)) @calls))
-        (is (= {:text "auto-session-name: rename checkpoint for session s1 at turn 2"
-                :level :info}
-               (last (:notifications @state))))))))
+                                                :else {}))
+                                  :mutate-fn (fn [op params]
+                                               (swap! calls conj [op params])
+                                               (case op
+                                                 psi.extension/create-child-session {:psi.agent-session/session-id "child-1"}
+                                                 psi.extension/run-agent-loop-in-session {:psi.agent-session/agent-run-ok? true
+                                                                                          :psi.agent-session/agent-run-text ""}
+                                                 psi.extension/schedule-event {:psi.extension/scheduled? true}
+                                                 psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                              :psi.agent-session/close-session-id (:session-id params)}
+                                                 {}))})]
+        (sut/init api)
+        (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+          (is (nil? (handler {:session-id "s1" :turn-count 2})))
+          (is (not-any? #(= 'psi.extension/set-session-name (first %)) @calls))
+          (is (= 1 (count (filter #(= 'psi.extension/close-session (first %)) @calls))))
+          (is (= {:text "auto-session-name: rename checkpoint for session s1 at turn 2"
+                  :level :info}
+                 (last (:notifications @state)))))))))
 
 (deftest stale-checkpoint-does-not-start-helper-test
   (testing "stale checkpoint does not create helper child session"
@@ -465,6 +468,275 @@
         (is (some #(= 'psi.extension/set-session-name (first %)) @calls))
         (is (= "New inferred name"
                (get-in @@#'sut/state [:last-auto-name-by-session "s1"])))))))
+
+(deftest fallback-from-failed-first-helper-to-succeeding-later-candidate-test
+  (testing "fallback follows exact ranked order and renames from a later successful candidate"
+    (reset-state!)
+    (with-redefs [sut/select-helper-models (fn [_api _source-session-id]
+                                             [{:provider :local-helper :id "first" :name "First"}
+                                              {:provider :local-helper :id "second" :name "Second"}])]
+      (let [calls (atom [])
+            child-n (atom 0)
+            run-n   (atom 0)
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/auto_session_name.clj"
+                                  :query-fn (fn [req]
+                                              (cond
+                                                (= {:session-id "s1"
+                                                    :query [{:psi.agent-session/session-entries
+                                                             [:psi.session-entry/kind
+                                                              :psi.session-entry/data]}]}
+                                                   req)
+                                                {:psi.agent-session/session-entries
+                                                 [{:psi.session-entry/kind :message
+                                                   :psi.session-entry/data {:message {:role "user"
+                                                                                      :content [{:type :text :text "Fix footer rendering"}]}}}]}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/session-name]}
+                                                   req)
+                                                {:psi.agent-session/session-name "initial"}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/model-provider
+                                                            :psi.agent-session/model-id]}
+                                                   req)
+                                                {:psi.agent-session/model-provider "anthropic"
+                                                 :psi.agent-session/model-id "claude-sonnet-4-6"}
+
+                                                :else {}))
+                                  :mutate-fn (fn [op params]
+                                               (swap! calls conj [op params])
+                                               (case op
+                                                 psi.extension/create-child-session {:psi.agent-session/session-id (str "child-" (swap! child-n inc))}
+                                                 psi.extension/run-agent-loop-in-session (if (= 1 (swap! run-n inc))
+                                                                                           (throw (ex-info "model unavailable" {}))
+                                                                                           {:psi.agent-session/agent-run-ok? true
+                                                                                            :psi.agent-session/agent-run-text "Fix footer rendering"})
+                                                 psi.extension/set-session-name {:psi.agent-session/session-name (:name params)}
+                                                 psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                              :psi.agent-session/close-session-id (:session-id params)}
+                                                 {}))})]
+        (sut/init api)
+        (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+          (is (nil? (handler {:session-id "s1" :turn-count 2})))
+          (is (= ["first" "second"]
+                 (->> @calls
+                      (keep (fn [[op params]]
+                              (when (= op 'psi.extension/run-agent-loop-in-session)
+                                (get-in params [:model :id]))))
+                      vec)))
+          (is (= 2 (count (filter #(= 'psi.extension/create-child-session (first %)) @calls))))
+          (is (= 2 (count (filter #(= 'psi.extension/close-session (first %)) @calls))))
+          (is (= 1 (count (filter #(= 'psi.extension/set-session-name (first %)) @calls)))))))))
+
+(deftest fallback-from-invalid-title-to-valid-later-candidate-test
+  (testing "fallback continues when a helper run succeeds but returns an invalid title"
+    (reset-state!)
+    (with-redefs [sut/select-helper-models (fn [_api _source-session-id]
+                                             [{:provider :local-helper :id "first" :name "First"}
+                                              {:provider :local-helper :id "second" :name "Second"}])]
+      (let [calls (atom [])
+            run-n (atom 0)
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/auto_session_name.clj"
+                                  :query-fn (fn [req]
+                                              (cond
+                                                (= {:session-id "s1"
+                                                    :query [{:psi.agent-session/session-entries
+                                                             [:psi.session-entry/kind
+                                                              :psi.session-entry/data]}]}
+                                                   req)
+                                                {:psi.agent-session/session-entries
+                                                 [{:psi.session-entry/kind :message
+                                                   :psi.session-entry/data {:message {:role "user"
+                                                                                      :content [{:type :text :text "Fix footer rendering"}]}}}]}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/session-name]}
+                                                   req)
+                                                {:psi.agent-session/session-name "initial"}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/model-provider
+                                                            :psi.agent-session/model-id]}
+                                                   req)
+                                                {:psi.agent-session/model-provider "anthropic"
+                                                 :psi.agent-session/model-id "claude-sonnet-4-6"}
+
+                                                :else {}))
+                                  :mutate-fn (fn [op params]
+                                               (swap! calls conj [op params])
+                                               (case op
+                                                 psi.extension/create-child-session {:psi.agent-session/session-id (str "child-" (count @calls))}
+                                                 psi.extension/run-agent-loop-in-session (if (= 1 (swap! run-n inc))
+                                                                                           {:psi.agent-session/agent-run-ok? true
+                                                                                            :psi.agent-session/agent-run-text ""}
+                                                                                           {:psi.agent-session/agent-run-ok? true
+                                                                                            :psi.agent-session/agent-run-text "Fix footer rendering"})
+                                                 psi.extension/set-session-name {:psi.agent-session/session-name (:name params)}
+                                                 psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                              :psi.agent-session/close-session-id (:session-id params)}
+                                                 {}))})]
+        (sut/init api)
+        (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+          (is (nil? (handler {:session-id "s1" :turn-count 2})))
+          (is (= ["first" "second"]
+                 (->> @calls
+                      (keep (fn [[op params]]
+                              (when (= op 'psi.extension/run-agent-loop-in-session)
+                                (get-in params [:model :id]))))
+                      vec)))
+          (is (= 1 (count (filter #(= 'psi.extension/set-session-name (first %)) @calls)))))))))
+
+(deftest empty-ranked-candidate-list-behaves-as-exhaustion-test
+  (testing "empty helper candidate list behaves as exhaustion without rename"
+    (reset-state!)
+    (with-redefs [sut/select-helper-models (fn [_api _source-session-id] [])]
+      (let [calls (atom [])
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/auto_session_name.clj"
+                                  :query-fn (fn [req]
+                                              (cond
+                                                (= {:session-id "s1"
+                                                    :query [{:psi.agent-session/session-entries
+                                                             [:psi.session-entry/kind
+                                                              :psi.session-entry/data]}]}
+                                                   req)
+                                                {:psi.agent-session/session-entries
+                                                 [{:psi.session-entry/kind :message
+                                                   :psi.session-entry/data {:message {:role "user"
+                                                                                      :content [{:type :text :text "Fix footer rendering"}]}}}]}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/model-provider
+                                                            :psi.agent-session/model-id]}
+                                                   req)
+                                                {:psi.agent-session/model-provider "anthropic"
+                                                 :psi.agent-session/model-id "claude-sonnet-4-6"}
+
+                                                :else {}))
+                                  :mutate-fn (fn [op params]
+                                               (swap! calls conj [op params])
+                                               {})})]
+        (sut/init api)
+        (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+          (is (nil? (handler {:session-id "s1" :turn-count 2})))
+          (is (empty? @calls))
+          (is (= {:text "auto-session-name: rename checkpoint for session s1 at turn 2"
+                  :level :info}
+                 (last (:notifications @state)))))))))
+
+(deftest stale-fallback-termination-prevents-later-attempts-test
+  (testing "stale checkpoint during fallback terminates without trying later candidates"
+    (reset-state!)
+    (swap! @#'sut/state assoc :turn-counts {"s1" 2})
+    (with-redefs [sut/select-helper-models (fn [_api _source-session-id]
+                                             [{:provider :local-helper :id "first"}
+                                              {:provider :local-helper :id "second"}])]
+      (let [calls (atom [])
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/auto_session_name.clj"
+                                  :query-fn (fn [req]
+                                              (cond
+                                                (= {:session-id "s1"
+                                                    :query [{:psi.agent-session/session-entries
+                                                             [:psi.session-entry/kind
+                                                              :psi.session-entry/data]}]}
+                                                   req)
+                                                {:psi.agent-session/session-entries
+                                                 [{:psi.session-entry/kind :message
+                                                   :psi.session-entry/data {:message {:role "user"
+                                                                                      :content [{:type :text :text "Fix footer rendering"}]}}}]}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/session-name]}
+                                                   req)
+                                                {:psi.agent-session/session-name "initial"}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/model-provider
+                                                            :psi.agent-session/model-id]}
+                                                   req)
+                                                {:psi.agent-session/model-provider "anthropic"
+                                                 :psi.agent-session/model-id "claude-sonnet-4-6"}
+
+                                                :else {}))
+                                  :mutate-fn (fn [op params]
+                                               (swap! calls conj [op params])
+                                               (case op
+                                                 psi.extension/create-child-session {:psi.agent-session/session-id "child-1"}
+                                                 psi.extension/run-agent-loop-in-session (do (swap! @#'sut/state assoc :turn-counts {"s1" 3})
+                                                                                             {:psi.agent-session/agent-run-ok? false
+                                                                                              :psi.agent-session/agent-run-text nil})
+                                                 psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                              :psi.agent-session/close-session-id (:session-id params)}
+                                                 {}))})]
+        (sut/init api)
+        (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+          (is (nil? (handler {:session-id "s1" :turn-count 2})))
+          (is (= ["first"]
+                 (->> @calls
+                      (keep (fn [[op params]]
+                              (when (= op 'psi.extension/run-agent-loop-in-session)
+                                (get-in params [:model :id]))))
+                      vec))))))))
+
+(deftest manual-override-during-fallback-terminates-later-attempts-test
+  (testing "manual override detected during fallback terminates without trying later candidates"
+    (reset-state!)
+    (swap! @#'sut/state assoc :last-auto-name-by-session {"s1" "Old auto name"})
+    (with-redefs [sut/select-helper-models (fn [_api _source-session-id]
+                                             [{:provider :local-helper :id "first"}
+                                              {:provider :local-helper :id "second"}])]
+      (let [calls (atom [])
+            current-name* (atom "Old auto name")
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/auto_session_name.clj"
+                                  :query-fn (fn [req]
+                                              (cond
+                                                (= {:session-id "s1"
+                                                    :query [{:psi.agent-session/session-entries
+                                                             [:psi.session-entry/kind
+                                                              :psi.session-entry/data]}]}
+                                                   req)
+                                                {:psi.agent-session/session-entries
+                                                 [{:psi.session-entry/kind :message
+                                                   :psi.session-entry/data {:message {:role "user"
+                                                                                      :content [{:type :text :text "Fix footer rendering"}]}}}]}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/session-name]}
+                                                   req)
+                                                {:psi.agent-session/session-name @current-name*}
+
+                                                (= {:session-id "s1"
+                                                    :query [:psi.agent-session/model-provider
+                                                            :psi.agent-session/model-id]}
+                                                   req)
+                                                {:psi.agent-session/model-provider "anthropic"
+                                                 :psi.agent-session/model-id "claude-sonnet-4-6"}
+
+                                                :else {}))
+                                  :mutate-fn (fn [op params]
+                                               (swap! calls conj [op params])
+                                               (case op
+                                                 psi.extension/create-child-session {:psi.agent-session/session-id "child-1"}
+                                                 psi.extension/run-agent-loop-in-session (do (reset! current-name* "Manual name")
+                                                                                             {:psi.agent-session/agent-run-ok? false
+                                                                                              :psi.agent-session/agent-run-text nil})
+                                                 psi.extension/close-session {:psi.agent-session/close-session-closed? true
+                                                                              :psi.agent-session/close-session-id (:session-id params)}
+                                                 {}))})]
+        (sut/init api)
+        (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+          (is (nil? (handler {:session-id "s1" :turn-count 2})))
+          (is (= ["first"]
+                 (->> @calls
+                      (keep (fn [[op params]]
+                              (when (= op 'psi.extension/run-agent-loop-in-session)
+                                (get-in params [:model :id]))))
+                      vec))))))))
 
 (deftest helper-session-turn-finished-is-ignored-test
   (testing "turn-finished events for helper child sessions do not schedule nested checkpoints"

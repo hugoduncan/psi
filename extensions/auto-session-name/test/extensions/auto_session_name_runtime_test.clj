@@ -130,10 +130,11 @@
              (:session-name (ss/get-session-data-in ctx session-id)))))))
 
 (deftest close-session-fires-even-when-agent-loop-throws-test
-  (testing "helper session is closed and removed from helper-session-ids even when run-agent-loop-in-session throws"
+  (testing "helper session is closed and removed from helper-session-ids even when run-agent-loop-in-session throws across fallback attempts"
     (let [[ctx session-id] (create-runtime-session)
           ext-path         "/test/auto_session_name_throw.clj"
           close-calls*     (atom [])
+          run-calls*       (atom 0)
           reg              (:extension-registry ctx)
           runtime-fs       (runtime-fns/make-extension-runtime-fns ctx session-id ext-path)
           base-mutate      (:mutate-fn runtime-fs)
@@ -142,10 +143,12 @@
                                   (fn [op params]
                                     (case op
                                       psi.extension/create-child-session
-                                      {:psi.agent-session/session-id "child-throw"}
+                                      {:psi.agent-session/session-id (str "child-throw-" (inc (count @close-calls*)))}
 
                                       psi.extension/run-agent-loop-in-session
-                                      (throw (ex-info "Connection refused" {:cause :network}))
+                                      (do
+                                        (swap! run-calls* inc)
+                                        (throw (ex-info "Connection refused" {:cause :network})))
 
                                       psi.extension/close-session
                                       (do (swap! close-calls* conj (:session-id params))
@@ -164,9 +167,14 @@
                             :ui nil})
       (seed-conversation! ctx session-id)
       (sut/init api)
-      ;; Checkpoint fires; agent loop throws — close must still be called and state cleaned up.
-      ((checkpoint-handler ctx ext-path) {:session-id session-id :turn-count 2})
-      (is (= ["child-throw"] @close-calls*)
-          "close-session was called despite agent-loop throwing")
-      (is (not (contains? (:helper-session-ids (deref @#'sut/state)) "child-throw"))
+      (with-redefs [sut/select-helper-models (fn [_api _source-session-id]
+                                               [{:provider :local-helper :id "first"}
+                                                {:provider :local-helper :id "second"}])]
+        ;; Checkpoint fires; agent loop throws for each candidate — every helper session must still be closed and state cleaned up.
+        ((checkpoint-handler ctx ext-path) {:session-id session-id :turn-count 2}))
+      (is (= 2 @run-calls*)
+          "fallback attempted each ranked candidate")
+      (is (= ["child-throw-1" "child-throw-2"] @close-calls*)
+          "close-session was called for each failed helper attempt")
+      (is (empty? (:helper-session-ids (deref @#'sut/state)))
           "helper-session-ids cleaned up despite agent-loop throwing"))))
