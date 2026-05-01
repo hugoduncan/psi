@@ -12,6 +12,7 @@ Queue:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 `munera/open/067-add-anthropic-4-7-and-openai-5-5-models/`
 `munera/open/070-delegate-command-posts-workflow-result-into-chat/`
+`munera/open/072-canonical-delegate-result-publication/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.

@@ -135,3 +135,30 @@ Latest verification results
   - green
 - `clojure -M:test --focus psi.rpc-real-delegate-command-test --focus psi.rpc-delegate-bridge-test --focus psi.rpc-delegate-command-and-bridge-order-test --focus psi.tui.real-delegate-command-path-test --focus psi.tui.delegate_live_sequence_test --focus psi.agent-session.workflow-loader-delivery-test`
   - green after the live-e2e additions as well
+
+Architectural note
+
+- The sequence of fixes indicates the underlying issue was broader than a missing `/delegate` flag.
+- The same user-visible concept — delegated workflow result delivery — was represented in several partially overlapping forms:
+  - workflow run result
+  - child-session assistant journal entry
+  - parent-session injected transcript messages
+  - background-job terminal payload
+  - RPC `assistant/message` events
+  - TUI/Emacs external-message rendering
+- The clearest root-boundary problem was that workflow execution and workflow judge code were recovering result text by rereading the child-session journal via `last-assistant-message-in` after prompt submission.
+- That made persistence/journal order act as an API for bounded workflow callers. The canonical semantic result already existed at prompt execution time as `:execution-result/assistant-message`; bounded callers should consume that value directly.
+- `prompt-execution-result-in!` is therefore not just a bug fix convenience. It is the architectural correction that restores the right ownership boundary:
+  - prompt execution returns the semantic turn result
+  - persistence records history
+  - transcript/UI projection renders the result
+  - callers do not reconstruct execution semantics from storage
+- A second exposed seam was publication policy. Async completion could publish via transcript injection, append-entry fallback, notification, background-job terminal payload, and adapter event emission. That worked, but it meant result visibility semantics were spread across several side-effect channels.
+- A third exposed seam was adapter contract drift. RPC, TUI, and Emacs each needed explicit convergence tests for ordering, role preservation, and blank/filler suppression, which suggests the cross-adapter external-message contract was previously too implicit.
+- Working diagnosis:
+  - there was no single explicit canonical abstraction for delegated-result publication across execution, persistence, and UI projection boundaries.
+  - the fix set improved this by converging on direct execution results, explicit parent-context injection, and cross-adapter sequence tests.
+- Suggested future shaping direction:
+  - keep direct execution-result return as the bounded-caller contract
+  - treat journals as audit/history, not semantic recovery
+  - define a single shaped delegated-result publication model that adapters/projectors consume consistently
