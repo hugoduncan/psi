@@ -4,6 +4,7 @@ Open tasks in suggested execution order:
 
 Queue:
 
+`munera/open/073-session-gc-primitives-and-auto-cleanup/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
