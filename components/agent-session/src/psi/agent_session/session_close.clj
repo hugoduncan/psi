@@ -66,10 +66,9 @@
 
    Returns {:closed? bool :session-id sid :active-session-id sid-or-nil}."
   [ctx session-id]
-  (if-not (ss/get-session-data-in ctx session-id)
-    {:closed? false :session-id session-id}
+  (if-let [sd (ss/get-session-data-in ctx session-id)]
     (let [sc-session-id      (ss/sc-session-id-in ctx session-id)
-          owned-schedule-ids (->> (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules] {})
+          owned-schedule-ids (->> (get-in sd [:scheduler :schedules] {})
                                   keys
                                   vec)
           _                  (cancel-owned-schedules! ctx session-id)
@@ -90,7 +89,8 @@
                           {:origin :core})
       {:closed? true
        :session-id session-id
-       :active-session-id active-session-id})))
+       :active-session-id active-session-id})
+    {:closed? false :session-id session-id}))
 
 (defn close-session-tree-in!
   "Close `root-id` and all its descendants.
