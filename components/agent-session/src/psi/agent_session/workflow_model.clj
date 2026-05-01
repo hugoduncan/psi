@@ -9,7 +9,8 @@
    - [:workflows :runs]        => {run-id -> workflow-run}
    - [:workflows :run-order]   => [run-id ...] creation order"
   (:require
-   [malli.core :as m]))
+   [malli.core :as m]
+   [psi.agent-session.session :as session]))
 
 (def workflow-definition-id-schema :string)
 (def workflow-run-id-schema :string)
@@ -129,7 +130,8 @@
      [:tools {:optional true} [:vector :string]]
      [:skills {:optional true} [:vector :string]]
      [:model {:optional true} [:or :string :map]]
-     [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]]]])
+     [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]
+     [:prompt-component-selection {:optional true} [:maybe session/prompt-component-selection-schema]]]]])
 
 (def workflow-definition-schema
   [:map

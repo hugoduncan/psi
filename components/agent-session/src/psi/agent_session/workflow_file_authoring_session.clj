@@ -18,7 +18,7 @@
   #{:preload})
 
 (def ^:private override-session-keys
-  #{:system-prompt :tools :skills :model :thinking-level})
+  #{:system-prompt :tools :skills :model :thinking-level :prompt-component-selection})
 
 (def ^:private supported-session-keys
   (into #{} (concat binding-session-keys preload-session-keys override-session-keys)))
@@ -273,25 +273,38 @@
                                      "expected one of :off, :minimal, :low, :medium, :high, :xhigh")))
     {:ok ::absent}))
 
+(defn- compile-prompt-component-selection-override
+  [session]
+  (if (contains? session :prompt-component-selection)
+    (let [selection (:prompt-component-selection session)]
+      (if (m/validate session/prompt-component-selection-schema selection)
+        {:ok selection}
+        (authoring-errors/invalid-in ":session prompt-component-selection"
+                                     "expected canonical prompt-component-selection map")))
+    {:ok ::absent}))
+
 (defn- compile-session-overrides
   [session]
   (let [{system-prompt :ok system-prompt-error :error} (compile-system-prompt-override session)
         {tools :ok tools-error :error} (compile-tools-override session)
         {skills :ok skills-error :error} (compile-skills-override session)
         {model :ok model-error :error} (compile-model-override session)
-        {thinking-level :ok thinking-level-error :error} (compile-thinking-level-override session)]
+        {thinking-level :ok thinking-level-error :error} (compile-thinking-level-override session)
+        {prompt-component-selection :ok prompt-component-selection-error :error} (compile-prompt-component-selection-override session)]
     (cond
       system-prompt-error {:error system-prompt-error}
       tools-error {:error tools-error}
       skills-error {:error skills-error}
       model-error {:error model-error}
       thinking-level-error {:error thinking-level-error}
+      prompt-component-selection-error {:error prompt-component-selection-error}
       :else {:ok (cond-> {}
                    (not= system-prompt ::absent) (assoc :system-prompt system-prompt)
                    (not= tools ::absent) (assoc :tools tools)
                    (not= skills ::absent) (assoc :skills skills)
                    (not= model ::absent) (assoc :model model)
-                   (not= thinking-level ::absent) (assoc :thinking-level thinking-level))})))
+                   (not= thinking-level ::absent) (assoc :thinking-level thinking-level)
+                   (not= prompt-component-selection ::absent) (assoc :prompt-component-selection prompt-component-selection))})))
 
 (defn compile-step-session-overrides
   [step]

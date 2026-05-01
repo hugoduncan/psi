@@ -176,6 +176,33 @@
       (is (str/includes? (prompt-request/effective-system-prompt child-sd) "A"))
       (is (not (str/includes? (prompt-request/effective-system-prompt child-sd) "B"))))))
 
+(deftest create-child-session-nil-selection-rebuilds-full-base-prompt-without-parent-build-opts-test
+  (testing "child nil selection rebuilds from structured state without requiring parent build opts"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          qctx   (query/create-query-context)
+          mutate (fn [op params]
+                   (get (query/query-in qctx
+                                        {:psi/agent-session-ctx ctx}
+                                        [(list op (cond-> (assoc params :psi/agent-session-ctx ctx)
+                                                    (not (contains? params :session-id))
+                                                    (assoc :session-id session-id)))])
+                        op))]
+      (session/register-resolvers-in! qctx false)
+      (session/register-mutations-in! qctx mutations/all-mutations true)
+      (let [child-id (:psi.agent-session/session-id
+                      (mutate 'psi.extension/create-child-session
+                              {:session-name "child"
+                               :tool-defs [{:name "read" :description "Read"}
+                                           {:name "bash" :description "Bash"}
+                                           {:name "psi-tool" :description "Psi tool"}]
+                               :skills [{:name "skill-a" :description "A"
+                                         :file-path "/s/SKILL.md" :base-dir "/s"
+                                         :source :user :disable-model-invocation false}]}))
+            child-sd (ss/get-session-data-in ctx child-id)]
+        (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
+        (is (str/includes? (:base-system-prompt child-sd) "skill-a"))
+        (is (str/includes? (:base-system-prompt child-sd) "Current working directory:"))))))
+
 (deftest create-child-session-selection-rebuilds-minimal-base-prompt-and-filters-tools-test
   (testing "child selection can rebuild a reduced base prompt and align prompt-visible tools"
     (let [[ctx session-id] (create-session-context {:persist? false})

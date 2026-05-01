@@ -197,4 +197,5 @@
                (resolve-step-skills ctx parent-session-id (:skills base-meta)))
      :model (or (:model step-overrides)
                 (:model base-meta)
-                parent-session-model)}))
+                parent-session-model)
+     :prompt-component-selection (:prompt-component-selection step-overrides)}))

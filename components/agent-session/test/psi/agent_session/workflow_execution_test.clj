@@ -68,6 +68,25 @@
                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}
    :workflow-file-meta {:framing-prompt "Coordinate a plan-build cycle."}})
 
+(def workflow-selection-definition
+  {:definition-id "planner-selection"
+   :name "planner-selection"
+   :step-order ["step-1"]
+   :steps {"step-1" {:executor {:type :agent :profile "planner"}
+                     :prompt-template "$INPUT"
+                     :input-bindings {:input {:source :workflow-input :path [:input]}}
+                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
+                     :session-overrides {:prompt-component-selection {:components #{:skills}
+                                                                      :tool-names ["read"]
+                                                                      :skill-names ["testing-best-practices"]
+                                                                      :extension-prompt-contributions []
+                                                                      :agents-md? false}}}}
+   :workflow-file-meta {:system-prompt "You are a planner."
+                        :tools ["read" "bash"]
+                        :skills ["testing-best-practices"]
+                        :thinking-level :medium}})
+
 (def judged-definition
   {:definition-id "plan-build-review-judged"
    :name "plan-build-review-judged"
@@ -360,6 +379,63 @@
           (is (str/includes? (:prepared-request/system-prompt prepared) "command: /work-on"))
           (is (= (:prepared-request/system-prompt prepared)
                  (get-in prepared [:prepared-request/provider-conversation :system-prompt]))))))))
+
+(deftest execute-run-selection-filters-rendered-prompt-and-tools-test
+  (testing "workflow child explicit prompt-component-selection filters rendered prompt content and provider tools"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/register-definition state workflow-selection-definition)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner-selection"
+                                                                   :run-id "run-selection-1"
+                                                                   :workflow-input {:input "plan it"}})]
+                       (-> s
+                           (assoc-in [:agent-session :sessions session-id :data :tool-defs]
+                                     [{:name "read" :description "Read"}
+                                      {:name "bash" :description "Bash"}])
+                           (assoc-in [:agent-session :sessions session-id :data :skills]
+                                     [{:name "testing-best-practices" :description "Testing"
+                                       :file-path "/s/SKILL.md"
+                                       :base-dir "/s"
+                                       :source :project
+                                       :disable-model-invocation false}])
+                           (assoc-in [:agent-session :sessions session-id :data :prompt-contributions]
+                                     [{:id "a"
+                                       :ext-path "/ext/a"
+                                       :content "A"
+                                       :enabled true
+                                       :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
+                                       :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}])))))]
+      (with-redefs [psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx _child-session-id _prompt]
+                      {:execution-result/assistant-message
+                       {:content "planner output"}})]
+        (let [result   (workflow-execution/execute-run! ctx session-id "run-selection-1")
+              run      (workflow-runtime/workflow-run-in @(:state* ctx) "run-selection-1")
+              child-id (get-in run [:step-runs "step-1" :attempts 0 :execution-session-id])
+              child-sd (get-in @(:state* ctx) [:agent-session :sessions child-id :data])
+              prepared (prompt-request/build-prepared-request
+                        ctx child-id
+                        {:turn-id "wf-selection-proof"
+                         :user-message {:role "user"
+                                        :content [{:type :text :text "plan it"}]}})]
+          (is (= :completed (:status result)))
+          (is (= ["read"] (mapv :name (:tool-defs child-sd))))
+          (is (= ["testing-best-practices"] (mapv :name (:skills child-sd))))
+          (is (= {:agents-md? false
+                  :extension-prompt-contributions []
+                  :tool-names ["read"]
+                  :skill-names ["testing-best-practices"]
+                  :components #{:skills}
+                  :include-preamble? false
+                  :include-context-files? false
+                  :include-skills? true
+                  :include-runtime-metadata? false}
+                 (:prompt-component-selection child-sd)))
+          (is (not (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus).")))
+          (is (str/includes? (:base-system-prompt child-sd) "testing-best-practices"))
+          (is (not (str/includes? (:prepared-request/system-prompt prepared) "A")))
+          (is (= ["read"] (mapv :name (:prepared-request/tools prepared)))))))))
 
 (deftest execute-run-with-judge-loop-test
   (testing "execute-run! handles a judge loop via the statechart runtime"

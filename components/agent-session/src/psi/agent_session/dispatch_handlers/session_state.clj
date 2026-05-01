@@ -140,9 +140,26 @@
       (assoc-in (session-flush-state-path new-session-id) {:flushed?     false
                                                            :session-file (io/file session-file)}))))
 
+(defn- default-child-system-prompt-build-opts
+  [parent-sd resolved-tool-defs resolved-skills normalized-selection]
+  (let [cwd (:worktree-path parent-sd)
+        base-opts (merge {:cwd             cwd
+                          :context-files   (when cwd
+                                             (psi.agent-session.system-prompt/discover-context-files cwd))
+                          :selected-tools  (mapv :name resolved-tool-defs)
+                          :skills          resolved-skills
+                          :prompt-mode     (:prompt-mode parent-sd :lambda)
+                          :nucleus-prelude-override (:nucleus-prelude-override parent-sd)}
+                         (:system-prompt-build-opts parent-sd))]
+    (cond-> base-opts
+      normalized-selection
+      (assoc :include-preamble? (:include-preamble? normalized-selection)
+             :include-runtime-metadata? (:include-runtime-metadata? normalized-selection)
+             :include-context-files? (:include-context-files? normalized-selection)))))
+
 (defn- derive-child-prompt-state
   "Derive child prompt-related state from parent session data and child creation params.
-   Returns normalized selection, filtered capabilities, optional rebuild opts, and the
+   Returns normalized selection, filtered capabilities, rebuild opts, and the
    base prompt to store on the child session."
   [parent-sd {:keys [system-prompt tool-defs prompt-component-selection skills]}]
   (let [normalized-selection (psi.agent-session.system-prompt/normalize-prompt-component-selection prompt-component-selection)
@@ -158,20 +175,10 @@
                                 parent-skills
                                 normalized-selection)
                                (vec (or parent-skills [])))
-        build-opts           (when-let [parent-build-opts (:system-prompt-build-opts parent-sd)]
-                               (cond-> (-> parent-build-opts
-                                           (assoc :selected-tools (mapv :name resolved-tool-defs))
-                                           (assoc :skills resolved-skills))
-                                 normalized-selection
-                                 (assoc :include-preamble? (:include-preamble? normalized-selection)
-                                        :include-runtime-metadata? (:include-runtime-metadata? normalized-selection)
-                                        :include-context-files? (:include-context-files? normalized-selection))))
+        build-opts           (default-child-system-prompt-build-opts
+                              parent-sd resolved-tool-defs resolved-skills normalized-selection)
         resolved-base-prompt (or system-prompt
-                                 (when build-opts
-                                   (psi.agent-session.system-prompt/build-system-prompt
-                                    (assoc build-opts
-                                           :prompt-mode (:prompt-mode parent-sd :lambda)
-                                           :nucleus-prelude-override (:nucleus-prelude-override parent-sd))))
+                                 (psi.agent-session.system-prompt/build-system-prompt build-opts)
                                  (:base-system-prompt parent-sd))]
     {:prompt-component-selection normalized-selection
      :tool-defs                 resolved-tool-defs

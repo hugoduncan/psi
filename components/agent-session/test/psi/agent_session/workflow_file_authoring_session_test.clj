@@ -48,7 +48,10 @@
     :expected-re #"expected string in `:session system-prompt`"}
    {:label "thinking level override requires canonical level"
     :step {:session {:thinking-level :ultra}}
-    :expected-re #"expected one of :off, :minimal, :low, :medium, :high, :xhigh in `:session thinking-level`"}])
+    :expected-re #"expected one of :off, :minimal, :low, :medium, :high, :xhigh in `:session thinking-level`"}
+   {:label "prompt-component-selection override requires canonical map"
+    :step {:session {:prompt-component-selection :all}}
+    :expected-re #"expected canonical prompt-component-selection map"}])
 
 (def ^:private preload-validation-cases
   [{:label "preload requires vector"

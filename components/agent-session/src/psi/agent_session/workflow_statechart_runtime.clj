@@ -263,6 +263,9 @@
                  (:model step-config)
                  (assoc :model (:model step-config))
 
+                 (contains? step-config :prompt-component-selection)
+                 (assoc :prompt-component-selection (:prompt-component-selection step-config))
+
                  preloaded-messages
                  (assoc :preloaded-messages preloaded-messages)))]
           (swap! working-memory*
