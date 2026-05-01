@@ -91,3 +91,26 @@
       {:closed? true
        :session-id session-id
        :active-session-id active-session-id})))
+
+(defn close-session-tree-in!
+  "Close `root-id` and all its descendants.
+
+   Obtains the full descendant list in bottom-up (leaf-first) order via
+   `descendants-of-in`, calls `close-session-in!` on each descendant, then
+   on the root. Idempotency of `close-session-in!` means already-closed
+   sessions in the tree are handled gracefully.
+
+   Each individual `close-session-in!` call emits its own
+   `:session/context-closed` projection.
+
+   Returns {:closed-count N :closed-session-ids [...]} where N counts only
+   the sessions that were actually open at the time of close."
+  [ctx root-id]
+  (let [descendants (ss/descendants-of-in ctx root-id)
+        all-ids     (conj descendants root-id)
+        results     (mapv #(close-session-in! ctx %) all-ids)
+        closed-ids  (->> results
+                         (filter :closed?)
+                         (mapv :session-id))]
+    {:closed-count      (count closed-ids)
+     :closed-session-ids closed-ids}))

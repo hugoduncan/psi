@@ -82,3 +82,39 @@
       (session/close-session-in! ctx session-id)
       ;; After close: working memory is gone, sc-phase returns nil
       (is (nil? (sc/sc-phase (:sc-env ctx) sc-session-id))))))
+
+(deftest close-session-tree-closes-all-descendants-test
+  (testing "close-session-tree-in! closes all descendants then the root"
+    (let [[ctx root-id] (create-session-context {:persist? false})
+          child-id      (str (java.util.UUID/randomUUID))
+          grandchild-id (str (java.util.UUID/randomUUID))]
+      ;; Inject child and grandchild with parent references
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions child-id :data]
+             {:session-id child-id :parent-session-id root-id})
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions grandchild-id :data]
+             {:session-id grandchild-id :parent-session-id child-id})
+      (let [result (session/close-session-tree-in! ctx root-id)]
+        (is (= 3 (:closed-count result)))
+        (is (= #{root-id child-id grandchild-id} (set (:closed-session-ids result))))
+        (is (nil? (ss/get-session-data-in ctx root-id)))
+        (is (nil? (ss/get-session-data-in ctx child-id)))
+        (is (nil? (ss/get-session-data-in ctx grandchild-id))))))
+
+  (testing "close-session-tree-in! on a leaf session behaves like single close"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          result           (session/close-session-tree-in! ctx session-id)]
+      (is (= 1 (:closed-count result)))
+      (is (= [session-id] (:closed-session-ids result)))
+      (is (nil? (ss/get-session-data-in ctx session-id)))))
+
+  (testing "close-session-tree-in! handles already-closed descendants idempotently"
+    (let [[ctx root-id] (create-session-context {:persist? false})
+          child-id      (str (java.util.UUID/randomUUID))]
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions child-id :data]
+             {:session-id child-id :parent-session-id root-id})
+      ;; Close child manually first
+      (session/close-session-in! ctx child-id)
+      ;; Tree close should still close root and gracefully handle already-closed child
+      (let [result (session/close-session-tree-in! ctx root-id)]
+        (is (= 1 (:closed-count result)))
+        (is (= [root-id] (:closed-session-ids result)))))))

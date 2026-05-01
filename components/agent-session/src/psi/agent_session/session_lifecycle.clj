@@ -274,3 +274,9 @@
    Returns {:closed? bool :session-id sid :active-session-id sid-or-nil}."
   [ctx session-id]
   (session-close/close-session-in! ctx session-id))
+
+(defn close-session-tree-in!
+  "Close a session and all its descendants.
+   Returns {:closed-count N :closed-session-ids [...]}."
+  [ctx root-id]
+  (session-close/close-session-tree-in! ctx root-id))

@@ -60,6 +60,10 @@
   [ctx session-id]
   (lifecycle/close-session-in! ctx session-id))
 
+(defn close-session-tree-in!
+  [ctx root-id]
+  (lifecycle/close-session-tree-in! ctx root-id))
+
 (defn prompt-in!
   ([ctx session-id text]
    (prompt-control/prompt-in! ctx session-id text))
