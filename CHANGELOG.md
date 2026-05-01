@@ -6,6 +6,10 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- Extensions can close sessions via `close-session` and `close-session-tree` mutations.
+- Helper sessions from `auto-session-name` are now automatically closed after use.
+
 ### Fixed
 - Emacs: typing before RPC connects no longer has a newline injected mid-draft when the footer first updates.
 - Emacs: footer now updates correctly after connect (was filtered due to missing session-id in payload).
