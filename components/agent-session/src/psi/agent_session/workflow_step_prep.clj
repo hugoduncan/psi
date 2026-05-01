@@ -173,18 +173,23 @@
 
    For single-step workflows, uses the run's own :workflow-file-meta.
    For multi-step workflows, looks up the referenced workflow's definition from
-   registered definitions to get that step's :workflow-file-meta."
+   registered definitions to get that step's :workflow-file-meta.
+
+   Prompt semantics:
+   - workflow-authored prompt text is resolved here as a composed instruction /
+     developer layer for the child session
+   - it is not the implicit full replacement for the child base system prompt
+   - the child base system prompt is still rebuilt from structured session state
+     downstream during child-session initialization"
   [ctx parent-session-id workflow-run step-id]
   (let [{:keys [base-meta framing-prompt step-overrides]} (step-meta-for ctx workflow-run step-id)
         parent-session-id (or parent-session-id
                               (some->> (session-state/list-context-sessions-in ctx) first :session-id))
         parent-session    (session-state/get-session-data-in ctx parent-session-id)
         parent-session-model (:model parent-session)
-        base-system-prompt (or (:system-prompt step-overrides)
-                               (:system-prompt base-meta))]
-    {:base-system-prompt base-system-prompt
-     :framing-prompt framing-prompt
-     :system-prompt (compose-system-prompt base-system-prompt framing-prompt)
+        developer-prompt  (or (:system-prompt step-overrides)
+                              (:system-prompt base-meta))]
+    {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
      :prompt-mode (:prompt-mode parent-session)
      :tool-defs (if (contains? step-overrides :tools)
                   (resolve-step-tool-defs ctx parent-session-id (:tools step-overrides))

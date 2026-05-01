@@ -20,3 +20,10 @@
 - [x] Update at least one existing connected prompt/session/lambda spec file
 - [x] If a new Allium file is added, explicitly connect it into the existing prompt/session/workflow spec graph
 - [x] Verify no isolated new Allium file is introduced without graph connection
+
+Follow-up steps before close:
+- [x] Restore representative workflow lifecycle proof on the canonical execution path
+- [x] Converge lifecycle tests on `prompt-execution-result-in!` or preserve an explicit compatibility seam
+- [x] Re-run focused workflow lifecycle and workflow execution unit tests
+- [x] Tighten workflow step config naming/docs so workflow-authored prompt text is clearly a composed developer/instruction layer, not an implicit full system prompt
+- [x] Re-check Allium/runtime/test parity after the lifecycle proof is green

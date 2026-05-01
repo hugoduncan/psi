@@ -250,8 +250,8 @@
                         :session-name (str "workflow " step-id " attempt")
                         :tool-defs (:tool-defs step-config)
                         :thinking-level (:thinking-level step-config)}
-                 (:system-prompt step-config)
-                 (assoc :developer-prompt (:system-prompt step-config)
+                 (:developer-prompt step-config)
+                 (assoc :developer-prompt (:developer-prompt step-config)
                         :developer-prompt-source :explicit)
 
                  (:prompt-mode step-config)

@@ -101,16 +101,15 @@
                         (swap! child-sessions* conj sid)
                         {:attempt attempt
                          :execution-session execution-session}))
-                    psi.agent-session.prompt-control/prompt-in!
-                    (fn [_ctx _sid _prompt] nil)
-                    psi.agent-session.prompt-control/last-assistant-message-in
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
                     (let [responses* (atom ["plan-output" "build-output" "review-output"])]
-                      (fn [_ctx _sid]
-                        {:role "assistant"
-                         :content [(let [resp (first @responses*)]
-                                     (swap! responses* subvec 1)
-                                     {:type :text :text resp})]
-                         :stop-reason :stop}))]
+                      (fn [_ctx _sid _prompt]
+                        {:execution-result/assistant-message
+                         {:role "assistant"
+                          :content [(let [resp (first @responses*)]
+                                      (swap! responses* subvec 1)
+                                      {:type :text :text resp})]
+                          :stop-reason :stop}}))]
         (let [result             (workflow-execution/execute-run! ctx session-id run-id)
               run                (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
               detail-result      (session/query-in ctx

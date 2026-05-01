@@ -6,11 +6,11 @@ What landed well:
 - provider-visible prepared request remains the proof surface
 
 Blocking gaps before close:
-- default nil-selection rebuild is still conditional on parent `:system-prompt-build-opts`, so workflow child prompt rebuilding is not yet unconditional from structured state
-- workflow-path proof for explicit `:prompt-component-selection` filtering is still missing
-- workflow-path proof for rendered tool/skill narrowing is still incomplete
-- Allium now states stronger recomposition semantics than the runtime fully guarantees
+- representative workflow lifecycle proof regressed: `workflow_lifecycle_test` now fails on the canonical execution path
+- workflow execution now depends on `prompt-execution-result-in!`, but broader lifecycle proof still targets the older prompt-control seam
+- workflow step config still names workflow-authored layer text as `:system-prompt` even though runtime now applies it as `:developer-prompt`, which leaves prompt semantics harder to read
 
 Recommendation:
 - do not close task 073 yet
-- add a follow-on slice to make default workflow child prompt rebuilding unconditional and extend workflow-path tests/spec alignment accordingly
+- restore or converge the workflow lifecycle proof on the canonical execution seam
+- tighten naming/docs around workflow-authored prompt text as a composed instruction/developer layer

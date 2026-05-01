@@ -11,4 +11,8 @@ Summary:
 
 Status:
 - implementation improves convergence substantially
+- representative workflow lifecycle proof has been converged onto the canonical `prompt-execution-result-in!` seam
+- workflow step config naming/docs now reflect workflow-authored prompt text as a composed developer/instruction layer
+- focused workflow lifecycle + workflow execution suites are green
+- broader unit suite still has unrelated failures outside this task slice
 - follow-on work remains; see `review.md`

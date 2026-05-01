@@ -129,7 +129,7 @@
                        s)))
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-1")
           config (workflow-execution/resolve-step-session-config ctx workflow-run "step-1")]
-      (is (= "You are a planner." (:system-prompt config)))
+      (is (= "You are a planner." (:developer-prompt config)))
       (is (= :medium (:thinking-level config)))
       (is (= {:provider :anthropic :id "claude-test"} (:model config)))
       (is (= ["read" "bash"] (mapv :name (:tool-defs config))))
@@ -153,8 +153,8 @@
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-2")
           planner-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-1-planner")
           builder-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-2-builder")]
-      (is (= "You are a planner.\n\nCoordinate a plan-build cycle." (:system-prompt planner-config)))
-      (is (= "You are a builder.\n\nCoordinate a plan-build cycle." (:system-prompt builder-config)))
+      (is (= "You are a planner.\n\nCoordinate a plan-build cycle." (:developer-prompt planner-config)))
+      (is (= "You are a builder.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
       (is (= ["read" "bash"] (mapv :name (:tool-defs planner-config))))
       (is (= ["read" "bash" "edit" "write"] (mapv :name (:tool-defs builder-config))))
       (is (= {:provider "openai" :id "gpt-test"} (:model planner-config)))
@@ -200,7 +200,7 @@
                      :disable-model-invocation false}])
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-overrides")
           builder-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-2-builder")]
-      (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:system-prompt builder-config)))
+      (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
       (is (= [] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config))))
       (is (= "gpt-5" (:model builder-config)))
