@@ -128,6 +128,13 @@
                         op))]
       (session/register-resolvers-in! qctx false)
       (session/register-mutations-in! qctx mutations/all-mutations true)
+      (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
+                          {:session-id session-id
+                           :opts {:selected-tools ["read" "bash" "psi-tool"]
+                                  :skills [{:name "lambda-compiler" :description "Compile lambda expressions"
+                                            :file-path "/s/SKILL.md" :base-dir "/s"
+                                            :source :user :disable-model-invocation false}]}}
+                          {:origin :test})
       (dispatch/dispatch! ctx :session/register-prompt-contribution
                           {:session-id session-id
                            :ext-path "/ext/work-on"
@@ -139,7 +146,12 @@
       (let [child-id (:psi.agent-session/session-id
                       (mutate 'psi.extension/create-child-session
                               {:session-name "child"
-                               :tool-defs []}))
+                               :tool-defs [{:name "read" :description "Read"}
+                                           {:name "bash" :description "Bash"}
+                                           {:name "psi-tool" :description "Psi tool"}]
+                               :skills [{:name "lambda-compiler" :description "Compile lambda expressions"
+                                         :file-path "/s/SKILL.md" :base-dir "/s"
+                                         :source :user :disable-model-invocation false}]}))
             child-sd (ss/get-session-data-in ctx child-id)]
         (is (= [{:id "work-on"
                  :ext-path "/ext/work-on"
@@ -148,6 +160,8 @@
                  :enabled true}]
                (mapv #(select-keys % [:id :ext-path :section :content :enabled])
                      (:prompt-contributions child-sd))))
+        (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
+        (is (str/includes? (:base-system-prompt child-sd) "lambda-compiler"))
         (is (str/includes? (prompt-request/effective-system-prompt child-sd)
                            "tool: /work-on"))))))
 

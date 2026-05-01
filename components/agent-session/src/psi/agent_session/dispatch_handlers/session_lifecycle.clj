@@ -95,13 +95,14 @@
 
   (dispatch/register-handler!
    :session/create-child
-   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
+   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
      (let [parent-sd (or (session/get-session-data-in ctx session-id)
                          {:worktree-path worktree-path})]
        {:root-state-update #(ss/initialize-child-session-state % parent-sd
                                                                {:child-session-id       child-session-id
                                                                 :session-name           session-name
                                                                 :system-prompt          system-prompt
+                                                                :prompt-mode            prompt-mode
                                                                 :tool-defs              tool-defs
                                                                 :thinking-level         thinking-level
                                                                 :model                  model

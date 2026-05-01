@@ -138,6 +138,60 @@ rule SpawnedSessionInheritsThenDiverges {
     ensures: ParentAndChildConfigsCanDivergeAfterSpawn(parent.id, child.id)
 }
 
+rule WorkflowChildSessionPromptRebuiltFromStructuredState {
+    when: CreateChildSession(context_id, parent_session_id, relation, config)
+    requires: relation in {agent, automation}
+    requires: config.workflow_run_id != null
+
+    ensures: child.prompt_mode = parent.prompt_mode unless config.prompt_mode_override != null
+    ensures: child.effective_system_prompt = RecomposeSessionPrompt(context_id, child.id)
+
+    @guidance
+        -- Workflow-owned child sessions do not implicitly treat workflow-authored
+        -- prompt text as full prompt replacement. Their provider-visible prompt is
+        -- rebuilt from canonical session prompt state, then composed with any
+        -- workflow-authored instruction layer and extension prompt contributions.
+}
+
+rule WorkflowChildSessionNilSelectionMeansFullPromptComposition {
+    when: CreateChildSession(context_id, parent_session_id, relation, config)
+    requires: relation in {agent, automation}
+    requires: config.workflow_run_id != null
+    requires: config.prompt_component_selection = null
+
+    ensures: child.effective_system_prompt = RecomposeSessionPrompt(context_id, child.id)
+
+    @guidance
+        -- Nil prompt-component-selection means default/full prompt composition,
+        -- not prompt rebuild bypass.
+}
+
+rule WorkflowChildSessionExplicitSelectionFiltersRecomposition {
+    when: CreateChildSession(context_id, parent_session_id, relation, config)
+    requires: relation in {agent, automation}
+    requires: config.workflow_run_id != null
+    requires: config.prompt_component_selection != null
+
+    ensures: child.effective_system_prompt = RecomposeSessionPromptWithSelection(context_id, child.id, config.prompt_component_selection)
+
+    @guidance
+        -- Explicit selection narrows the recomposed prompt components while still
+        -- using canonical prompt rebuilding.
+}
+
+rule WorkflowChildCapabilityNarrowingMatchesRenderedPromptVisibility {
+    when: CreateChildSession(context_id, parent_session_id, relation, config)
+    requires: relation in {agent, automation}
+    requires: config.workflow_run_id != null
+
+    ensures: RenderedTools(child.effective_system_prompt) = child.active_tools
+    ensures: RenderedSkills(child.effective_system_prompt) = child.available_skills
+
+    @guidance
+        -- Workflow-declared tool/skill narrowing must stay coherent between child
+        -- session state and rendered prompt sections.
+}
+
 rule UserPrompts {
     when: UserPrompts(session, text, images)
 

@@ -251,7 +251,11 @@
                         :tool-defs (:tool-defs step-config)
                         :thinking-level (:thinking-level step-config)}
                  (:system-prompt step-config)
-                 (assoc :system-prompt (:system-prompt step-config))
+                 (assoc :developer-prompt (:system-prompt step-config)
+                        :developer-prompt-source :explicit)
+
+                 (:prompt-mode step-config)
+                 (assoc :prompt-mode (:prompt-mode step-config))
 
                  (:skills step-config)
                  (assoc :skills (:skills step-config))
