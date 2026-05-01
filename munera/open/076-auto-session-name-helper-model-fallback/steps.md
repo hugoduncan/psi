@@ -1,0 +1,12 @@
+Steps:
+- confirm the exact ranked-candidate surface already available from `psi.ai.model-selection/resolve-selection` and prefer consuming it directly
+- keep fallback ownership inside `extensions.auto-session-name` rather than broadening into generic session runtime behavior
+- add tests that model first-attempt throw or unsuccessful run and second-attempt success using existing extension test seams
+- add a test where the first attempt succeeds at execution but returns an invalid title and a later attempt returns a valid title
+- add tests for empty ranked-candidate exhaustion, all-candidates-fail exhaustion, stale checkpoint termination, and manual override termination under fallback
+- implement ordered helper fallback with exact ranked-order attempt semantics
+- reuse one sanitized bounded checkpoint snapshot across all fallback attempts for the same checkpoint
+- create a fresh helper child session for each candidate attempt
+- emit the existing notification/log fallback once after exhaustion rather than once per failed attempt
+- verify focused test suites pass
+- capture any follow-on design pressure toward shared runtime availability facts separately rather than broadening this task

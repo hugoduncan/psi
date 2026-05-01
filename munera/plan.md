@@ -13,6 +13,7 @@ Queue:
 `munera/open/067-add-anthropic-4-7-and-openai-5-5-models/`
 `munera/open/070-delegate-command-posts-workflow-result-into-chat/`
 `munera/open/073-workflow-child-session-prompt-composition/`
+`munera/open/076-auto-session-name-helper-model-fallback/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.
