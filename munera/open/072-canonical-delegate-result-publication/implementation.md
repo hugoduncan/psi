@@ -11,4 +11,11 @@ Starting point
 
 Implementation notes
 
-- Pending.
+- Added `extensions.workflow-loader.orchestration/delegated-result-publication` as the single pure decision point for async delegated completion publication.
+- `on-async-completion!` now derives one publication map first, then applies background-job terminal marking, chat injection, notification, and append-entry side effects from that map without re-deciding policy inline.
+- Preserved current semantics:
+  - completed + include-result + nonblank result => inject into parent chat, suppress fallback append-entry, suppress terminal background-job message
+  - blank-result include path => no chat injection, retain non-chat fallback semantics
+  - include-result false => retain append-entry fallback semantics
+  - non-completed statuses => retain non-chat semantics
+- Added decision-level tests for the mandatory publication cases alongside the existing side-effect-level completion test coverage.

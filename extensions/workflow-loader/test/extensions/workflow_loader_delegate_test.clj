@@ -750,6 +750,82 @@
           (is (= "test-session-1" (:session-id @execute-params)))
           (is (string? (:run-id @execute-params))))))))
 
+(deftest delegated-result-publication-test
+  (testing "completed + include_result_in_context + nonblank result selects chat delivery"
+    (is (= {:completion {:run-id "run-1"
+                         :workflow "planner"
+                         :parent-session-id "session-1"
+                         :status :completed
+                         :result-text "done"
+                         :error nil
+                         :include-result? true
+                         :ok? true}
+            :background-job {:payload {:run-id "run-1"
+                                       :workflow "planner"
+                                       :status :completed
+                                       :result "done"
+                                       :error nil}
+                             :suppress-terminal-message? true}
+            :chat-injection {:enabled? true
+                             :parent-session-id "session-1"
+                             :run-id "run-1"
+                             :result-text "done"}
+            :notification {:enabled? false
+                           :message "Workflow 'planner' completed (run run-1)"
+                           :level :info}
+            :append-entry {:enabled? false
+                           :custom-type "delegate-result"
+                           :data "Workflow 'planner' — completed (run run-1)"}}
+           (orchestration/delegated-result-publication
+            {:run-id "run-1"
+             :workflow-name "planner"
+             :parent-session-id "session-1"
+             :include-result? true
+             :exec-result {:psi.workflow/status :completed
+                           :psi.workflow/result " done "}}))))
+
+  (testing "completed + include_result_in_context + blank result preserves non-chat fallback semantics"
+    (let [publication (orchestration/delegated-result-publication
+                       {:run-id "run-2"
+                        :workflow-name "planner"
+                        :parent-session-id "session-1"
+                        :include-result? true
+                        :exec-result {:psi.workflow/status :completed
+                                      :psi.workflow/result "   "}})]
+      (is (false? (get-in publication [:chat-injection :enabled?])))
+      (is (true? (get-in publication [:notification :enabled?])))
+      (is (false? (get-in publication [:append-entry :enabled?])))
+      (is (false? (get-in publication [:background-job :suppress-terminal-message?])))))
+
+  (testing "completed + no include_result_in_context preserves append-entry fallback semantics"
+    (let [publication (orchestration/delegated-result-publication
+                       {:run-id "run-3"
+                        :workflow-name "planner"
+                        :parent-session-id "session-1"
+                        :include-result? false
+                        :exec-result {:psi.workflow/status :completed
+                                      :psi.workflow/result "done"}})]
+      (is (false? (get-in publication [:chat-injection :enabled?])))
+      (is (true? (get-in publication [:notification :enabled?])))
+      (is (true? (get-in publication [:append-entry :enabled?])))
+      (is (= "Workflow 'planner' — completed (run run-3)\n\nResult:\ndone"
+             (get-in publication [:append-entry :data])))))
+
+  (testing "failed/cancelled/timed-out preserve non-chat semantics"
+    (doseq [status [:failed :cancelled :timed-out]]
+      (let [publication (orchestration/delegated-result-publication
+                         {:run-id "run-4"
+                          :workflow-name "planner"
+                          :parent-session-id "session-1"
+                          :include-result? true
+                          :exec-result {:psi.workflow/status status
+                                        :psi.workflow/error "boom"}})]
+        (is (false? (get-in publication [:chat-injection :enabled?])))
+        (is (true? (get-in publication [:notification :enabled?])))
+        (is (= :warn (get-in publication [:notification :level])))
+        (is (false? (get-in publication [:append-entry :enabled?])))
+        (is (false? (get-in publication [:background-job :suppress-terminal-message?])))))))
+
 (deftest on-async-completion-side-effects-do-not-rewrite-clean-exec-result-test
   (testing "async completion side effects should not turn a clean workflow failure into a keyword contains? error"
     (let [inflight-runs (atom {"run-1" {:job-id "job-1"}})

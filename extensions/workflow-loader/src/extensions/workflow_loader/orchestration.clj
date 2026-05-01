@@ -77,41 +77,74 @@
        (str msg " | " (str/join " <= " frames))
        msg))))
 
+(defn delegated-result-publication
+  [{:keys [run-id workflow-name parent-session-id include-result? exec-result]}]
+  (let [status (:psi.workflow/status exec-result)
+        result-text (some-> (:psi.workflow/result exec-result) str/trim not-empty)
+        ok? (= :completed status)
+        chat-delivery? (and include-result? ok? (some? result-text))]
+    {:completion {:run-id run-id
+                  :workflow workflow-name
+                  :parent-session-id parent-session-id
+                  :status status
+                  :result-text result-text
+                  :error (:psi.workflow/error exec-result)
+                  :include-result? include-result?
+                  :ok? ok?}
+     :background-job {:payload {:run-id run-id
+                                :workflow workflow-name
+                                :status status
+                                :result result-text
+                                :error (:psi.workflow/error exec-result)}
+                      :suppress-terminal-message? chat-delivery?}
+     :chat-injection {:enabled? chat-delivery?
+                      :parent-session-id parent-session-id
+                      :run-id run-id
+                      :result-text result-text}
+     :notification {:enabled? (not chat-delivery?)
+                    :message (text/completion-notification-text workflow-name status run-id)
+                    :level (if ok? :info :warn)}
+     :append-entry {:enabled? (not include-result?)
+                    :custom-type "delegate-result"
+                    :data (text/completion-entry-content workflow-name
+                                                         status
+                                                         run-id
+                                                         result-text
+                                                         include-result?)}}))
+
 (defn on-async-completion!
   "Handle async workflow completion — notify, inject results, update canonical job state, and clean up waits."
   [{:keys [mutate! notify! mark-background-job-terminal! inject-result-into-context!
            refresh-widgets! inflight-runs]}
    run-id workflow-name parent-session-id include-result? exec-result]
-  (let [status (:psi.workflow/status exec-result)
-        result-text (some-> (:psi.workflow/result exec-result) str/trim not-empty)
-        ok? (= :completed status)
-        chat-delivery? (and include-result? ok? (some? result-text))
+  (let [{:keys [completion background-job chat-injection notification append-entry] :as _publication}
+        (delegated-result-publication
+         {:run-id run-id
+          :workflow-name workflow-name
+          :parent-session-id parent-session-id
+          :include-result? include-result?
+          :exec-result exec-result})
+        {:keys [status]} completion
         job-id (get-in @inflight-runs [run-id :job-id])]
     (when job-id
       (mark-background-job-terminal!
        job-id
        status
-       {:run-id run-id
-        :workflow workflow-name
-        :status status
-        :result result-text
-        :error (:psi.workflow/error exec-result)}
-       {:suppress-terminal-message? chat-delivery?}))
-    (when chat-delivery?
-      (inject-result-into-context! parent-session-id run-id result-text))
-    (when-not chat-delivery?
-      (notify! (text/completion-notification-text workflow-name status run-id)
-               (if ok? :info :warn)))
+       (:payload background-job)
+       {:suppress-terminal-message? (:suppress-terminal-message? background-job)}))
+    (when (:enabled? chat-injection)
+      (inject-result-into-context! (:parent-session-id chat-injection)
+                                   (:run-id chat-injection)
+                                   (:result-text chat-injection)))
+    (when (:enabled? notification)
+      (notify! (:message notification)
+               (:level notification)))
     (when-let [mf mutate!]
-      (when-not include-result?
+      (when (:enabled? append-entry)
         (try
           (mf 'psi.extension/append-entry
-              {:custom-type "delegate-result"
-               :data (text/completion-entry-content workflow-name
-                                                    status
-                                                    run-id
-                                                    result-text
-                                                    include-result?)})
+              {:custom-type (:custom-type append-entry)
+               :data (:data append-entry)})
           (catch Exception _ nil))))
     (swap! inflight-runs dissoc run-id)
     (refresh-widgets!)))
