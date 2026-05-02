@@ -1,0 +1,35 @@
+---
+name: gh-issue-refine
+description: Find an enhancement issue labeled refine, create an issue worktree, refine its design until unambiguous, then push a PR and advance labels
+---
+{:steps [{:name "discover"
+          :workflow "builder"
+          :session {:input {:from :workflow-input}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently"]}
+          :prompt "Find exactly one open GitHub issue in this repository carrying both the `enhancement` and `refine` labels. Use `$INPUT` only as an optional narrowing hint such as an issue number, URL, or short selector.\n\nRequired procedure:\n1. Use `gh issue list --state open --label enhancement --label refine --json number,title,labels,state,url` to discover candidates.\n2. If none match, stop and report that there is nothing to process.\n3. If multiple match and `$INPUT` does not narrow to one, pick the lowest issue number.\n4. Emit a compact Markdown handoff with these headings exactly:\n   - `## Issue Selection`\n   - `## Handoff Data`\n5. Under `## Handoff Data`, include machine-friendly bullet lines for:\n   - `issue_number:`\n   - `issue_title:`\n   - `issue_url:`\n   - `worktree_description:`\n\nThe worktree description should be a short issue-derived slug suitable for the downstream worktree step."}
+         {:name "worktree"
+          :workflow "gh-issue-create-worktree"
+          :session {:input {:from {:step "discover" :kind :accepted-result}}
+                    :reference {:from :workflow-original}}
+          :prompt "$INPUT"}
+         {:name "refine-design"
+          :workflow "builder"
+          :session {:input {:from {:step "worktree" :kind :accepted-result}}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently" "task-design"]
+                    :preload [{:from {:step "discover" :kind :accepted-result}
+                               :projection :text}]}
+          :prompt "Using the selected issue and issue-specific worktree described by $INPUT, refine the issue into a clean design artifact. Use the `task-design` skill and work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the issue number, branch name, and worktree path.\n2. In the worktree, read `munera/plan.md` and inspect `munera/open/` and `munera/closed/`.\n3. Read the GitHub issue with comments using `gh issue view <issue> --comments --json number,title,body,comments,labels,state,url`.\n4. Allocate the next canonical Munera task id and create a new task directory under `munera/open/NNN-slug/`.\n5. Write at least `design.md`, `steps.md`, and `implementation.md`.\n6. Include issue provenance in the task files, especially the issue number and URL.\n7. Refine `design.md` with the `task-design` skill until it is complete and unambiguous.\n8. Record terse design/refinement notes in `implementation.md`.\n9. Keep `steps.md` synchronized with the remaining work needed to carry the design.\n10. If ambiguities remain after this pass, say so explicitly and list them tersely. If no ambiguities remain, say so explicitly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Refine Outcome`\n  - `## Munera Task`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `issue_number:`\n  - `worktree_path:`\n  - `branch_name:`\n  - `munera_task_path:`\n  - `ambiguity_status:`\n\nSet `ambiguity_status:` to either `ambiguous` or `clear`."
+          :judge {:system-prompt "You are a workflow routing judge. Respond with exactly one word: REPEAT or DONE."
+                  :prompt "Respond exactly with one word. Return REPEAT if the refined design still has material ambiguities, missing decisions, or incomplete acceptance criteria. Return DONE if the design is complete and unambiguous enough to hand off through a PR. Use the actor step context, including its reported ambiguity status and task artifacts, to decide."}
+          :on {"REPEAT" {:goto "refine-design" :max-iterations 6}
+               "DONE"   {:goto :next}}}
+         {:name "publish"
+          :workflow "builder"
+          :session {:input {:from {:step "refine-design" :kind :accepted-result}}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently"]}
+          :prompt "Publish the refined issue design described by $INPUT. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the issue number, branch name, worktree path, and Munera task path.\n2. In the issue worktree, review the final `design.md` and use it as the primary PR description body.\n3. Commit any remaining uncommitted task-design changes if needed.\n4. Push the branch.\n5. Create a PR against `master` whose description is the issue design content, and include a reference to the original issue such as `Refs #<issue-number>`.\n6. Remove the `refine` label from the issue.\n7. Add the `waiting` label to the PR.\n8. If any publication step fails after earlier steps succeeded, report the partial-success state clearly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Publish Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `issue_number:`\n  - `worktree_path:`\n  - `branch_name:`\n  - `munera_task_path:`\n  - `pr_url:`\n  - `issue_label_update:`\n  - `pr_label_update:`"}]}
+
+Coordinate refinement of a GitHub enhancement issue labeled `refine`: select the issue, create an issue-specific worktree, refine it into a complete and unambiguous Munera task design, iterate until ambiguities are resolved, then push the branch, create a PR using the design as the PR description, remove the issue's `refine` label, and add a `waiting` label to the PR.
