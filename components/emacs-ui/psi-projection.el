@@ -537,7 +537,18 @@ tracks transcript growth like a terminal footer."
            (start (and (consp range) (car range)))
            (end (and (consp range) (cdr range)))
            (rendered (psi-emacs--projection-render-block psi-emacs--state)))
-      (let ((inhibit-read-only t))
+      (let ((inhibit-read-only t)
+            ;; Suppress undo recording for projection block changes.
+            ;; The projection block is ephemeral UI recomputed from state on
+            ;; every update; undo of its content is meaningless.  More
+            ;; critically, without this, large undo records can trigger
+            ;; `undo-outer-limit-truncate', which calls `display-warning',
+            ;; which calls `sit-for 0', which processes pending process output
+            ;; mid-upsert.  That allows re-entrant RPC events to call
+            ;; `upsert-projection-block' while the projection region is
+            ;; unregistered, corrupting the draft/footer boundary and causing
+            ;; footer content to be captured as part of the submitted prompt.
+            (buffer-undo-list t))
         ;; Remove previous projection block first.
         (when (and (markerp start)
                    (markerp end)
