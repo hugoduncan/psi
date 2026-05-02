@@ -9,7 +9,8 @@
    [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.agent-session.project-nrepl-ops]
    [psi.agent-session.psi-tool :as psi-tool]
-   [psi.agent-session.tools :as tools]))
+   [psi.agent-session.tools :as tools]
+   [psi.ai.model-registry :as model-registry]))
 
 (defn- delete-tree! [path]
   (when path
@@ -253,6 +254,23 @@
       (is (= :ok (:psi-tool/overall-status parsed)))
       (is (= "preserved current extension registry without rediscovery"
              (get-in parsed [:psi-tool/graph-refresh :steps 3 :summary])))))
+
+  (testing "reloading model namespaces reinitializes the model registry for the effective worktree"
+    (let [dir (str (java.nio.file.Files/createTempDirectory "psi-tool-model-registry-reload-"
+                                                            (make-array java.nio.file.attribute.FileAttribute 0)))
+          captured-init-opts* (atom nil)]
+      (try
+        (with-redefs [model-registry/init! (fn [opts]
+                                             (reset! captured-init-opts* opts)
+                                             :ok)
+                      model-registry/all-models-seq (fn [] [{:provider :local :id "m1"} {:provider :openai :id "m2"}])
+                      model-registry/get-load-error (fn [] nil)]
+          (psi-tool/reload-namespace! dir "psi.ai.models")
+          (is (= {:user-models-path (model-registry/default-user-models-path)
+                  :project-models-path (str dir "/.psi/models.edn")}
+                 @captured-init-opts*)))
+        (finally
+          (delete-tree! dir)))))
 
   (testing "namespace mode stops at first namespace failure and reports successful prefix"
     (let [tool   (tools/make-psi-tool (fn [_q] {}))

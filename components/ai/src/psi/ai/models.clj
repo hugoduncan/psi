@@ -483,9 +483,9 @@
     :supports-text true
     :context-window 128000
     :max-tokens 128000
-    :input-cost 0.0
-    :output-cost 0.0
-    :cache-read-cost 0.0
+    :input-cost 1.75
+    :output-cost 14.0
+    :cache-read-cost 0.175
     :cache-write-cost 0.0}
 
    :gpt-5.4

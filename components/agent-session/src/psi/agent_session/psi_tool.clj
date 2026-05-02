@@ -6,6 +6,7 @@
    [clojure.string :as str]
    [clojure.walk :as walk]
    [psi.agent-core.core :as agent]
+   [psi.ai.model-registry :as model-registry]
    [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.agent-session.extensions :as extensions]
    [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
@@ -335,18 +336,36 @@
        :install (some-> install-report sanitize-psi-tool-data)})))
 
 (defn- preserve-extension-registry-step [] {:status :ok :summary "preserved current extension registry without rediscovery"})
-(defn- reload-namespace! [ns-name] (require (symbol ns-name) :reload))
+
+(defn- reload-model-registry-step! [worktree-path]
+  (let [effective-path (or worktree-path (System/getProperty "user.dir"))]
+    (model-registry/init! {:user-models-path    (model-registry/default-user-models-path)
+                           :project-models-path (str effective-path "/.psi/models.edn")})
+    {:status :ok
+     :summary (str "reinitialized model registry for worktree " effective-path)
+     :worktree-path effective-path
+     :model-count (count (model-registry/all-models-seq))
+     :load-error (model-registry/get-load-error)}))
+
+(defn reload-namespace! [worktree-path ns-name]
+  (require (symbol ns-name) :reload)
+  (when ((set ["psi.ai.models" "psi.ai.model-registry"]) ns-name)
+    (reload-model-registry-step! worktree-path)))
 
 (defn- execute-psi-tool-reload-report [{:keys [ctx session-id cwd]} {:keys [namespaces worktree-path]}]
   (let [started-at (System/nanoTime)
         namespace-mode? (some? namespaces)
         reload-mode (if namespace-mode? :namespaces :worktree)
         requested-nses (when namespace-mode? (validate-reload-namespaces namespaces))
-        effective-path (when-not namespace-mode?
+        session-derived-path (cond
+                               (and ctx session-id) (absolute-directory-path! (session-state/session-worktree-path-in ctx session-id))
+                               (some? cwd) (absolute-directory-path! cwd)
+                               :else nil)
+        effective-path (if namespace-mode?
+                         session-derived-path
                          (cond
                            (some? worktree-path) (absolute-directory-path! worktree-path)
-                           (some? cwd) (absolute-directory-path! cwd)
-                           (and ctx session-id) (absolute-directory-path! (session-state/session-worktree-path-in ctx session-id))
+                           (some? session-derived-path) session-derived-path
                            :else (throw (ex-info "psi-tool reload-code worktree mode requires explicit worktree-path or invoking session worktree-path" {:phase :validate :action "reload-code"}))))
         worktree-source (when-not namespace-mode? (if (some? worktree-path) :explicit :session))
         candidates (if namespace-mode?
@@ -357,7 +376,7 @@
                        matches))
         reload-result (loop [remaining candidates reloaded []]
                         (if-let [{:keys [ns-name]} (first remaining)]
-                          (let [step-result (try (reload-namespace! ns-name) {:ok? true}
+                          (let [step-result (try (reload-namespace! effective-path ns-name) {:ok? true}
                                                  (catch Exception e {:ok? false :error e}))]
                             (if (:ok? step-result)
                               (recur (rest remaining) (conj reloaded ns-name))
