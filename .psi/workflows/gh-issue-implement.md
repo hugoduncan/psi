@@ -1,119 +1,54 @@
 ---
 name: gh-issue-implement
-description: Find labeled GitHub implementation requests, create an issue worktree, design a Munera task, implement when design is clean, and create a PR
+description: Find an implement-labeled PR, prepare its branch worktree, design and implement the task, then push back to the PR branch and advance PR labels
 ---
-{:tools ["read" "bash" "edit" "write" "work-on"]
- :skills ["munera-task-design" "work-independently"]
- :thinking-level :high}
+{:steps [{:name "search"
+          :workflow "builder"
+          :session {:input {:from :workflow-input}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently"]}
+          :prompt "Find exactly one open GitHub PR in this repository carrying the `implement` label. Work independently. Use `$INPUT` only as an optional narrowing hint such as a PR number, URL, branch name, or short selector.\n\nRequired procedure:\n1. Use `gh pr list --state open --label implement --json number,title,labels,url,headRefName,baseRefName` to discover candidates.\n2. If none match, stop and report that there is nothing to process.\n3. If multiple match and `$INPUT` does not narrow to one, pick the lowest PR number.\n4. Read the selected PR with `gh pr view <pr> --json number,title,body,labels,url,headRefName,baseRefName,headRepositoryOwner,author`.\n5. Emit a compact Markdown handoff with these headings exactly:\n   - `## PR Selection`\n   - `## Handoff Data`\n6. Under `## Handoff Data`, include machine-friendly bullet lines for:\n   - `pr_number:`\n   - `pr_title:`\n   - `pr_url:`\n   - `pr_branch:`\n   - `pr_base_branch:`\n   - `worktree_description:`\n\nThe worktree description should be a short branch-derived slug suitable for a branch-specific worktree."}
+         {:name "prep"
+          :workflow "builder"
+          :session {:input {:from {:step "search" :kind :accepted-result}}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently"]}
+          :prompt "Prepare the PR branch worktree described by $INPUT. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR branch, base branch, and desired worktree description.\n2. Create or reuse a branch-specific worktree for the PR branch. Reuse in place if an appropriate worktree already exists for that branch.\n3. In that worktree, fetch the PR branch and `origin/master`.\n4. Check out the PR branch if needed.\n5. Rebase the PR branch onto `origin/master`.\n6. If the rebase rewrites history, push back to the PR branch with `--force-with-lease`. Otherwise do a normal push.\n7. If prep fails at any point, stop and report the failure instead of continuing on a stale or ambiguous branch state.\n\nOutput requirements:\n- Output a compact Markdown handoff with these headings exactly:\n  - `## Prep Outcome`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `rebase_status:`\n  - `push_mode:`"}
+         {:name "design"
+          :workflow "builder"
+          :session {:input {:from {:step "prep" :kind :accepted-result}}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently" "task-design"]
+                    :preload [{:from {:step "search" :kind :accepted-result}
+                               :projection :text}]}
+          :prompt "Using the prepared PR branch worktree described by $INPUT, create and refine the Munera task for the PR. Use the `task-design` skill and work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR URL, PR branch, and worktree path.\n2. In the worktree, read `munera/plan.md` and inspect `munera/open/` and `munera/closed/`.\n3. Read the PR and its current discussion context as needed with `gh pr view <pr> --comments`.\n4. Allocate the next canonical Munera task id and create a new task directory under `munera/open/NNN-slug/` if one does not already exist for this PR. Reuse and refine it if it already exists.\n5. Write or refine at least `design.md`, `steps.md`, and `implementation.md`.\n6. Include PR provenance in the task files, especially the PR number, URL, and branch name.\n7. Refine `design.md` with the `task-design` skill until it is complete and unambiguous. The design must specify not only conceptual behavior but also the intended implementation approach.\n8. In `design.md`, make the implementation approach explicit enough for a builder to execute without inventing core mechanics. Cover at least:\n   - implementation strategy and architectural fit\n   - key algorithms or procedural approach\n   - main data structures, state shapes, and configuration shapes\n   - interface changes, including commands, flags, API/resolver/tool surfaces, and file/config format changes as applicable\n   - important invariants, edge cases, and verification expectations\n   - important alternatives considered and rejected when that matters for clarity\n9. Record terse design/refinement notes in `implementation.md`.\n10. Keep `steps.md` synchronized with the planned implementation work.\n11. If ambiguities remain after this pass, say so explicitly and list them tersely. If no ambiguities remain, say so explicitly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Design Outcome`\n  - `## Munera Task`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`\n  - `ambiguity_status:`\n\nSet `ambiguity_status:` to either `ambiguous` or `clear`."
+          :judge {:system-prompt "You are a workflow routing judge. Respond with exactly one word: REPEAT or DONE."
+                  :prompt "Respond exactly with one word. Return REPEAT if the task design still has material ambiguities, missing decisions, incomplete acceptance criteria, or an underspecified implementation approach. Return DONE if the design is complete and unambiguous enough to begin implementation, including the implementation strategy, key algorithms, data structures, and interface changes. Use the actor step context, including its reported ambiguity status and task artifacts, to decide."}
+          :on {"REPEAT" {:goto "design" :max-iterations 6}
+               "DONE"   {:goto :next}}}
+         {:name "implement"
+          :workflow "builder"
+          :session {:input {:from {:step "design" :kind :accepted-result}}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently"]}
+          :prompt "Execute the Munera task described by $INPUT. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR branch, worktree path, and Munera task path.\n2. In the worktree, execute the task autonomously using the refined design as authoritative guidance.\n3. Add or refine `plan.md` only after the design is complete and unambiguous.\n4. Implement in small, reviewable steps.\n5. Keep `design.md`, `plan.md`, `steps.md`, and `implementation.md` synchronized with what was learned and done.\n6. Run relevant verification for the affected area.\n7. Record any important deviations from the initial design in `implementation.md` so they can be summarized back onto the PR.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Implementation Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`\n  - `deviation_summary:`"}
+         {:name "review"
+          :workflow "review-implementation"
+          :session {:input {:from {:step "implement" :kind :accepted-result}}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently"]
+                    :preload [{:from {:step "design" :kind :accepted-result}
+                               :projection :text}]}
+          :prompt "Improve the implemented Munera task described by $INPUT by running the review-implementation workflow in the same PR worktree. Work independently. Use the preloaded design handoff so the review can compare implementation against the intended design. Execute the review workflow until it converges, update the task artifacts as it goes, and preserve any meaningful deviations from the initial design in `implementation.md` so they can be summarized back onto the PR."}
+         {:name "push"
+          :workflow "builder"
+          :session {:input {:from {:step "review" :kind :accepted-result}}
+                    :reference {:from :workflow-original}
+                    :skills ["work-independently"]
+                    :preload [{:from {:step "design" :kind :accepted-result}
+                               :projection :text}
+                              {:from {:step "implement" :kind :accepted-result}
+                               :projection :text}]}
+          :prompt "Push the reviewed implementation back to the existing PR branch and advance PR labels. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR URL, PR branch, worktree path, Munera task path, and any deviation summary.\n2. In the worktree, verify the local branch matches the PR branch and review the current git status.\n3. Commit any remaining implementation or review follow-up changes if needed.\n4. Push the work back to the PR branch.\n5. Post a PR comment summarizing any meaningful deviations from the initial design that were recorded during implementation or review. If there were no meaningful deviations, say so explicitly.\n6. Remove the `implement` label from the PR.\n7. Add the `review` label to the PR.\n8. If any push or labeling step fails after earlier steps succeeded, report the partial-success state clearly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Push Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`\n  - `pr_label_update:`"}]}
 
-You are executing a focused GitHub-issue implementation workflow in this repository.
-
-Goal:
-- Find an open GitHub issue labeled `implement`.
-- Refresh `origin/master` and create an issue-specific worktree using the `work-on` tool based on `origin/master`.
-- In that worktree, review the issue request and create a new Munera task.
-- Iteratively refine and review the task design with the `munera-task-design` skill until forgotten aspects are covered and ambiguities are resolved.
-- If the design cannot be made complete and unambiguous, commit the design work, push the branch, and create a PR that references the original issue.
-- If the design is clean, execute the task autonomously using the `work-independently` skill, then push and create a PR that references the original issue.
-
-Use the `munera-task-design` skill when shaping and reviewing the Munera task design.
-Use the `work-independently` skill when implementation begins.
-
-Primary selection rule:
-- Look for open GitHub issues carrying the `implement` label.
-- If there are no matching issues, stop and report that there is nothing to process.
-- If multiple matching issues exist, process them in ascending issue-number order unless the input narrows the target.
-
-Input expectations:
-- `$INPUT` is optional.
-- If provided, treat it as an optional narrowing hint such as an issue number, repo-qualified issue reference, full issue URL, or a short instruction that identifies a specific matching issue.
-- If `$INPUT` is absent, discover candidate issues from labels.
-
-Required procedure:
-
-1. Discover and select the issue.
-   - Use `gh issue list` with JSON output to find open issues with the `implement` label.
-   - Retrieve enough list information to identify candidates, including at least: number, title, labels, state, and URL.
-   - Treat the current repository as authoritative unless the input explicitly identifies another repository.
-   - If the request input narrows the target, use it to select exactly one matching issue.
-
-2. Read the selected issue.
-   - Use `gh issue view` with JSON output.
-   - Retrieve enough detail to understand the request, including at least: number, title, body, labels, author, assignees, state, and URL.
-   - If the issue cannot be read, stop and report the failure instead of fabricating details.
-
-3. Refresh the base branch.
-   - Run `git fetch origin master`.
-   - Treat `origin/master` as the authoritative base for the implementation worktree.
-   - If the fetch fails, stop and report the failure rather than proceeding on a stale base.
-
-4. Create the issue worktree.
-   - Use the `work-on` tool, not manual `git worktree` shell commands.
-   - Base the worktree on `origin/master`.
-   - Use a short issue-derived description, such as the issue number plus a concise title fragment.
-   - After `work-on`, treat the resulting worktree path as authoritative for all repository edits, git commands, and PR work.
-   - If the `work-on` tool is unavailable, stop and report that limitation instead of improvising a different mechanism.
-
-5. Create the Munera task in the worktree.
-   - Orient in Munera by reading `munera/plan.md` and inspecting `munera/open/` and `munera/closed/`.
-   - Allocate the next canonical `NNN-slug` task id.
-   - Create a new task directory under `munera/open/NNN-slug/`.
-   - Write at least:
-     - `design.md`
-     - `steps.md`
-     - `implementation.md`
-   - Include issue provenance in the task files, especially the issue number and URL.
-   - Keep `design.md` focused on what and why, not code-level implementation.
-
-6. Refine the task design until it is clean or clearly blocked.
-   - Use the `munera-task-design` skill to review the design repeatedly.
-   - Continue refining until forgotten aspects are covered and ambiguities are resolved.
-   - A clean design should be complete and unambiguous enough to pass the Munera design gate before implementation planning/execution.
-   - If you cannot reach that state without user decisions or missing external information, stop implementation work.
-
-7. If the design is not clean.
-   - Preserve the improved design state in the worktree.
-   - Commit the task-design work.
-   - Push the branch.
-   - Create a PR that clearly explains the unresolved ambiguities or missing decisions.
-   - The PR must mention the original issue number, for example `Refs #<issue-number>` or equivalent.
-   - Do not proceed into implementation.
-
-8. If the design is clean, execute autonomously.
-   - Follow the `work-independently` skill.
-   - Add or refine `plan.md` only after the design is complete and unambiguous.
-   - Implement the task in small, reviewable steps.
-   - Keep Munera task files synchronized with what was learned and done.
-   - Run relevant verification for the affected area.
-   - If the task completes successfully, commit the work, push the branch, and create a PR.
-   - The PR must mention the original issue number, for example `Closes #<issue-number>` or equivalent when appropriate.
-
-9. PR requirements.
-   - In either the ambiguous-design or completed-implementation case, create a PR.
-   - The PR title and body should mention the original issue number.
-   - The PR body should summarize:
-     - the issue being addressed
-     - whether the outcome is design-only or implementation-complete
-     - any remaining ambiguities or follow-on work
-
-Execution constraints:
-- Prefer one issue per run unless the input explicitly asks for batch processing.
-- Use `work-on` rather than manual git worktree creation.
-- Do not proceed to implementation on an ambiguous design.
-- Do not wait for user input once the design is clean; continue autonomously.
-- Keep changes scoped to the selected issue.
-- Preserve Munera protocol distinctions among `design.md`, `plan.md`, `steps.md`, and `implementation.md`.
-
-Suggested command shapes:
-- `gh issue list --state open --label implement --json number,title,labels,state,url`
-- `gh issue view "$ISSUE" --json number,title,body,labels,author,assignees,state,url`
-- `git fetch origin master`
-- `gh pr create ...`
-
-Final response requirements:
-- Report the selected issue.
-- State whether a worktree was created and give its path when available.
-- Report the created Munera task id/path.
-- State whether the result was design-only or implementation-complete.
-- Include the branch name if pushed.
-- Include the PR URL if created.
+Coordinate implementation work for an existing GitHub PR labeled `implement`: select the PR, prepare or reuse its branch-specific worktree, rebase the PR branch onto `origin/master`, create and refine a Munera task design with explicit implementation approach detail, implement the task, review and improve the task implementation through the `review-implementation` workflow, then push back to the PR branch, summarize any meaningful deviations from the initial design on the PR, remove the PR's `implement` label, and add the `review` label. All stages use the `work-independently` skill.
