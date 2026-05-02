@@ -1,8 +1,9 @@
 - [x] Read issue #27 and comments.
-- [x] Inspect Munera plan and existing open/closed tasks.
+- [x] Inspect `munera/plan.md` and existing `munera/open/` and `munera/closed/` tasks.
 - [x] Allocate next canonical task id and create `munera/open/076-model-api-proxy-support/`.
-- [x] Draft `design.md` with issue provenance, scope, constraints, and acceptance criteria.
-- [x] Refine design toward completeness and unambiguity.
-- [x] Record terse refinement notes in `implementation.md`.
-- [x] Synchronize this checklist with remaining design work.
-- [ ] Handoff result for PR/next workflow step.
+- [x] Draft `design.md` with issue provenance, intent, scope, constraints, and acceptance criteria.
+- [x] Refine `design.md` until the task-level behavior, boundaries, and acceptance criteria are unambiguous.
+- [x] Record terse design/refinement notes in `implementation.md`.
+- [x] Confirm whether any task-level ambiguities remain.
+- [ ] Commit the new Munera task artifacts.
+- [ ] Hand off for publish/PR step.
