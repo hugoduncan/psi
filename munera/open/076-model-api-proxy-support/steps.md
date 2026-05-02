@@ -1,0 +1,9 @@
+- [x] Read upstream refine handoff requirements and identify issue provenance
+- [x] Inspect worktree Munera surfaces (`munera/plan.md`, `munera/open/`, `munera/closed/`)
+- [x] Read GitHub issue #27 with comments
+- [x] Allocate next canonical Munera task id and create task directory
+- [x] Draft `design.md` with issue provenance, scope, constraints, and acceptance criteria
+- [x] Refine `design.md` against task-design criteria for completeness and unambiguity
+- [x] Record terse refinement notes in `implementation.md`
+- [x] Confirm ambiguity status explicitly
+- [ ] Handoff this refined design for publication/push/PR workflow
