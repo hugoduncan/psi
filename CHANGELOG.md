@@ -12,6 +12,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - Model API HTTP requests now honor standard proxy environment variables (`HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`); see [Configuration](doc/configuration.md) and [Custom providers](doc/custom-providers.md).
 
 ### Fixed
+- Auto session naming now falls back across ranked helper models when a preferred helper model is unavailable or yields no usable title.
 - Emacs: typing before RPC connects no longer has a newline injected mid-draft when the footer first updates.
 - Emacs: footer now updates correctly after connect (was filtered due to missing session-id in payload).
 - Emacs: footer content no longer appears inside submitted prompts on longer sessions (root cause: re-entrant projection upsert triggered by undo-outer-limit on large buffers).
