@@ -416,28 +416,33 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"context/updated\"]}}")
-        (let [child-id (:psi.agent-session/session-id
-                        (mutate 'psi.extension/create-child-session
-                                {:session-name "child"
-                                 :tool-defs []
-                                 :thinking-level :off}))
-              context-evts (support/await-frames!
-                            out-writer
-                            (fn [frames]
-                              (let [context-evts (filter #(= "context/updated" (:event %)) frames)
-                                    latest (last context-evts)]
-                                (when (and (<= 2 (count context-evts))
-                                           (= session-id (get-in latest [:data :active-session-id]))
-                                           (some #(= child-id (:id %)) (get-in latest [:data :sessions])))
-                                  context-evts)))
-                            1000)]
-          (.close in-writer)
-          (deref loop-future 500 support/timeout-token)
-          (is (not= support/timeout-token context-evts) "timed out waiting for context/updated with new child session")
-          (let [latest (last context-evts)]
-            (is (<= 2 (count context-evts)))
-            (is (= session-id (get-in latest [:data :active-session-id])))
-            (is (some #(= child-id (:id %)) (get-in latest [:data :sessions])))))
+        (let [bootstrap-context (support/await-frame!
+                                 out-writer
+                                 #(when (= "context/updated" (:event %)) %)
+                                 1000)]
+          (is (not= support/timeout-token bootstrap-context) "timed out waiting for subscribe bootstrap context/updated")
+          (let [child-id (:psi.agent-session/session-id
+                          (mutate 'psi.extension/create-child-session
+                                  {:session-name "child"
+                                   :tool-defs []
+                                   :thinking-level :off}))
+                context-evts (support/await-frames!
+                              out-writer
+                              (fn [frames]
+                                (let [context-evts (filter #(= "context/updated" (:event %)) frames)
+                                      latest (last context-evts)]
+                                  (when (and (<= 2 (count context-evts))
+                                             (= session-id (get-in latest [:data :active-session-id]))
+                                             (some #(= child-id (:id %)) (get-in latest [:data :sessions])))
+                                    context-evts)))
+                              1000)]
+            (.close in-writer)
+            (deref loop-future 500 support/timeout-token)
+            (is (not= support/timeout-token context-evts) "timed out waiting for context/updated with new child session")
+            (let [latest (last context-evts)]
+              (is (<= 2 (count context-evts)))
+              (is (= session-id (get-in latest [:data :active-session-id])))
+              (is (some #(= child-id (:id %)) (get-in latest [:data :sessions]))))))
         (finally
           (future-cancel loop-future)
           (try (.close in-writer) (catch Exception _ nil))
