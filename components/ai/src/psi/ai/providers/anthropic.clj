@@ -26,16 +26,13 @@
   "Coerce any value to a string; nil and false become \"\"."
   [x]
   (str (or x "")))
-
 (defn- valid-anthropic-tool-id?
   [id]
   (and (string? id)
        (boolean (re-matches anthropic-tool-id-pattern id))))
-
 (defn- fallback-anthropic-tool-id
   []
   (str "tool_" (UUID/randomUUID)))
-
 (defn- ensure-anthropic-tool-id
   "Return an Anthropic-safe tool id (alnum, underscore, hyphen only).
    Generates a fallback when id is nil/blank/invalid."
