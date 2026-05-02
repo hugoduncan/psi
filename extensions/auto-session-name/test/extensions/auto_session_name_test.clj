@@ -181,8 +181,8 @@
                                                        :cache-breakpoints]))))
                         first)))
         (is (= {:provider :openai
-                :id "gpt-5.3-codex-spark"
-                :name "GPT-5.3 Codex Spark"}
+                :id "gpt-5-nano"
+                :name "GPT-5 Nano"}
                (some->> @calls
                         (keep (fn [[kind op params]]
                                 (when (and (= kind :mutate)

@@ -85,7 +85,7 @@
       (is (= "Conversation excerpt:\n\nUser: Fix footer rendering\nAssistant: I will inspect the selector path."
              (:prompt @last-run-params*)))
       (is (= {:provider :openai
-              :id "gpt-5.3-codex-spark"}
+              :id "gpt-5-nano"}
              (some-> @last-run-params*
                      :model
                      (select-keys [:provider :id])))))))
