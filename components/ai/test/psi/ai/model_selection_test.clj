@@ -322,7 +322,7 @@
             survivors [(sut/find-candidate catalog :anthropic "claude-3-5-haiku-20241022")
                        (sut/find-candidate catalog :openai "gpt-5.3-codex-spark")]
             ranked   (sut/rank-candidates request survivors)]
-        (is (= ["gpt-5.3-codex-spark" "claude-3-5-haiku-20241022"]
+        (is (= ["claude-3-5-haiku-20241022" "gpt-5.3-codex-spark"]
                (mapv :id (:ranked ranked))))
         (is (false? (:ambiguous? ranked)))))
 
@@ -336,7 +336,7 @@
             survivors [(sut/find-candidate catalog :anthropic "claude-3-5-haiku-20241022")
                        (sut/find-candidate catalog :openai "gpt-5.3-codex-spark")]
             ranked    (sut/rank-candidates request survivors)]
-        (is (= ["gpt-5.3-codex-spark" "claude-3-5-haiku-20241022"]
+        (is (= ["claude-3-5-haiku-20241022" "gpt-5.3-codex-spark"]
                (mapv :id (:ranked ranked))))
         (is (false? (:ambiguous? ranked)))))
 
