@@ -5,6 +5,7 @@
    [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
+   [psi.ai.proxy :as proxy]
    [psi.ai.providers.openai :as openai])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
@@ -184,6 +185,57 @@
         (is (some #(= "response.completed"
                       (get-in % [:event :type]))
                   @reply-captures))))))
+
+(deftest openai-stream-applies-proxy-request-options-test
+  (testing "OpenAI codex stream request merges shared proxy options"
+    (let [model    (models/get-model :gpt-5.3-codex)
+          token    (jwt-with-account-id "acc_test")
+          convo    (-> (conv/create "sys")
+                       (conv/add-user-message "hello"))
+          captured (atom nil)
+          sse      (str
+                    "data: " (json/generate-string
+                              {:type "response.output_item.added"
+                               :item {:type "message"
+                                      :id "msg_1"
+                                      :role "assistant"
+                                      :status "in_progress"
+                                      :content []}}) "\n\n"
+                    "data: " (json/generate-string
+                              {:type "response.completed"
+                               :response {:status "completed"}}) "\n\n")]
+      (with-redefs [proxy/request-proxy-options (fn [url]
+                                                  (is (= "https://chatgpt.com/backend-api/codex/responses" url))
+                                                  {:proxy-host "proxy.example"
+                                                   :proxy-port 8080
+                                                   :proxy-scheme :http})
+                    http/post (fn [_url req]
+                                (reset! captured req)
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key token}
+         (fn [_] nil)))
+      (is (= "proxy.example" (:proxy-host @captured)))
+      (is (= 8080 (:proxy-port @captured)))
+      (is (= :http (:proxy-scheme @captured)))))
+
+  (testing "OpenAI completions stream leaves request unchanged when no proxy applies"
+    (let [model    (models/get-model :gpt-4o)
+          convo    (-> (conv/create "sys")
+                       (conv/add-user-message "hello"))
+          captured (atom nil)
+          sse      (str "data: " (json/generate-string {:choices [{:delta {:content "hi"}}]}) "\n\n"
+                        "data: [DONE]\n\n")]
+      (with-redefs [proxy/request-proxy-options (constantly nil)
+                    http/post (fn [_url req]
+                                (reset! captured req)
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key "test-key"}
+         (fn [_] nil)))
+      (is (nil? (:proxy-host @captured)))
+      (is (nil? (:proxy-port @captured)))
+      (is (nil? (:proxy-scheme @captured))))))
 
 (deftest codex-requires-chatgpt-token-test
   (testing "non-ChatGPT token emits an error event (missing chatgpt_account_id)"

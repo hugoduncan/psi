@@ -3,6 +3,9 @@
 ## Provenance
 - GitHub issue: #27
 - Issue URL: https://github.com/hugoduncan/psi/issues/27
+- GitHub PR: #66
+- PR URL: https://github.com/hugoduncan/psi/pull/66
+- PR branch: issue-27-proxy-support-model-api
 - Issue title: Add proxy support (socks, http, https, ...) for accessing model API
 - Refinement branch: issue-27-proxy-support-model-api
 - Worktree: /Users/duncan/projects/hugoduncan/psi/issue-27-proxy-support-model-api
@@ -100,6 +103,53 @@ This yields one unambiguous story: psi inherits proxy settings from the process 
 5. Add provider-level tests proving that OpenAI and Anthropic transport calls pass the expected proxy options to `http/post` when the relevant environment variables are set.
 6. Update user docs to describe the canonical environment-based configuration story, supported proxy variable names, precedence, and caveats.
 
+## Intended implementation slices
+1. Inspect the existing transport helper seams in `components/ai/src/psi/ai/providers/openai/transport.clj` and `components/ai/src/psi/ai/providers/anthropic.clj` and choose the narrowest shared enrichment point that both providers can use without changing provider protocols.
+2. Add a dedicated proxy helper namespace under `components/ai/src/psi/ai/` with pure functions for environment normalization, URL-scheme selection, proxy URI parsing, and clj-http option projection.
+3. Keep environment reading at the edge of that helper so tests can exercise pure logic with injected env maps instead of mutating process state globally.
+4. Extend the provider transport call path so the final request map passed into `clj-http.client/post` is `(merge existing-options proxy-options)` and remains directly observable to existing stubs.
+5. Add focused unit tests for the helper first, then provider transport tests for both OpenAI and Anthropic integration points.
+6. Update docs only after the exact supported URI forms and any `NO_PROXY` limitation are proven by the implementation/tests.
+
+## Builder-oriented implementation approach
+### Files and namespaces expected to change
+- Add one new shared helper namespace under `components/ai/src/psi/ai/`, likely `proxy.clj` or equivalently named, containing only proxy normalization/selection/projection logic.
+- Update `components/ai/src/psi/ai/providers/openai/transport.clj` so the final options map passed to `clj-http.client/post` is enriched by the shared proxy helper.
+- Update `components/ai/src/psi/ai/providers/anthropic.clj` at the equivalent `http/post` boundary with the same enrichment call.
+- Add focused tests under the `components/ai/test/psi/ai/` tree for the shared helper and update provider transport tests in the existing OpenAI and Anthropic test namespaces.
+- Update user docs in `README.md`, `doc/psi-project-config.md`, and `doc/custom-providers.md` only where they describe real supported behavior after implementation is proved.
+
+### Integration point constraints
+- The builder must not add proxy parameters to provider protocol methods, runtime session state, or model definitions.
+- The builder must not thread proxy state through unrelated runtime layers if the provider transport already has enough information via request URL and process environment.
+- The builder should enrich only the final clj-http request options map, preserving current provider-owned request body, headers, auth, capture hooks, response decoding, and exception behavior.
+- If the codebase already has a common request-options helper used by both providers, extend that helper instead of inserting duplicate calls in multiple places; otherwise a direct shared helper call at each provider `http/post` boundary is acceptable.
+
+### Expected helper API shape
+The implementation should be explicit enough that a later builder does not need to invent the helper contract. A suitable public surface is:
+- `normalize-proxy-env` — pure, takes an env map, returns normalized logical proxy config.
+- `effective-proxy-for-url` — pure, takes normalized config plus request URL, returns either `nil` or a parsed effective proxy map.
+- `proxy-request-options` — pure, takes parsed effective proxy data, returns a clj-http-compatible options map.
+- `request-proxy-options` or equivalent convenience helper — edge function that reads the process env once and returns the final options map for a given request URL.
+
+Names may differ, but the separation of concerns must remain: normalize env → resolve effective proxy → project request options.
+
+### Expected request enrichment flow
+For each provider transport call:
+1. Construct the current provider request map exactly as today.
+2. Determine the request URL string already being posted.
+3. Call the shared proxy helper with that URL.
+4. Merge the returned options into the final request map immediately before `http/post`.
+5. Leave the no-proxy case as an empty map merge so current behavior is unchanged.
+
+The implementation should prefer a shape equivalent to:
+```clojure
+(let [request-options {...provider-owned request options...}
+      proxy-options   (proxy/request-proxy-options request-url)]
+  (http/post request-url (merge request-options proxy-options)))
+```
+If a shared helper returns the final merged map instead, that is acceptable only if the provider-owned request map remains directly observable to tests and capture seams.
+
 ## Key algorithms and rules
 ### 1. Environment normalization
 Input: current process environment map.
@@ -133,7 +183,8 @@ Input: effective proxy URI.
 
 Projection rules:
 - parse the proxy URI once into its components;
-- map supported schemes to clj-http options in the form expected by the client, including host, port, and protocol-specific flags;
+- require a host and numeric port; missing host/port is an error, not an implicit default;
+- map supported schemes to clj-http options in the exact form expected by the client, including host, port, and protocol-specific flags;
 - attach auth fields only if present in the proxy URI and supported by clj-http;
 - merge the resulting proxy options with existing request options without changing existing headers/body/as/throw-exceptions behavior.
 
@@ -183,7 +234,7 @@ The final concrete keys must match `clj-http` expectations, but the helper shoul
 - If there is already a common request-helper seam for provider transports, prefer extending that seam instead of duplicating helper calls.
 
 ### Documentation surfaces
-- Update `README.md` and/or `doc/configuration.md` with the canonical proxy configuration story.
+- Update `README.md` and/or `doc/psi-project-config.md` with the canonical proxy configuration story.
 - Add or update a focused doc section describing:
   - supported variables,
   - precedence,
@@ -194,8 +245,14 @@ The final concrete keys must match `clj-http` expectations, but the helper shoul
 
 ### User-visible command/config surfaces
 - No new slash command.
-- No new `.psi/models.edn` field.
+- No new `.psi/project.edn` or model-definition proxy field.
 - No new resolver/API surface is required for this task unless the implementation adds introspection for diagnostics; if so, it must be documented as auxiliary, not as the primary configuration mechanism.
+
+## Architectural fit and constraints
+- The change must preserve the current separation between provider semantics and transport mechanics.
+- The helper should be pure-by-default and not require wider runtime state threading.
+- Existing request capture/test seams should remain intact so current provider tests can continue to observe the final request map at the `http/post` boundary.
+- The implementation must not introduce a parallel proxy story in project config or provider definitions.
 
 ## Invariants
 - One canonical user configuration story: environment variables.
@@ -208,6 +265,8 @@ The final concrete keys must match `clj-http` expectations, but the helper shoul
 ## Edge cases and explicit decisions
 - If both uppercase and lowercase environment variables are present with different values, uppercase wins.
 - If both scheme-specific and `ALL_PROXY` are present, the scheme-specific value wins.
+- Blank env values behave as unset.
+- Request URLs without `http` or `https` schemes are outside the supported proxy surface and should not silently coerce into a supported scheme.
 - SOCKS support is in scope only if `clj-http` supports the required option projection cleanly from the same helper. If a named SOCKS variant is not actually supported by the underlying client, the implementation must fail clearly and document the limitation instead of claiming broad SOCKS support.
 - `NO_PROXY` support is optional in this task design only if the implementation surface cannot support it coherently with the chosen client options. The final implementation must either support it and document matching rules, or document it as unsupported.
 - Proxy support applies only to model API HTTP traffic; it does not imply proxying unrelated runtime subsystems.
@@ -215,11 +274,21 @@ The final concrete keys must match `clj-http` expectations, but the helper shoul
 
 ## Verification expectations
 The implementation is done only when all of the following are true:
-1. Focused unit tests cover environment normalization, precedence, effective-proxy selection, malformed URI handling, and unsupported-scheme handling.
+1. Focused unit tests cover environment normalization, precedence, effective-proxy selection, malformed URI handling, missing host/port handling, and unsupported-scheme handling.
 2. OpenAI transport tests prove that an applicable proxy environment variable yields proxy options in the final `http/post` request map.
 3. Anthropic transport tests prove the same.
 4. Tests also prove that no proxy options are added when no relevant environment variable is set.
-5. Docs clearly describe the supported proxy configuration story and any boundaries or caveats.
+5. If proxy credentials are supported, tests prove they are projected correctly and not leaked in any diagnostic surface that is asserted.
+6. Docs clearly describe the supported proxy configuration story and any boundaries or caveats.
+
+### Verification commands to expect during implementation
+The builder should expect to run focused AI-component tests first, then broader verification only if needed. At minimum, verification should include:
+- focused tests for the new proxy helper namespace,
+- focused Anthropic transport tests,
+- focused OpenAI transport tests,
+- any doc or lint checks normally run for touched files if the repository has a standard task for them.
+
+Exact commands may follow existing project conventions, but the builder must preserve a narrow feedback loop and record the real commands/results in `implementation.md`.
 
 ## Alternatives considered
 ### Add proxy fields to provider definitions
@@ -230,6 +299,9 @@ Rejected because it duplicates well-understood process-environment behavior, add
 
 ### Implement proxy logic separately inside each provider
 Rejected because the built-in providers already share the same HTTP client boundary and duplicated logic would drift.
+
+### Add broad runtime/global networking settings first
+Rejected for this task because the requested behavior is specifically model API reachability and the narrowest correct change is at the shared AI transport boundary already used by the affected providers.
 
 ## Acceptance criteria
 1. A user can configure psi so outbound model API requests are sent through a proxy by setting documented environment variables before launching psi.

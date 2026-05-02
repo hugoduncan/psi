@@ -93,6 +93,11 @@ same way but set `:api` to `:anthropic-messages`.
 For Anthropic-compatible providers, psi uses the Anthropic transport and will
 send the configured key through the compatible auth path.
 
+Custom providers do not define their own proxy fields. When a custom provider
+uses psi's built-in OpenAI-compatible or Anthropic-compatible transport path, it
+inherits the same environment-driven outbound proxy behavior documented in
+[`doc/configuration.md`](configuration.md).
+
 ## Local servers and custom headers
 
 The `:auth` map supports more than just an API key:

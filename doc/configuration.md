@@ -102,6 +102,59 @@ layers.
 Both `:model-provider` and `:model-id` must be set together; a partial entry is
 ignored and the next lower source is used instead.
 
+---
+
+## Outbound model API proxy configuration
+
+Psi inherits outbound proxy settings for model API HTTP traffic from the process
+environment. There is no parallel proxy field in session config, project config,
+or custom provider definitions.
+
+Supported environment variables:
+
+- `HTTPS_PROXY` / `https_proxy` — used for `https://...` model API URLs
+- `HTTP_PROXY` / `http_proxy` — used for `http://...` model API URLs
+- `ALL_PROXY` / `all_proxy` — fallback when the scheme-specific variable is absent
+
+Precedence rules:
+
+1. uppercase wins over lowercase for the same logical variable
+2. scheme-specific wins over `ALL_PROXY`
+3. blank values behave as unset
+
+Supported proxy URI schemes in this implementation:
+
+- `http://`
+- `https://`
+- `socks://`
+- `socks5://`
+
+Proxy URIs must include both host and numeric port. Invalid or unsupported proxy
+URIs fail explicitly when psi prepares the provider request.
+
+`NO_PROXY` / `no_proxy` is not currently supported for model API transport in
+this implementation.
+
+Examples:
+
+```bash
+# HTTPS model APIs through an HTTP proxy
+export HTTPS_PROXY=http://proxy.example:8443
+psi
+
+# HTTP model APIs through a dedicated HTTP proxy
+export HTTP_PROXY=http://proxy.example:8080
+psi
+
+# Shared fallback proxy, including SOCKS5
+export ALL_PROXY=socks5://proxy.example:1080
+psi
+```
+
+These environment variables affect the shared OpenAI and Anthropic transport
+paths used by built-in providers and by custom providers that reuse those same
+transport implementations.
+
 ### `:thinking-level` values
 
 | Value | Meaning |

@@ -1,9 +1,20 @@
 # Implementation notes
 
 - 2026-05-01: Created task from GitHub issue #27 (`https://github.com/hugoduncan/psi/issues/27`).
-- 2026-05-01: Used existing issue worktree `/Users/duncan/projects/hugoduncan/psi/issue-27-proxy-support-model-api` on branch `issue-27-proxy-support-model-api`.
-- 2026-05-01: Confirmed canonical task id `076` because existing open/closed task ids already reached `075` and `076` was unused.
-- 2026-05-01: Read the issue comment history and current transport code in `components/ai/src/psi/ai/providers/openai/transport.clj` and `components/ai/src/psi/ai/providers/anthropic.clj` to ground the design in the real HTTP boundary.
-- 2026-05-01: Replaced the earlier behavior-only design with an implementation-grade design that explicitly chooses environment-driven proxy configuration, shared transport helper extraction, provider integration points, proxy precedence rules, data shapes, edge cases, and verification expectations.
-- 2026-05-01: Explicitly rejected provider-local proxy fields and a new psi-specific proxy config file to preserve one canonical operator story.
+- 2026-05-01: Confirmed PR provenance for refinement handoff: PR #66 (`https://github.com/hugoduncan/psi/pull/66`) on branch `issue-27-proxy-support-model-api` in worktree `/Users/duncan/projects/hugoduncan/psi/issue-27-proxy-support-model-api`.
+- 2026-05-01: Reused existing canonical task id `076` at `munera/open/076-model-api-proxy-support/` rather than allocating a new task.
+- 2026-05-01: Read the issue/PR context plus current transport code in `components/ai/src/psi/ai/providers/openai/transport.clj` and `components/ai/src/psi/ai/providers/anthropic.clj` to ground the design in the real HTTP boundary.
+- 2026-05-01: Refined the design to make the implementation approach explicit: shared `components/ai` proxy helper, env normalization/precedence, URL-scheme-based proxy selection, clj-http request-option projection, provider integration points, and focused verification seams.
+- 2026-05-01: Tightened the design with explicit implementation slices, architectural constraints, request-map observability expectations, missing host/port failure behavior, and a stronger statement that project/provider config surfaces stay unchanged.
+- 2026-05-01: Added builder-facing refinement detail so a later implementation pass has concrete expected file/namespace targets, helper API boundaries, and request enrichment flow rather than only conceptual guidance.
+- 2026-05-01: Explicitly rejected provider-local proxy fields, a psi-specific proxy config file, and a broader runtime-network-settings-first approach to preserve one canonical operator story.
 - 2026-05-01: Declared the design clear; no material task-level ambiguities remain after specifying the intended implementation mechanism and boundaries.
+- 2026-05-01: Re-read the PR handoff context via `gh pr view 66 --comments`; no additional PR discussion changed the design direction.
+- 2026-05-01: Re-read `munera/plan.md` plus `munera/open/` and `munera/closed/` in the PR worktree to confirm task `076` remains the correct canonical task for this PR.
+- 2026-05-01: Rewrote `design.md` as a complete builder handoff so the implementation approach is explicit at the level of helper API, integration boundaries, request-option merge shape, invariants, failure modes, and verification scope.
+- 2026-05-01: Added shared `components/ai/src/psi/ai/proxy.clj` with env normalization, scheme-aware proxy selection, proxy URI parsing/validation, and clj-http request-option projection. Implemented uppercase-over-lowercase precedence, scheme-specific-over-ALL precedence, blank-as-unset behavior, and explicit malformed/unsupported/missing-port failures.
+- 2026-05-01: Integrated proxy request-option enrichment at the shared `http/post` boundaries in `components/ai/src/psi/ai/providers/openai/transport.clj` and `components/ai/src/psi/ai/providers/anthropic.clj` without changing provider config surfaces, request body ownership, or provider capture callbacks.
+- 2026-05-01: Added focused proxy helper tests in `components/ai/test/psi/ai/proxy_test.clj` plus provider transport tests in `components/ai/test/psi/ai/providers/anthropic_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` proving request-option injection and no-proxy pass-through.
+- 2026-05-01: Updated `README.md`, `doc/configuration.md`, and `doc/custom-providers.md` to document the canonical environment-driven proxy story, precedence, supported proxy schemes (`http`, `https`, `socks`, `socks5`), required host/port, inherited behavior for custom providers, and the explicit current limitation that `NO_PROXY` is unsupported.
+- 2026-05-01: Verification: `clojure -M:test -c tests-component-isolated.edn --focus psi.ai.proxy-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` => `46 tests, 261 assertions, 0 failures`.
+- 2026-05-01: Design deviation: `NO_PROXY` support was left explicitly unsupported and documented as such rather than partially implemented without a coherent clj-http-backed bypass story.

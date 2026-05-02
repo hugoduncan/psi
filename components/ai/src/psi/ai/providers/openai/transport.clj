@@ -1,7 +1,8 @@
 (ns psi.ai.providers.openai.transport
   (:require [clojure.string :as str]
             [clj-http.client :as http]
-            [cheshire.core :as json]))
+            [cheshire.core :as json]
+            [psi.ai.proxy :as proxy]))
 
 (defn safe-call!
   [f payload]
@@ -13,7 +14,9 @@
 
 (defn stream-response
   [url request]
-  (http/post url (merge request {:as :stream :cookie-policy :none :throw-exceptions false})))
+  (http/post url (merge request
+                        (proxy/request-proxy-options url)
+                        {:as :stream :cookie-policy :none :throw-exceptions false})))
 
 (defn redact-authorization
   [value]

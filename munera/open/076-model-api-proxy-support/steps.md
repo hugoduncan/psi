@@ -1,10 +1,14 @@
 - [x] Read issue #27 and comments.
 - [x] Inspect `munera/plan.md` and existing `munera/open/` and `munera/closed/` tasks.
-- [x] Confirm existing issue worktree `/Users/duncan/projects/hugoduncan/psi/issue-27-proxy-support-model-api` on branch `issue-27-proxy-support-model-api`.
-- [x] Allocate canonical task id `076` and create `munera/open/076-model-api-proxy-support/`.
-- [x] Draft `design.md` with issue provenance, behavior, architecture fit, implementation strategy, data shapes, interface changes, invariants, edge cases, and verification expectations.
-- [x] Refine `design.md` until the implementation approach is explicit enough for a later builder to execute without inventing core mechanics.
+- [x] Confirm PR #66 (`https://github.com/hugoduncan/psi/pull/66`) on branch `issue-27-proxy-support-model-api` using worktree `/Users/duncan/projects/hugoduncan/psi/issue-27-proxy-support-model-api`.
+- [x] Reuse existing canonical task `munera/open/076-model-api-proxy-support/`.
+- [x] Refine `design.md` with PR provenance, behavior, architecture fit, implementation strategy, data shapes, interface changes, invariants, edge cases, alternatives, and verification expectations.
+- [x] Make the builder-facing implementation approach explicit enough to execute without inventing core mechanics, including helper boundaries, integration points, request enrichment flow, and expected verification scope.
 - [x] Record terse design/refinement notes in `implementation.md`.
-- [x] Confirm whether any task-level ambiguities remain.
-- [ ] Commit the refined Munera task artifacts.
-- [ ] Hand off for publish/PR step.
+- [x] Confirm ambiguity status for the task handoff.
+- [x] Implement proxy helper and provider transport changes described by the design.
+- [x] Add focused tests for proxy normalization/selection/projection and provider request-option enrichment.
+- [x] Update user-facing docs for the canonical environment-driven proxy configuration story.
+- [x] Run focused verification and record commands/results in `implementation.md`.
+- [ ] Commit the implementation task artifacts and code changes.
+- [x] Hand off for implementation/publish workflow.

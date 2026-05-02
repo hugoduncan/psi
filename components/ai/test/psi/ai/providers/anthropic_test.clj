@@ -5,6 +5,7 @@
    [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
+   [psi.ai.proxy :as proxy]
    [psi.ai.providers.anthropic :as anthropic]
    [psi.ai.providers.anthropic.request-schema :as request-schema])
   (:import [java.io ByteArrayInputStream]))
@@ -264,6 +265,43 @@
       (is (= use-id res-id) "tool_result must reference normalized tool_use id")
       (is (re-matches #"^[a-zA-Z0-9_-]+$" use-id)
           "normalized id must satisfy Anthropic regex"))))
+
+(deftest stream-anthropic-applies-proxy-request-options-test
+  (testing "Anthropic stream request merges shared proxy options"
+    (let [model      (models/get-model :sonnet-4.6)
+          convo      (-> (conv/create "sys")
+                         (conv/add-user-message "hello"))
+          captured   (atom nil)
+          sse        (str (sse-line "message_start" {:type "message_start"})
+                          (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [proxy/request-proxy-options (fn [url]
+                                                  (is (= "https://api.anthropic.com/v1/messages" url))
+                                                  {:proxy-host "proxy.example"
+                                                   :proxy-port 8443
+                                                   :proxy-scheme :http})
+                    http/post (fn [_url req]
+                                (reset! captured req)
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"} (fn [_] nil)))
+      (is (= "proxy.example" (:proxy-host @captured)))
+      (is (= 8443 (:proxy-port @captured)))
+      (is (= :http (:proxy-scheme @captured)))))
+
+  (testing "Anthropic stream leaves request unchanged when no proxy applies"
+    (let [model    (models/get-model :sonnet-4.6)
+          convo    (-> (conv/create "sys")
+                       (conv/add-user-message "hello"))
+          captured (atom nil)
+          sse      (str (sse-line "message_start" {:type "message_start"})
+                        (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [proxy/request-proxy-options (constantly nil)
+                    http/post (fn [_url req]
+                                (reset! captured req)
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"} (fn [_] nil)))
+      (is (nil? (:proxy-host @captured)))
+      (is (nil? (:proxy-port @captured)))
+      (is (nil? (:proxy-scheme @captured))))))
 
 (deftest stream-anthropic-captures-provider-request-and-response-test
   (testing "Anthropic streaming emits provider request/response captures"
