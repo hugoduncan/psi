@@ -1,9 +1,10 @@
 - [x] Read issue #27 and comments.
 - [x] Inspect `munera/plan.md` and existing `munera/open/` and `munera/closed/` tasks.
-- [x] Allocate next canonical task id and create `munera/open/076-model-api-proxy-support/`.
-- [x] Draft `design.md` with issue provenance, intent, scope, constraints, and acceptance criteria.
-- [x] Refine `design.md` until the task-level behavior, boundaries, and acceptance criteria are unambiguous.
+- [x] Confirm existing issue worktree `/Users/duncan/projects/hugoduncan/psi/issue-27-proxy-support-model-api` on branch `issue-27-proxy-support-model-api`.
+- [x] Allocate canonical task id `076` and create `munera/open/076-model-api-proxy-support/`.
+- [x] Draft `design.md` with issue provenance, behavior, architecture fit, implementation strategy, data shapes, interface changes, invariants, edge cases, and verification expectations.
+- [x] Refine `design.md` until the implementation approach is explicit enough for a later builder to execute without inventing core mechanics.
 - [x] Record terse design/refinement notes in `implementation.md`.
 - [x] Confirm whether any task-level ambiguities remain.
-- [ ] Commit the new Munera task artifacts.
+- [ ] Commit the refined Munera task artifacts.
 - [ ] Hand off for publish/PR step.
