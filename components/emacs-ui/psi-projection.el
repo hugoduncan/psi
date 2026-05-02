@@ -22,6 +22,15 @@
 
 (defvar psi-emacs-notification-timeout-seconds)
 
+(defvar-local psi-emacs--upsert-projection-in-progress nil
+  "Non-nil while `psi-emacs--upsert-projection-block' is executing.
+Guards against re-entrant calls that can occur when large undo records cause
+`undo-outer-limit-truncate' to fire `display-warning', which calls
+`sit-for 0', which processes pending RPC process output mid-upsert.  Without
+this guard the projection region is unregistered when the re-entrant call
+arrives, causing a second projection block to be inserted and the
+draft/footer boundary to be corrupted.")
+
 (defvar psi-emacs--send-request-function)
 (defvar psi-emacs--slash-command-handler-function)
 
@@ -524,76 +533,81 @@ path-line, stats-line, session-activity-line, status-line (blank lines omitted).
 
 Projection is always reinserted at end-of-buffer so footer/projection content
 tracks transcript growth like a terminal footer."
-  (when psi-emacs--state
-    ;; Keep dedicated input separator width aligned with current visible window
-    ;; whenever projection is re-rendered (notably after startup hydration).
-    (when (and (psi-emacs--input-separator-marker-valid-p)
-               (psi-emacs--input-separator-needs-refresh-p))
-      (psi-emacs--refresh-input-separator-line))
-    (let* ((follow-anchor (psi-emacs--draft-anchor-at-end-p))
-           (range (when-let ((bounds (psi-emacs--region-bounds 'projection 'main)))
-                    (cons (copy-marker (car bounds) nil)
-                          (copy-marker (cdr bounds) nil))))
-           (start (and (consp range) (car range)))
-           (end (and (consp range) (cdr range)))
-           (rendered (psi-emacs--projection-render-block psi-emacs--state)))
-      (let ((inhibit-read-only t)
-            ;; Suppress undo recording for projection block changes.
-            ;; The projection block is ephemeral UI recomputed from state on
-            ;; every update; undo of its content is meaningless.  More
-            ;; critically, without this, large undo records can trigger
-            ;; `undo-outer-limit-truncate', which calls `display-warning',
-            ;; which calls `sit-for 0', which processes pending process output
-            ;; mid-upsert.  That allows re-entrant RPC events to call
-            ;; `upsert-projection-block' while the projection region is
-            ;; unregistered, corrupting the draft/footer boundary and causing
-            ;; footer content to be captured as part of the submitted prompt.
-            (buffer-undo-list t))
-        ;; Remove previous projection block first.
-        (when (and (markerp start)
-                   (markerp end)
-                   (marker-buffer start)
-                   (marker-buffer end))
-          ;; Snapshot projection start before deleting so draft-end-position
-          ;; has a reliable backstop during the gap between unregister and
-          ;; re-register (after-change hooks can fire inside delete-region).
-          (setf (psi-emacs-state-last-projection-start psi-emacs--state)
-                (marker-position start))
-          (save-excursion
-            (delete-region start end))
-          (psi-emacs--region-unregister 'projection 'main)
-          (set-marker start nil)
-          (set-marker end nil))
-
-        ;; Reinsert at current end-of-buffer.
-        ;; rendered already starts with "\n" so no extra newline is needed here.
-        (unless (string-empty-p rendered)
-          (save-excursion
-            (goto-char (point-max))
-            (let ((new-start (copy-marker (point) nil))
-                  ;; Keep insertion-type nil on end marker so appends at the
-                  ;; projection tail stay outside the projection range.
-                  (new-end (copy-marker (point) nil)))
-              (insert rendered)
-              (let ((render-start (marker-position new-start))
-                    (render-end (point)))
-                ;; Keep projection/footer content non-editable by user input.
-                ;; Leave boundary insertion at projection start writable so
-                ;; transcript/tool appends can insert immediately before block.
-                (when (and (fboundp 'psi-emacs--mark-region-read-only)
-                           (< (1+ render-start) render-end))
-                  (psi-emacs--mark-region-read-only (1+ render-start) render-end))
-                ;; After insertion, make start marker advance when user inserts at
-                ;; draft/projection boundary so draft text stays outside range.
-                (set-marker-insertion-type new-start t)
-                (set-marker new-end render-end)
-                (psi-emacs--region-register 'projection 'main new-start new-end)
-                ;; Clear the snapshot now that the live region is registered.
+  (when (and psi-emacs--state
+             (not psi-emacs--upsert-projection-in-progress))
+    (setq psi-emacs--upsert-projection-in-progress t)
+    (unwind-protect
+        (progn
+          ;; Keep dedicated input separator width aligned with current visible window
+          ;; whenever projection is re-rendered (notably after startup hydration).
+          (when (and (psi-emacs--input-separator-marker-valid-p)
+                     (psi-emacs--input-separator-needs-refresh-p))
+            (psi-emacs--refresh-input-separator-line))
+          (let* ((follow-anchor (psi-emacs--draft-anchor-at-end-p))
+                 (range (when-let ((bounds (psi-emacs--region-bounds 'projection 'main)))
+                          (cons (copy-marker (car bounds) nil)
+                                (copy-marker (cdr bounds) nil))))
+                 (start (and (consp range) (car range)))
+                 (end (and (consp range) (cdr range)))
+                 (rendered (psi-emacs--projection-render-block psi-emacs--state)))
+            (let ((inhibit-read-only t)
+                  ;; Suppress undo recording for projection block changes.
+                  ;; The projection block is ephemeral UI recomputed from state on
+                  ;; every update; undo of its content is meaningless.  More
+                  ;; critically, without this, large undo records can trigger
+                  ;; `undo-outer-limit-truncate', which calls `display-warning',
+                  ;; which calls `sit-for 0', which processes pending process output
+                  ;; mid-upsert.  That allows re-entrant RPC events to call
+                  ;; `upsert-projection-block' while the projection region is
+                  ;; unregistered, corrupting the draft/footer boundary and causing
+                  ;; footer content to be captured as part of the submitted prompt.
+                  (buffer-undo-list t))
+              ;; Remove previous projection block first.
+              (when (and (markerp start)
+                         (markerp end)
+                         (marker-buffer start)
+                         (marker-buffer end))
+                ;; Snapshot projection start before deleting so draft-end-position
+                ;; has a reliable backstop during the gap between unregister and
+                ;; re-register (after-change hooks can fire inside delete-region).
                 (setf (psi-emacs-state-last-projection-start psi-emacs--state)
-                      nil))))))
+                      (marker-position start))
+                (save-excursion
+                  (delete-region start end))
+                (psi-emacs--region-unregister 'projection 'main)
+                (set-marker start nil)
+                (set-marker end nil))
 
-      (when follow-anchor
-        (psi-emacs--set-draft-anchor-to-end)))))
+              ;; Reinsert at current end-of-buffer.
+              ;; rendered already starts with "\n" so no extra newline is needed here.
+              (unless (string-empty-p rendered)
+                (save-excursion
+                  (goto-char (point-max))
+                  (let ((new-start (copy-marker (point) nil))
+                        ;; Keep insertion-type nil on end marker so appends at the
+                        ;; projection tail stay outside the projection range.
+                        (new-end (copy-marker (point) nil)))
+                    (insert rendered)
+                    (let ((render-start (marker-position new-start))
+                          (render-end (point)))
+                      ;; Keep projection/footer content non-editable by user input.
+                      ;; Leave boundary insertion at projection start writable so
+                      ;; transcript/tool appends can insert immediately before block.
+                      (when (and (fboundp 'psi-emacs--mark-region-read-only)
+                                 (< (1+ render-start) render-end))
+                        (psi-emacs--mark-region-read-only (1+ render-start) render-end))
+                      ;; After insertion, make start marker advance when user inserts at
+                      ;; draft/projection boundary so draft text stays outside range.
+                      (set-marker-insertion-type new-start t)
+                      (set-marker new-end render-end)
+                      (psi-emacs--region-register 'projection 'main new-start new-end)
+                      ;; Clear the snapshot now that the live region is registered.
+                      (setf (psi-emacs-state-last-projection-start psi-emacs--state)
+                            nil))))))
+
+            (when follow-anchor
+              (psi-emacs--set-draft-anchor-to-end))))
+      (setq psi-emacs--upsert-projection-in-progress nil))))
 
 (provide 'psi-projection)
 

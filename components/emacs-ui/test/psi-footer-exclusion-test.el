@@ -66,6 +66,66 @@ submitted RPC message must contain only the user's draft text."
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-upsert-projection-block-reentrant-call-does-not-corrupt-buffer ()
+  "Re-entrant upsert-projection-block must not produce a second projection block.
+
+Scenario: upsert snapshots last-projection-start, deletes the old projection
+text, then a re-entrant call arrives before region-unregister fires.  This
+simulates what happens when undo-outer-limit-truncate fires display-warning ->
+sit-for 0 -> pending RPC process output is processed mid-upsert.
+
+Without the re-entrancy guard the second upsert sees the (now zero-length)
+registered region, deletes nothing, inserts a new projection block, registers
+it, and the outer upsert then inserts a second block at point-max.  The result
+is two footer blocks concatenated after the draft, corrupting draft-end-position
+so footer content is captured on the next submit.
+
+The advice injects the re-entrant call immediately after delete-region returns,
+gated on last-projection-start being set — the exact window the upsert opens."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((inhibit-read-only t))
+      ;; Build: banner + separator + draft + initial footer.
+      (psi-emacs--ensure-startup-banner)
+      (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+            (copy-marker (point-max) nil))
+      (psi-emacs--ensure-input-area)
+      (goto-char (psi-emacs--draft-end-position))
+      (insert "my draft")
+      (setf (psi-emacs-state-projection-footer psi-emacs--state) "connecting...")
+      (psi-emacs--upsert-projection-block)
+      (should (equal "my draft" (psi-emacs--tail-draft-text)))
+      (should (psi-emacs--region-bounds 'projection 'main))
+      ;; Inject a re-entrant upsert call inside delete-region.
+      ;; Gate on last-projection-start being set so the injection fires only
+      ;; during the upsert's own projection-block delete, not other deletes.
+      (let ((injected nil))
+        (advice-add
+         'delete-region :around
+         (lambda (orig beg end)
+           (funcall orig beg end)
+           (when (and (not injected)
+                      psi-emacs--state
+                      (psi-emacs-state-last-projection-start psi-emacs--state))
+             (setq injected t)
+             (setf (psi-emacs-state-projection-footer psi-emacs--state)
+                   "idle · claude-3-5-sonnet")
+             (psi-emacs--upsert-projection-block)))
+         '((name . psi-test-reentrant-upsert-inject)))
+        (unwind-protect
+            (progn
+              (setf (psi-emacs-state-projection-footer psi-emacs--state) "new footer")
+              (psi-emacs--upsert-projection-block))
+          (advice-remove 'delete-region 'psi-test-reentrant-upsert-inject)))
+      ;; Draft must be intact — not contaminated with any footer content.
+      (should (equal "my draft" (psi-emacs--tail-draft-text)))
+      ;; Exactly one projection block: region is live and ends at point-max.
+      (let ((bounds (psi-emacs--region-bounds 'projection 'main)))
+        (should bounds)
+        (should (< (car bounds) (cdr bounds)))
+        (should (= (cdr bounds) (point-max)))))))
+
 (provide 'psi-footer-exclusion-test)
 
 ;;; psi-footer-exclusion-test.el ends here
