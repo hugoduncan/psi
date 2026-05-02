@@ -118,6 +118,12 @@ See:
 - [`doc/psi-project-config.md`](doc/psi-project-config.md) for examples and reload targeting rules
 - [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
 
+### Workflows
+
+For user-facing workflow usage, workflow file location, `/delegate`, and reload
+behavior, see:
+- [`doc/workflows.md`](doc/workflows.md)
+
 ### Extension API
 
 For extension-facing runtime/query details (including memory durability operations), see:
