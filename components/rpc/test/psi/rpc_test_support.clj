@@ -37,6 +37,8 @@
      :content (vec content)
      :stop-reason :stop})))
 
+(declare await-inflight-workers!)
+
 (defn run-loop
   "Run a stdio loop."
   ([input handler]
@@ -52,15 +54,88 @@
                            :state           state
                            :request-handler handler})
      (when (pos? wait-ms)
-       (Thread/sleep wait-ms))
+       (Thread/sleep wait-ms)
+       (await-inflight-workers! state wait-ms))
      {:out-lines (->> (str/split-lines (str out))
                       (remove str/blank?)
                       vec)
       :err-text  (str err)
       :state     @state})))
 
+(def timeout-token ::timeout)
+(def default-await-timeout-ms 1000)
+(def default-await-poll-ms 25)
+
 (defn parse-frames [lines]
   (mapv edn/read-string lines))
+
+(defn parse-out-frames
+  [^java.io.StringWriter out-writer]
+  (parse-frames (->> (str/split-lines (str out-writer))
+                     (remove str/blank?)
+                     vec)))
+
+(defn await-until
+  ([pred]
+   (await-until pred default-await-timeout-ms))
+  ([pred timeout-ms]
+   (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
+     (loop []
+       (let [value (pred)]
+         (if value
+           value
+           (if (< (System/currentTimeMillis) deadline)
+             (do
+               (Thread/sleep default-await-poll-ms)
+               (recur))
+             timeout-token)))))))
+
+(defn await-promise!
+  ([p]
+   (await-promise! p default-await-timeout-ms))
+  ([p timeout-ms]
+   (deref p timeout-ms timeout-token)))
+
+(defn await-frame!
+  ([out-writer pred]
+   (await-frame! out-writer pred default-await-timeout-ms))
+  ([out-writer pred timeout-ms]
+   (await-until (fn []
+                  (some pred (parse-out-frames out-writer)))
+                timeout-ms)))
+
+(defn await-frames!
+  ([out-writer pred]
+   (await-frames! out-writer pred default-await-timeout-ms))
+  ([out-writer pred timeout-ms]
+   (await-until (fn []
+                  (let [frames (parse-out-frames out-writer)]
+                    (when-let [value (pred frames)]
+                      value)))
+                timeout-ms)))
+
+(defn inflight-workers
+  [state]
+  (vec (get-in @state [:workers :inflight-futures] [])))
+
+(defn worker-complete?
+  [worker]
+  (cond
+    (nil? worker) true
+    (instance? java.util.concurrent.Future worker) (.isDone ^java.util.concurrent.Future worker)
+    (instance? Thread worker) (not (.isAlive ^Thread worker))
+    :else true))
+
+(defn await-inflight-workers!
+  ([state]
+   (await-inflight-workers! state default-await-timeout-ms))
+  ([state timeout-ms]
+   (await-until (fn []
+                  (let [workers (inflight-workers state)]
+                    (when (and (seq workers)
+                               (every? worker-complete? workers))
+                      workers)))
+                timeout-ms)))
 
 (defn enqueue-active-dialog!
   "Directly place a dialog into the active slot of canonical ui-state.

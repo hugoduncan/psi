@@ -1,6 +1,5 @@
 (ns psi.rpc-delegate-command-and-bridge-order-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
@@ -11,22 +10,6 @@
 (defn- write-line! [^java.io.Writer w line]
   (.write w (str line "\n"))
   (.flush w))
-
-(defn- parse-out-frames [^java.io.StringWriter out-writer]
-  (support/parse-frames (->> (str/split-lines (str out-writer))
-                             (remove str/blank?)
-                             vec)))
-
-(defn- wait-until
-  [pred timeout-ms]
-  (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
-    (loop []
-      (let [value (pred)]
-        (if value
-          value
-          (when (< (System/currentTimeMillis) deadline)
-            (Thread/sleep 25)
-            (recur)))))))
 
 (deftest rpc-delegate-command-result-precedes-bridge-events-test
   (testing "RPC command op emits delegated ack before later bridge user/assistant messages"
@@ -63,13 +46,12 @@
       (try
         (write-line! in-writer "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! in-writer "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"command-result\" \"session/updated\" \"footer/updated\"]}}")
-        (Thread/sleep 50)
         (write-line! in-writer "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/fake-delegate-order\"}}")
         (let [compact-seq
-              (wait-until
-               (fn []
-                 (let [frames      (parse-out-frames out-writer)
-                       events      (filter #(= :event (:kind %)) frames)
+              (support/await-frames!
+               out-writer
+               (fn [frames]
+                 (let [events      (filter #(= :event (:kind %)) frames)
                        interesting (keep (fn [frame]
                                            (case (:event frame)
                                              "command-result" {:event :command-result

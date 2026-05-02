@@ -34,18 +34,28 @@
                              "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"command-result\" \"session/updated\" \"footer/updated\"]}}\n"
                              "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/fake-delegate\"}}\n")
           {:keys [out-lines]} (support/run-loop input handler state 250)
-          _              (Thread/sleep 100)
-          frames         (support/parse-frames out-lines)
-          events         (filter #(= :event (:kind %)) frames)
-          command-text   (some #(when (= "command-result" (:event %)) %) events)
-          assistant-msgs (filter #(= "assistant/message" (:event %)) events)
-          user-texts     (keep #(when (= "user" (get-in % [:data :role]))
-                                  (get-in % [:data :text]))
-                               assistant-msgs)
-          asst-texts     (keep #(when (= "assistant" (get-in % [:data :role]))
-                                  (get-in % [:data :text]))
-                               assistant-msgs)]
+          result         (support/await-until
+                          (fn []
+                            (let [frames         (support/parse-frames out-lines)
+                                  events         (filter #(= :event (:kind %)) frames)
+                                  command-text   (some #(when (= "command-result" (:event %)) %) events)
+                                  assistant-msgs (filter #(= "assistant/message" (:event %)) events)
+                                  user-texts     (keep #(when (= "user" (get-in % [:data :role]))
+                                                          (get-in % [:data :text]))
+                                                       assistant-msgs)
+                                  asst-texts     (keep #(when (= "assistant" (get-in % [:data :role]))
+                                                          (get-in % [:data :text]))
+                                                       assistant-msgs)]
+                              (when (and (= "Delegated to lambda-build — run run-1"
+                                            (get-in command-text [:data :message]))
+                                         (some #{"Workflow run run-1 result:"} user-texts)
+                                         (some #{"result text"} asst-texts))
+                                {:command-text command-text
+                                 :user-texts user-texts
+                                 :asst-texts asst-texts})))
+                          1000)]
+      (is (not= support/timeout-token result) "timed out waiting for delegate bridge command-result and messages")
       (is (= "Delegated to lambda-build — run run-1"
-             (get-in command-text [:data :message])))
-      (is (some #{"Workflow run run-1 result:"} user-texts))
-      (is (some #{"result text"} asst-texts)))))
+             (get-in result [:command-text :data :message])))
+      (is (some #{"Workflow run run-1 result:"} (:user-texts result)))
+      (is (some #{"result text"} (:asst-texts result))))))

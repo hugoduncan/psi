@@ -1,7 +1,6 @@
 (ns psi.rpc-ops-test
   (:require
    [clojure.edn :as edn]
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
@@ -284,20 +283,20 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/widgets-updated\"]}}")
-        (Thread/sleep 100)
         (dispatch/dispatch! ctx :session/ui-set-widget
                             {:extension-id "ext.demo" :widget-id "w-2"
                              :placement :above-editor :content ["live update"]}
                             {:origin :test})
-        (Thread/sleep 180)
-        (.close in-writer)
-        (deref loop-future 500 nil)
-        (let [frames        (support/parse-frames (->> (str/split-lines (str out-writer))
-                                                       (remove str/blank?)
-                                                       vec))
-              widget-events (filter #(= "ui/widgets-updated" (:event %)) frames)
-              latest        (last widget-events)]
-          (is (seq widget-events))
+        (let [latest (support/await-frames!
+                      out-writer
+                      (fn [frames]
+                        (let [widget-events (filter #(= "ui/widgets-updated" (:event %)) frames)]
+                          (when (seq widget-events)
+                            (last widget-events))))
+                      1000)]
+          (.close in-writer)
+          (deref loop-future 500 support/timeout-token)
+          (is (not= support/timeout-token latest) "timed out waiting for ui/widgets-updated")
           (is (= "w-2" (get-in latest [:data :widgets 0 :widget-id])))
           (is (= ["live update"] (get-in latest [:data :widgets 0 :content]))))
         (finally
@@ -327,21 +326,21 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/notification\"]}}")
-        (Thread/sleep 100)
         (dispatch/dispatch! ctx :session/ui-notify
                             {:extension-id "ext.demo"
                              :message "live note"
                              :level :warning}
                             {:origin :test})
-        (Thread/sleep 180)
-        (.close in-writer)
-        (deref loop-future 500 nil)
-        (let [frames               (support/parse-frames (->> (str/split-lines (str out-writer))
-                                                              (remove str/blank?)
-                                                              vec))
-              notification-events  (filter #(= "ui/notification" (:event %)) frames)
-              latest               (last notification-events)]
-          (is (seq notification-events))
+        (let [latest (support/await-frames!
+                      out-writer
+                      (fn [frames]
+                        (let [notification-events (filter #(= "ui/notification" (:event %)) frames)]
+                          (when (seq notification-events)
+                            (last notification-events))))
+                      1000)]
+          (.close in-writer)
+          (deref loop-future 500 support/timeout-token)
+          (is (not= support/timeout-token latest) "timed out waiting for ui/notification")
           (is (= "ext.demo" (get-in latest [:data :extension-id])))
           (is (= "live note" (get-in latest [:data :message])))
           (is (= "warning" (get-in latest [:data :level]))))
@@ -372,7 +371,6 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/status-updated\" \"ui/dialog-requested\"]}}")
-        (Thread/sleep 100)
         (dispatch/dispatch! ctx :session/ui-set-status
                             {:session-id session-id
                              :extension-id "ext.demo"
@@ -385,18 +383,20 @@
                              :title "Live dialog"
                              :message "Proceed?"}
                             {:origin :test})
-        (Thread/sleep 180)
-        (.close in-writer)
-        (deref loop-future 500 nil)
-        (let [frames       (support/parse-frames (->> (str/split-lines (str out-writer))
-                                                      (remove str/blank?)
-                                                      vec))
-              status-evts  (filter #(= "ui/status-updated" (:event %)) frames)
-              dialog-evts  (filter #(= "ui/dialog-requested" (:event %)) frames)
-              latest-status (last status-evts)
-              latest-dialog (last dialog-evts)]
-          (is (seq status-evts))
-          (is (seq dialog-evts))
+        (let [frames* (support/await-frames!
+                       out-writer
+                       (fn [frames]
+                         (let [status-evts (filter #(= "ui/status-updated" (:event %)) frames)
+                               dialog-evts (filter #(= "ui/dialog-requested" (:event %)) frames)]
+                           (when (and (seq status-evts) (seq dialog-evts))
+                             {:latest-status (last status-evts)
+                              :latest-dialog (last dialog-evts)})))
+                       1000)
+              latest-status (:latest-status frames*)
+              latest-dialog (:latest-dialog frames*)]
+          (.close in-writer)
+          (deref loop-future 500 support/timeout-token)
+          (is (not= support/timeout-token frames*) "timed out waiting for status/dialog projection events")
           (is (= "ext.demo" (get-in latest-status [:data :statuses 0 :extension-id])))
           (is (= "Live status" (get-in latest-status [:data :statuses 0 :text])))
           (is (= "confirm" (get-in latest-dialog [:data :kind])))

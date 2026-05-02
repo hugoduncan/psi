@@ -1,48 +1,14 @@
 (ns psi.rpc-invariants-test
   (:require
-   [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
-   [psi.agent-session.core :as session]
    [psi.agent-session.prompt-runtime :as prompt-runtime]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.test-support :as test-support]
    [psi.rpc :as rpc]
    [psi.rpc.events :as rpc.events]
-   [psi.rpc.state :as rpc.state]))
-
-(defn- run-loop
-  ([input handler]
-   (run-loop input handler (atom {}) 0))
-  ([input handler state]
-   (run-loop input handler state 0))
-  ([input handler state wait-ms]
-   (let [out (java.io.StringWriter.)
-         err (java.io.StringWriter.)]
-     (rpc/run-stdio-loop! {:in              (java.io.StringReader. input)
-                           :out             out
-                           :err             err
-                           :state           state
-                           :request-handler handler})
-     (when (pos? wait-ms)
-       (Thread/sleep wait-ms))
-     {:out-lines (->> (str/split-lines (str out))
-                      (remove str/blank?)
-                      vec)
-      :err-text  (str err)
-      :state     @state})))
-
-(defn- parse-frames [lines]
-  (mapv edn/read-string lines))
-
-(defn- create-session-context
-  ([]
-   (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
+   [psi.rpc.state :as rpc.state]
+   [psi.rpc-test-support :as support]))
 
 (deftest rpc-state-shape-and-helpers-invariant-test
   (testing "rpc.state owns connection-local transport/connection/worker state through helpers"
@@ -102,7 +68,7 @@
 
 (deftest rpc-handshake-uses-explicit-transport-deps-invariant-test
   (testing "handshake server-info comes from explicit transport deps, not mutable state magic"
-    (let [[ctx sid] (create-session-context)
+    (let [[ctx sid] (support/create-session-context)
           wrong-called?   (atom false)
           right-called?   (atom false)
           state           (atom {:handshake-server-info-fn (fn [_] (reset! wrong-called? true)
@@ -120,9 +86,9 @@
                                                         (reset! right-called? true)
                                                         (assoc (rpc.events/session->handshake-server-info ctx sid)
                                                                :ui-type :emacs))})
-      (let [[frame] (parse-frames (->> (str/split-lines (str out))
-                                       (remove str/blank?)
-                                       vec))]
+      (let [[frame] (support/parse-frames (->> (str/split-lines (str out))
+                                               (remove str/blank?)
+                                               vec))]
         (is (true? @right-called?))
         (is (false? @wrong-called?))
         (is (= sid (get-in frame [:data :server-info :session-id])))
@@ -130,7 +96,7 @@
 
 (deftest rpc-new-session-uses-explicit-session-deps-invariant-test
   (testing "new_session uses explicit session deps callback, not mutable state callback"
-    (let [[ctx _]       (create-session-context)
+    (let [[ctx _]       (support/create-session-context)
           wrong-called? (atom false)
           right-called? (atom 0)
           state         (atom {:transport {:ready? true :pending {}}
@@ -154,8 +120,8 @@
                                               :tool-order ["call-1"]})})
           input         (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                              "{:id \"n1\" :kind :request :op \"new_session\"}\n")
-          {:keys [out-lines]} (run-loop input handler state)
-          frames         (parse-frames out-lines)
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames         (support/parse-frames out-lines)
           rehydrate-event (some #(when (= "session/rehydrated" (:event %)) %) frames)]
       (is (= 1 @right-called?))
       (is (false? @wrong-called?))
@@ -167,8 +133,8 @@
 
 (deftest rpc-prompt-uses-dispatch-lifecycle-invariant-test
   (testing "prompt routes through dispatch-visible prompt lifecycle, not mutable executor"
-    (let [[ctx _]        (create-session-context)
-          lifecycle-used? (atom false)
+    (let [[ctx _]        (support/create-session-context)
+          lifecycle-used? (promise)
           state          (atom {:transport {:ready? true :pending {}}
                                 :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}})
           handler        (rpc/make-session-request-handler
@@ -180,7 +146,7 @@
                     runtime/resolve-api-key-in (fn [_ctx _session-id _model] nil)
                     prompt-runtime/execute-prepared-request!
                     (fn [_ai-ctx _ctx session-id prepared _pq]
-                      (reset! lifecycle-used? true)
+                      (deliver lifecycle-used? true)
                       {:execution-result/turn-id (:prepared-request/id prepared)
                        :execution-result/session-id session-id
                        :execution-result/assistant-message {:role "assistant"
@@ -190,5 +156,6 @@
                        :execution-result/turn-outcome :turn.outcome/stop
                        :execution-result/tool-calls []
                        :execution-result/stop-reason :stop})]
-        (run-loop input handler state 250)
-        (is (true? @lifecycle-used?))))))
+        (support/run-loop input handler state 250)
+        (is (= true (support/await-promise! lifecycle-used? 1000))
+            "timed out waiting for prompt lifecycle execution")))))

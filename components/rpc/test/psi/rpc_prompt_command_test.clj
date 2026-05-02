@@ -20,23 +20,22 @@
     (let [[ctx _a-sid] (support/create-session-context)
           z-sd         (session/new-session-in! ctx _a-sid {})
           z-sid        (:session-id z-sd)
-          captured     (atom nil)
+          captured     (promise)
           state        (atom {:transport {:ready? true
                                           :pending {}}
                               :connection {:focus-session-id _a-sid}
                               :workers {}
                               :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                               :execute-prepared-request-fn (fn [_ai-ctx _ctx sid _prepared-request _opts]
-                                                             (reset! captured sid)
+                                                             (deliver captured sid)
                                                              (support/ok-execution-result sid [{:type :text :text "ok"}]))})
           handler (support/make-handler ctx state)
           input    (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                         (format "{:id \"p1\" :kind :request :op \"prompt\" :params {:session-id \"%s\" :message \"hi\"}}\n" z-sid))]
       (support/run-loop input handler state 300)
-      (dotimes [_ 20]
-        (when-not @captured
-          (Thread/sleep 50)))
-      (is (= z-sid @captured)))))
+      (let [captured* (support/await-promise! captured 1000)]
+        (is (not= support/timeout-token captured*) "timed out waiting for routed session-id capture")
+        (is (= z-sid captured*))))))
 
 (deftest rpc-prompt-slash-dispatch-gate-test
   (testing "when commands/dispatch-in returns non-nil, execute-prepared-request-fn is NOT called"
@@ -100,7 +99,7 @@
                        :source :path
                        :disable-model-invocation false}
           [ctx _]     (support/create-session-context {:session-defaults {:skills [skill]}})
-          captured    (atom nil)
+          captured    (promise)
           bridge      (fn [_ai-ctx _ctx session-id prepared _pq]
                         ;; Capture the user message text from the prepared request.
                         ;; Provider-format messages have {:role :user :content {:kind :text :text "..."}}
@@ -111,7 +110,7 @@
                                          (string? content) content
                                          (map? content)    (:text content)
                                          (vector? content) (-> content first :text))]
-                          (reset! captured txt))
+                          (deliver captured txt))
                         (support/assistant-msg->execution-result session-id
                                                                  {:role "assistant"
                                                                   :content [{:type :text :text "ok"}]
@@ -123,17 +122,19 @@
           input       (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                            "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"/skill:demo apply this\"}}\n")]
       (support/run-loop input handler state 250)
-      (is (string? @captured))
-      (when (string? @captured)
-        (is (str/includes? @captured "<skill name=\"demo\""))
-        (is (str/includes? @captured "# Skill Body"))
-        (is (str/includes? @captured "apply this"))
-        (is (not= "/skill:demo apply this" @captured))))))
+      (let [captured* (support/await-promise! captured 1000)]
+        (is (not= support/timeout-token captured*) "timed out waiting for expanded skill prompt capture")
+        (is (string? captured*))
+        (when (string? captured*)
+          (is (str/includes? captured* "<skill name=\"demo\""))
+          (is (str/includes? captured* "# Skill Body"))
+          (is (str/includes? captured* "apply this"))
+          (is (not= "/skill:demo apply this" captured*)))))))
 
 (deftest rpc-prompt-passes-resolved-api-key-to-agent-loop-test
   (testing "non-command prompt forwards runtime-resolved api-key through prepared request"
     (let [[ctx _]    (support/create-session-context)
-          captured   (atom nil)
+          captured   (promise)
           state      (atom {:transport {:ready? true :pending {}}
                             :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}})
           handler (support/make-handler ctx state)
@@ -143,7 +144,7 @@
                     commands/dispatch-in (fn [_ctx _session-id _text _opts] nil)
                     prompt-runtime/execute-prepared-request!
                     (fn [_ai-ctx _ctx session-id prepared _pq]
-                      (reset! captured (:prepared-request/ai-options prepared))
+                      (deliver captured (:prepared-request/ai-options prepared))
                       {:execution-result/turn-id (:prepared-request/id prepared)
                        :execution-result/session-id session-id
                        :execution-result/assistant-message {:role "assistant"}
@@ -154,7 +155,9 @@
                        :execution-result/tool-calls []
                        :execution-result/stop-reason :stop})]
         (support/run-loop input handler state 250)
-        (is (= "test-api-key" (:api-key @captured)))))))
+        (let [captured* (support/await-promise! captured 1000)]
+          (is (not= support/timeout-token captured*) "timed out waiting for prepared-request capture")
+          (is (= "test-api-key" (:api-key captured*))))))))
 
 (deftest rpc-prompt-handle-command-result-types-test
   (testing "text-command-emits-assistant-message with session/updated and footer/updated"

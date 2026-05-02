@@ -1,6 +1,5 @@
 (ns psi.rpc-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
@@ -417,20 +416,25 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"context/updated\"]}}")
-        (Thread/sleep 100)
         (let [child-id (:psi.agent-session/session-id
                         (mutate 'psi.extension/create-child-session
                                 {:session-name "child"
                                  :tool-defs []
-                                 :thinking-level :off}))]
-          (Thread/sleep 150)
+                                 :thinking-level :off}))
+              context-evts (support/await-frames!
+                            out-writer
+                            (fn [frames]
+                              (let [context-evts (filter #(= "context/updated" (:event %)) frames)
+                                    latest (last context-evts)]
+                                (when (and (<= 2 (count context-evts))
+                                           (= session-id (get-in latest [:data :active-session-id]))
+                                           (some #(= child-id (:id %)) (get-in latest [:data :sessions])))
+                                  context-evts)))
+                            1000)]
           (.close in-writer)
-          (deref loop-future 500 nil)
-          (let [frames        (support/parse-frames (->> (str/split-lines (str out-writer))
-                                                         (remove str/blank?)
-                                                         vec))
-                context-evts (filter #(= "context/updated" (:event %)) frames)
-                latest       (last context-evts)]
+          (deref loop-future 500 support/timeout-token)
+          (is (not= support/timeout-token context-evts) "timed out waiting for context/updated with new child session")
+          (let [latest (last context-evts)]
             (is (<= 2 (count context-evts)))
             (is (= session-id (get-in latest [:data :active-session-id])))
             (is (some #(= child-id (:id %)) (get-in latest [:data :sessions])))))

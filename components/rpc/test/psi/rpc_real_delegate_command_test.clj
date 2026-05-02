@@ -1,6 +1,5 @@
 (ns psi.rpc-real-delegate-command-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.app-runtime :as app]
    [psi.agent-session.context :as context]
@@ -23,22 +22,6 @@
 (defn- write-line! [^java.io.Writer w line]
   (.write w (str line "\n"))
   (.flush w))
-
-(defn- parse-out-frames [^java.io.StringWriter out-writer]
-  (support/parse-frames (->> (str/split-lines (str out-writer))
-                             (remove str/blank?)
-                             vec)))
-
-(defn- wait-until
-  [pred timeout-ms]
-  (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
-    (loop []
-      (let [value (pred)]
-        (if value
-          value
-          (when (< (System/currentTimeMillis) deadline)
-            (Thread/sleep 25)
-            (recur)))))))
 
 (deftest real-delegate-command-op-immediate-ack-current-behavior-test
   (testing "real workflow-loader /delegate on the RPC command op emits the immediate ack before async completion"
@@ -94,13 +77,12 @@
       (try
         (write-line! in-writer "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! in-writer "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"command-result\" \"session/updated\" \"footer/updated\"]}}")
-        (Thread/sleep 100)
         (write-line! in-writer "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/delegate lambda-compiler munera tracks work, mementum tracks state and knowledge\"}}")
         (let [interesting
-              (wait-until
-               (fn []
-                 (let [frames (parse-out-frames out-writer)
-                       events (filter #(= :event (:kind %)) frames)
+              (support/await-frames!
+               out-writer
+               (fn [frames]
+                 (let [events (filter #(= :event (:kind %)) frames)
                        xs     (keep (fn [frame]
                                       (case (:event frame)
                                         "command-result" {:kind :ack
@@ -133,16 +115,16 @@
                    (when (= [:ack :user-bridge :assistant-result] compact)
                      xs)))
                5000)
-              messages (wait-until
+              messages (support/await-until
                         (fn []
                           (let [msgs (app-messages/session-messages ctx session-id)]
                             (when (>= (count msgs) 3)
                               msgs)))
                         5000)]
           (.close in-writer)
-          (deref loop-future 1000 nil)
-          (is (some? interesting))
-          (is (some? messages))
+          (deref loop-future 1000 support/timeout-token)
+          (is (not= support/timeout-token interesting) "timed out waiting for delegate bridge events")
+          (is (not= support/timeout-token messages) "timed out waiting for session messages")
           (let [compact-seq (filterv identity
                                      (map (fn [x]
                                             (cond
