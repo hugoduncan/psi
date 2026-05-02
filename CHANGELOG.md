@@ -9,6 +9,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Added
 - Extensions can close sessions via `close-session` and `close-session-tree` mutations.
 - Helper sessions from `auto-session-name` are now automatically closed after use.
+- Model API HTTP requests now honor standard proxy environment variables (`HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`); see [Configuration](doc/configuration.md) and [Custom providers](doc/custom-providers.md).
 
 ### Fixed
 - Emacs: typing before RPC connects no longer has a newline injected mid-draft when the footer first updates.
