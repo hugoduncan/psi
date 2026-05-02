@@ -1,9 +1,8 @@
-- [x] Read upstream refine handoff requirements and identify issue provenance
-- [x] Inspect worktree Munera surfaces (`munera/plan.md`, `munera/open/`, `munera/closed/`)
-- [x] Read GitHub issue #27 with comments
-- [x] Allocate next canonical Munera task id and create task directory
-- [x] Draft `design.md` with issue provenance, scope, constraints, and acceptance criteria
-- [x] Refine `design.md` against task-design criteria for completeness and unambiguity
-- [x] Record terse refinement notes in `implementation.md`
-- [x] Confirm ambiguity status explicitly
-- [ ] Handoff this refined design for publication/push/PR workflow
+- [x] Read issue #27 and comments.
+- [x] Inspect Munera plan and existing open/closed tasks.
+- [x] Allocate next canonical task id and create `munera/open/076-model-api-proxy-support/`.
+- [x] Draft `design.md` with issue provenance, scope, constraints, and acceptance criteria.
+- [x] Refine design toward completeness and unambiguity.
+- [x] Record terse refinement notes in `implementation.md`.
+- [x] Synchronize this checklist with remaining design work.
+- [ ] Handoff result for PR/next workflow step.

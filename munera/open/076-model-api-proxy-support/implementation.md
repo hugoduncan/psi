@@ -1,11 +1,7 @@
-Issue provenance
-- GitHub issue: #27
-- URL: https://github.com/hugoduncan/psi/issues/27
+# Implementation notes
 
-2026-05-01/02 — refinement notes
-- created task `076-model-api-proxy-support`
-- anchored design on issue #27 and the existing triage comment intent/scope
-- made configuration-surface choice an explicit required design decision so implementation will not proceed with ambiguous env-vs-config semantics
-- made request-path applicability explicit because proxy support is only meaningful if the canonical outbound model transport boundary is named
-- constrained scope away from general enterprise networking and unrelated provider changes
-- declared ambiguity status clear for design-level refinement: no remaining ambiguity about the task’s intent, scope, acceptance surface, or required design decisions
+- 2026-05-01: Created task from GitHub issue #27 (`https://github.com/hugoduncan/psi/issues/27`).
+- 2026-05-01: Chose canonical task id `076` because existing open/closed task ids already reached `075` and `076` was unused.
+- 2026-05-01: Refined the issue into a task-design artifact focused on transport-level outbound proxy support for model API requests.
+- 2026-05-01: Captured issue scope from the issue body and owner triage comment; preserved implementation latitude only where it does not create task ambiguity.
+- 2026-05-01: Declared the design clear at the task level; remaining choices are implementation decisions, not unresolved scope ambiguity.
