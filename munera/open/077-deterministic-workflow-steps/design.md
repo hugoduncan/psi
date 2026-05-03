@@ -227,9 +227,9 @@ The first cut should validate step fields by `:type`.
 
 | Step `:type` | Required fields | Optional fields | Forbidden execution fields |
 | --- | --- | --- | --- |
-| `:invoke` | `:name`, `:type`, `:operation`, `:args` | `:judge`, `:on`, `:max-iterations` | inline-session fields such as `:model`, `:tools`, `:skills`, `:contributions`; delegated fields `:target`, `:prompt-string`, `:context` |
-| `:session` | `:name`, `:type`, `:contributions` | `:model`, `:tools`, `:skills`, other explicit inline-session construction fields, `:judge`, `:on`, `:max-iterations` | deterministic fields `:operation`, `:args`; delegated fields `:target`, `:prompt-string`, `:context` |
-| `:delegate` | `:name`, `:type`, `:target`, `:prompt-string` | `:context`, `:judge`, `:on`, `:max-iterations` | deterministic fields `:operation`, `:args`; inline-session fields such as `:model`, `:tools`, `:skills`, `:contributions` |
+| `:invoke` | `:name`, `:type`, `:operation`, `:args` | `:yields`, `:judge`, `:on`, `:max-iterations` | inline-session fields such as `:model`, `:tools`, `:skills`, `:contributions`; delegated fields `:target`, `:prompt-string`, `:context` |
+| `:session` | `:name`, `:type`, `:contributions` | `:yields`, `:model`, `:tools`, `:skills`, other explicit inline-session construction fields, `:judge`, `:on`, `:max-iterations` | deterministic fields `:operation`, `:args`; delegated fields `:target`, `:prompt-string`, `:context` |
+| `:delegate` | `:name`, `:type`, `:target`, `:prompt-string` | `:yields`, `:context`, `:judge`, `:on`, `:max-iterations` | deterministic fields `:operation`, `:args`; inline-session fields such as `:model`, `:tools`, `:skills`, `:contributions` |
 
 Control-flow fields such as `:judge`, `:on`, and `:max-iterations` are shared across all step types when the workflow author needs routing on the step result.
 
@@ -658,9 +658,10 @@ Deterministic args, sourced contributions, template vars, and delegated context 
 
 For the first cut:
 
-- delegated `:context` is an ordered vector of forwarded source-style items
-- delegated `:context` preserves author order
-- delegated `:context` reuses the same source/projection selectors as sourced contributions (`:from`, `:path`, optional richer `:projection`)
+- delegated `:context` is optional; when omitted it is equivalent to an empty ordered vector of forwarded source-style items
+- when present, delegated `:context` preserves author order
+- delegated `:context` reuses the same source/projection selectors as sourced contributions (`:from`, plus either `:path` or richer `:projection`)
+- a single source spec must not contain both `:path` and `:projection` in the first cut
 - delegated `:context` does not add template contributions in the first cut; keep delegated forwarding explicit and source-shaped until the boundary semantics are proven
 - delegated `:prompt-string` may reuse the template contribution rendering shape, but its fully rendered boundary value must be a string before invocation
 
@@ -672,6 +673,8 @@ Illustrative references:
 {:step "discover" :output :data}
 {:step "discover" :output :summary}
 {:step "discover" :output :result}
+{:step "discover" :yield :data}
+{:step "report" :yield :text}
 ```
 
 Illustrative projected reference:
@@ -681,7 +684,7 @@ Illustrative projected reference:
  :path [:issues]}
 ```
 
-This keeps deterministic-step data flow and inline-session conversation assembly aligned.
+This keeps deterministic-step data flow and inline-session conversation assembly aligned while making yielded-value references explicit when a caller needs the prior step's resulting value as a whole.
 
 ## Downstream result-reference alternatives
 
@@ -769,7 +772,7 @@ Too runtime-shaped for the normal author-facing surface.
 
 ## Current recommendation on downstream references
 
-Current recommendation: use **explicit output selectors** with `:output :data` as the normal machine-readable output surface.
+Current recommendation: use **explicit output selectors** with `:output :data` as the normal machine-readable output surface, and add explicit yielded-value selectors when a downstream step needs the prior step's resulting value rather than one of its step-local outputs.
 
 Leading direction:
 
@@ -778,7 +781,8 @@ Leading direction:
   - `:output :summary`
   - possibly `:output :result` for advanced/debug use, but not as the normal author-facing default
 - downstream `:path` or richer `:projection` applies relative to the selected output
-- deterministic steps, inline session steps, and delegated steps use the same reference/projection family when consuming deterministic outputs
+- downstream steps may reference yielded values through a yield selector such as `{:step "discover" :yield :data}` or `{:step "report" :yield :text}`
+- deterministic steps, inline session steps, and delegated steps use the same reference/projection family when consuming deterministic outputs or yielded values
 
 ## Step output surfaces and yielded value
 
@@ -809,11 +813,11 @@ Meaning: the step as a whole yields a tagged value whose `:type` is `:data` and 
 
 First-cut inline session steps should expose at least:
 
-- `:output :final-reply` — the terminal assistant/LLM reply produced by the session step
+- `:output :final-llm-reply` — the terminal assistant/LLM reply produced by the session step
 - `:output :transcript` — the child-session transcript surface when transcript projection is requested
 - `:output :result` may exist later if a normalized envelope proves necessary, but it is not required as a first-cut author-facing surface
 
-For the first cut, `:output :final-reply` means the final LLM response from the executed child session.
+For the first cut, `:output :final-llm-reply` means the final LLM response from the executed child session.
 
 Default yielded value for `:type :session`:
 
@@ -855,12 +859,12 @@ Success forms:
 
 ```clojure
 {:type :data
- :data ...}
+ :data :data}
 ```
 
 ```clojure
 {:type :text
- :text ...}
+ :text :final-llm-reply}
 ```
 
 Error form:
@@ -872,9 +876,11 @@ Error form:
  :details {...optional diagnostic data...}}
 ```
 
+For success forms, the authored keyword on the right-hand side names a step-local output surface exposed by that step type.
+
 Illustrative defaults:
 
-- `:type :invoke` ⇒ `:yields {:type :data :data :result-data}`
+- `:type :invoke` ⇒ `:yields {:type :data :data :data}`
 - `:type :session` ⇒ `:yields {:type :text :text :final-llm-reply}`
 - `:type :delegate` ⇒ yields the called workflow's yielded value unchanged
 
@@ -921,6 +927,14 @@ Across all three execution forms, first-cut routing should work through the step
 
 Across judge execution modes, `:on` should continue to consume one uniform judge outcome surface regardless of whether the judge was LLM-backed or deterministic.
 
+First-cut judge contract:
+
+- every judge normalizes to one logical outcome value
+- that outcome value may be a string or keyword
+- string outcomes are case-sensitive
+- strings and keywords do not auto-coerce to each other
+- if a judge produces an outcome not declared in the parent step's `:on` map, workflow execution fails with a routing error
+
 Deterministic steps should participate visibly in:
 
 - workflow run status
@@ -940,6 +954,16 @@ Inline session steps should continue to participate visibly through the child se
 Delegated steps should participate visibly through the named workflow they invoke plus the explicit boundary payload they pass (`:prompt-string` and `:context`).
 
 Across all three execution forms, the runtime should make the step's effective boundary/input surface inspectable: deterministic `:args`, inline-session `:contributions`, and delegated `:prompt-string` + `:context`.
+
+## Workflow result composition
+
+A workflow's final result is the yielded value of the step whose selected transition goes to `:done`.
+
+Rules:
+
+- if a step transitions directly to `:done`, that step's yielded value becomes the workflow result
+- if a step uses a judge and the selected `:on` transition goes to `:done`, the workflow result is still the parent step's yielded value rather than the judge's routing value
+- the judge participates in routing, not in replacing the parent step's yielded value
 
 ## GitHub label-search anchor use case
 

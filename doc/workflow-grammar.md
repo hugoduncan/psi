@@ -1,5 +1,13 @@
 # Workflow Grammar
 
+This document describes the **target workflow authoring grammar** for the converged deterministic-workflow-step design.
+
+It is a design artifact for the intended end-state surface discussed in task `077-deterministic-workflow-steps`, not a verbatim description of the currently implemented `workflow_model.clj` Malli schemas.
+
+In particular, this grammar describes the proposed author-facing `:type :invoke | :session | :delegate` model, while the current runtime implementation still uses older step-definition shapes such as `:executor`, `:prompt-template`, `:input-bindings`, `:session-preload`, and `:session-overrides`.
+
+For the currently implemented schema surface, see `doc/workflow-grammar-current.md`. For the conceptual explanation of this target design, see `doc/workflow-grammar-concepts.md`.
+
 ```clojure
 workflow ::= workflow-map
 
@@ -11,11 +19,12 @@ invoke-step ::= {:name step-name
                  :type :invoke
                  :operation operation-id
                  :args arg-map
+                 yields?
                  control-flow*}
 
 session-step ::= {:name step-name
                   :type :session
-                  session-config*
+                  session-config-entry*
                   :contributions [contribution+]
                   yields?
                   control-flow*}
@@ -24,7 +33,7 @@ delegate-step ::= {:name step-name
                    :type :delegate
                    :target workflow-name
                    :prompt-string (string | template-contribution)
-                   :context [source-item*]
+                   :context? [source-item*]
                    yields?
                    control-flow*}
 
@@ -35,7 +44,7 @@ control-flow ::= :judge judge-spec
 judge-spec ::= llm-judge | invoke-judge
 
 llm-judge ::= {:type :llm
-               judge-session-config*
+               judge-session-config-entry*
                :contributions [contribution+]}
 
 invoke-judge ::= {:type :invoke
@@ -45,7 +54,9 @@ invoke-judge ::= {:type :invoke
 outcome-map ::= {outcome transition-map}+
 
 transition-map ::= {:goto goto-target
-                    :max-iterations? pos-int}
+                    max-iterations-clause?}
+
+max-iterations-clause ::= :max-iterations pos-int
 
 goto-target ::= :next | :previous | :done | step-name
 
@@ -53,8 +64,7 @@ contribution ::= source-contribution | template-contribution
 
 source-contribution ::= {:type :source
                          :from source-ref
-                         :path? path
-                         :projection? projection}
+                         source-projection?}
 
 template-contribution ::= {:type :template
                            :text string
@@ -62,45 +72,49 @@ template-contribution ::= {:type :template
 
 source-item ::= {:type :source
                  :from source-ref
-                 :path? path
-                 :projection? projection}
+                 source-projection?}
 
 source-spec ::= {:from source-ref
-                 :path? path
-                 :projection? projection}
+                 source-projection?}
+
+source-projection ::= :path path
+                    | :projection projection
 
 source-ref ::= :workflow-input
              | :workflow-original
              | {:step step-name :output output-key}
+             | {:step step-name :yield yield-field}
 
 output-key ::= :data | :summary | :result | :final-llm-reply | :transcript
 
+yield-field ::= :data | :text | :error | :reason | :message | :details
+
 arg-map ::= {keyword (literal | source-spec)}*
 
-session-config ::= :model model-selection-spec
-                 | :tools [tool-id*]
-                 | :skills [skill-id*]
-                 | session-config-extension
-
-judge-session-config ::= :model model-selection-spec
+session-config-entry ::= :model model-selection-spec
                        | :tools [tool-id*]
                        | :skills [skill-id*]
-                       | judge-session-config-extension
+                       | session-config-extension
+
+judge-session-config-entry ::= :model model-selection-spec
+                             | :tools [tool-id*]
+                             | :skills [skill-id*]
+                             | judge-session-config-extension
 
 model-selection-spec ::= external-nonterminal-defined-in-doc-model-selection-grammar
 
-yields ::= {:type :data :data yield-source}
-         | {:type :text :text yield-source}
+yields ::= {:type :data :data output-keyword}
+         | {:type :text :text output-keyword}
          | {:type :error :reason keyword :message string :details? map}
 
-yield-source ::= keyword
+output-keyword ::= keyword
 
 step-name ::= string
 workflow-name ::= string
 operation-id ::= string
 tool-id ::= string
 skill-id ::= string
-var-name ::= keyword | symbol | string
+var-name ::= string
 outcome ::= string | keyword
 path ::= vector
 projection ::= map
@@ -110,7 +124,6 @@ map ::= clojure-map
 vector ::= clojure-vector
 string ::= clojure-string
 keyword ::= clojure-keyword
-symbol ::= clojure-symbol
 number ::= clojure-number
 boolean ::= true | false
 nil ::= nil

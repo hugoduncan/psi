@@ -2,7 +2,15 @@
 
 ## Overview
 
-The workflow grammar separates workflow authoring into a small number of orthogonal concerns:
+The workflow grammar is a compact, EBNF-like documentation grammar for authored workflow data. It is not intended to be a complete executable parser specification.
+
+It describes the target converged authoring surface for task `077-deterministic-workflow-steps`, not the current `workflow_model.clj` implementation schemas.
+
+The current implementation still exposes an older workflow model centered on fields such as `:executor`, `:prompt-template`, `:input-bindings`, `:session-preload`, `:session-overrides`, and a narrower judge schema. This document instead explains the intended future authoring model built around explicit step `:type` values, contributions, delegated boundaries, and yielded-value semantics.
+
+For the currently implemented schema surface, see `doc/workflow-grammar-current.md`.
+
+The grammar separates workflow authoring into a small number of orthogonal concerns:
 
 - control flow
 - execution form
@@ -27,7 +35,7 @@ The control-flow surface is made of:
 - `:goto`
 - `:max-iterations`
 
-A step produces a result. Routing decisions are made from that result, either directly or through a judge sub-step.
+A step produces a result. Routing decisions are made from that result through a judge sub-step.
 
 A judge is itself a routing sub-step. The grammar allows at least two judge forms:
 
@@ -36,7 +44,27 @@ A judge is itself a routing sub-step. The grammar allows at least two judge form
 
 The purpose of the judge is to normalize a step result into a routing outcome consumed by `:on`.
 
+### Judge outcome contract
+
+All judge forms normalize to one logical outcome value.
+
+That normalized outcome value:
+
+- may be a string or keyword
+- is matched against the keys of the parent step's `:on` map
+- is case-sensitive for strings
+- does not auto-coerce between strings and keywords
+
+A judge result that does not normalize to a declared `:on` key is a workflow execution error in the first cut.
+
 Control flow is orthogonal to step execution form, so invoke, session, and delegate steps may all participate in routing.
+
+`:max-iterations` appears in two places in the first cut:
+
+- as a step-level loop bound on the parent step
+- as an optional transition-local bound inside an `:on` routing directive
+
+The transition-local form uses the literal key `:max-iterations`; the earlier `:max-iterations?` spelling in the docs was only an imprecise optionality notation and not a distinct authored field name.
 
 ## Execution forms
 
@@ -48,9 +76,11 @@ The grammar has three step execution forms:
 
 These are mutually exclusive.
 
+All three step forms may author `:yields`. When omitted, the runtime applies the default yielded-value rule for that step type.
+
 ### Invoke
 
-`:`type :invoke` describes deterministic execution.
+`:type :invoke` describes deterministic execution.
 
 An invoke step names:
 
@@ -61,7 +91,7 @@ It is intended for operations that are deterministic, code-backed, and structura
 
 ### Session
 
-`:`type :session` describes inline child-session construction.
+`:type :session` describes inline child-session construction.
 
 A session step names inline session-construction fields such as:
 
@@ -74,13 +104,13 @@ Its purpose is to explicitly describe the child session to be run and the conver
 
 ### Delegate
 
-`:`type :delegate` describes delegation to an existing named workflow.
+`:type :delegate` describes delegation to an existing named workflow.
 
 A delegate step names:
 
 - `:target`
 - `:prompt-string`
-- `:context`
+- optional `:context`
 
 Its purpose is to call a reusable workflow while making the delegation boundary explicit.
 
@@ -113,9 +143,9 @@ The delegation boundary has two channels:
 - `:prompt-string`
 - `:context`
 
-`:`prompt-string` is the new string request sent to the delegated workflow. It may be authored as a literal string or as a template-shaped renderer, but it is rendered to a final string before delegation.
+`:prompt-string` is the new string request sent to the delegated workflow. It may be authored as a literal string or as a template-shaped renderer, but it is rendered to a final string before delegation.
 
-`:`context` is caller-derived material forwarded across the delegation boundary.
+`:context` is caller-derived material forwarded across the delegation boundary. It is optional; when omitted, it is equivalent to an empty vector.
 
 The grammar keeps these separate because they play different roles:
 
@@ -134,6 +164,7 @@ The core data-flow surface is:
 - `:path`
 - `:projection`
 - `{:step ... :output ...}`
+- `{:step ... :yield ...}`
 
 This data-flow surface is shared across:
 
@@ -144,6 +175,27 @@ This data-flow surface is shared across:
 - model-selection query values where applicable
 
 The grammar therefore treats data flow as a common substrate rather than duplicating separate per-feature reference languages.
+
+### Projection rule
+
+A source-spec may contain either:
+
+- `:path`, or
+- `:projection`
+
+The first cut does not allow both on the same source-spec. `:path` is the simple selector form; `:projection` is the richer selector form.
+
+### Workflow input and original request
+
+For a top-level workflow invocation:
+
+- `:workflow-input` is the workflow's current input value
+- `:workflow-original` is the invocation's original request surface
+
+For a delegated workflow invocation:
+
+- `:workflow-input` is the delegated step's fully rendered `:prompt-string`
+- `:workflow-original` is rebound per invocation and is local to the delegated workflow run rather than implicitly inherited from the root caller
 
 ## Contributions
 
@@ -177,6 +229,8 @@ Templating is modeled as:
 
 A template contribution does not invent a separate data source model; it binds vars through the same source-spec mechanism used elsewhere.
 
+Template variable names are strings in the grammar. The placeholder `{{issues}}` therefore binds to the key `"issues"` in `:vars`.
+
 This keeps textual rendering aligned with workflow data flow.
 
 ## Result surfaces
@@ -184,6 +238,7 @@ This keeps textual rendering aligned with workflow data flow.
 The grammar distinguishes between:
 
 - step-local output surfaces
+- step-local yielded value references
 - the step's yielded value as a whole
 
 ### Output surfaces
@@ -200,11 +255,13 @@ Examples include:
 
 Not every step form exposes every output surface.
 
-For the current grammar shape:
+For the first cut:
 
-- invoke steps expose deterministic result-oriented surfaces such as `:data`, `:summary`, and optionally `:result`
-- session steps expose session-oriented surfaces such as `:final-llm-reply`, `:transcript`, and optionally `:result`
-- delegate steps expose the delegated workflow's yielded value and may later expose step-local debug/result surfaces
+- invoke steps may expose `:data`, `:summary`, and optional `:result`
+- session steps may expose `:final-llm-reply`, `:transcript`, and optional `:result`
+- delegate steps do not add first-cut step-specific output surfaces beyond any future optional debug/result surface
+
+A reference that selects an output not exposed by that step type is invalid.
 
 ### Yielded value
 
@@ -225,9 +282,21 @@ This makes yielded values structurally exclusive rather than implicitly exclusiv
 
 The default yielded-value composition by step form is:
 
-- invoke step ⇒ yields data-oriented value
+- invoke step ⇒ yields data-oriented value sourced from its `:data` output surface
 - session step ⇒ yields text-oriented value sourced from the `:final-llm-reply` output surface
 - delegate step ⇒ yields the called workflow's yielded value unchanged
+
+### Referencing another step's yielded value
+
+A downstream step may reference a prior step's yielded value through `{:step ... :yield ...}`.
+
+Examples:
+
+- `{:from {:step "discover" :yield :data}}`
+- `{:from {:step "report" :yield :text}}`
+- `{:from {:step "review" :yield :reason}}`
+
+This reference form addresses fields of the yielded tagged union, not step-local output surfaces.
 
 ## Error handling
 
@@ -263,7 +332,11 @@ This keeps model choice in one semantic slot while allowing both direct and quer
 
 ## Workflow result composition
 
-A workflow's result is built from step results.
+A workflow's result is the yielded value of the step that transitions execution to `:done`.
+
+If a step reaches `:done` directly, that step's yielded value becomes the workflow result.
+
+If a step uses a judge and the judge outcome selects a transition whose `:goto` is `:done`, the workflow result is still the parent step's yielded value, not the judge's routing value.
 
 An invoke step yields a deterministic result-oriented value.
 

@@ -33,4 +33,22 @@
 - Materialized the grammar as project docs: `doc/workflow-grammar.md` for the bare grammar and `doc/workflow-grammar-concepts.md` for the conceptual explanation.
 - Extracted model selection into its own broader artifacts: `doc/model-selection-grammar.md` and `doc/model-selection-concepts.md`, and made the workflow grammar reference that external grammar through the nonterminal `model-selection-spec` rather than partially redefining it.
 - Added inline-session model selection flexibility: `:type :session` uses a single `:model` field whose value may be either a concrete model id or a query-shaped model-selection specification.
+- Reviewed the resulting design and grammar docs for residual ambiguity, then tightened the first-cut contract in response.
+- Updated `doc/workflow-grammar.md` so authored `:yields` are allowed on `:invoke`, `:session`, and `:delegate` steps rather than only some step forms.
+- Made delegated `:context` optional in the grammar and aligned the concepts/design docs on omitted `:context` meaning `[]`.
+- Added explicit yielded-value reference syntax `{:step ... :yield ...}` so downstream consumers can select a prior step's resulting value as distinct from step-local `:output` surfaces.
+- Clarified the source-spec rule that first-cut authors may use either `:path` or `:projection`, but not both in the same source selector.
+- Corrected the grammar/docs so transition-local routing directives may include optional `:max-iterations`, matching the implemented routing-directive schema.
+- Clarified that the earlier `:max-iterations?` spelling in the docs was only an imprecise optionality notation, not a distinct authored field name.
+- Tightened the judge contract in the concepts/design docs: normalized outcome is one string or keyword; string matching is case-sensitive; strings and keywords do not auto-coerce; missing `:on` match is a routing error.
+- Normalized first-cut session output naming on `:final-llm-reply` and aligned the design prose with the grammar.
+- Restricted template variable names in the grammar to strings so `{{var}}` placeholders map unambiguously to `:vars` keys.
+- Replaced the vague `yield-source ::= keyword` idea with the clearer rule that success-form `:yields` keywords point at step-local output surfaces.
+- Added explicit workflow result-composition rules: the workflow result is the yielded value of the step whose selected transition goes to `:done`; judge routing does not replace the parent step's yielded value.
+- Added an explicit framing note that `doc/workflow-grammar.md` is an EBNF-like documentation grammar rather than a complete executable parser specification.
+- After comparing the edited docs to `workflow_model.clj`, clarified that `doc/workflow-grammar.md` and `doc/workflow-grammar-concepts.md` describe the target converged authoring grammar from task 077, not the current implemented Malli schema surface.
+- Recorded the major current-model differences explicitly in the docs: current implementation still centers on `:executor`, `:prompt-template`, `:input-bindings`, `:session-preload`, `:session-overrides`, and the older judge/routing shape.
+- Added `doc/workflow-grammar-current.md` as a separate documentation artifact for the currently implemented workflow schema surface reflected by `workflow_model.clj`.
+- Tightened `doc/workflow-grammar-current.md` to better match the current Malli schemas: clarified optionality notation, corrected `:input-bindings` shape, made binding paths explicit as vectors of keywords/strings/ints, and called out the current optional map-shaped `:workflow-input` run field.
+- Added cross-links among `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-grammar-current.md` so target-design and current-implementation surfaces are explicitly navigable.
 - Wrote initial design/plan/steps surfaces.

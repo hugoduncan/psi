@@ -22,6 +22,20 @@
   - added `:yields` as the step-level resulting value mapping
   - made control flow explicit across `:invoke`, `:session`, and `:delegate`
   - clarified that `:judge` itself can be either LLM-backed or deterministic in the first cut
+- [x] Resolve follow-on ambiguities found during document review
+  - allowed authored `:yields` on all three step types in the grammar and design
+  - made delegated `:context` optional and defined omission as equivalent to `[]`
+  - added explicit workflow final-result composition rules for transitions to `:done`
+  - added explicit yielded-value references via `{:step ... :yield ...}` alongside `{:step ... :output ...}`
+  - clarified that a first-cut source spec may contain either `:path` or `:projection`, but not both
+  - tightened the judge outcome contract: string/keyword outcomes, no auto-coercion, unmatched outcomes are routing errors
+  - corrected the grammar/docs so transition-local routing directives may include optional `:max-iterations`
+  - clarified that the prior `:max-iterations?` spelling was only imprecise optionality notation, not a real authored field name
+  - preserved the existing implemented distinction between step-level `:max-iterations` and transition-local routing-directive `:max-iterations`
+  - normalized first-cut session output naming on `:final-llm-reply`
+  - restricted template variable names in the grammar to strings so `{{var}}` binding is unambiguous
+  - clarified that successful `:yields` forms point at step-local output surfaces by keyword
+  - clarified that the grammar artifact is EBNF-like documentation rather than a complete executable parser spec
 - [x] Allow both explicit model choice and model selection queries for inline session steps
   - `:type :session` uses a single `:model` field
   - `:model` may be either a concrete model id or a query specification
