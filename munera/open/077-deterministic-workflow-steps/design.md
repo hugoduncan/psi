@@ -138,12 +138,21 @@ Recommended control-flow terms:
 
 - `:steps` — ordered authored step list
 - `:name` — author-facing step identity
-- `:judge` — route-deciding judge for a step when present
+- `:judge` — route-deciding sub-step for a step when present
 - `:on` — outcome-to-transition map
 - `:goto` — target transition destination
 - `:max-iterations` — explicit loop bound
 
+Judge sub-steps should produce the same routing outcome surface regardless of execution mode so that `:on` remains uniform.
+
 These terms should continue to mean routing and progression, not payload or execution configuration.
+
+Control flow is orthogonal to execution form. First-cut design intent is that `:judge`, `:on`, `:goto`, and `:max-iterations` may be used with `:type :invoke`, `:type :session`, and `:type :delegate` steps, provided the step exposes a valid output surface for routing.
+
+A `:judge` is itself a routing sub-step. It should not be implicitly limited to LLM execution. First-cut design should allow at least:
+
+- an LLM-backed judge
+- a deterministic invoke-style judge
 
 ### Deterministic-step vocabulary
 
@@ -173,7 +182,7 @@ Recommended delegated-step terms:
 
 - `:delegate` — explicit delegated execution boundary
 - `:target` — existing named workflow to invoke
-- `:prompt-string` — explicit new prompt string passed to the delegated workflow
+- `:prompt-string` — explicit new prompt string passed to the delegated workflow; authored form may be a literal string or a template-shaped string renderer
 - `:context` — caller-derived material forwarded to the delegated workflow
 
 ### Conversation-contribution vocabulary
@@ -224,6 +233,13 @@ The first cut should validate step fields by `:type`.
 
 Control-flow fields such as `:judge`, `:on`, and `:max-iterations` are shared across all step types when the workflow author needs routing on the step result.
 
+That means first-cut control flow is intentionally allowed after deterministic and delegated execution as well as after inline session execution.
+
+For the first cut, judge execution modes should include at least:
+
+- `:judge {:type :llm ...}` for LLM-backed routing
+- `:judge {:type :invoke ...}` for deterministic routing via an operation call
+
 ### Deterministic step
 
 A deterministic step invokes a named operation through the runtime using hoisted deterministic fields on the step.
@@ -267,7 +283,7 @@ A delegated step invokes an existing named workflow and passes both explicit pro
 Delegated first-cut boundary semantics:
 
 - `:target` resolves against the existing named workflow definitions available to the runtime for the current project/worktree scope.
-- `:prompt-string` becomes the delegated workflow invocation's local workflow input value.
+- `:prompt-string` is rendered to a final string before delegation and then becomes the delegated workflow invocation's local workflow input value.
 - the delegated workflow should treat that local workflow input as the value available via `:workflow-input` within the callee.
 - `:workflow-original` is per workflow invocation, not globally inherited from the root caller; for a delegated workflow, its local `:workflow-original` is the delegated invocation's own original request surface, derived from the delegated boundary rather than silently reaching back to the root workflow.
 - `:context` is forwarded explicitly and remains separate from `:prompt-string`; it does not implicitly rewrite the delegated workflow's `:workflow-input`.
@@ -279,7 +295,10 @@ Illustrative shape:
 {:name "report"
  :type :delegate
  :target "builder"
- :prompt-string "Review these issues and produce a triage report."
+ :prompt-string {:type :template
+                 :text "Review these issues and produce a triage report:\n\n{{issues}}"
+                 :vars {:issues {:from {:step "discover" :output :data}
+                                 :path [:issues]}}}
  :context [{:type :source
             :from :workflow-original}
            {:type :source
@@ -643,6 +662,7 @@ For the first cut:
 - delegated `:context` preserves author order
 - delegated `:context` reuses the same source/projection selectors as sourced contributions (`:from`, `:path`, optional richer `:projection`)
 - delegated `:context` does not add template contributions in the first cut; keep delegated forwarding explicit and source-shaped until the boundary semantics are proven
+- delegated `:prompt-string` may reuse the template contribution rendering shape, but its fully rendered boundary value must be a string before invocation
 
 Illustrative references:
 
@@ -760,9 +780,13 @@ Leading direction:
 - downstream `:path` or richer `:projection` applies relative to the selected output
 - deterministic steps, inline session steps, and delegated steps use the same reference/projection family when consuming deterministic outputs
 
-## Step output surfaces
+## Step output surfaces and yielded value
 
-The design should make explicit what later steps can reference from each step form.
+The design should make explicit what later steps can reference from each step form, and what resulting value each step yields as a whole.
+
+Important modeling rule: output names should describe output content type, not output provenance. The step's overall resulting value is modelled separately through `:yields`.
+
+For the first cut, `:yields` should be an explicit tagged union with hoisted type-specific fields rather than an implicit one-of map shape.
 
 ### Deterministic step outputs
 
@@ -772,24 +796,89 @@ Deterministic steps expose explicit logical outputs:
 - `:output :summary` — optional human-readable summary
 - `:output :result` — optional full deterministic result envelope for advanced/debug use
 
+Default yielded value for `:type :invoke`:
+
+```clojure
+:yields {:type :data
+         :data :result-data}
+```
+
+Meaning: the step as a whole yields a tagged value whose `:type` is `:data` and whose `:data` field comes from the deterministic step's canonical result-data surface.
+
 ### Inline session step outputs
 
 First-cut inline session steps should expose at least:
 
-- `:output :text` — the accepted/result text surface produced by the executed child session
+- `:output :final-reply` — the terminal assistant/LLM reply produced by the session step
 - `:output :transcript` — the child-session transcript surface when transcript projection is requested
 - `:output :result` may exist later if a normalized envelope proves necessary, but it is not required as a first-cut author-facing surface
 
+For the first cut, `:output :final-reply` means the final LLM response from the executed child session.
+
+Default yielded value for `:type :session`:
+
+```clojure
+:yields {:type :text
+         :text :final-llm-reply}
+```
+
+Meaning: the step as a whole yields a tagged value whose `:type` is `:text` and whose `:text` field comes from the session step's final LLM reply surface.
+
 ### Delegated step outputs
 
-Delegated steps should expose the outputs of the delegated workflow run through the delegated workflow's terminal result surface.
+Delegated steps should expose the outputs of the delegated workflow run through the delegated workflow's yielded value and output surfaces.
 
-For the first cut, later steps should be able to reference at least:
+For the first cut:
 
-- `:output :text` — the delegated workflow's accepted/result text surface
-- `:output :result` may exist later if a normalized delegated envelope proves necessary, but it is not required as a first-cut author-facing surface
+- a delegated step yields exactly the value yielded by the called workflow
+- if the called workflow yields `{:type :data :data ...}`, the delegated step yields `{:type :data :data ...}`
+- if the called workflow yields `{:type :text :text ...}`, the delegated step yields `{:type :text :text ...}`
+- if the called workflow yields `{:type :error :reason ...}`, the delegated step yields `{:type :error :reason ...}`
+- delegated steps may still expose step-local debug/result surfaces such as `:output :result` later, but the primary resulting value is the callee's yielded value
+
+Default yielded value for `:type :delegate`:
+
+- the called workflow's yielded value, unchanged
 
 These output names must be validated by step type; not every output selector is valid for every step form.
+
+### `:yields` as the step's resulting value
+
+The design should distinguish between:
+
+- step-local output surfaces addressable via `:output ...`
+- the step's resulting value as a whole, declared via `:yields`
+
+For the first cut, `:yields` is a tagged union shape.
+
+Success forms:
+
+```clojure
+{:type :data
+ :data ...}
+```
+
+```clojure
+{:type :text
+ :text ...}
+```
+
+Error form:
+
+```clojure
+{:type :error
+ :reason :keyword
+ :message "human-readable message"
+ :details {...optional diagnostic data...}}
+```
+
+Illustrative defaults:
+
+- `:type :invoke` ⇒ `:yields {:type :data :data :result-data}`
+- `:type :session` ⇒ `:yields {:type :text :text :final-llm-reply}`
+- `:type :delegate` ⇒ yields the called workflow's yielded value unchanged
+
+First-cut yielded values should be structurally exclusive by tagged shape rather than by convention.
 
 ## Canonical deterministic result model
 
@@ -813,9 +902,24 @@ Illustrative shape only:
 
 Important design rule: for deterministic steps, `:data` should be the canonical machine-readable output. Any text summary is secondary.
 
+When a step fails, the first-cut yielded value should use:
+
+```clojure
+{:type :error
+ :reason :keyword
+ :message "human-readable message"
+ :details {...optional diagnostic data...}}
+```
+
+`:`reason` should always be a keyword in the first cut.
+
 ## Runtime and observability expectations
 
 Although this is a design-first umbrella, it must define what runtime surfaces the eventual implementation should preserve.
+
+Across all three execution forms, first-cut routing should work through the step's validated output surface. Judge-based routing is the canonical common mechanism shared by deterministic, inline-session, and delegated steps.
+
+Across judge execution modes, `:on` should continue to consume one uniform judge outcome surface regardless of whether the judge was LLM-backed or deterministic.
 
 Deterministic steps should participate visibly in:
 
@@ -927,7 +1031,7 @@ Preferred direction:
 - `:type :delegate` steps use hoisted `:target`, `:prompt-string`, and `:context` fields
 - `:target` names an existing workflow only
 - a delegated step passes both:
-  - `:prompt-string` — the explicit new prompt string for the delegated workflow
+  - `:prompt-string` — the explicit new prompt string for the delegated workflow; authored as either a literal string or a template-shaped renderer, but rendered to a final string before invocation
   - `:context` — caller-derived material forwarded across the boundary
 - first cut disallows delegated workflow session overrides
 - delegated context reuses the same reference/projection language as source contributions
@@ -951,10 +1055,12 @@ Preferred direction:
 - `:data` is the canonical machine-readable output
 - `:summary` is optional and secondary
 - output selectors are validated by step type
+- yielded values are modelled separately via `:yields`
 - downstream references use explicit output selectors such as:
   - deterministic: `:output :data`, `:output :summary`, optional `:output :result`
-  - inline-session: `:output :text`, `:output :transcript`
-  - delegated: `:output :text`, optional later `:output :result`
+  - inline-session: `:output :final-llm-reply`, `:output :transcript`
+  - delegated: whatever output surfaces are exposed by the called workflow, plus optional later `:output :result`
+- the step's resulting value as a whole is defined by `:yields`, not by any single output selector alone
 
 ### 8. Runtime expectations
 
@@ -963,7 +1069,7 @@ Preferred direction:
 - deterministic steps do not create child sessions by default
 - deterministic execution is still recorded in workflow progression/attempt history
 - inline session steps execute by building and running the child-session conversation assembled from contributions
-- delegated steps execute by invoking the target workflow with the explicit delegated boundary payload
+- delegated steps execute by invoking the target workflow with the explicit delegated boundary payload and yielding the called workflow's yielded value unchanged, including propagated `:type :error` values
 
 ### 9. Current open questions that remain after this summary
 
@@ -985,13 +1091,14 @@ Acceptance:
 - the task defines the preferred 3-form execution model (`:type :invoke`, `:type :session`, `:type :delegate`)
 - the task defines the preferred workflow authoring model for deterministic steps
 - the task defines the preferred inline-session conversation-assembly model
-- the task defines the preferred delegated boundary model (`:target` names an existing workflow; `:prompt-string` is string-only in the first cut; delegated workflow session overrides are disallowed)
+- the task defines the preferred delegated boundary model (`:target` names an existing workflow; `:prompt-string` renders to a string in the first cut and may be authored literally or via template shape; delegated workflow session overrides are disallowed)
 - the task defines the preferred argument-passing model for deterministic invocation
 - the task defines the preferred extension/runtime contract for deterministic operations
 - the task defines the canonical deterministic result shape
 - the task defines how downstream steps reference deterministic results
 - the task defines how inline-session contributions and delegated context reference workflow state and prior-step outputs
 - the task defines the first-cut output surfaces exposed by each of the three step types
+- the task defines how each step type yields its resulting value as a whole, including first-cut success and error tagged shapes
 - the task includes at least one GH label-search anchor example that exercises deterministic invocation and both inline-session and delegated downstream consumption
 - the task identifies the follow-on implementation slices needed to build the feature safely
 - the design is specific enough that a later implementation task does not need to reinvent the API surface

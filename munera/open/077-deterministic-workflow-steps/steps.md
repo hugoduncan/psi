@@ -10,16 +10,26 @@
 - [x] Validate the design against the GitHub label-search anchor use case
   - design now includes a consolidated end-state summary and anchor examples covering deterministic invocation plus deterministic and LLM-backed downstream consumers
 - [ ] Split accepted design into follow-on implementation child tasks
+- [x] Materialize the workflow grammar as project docs
+  - added `doc/workflow-grammar.md` as the grammar artifact
+  - added `doc/workflow-grammar-concepts.md` as the conceptual explanation artifact
+  - extracted broader model selection into `doc/model-selection-grammar.md` and `doc/model-selection-concepts.md`
 - [x] Tighten ambiguity around per-type field validity, delegated boundary semantics, and step output surfaces
   - added first-cut field matrix
   - clarified delegated `:prompt-string` / `:workflow-input` relationship
   - added first-cut output surfaces per step type
+  - clarified that output names and yielded values are distinct concepts
+  - added `:yields` as the step-level resulting value mapping
+  - made control flow explicit across `:invoke`, `:session`, and `:delegate`
+  - clarified that `:judge` itself can be either LLM-backed or deterministic in the first cut
 - [x] Allow both explicit model choice and model selection queries for inline session steps
   - `:type :session` uses a single `:model` field
   - `:model` may be either a concrete model id or a query specification
+- [x] Make yielded values structurally exclusive
+  - `:yields` is now a tagged union with hoisted type-specific fields (`:data`, `:text`, `:details`) and `:reason` for failures
 - [x] Narrow delegated boundary first cut
   - `:target` names existing workflows only
-  - `:prompt-string` is string-only in the first cut
+  - `:prompt-string` renders to a string in the first cut and may be authored literally or via template shape
   - delegated workflow session overrides are disallowed for now
 - [x] Replace the older prompt/input/reference framing with the newer session-conversation contribution model
   - canonical inline-session shape is now `:session {:contributions [...]}` with `:type :source` and `:type :template`
