@@ -15,6 +15,7 @@ Queue:
 `munera/open/070-delegate-command-posts-workflow-result-into-chat/`
 `munera/open/073-workflow-child-session-prompt-composition/`
 `munera/open/076-auto-session-name-helper-model-fallback/`
+`munera/open/077-deterministic-workflow-steps/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.

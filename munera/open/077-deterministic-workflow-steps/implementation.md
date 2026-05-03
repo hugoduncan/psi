@@ -1,0 +1,33 @@
+2026-05-02
+- Created umbrella task 077 for deterministic workflow steps.
+- Framed this as design-first rather than implementation-first.
+- Captured open decisions from the discussion:
+  - argument passing needs explicit design
+  - extension contract might be as small as a named function/operation, but is not yet chosen
+  - deterministic outputs must feed both LLM-backed and deterministic downstream steps
+  - statechart-style invoke/input/output clarity is a useful design reference
+- Added a side-by-side syntax comparison section to `design.md` covering `:deterministic`, `:invoke`, and `:executor`/`:kind` shapes.
+- Current design recommendation is to prefer a general `:invoke` block with explicit map-shaped `:args`.
+- Added an operation identity comparison section covering canonical string operation ids, explicit extension+operation maps, and direct var/function-style references.
+- Current design recommendation is to use an author-facing canonical operation id resolved through a runtime-owned registry, avoiding direct implementation references in workflow files.
+- Added an argument-model comparison section covering single `:args`, split `:input` + `:args`, and positional/list-shaped arguments.
+- Current design recommendation is one explicit map-shaped `:args` surface with mixed literal and projected values, reusing the existing workflow source/path projection family.
+- Added a downstream result-reference comparison section covering explicit result kinds, implicit defaults, and full-result-envelope references.
+- Current design recommendation is explicit downstream result kinds with `:data` as the canonical machine-readable surface, `:summary` for human-readable output, and optional `:full-result` only for advanced/debug use.
+- Added a consolidated proposed end-state summary that gathers the current recommendations into one implementation-oriented view.
+- The summary now captures the leading design as: `:invoke` + canonical operation id + map-shaped `:args` + explicit result outputs + shared source/path projection across deterministic and LLM-backed consumers.
+- Added a naming review section to separate control-flow, deterministic-execution, session-conversation-assembly, and data-reference vocabulary.
+- Current naming direction prefers `:operation` over using `:deterministic` as a field name, and `:output` over overloading `:kind` for deterministic result references.
+- Rewrote the design around the newer inline-session conversation model: canonical inline session authoring now uses hoisted session-construction fields on `:type :session` steps rather than `:prompt` / `:input` / `:reference` / `:preload`.
+- The canonical contribution forms are now tagged maps with `:type`, currently `:source` and `:template`.
+- `:source` contributions explicitly reuse existing projection functionality, and the assembled output is modelled simply as the child session conversation.
+- Clean break decision captured: no new-model `:prompt` compatibility surface.
+- Expanded the execution algebra from 2 forms to 3 explicit mutually-exclusive forms: `:type :invoke`, `:type :session`, and `:type :delegate`.
+- Added explicit step `:type` so exclusivity is modelled directly in authored data rather than inferred only from field presence.
+- Removed per-type submaps and switched to hoisted step fields keyed by `:type`.
+- Renamed delegated execution vocabulary to match `/delegate`: hoisted delegated fields are now `:target`, `:prompt-string`, and `:context`.
+- Captured the design insight that `/delegate` effectively carries both caller context and explicit request text, so `:type :delegate` should model both.
+- Narrowed the delegated first cut: `:target` names existing workflows only, `:prompt-string` is string-only, and delegated workflow session overrides are disallowed for now.
+- Tightened ambiguity around runtime contracts by adding: a first-cut per-`type` field validity matrix, delegated boundary semantics (`:prompt-string` becomes the callee's local `:workflow-input`), ordered source-only delegated `:context`, and first-cut output surfaces for `:invoke`, `:session`, and `:delegate` steps.
+- Added inline-session model selection flexibility: `:type :session` uses a single `:model` field whose value may be either a concrete model id or a query-shaped model-selection specification.
+- Wrote initial design/plan/steps surfaces.

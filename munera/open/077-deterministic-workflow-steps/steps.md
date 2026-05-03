@@ -1,0 +1,33 @@
+- [x] Compare candidate deterministic-step authoring syntaxes and choose one preferred direction
+  - current recommendation: prefer a general `:invoke` block over `:deterministic` or `:executor`/`:kind`
+- [x] Define the deterministic operation contract for extension/runtime implementers
+  - current recommendation: author-facing canonical operation id resolved through a runtime-owned registry, not direct var/function references from workflow files
+- [x] Define the argument-passing model, including projected and literal values
+  - current recommendation: one explicit map-shaped `:args` surface with mixed literal and projected values, reusing the existing source/path projection family
+- [x] Define the canonical deterministic result shape and downstream reference semantics
+  - current recommendation: structured result envelope with `:data` as canonical output, explicit downstream result kinds (`:data`, `:summary`, optional `:full-result`), and shared source/path projection across deterministic and LLM-backed consumers
+- [ ] Define runtime/observability expectations for deterministic steps
+- [x] Validate the design against the GitHub label-search anchor use case
+  - design now includes a consolidated end-state summary and anchor examples covering deterministic invocation plus deterministic and LLM-backed downstream consumers
+- [ ] Split accepted design into follow-on implementation child tasks
+- [x] Tighten ambiguity around per-type field validity, delegated boundary semantics, and step output surfaces
+  - added first-cut field matrix
+  - clarified delegated `:prompt-string` / `:workflow-input` relationship
+  - added first-cut output surfaces per step type
+- [x] Allow both explicit model choice and model selection queries for inline session steps
+  - `:type :session` uses a single `:model` field
+  - `:model` may be either a concrete model id or a query specification
+- [x] Narrow delegated boundary first cut
+  - `:target` names existing workflows only
+  - `:prompt-string` is string-only in the first cut
+  - delegated workflow session overrides are disallowed for now
+- [x] Replace the older prompt/input/reference framing with the newer session-conversation contribution model
+  - canonical inline-session shape is now `:session {:contributions [...]}` with `:type :source` and `:type :template`
+- [x] Expand the model from 2 execution forms to the explicit 3-form model
+  - canonical step execution forms are now `:type :invoke`, `:type :session`, and `:type :delegate`, and they are intended to be mutually exclusive
+- [x] Add explicit step `:type`
+  - step type now models exclusivity directly in the authored data instead of relying only on field presence
+- [x] Hoist type-specific fields into the step map
+  - removed redundant per-type submaps now that `:type` determines which fields are valid
+- [x] Rename delegated execution vocabulary to match `/delegate`
+  - `:type :delegate` + `:target` + `:prompt-string` + `:context`
