@@ -37,7 +37,7 @@
                    :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
            "build" {:executor {:type :agent :profile "builder"}
                     :prompt-template "Build: $INPUT"
-                    :input-bindings {:input {:source :step-output :path ["plan" :outputs :text]}}
+                    :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})
 
@@ -111,6 +111,8 @@
           (is (= :completed (:status result)))
           (is (= :ok (:outcome accepted)))
           (is (= "build output" (get-in accepted [:outputs :final-llm-reply])))
-          (is (= "build output" (get-in accepted [:outputs :text])))
+          (is (= "build output"
+                 (workflow-execution/binding-source-value run {:source :step-output
+                                                               :path ["build" :outputs :final-llm-reply]})))
           (is (= ["ship it" "Build: plan output"]
                  (mapv :prompt @prompts*))))))))

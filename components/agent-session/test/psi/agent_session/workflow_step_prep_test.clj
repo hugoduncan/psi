@@ -26,7 +26,7 @@
                                       :retry-policy {:max-attempts 1 :retry-on #{}}}
                               "review" {:executor {:type :agent :profile "reviewer"}
                                         :prompt-template "$INPUT"
-                                        :input-bindings {:input {:source :step-output :path ["plan" :outputs :text]}}
+                                        :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
                                         :session-preload [{:kind :value
                                                            :role "user"
                                                            :binding {:source :workflow-input :path [:original]}}
@@ -47,7 +47,7 @@
                                                                                     :original "Original request"}})]
                        (-> s
                            (assoc-in [:workflows :runs "run-preload-proof" :step-runs "plan" :accepted-result]
-                                     {:outcome :ok :outputs {:text "plan text"} :diagnostics {:summary "summary"}})
+                                     {:outcome :ok :outputs {:final-llm-reply "plan text"} :diagnostics {:summary "summary"}})
                            (assoc-in [:workflows :runs "run-preload-proof" :step-runs "plan" :attempts]
                                      [{:attempt-id "a1" :status :succeeded :execution-session-id session-id}])))))
           _ (persistence/append-entry-in! ctx session-id
@@ -70,7 +70,7 @@
           preload (workflow-step-prep/materialize-step-session-preload ctx workflow-run "review")]
       (is (= [{:role "user" :content "Original request"}
               {:role "assistant" :content (pr-str {:outcome :ok
-                                                   :outputs {:text "plan text"}
+                                                   :outputs {:final-llm-reply "plan text"}
                                                    :diagnostics {:summary "summary"}})}
               {:role "user" :content "Build it"}
               {:role "assistant" :content [{:type :text :text "Reading"}]}
@@ -106,7 +106,7 @@
                                         :result :ignored-by-resolver}})
                    (assoc-in [:workflows :runs run-id :step-runs "report" :accepted-result]
                              {:outcome :ok
-                              :outputs {:text "session text"}}))
+                              :outputs {:final-llm-reply "session text"}}))
         run (workflow-runtime/workflow-run-in state3 run-id)]
     (is (= {:reply "session text"
             :data {:issues [1 2]}

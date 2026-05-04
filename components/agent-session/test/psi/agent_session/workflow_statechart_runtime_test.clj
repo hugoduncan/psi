@@ -228,7 +228,7 @@
                                     :retry-policy {:max-attempts 1 :retry-on #{}}}
                             "review" {:executor {:type :agent :profile "reviewer"}
                                       :prompt-template "$INPUT"
-                                      :input-bindings {:input {:source :step-output :path ["plan" :outputs :text]}}
+                                      :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
                                       :session-preload [{:kind :value
                                                          :role "user"
                                                          :binding {:source :workflow-input :path [:original]}}]
@@ -243,7 +243,7 @@
                            {:input "go" :original "Original request"})
                  (assoc-in [:workflows :runs "run-preload" :current-step-id] "review")
                  (assoc-in [:workflows :runs "run-preload" :step-runs "plan" :accepted-result]
-                           {:outcome :ok :outputs {:text "plan text"}})
+                           {:outcome :ok :outputs {:final-llm-reply "plan text"}})
                  (assoc-in [:workflows :runs "run-preload" :step-runs "plan" :attempts]
                            [{:attempt-id "a1" :status :succeeded :execution-session-id session-id}]))))
     (let [wf-ctx (runtime/create-workflow-context ctx session-id "run-preload")]
