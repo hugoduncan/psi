@@ -1,0 +1,13 @@
+- [ ] Reproduce the regression with tests that use string-shaped provider identities matching live session state
+- [ ] Add or refine prompt-request coverage for a custom `:anthropic-messages` provider stored as `{:provider "minimax" ...}`
+- [ ] Add or refine runtime helper coverage for `resolve-api-key-in` with `{:provider "minimax" ...}`
+- [ ] Add or refine at least one regression test that uses live session-data shape `{:model {:provider "minimax" :id "MiniMax-M2.7"}}`
+- [ ] Inspect the shared provider-auth boundary and identify the exact normalization seam
+- [ ] Implement provider identity normalization once in shared provider-auth resolution
+- [ ] Ensure every shared provider-auth lookup path that uses provider identity as a registry key uses the same normalized provider identity
+- [ ] Add or refine coverage for provider-request option lookup if it shares the same provider-identity seam
+- [ ] Verify explicit runtime override precedence remains intact
+- [ ] Verify built-in Anthropic missing-auth behavior remains unchanged
+- [ ] Verify the new string-provider regression test(s) fail on the pre-fix implementation and pass after the fix
+- [ ] Run focused regression tests and record the result
+- [ ] Capture any implementation notes or edge-case decisions in `implementation.md`
