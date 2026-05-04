@@ -278,10 +278,17 @@
               invoke-step? (= :invoke (:type step-def))
               step-config (when-not invoke-step?
                             (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id))
-              prompt-data (when-not invoke-step?
-                            (workflow-step-prep/step-prompt workflow-run step-id))
-              preloaded-messages (when-not invoke-step?
-                                   (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id))
+              session-conversation (when-not invoke-step?
+                                     (workflow-step-prep/materialize-step-session-conversation workflow-run step-id))
+              {:keys [preloaded-messages prompt]}
+              (if invoke-step?
+                {}
+                (workflow-step-prep/split-step-session-conversation session-conversation))
+              compat-preload-messages (when-not invoke-step?
+                                        (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id))
+              combined-preloaded-messages (when-not invoke-step?
+                                            (not-empty (vec (concat (or preloaded-messages [])
+                                                                    (or compat-preload-messages [])))))
               {:keys [attempt execution-session]}
               (if invoke-step?
                 {:attempt {:attempt-id attempt-id
@@ -313,8 +320,8 @@
                    (contains? step-config :prompt-component-selection)
                    (assoc :prompt-component-selection (:prompt-component-selection step-config))
 
-                   preloaded-messages
-                   (assoc :preloaded-messages preloaded-messages))))]
+                   combined-preloaded-messages
+                   (assoc :preloaded-messages combined-preloaded-messages))))]
           (swap! working-memory*
                  (fn [wm]
                    (cond-> (-> wm
@@ -350,7 +357,7 @@
                                   :failure :actor/failed
                                   :actor/failed)
                                 {}))
-              (let [execution-result (prompt-control/prompt-execution-result-in! ctx (:session-id execution-session) (:prompt prompt-data))
+              (let [execution-result (prompt-control/prompt-execution-result-in! ctx (:session-id execution-session) prompt)
                     assistant-message (:execution-result/assistant-message execution-result)
                     {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
                     failure-payload (when (= :turn.outcome/error outcome)

@@ -3,6 +3,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.deterministic-operation-registry]
+   [psi.agent-session.deterministic-operations]
    [psi.agent-session.persistence]
    [psi.agent-session.prompt-control]
    [psi.agent-session.prompt-request :as prompt-request]
@@ -290,10 +292,13 @@
                                                                                     :original "build this feature"}})]
                        s)))
           prompts* (atom [])
+          created* (atom [])
           responses* (atom ["planner output" "builder output"])]
       (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]
+                        (swap! created* conj {:step-id (:workflow-step-id opts)
+                                              :preloaded-messages (:preloaded-messages opts)})
                         {:attempt {:attempt-id (str sid "-attempt")
                                    :status :pending
                                    :execution-session-id sid}
@@ -314,7 +319,79 @@
                  (get-in run [:step-runs "step-2-builder" :accepted-result :outputs :final-llm-reply])))
           (is (= ["ship it"
                   "Execute: planner output"]
-                 (mapv :prompt @prompts*))))))))
+                 (mapv :prompt @prompts*)))
+          (is (= [{:step-id "step-1-planner"
+                   :preloaded-messages nil}
+                  {:step-id "step-2-builder"
+                   :preloaded-messages nil}]
+                 @created*)))))))
+
+(deftest execute-run-materializes-session-contributions-into-child-session-conversation-test
+  (testing "IR session contributions become canonical child-session preload plus final prompt submission"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          definition {:steps [{:name "discover"
+                               :type :invoke
+                               :operation "demo/discover"
+                               :args {}}
+                              {:name "report"
+                               :type :session
+                               :tools ["read"]
+                               :contributions [{:type :source
+                                                :from :workflow-original}
+                                               {:type :template
+                                                :text "Review {{issues}} / {{summary}}"
+                                                :vars {"issues" {:from {:step "discover" :output :data}
+                                                                 :path [:issues]}
+                                                       "summary" {:from {:step "discover" :yield :data}
+                                                                  :path [:summary]}}}]}]}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/create-run state {:definition definition
+                                                                       :run-id "run-session-contrib"
+                                                                       :workflow-input {:original {:ticket 123
+                                                                                                   :request "Please triage"}}})]
+                       s)))
+          created* (atom [])
+          prompts* (atom [])]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        (swap! created* conj {:step-id (:workflow-step-id opts)
+                                              :preloaded-messages (:preloaded-messages opts)})
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session (valid-child-session sid)}))
+                    psi.agent-session.deterministic-operation-registry/invoke-operation-in
+                    (fn [_registry operation-id invocation]
+                      (if (= operation-id "demo/discover")
+                        {:status :succeeded
+                         :data {:issues ["i-1" "i-2"]
+                                :summary "2 issues found"}
+                         :summary "2 issues found"}
+                        (throw (ex-info "unexpected operation" {:operation-id operation-id
+                                                                :invocation invocation}))))
+                    psi.agent-session.deterministic-operations/operation-result->invoke-step-result
+                    (fn [operation-result]
+                      {:kind :accepted-result
+                       :accepted-result {:outcome :ok
+                                         :outputs {:data (:data operation-result)
+                                                   :summary (:summary operation-result)}}})
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:content "triage output"}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-session-contrib")
+              report-created (last @created*)]
+          (is (= :completed (:status result)))
+          (is (= {:step-id "report"
+                  :preloaded-messages [{:role "user"
+                                        :content "{:ticket 123, :request \"Please triage\"}"}]}
+                 report-created))
+          (is (= [{:session-id "report-child"
+                   :prompt "Review [\"i-1\" \"i-2\"] / 2 issues found"}]
+                 @prompts*)))))))
 
 (deftest resolve-step-session-config-inherits-parent-prompt-mode-test
   (testing "workflow child sessions inherit parent prompt mode into step session config"
