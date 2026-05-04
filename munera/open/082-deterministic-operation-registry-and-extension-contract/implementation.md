@@ -10,3 +10,19 @@
 - 2026-05-04 follow-up status: the design ambiguity itself is resolved and the newly added design-step is complete. Focused malformed-return tests remain part of the future code implementation slice for this task and should reject malformed operation results at the boundary rather than attempting lossy normalization.
 - Review: inconsistency — `implementation.md` now records the authoritative boundary decision as resolved via a completed design-step, but `steps.md` still tracks only the implementation-facing checklist and has no item acknowledging or linking that design-resolution follow-through; add an explicit task-local step (or checked note) so the task files agree that the boundary ambiguity has already been resolved in design while malformed-return proof remains future implementation work.
 - 2026-05-04 follow-up executed: updated `steps.md` to carry an explicit checked task-local note that the return-boundary decision is settled (tagged operation results from operations; runtime-owned invoke-step wrapping) while malformed-return rejection proof remains future implementation work.
+- 2026-05-04 implementation landed:
+  - added canonical runtime-owned deterministic operation boundary in `components/agent-session/src/psi/agent_session/deterministic_operations.clj`
+  - added authoritative deterministic operation registry in `components/agent-session/src/psi/agent_session/deterministic_operation_registry.clj`
+  - rooted the registry in session context as `:deterministic-operation-registry`
+  - extended extension API/runtime registration with `:register-operation` routed through runtime-owned duplicate detection and extension ownership recording
+  - recorded extension-owned operation ids in extension registry introspection surfaces
+  - wired invoke-step execution in `workflow_statechart_runtime.clj` to resolve stable operation ids through the runtime registry, materialize args through `workflow_source_resolution/resolve-invoke-args`, and normalize successful/error operation results at the runtime boundary
+  - malformed returned values are now rejected at the operation boundary with explicit `ex-info` rather than lossy normalization
+  - focused proof added in:
+    - `deterministic_operation_registry_test.clj`
+    - `workflow_invoke_runtime_test.clj`
+    - extension API registration coverage in `extensions_test.clj`
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.workflow-invoke-runtime-test --skip-meta :integration`
+    - `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.extensions-test --focus psi.agent-session.workflow-statechart-runtime-test --skip-meta :integration`
+    - `clj-kondo --lint ...` across changed source/test files (0 warnings)

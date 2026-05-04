@@ -551,6 +551,22 @@
       ((:register-command api) "greet" {:handler (fn [_] nil) :description "Say hi"})
       (is (contains? (ext/command-names-in reg) "greet"))))
 
+  (testing "API :register-operation delegates to deterministic operation runtime registration"
+    (let [reg (ext/create-registry)
+          _   (ext/register-extension-in! reg "/ext/test")
+          calls (atom [])
+          api (ext/create-extension-api reg "/ext/test"
+                                        {:register-deterministic-operation-fn
+                                         (fn [ext-path op]
+                                           (swap! calls conj [ext-path op])
+                                           {:id (:id op)})})]
+      (is (= {:id "github/search-issues-by-label"}
+             ((:register-operation api)
+              {:id "github/search-issues-by-label"
+               :handler (fn [_] {:status :ok :data {}})})))
+      (is (= [["/ext/test" "github/search-issues-by-label"]]
+             (mapv (fn [[ext-path op]] [ext-path (:id op)]) @calls)))))
+
   (testing "API :register-flag with default"
     (let [reg (ext/create-registry)
           _   (ext/register-extension-in! reg "/ext/test")

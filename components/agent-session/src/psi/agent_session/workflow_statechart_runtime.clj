@@ -19,6 +19,8 @@
    [com.fulcrologic.statecharts.events :as evts]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
+   [psi.agent-session.deterministic-operation-registry :as deterministic-op-reg]
+   [psi.agent-session.deterministic-operations :as deterministic-ops]
    [psi.agent-session.prompt-control :as prompt-control]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
@@ -26,6 +28,7 @@
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-progression-recording :as workflow-progression-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
    [psi.agent-session.workflow-step-prep :as workflow-step-prep]))
 
@@ -205,6 +208,31 @@
       execution-session-id
       (assoc :session-id execution-session-id))))
 
+(defn- invoke-step-runtime-result
+  [ctx parent-session-id run-id step-id step-def workflow-run]
+  (let [invoke-spec (or (:invoke step-def)
+                        (get-in step-def [:judge :invoke]))
+        args (workflow-source-resolution/resolve-invoke-args workflow-run (:args invoke-spec))]
+    (deterministic-op-reg/invoke-operation-in
+     (:deterministic-operation-registry ctx)
+     (:operation invoke-spec)
+     {:ctx ctx
+      :parent-session-id parent-session-id
+      :workflow-run-id run-id
+      :step-id step-id
+      :args args})))
+
+(defn- apply-invoke-step-result
+  [operation-result]
+  (let [{:keys [kind accepted-result yield]} (deterministic-ops/operation-result->invoke-step-result operation-result)]
+    (case kind
+      :accepted-result {:pending-kind :success
+                        :payload accepted-result}
+      :error-yield {:pending-kind :failure
+                    :payload {:reason (:reason yield)
+                              :message (:message yield)
+                              :details (:details yield)}})))
+
 (defn- enqueue-event!
   [event-queue* working-memory* event data]
   (swap! event-queue* conj {:event event
@@ -246,48 +274,59 @@
         :step/enter
         (let [attempt-id (str (java.util.UUID/randomUUID))
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              step-config (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id)
-              {:keys [prompt]} (workflow-step-prep/step-prompt workflow-run step-id)
-              preloaded-messages (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id)
+              step-def (runtime-step-def workflow-run step-id)
+              invoke-step? (= :invoke (:type step-def))
+              step-config (when-not invoke-step?
+                            (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id))
+              prompt-data (when-not invoke-step?
+                            (workflow-step-prep/step-prompt workflow-run step-id))
+              preloaded-messages (when-not invoke-step?
+                                   (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id))
               {:keys [attempt execution-session]}
-              (workflow-attempts/create-step-attempt-session!
-               ctx
-               parent-session-id
-               (cond-> {:workflow-run-id run-id
-                        :workflow-step-id step-id
-                        :attempt-id attempt-id
-                        :session-name (str "workflow " step-id " attempt")
-                        :tool-defs (:tool-defs step-config)
-                        :thinking-level (:thinking-level step-config)}
-                 (:developer-prompt step-config)
-                 (assoc :developer-prompt (:developer-prompt step-config)
-                        :developer-prompt-source :explicit)
+              (if invoke-step?
+                {:attempt {:attempt-id attempt-id
+                           :status :pending
+                           :execution-session-id nil}
+                 :execution-session nil}
+                (workflow-attempts/create-step-attempt-session!
+                 ctx
+                 parent-session-id
+                 (cond-> {:workflow-run-id run-id
+                          :workflow-step-id step-id
+                          :attempt-id attempt-id
+                          :session-name (str "workflow " step-id " attempt")
+                          :tool-defs (:tool-defs step-config)
+                          :thinking-level (:thinking-level step-config)}
+                   (:developer-prompt step-config)
+                   (assoc :developer-prompt (:developer-prompt step-config)
+                          :developer-prompt-source :explicit)
 
-                 (:prompt-mode step-config)
-                 (assoc :prompt-mode (:prompt-mode step-config))
+                   (:prompt-mode step-config)
+                   (assoc :prompt-mode (:prompt-mode step-config))
 
-                 (:skills step-config)
-                 (assoc :skills (:skills step-config))
+                   (:skills step-config)
+                   (assoc :skills (:skills step-config))
 
-                 (:model step-config)
-                 (assoc :model (:model step-config))
+                   (:model step-config)
+                   (assoc :model (:model step-config))
 
-                 (contains? step-config :prompt-component-selection)
-                 (assoc :prompt-component-selection (:prompt-component-selection step-config))
+                   (contains? step-config :prompt-component-selection)
+                   (assoc :prompt-component-selection (:prompt-component-selection step-config))
 
-                 preloaded-messages
-                 (assoc :preloaded-messages preloaded-messages)))]
+                   preloaded-messages
+                   (assoc :preloaded-messages preloaded-messages))))]
           (swap! working-memory*
                  (fn [wm]
-                   (-> wm
-                       (assoc-in [:attempt-ids step-id] attempt-id)
-                       (assoc-in [:sessions step-id] (:session-id execution-session))
-                       (update-in [:attempt-counts step-id] (fnil inc 0))
-                       (assoc :current-step-id step-id
-                              :blocked-step-id nil
-                              :pending-actor-result nil
-                              :updated-at (now))
-                       (update-in [:iteration-counts step-id] (fnil inc 0)))))
+                   (cond-> (-> wm
+                               (assoc-in [:attempt-ids step-id] attempt-id)
+                               (update-in [:attempt-counts step-id] (fnil inc 0))
+                               (assoc :current-step-id step-id
+                                      :blocked-step-id nil
+                                      :pending-actor-result nil
+                                      :updated-at (now))
+                               (update-in [:iteration-counts step-id] (fnil inc 0)))
+                     (:session-id execution-session)
+                     (assoc-in [:sessions step-id] (:session-id execution-session)))))
           (swap! (:state* ctx)
                  (fn [state]
                    (-> state
@@ -296,38 +335,51 @@
                        (workflow-progression-recording/start-latest-attempt run-id step-id)
                        (workflow-progression-recording/increment-iteration-count run-id step-id))))
           (try
-            (let [execution-result (prompt-control/prompt-execution-result-in! ctx (:session-id execution-session) prompt)
-                  assistant-message (:execution-result/assistant-message execution-result)
-                  {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
-                  failure-payload (when (= :turn.outcome/error outcome)
-                                    (execution-failure-payload (:session-id execution-session) assistant-message))]
-              (if failure-payload
-                (do
-                  (swap! working-memory* assoc :pending-actor-result {:kind :failure
-                                                                      :payload failure-payload
-                                                                      :step-id step-id
-                                                                      :attempt-id attempt-id
-                                                                      :updated-at (now)})
-                  (enqueue-event! event-queue* working-memory* :actor/failed {}))
-                (let [step-def (runtime-step-def (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-                                                 step-id)
-                      assistant-text (assistant-message-text assistant-message)
-                      normalized-outputs (workflow-ir/step-output-surfaces
-                                          step-def
-                                          {:outcome :ok
-                                           :outputs {:final-llm-reply assistant-text
-                                                     :text assistant-text}})
-                      envelope {:outcome :ok
-                                :outputs (merge {:text assistant-text}
-                                                normalized-outputs)}]
-                  (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
-                                                                      :payload envelope
-                                                                      :step-id step-id
-                                                                      :attempt-id attempt-id
-                                                                      :updated-at (now)})
-                  (enqueue-event! event-queue* working-memory*
-                                  (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done)
-                                  {}))))
+            (if invoke-step?
+              (let [operation-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
+                    {:keys [pending-kind payload]} (apply-invoke-step-result operation-result)]
+                (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
+                                                                    :payload payload
+                                                                    :step-id step-id
+                                                                    :attempt-id attempt-id
+                                                                    :updated-at (now)})
+                (enqueue-event! event-queue* working-memory*
+                                (case pending-kind
+                                  :success :actor/done
+                                  :blocked :actor/blocked
+                                  :failure :actor/failed
+                                  :actor/failed)
+                                {}))
+              (let [execution-result (prompt-control/prompt-execution-result-in! ctx (:session-id execution-session) (:prompt prompt-data))
+                    assistant-message (:execution-result/assistant-message execution-result)
+                    {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
+                    failure-payload (when (= :turn.outcome/error outcome)
+                                      (execution-failure-payload (:session-id execution-session) assistant-message))]
+                (if failure-payload
+                  (do
+                    (swap! working-memory* assoc :pending-actor-result {:kind :failure
+                                                                        :payload failure-payload
+                                                                        :step-id step-id
+                                                                        :attempt-id attempt-id
+                                                                        :updated-at (now)})
+                    (enqueue-event! event-queue* working-memory* :actor/failed {}))
+                  (let [assistant-text (assistant-message-text assistant-message)
+                        normalized-outputs (workflow-ir/step-output-surfaces
+                                            step-def
+                                            {:outcome :ok
+                                             :outputs {:final-llm-reply assistant-text
+                                                       :text assistant-text}})
+                        envelope {:outcome :ok
+                                  :outputs (merge {:text assistant-text}
+                                                  normalized-outputs)}]
+                    (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
+                                                                        :payload envelope
+                                                                        :step-id step-id
+                                                                        :attempt-id attempt-id
+                                                                        :updated-at (now)})
+                    (enqueue-event! event-queue* working-memory*
+                                    (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done)
+                                    {})))))
             (catch Exception e
               (let [failure-payload {:message (ex-message e)}]
                 (swap! working-memory* assoc :pending-actor-result {:kind :failure
@@ -337,7 +389,6 @@
                                                                     :updated-at (now)})
                 (enqueue-event! event-queue* working-memory* :actor/failed {}))))
           nil)
-
         :step/record-result
         (let [{:keys [payload]} (:pending-actor-result @working-memory*)
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)

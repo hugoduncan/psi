@@ -1,6 +1,7 @@
 (ns psi.agent-session.extensions
   "Extension registry, loading, dispatch, tool wrapping, and introspection."
   (:require
+   [psi.agent-session.deterministic-operations :as deterministic-ops]
    [psi.agent-session.extensions.api :as api]
    [psi.agent-session.extensions.loader :as loader]
    [psi.agent-session.tool-defs :as tool-defs]
@@ -26,7 +27,10 @@
   State is {:extensions          {path ExtensionRecord}
             :registration-order  [path ...]
             :flag-values         {name value}
-            :event-bus           {channel [handler-fn ...]}}"
+            :event-bus           {channel [handler-fn ...]}}
+
+  Extension records may also carry deterministic operations under
+  `:operations` keyed by stable author-facing operation ids."
   []
   (->ExtensionRegistry
    (atom {:extensions         {}
@@ -55,6 +59,7 @@
                            :commands       {}
                            :flags          {}
                            :shortcuts      {}
+                           :operations     {}
                            :allowed-events default-allowed-events}))
                (not registered?)
                (update :registration-order conj path)))))
@@ -114,6 +119,21 @@
   (swap! (:state reg)
          assoc-in [:extensions ext-path :commands (:name cmd)] cmd)
   reg)
+
+(defn register-operation-in!
+  "Register a deterministic operation for the extension at `ext-path`.
+   Operation ids are stable author-facing ids such as
+   `github/search-issues-by-label`.
+
+   This records extension ownership in the extension registry. The runtime-owned
+   deterministic operation registry remains authoritative for invoke-time
+   resolution and duplicate detection."
+  [reg ext-path operation]
+  (let [operation* (deterministic-ops/normalize-operation-def
+                    (assoc operation :ext-path ext-path :source :extension))]
+    (swap! (:state reg)
+           assoc-in [:extensions ext-path :operations (:id operation*)] operation*)
+    reg))
 
 (defn register-flag-in!
   "Register `flag` (a map with :name key) for the extension at `ext-path`.
@@ -355,6 +375,11 @@
   [reg]
   (extension-item-names-in reg :tools))
 
+(defn operation-ids-in
+  "Return set of all deterministic operation ids registered across all extensions in `reg`."
+  [reg]
+  (extension-item-names-in reg :operations))
+
 (defn command-names-in
   "Return set of all registered command names across all extensions in `reg`."
   [reg]
@@ -409,17 +434,19 @@
   (let [state @(:state reg)
         ext   (get-in state [:extensions ext-path])]
     (when ext
-      {:path           ext-path
-       :handler-names  (into (sorted-set) (keys (:handlers ext)))
-       :handler-count  (reduce + 0 (map count (vals (:handlers ext))))
-       :tool-names     (into (sorted-set) (keys (:tools ext)))
-       :tool-count     (count (:tools ext))
-       :command-names  (into (sorted-set) (keys (:commands ext)))
-       :command-count  (count (:commands ext))
-       :flag-names     (into (sorted-set) (keys (:flags ext)))
-       :flag-count     (count (:flags ext))
-       :shortcut-count (count (:shortcuts ext))
-       :allowed-events (:allowed-events ext)})))
+      {:path            ext-path
+       :handler-names   (into (sorted-set) (keys (:handlers ext)))
+       :handler-count   (reduce + 0 (map count (vals (:handlers ext))))
+       :tool-names      (into (sorted-set) (keys (:tools ext)))
+       :tool-count      (count (:tools ext))
+       :operation-ids   (into (sorted-set) (keys (:operations ext)))
+       :operation-count (count (:operations ext))
+       :command-names   (into (sorted-set) (keys (:commands ext)))
+       :command-count   (count (:commands ext))
+       :flag-names      (into (sorted-set) (keys (:flags ext)))
+       :flag-count      (count (:flags ext))
+       :shortcut-count  (count (:shortcuts ext))
+       :allowed-events  (:allowed-events ext)})))
 
 (defn extension-details-in
   "Return vector of detail maps for all registered extensions."
@@ -434,6 +461,7 @@
    :handler-count   (handler-count-in reg)
    :handler-events  (handler-event-names-in reg)
    :tool-names      (tool-names-in reg)
+   :operation-ids   (operation-ids-in reg)
    :command-names   (command-names-in reg)
    :flag-names      (flag-names-in reg)})
 
@@ -453,6 +481,7 @@
    {:register-handler-in!     register-handler-in!
     :register-tool-in!        register-tool-in!
     :register-command-in!     register-command-in!
+    :register-operation-in!   register-operation-in!
     :register-shortcut-in!    register-shortcut-in!
     :register-flag-in!        register-flag-in!
     :set-allowed-events-in!   set-allowed-events-in!
