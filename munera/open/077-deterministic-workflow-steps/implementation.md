@@ -66,3 +66,7 @@
   - re-read task design/plan/steps plus the referenced IR/docs/runtime code
   - confirmed the only current shaping seam is the already-recorded unchecked `workflow_step_prep.clj` follow-up
   - no additional simplicity/consistency/robustness issues were identified beyond the existing note and step
+- 2026-05-04 — Code-shaper re-review found no new actionable feedback.
+  - re-read task artifacts plus the referenced IR/compiler/runtime source and focused tests
+  - confirmed the previously recorded unchecked `workflow_step_prep.clj` normalization follow-up still covers the only live consistency seam from this shaping thread
+  - current `workflow_step_prep_test.clj` and `workflow_source_resolution.clj` already exercise canonical `:output :final-llm-reply` and `:yield :text` resolution, so no additional simplicity/consistency/robustness steps were added
