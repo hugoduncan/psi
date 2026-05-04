@@ -23,18 +23,21 @@ Without this slice:
 - invoke steps cannot run end-to-end
 - deterministic operation results cannot feed downstream refs and yields through real runtime paths
 - invoke-step observability remains undefined in practice
+- the canonical nested IR invoke boundary remains unimplemented in runtime execution even if authored syntax can illustrate hoisted operation/arg fields before compilation
 - judge/routing behavior across execution forms remains incompletely proven
 
 ## Scope
 
 In scope:
 
-- execute IR `:type :invoke` steps through the deterministic operation registry
+- execute canonical normalized IR `:type :invoke` steps through the deterministic operation registry
+- treat the runtime execution boundary as nested invoke payload data (`:type :invoke` with `:invoke {:operation ... :args ...}`)
 - resolve and materialize invoke args from IR source specs before invocation
 - record invoke attempts/results in runtime history/attempt surfaces
 - expose invoke outputs for downstream `:output` and `:yield` references
 - integrate invoke-step success/failure with workflow progression and terminal outcomes
-- allow invoke steps to participate in judge/routing behavior through the same normalized control-flow model as other step types
+- define invoke-operation error control flow explicitly: a deterministic operation result `{:status :error ...}` records the canonical parent-step error-yield/result surfaces and then fails the current step/run immediately rather than routing that error through shared judge semantics first
+- allow successful invoke steps to participate in judge/routing behavior through the same normalized control-flow model as other step types
 - add focused tests for representative invoke-step execution flows
 
 Out of scope:

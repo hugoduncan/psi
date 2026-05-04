@@ -1,3 +1,9 @@
 - Review 2026-05-04 ψ: actionable ambiguity feedback.
   - The task does not specify whether a deterministic operation `{:status :error ...}` should always fail the run immediately, or whether invoke execution must also support recording a parent-step `:yields {:type :error ...}` value that can still participate in step-local judge/routing before terminal failure. Current runtime helpers already normalize operation errors into canonical error yields, so the design/plan/steps should make the intended control-flow contract explicit.
   - The task examples still describe authored/hoisted `:operation` + `:args`, but the canonical runtime execution boundary is nested IR payload (`:invoke {:operation ... :args ...}`). The task should state explicitly whether this slice targets canonical IR only, and whether any authored-shape examples are illustrative-only rather than the runtime contract.
+- 2026-05-04 ψ: resolved the new ambiguity-review follow-up items in task artifacts.
+  - `design.md` now states that task 083 targets canonical normalized IR invoke execution and that the runtime contract is nested `:invoke {:operation ... :args ...}` payload data.
+  - `design.md` now states the error control-flow decision explicitly: deterministic operation `{:status :error ...}` records canonical parent-step error-yield/result surfaces and then fails the current step/run immediately.
+  - `plan.md` now mirrors both decisions so implementation planning does not leave either seam implicit.
+  - `steps.md` now carries a matching artifact-alignment checklist item so future passes can see the clarification work directly in the execution checklist.
+  - The design-step resolutions match current repo proof surfaces in `doc/workflow-ir.md`, `workflow_target_ir_compiler_test.clj`, `deterministic_operation_registry_test.clj`, and `workflow_invoke_runtime_test.clj`.

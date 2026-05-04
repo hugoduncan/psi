@@ -10,3 +10,4 @@
 - [ ] Add focused invoke-only workflow execution tests
 - [ ] Add focused mixed invoke/session/delegate workflow execution tests
 - [ ] Reconcile runtime behavior with task `077`, `doc/workflow-ir.md`, and task `082`
+- [x] Clarify and align task artifacts on invoke-operation error control flow and canonical nested IR invoke execution boundary

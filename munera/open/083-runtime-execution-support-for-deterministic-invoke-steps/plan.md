@@ -1,5 +1,6 @@
 Approach:
-- build invoke execution as a first-class runtime path on top of the IR execution substrate rather than as a side-channel helper
+- build invoke execution as a first-class runtime path on top of the canonical normalized IR execution substrate rather than as a side-channel helper
+- treat nested IR invoke payloads (`:type :invoke` with `:invoke {:operation ... :args ...}`) as the runtime execution contract; any authored examples that hoist `:operation`/`:args` are compiler- or design-level illustrations rather than the runtime boundary itself
 - keep invoke-step semantics parallel to other step forms where possible: attempts, results, progression, routing, and observability should stay structurally coherent across forms
 - use minimal concrete operations or test doubles to prove the execution model before broadening real integrations
 - prefer explicit resolution of invoke arg source specs before calling the registry implementation
@@ -20,4 +21,5 @@ Proof target:
 Risks:
 - current step-attempt/result recording may assume session-oriented execution too deeply
 - invoke failure semantics may need careful shaping so they align with existing workflow terminal/error behavior
+- this task's intended error contract is immediate step/run failure after recording canonical error-yield/result surfaces for `{:status :error ...}` operation results, so any later desire for judge-before-fail error routing would be a follow-on design change rather than implicit scope here
 - mixed-form workflows may reveal gaps in shared output/yield reference resolution
