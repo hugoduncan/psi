@@ -26,5 +26,5 @@
   - Added focused runtime exclusivity proof for invalid source-specs carrying both `:path` and `:projection`.
 - [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`
   - Updated `doc/workflow-ir.md` to make delegated prompt-string template vars part of the shared source-spec family explicitly and to name `workflow_source_resolution.clj` as the canonical runtime materialization owner.
-- [ ] Update stale runtime expectation in `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`
-  - `linear-success-recording-test` still expects accepted-result outputs of only `{:text ...}`, but the current runtime records canonical session output surfaces `:final-llm-reply`, `:transcript`, and `:result` alongside `:text`; align the assertion with the canonical runtime envelope so the focused task verification is green again.
+- [x] Update stale runtime expectation in `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`
+  - `linear-success-recording-test` now asserts the canonical accepted-result envelope with `:text`, `:final-llm-reply`, `:transcript`, and nested `:result`, matching the current runtime-recorded session output surfaces.

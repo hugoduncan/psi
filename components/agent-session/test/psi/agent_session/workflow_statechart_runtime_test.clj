@@ -170,7 +170,13 @@
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-7")]
       (is (= :completed (:status run)))
       (is (nil? (:current-step-id run)))
-      (is (= {:outcome :ok :outputs {:text "planned"}}
+      (is (= {:outcome :ok
+              :outputs {:text "planned"
+                        :final-llm-reply "planned"
+                        :transcript nil
+                        :result {:outcome :ok
+                                 :outputs {:final-llm-reply "planned"
+                                           :text "planned"}}}}
              (get-in run [:step-runs "plan" :accepted-result])))
       (is (= :succeeded (get-in run [:step-runs "plan" :attempts 0 :status])))
       (is (nil? (:pending-actor-result @(:working-memory* wf-ctx)))))))
