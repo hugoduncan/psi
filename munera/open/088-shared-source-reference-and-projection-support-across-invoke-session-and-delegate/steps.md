@@ -1,5 +1,7 @@
-- [ ] Identify existing source-selection/projection helpers for reuse or convergence
-- [ ] Define the canonical resolution contract for workflow source refs and source specs
+- [x] Identify existing source-selection/projection helpers for reuse or convergence
+  - Current runtime semantics live in `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`; compiler/authoring shaping remains split across `workflow_file_authoring_session.clj`, `workflow_current_ir_compiler.clj`, and `workflow_target_ir_compiler.clj`.
+- [x] Define the canonical resolution contract for workflow source refs and source specs
+  - Canonical owner is a shared workflow-runtime IR substrate for source-ref/source-spec, `:path`, and `:projection` resolution; compiler/authoring helpers remain translation/validation seams rather than runtime value resolvers.
 - [ ] Implement resolution for `:workflow-input` and `:workflow-original`
 - [ ] Implement resolution for prior step `:output` refs
 - [ ] Implement resolution for prior step `:yield` refs

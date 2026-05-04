@@ -58,6 +58,30 @@ Workflow data-flow resolution means the same thing everywhere it appears.
 
 A source spec written for invoke args, session contributions, or delegated context should resolve through one shared set of rules and helpers.
 
+## Canonical boundary for this task
+
+Review and follow-up recording for this task lives in:
+
+- `design-steps.md` — actionable ambiguity/design follow-ups
+- `implementation.md` — dated review notes, decisions, discoveries, and blocking reasons
+
+This task's canonical shared resolution owner is a workflow-runtime substrate namespace/API dedicated to normalized IR source resolution. Its responsibility is to resolve:
+
+- source refs (`:workflow-input`, `:workflow-original`, `{:step ... :output ...}`, `{:step ... :yield ...}`)
+- source specs (`{:from ...}` plus optional `:path` or `:projection`)
+- first-cut path traversal
+- first-cut projection application
+
+The intended convergence target is runtime-owned and IR-shaped, not step-form-owned. The current `workflow_step_prep.clj` helpers are therefore only a temporary host for the semantics and must converge onto the shared runtime substrate in scope for this task rather than remain the long-term owner.
+
+Authoring/compiler helpers remain separate when they are only translating authored syntax into canonical IR and are not themselves resolving runtime values. In particular:
+
+- `workflow_file_authoring_session.clj` remains authoring-only compilation/validation for workflow-file `:session` authoring
+- `workflow_current_ir_compiler.clj` remains a current-grammar compatibility compiler
+- `workflow_target_ir_compiler.clj` remains the target-grammar-to-IR compiler
+
+Those compiler/authoring seams may preserve compatibility breadcrumbs or authored-surface validation, but once canonical IR exists they should delegate runtime value resolution semantics to the shared substrate rather than re-encode divergent behavior.
+
 ## Acceptance
 
 - one canonical resolution substrate exists for workflow source refs and source specs
