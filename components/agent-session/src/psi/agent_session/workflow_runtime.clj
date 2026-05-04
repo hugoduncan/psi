@@ -7,6 +7,7 @@
    - expose small pure lookup helpers for later dispatch/mutation/query layers"
   (:require
    [clojure.string :as str]
+   [psi.agent-session.workflow-current-ir-compiler :as workflow-current-ir-compiler]
    [psi.agent-session.workflow-model :as workflow-model]
    [psi.agent-session.workflow-statechart :as workflow-statechart]))
 
@@ -66,6 +67,31 @@
     [(update-in state (definitions-path) dissoc definition-id')
      definition]))
 
+(defn- workflow-definition-source
+  [definition-id]
+  (if definition-id
+    :registered-definition
+    :inline-definition))
+
+(defn- compile-current-definition-to-ir!
+  [definition source]
+  (let [{:keys [valid? ir structural-errors semantic-errors compile-error]}
+        (workflow-current-ir-compiler/compile-and-validate-workflow-definition definition)]
+    (when-not valid?
+      (throw (ex-info "Workflow definition does not compile to execution-valid canonical IR"
+                      {:source source
+                       :definition-id (:definition-id definition)
+                       :compile-error compile-error
+                       :structural-errors structural-errors
+                       :semantic-errors semantic-errors})))
+    ir))
+
+(defn- normalize-effective-definition
+  [definition source]
+  (assoc definition
+         :definition-id (normalize-id (:definition-id definition))
+         :canonical-ir (compile-current-definition-to-ir! definition source)))
+
 (defn- resolve-effective-definition
   [state {:keys [definition definition-id]}]
   (cond
@@ -74,7 +100,8 @@
       (when-not (workflow-model/valid-workflow-definition? definition)
         (throw (ex-info "Invalid inline workflow definition"
                         {:explanation (workflow-model/explain-workflow-definition definition)})))
-      {:effective-definition (assoc definition :definition-id (normalize-id (:definition-id definition)))
+      {:effective-definition (normalize-effective-definition definition
+                                                             (workflow-definition-source nil))
        :source-definition-id nil})
 
     (some? definition-id)
@@ -82,7 +109,8 @@
       (when-not resolved
         (throw (ex-info "Workflow definition not found"
                         {:definition-id definition-id})))
-      {:effective-definition resolved
+      {:effective-definition (normalize-effective-definition resolved
+                                                             (workflow-definition-source definition-id))
        :source-definition-id (:definition-id resolved)})
 
     :else

@@ -9,7 +9,16 @@
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.workflow-judge :as workflow-judge]))
+   [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.agent-session.workflow-statechart :as workflow-statechart]))
+
+(defn- authored-step-def
+  [workflow-run step-id]
+  (get-in workflow-run [:effective-definition :steps step-id]))
+
+(defn- effective-step-def
+  [workflow-run step-id]
+  (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
 
 (defn- get-path*
   [m path]
@@ -38,13 +47,56 @@
 
     nil))
 
+(defn- source-spec-value
+  [workflow-run {:keys [from path]}]
+  (let [base (cond
+               (= :workflow-input from)
+               (:workflow-input workflow-run)
+
+               (= :workflow-original from)
+               (or (get-in (:workflow-input workflow-run) [:original])
+                   (:workflow-input workflow-run))
+
+               (and (map? from) (:output from))
+               (let [accepted (get-in workflow-run [:step-runs (:step from) :accepted-result])]
+                 (case (:output from)
+                   :result accepted
+                   :final-llm-reply (get-in accepted [:outputs :text])
+                   :transcript (get-in accepted [:outputs :transcript])
+                   (get-in accepted [:outputs (:output from)])))
+
+               (and (map? from) (:yield from))
+               (let [accepted (get-in workflow-run [:step-runs (:step from) :accepted-result])]
+                 (case (:yield from)
+                   :text (get-in accepted [:outputs :text])
+                   :data (get-in accepted [:outputs :data])
+                   :reason (get-in accepted [:blocked :reason])
+                   :message (get-in accepted [:blocked :message])
+                   :details (get-in accepted [:blocked :details])
+                   nil))
+
+               :else nil)]
+    (if (seq path)
+      (get-path* base path)
+      base)))
+
 (defn materialize-step-inputs
   [workflow-run step-id]
-  (let [bindings (get-in workflow-run [:effective-definition :steps step-id :input-bindings])]
-    (reduce-kv (fn [acc k ref]
-                 (assoc acc k (binding-source-value workflow-run ref)))
-               {}
-               (or bindings {}))))
+  (let [step-def (effective-step-def workflow-run step-id)
+        compat-bindings (:input-bindings step-def)
+        ir-template-vars (some->> (get-in step-def [:session :contributions])
+                                  (filter #(= :template (:type %)))
+                                  last
+                                  :vars)]
+    (if (seq ir-template-vars)
+      (into {}
+            (map (fn [[var-name source-spec]]
+                   [(keyword var-name) (source-spec-value workflow-run source-spec)]))
+            ir-template-vars)
+      (reduce-kv (fn [acc k ref]
+                   (assoc acc k (binding-source-value workflow-run ref)))
+                 {}
+                 (or compat-bindings {})))))
 
 (defn materialize-step-session-preload
   "Materialize compiled `:session-preload` entries into canonical child-session
@@ -95,12 +147,32 @@
         (str/replace "$INPUT" (str input-text))
         (str/replace "$ORIGINAL" (str original-text)))))
 
+(defn- render-template-contribution
+  [workflow-run contribution]
+  (let [vars (:vars contribution)
+        values (into {}
+                     (map (fn [[var-name source-spec]]
+                            [var-name (source-spec-value workflow-run source-spec)]))
+                     vars)]
+    (reduce-kv (fn [text var-name value]
+                 (str/replace text
+                              (str "{{" var-name "}}")
+                              (str (or value ""))))
+               (:text contribution)
+               values)))
+
 (defn step-prompt
   [workflow-run step-id]
-  (let [step-def (get-in workflow-run [:effective-definition :steps step-id])
-        step-inputs (materialize-step-inputs workflow-run step-id)]
+  (let [step-def (effective-step-def workflow-run step-id)
+        step-inputs (materialize-step-inputs workflow-run step-id)
+        template-contribution (some->> (get-in step-def [:session :contributions])
+                                       (filter #(= :template (:type %)))
+                                       last)
+        compat-prompt-template (:prompt-template step-def)]
     {:step-inputs step-inputs
-     :prompt (render-prompt-template (:prompt-template step-def) step-inputs)}))
+     :prompt (if template-contribution
+               (render-template-contribution workflow-run template-contribution)
+               (render-prompt-template compat-prompt-template step-inputs))}))
 
 (defn- compose-system-prompt
   [base-system-prompt framing-prompt]
@@ -152,8 +224,10 @@
 
 (defn- step-meta-for
   [ctx workflow-run step-id]
-  (let [step-def (get-in workflow-run [:effective-definition :steps step-id])
-        profile (get-in step-def [:executor :profile])
+  (let [step-def (effective-step-def workflow-run step-id)
+        authored-step (authored-step-def workflow-run step-id)
+        profile (or (get-in step-def [:compat :executor :profile])
+                    (get-in step-def [:executor :profile]))
         run-meta (get-in workflow-run [:effective-definition :workflow-file-meta])
         delegated-workflow? (and profile
                                  (not= profile (:definition-id (:effective-definition workflow-run))))
@@ -162,7 +236,7 @@
                       (or (:workflow-file-meta ref-def) {}))
                     (or run-meta {}))
         framing-prompt (when delegated-workflow? (:framing-prompt run-meta))
-        step-overrides (or (:session-overrides step-def) {})]
+        step-overrides (or (:session-overrides authored-step) {})]
     {:step-def step-def
      :base-meta base-meta
      :framing-prompt framing-prompt

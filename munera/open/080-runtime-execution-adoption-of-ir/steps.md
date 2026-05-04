@@ -1,13 +1,13 @@
-- [ ] Identify the runtime seam where executable workflow definitions enter execution
-- [ ] Thread normalized IR through the execution entrypoint
-- [ ] Reject compiled current-grammar `:workflow-runtime` refs explicitly at the execution-entry seam until a canonical IR runtime-source surface exists
-- [ ] Adapt step lookup/progression to IR step structure
-- [ ] Adapt routing and loop-bound handling to IR control-flow forms
-- [ ] Adapt judge execution to typed IR judge forms
-- [ ] Adapt existing session-style workflow step execution to IR `:session` payloads
-- [ ] Keep attempt/result/history recording coherent after IR adoption
-- [ ] Keep observer-facing workflow run / step-run / attempt / history surfaces shape-stable while execution pivots to IR
-- [ ] Keep workflow definition/detail resolver surfaces intentionally compatibility-shaped while execution pivots to IR
-- [ ] Add focused IR-native execution and observability regression tests
-- [ ] Re-run representative workflow lifecycle/execution/routing regression suites
-- [ ] Remove or isolate execution-time dependence on current authored field names
+- [x] Identify the runtime seam where executable workflow definitions enter execution
+- [x] Thread normalized IR through the execution entrypoint
+- [x] Reject compiled current-grammar `:workflow-runtime` refs explicitly at the execution-entry seam until a canonical IR runtime-source surface exists
+- [x] Adapt step lookup/progression to IR step structure
+- [x] Adapt routing and loop-bound handling to IR control-flow forms
+- [x] Adapt judge execution to typed IR judge forms
+- [x] Adapt existing session-style workflow step execution to IR `:session` payloads
+- [x] Keep attempt/result/history recording coherent after IR adoption
+- [x] Keep observer-facing workflow run / step-run / attempt / history surfaces shape-stable while execution pivots to IR
+- [x] Keep workflow definition/detail resolver surfaces intentionally compatibility-shaped while execution pivots to IR
+- [x] Add focused IR-native execution and observability regression tests
+- [x] Re-run representative workflow lifecycle/execution/routing regression suites
+- [x] Remove or isolate execution-time dependence on current authored field names

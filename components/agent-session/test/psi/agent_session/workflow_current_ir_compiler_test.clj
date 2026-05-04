@@ -99,11 +99,12 @@
                                                           :role "user"}}}
                               {:type :template
                                :text "Execute: {{input}}\nOriginal: {{original}}"
-                               :vars {"input" {:from {:step "step-1-plan" :output :final-llm-reply}
+                               :vars {"input" {:from {:step "step-1-plan" :output :result}
+                                               :path [:outputs :text]
                                                :compat {:current-binding-ref {:source :step-output
                                                                               :path ["step-1-plan" :outputs :text]
-                                                                              :legacy-output-key :text
-                                                                              :canonical-output-key :final-llm-reply}}}
+                                                                              :accepted-result-envelope true
+                                                                              :surface :outputs}}}
                                       "original" {:from :workflow-original}}
                                :compat {:current-template-syntax :dollar-bindings
                                         :current-prompt-template "Execute: $INPUT\nOriginal: $ORIGINAL"}}]}

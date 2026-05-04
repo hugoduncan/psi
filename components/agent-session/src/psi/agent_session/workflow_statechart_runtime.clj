@@ -28,6 +28,14 @@
    [psi.agent-session.workflow-statechart :as workflow-statechart]
    [psi.agent-session.workflow-step-prep :as workflow-step-prep]))
 
+(defn- runtime-step-order
+  [workflow-run]
+  (workflow-statechart/effective-step-order (:effective-definition workflow-run)))
+
+(defn- runtime-step-def
+  [workflow-run step-id]
+  (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
+
 (defn- now []
   (java.time.Instant/now))
 
@@ -77,7 +85,7 @@
    still evolve execution state between events."
   [ctx parent-session-id run-id]
   (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-        steps (get-in workflow-run [:effective-definition :steps])]
+        steps (workflow-statechart/effective-steps (:effective-definition workflow-run))]
     {:workflow-run-id run-id
      :parent-session-id parent-session-id
      :workflow-input (:workflow-input workflow-run)
@@ -323,7 +331,7 @@
         :step/record-result
         (let [{:keys [payload]} (:pending-actor-result @working-memory*)
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              judged-step? (some? (get-in workflow-run [:effective-definition :steps step-id :judge]))]
+              judged-step? (some? (:judge (runtime-step-def workflow-run step-id)))]
           (if judged-step?
             (swap! (:state* ctx)
                    workflow-progression-recording/record-actor-result run-id step-id payload)
@@ -350,8 +358,9 @@
 
         :judge/enter
         (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              judge-spec (get-in workflow-run [:effective-definition :steps step-id :judge])
-              routing-table (or (get-in workflow-run [:effective-definition :steps step-id :on]) {})
+              step-def (runtime-step-def workflow-run step-id)
+              judge-spec (:judge step-def)
+              routing-table (or (:on step-def) {})
               actor-session-id (get-in @working-memory* [:sessions step-id])
               judge-result (workflow-judge/execute-judge!
                             ctx
@@ -360,7 +369,7 @@
                             judge-spec
                             routing-table
                             {:current-step-id step-id
-                             :step-order (get-in workflow-run [:effective-definition :step-order])
+                             :step-order (runtime-step-order workflow-run)
                              :step-runs (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])})
               routing-result (:routing-result judge-result)]
           (swap! working-memory*

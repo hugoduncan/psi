@@ -24,7 +24,10 @@
 
 (defn step-definition
   [workflow-run step-id]
-  (get-in workflow-run [:effective-definition :steps step-id]))
+  (or (some->> (get-in workflow-run [:effective-definition :canonical-ir :steps])
+               (filter #(= step-id (:name %)))
+               first)
+      (get-in workflow-run [:effective-definition :steps step-id])))
 
 (defn retry-policy
   [workflow-run step-id]

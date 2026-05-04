@@ -11,6 +11,21 @@
    [com.fulcrologic.statecharts.elements :as ele]
    [psi.agent-session.workflow-model :as workflow-model]))
 
+(defn effective-step-order
+  [definition]
+  (or (some->> (get-in definition [:canonical-ir :steps])
+               (mapv :name)
+               not-empty)
+      (:step-order definition)))
+
+(defn effective-steps
+  [definition]
+  (or (some->> (get-in definition [:canonical-ir :steps])
+               (mapv (juxt :name identity))
+               (into {})
+               not-empty)
+      (:steps definition)))
+
 (def workflow-run-chart
   (chart/statechart
    {:id :workflow-run}
@@ -107,7 +122,7 @@
 (defn next-step-id
   "Return the next step id after `step-id` in workflow definition order, or nil."
   [definition step-id]
-  (let [step-order (:step-order definition)
+  (let [step-order (effective-step-order definition)
         idx        (.indexOf ^java.util.List step-order step-id)]
     (when (<= 0 idx)
       (nth step-order (inc idx) nil))))
@@ -115,7 +130,7 @@
 (defn initial-step-id
   "Return the first step id in definition order, or nil for empty definitions."
   [definition]
-  (first (:step-order definition)))
+  (first (effective-step-order definition)))
 
 ;;; ============================================================
 ;;; Phase A — Hierarchical chart compiler
@@ -145,6 +160,10 @@
   "True if a step definition has a judge."
   [step-def]
   (some? (:judge step-def)))
+
+(defn- step-routing-table
+  [step-def]
+  (or (:on step-def) {}))
 
 (defn- dispatch-action
   "Create a script element that calls the actions-fn with the given action keyword
@@ -297,7 +316,7 @@
 (defn- compile-judged-step
   "Compile a judged step into the canonical step shell with `.acting`, `.blocked`, and `.judging`."
   [step-id step-def step-order]
-  (let [routing-table (or (:on step-def) {})
+  (let [routing-table (step-routing-table step-def)
         routing-transitions (mapv #(judged-routing-transition % step-id)
                                   (compile-routing-transitions routing-table step-order step-id))
         ;; Fallback: if no signal matches and judge retries exhausted → fail
@@ -344,8 +363,8 @@
   (when-not (workflow-model/valid-workflow-definition? definition)
     (throw (ex-info "Invalid workflow definition"
                     {:explanation (workflow-model/explain-workflow-definition definition)})))
-  (let [step-order (:step-order definition)
-        steps      (:steps definition)
+  (let [step-order (effective-step-order definition)
+        steps      (effective-steps definition)
         step-states (mapv (fn [step-id]
                             (compile-step step-id (get steps step-id) step-order))
                           step-order)

@@ -57,7 +57,8 @@
       (is (= :pending (:status run)))
       (is (= "plan" (:current-step-id run)))
       (is (= definition-id (:source-definition-id run)))
-      (is (= registered-definition (:effective-definition run)))
+      (is (= registered-definition (dissoc (:effective-definition run) :canonical-ir)))
+      (is (= :workflow-ir/v1 (get-in run [:effective-definition :canonical-ir :version])))
       (is (= #{"plan" "build" "review"}
              (set (keys (:step-runs run)))))
       (is (= run (workflow-runtime/workflow-run-in state2 run-id)))
