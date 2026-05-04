@@ -21,6 +21,12 @@ For this task's first cut, the delegated boundary payload reaching the callee ru
 
 This task makes that delegated boundary executable and explicit in runtime plumbing.
 
+Dependency/orchestration note:
+
+- the older task breakdown referenced a future dedicated shared source/reference/projection task `088`
+- the active task inventory no longer contains a standalone `088` task directory, and the relevant semantics are instead treated as already-defined by task `077` and exercised by the currently landed/active workflow runtime slices (`081`, `083`, `085`)
+- this task therefore depends on those existing semantics and implementation surfaces rather than waiting on a non-present standalone `088` task
+
 ## Problem statement
 
 The target grammar and IR now model `:type :delegate`, but that execution form remains incomplete until runtime can:

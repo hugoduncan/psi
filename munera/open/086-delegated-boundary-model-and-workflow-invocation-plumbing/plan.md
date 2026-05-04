@@ -1,5 +1,5 @@
 Approach:
-- dependency note: this slice should reuse the shared source/reference/projection substrate from task `088` so delegated `:context` and templated `:prompt-string` resolution match the rest of workflow data flow
+- dependency note: this slice should reuse the shared source/reference/projection semantics defined in task `077` and already exercised by the landed deterministic workflow runtime/compiler slices (`081`, `083`, `085`) so delegated `:context` and templated `:prompt-string` resolution match the rest of workflow data flow; any later extraction into a separate dedicated task can remain a follow-on rather than a prerequisite for this slice
 - treat delegated execution as a distinct workflow boundary, not as a disguised child-session call
 - keep the boundary explicit: rendered prompt string, ordered forwarded context, target workflow identity, and propagated yielded value should all be visible in data and recording surfaces
 - reuse existing workflow-loading and workflow-execution machinery where possible, but normalize delegated semantics through the IR execution path
