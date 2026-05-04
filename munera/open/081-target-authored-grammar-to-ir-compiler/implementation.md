@@ -17,3 +17,5 @@
 - target-authored effective definitions are padded with minimal compatibility step-order/step-map structure so existing workflow-run schema/statechart helpers remain valid while runtime execution continues to consume `:canonical-ir`
 - added `workflow_target_ir_compiler_test.clj` with golden target-authored compile tests, semantic IR equivalence tests against current-authored workflows after recursive `:compat` stripping, and a create-run seam proof
 - focused verification green via `bb clojure:test:unit --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-runtime-test`
+
+2026-05-04 review: actionable runtime contract drift remains — target-authored inline `create-run` definitions are normalized with a generated `:definition-id` in `:effective-definition`, unlike current inline definitions whose snapshot remains source-id-free while provenance is carried only by `:source-definition-id nil`. Align the target-authored inline snapshot contract with the existing inline-definition behavior and add a regression test.
