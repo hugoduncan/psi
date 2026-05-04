@@ -106,9 +106,11 @@
                                    (swap! responses* subvec 1)
                                    resp)}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-ir")
-              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-ir")]
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-ir")
+              accepted (get-in run [:step-runs "build" :accepted-result])]
           (is (= :completed (:status result)))
-          (is (= {:outcome :ok :outputs {:text "build output"}}
-                 (get-in run [:step-runs "build" :accepted-result])))
+          (is (= :ok (:outcome accepted)))
+          (is (= "build output" (get-in accepted [:outputs :final-llm-reply])))
+          (is (= "build output" (get-in accepted [:outputs :text])))
           (is (= ["ship it" "Build: plan output"]
                  (mapv :prompt @prompts*))))))))

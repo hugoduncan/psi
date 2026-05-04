@@ -226,6 +226,21 @@
       (is (false? (:valid? result)))
       (is (= :missing-output-key (-> result :semantic-errors first :type)))))
 
+  (testing "semantic validation rejects delegate output refs because first-cut delegates expose no local outputs"
+    (let [step-2 (assoc valid-session-step
+                        :session {:contributions [{:type :template
+                                                   :text "{{missing}}"
+                                                   :vars {"missing" {:from {:step "report-call" :output :data}}}}]})
+          ir {:version :workflow-ir/v1
+              :steps [valid-invoke-step valid-delegate-step step-2]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :missing-output-key
+               :step "report"
+               :ref {:step "report-call" :output :data}
+               :available-outputs []}]
+             (:semantic-errors result)))))
+
   (testing "semantic validation rejects refs to undeclared yield fields"
     (let [step-2 (assoc valid-session-step
                         :session {:contributions [{:type :template

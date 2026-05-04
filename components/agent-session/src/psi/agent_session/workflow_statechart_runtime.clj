@@ -22,6 +22,7 @@
    [psi.agent-session.prompt-control :as prompt-control]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
+   [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-progression-recording :as workflow-progression-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
@@ -308,8 +309,17 @@
                                                                       :attempt-id attempt-id
                                                                       :updated-at (now)})
                   (enqueue-event! event-queue* working-memory* :actor/failed {}))
-                (let [envelope {:outcome :ok
-                                :outputs {:text (assistant-message-text assistant-message)}}]
+                (let [step-def (runtime-step-def (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
+                                                 step-id)
+                      assistant-text (assistant-message-text assistant-message)
+                      normalized-outputs (workflow-ir/step-output-surfaces
+                                          step-def
+                                          {:outcome :ok
+                                           :outputs {:final-llm-reply assistant-text
+                                                     :text assistant-text}})
+                      envelope {:outcome :ok
+                                :outputs (merge {:text assistant-text}
+                                                normalized-outputs)}]
                   (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
                                                                       :payload envelope
                                                                       :step-id step-id

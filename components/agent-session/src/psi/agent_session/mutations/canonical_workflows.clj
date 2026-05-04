@@ -7,6 +7,7 @@
   (:require
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
 (pco/defmutation register-workflow-definition
@@ -89,12 +90,16 @@
     (let [execute-fn (:execute-workflow-run-fn agent-session-ctx)
           exec-result (execute-fn agent-session-ctx session-id run-id)
           final-run (workflow-runtime/workflow-run-in @(:state* agent-session-ctx) run-id)
-          ;; Extract terminal result text from last completed step, but treat
-          ;; blank accepted-result text as missing so callers can suppress empty
-          ;; transcript injection and still distinguish a real final reply.
+          ;; Extract terminal yielded text from the last completed step's
+          ;; canonical output surface, but treat blank text as missing so callers
+          ;; can suppress empty transcript injection and still distinguish a real
+          ;; final reply.
           result-text (when (= :completed (:status final-run))
-                        (let [last-step-id (last (:step-order (:effective-definition final-run)))]
-                          (some-> (get-in final-run [:step-runs last-step-id :accepted-result :outputs :text])
+                        (let [last-step-id (last (:step-order (:effective-definition final-run)))
+                              step-def (some #(when (= last-step-id (:name %)) %)
+                                             (get-in final-run [:effective-definition :canonical-ir :steps]))
+                              accepted-result (get-in final-run [:step-runs last-step-id :accepted-result])]
+                          (some-> (workflow-ir/step-yield-field-value step-def accepted-result :text)
                                   str/trim
                                   not-empty)))]
       {:psi.workflow/run-id run-id

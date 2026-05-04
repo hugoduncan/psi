@@ -1,8 +1,8 @@
-- [ ] Inspect current output/result/yield surfaces across workflow execution paths
-- [ ] Define canonical output key sets for `:invoke`, `:session`, and `:delegate`
-- [ ] Define the canonical runtime representation for normalized step outputs
-- [ ] Validate `:output` refs against referenced step type and exposed outputs
-- [ ] Keep `:yield` ref validation distinct from `:output` ref validation
-- [ ] Add focused valid-reference tests across invoke/session/delegate workflows
-- [ ] Add focused invalid-reference tests across invoke/session/delegate workflows
+- [x] Inspect current output/result/yield surfaces across workflow execution paths
+- [x] Define canonical output key sets for `:invoke`, `:session`, and `:delegate`
+- [x] Define the canonical runtime representation for normalized step outputs
+- [x] Validate `:output` refs against referenced step type and exposed outputs
+- [x] Keep `:yield` ref validation distinct from `:output` ref validation
+- [x] Add focused valid-reference tests across invoke/session/delegate workflows
+- [x] Add focused invalid-reference tests across invoke/session/delegate workflows
 - [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`

@@ -392,3 +392,51 @@
 (defn valid-workflow-ir-value?
   [workflow-ir]
   (:valid? (validate-workflow-ir workflow-ir)))
+
+(defn step-output-value
+  "Resolve the normalized logical output-surface value for `output-key` from an
+   accepted result envelope for the given canonical IR `step`.
+
+   Notes:
+   - canonical refs address declared logical output keys, not storage details
+   - session steps still tolerate legacy stored `:text` output as a fallback for
+     canonical `:final-llm-reply` during compatibility migration
+   - `:result` denotes the whole accepted-result envelope when declared locally"
+  [_step accepted-result output-key]
+  (let [raw-outputs (:outputs accepted-result)]
+    (case output-key
+      :result accepted-result
+      :final-llm-reply (or (get raw-outputs :final-llm-reply)
+                           (get raw-outputs :text))
+      (get raw-outputs output-key))))
+
+(defn step-output-surfaces
+  "Return the normalized logical output-surface map for a canonical IR `step`
+   and accepted result envelope.
+
+   The returned map is keyed by declared output keys only, with compatibility
+   fallback applied at value resolution time. Undeclared storage keys are not
+   surfaced here."
+  [step accepted-result]
+  (into {}
+        (map (fn [output-key]
+               [output-key (step-output-value step accepted-result output-key)]))
+        (keys (:outputs step))))
+
+(defn step-yield-field-value
+  "Resolve a yielded-value field from a canonical IR `step` and accepted result
+   envelope.
+
+   Yielded-value resolution is distinct from step-local output-surface resolution:
+   `:yield` addresses fields of the step's yielded tagged union, not arbitrary
+   logical outputs."
+  [step accepted-result yield-field]
+  (let [yield-spec (:yields step)]
+    (case (:type yield-spec)
+      :data (when (= :data yield-field)
+              (step-output-value step accepted-result (:data yield-spec)))
+      :text (when (= :text yield-field)
+              (step-output-value step accepted-result (:text yield-spec)))
+      :error (get-in accepted-result [:blocked yield-field])
+      :delegated nil
+      nil)))

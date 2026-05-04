@@ -154,7 +154,39 @@
                        :yields {:type :delegated}}]}
              ir))
       (is (= {:valid? true :structural-errors nil :semantic-errors []}
-             (dissoc (workflow-ir/validate-workflow-ir ir) :ir :compile-error))))))
+             (dissoc (workflow-ir/validate-workflow-ir ir) :ir :compile-error)))))
+
+  (testing "normalized output surfaces resolve declared keys rather than storage aliases"
+    (let [compiled-steps (:steps (target-compiler/compile-workflow-definition
+                                  target-invoke-session-delegate-definition))
+          invoke-step (nth compiled-steps 0)
+          session-step (nth compiled-steps 1)
+          delegate-step (nth compiled-steps 2)]
+      (is (= {:data {:issues [1 2]}
+              :summary "found two"
+              :result {:outcome :ok
+                       :outputs {:data {:issues [1 2]}
+                                 :summary "found two"}}}
+             (workflow-ir/step-output-surfaces
+              invoke-step
+              {:outcome :ok
+               :outputs {:data {:issues [1 2]}
+                         :summary "found two"}})))
+      (is (= {:final-llm-reply "done"
+              :transcript [{:role "assistant" :content "done"}]
+              :result {:outcome :ok
+                       :outputs {:text "done"
+                                 :transcript [{:role "assistant" :content "done"}]}}}
+             (workflow-ir/step-output-surfaces
+              session-step
+              {:outcome :ok
+               :outputs {:text "done"
+                         :transcript [{:role "assistant" :content "done"}]}})))
+      (is (= {}
+             (workflow-ir/step-output-surfaces
+              delegate-step
+              {:outcome :ok
+               :outputs {:data {:ignored true}}}))))))
 
 (deftest compile-target-judge-routing-and-loop-bounds-test
   (testing "target authored judges, routing, and loop bounds compile into canonical IR"

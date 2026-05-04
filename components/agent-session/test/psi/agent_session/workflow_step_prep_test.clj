@@ -76,3 +76,39 @@
               {:role "assistant" :content [{:type :text :text "Reading"}]}
               {:role "assistant" :content [{:type :text :text "Done"}]}]
              preload)))))
+
+(deftest materialize-step-inputs-uses-canonical-output-and-yield-surfaces-test
+  (let [definition {:steps [{:name "discover"
+                             :type :invoke
+                             :operation "github/search"
+                             :args {}}
+                            {:name "report"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "report"
+                                              :vars {}}]}
+                            {:name "consume"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "reply={{reply}} data={{data}} text={{text}}"
+                                              :vars {"reply" {:from {:step "report" :output :final-llm-reply}}
+                                                     "data" {:from {:step "discover" :yield :data}}
+                                                     "text" {:from {:step "report" :yield :text}}}}]}]}
+        [state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                       {:definition definition
+                                                        :run-id "run-canonical-surfaces"
+                                                        :workflow-input {}})
+        state3 (-> state2
+                   (assoc-in [:workflows :runs run-id :step-runs "discover" :accepted-result]
+                             {:outcome :ok
+                              :outputs {:data {:issues [1 2]}
+                                        :summary "found"
+                                        :result :ignored-by-resolver}})
+                   (assoc-in [:workflows :runs run-id :step-runs "report" :accepted-result]
+                             {:outcome :ok
+                              :outputs {:text "session text"}}))
+        run (workflow-runtime/workflow-run-in state3 run-id)]
+    (is (= {:reply "session text"
+            :data {:issues [1 2]}
+            :text "session text"}
+           (workflow-step-prep/materialize-step-inputs run "consume")))))

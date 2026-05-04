@@ -9,6 +9,7 @@
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
+   [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-statechart :as workflow-statechart]))
 
@@ -58,22 +59,17 @@
                    (:workflow-input workflow-run))
 
                (and (map? from) (:output from))
-               (let [accepted (get-in workflow-run [:step-runs (:step from) :accepted-result])]
-                 (case (:output from)
-                   :result accepted
-                   :final-llm-reply (get-in accepted [:outputs :text])
-                   :transcript (get-in accepted [:outputs :transcript])
-                   (get-in accepted [:outputs (:output from)])))
+               (let [step-id (:step from)
+                     output-key (:output from)
+                     accepted (get-in workflow-run [:step-runs step-id :accepted-result])
+                     step-def (effective-step-def workflow-run step-id)]
+                 (workflow-ir/step-output-value step-def accepted output-key))
 
                (and (map? from) (:yield from))
-               (let [accepted (get-in workflow-run [:step-runs (:step from) :accepted-result])]
-                 (case (:yield from)
-                   :text (get-in accepted [:outputs :text])
-                   :data (get-in accepted [:outputs :data])
-                   :reason (get-in accepted [:blocked :reason])
-                   :message (get-in accepted [:blocked :message])
-                   :details (get-in accepted [:blocked :details])
-                   nil))
+               (let [step-id (:step from)
+                     accepted (get-in workflow-run [:step-runs step-id :accepted-result])
+                     step-def (effective-step-def workflow-run step-id)]
+                 (workflow-ir/step-yield-field-value step-def accepted (:yield from)))
 
                :else nil)]
     (if (seq path)

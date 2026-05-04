@@ -88,7 +88,7 @@
                                                    :workflow-input {:input "hello" :original "hello"}
                                                    :run-id "run-1"})
           _ (swap! (:state* ctx) assoc-in [:workflows :runs "run-1" :step-runs "step-1" :accepted-result]
-                   {:outcome :ok :outputs {:text "final reply"}})
+                   {:outcome :ok :outputs {:final-llm-reply "final reply"}})
           result (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
                                                          :session-id "parent-session"
                                                          :run-id "run-1"})]
@@ -111,12 +111,32 @@
                                                    :workflow-input {:input "hello" :original "hello"}
                                                    :run-id "run-1"})
           _ (swap! (:state* ctx) assoc-in [:workflows :runs "run-1" :step-runs "step-1" :accepted-result]
-                   {:outcome :ok :outputs {:text "   "}})
+                   {:outcome :ok :outputs {:final-llm-reply "   "}})
           result (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
                                                          :session-id "parent-session"
                                                          :run-id "run-1"})]
       (is (= :completed (:psi.workflow/status result)))
-      (is (nil? (:psi.workflow/result result))))))
+      (is (nil? (:psi.workflow/result result)))))
+
+  (testing "legacy stored session text remains readable through canonical yielded text resolution"
+    (let [ctx (assoc (make-test-ctx)
+                     :execute-workflow-run-fn
+                     (fn [ctx* _session-id run-id]
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :status] :completed)
+                       {:status :completed :terminal? true :blocked? false :steps-executed []}))
+          _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                            :definition sample-definition})
+          _ (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                                   :definition-id "test-workflow"
+                                                   :workflow-input {:input "hello" :original "hello"}
+                                                   :run-id "run-1"})
+          _ (swap! (:state* ctx) assoc-in [:workflows :runs "run-1" :step-runs "step-1" :accepted-result]
+                   {:outcome :ok :outputs {:text "legacy reply"}})
+          result (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
+                                                         :session-id "parent-session"
+                                                         :run-id "run-1"})]
+      (is (= :completed (:psi.workflow/status result)))
+      (is (= "legacy reply" (:psi.workflow/result result))))))
 
 (deftest resume-workflow-run-test
   (testing "resume-workflow-run updates workflow input before resuming when provided"
