@@ -1,4 +1,5 @@
 - [x] Clarify the task's review/output surface in `design.md` and `plan.md`; keep `implementation.md` and `design-steps.md` as the canonical review/follow-up files
+- [x] Reconcile the cited proof-surface claim for `workflow_source_resolution_test.clj`: keep target-authored session fixtures in authored shape and prove canonical nested `:session :contributions` at the compiled IR/assertion seam
 - [ ] Identify the child-session creation seam for IR `:session` contribution materialization
 - [ ] Define any needed internal compiled contribution representation
 - [ ] Resolve `:source` contributions from workflow and prior-step sources
