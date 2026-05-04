@@ -1007,6 +1007,55 @@ Representative example shape:
 
 This example is intentionally small. The umbrella should use it to judge whether the syntax feels clear and whether the extension contract is too heavy or too magical.
 
+## Migration architecture
+
+The target grammar alone is not enough to land this work safely. The project also needs a convergence path from the current implemented workflow grammar to the target grammar.
+
+Preferred direction:
+
+- treat `doc/workflow-grammar-current.md` as the current authored surface
+- treat `doc/workflow-grammar.md` and `doc/workflow-grammar-concepts.md` as the target authored surface
+- introduce `doc/workflow-ir.md` as the canonical normalized execution model
+- introduce `doc/workflow-grammar-migration.md` as the migration plan from current grammar -> IR <- target grammar
+- make runtime execution consume normalized IR rather than either authored grammar directly
+
+Architectural rule:
+
+- the target grammar is not the runtime model
+- the normalized workflow IR is the runtime model
+
+Why this is the preferred path:
+
+- it avoids a flag-day rewrite of existing workflows
+- it prevents the current authored grammar from remaining the permanent hidden runtime schema
+- it gives deterministic, session, and delegated execution one shared runtime substrate
+- it lets tests prove equivalence by comparing compiled IR rather than relying on informal reasoning
+
+First-cut migration sequence:
+
+1. define and validate the normalized IR
+2. compile the current grammar to IR
+3. execute IR in runtime while keeping current workflows green
+4. compile the target grammar to IR
+5. land first-class invoke and delegate execution on the IR substrate
+6. migrate example and built-in workflows to the target grammar
+7. deprecate and eventually retire the current authored grammar
+
+Current-grammar preservation rules to carry into implementation:
+
+- current `:executor`-based steps compile to IR `:type :session`, not `:type :delegate`
+- current `:prompt-template` compiles to a template contribution
+- current `:input-bindings` compile to normalized source refs used by template vars and related payload surfaces
+- current `:session-preload` compiles to ordered source-style contributions, with temporary IR compatibility metadata only if needed to preserve semantics
+- current `:session-overrides` compile into the IR session payload
+- current prompt/projection judges compile to typed IR `:judge {:type :llm ...}` forms
+- workflow input must widen from map-only assumptions so delegated workflows can receive rendered string input cleanly
+
+See:
+
+- `doc/workflow-grammar-migration.md`
+- `doc/workflow-ir.md`
+
 ## Proposed end-state summary
 
 ### 1. Execution split
@@ -1094,8 +1143,19 @@ Preferred direction:
 - deterministic execution is still recorded in workflow progression/attempt history
 - inline session steps execute by building and running the child-session conversation assembled from contributions
 - delegated steps execute by invoking the target workflow with the explicit delegated boundary payload and yielding the called workflow's yielded value unchanged, including propagated `:type :error` values
+- runtime execution should consume normalized workflow IR rather than either authored grammar directly
 
-### 9. Current open questions that remain after this summary
+### 9. Migration and implementation path
+
+Preferred direction:
+
+- define the normalized workflow IR as the canonical runtime model
+- compile both current and target authored grammars into that IR
+- adopt IR execution before requiring broad target-grammar migration
+- use golden compiler tests and cross-grammar equivalence tests to prove convergence
+- keep compatibility concerns at compile time rather than distributing them through runtime execution
+
+### 10. Current open questions that remain after this summary
 
 The main unresolved details are now narrower:
 
@@ -1125,21 +1185,27 @@ Acceptance:
 - the task defines how each step type yields its resulting value as a whole, including first-cut success and error tagged shapes
 - the task includes at least one GH label-search anchor example that exercises deterministic invocation and both inline-session and delegated downstream consumption
 - the task identifies the follow-on implementation slices needed to build the feature safely
+- the task defines the migration architecture from current authored grammar -> normalized IR <- target authored grammar
+- the task defines the normalized workflow IR as the intended runtime execution boundary
 - the design is specific enough that a later implementation task does not need to reinvent the API surface
 
 ## Follow-on child tasks to create after design convergence
 
 Expected children are likely to include some subset of:
 
-1. workflow authoring/compiler support for deterministic step syntax
-2. deterministic operation registry / extension contract
-3. runtime execution support for deterministic steps
-4. deterministic result recording and introspection surfaces
-5. inline-session contribution compilation into child-session conversations
-6. delegated boundary model and workflow invocation plumbing
-7. step-output surface normalization and validation across `:invoke`, `:session`, and `:delegate`
-8. shared source/reference/projection support across deterministic args, inline-session contributions, and delegated context
-9. example workflow migration and documentation
+1. normalized workflow IR schema and validation
+2. current authored grammar -> IR compiler
+3. runtime execution adoption of IR
+4. target authored grammar -> IR compiler
+5. deterministic operation registry / extension contract
+6. runtime execution support for deterministic invoke steps
+7. deterministic result recording and introspection surfaces
+8. inline-session contribution compilation into child-session conversations
+9. delegated boundary model and workflow invocation plumbing
+10. step-output surface normalization and validation across `:invoke`, `:session`, and `:delegate`
+11. shared source/reference/projection support across deterministic args, inline-session contributions, and delegated context
+12. example workflow migration and documentation
+13. eventual compatibility retirement for the current authored grammar
 
 The exact slice boundaries should be chosen only after the umbrella design is accepted.
 

@@ -6,13 +6,33 @@
   - current recommendation: one explicit map-shaped `:args` surface with mixed literal and projected values, reusing the existing source/path projection family
 - [x] Define the canonical deterministic result shape and downstream reference semantics
   - current recommendation: structured result envelope with `:data` as canonical output, explicit downstream result kinds (`:data`, `:summary`, optional `:full-result`), and shared source/path projection across deterministic and LLM-backed consumers
-- [ ] Define runtime/observability expectations for deterministic steps
+- [x] Define runtime/observability expectations for deterministic steps
+  - deterministic steps do not create child sessions by default
+  - deterministic execution remains visible in workflow progression, attempts/history, and debugging/introspection surfaces
+  - runtime should make effective step boundary/input surfaces inspectable across invoke/session/delegate execution forms
+  - runtime execution should consume normalized workflow IR rather than either authored grammar directly
 - [x] Validate the design against the GitHub label-search anchor use case
   - design now includes a consolidated end-state summary and anchor examples covering deterministic invocation plus deterministic and LLM-backed downstream consumers
-- [ ] Split accepted design into follow-on implementation child tasks
+- [x] Split accepted design into follow-on implementation child tasks
+  - normalized workflow IR schema and validation
+  - current authored grammar -> IR compiler
+  - runtime execution adoption of IR
+  - target authored grammar -> IR compiler
+  - deterministic operation registry / extension contract
+  - runtime execution support for deterministic invoke steps
+  - deterministic result recording and introspection surfaces
+  - inline-session contribution compilation into child-session conversations
+  - delegated boundary model and workflow invocation plumbing
+  - step-output surface normalization and validation across `:invoke`, `:session`, and `:delegate`
+  - shared source/reference/projection support across deterministic args, inline-session contributions, and delegated context
+  - example workflow migration and documentation
+  - eventual compatibility retirement for the current authored grammar
 - [x] Materialize the workflow grammar as project docs
-  - added `doc/workflow-grammar.md` as the grammar artifact
+  - added `doc/workflow-grammar.md` as the target grammar artifact
   - added `doc/workflow-grammar-concepts.md` as the conceptual explanation artifact
+  - added `doc/workflow-grammar-current.md` as the current implemented grammar artifact
+  - added `doc/workflow-ir.md` as the normalized runtime model artifact
+  - added `doc/workflow-grammar-migration.md` as the convergence/migration artifact
   - extracted broader model selection into `doc/model-selection-grammar.md` and `doc/model-selection-concepts.md`
 - [x] Tighten ambiguity around per-type field validity, delegated boundary semantics, and step output surfaces
   - added first-cut field matrix
