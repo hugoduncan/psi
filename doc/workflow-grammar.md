@@ -85,7 +85,7 @@ source-ref ::= :workflow-input
              | {:step step-name :output output-key}
              | {:step step-name :yield yield-field}
 
-output-key ::= :data | :summary | :result | :final-llm-reply | :transcript
+output-key ::= keyword
 
 yield-field ::= :data | :text | :error | :reason | :message | :details
 

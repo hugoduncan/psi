@@ -192,6 +192,7 @@ Illustrative shape:
 - the delegated workflow's local `:workflow-input` becomes the rendered prompt string
 - the delegated workflow's local `:workflow-original` is rebound for the delegated invocation
 - by default, the step yields the delegated workflow's yielded value unchanged
+- first cut does not re-export the callee workflow's step-local output surfaces through downstream `{:step ... :output ...}` refs against the delegate step itself
 - first cut does not use delegated session overrides; delegation is a workflow boundary, not a child-session customization surface
 
 ## Outputs
@@ -204,7 +205,7 @@ Illustrative common output keys:
 
 - invoke step: `:data`, `:summary`, `:result`
 - session step: commonly `:final-llm-reply`, `:transcript`, `:result`
-- delegate step: optional debug/result outputs only if justified later
+- delegate step: no first-cut step-local outputs; only explicit delegate-local outputs such as a later justified debug/result surface if intentionally added
 
 The `:outputs` map should describe what logical output keys exist for a step and, at minimum, give runtime a canonical local meaning for each key.
 

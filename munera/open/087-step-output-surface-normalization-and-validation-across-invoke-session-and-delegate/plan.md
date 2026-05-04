@@ -13,6 +13,10 @@ Likely steps:
 6. add focused tests for representative valid and invalid references across mixed-form workflows
 7. reconcile any discovered drift among docs, schema, compilers, and runtime execution
 
+Clarified design decision:
+- first-cut delegate steps do not re-export callee step-local outputs through downstream `{:step ... :output ...}` refs
+- delegate steps remain yielded-value-first and only gain `:output` surfaces when the delegate step itself explicitly declares local outputs in a later slice
+
 Proof target:
 - mixed-form workflows can rely on one stable, validated `:output` reference model without confusing step-local outputs with yielded values
 

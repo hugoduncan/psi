@@ -21,7 +21,7 @@ Different workflow step forms expose different natural outputs:
 
 - invoke steps: `:data`, `:summary`, optional `:result`
 - session steps: `:final-llm-reply`, `:transcript`, optional `:result`
-- delegate steps: yielded-value-first semantics, with any step-local outputs requiring explicit modeling if present
+- delegate steps: first-cut yielded-value-first semantics; they do not re-expose callee step-local outputs, and any step-local outputs must be explicitly modeled on the delegate step itself if introduced later
 
 Without one canonical normalization and validation layer:
 

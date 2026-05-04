@@ -259,7 +259,7 @@ For the first cut:
 
 - invoke steps may expose `:data`, `:summary`, and optional `:result`
 - session steps may expose `:final-llm-reply`, `:transcript`, and optional `:result`
-- delegate steps do not add first-cut step-specific output surfaces beyond any future optional debug/result surface
+- delegate steps do not re-export callee step-local outputs and do not add first-cut step-specific output surfaces beyond any future explicit delegate-local debug/result surface
 
 A reference that selects an output not exposed by that step type is invalid.
 
