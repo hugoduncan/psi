@@ -1,0 +1,8 @@
+- [ ] Choose representative workflows or workflow slices for migration/example use
+- [ ] Ensure the example set covers invoke/session/delegate and shared data-flow semantics where practical
+- [ ] Migrate or add target-grammar variants for the chosen examples
+- [ ] Add or update docs showing the preferred target authoring style
+- [ ] Add concise current->target mapping notes where they reduce author confusion
+- [ ] Run focused verification for migrated examples
+- [ ] Tighten examples/docs if migration reveals readability or ergonomics issues
+- [ ] Reconcile examples/docs with task `077` and executable runtime behavior

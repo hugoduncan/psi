@@ -1,0 +1,11 @@
+- [ ] Identify the child-session creation seam for IR `:session` contribution materialization
+- [ ] Define any needed internal compiled contribution representation
+- [ ] Resolve `:source` contributions from workflow and prior-step sources
+- [ ] Render `:template` contributions from explicit vars and resolved source specs
+- [ ] Preserve authored contribution order during materialization
+- [ ] Thread compiled contributions into canonical child-session conversation state
+- [ ] Ensure the canonical prompt/session preparation path consumes that conversation state
+- [ ] Add focused source-only contribution tests
+- [ ] Add focused template-only contribution tests
+- [ ] Add focused mixed contribution compilation/execution-coherence tests
+- [ ] Reconcile implementation with task `077`, `doc/workflow-ir.md`, and converged child-session prompt composition behavior

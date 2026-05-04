@@ -16,6 +16,19 @@ Queue:
 `munera/open/073-workflow-child-session-prompt-composition/`
 `munera/open/076-auto-session-name-helper-model-fallback/`
 `munera/open/077-deterministic-workflow-steps/`
+`munera/open/078-workflow-ir-schema-and-validation/`
+`munera/open/079-current-authored-grammar-to-ir-compiler/`
+`munera/open/080-runtime-execution-adoption-of-ir/`
+`munera/open/087-step-output-surface-normalization-and-validation-across-invoke-session-and-delegate/`
+`munera/open/088-shared-source-reference-and-projection-support-across-invoke-session-and-delegate/`
+`munera/open/081-target-authored-grammar-to-ir-compiler/`
+`munera/open/082-deterministic-operation-registry-and-extension-contract/`
+`munera/open/083-runtime-execution-support-for-deterministic-invoke-steps/`
+`munera/open/085-inline-session-contribution-compilation-into-child-session-conversations/`
+`munera/open/086-delegated-boundary-model-and-workflow-invocation-plumbing/`
+`munera/open/084-deterministic-result-recording-and-introspection-surfaces/`
+`munera/open/089-example-workflow-migration-and-documentation/`
+`munera/open/090-eventual-compatibility-retirement-for-current-authored-workflow-grammar/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.

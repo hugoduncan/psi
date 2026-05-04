@@ -1,0 +1,12 @@
+- [ ] Identify the existing workflow loader/compiler seam for current-grammar normalization
+- [ ] Compile current workflow definition shape into ordered IR steps
+- [ ] Compile current `:executor` to IR `:type :session`
+- [ ] Compile current `:prompt-template` + `:input-bindings` into template contributions
+- [ ] Compile current `:session-preload` into ordered contribution items
+- [ ] Compile current `:session-overrides` into the IR session payload
+- [ ] Compile current judge shape into typed IR judge forms
+- [ ] Compile current routing tables and loop bounds into IR control-flow forms
+- [ ] Add golden tests for representative current-authored workflow -> IR compilation
+- [ ] Add focused edge-case tests for preload/binding/override compatibility behavior
+- [ ] Document or encode minimal `:compat` metadata only where required to preserve current semantics
+- [ ] Reconcile compiler behavior with `doc/workflow-grammar-migration.md`

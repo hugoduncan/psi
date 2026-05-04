@@ -1,0 +1,11 @@
+- [ ] Inspect current workflow attempt/result/history/introspection surfaces for session-oriented assumptions
+- [ ] Define the canonical runtime recording shape for invoke attempts
+- [ ] Define the canonical runtime recording shape for invoke accepted/terminal results
+- [ ] Record effective invoke args in an inspectable runtime surface
+- [ ] Record canonical invoke outputs (`:data`, `:summary`, optional `:result`) coherently
+- [ ] Record invoke yielded values coherently for downstream `:yield` consumers
+- [ ] Preserve structured diagnostics/failure details for unsuccessful invoke steps
+- [ ] Expose invoke result data through workflow introspection/query surfaces
+- [ ] Add focused success recording/introspection tests
+- [ ] Add focused failure recording/introspection tests
+- [ ] Reconcile recorded/introspection surfaces with task `077`, task `083`, and `doc/workflow-ir.md`

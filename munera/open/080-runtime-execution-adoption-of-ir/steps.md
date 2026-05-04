@@ -1,0 +1,10 @@
+- [ ] Identify the runtime seam where executable workflow definitions enter execution
+- [ ] Thread normalized IR through the execution entrypoint
+- [ ] Adapt step lookup/progression to IR step structure
+- [ ] Adapt routing and loop-bound handling to IR control-flow forms
+- [ ] Adapt judge execution to typed IR judge forms
+- [ ] Adapt existing session-style workflow step execution to IR `:session` payloads
+- [ ] Keep attempt/result/history recording coherent after IR adoption
+- [ ] Add focused IR-native execution tests
+- [ ] Re-run representative workflow lifecycle/execution/routing regression suites
+- [ ] Remove or isolate execution-time dependence on current authored field names

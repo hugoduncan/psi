@@ -1,0 +1,14 @@
+- [ ] Identify existing source-selection/projection helpers for reuse or convergence
+- [ ] Define the canonical resolution contract for workflow source refs and source specs
+- [ ] Implement resolution for `:workflow-input` and `:workflow-original`
+- [ ] Implement resolution for prior step `:output` refs
+- [ ] Implement resolution for prior step `:yield` refs
+- [ ] Implement first-cut `:path` selection
+- [ ] Implement first-cut richer `:projection` handling
+- [ ] Enforce the exclusivity rule for `:path` vs `:projection`
+- [ ] Thread the shared substrate into invoke arg resolution
+- [ ] Thread the shared substrate into session contribution/template-var resolution
+- [ ] Thread the shared substrate into delegate context and templated prompt-string resolution
+- [ ] Add focused mixed-form resolution tests
+- [ ] Add focused invalid-source/invalid-spec tests
+- [ ] Reconcile implementation with task `077` and `doc/workflow-ir.md`

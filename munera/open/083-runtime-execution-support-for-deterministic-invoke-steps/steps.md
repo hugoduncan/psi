@@ -1,0 +1,12 @@
+- [ ] Identify the IR step-dispatch seam and add `:type :invoke` execution
+- [ ] Resolve invoke args from normalized source refs/projections
+- [ ] Invoke registered deterministic operations through the runtime-owned registry
+- [ ] Validate or normalize returned invoke results against the canonical contract
+- [ ] Record invoke attempts/results in runtime history surfaces
+- [ ] Expose invoke outputs for downstream `:output` references
+- [ ] Expose invoke yielded values for downstream `:yield` references
+- [ ] Integrate invoke success/failure with workflow progression and terminal outcomes
+- [ ] Prove invoke-step participation in shared judge/routing behavior
+- [ ] Add focused invoke-only workflow execution tests
+- [ ] Add focused mixed invoke/session/delegate workflow execution tests
+- [ ] Reconcile runtime behavior with task `077`, `doc/workflow-ir.md`, and task `082`

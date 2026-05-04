@@ -1,0 +1,13 @@
+- [ ] Identify the IR execution seam for `:type :delegate` dispatch
+- [ ] Resolve target workflow definitions through canonical runtime/loading facilities
+- [ ] Render delegated `:prompt-string` to a final string
+- [ ] Resolve delegated `:context` items from normalized workflow/prior-step sources
+- [ ] Preserve authored delegated-context order
+- [ ] Establish explicit callee local `:workflow-input` semantics from rendered prompt string
+- [ ] Establish explicit callee local `:workflow-original` semantics for delegated invocation
+- [ ] Execute the callee workflow through the canonical runtime path
+- [ ] Propagate the callee yielded value back as the delegating step's default yielded value
+- [ ] Keep delegated boundary recording/introspection coherent enough for debugging
+- [ ] Add focused delegate-only workflow execution tests
+- [ ] Add focused mixed delegate/session/invoke workflow execution tests
+- [ ] Reconcile implementation with task `077` and `doc/workflow-ir.md`

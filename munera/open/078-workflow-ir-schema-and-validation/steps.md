@@ -1,0 +1,20 @@
+- [x] Inspect current workflow model/schema namespaces and choose the canonical home for IR validation
+- [x] Define top-level normalized workflow IR schema
+- [x] Define tagged IR step schemas for `:invoke`, `:session`, and `:delegate`
+- [x] Define shared source-ref and source-spec schemas
+- [x] Define contribution schemas for `:source` and `:template`
+- [x] Define output and yielded-value schemas
+- [x] Define judge schemas for `:type :llm` and `:type :invoke`
+- [x] Define control-flow/routing schemas
+- [x] Define explicitly optional compatibility metadata allowance
+- [x] Add focused valid-shape tests for representative IR examples
+- [x] Add focused invalid-shape tests for representative malformed IR examples
+- [x] Reconcile code-level schema wording/shape with `doc/workflow-ir.md`
+- [x] Decide and document this slice's validation boundary: Malli structural schema only vs additional semantic validation (for example prior-step-only refs, `:on` requiring `:judge`, and output/yield cross-reference checks)
+- [x] Implement the decided validation boundary in a dedicated runtime-owned `workflow_ir` namespace so task progress matches the recorded design/decision state
+- [x] Add focused proof/tests showing the decided semantic-validation boundary exists in code (at minimum prior-step-only refs, `:on` requires `:judge`, and yield/source-ref output cross-reference checks), or explicitly defer any invariant not implemented
+- [x] Add focused proof/tests for whichever non-structural IR invariants this slice is responsible for, or explicitly defer them if out of scope
+- [x] Decide whether `:yields` defaults are compiler-owned normalization requirements or accepted-and-filled at the runtime-owned IR validation boundary; encode the chosen boundary in design/tests.
+- [x] Decide whether local `:yields` output-key references (for example session `{:type :text :text :final-llm-reply}`) must correspond to declared step-local `:outputs`, and encode/document the invariant explicitly.
+- [x] Decide whether normalized workflow IR permits an empty `:steps` vector or must require at least one step; align `doc/workflow-ir.md`, schema, and tests.
+- [x] Decide whether a present `:judge` must also require a non-empty `:on` routing table at the normalized IR boundary, and prove the chosen rule with focused tests.

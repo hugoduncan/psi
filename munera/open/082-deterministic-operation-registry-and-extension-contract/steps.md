@@ -1,0 +1,10 @@
+- [ ] Inspect existing extension/runtime registration patterns for a suitable registry shape
+- [ ] Choose the canonical runtime home for deterministic operation registration and lookup
+- [ ] Define the operation registration shape, including stable id and minimal metadata
+- [ ] Define the operation invocation input contract
+- [ ] Define the canonical structured success result contract
+- [ ] Define the canonical failure/diagnostic contract
+- [ ] Define handling for duplicate ids, missing ids, and malformed returned values
+- [ ] Add focused tests for registration and lookup behavior
+- [ ] Add focused tests for representative invocation and result-shape enforcement
+- [ ] Reconcile the implemented contract with task `077` and `doc/workflow-ir.md`

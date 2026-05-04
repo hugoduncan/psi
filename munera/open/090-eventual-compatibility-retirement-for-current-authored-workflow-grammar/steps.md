@@ -1,0 +1,8 @@
+- [ ] Inventory remaining current-authored workflow definitions, tests, loaders, and docs
+- [ ] Define explicit retirement gates
+- [ ] Migrate or replace remaining current-grammar blockers
+- [ ] Remove current-authored grammar loading/compilation support
+- [ ] Delete compatibility-only tests/docs/helpers no longer needed
+- [ ] Update project guidance so the target grammar is the only supported authored workflow surface
+- [ ] Run focused and broader verification after compatibility removal
+- [ ] Reconcile final cleanup with task `077` migration intent
