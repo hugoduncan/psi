@@ -18,7 +18,6 @@ Queue:
 `munera/open/077-deterministic-workflow-steps/`
 `munera/open/087-step-output-surface-normalization-and-validation-across-invoke-session-and-delegate/`
 `munera/open/088-shared-source-reference-and-projection-support-across-invoke-session-and-delegate/`
-`munera/open/081-target-authored-grammar-to-ir-compiler/`
 `munera/open/082-deterministic-operation-registry-and-extension-contract/`
 `munera/open/083-runtime-execution-support-for-deterministic-invoke-steps/`
 `munera/open/085-inline-session-contribution-compilation-into-child-session-conversations/`
