@@ -21,6 +21,7 @@ Created to track the custom-provider auth regression where real session-shaped s
   - model-registry auth lookup
   - OAuth API key lookup
   - provider-request option lookup via shared auth config lookup
+- Follow-on shaping aligned `prompt_request/resolve-runtime-model` with the same shared `normalize-provider-id` helper so provider interpretation no longer drifts between runtime-model lookup and provider-auth lookup paths
 
 ## Regression coverage
 
@@ -47,6 +48,11 @@ After review follow-up coverage:
 - `bb clojure:test:unit --focus psi.agent-session.prompt-request-test --focus psi.agent-session.runtime-test`
   - `1497 tests, 11025 assertions, 0 failures`
 
+After shaping follow-up:
+
+- `bb clojure:test:unit --focus psi.agent-session.prompt-request-test --focus psi.agent-session.runtime-test`
+  - `1497 tests, 11025 assertions, 0 failures`
+
 Additional checks run during the session:
 
 - `bb test:agent-core`
@@ -56,4 +62,4 @@ Additional checks run during the session:
 
 ## Review note
 
-Implementation review: accept with small follow-up. Shared-boundary normalization is correct, but string-shaped regression coverage should be extended to prove provider-request option shaping too, especially `:auth-header? false -> :no-auth-header true` and custom `:headers` propagation.
+Implementation review: accept with small follow-up. Shared-boundary normalization is correct, and request-option string-provider coverage is now in place. Remaining shaping follow-up: make `prompt_request/resolve-runtime-model` use the shared `provider-auth/normalize-provider-id` helper instead of normalizing provider identity locally.

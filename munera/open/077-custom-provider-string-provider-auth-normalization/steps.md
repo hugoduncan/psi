@@ -14,3 +14,5 @@
 - [x] Add string-provider regression coverage for provider-request option shaping with `:auth-header? false` proving `:no-auth-header true`
 - [x] Add string-provider regression coverage for provider-request option shaping proving custom `:headers` propagation
 - [x] Re-run focused `prompt-request` and `runtime` tests and record the updated result after the review follow-up
+- [x] Replace local provider normalization in `prompt_request/resolve-runtime-model` with shared `provider-auth/normalize-provider-id`
+- [x] Re-run focused `prompt-request` and `runtime` tests and record the result after the shaping follow-up
