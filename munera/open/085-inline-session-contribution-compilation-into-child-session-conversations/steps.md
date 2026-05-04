@@ -1,3 +1,4 @@
+- [x] Clarify the task's review/output surface in `design.md` and `plan.md`; keep `implementation.md` and `design-steps.md` as the canonical review/follow-up files
 - [ ] Identify the child-session creation seam for IR `:session` contribution materialization
 - [ ] Define any needed internal compiled contribution representation
 - [ ] Resolve `:source` contributions from workflow and prior-step sources

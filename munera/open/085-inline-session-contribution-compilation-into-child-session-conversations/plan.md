@@ -18,6 +18,10 @@ Likely steps:
 Proof target:
 - an IR session step's authored contributions become the actual canonical child-session conversation substrate used for execution
 
+Task-artifact note:
+- ambiguity/design review follow-ups live in `design-steps.md`
+- review notes, discoveries, and blockers append to `implementation.md`
+
 Risks:
 - existing workflow child-session code may still assume compatibility-era prompt-template shortcuts
 - contribution materialization may accidentally bypass canonical prompt/session preparation if threaded at the wrong seam

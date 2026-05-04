@@ -44,6 +44,18 @@ Out of scope:
 
 A workflow IR `:type :session` step can produce a canonical child-session conversation from its authored contributions, and that conversation becomes the actual execution substrate for the child session.
 
+## Task artifact protocol
+
+This task uses the following canonical task-artifact surfaces during review and execution:
+
+- `design.md` — task intent, scope, and acceptance
+- `plan.md` — implementation approach and sequencing
+- `steps.md` — execution checklist
+- `design-steps.md` — actionable follow-up items from ambiguity/design reviews
+- `implementation.md` — append-only review notes, discoveries, decisions, and blocking reasons
+
+When a review pass finds ambiguities that require task-artifact follow-up, add the actionable items to `design-steps.md` and append the review note to `implementation.md`.
+
 ## Acceptance
 
 - IR session contributions compile into canonical child-session conversation state

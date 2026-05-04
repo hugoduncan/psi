@@ -1,1 +1,1 @@
-- [ ] Make the review/output surface explicit for this task: keep `implementation.md` and `design-steps.md` present in the task directory, or update the task artifacts to name the canonical alternatives so review-note and follow-up recording are unambiguous.
+- [x] Make the review/output surface explicit for this task: keep `implementation.md` and `design-steps.md` present in the task directory, or update the task artifacts to name the canonical alternatives so review-note and follow-up recording are unambiguous.
