@@ -1,3 +1,7 @@
+- [x] Record the resolved return-boundary decision in task-local execution tracking so this task no longer implies the invoke/result boundary is still design-open
+  - Registered deterministic operations return tagged success/failure operation results, not full invoke-step envelopes.
+  - Runtime-owned invoke execution wraps successful results into canonical invoke-step outputs (`:data`, optional `:summary`, full `:result`) and turns unsuccessful results into canonical invoke-step failure/yield recording inputs.
+  - Focused malformed-return rejection proof remains future implementation work for this task.
 - [ ] Inspect existing extension/runtime registration patterns for a suitable registry shape
 - [ ] Choose the canonical runtime home for deterministic operation registration and lookup
 - [ ] Define the operation registration shape, including stable id and minimal metadata
