@@ -12,4 +12,4 @@
 - [x] Record that delegate-path coverage for this slice remains IR/source-resolution proof rather than runtime execution proof unless delegate execution support lands concurrently
 - [x] Reconcile runtime behavior with task `077`, `doc/workflow-ir.md`, and task `082`
 - [x] Clarify and align task artifacts on invoke-operation error control flow and canonical nested IR invoke execution boundary
-- [ ] Reconcile invoke-judge claims with runtime/proof surfaces: either implement `:judge {:type :invoke ...}` through the deterministic operation registry with focused tests, or narrow task/documentation claims so shared judge/routing proof does not overstate current prompt-only judge execution
+- [x] Reconcile invoke-judge claims with runtime/proof surfaces: either implement `:judge {:type :invoke ...}` through the deterministic operation registry with focused tests, or narrow task/documentation claims so shared judge/routing proof does not overstate current prompt-only judge execution
