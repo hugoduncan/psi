@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Fixed
+- Custom model providers whose selected session model stores `:provider` as a string now resolve provider-scoped auth, request options, and runtime model lookup consistently instead of falling back to built-in provider auth behavior.
+
 ## [0.1.2049] - 2026-05-02
 
 ### Added
