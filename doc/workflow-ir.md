@@ -347,7 +347,13 @@ The IR uses one shared source-spec language for:
 - source contributions
 - template vars
 - delegated context
+- delegated prompt-string template vars
 - judge args where applicable
+
+Current runtime ownership note:
+
+- canonical runtime materialization of these refs/specs now lives in `components/agent-session/src/psi/agent_session/workflow_source_resolution.clj`
+- compiler/authoring seams may translate authored syntax into IR-compatible refs/specs, but they should not re-encode divergent runtime resolution semantics
 
 ### Source spec
 

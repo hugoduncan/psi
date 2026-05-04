@@ -24,4 +24,5 @@
   - Added `workflow_source_resolution_test.clj` proving shared semantics across invoke/session/delegate consumers.
 - [x] Add focused invalid-source/invalid-spec tests
   - Added focused runtime exclusivity proof for invalid source-specs carrying both `:path` and `:projection`.
-- [ ] Reconcile implementation with task `077` and `doc/workflow-ir.md`
+- [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`
+  - Updated `doc/workflow-ir.md` to make delegated prompt-string template vars part of the shared source-spec family explicitly and to name `workflow_source_resolution.clj` as the canonical runtime materialization owner.
