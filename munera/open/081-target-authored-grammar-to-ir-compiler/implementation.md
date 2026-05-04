@@ -24,3 +24,8 @@
 - `workflow_runtime.clj` now preserves `:definition-id` only when the authored definition actually provides one, so inline target-authored effective-definition snapshots no longer gain synthetic ids while registered definitions still retain their source ids
 - extended `workflow_target_ir_compiler_test.clj` with regression coverage for both inline target-authored runs (`:effective-definition :definition-id` stays nil) and registered target-authored runs (`:source-definition-id` and effective-definition `:definition-id` stay aligned)
 - focused verification green via `bb clojure:test:unit --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-runtime-test` (`1511 tests, 11028 assertions, 0 failures`)
+
+2026-05-04 execution: reviewed the preloaded code-shape follow-up surfaces for task 081 and found no newly added unchecked actionable steps remaining in `steps.md`.
+- verified task artifacts (`steps.md`, `implementation.md`, `design.md`, `plan.md`) are already synchronized on the resolved compile seam, equivalence contract, and inline provenance follow-up
+- no additional code or task-artifact edits were required in this pass because the only previously added follow-up item is already marked done in `steps.md`
+- repository state for this task is unchanged by execution; committing only the implementation log note for the completed verification pass
