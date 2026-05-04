@@ -7,6 +7,7 @@ Approach:
 - record effective invoke args on the attempt that executed them
 - keep invoke yielded-value visibility derived from accepted-result outputs plus normalized `:yields`, with any direct yield projection treated as convenience-only
 - center invoke failures on the canonical attempt `:execution-error` surface, with history/read projections derived from it
+- converge the shared invoke runtime seam so operation `{:status :error ...}` results remain attempt-failure only and do not imply a stored yielded-value/accepted-result failure surface
 
 Likely steps:
 1. inspect current workflow attempt/result/introspection surfaces and identify session-oriented assumptions

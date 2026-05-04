@@ -226,14 +226,12 @@
 
 (defn- apply-invoke-step-result
   [operation-result]
-  (let [{:keys [kind accepted-result yield]} (deterministic-ops/operation-result->invoke-step-result operation-result)]
+  (let [{:keys [kind accepted-result execution-error]} (deterministic-ops/operation-result->invoke-step-result operation-result)]
     (case kind
       :accepted-result {:pending-kind :success
                         :payload accepted-result}
-      :error-yield {:pending-kind :failure
-                    :payload {:reason (:reason yield)
-                              :message (:message yield)
-                              :details (:details yield)}})))
+      :execution-error {:pending-kind :failure
+                        :payload execution-error})))
 
 (defn- resolve-delegate-target-definition
   [ctx target]

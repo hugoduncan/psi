@@ -107,7 +107,8 @@
             :handler (fn [_]
                        {:status :error
                         :reason :not-found
-                        :message "repo missing"})})
+                        :message "repo missing"
+                        :details {:repo "psi"}})})
         _ (swap! (:state* ctx)
                  (fn [state]
                    (let [[s _ _] (workflow-runtime/create-run state {:definition invoke-definition
@@ -118,7 +119,16 @@
         result (workflow-execution/execute-run! ctx session-id "run-invoke-error")
         run (workflow-runtime/workflow-run-in @(:state* ctx) "run-invoke-error")]
     (is (= :failed (:status result)))
-    (is (= :execution-failed (get-in run [:step-runs "discover" :attempts 0 :status])))))
+    (is (= :execution-failed (get-in run [:step-runs "discover" :attempts 0 :status])))
+    (is (= {:reason :not-found
+            :message "repo missing"
+            :operation-result {:status :error
+                               :reason :not-found
+                               :message "repo missing"
+                               :details {:repo "psi"}}
+            :operation-details {:repo "psi"}}
+           (get-in run [:step-runs "discover" :attempts 0 :execution-error])))
+    (is (nil? (get-in run [:step-runs "discover" :accepted-result])))))
 
 (deftest invoke-to-session-workflow-executes-and-exposes-cross-form-results-test
   (testing "invoke outputs and yields feed downstream session execution through the canonical runtime path"

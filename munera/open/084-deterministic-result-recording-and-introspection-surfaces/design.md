@@ -113,6 +113,24 @@ Allowed accompanying surfaces:
 
 This task should not introduce an invoke-only diagnostics store separate from the attempt record unless an existing shared workflow failure surface requires it.
 
+### Failure/yield convergence rule
+
+Task `084` converges invoke-step failure onto attempt-local execution failure only.
+
+That means:
+
+- invoke operations returning `{:status :error ...}` do **not** produce an accepted-result envelope
+- invoke operations returning `{:status :error ...}` do **not** produce a separately recorded yielded value
+- runtime helpers may use a small internal tagged result to distinguish success from failure before recording, but that helper shape is not itself a public runtime/introspection surface
+- canonical inspectable failure data lives on the latest attempt `:execution-error`
+- any introspection convenience about invoke failure must be derived from that attempt record, not from a second stored failure/yield surface
+
+This also clarifies the relationship to IR `{:type :error ...}` yielded values:
+
+- IR error yields remain part of the shared normalized yield union because other step forms or future flows may use them
+- task `084` does not require invoke-step runtime failures to materialize that IR error yield into stored accepted-result/blocked data
+- `workflow_ir.clj` yield helpers should therefore not imply that invoke-step runtime failure is recorded via accepted-result `[:blocked ...]`
+
 ## Acceptance
 
 - invoke attempt/result recording is explicit and coherent in runtime state

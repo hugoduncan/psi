@@ -118,7 +118,8 @@
    - :summary <- operation :summary when present
    - :result  <- full tagged operation result
 
-   Failure becomes a canonical error yield input for invoke-step execution."
+   Failure remains attempt-local execution failure input. It does not produce a
+   synthetic accepted-result or a separately recorded yielded-value surface."
   [operation-result]
   (when-not (valid-operation-result? operation-result)
     (throw (ex-info "Cannot wrap malformed deterministic operation result"
@@ -135,13 +136,12 @@
                                   (assoc :summary (:summary operation-result)))}}
 
     :error
-    {:kind :error-yield
-     :yield {:type :error
-             :reason (:reason operation-result)
-             :message (:message operation-result)
-             :details (cond-> {:operation-result operation-result}
+    {:kind :execution-error
+     :execution-error (cond-> {:reason (:reason operation-result)
+                               :message (:message operation-result)
+                               :operation-result operation-result}
                         (:details operation-result)
-                        (assoc :operation-details (:details operation-result)))}}
+                        (assoc :operation-details (:details operation-result)))}
 
     (throw (ex-info "Unknown deterministic operation result status"
                     {:result operation-result}))))

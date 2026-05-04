@@ -103,13 +103,12 @@
            (ops/operation-result->invoke-step-result
             {:status :ok :data {:issues [1]} :summary "1 issue"}))))
 
-  (testing "error operation result wraps into canonical error yield input"
-    (is (= {:kind :error-yield
-            :yield {:type :error
-                    :reason :not-found
-                    :message "repo missing"
-                    :details {:operation-result {:status :error
+  (testing "error operation result wraps into canonical attempt execution failure input"
+    (is (= {:kind :execution-error
+            :execution-error {:reason :not-found
+                              :message "repo missing"
+                              :operation-result {:status :error
                                                  :reason :not-found
-                                                 :message "repo missing"}}}}
+                                                 :message "repo missing"}}}
            (ops/operation-result->invoke-step-result
             {:status :error :reason :not-found :message "repo missing"})))))

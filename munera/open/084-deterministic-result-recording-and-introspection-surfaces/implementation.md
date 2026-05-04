@@ -7,3 +7,13 @@
   - `plan.md` was aligned to those contract decisions.
   - `design-steps.md` review follow-ups were marked done after the task artifacts became explicit enough for implementation.
 - Review 2026-05-04: actionable inconsistency found. `design.md`/`plan.md` now center invoke failure on attempt-local `:execution-error` and reject synthetic accepted results, but the shared runtime contract still has an invoke `:error-yield` path (`deterministic_operations.clj`) while `workflow_ir.clj` resolves `:type :error` yields from accepted-result `[:blocked ...]`. The task artifacts do not yet say which failure/yield contract 084 will converge or whether invoke failures should bypass yielded-value projection entirely.
+- 2026-05-04 follow-up execution: resolved the remaining invoke failure/yield contract inconsistency in task artifacts.
+  - `design.md` now states that task 084 converges invoke failure onto attempt-local `:execution-error` only.
+  - invoke operation `{:status :error ...}` results explicitly do not produce accepted-result envelopes or separately recorded yielded values.
+  - any runtime helper tagging used to branch success vs failure is implementation-local rather than a public introspection surface.
+  - `plan.md` was aligned so implementation now targets one failure source of truth.
+- 2026-05-04 implementation: converged the shared invoke runtime seam to the attempt-only failure contract.
+  - Updated `components/agent-session/src/psi/agent_session/deterministic_operations.clj` so `operation-result->invoke-step-result` now returns `{:kind :execution-error ...}` for operation `{:status :error ...}` results instead of the previous synthetic `:error-yield` shape.
+  - Updated `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` so invoke failure recording consumes that execution-error payload directly as attempt failure data.
+  - Updated focused registry/runtime proofs so failure assertions now target attempt `:execution-error` and explicitly prove that invoke failures do not create `:accepted-result` envelopes.
+- 2026-05-04 verification: focused invoke/runtime checks green via `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.workflow-invoke-runtime-test` (`10 tests, 27 assertions, 0 failures`).
