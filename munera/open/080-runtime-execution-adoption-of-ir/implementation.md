@@ -26,3 +26,8 @@
 
 2026-05-04 — implementation review pass
 - Review: no new actionable feedback after reading task artifacts plus runtime execution, statechart, progression/recording, judge, resolver, and focused IR adoption tests; reran the focused regression suite and it stayed green (`29 tests, 161 assertions, 0 failures`).
+
+2026-05-04 — follow-up execution pass
+- Checked `steps.md` against the preceding review result: no newly added unchecked actionable items remained for task `080`, so no code/task-surface execution was pending.
+- Re-read the IR adoption seam in `components/agent-session/src/psi/agent_session/workflow_runtime.clj` and `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`, plus focused proof in `components/agent-session/test/psi/agent_session/workflow_ir_runtime_adoption_test.clj`.
+- Re-ran the focused runtime IR adoption regression suite and it stayed green (`29 tests, 161 assertions, 0 failures`).
