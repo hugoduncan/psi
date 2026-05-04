@@ -9,3 +9,11 @@
 2026-05-04 review: actionable inconsistency remains — `steps.md` still lists the compile seam decision as open (`Identify the loader/compiler seam for target-authored workflow normalization`) even though `design.md`, `plan.md`, `design-steps.md`, and this implementation log already record that seam as decided at `workflow-runtime/create-run` effective-definition normalization. The task files should align so unresolved design work in `steps.md` does not contradict recorded design decisions.
 
 2026-05-04 execution: reconciled `steps.md` with the recorded design decisions by marking the compile-seam item done and annotating it with the authoritative `workflow-runtime/create-run` effective-definition normalization seam. No further newly added design follow-up items remained open after this alignment pass.
+
+2026-05-04 implementation: landed the target-authored compiler and runtime seam integration.
+- added `workflow_target_ir_compiler.clj` as the forward compiler from `{:steps [...]}` target-authored workflow data into canonical workflow IR
+- compiler now normalizes `:invoke`, `:session`, and `:delegate` step forms, shared source-specs, `:source`/`:template` contributions, default yields, judge forms, and routing/loop-bound fields
+- runtime `create-run` effective-definition normalization now detects target-authored definitions and compiles them through the new compiler while current-authored definitions continue through `workflow_current_ir_compiler`
+- target-authored effective definitions are padded with minimal compatibility step-order/step-map structure so existing workflow-run schema/statechart helpers remain valid while runtime execution continues to consume `:canonical-ir`
+- added `workflow_target_ir_compiler_test.clj` with golden target-authored compile tests, semantic IR equivalence tests against current-authored workflows after recursive `:compat` stripping, and a create-run seam proof
+- focused verification green via `bb clojure:test:unit --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-runtime-test`

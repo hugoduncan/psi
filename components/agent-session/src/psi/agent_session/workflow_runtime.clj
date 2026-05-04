@@ -9,7 +9,8 @@
    [clojure.string :as str]
    [psi.agent-session.workflow-current-ir-compiler :as workflow-current-ir-compiler]
    [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]))
+   [psi.agent-session.workflow-statechart :as workflow-statechart]
+   [psi.agent-session.workflow-target-ir-compiler :as workflow-target-ir-compiler]))
 
 (defn- now []
   (java.time.Instant/now))
@@ -48,7 +49,8 @@
 (defn register-definition
   "Return [state definition-id stored-definition] after validating and storing definition."
   [state definition]
-  (when-not (workflow-model/valid-workflow-definition? definition)
+  (when-not (or (workflow-model/valid-workflow-definition? definition)
+                (workflow-target-ir-compiler/target-authored-workflow-definition? definition))
     (throw (ex-info "Invalid workflow definition"
                     {:explanation (workflow-model/explain-workflow-definition definition)})))
   (let [definition-id (normalize-id (:definition-id definition))
@@ -73,31 +75,55 @@
     :registered-definition
     :inline-definition))
 
-(defn- compile-current-definition-to-ir!
+(defn- compile-definition-to-ir!
   [definition source]
-  (let [{:keys [valid? ir structural-errors semantic-errors compile-error]}
-        (workflow-current-ir-compiler/compile-and-validate-workflow-definition definition)]
+  (let [target-authored? (workflow-target-ir-compiler/target-authored-workflow-definition? definition)
+        {:keys [valid? ir structural-errors semantic-errors compile-error]}
+        (if target-authored?
+          (workflow-target-ir-compiler/compile-and-validate-workflow-definition definition)
+          (workflow-current-ir-compiler/compile-and-validate-workflow-definition definition))]
     (when-not valid?
       (throw (ex-info "Workflow definition does not compile to execution-valid canonical IR"
                       {:source source
                        :definition-id (:definition-id definition)
+                       :authored-grammar (if target-authored? :target :current)
                        :compile-error compile-error
                        :structural-errors structural-errors
                        :semantic-errors semantic-errors})))
     ir))
 
+(def ^:private target-compat-retry-policy
+  {:max-attempts 1
+   :retry-on #{:execution-failed :validation-failed}})
+
+(defn- target-step->compat-step
+  [step]
+  (merge {:executor {:type :agent}
+          :result-schema [:map]
+          :retry-policy target-compat-retry-policy}
+         step))
+
 (defn- normalize-effective-definition
   [definition source]
-  (assoc definition
-         :definition-id (normalize-id (:definition-id definition))
-         :canonical-ir (compile-current-definition-to-ir! definition source)))
+  (let [canonical-ir (compile-definition-to-ir! definition source)
+        target-authored? (workflow-target-ir-compiler/target-authored-workflow-definition? definition)]
+    (cond-> (assoc definition
+                   :definition-id (normalize-id (:definition-id definition))
+                   :canonical-ir canonical-ir)
+      target-authored?
+      (assoc :step-order (mapv :name (:steps canonical-ir))
+             :steps (into {}
+                          (map (fn [step]
+                                 [(:name step) (target-step->compat-step step)]))
+                          (:steps definition))))))
 
 (defn- resolve-effective-definition
   [state {:keys [definition definition-id]}]
   (cond
     (some? definition)
     (do
-      (when-not (workflow-model/valid-workflow-definition? definition)
+      (when-not (or (workflow-model/valid-workflow-definition? definition)
+                    (workflow-target-ir-compiler/target-authored-workflow-definition? definition))
         (throw (ex-info "Invalid inline workflow definition"
                         {:explanation (workflow-model/explain-workflow-definition definition)})))
       {:effective-definition (normalize-effective-definition definition

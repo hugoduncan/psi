@@ -1,14 +1,14 @@
 - [x] Identify the loader/compiler seam for target-authored workflow normalization
   - authoritative seam is `workflow-runtime/create-run` effective-definition normalization; runtime execution continues to consume canonical IR only
-- [ ] Compile target workflow definition shape into ordered IR steps
-- [ ] Normalize authored `:type :invoke` hoisted fields into IR `:invoke` payloads
-- [ ] Normalize authored `:type :session` hoisted fields into IR `:session` payloads
-- [ ] Normalize authored `:type :delegate` hoisted fields into IR `:delegate` payloads
-- [ ] Compile shared source refs and source specs into IR forms
-- [ ] Compile contribution forms for `:source` and `:template`
-- [ ] Compile authored `:yields` into IR yielded-value forms
-- [ ] Compile authored judge forms into typed IR judge forms
-- [ ] Compile authored routing and loop-bound forms into IR control-flow forms
-- [ ] Add golden tests for representative target-authored workflow -> IR compilation
-- [ ] Add selected cross-grammar equivalence tests where current-authored and target-authored workflows overlap semantically
-- [ ] Reconcile compiler behavior with `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
+- [x] Compile target workflow definition shape into ordered IR steps
+- [x] Normalize authored `:type :invoke` hoisted fields into IR `:invoke` payloads
+- [x] Normalize authored `:type :session` hoisted fields into IR `:session` payloads
+- [x] Normalize authored `:type :delegate` hoisted fields into IR `:delegate` payloads
+- [x] Compile shared source refs and source specs into IR forms
+- [x] Compile contribution forms for `:source` and `:template`
+- [x] Compile authored `:yields` into IR yielded-value forms
+- [x] Compile authored judge forms into typed IR judge forms
+- [x] Compile authored routing and loop-bound forms into IR control-flow forms
+- [x] Add golden tests for representative target-authored workflow -> IR compilation
+- [x] Add selected cross-grammar equivalence tests where current-authored and target-authored workflows overlap semantically
+- [x] Reconcile compiler behavior with `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
