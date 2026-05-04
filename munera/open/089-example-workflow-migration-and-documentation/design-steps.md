@@ -1,2 +1,2 @@
-- [ ] Amend the task design/plan to name the minimum authoritative migrated example set, including whether invoke/session/delegate coverage may be distributed across a small workflow set or must be demonstrated by one coherent executable example.
-- [ ] Amend the task design/plan to name the primary documentation surface that must teach the preferred target authoring path, and clarify any required secondary doc updates.
+- [x] Amend the task design/plan to name the minimum authoritative migrated example set, including whether invoke/session/delegate coverage may be distributed across a small workflow set or must be demonstrated by one coherent executable example.
+- [x] Amend the task design/plan to name the primary documentation surface that must teach the preferred target authoring path, and clarify any required secondary doc updates.
