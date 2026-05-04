@@ -16,13 +16,13 @@
    [psi.agent-session.workflow-ir :as workflow-ir]))
 
 (def ^:private current-session-output-specs
-  {:text {:source :session/final-llm-reply}
+  {:final-llm-reply {:source :session/final-llm-reply}
    :transcript {:source :session/transcript}
    :result {:source :session/result}})
 
 (def ^:private current-session-yields
   {:type :text
-   :text :text})
+   :text :final-llm-reply})
 
 (defn- non-blank-map
   [m]
@@ -45,12 +45,20 @@
                                       :surface :whole-envelope}}}
 
       (= :outputs (first more))
-      (let [[_ output-key & output-path] more]
+      (let [[_ output-key & output-path] more
+            canonical-output-key (case output-key
+                                   :text :final-llm-reply
+                                   output-key)]
         (when-not (keyword? output-key)
           (throw (ex-info "Current `:step-output` `:outputs` refs must name a keyword output key"
                           {:path path})))
-        (cond-> {:from {:step step-id :output output-key}}
-          (seq output-path) (assoc :path (vec output-path))))
+        (cond-> {:from {:step step-id :output canonical-output-key}}
+          (seq output-path) (assoc :path (vec output-path))
+          (not= canonical-output-key output-key)
+          (assoc :compat {:current-binding-ref {:source :step-output
+                                                :path path
+                                                :legacy-output-key output-key
+                                                :canonical-output-key canonical-output-key}})))
 
       (#{:diagnostics :blocked} (first more))
       {:from {:step step-id :output :result}

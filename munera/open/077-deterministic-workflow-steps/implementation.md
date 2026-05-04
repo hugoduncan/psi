@@ -53,3 +53,8 @@
 - Added cross-links among `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-grammar-current.md` so target-design and current-implementation surfaces are explicitly navigable.
 - Wrote initial design/plan/steps surfaces.
 - Code-shaper review: found a new consistency gap between the target grammar and `doc/workflow-ir.md`; the target docs standardize the session output key as `:final-llm-reply`, but the IR examples/defaults still expose that surface via `:text`, which makes the normalization boundary less obvious.
+- 2026-05-04 — Closed the session-output naming follow-on.
+  - aligned `doc/workflow-ir.md` session examples, output-key prose, and default `:yields` to canonical `:final-llm-reply`
+  - aligned the current-grammar compatibility compiler in `workflow_current_ir_compiler.clj` so compiled session steps now expose `:final-llm-reply` instead of `:text`
+  - aligned focused proof in `workflow_current_ir_compiler_test.clj`
+  - this removes an avoidable naming drift between target grammar docs and normalized IR for session outputs

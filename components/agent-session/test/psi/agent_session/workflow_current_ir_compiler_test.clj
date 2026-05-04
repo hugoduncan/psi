@@ -69,10 +69,10 @@
                                                          "original" {:from :workflow-original}}
                                                   :compat {:current-template-syntax :dollar-bindings
                                                            :current-prompt-template "$INPUT"}}]}
-                       :outputs {:text {:source :session/final-llm-reply}
+                       :outputs {:final-llm-reply {:source :session/final-llm-reply}
                                  :transcript {:source :session/transcript}
                                  :result {:source :session/result}}
-                       :yields {:type :text :text :text}
+                       :yields {:type :text :text :final-llm-reply}
                        :compat {:current-step-id "step-1"
                                 :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
                                 :executor {:type :agent :profile "planner"}
@@ -99,7 +99,11 @@
                                                           :role "user"}}}
                               {:type :template
                                :text "Execute: {{input}}\nOriginal: {{original}}"
-                               :vars {"input" {:from {:step "step-1-plan" :output :text}}
+                               :vars {"input" {:from {:step "step-1-plan" :output :final-llm-reply}
+                                               :compat {:current-binding-ref {:source :step-output
+                                                                              :path ["step-1-plan" :outputs :text]
+                                                                              :legacy-output-key :text
+                                                                              :canonical-output-key :final-llm-reply}}}
                                       "original" {:from :workflow-original}}
                                :compat {:current-template-syntax :dollar-bindings
                                         :current-prompt-template "Execute: $INPUT\nOriginal: $ORIGINAL"}}]}

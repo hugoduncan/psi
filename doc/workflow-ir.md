@@ -147,11 +147,11 @@ Illustrative shape:
                             :text "Review these issues:\n\n{{issues}}"
                             :vars {"issues" {:from {:step "discover" :output :data}
                                               :path [:issues]}}}]}
- :outputs {:text {:source :session/final-llm-reply}
+ :outputs {:final-llm-reply {:source :session/final-llm-reply}
            :transcript {:source :session/transcript}
            :result {:source :session/result}}
  :yields {:type :text
-          :text :text}}
+          :text :final-llm-reply}}
 ```
 
 ### Session semantics
@@ -203,7 +203,7 @@ Each step may expose step-local outputs by logical output key.
 Illustrative common output keys:
 
 - invoke step: `:data`, `:summary`, `:result`
-- session step: commonly `:text`, `:transcript`, `:result`
+- session step: commonly `:final-llm-reply`, `:transcript`, `:result`
 - delegate step: optional debug/result outputs only if justified later
 
 The `:outputs` map should describe what logical output keys exist for a step and, at minimum, give runtime a canonical local meaning for each key.
@@ -265,7 +265,7 @@ The IR validator treats missing `:yields` as invalid normalized IR rather than f
 This aligns with the target grammar's preferred defaults:
 
 - deterministic/invoke steps yield their canonical machine-readable `:data`
-- inline session steps yield their canonical terminal text output key for the chosen compilation path; the current-grammar compatibility compiler currently normalizes this as `:text`
+- inline session steps yield their canonical terminal text output key `:final-llm-reply`
 - delegated steps yield the callee's yielded value unchanged
 
 ## Control flow
