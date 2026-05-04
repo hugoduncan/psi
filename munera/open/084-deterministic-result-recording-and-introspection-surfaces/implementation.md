@@ -6,3 +6,4 @@
   - `design.md` now fixes invoke failure introspection on canonical attempt `:execution-error`, with read/history projections derived from that record.
   - `plan.md` was aligned to those contract decisions.
   - `design-steps.md` review follow-ups were marked done after the task artifacts became explicit enough for implementation.
+- Review 2026-05-04: actionable inconsistency found. `design.md`/`plan.md` now center invoke failure on attempt-local `:execution-error` and reject synthetic accepted results, but the shared runtime contract still has an invoke `:error-yield` path (`deterministic_operations.clj`) while `workflow_ir.clj` resolves `:type :error` yields from accepted-result `[:blocked ...]`. The task artifacts do not yet say which failure/yield contract 084 will converge or whether invoke failures should bypass yielded-value projection entirely.
