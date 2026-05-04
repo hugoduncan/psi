@@ -7,3 +7,7 @@
   - `plan.md` now mirrors both decisions so implementation planning does not leave either seam implicit.
   - `steps.md` now carries a matching artifact-alignment checklist item so future passes can see the clarification work directly in the execution checklist.
   - The design-step resolutions match current repo proof surfaces in `doc/workflow-ir.md`, `workflow_target_ir_compiler_test.clj`, `deterministic_operation_registry_test.clj`, and `workflow_invoke_runtime_test.clj`.
+- Review 2026-05-04 ψ: no new actionable inconsistency feedback.
+  - `design.md`, `plan.md`, `steps.md`, and `design-steps.md` now agree on the canonical nested IR invoke boundary and immediate-fail error contract.
+  - Referenced repo surfaces are consistent with that framing: `doc/workflow-ir.md` defines nested `:invoke` runtime IR, `workflow_source_resolution.clj` owns shared invoke-arg/source-spec semantics, and `workflow_statechart_runtime.clj` executes invoke steps through the deterministic registry.
+  - Existing proof surfaces already cover the key cross-file claims this review checked: `workflow_invoke_runtime_test.clj` proves success plus immediate-fail error behavior, and `workflow_source_resolution_test.clj` proves shared source-spec semantics across invoke/session/delegate forms.
