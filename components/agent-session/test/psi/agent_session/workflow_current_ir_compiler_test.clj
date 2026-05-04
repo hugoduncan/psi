@@ -28,7 +28,7 @@
                           :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}}
            "step-2-build" {:executor {:type :agent :profile "builder" :skill "clojure-coding-standards"}
                            :prompt-template "Execute: $INPUT\nOriginal: $ORIGINAL"
-                           :input-bindings {:input {:source :step-output :path ["step-1-plan" :outputs :text]}
+                           :input-bindings {:input {:source :step-output :path ["step-1-plan" :outputs :final-llm-reply]}
                                             :original {:source :workflow-input :path [:original]}}
                            :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
                            :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}
@@ -100,9 +100,9 @@
                               {:type :template
                                :text "Execute: {{input}}\nOriginal: {{original}}"
                                :vars {"input" {:from {:step "step-1-plan" :output :result}
-                                               :path [:outputs :text]
+                                               :path [:outputs :final-llm-reply]
                                                :compat {:current-binding-ref {:source :step-output
-                                                                              :path ["step-1-plan" :outputs :text]
+                                                                              :path ["step-1-plan" :outputs :final-llm-reply]
                                                                               :accepted-result-envelope true
                                                                               :surface :outputs}}}
                                       "original" {:from :workflow-original}}

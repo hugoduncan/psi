@@ -76,7 +76,7 @@
                     {:name "reproduce"
                      :workflow "builder"
                      :session {:input {:from {:step "discover" :kind :accepted-result}
-                                       :projection {:path [:outputs :text]}}
+                                       :projection {:path [:outputs :final-llm-reply]}}
                                :reference {:from :workflow-input
                                            :projection {:path [:ticket :title]}}}
                      :prompt "$INPUT"}
@@ -139,10 +139,10 @@
       (is (= {:input {:source :workflow-input :path [:input]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps plan-id :input-bindings])))
-      (is (= {:input {:source :step-output :path [plan-id :outputs :text]}
+      (is (= {:input {:source :step-output :path [plan-id :outputs :final-llm-reply]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps build-id :input-bindings])))
-      (is (= {:input {:source :step-output :path [build-id :outputs :text]}
+      (is (= {:input {:source :step-output :path [build-id :outputs :final-llm-reply]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps review-id :input-bindings])))
       (is (= "$INPUT" (get-in definition [:steps plan-id :prompt-template])))
@@ -195,7 +195,7 @@
             :body "Frame."})
           [plan-id build-id] (:step-order definition)]
       (is (nil? error))
-      (is (= {:input {:source :step-output :path [plan-id :outputs :text]}
+      (is (= {:input {:source :step-output :path [plan-id :outputs :final-llm-reply]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps build-id :input-bindings])))))
 
@@ -214,7 +214,7 @@
             :body "Frame."})
           [plan-id build-id] (:step-order definition)]
       (is (nil? error))
-      (is (= {:input {:source :step-output :path [plan-id :outputs :text]}
+      (is (= {:input {:source :step-output :path [plan-id :outputs :final-llm-reply]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps build-id :input-bindings]))))))
 
@@ -227,7 +227,7 @@
       (is (= {:input {:source :workflow-input :path [:task]}
               :original {:source :workflow-input :path [:original]}}
              (get-in definition [:steps discover-id :input-bindings])))
-      (is (= {:input {:source :step-output :path [discover-id :outputs :text]}
+      (is (= {:input {:source :step-output :path [discover-id :outputs :final-llm-reply]}
               :original {:source :workflow-input :path [:ticket :title]}}
              (get-in definition [:steps reproduce-id :input-bindings])))
       (is (= {:input {:source :step-output :path [reproduce-id]}
@@ -250,14 +250,14 @@
                              {:name "request-more-info"
                               :workflow "builder"
                               :session {:input {:from {:step "discover" :kind :accepted-result}
-                                                :projection {:path [:outputs :text]}}}
+                                                :projection {:path [:outputs :final-llm-reply]}}}
                               :prompt "$INPUT"}]}
             :body "Frame."})
           [discover-id review-id request-more-info-id] (:step-order definition)]
       (is (nil? error))
       (is (= {:source :step-output :path [discover-id :diagnostics :summary]}
              (get-in definition [:steps review-id :input-bindings :input])))
-      (is (= {:source :step-output :path [discover-id :outputs :text]}
+      (is (= {:source :step-output :path [discover-id :outputs :final-llm-reply]}
              (get-in definition [:steps request-more-info-id :input-bindings :input]))))))
 
 (deftest compile-multi-step-session-overrides-test

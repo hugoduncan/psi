@@ -123,12 +123,12 @@
           (is (true? (:terminal? result)))
           (is (= :completed (:status run)))
           (is (nil? (:current-step-id run)))
-          (is (= {:outcome :ok :outputs {:text "plan-output"}}
-                 (get-in run [:step-runs "plan" :accepted-result])))
-          (is (= {:outcome :ok :outputs {:text "build-output"}}
-                 (get-in run [:step-runs "build" :accepted-result])))
-          (is (= {:outcome :ok :outputs {:text "review-output"}}
-                 (get-in run [:step-runs "review" :accepted-result])))
+          (is (= "plan-output"
+                 (get-in run [:step-runs "plan" :accepted-result :outputs :final-llm-reply])))
+          (is (= "build-output"
+                 (get-in run [:step-runs "build" :accepted-result :outputs :final-llm-reply])))
+          (is (= "review-output"
+                 (get-in run [:step-runs "review" :accepted-result :outputs :final-llm-reply])))
           (is (= 3 (count actual-session-ids)))
           (is (= (set @child-sessions*)
                  (set actual-session-ids)))
@@ -202,10 +202,10 @@
                        (fn [state]
                          (-> state
                              (assoc-in [:workflows :runs run-id :step-runs "plan" :accepted-result]
-                                       {:outcome :ok :outputs {:text "approved plan"}})
+                                       {:outcome :ok :outputs {:final-llm-reply "approved plan"}})
                              (assoc-in [:workflows :runs run-id :step-runs "plan" :attempts 1 :status] :succeeded)
                              (assoc-in [:workflows :runs run-id :step-runs "plan" :attempts 1 :result-envelope]
-                                       {:outcome :ok :outputs {:text "approved plan"}})
+                                       {:outcome :ok :outputs {:final-llm-reply "approved plan"}})
                              (assoc-in [:workflows :runs run-id :current-step-id] "build")
                              (assoc-in [:workflows :runs run-id :status] :running)
                              (assoc-in [:workflows :runs run-id :blocked] nil)

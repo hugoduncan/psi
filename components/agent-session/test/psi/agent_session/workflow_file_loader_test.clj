@@ -74,7 +74,7 @@
        "         {:name \"reproduce\"\n"
        "          :workflow \"builder\"\n"
        "          :session {:input {:from {:step \"discover\" :kind :accepted-result}\n"
-       "                            :projection {:path [:outputs :text]}}\n"
+       "                            :projection {:path [:outputs :final-llm-reply]}}\n"
        "                    :reference {:from :workflow-input\n"
        "                                :projection {:path [:ticket :title]}}}\n"
        "          :prompt \"$INPUT\"}\n"
@@ -199,7 +199,7 @@
             (is (= {:input {:source :workflow-input :path [:task]}
                     :original {:source :workflow-input :path [:original]}}
                    (get-in definition [:steps discover-id :input-bindings])))
-            (is (= {:input {:source :step-output :path [discover-id :outputs :text]}
+            (is (= {:input {:source :step-output :path [discover-id :outputs :final-llm-reply]}
                     :original {:source :workflow-input :path [:ticket :title]}}
                    (get-in definition [:steps reproduce-id :input-bindings])))
             (is (= {:input {:source :step-output :path [reproduce-id]}

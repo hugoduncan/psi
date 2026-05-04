@@ -62,7 +62,7 @@
                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
            "step-2-builder" {:executor {:type :agent :profile "builder"}
                              :prompt-template "Execute: $INPUT"
-                             :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :text]}
+                             :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :final-llm-reply]}
                                               :original {:source :workflow-input :path [:original]}}
                              :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}
@@ -105,7 +105,7 @@
                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
            "step-3-reviewer" {:executor {:type :agent :profile "reviewer"}
                               :prompt-template "Review: $INPUT\nOriginal: $ORIGINAL"
-                              :input-bindings {:input {:source :step-output :path ["step-2-builder" :outputs :text]}
+                              :input-bindings {:input {:source :step-output :path ["step-2-builder" :outputs :final-llm-reply]}
                                                :original {:source :workflow-input :path [:original]}}
                               :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
                               :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
@@ -173,7 +173,7 @@
                                                          :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
                                        "step-2-builder" {:executor {:type :agent :profile "builder"}
                                                          :prompt-template "$INPUT"
-                                                         :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :text]}}
+                                                         :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :final-llm-reply]}}
                                                          :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
                                                          :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
                                                          :session-overrides {:system-prompt "Focus only on correctness."
@@ -216,7 +216,7 @@
         run0 (workflow-runtime/workflow-run-in state2 run-id)
         prompt0 (workflow-execution/step-prompt run0 "step-1-planner")
         state3 (assoc-in state2 [:workflows :runs run-id :step-runs "step-1-planner" :accepted-result]
-                         {:outcome :ok :outputs {:text "plan text"}})
+                         {:outcome :ok :outputs {:final-llm-reply "plan text"}})
         run1 (workflow-runtime/workflow-run-in state3 run-id)
         prompt1 (workflow-execution/step-prompt run1 "step-2-builder")]
     (is (= {:input "ship it" :original "build this feature"} (:step-inputs prompt0)))
@@ -251,7 +251,7 @@
                                                                                 :original {:issue {:title "Bug 123"}}}})
         state3 (assoc-in state2 [:workflows :runs run-id :step-runs "step-1-discover" :accepted-result]
                          {:outcome :ok
-                          :outputs {:text "plan text"}
+                          :outputs {:final-llm-reply "plan text"}
                           :diagnostics {:summary "need logs"}})
         run (workflow-runtime/workflow-run-in state3 run-id)
         prompt (workflow-execution/step-prompt run "step-2-request-more-info")]
@@ -310,8 +310,8 @@
           (is (true? (:terminal? result)))
           (is (false? (:blocked? result)))
           (is (= 2 (count (:steps-executed result))))
-          (is (= {:outcome :ok :outputs {:text "builder output"}}
-                 (get-in run [:step-runs "step-2-builder" :accepted-result])))
+          (is (= "builder output"
+                 (get-in run [:step-runs "step-2-builder" :accepted-result :outputs :final-llm-reply])))
           (is (= ["ship it"
                   "Execute: planner output"]
                  (mapv :prompt @prompts*))))))))

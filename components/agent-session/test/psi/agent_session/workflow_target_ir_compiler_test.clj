@@ -85,7 +85,7 @@
                    :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
            "build" {:executor {:type :agent :profile "builder"}
                     :prompt-template "Build: $INPUT"
-                    :input-bindings {:input {:source :step-output :path ["plan" :outputs :text]}}
+                    :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})
 
@@ -100,7 +100,7 @@
             :contributions [{:type :template
                              :text "Build: {{input}}"
                              :vars {"input" {:from {:step "plan" :output :result}
-                                             :path [:outputs :text]}}}]}]})
+                                             :path [:outputs :final-llm-reply]}}}]}]})
 
 (defn- strip-compat
   [x]

@@ -38,7 +38,7 @@
     :input
     (if previous-step-id
       {:source :step-output
-       :path [previous-step-id :outputs :text]}
+       :path [previous-step-id :outputs :final-llm-reply]}
       {:source :workflow-input
        :path [:input]})
 
