@@ -5,7 +5,6 @@ Open tasks in suggested execution order:
 Queue:
 
 `munera/open/077-deterministic-workflow-steps/`
-`munera/open/085-inline-session-contribution-compilation-into-child-session-conversations/`
 `munera/open/086-delegated-boundary-model-and-workflow-invocation-plumbing/`
 `munera/open/084-deterministic-result-recording-and-introspection-surfaces/`
 `munera/open/089-example-workflow-migration-and-documentation/`
