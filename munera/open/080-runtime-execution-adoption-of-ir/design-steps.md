@@ -1,0 +1,8 @@
+- [ ] Decide how runtime IR adoption handles current-grammar `:workflow-runtime` refs that the compatibility compiler can emit but `workflow_ir.clj` currently rejects structurally.
+  - Evidence: `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj` proves current `:workflow-runtime` bindings compile into IR-shaped source specs with `:compat` breadcrumbs, and `workflow_ir/validate-workflow-ir` currently reports that compiled IR as invalid.
+  - Settle whether this task explicitly rejects such workflows at the runtime seam, translates them to another canonical IR source surface before execution, or widens canonical IR to admit them.
+  - Follow-up: encode the chosen rule in design/plan and add focused proof at the execution-entry seam so existing authored workflow compatibility is unambiguous.
+- [ ] Decide the observer-facing contract for attempt/result/history/observability surfaces after execution pivots to IR.
+  - Evidence: task design says to adapt attempt/result recording and observability to IR concepts, but current execution/tests still reason in accepted-result/step-run terms while the IR introduces typed execution forms (`:session`, `:invoke`, `:delegate`) and `:compat` metadata.
+  - Settle whether observer-facing runtime state and resolver/test surfaces stay shape-stable with only internal execution substrate changing, or whether any public/introspection surface is intentionally renamed/rekeyed around IR concepts in this slice.
+  - Follow-up: encode the chosen boundary in design/plan and add focused regression proof covering both execution and observability so they cannot drift independently.
