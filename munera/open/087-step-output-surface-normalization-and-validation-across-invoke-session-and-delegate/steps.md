@@ -6,3 +6,4 @@
 - [x] Add focused valid-reference tests across invoke/session/delegate workflows
 - [x] Add focused invalid-reference tests across invoke/session/delegate workflows
 - [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`
+- [ ] Update workflow runtime-adoption and step-prep tests to author/assert canonical session output keys (`:final-llm-reply`) by default; keep legacy `:outputs :text` only in fixtures that explicitly prove compatibility fallback behavior.
