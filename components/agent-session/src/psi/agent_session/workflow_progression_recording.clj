@@ -56,28 +56,51 @@
     workflow-run))
 
 (defn start-latest-attempt
-  "Mark the latest attempt for `step-id` as :running and the run as :running."
-  [state run-id step-id]
-  (update-in state (run-path run-id)
-             (fn [workflow-run]
-               (-> workflow-run
-                   (update-attempt step-id #(-> %
-                                                (assoc :status :running
-                                                       :updated-at (now))))
-                   (assoc :status :running
-                          :current-step-id step-id
-                          :blocked nil
-                          :updated-at (now))
-                   (append-history :workflow/attempt-started
-                                   {:run-id run-id
-                                    :step-id step-id
-                                    :attempt-id (:attempt-id (latest-attempt workflow-run step-id))})))))
+  "Mark the latest attempt for `step-id` as :running and the run as :running.
+
+   Optional `attempt-data` is merged onto the latest attempt before status/start
+   metadata so attempt-local execution records such as effective invoke args can
+   be captured canonically on the attempt that actually ran."
+  ([state run-id step-id]
+   (start-latest-attempt state run-id step-id nil))
+  ([state run-id step-id attempt-data]
+   (update-in state (run-path run-id)
+              (fn [workflow-run]
+                (-> workflow-run
+                    (update-attempt step-id #(cond-> (merge % (or attempt-data {}))
+                                               true (assoc :status :running
+                                                           :updated-at (now))))
+                    (assoc :status :running
+                           :current-step-id step-id
+                           :blocked nil
+                           :updated-at (now))
+                    (append-history :workflow/attempt-started
+                                    {:run-id run-id
+                                     :step-id step-id
+                                     :attempt-id (:attempt-id (latest-attempt workflow-run step-id))}))))))
 
 (defn increment-iteration-count
   "Increment the iteration count on a step-run. Starts at 0, incremented on every entry."
   [state run-id step-id]
   (update-in state (conj (run-path run-id) :step-runs step-id :iteration-count)
              (fnil inc 0)))
+
+(defn merge-latest-attempt-data
+  "Merge additional canonical execution data onto the latest attempt without
+   changing workflow control-flow status/history.
+
+   Used when step execution can only determine attempt-local runtime details
+   such as effective invoke args after the attempt has already been started."
+  [state run-id step-id attempt-data]
+  (if (seq attempt-data)
+    (update-in state (run-path run-id)
+               (fn [workflow-run]
+                 (-> workflow-run
+                     (update-attempt step-id #(-> %
+                                                  (merge attempt-data)
+                                                  (assoc :updated-at (now))))
+                     (assoc :updated-at (now)))))
+    state))
 
 (defn record-step-result
   "Record a successful step result on the latest attempt without owning control flow.

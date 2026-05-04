@@ -152,6 +152,7 @@
    [:attempt-id workflow-attempt-id-schema]
    [:status workflow-step-attempt-status-schema]
    [:execution-session-id {:optional true} [:maybe :string]]
+   [:effective-args {:optional true} [:maybe :map]]
    [:result-envelope {:optional true} [:maybe workflow-result-envelope-schema]]
    [:validation-outcome {:optional true} [:maybe workflow-validation-outcome-schema]]
    [:execution-error {:optional true} [:maybe :map]]

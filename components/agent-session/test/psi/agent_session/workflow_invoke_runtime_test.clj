@@ -91,6 +91,8 @@
              :run-id "run-invoke"
              :step-id "discover"}]
            @calls*))
+    (is (= {:repo "psi" :labels ["bug"]}
+           (get-in run [:step-runs "discover" :attempts 0 :effective-args])))
     (is (= {:outcome :ok
             :outputs {:data {:issues [{:id 1 :repo "psi"}]}
                       :summary "1 issue"
@@ -120,6 +122,8 @@
         run (workflow-runtime/workflow-run-in @(:state* ctx) "run-invoke-error")]
     (is (= :failed (:status result)))
     (is (= :execution-failed (get-in run [:step-runs "discover" :attempts 0 :status])))
+    (is (= {:repo "psi" :labels ["bug"]}
+           (get-in run [:step-runs "discover" :attempts 0 :effective-args])))
     (is (= {:reason :not-found
             :message "repo missing"
             :operation-result {:status :error

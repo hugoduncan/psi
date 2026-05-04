@@ -214,23 +214,27 @@
   [ctx parent-session-id run-id step-id step-def workflow-run]
   (let [invoke-spec (or (:invoke step-def)
                         (get-in step-def [:judge :invoke]))
-        args (workflow-source-resolution/resolve-invoke-args workflow-run (:args invoke-spec))]
-    (deterministic-op-reg/invoke-operation-in
-     (:deterministic-operation-registry ctx)
-     (:operation invoke-spec)
-     {:ctx ctx
-      :parent-session-id parent-session-id
-      :workflow-run-id run-id
-      :step-id step-id
-      :args args})))
+        args (workflow-source-resolution/resolve-invoke-args workflow-run (:args invoke-spec))
+        operation-result (deterministic-op-reg/invoke-operation-in
+                          (:deterministic-operation-registry ctx)
+                          (:operation invoke-spec)
+                          {:ctx ctx
+                           :parent-session-id parent-session-id
+                           :workflow-run-id run-id
+                           :step-id step-id
+                           :args args})]
+    {:effective-args args
+     :operation-result operation-result}))
 
 (defn- apply-invoke-step-result
-  [operation-result]
+  [{:keys [effective-args operation-result]}]
   (let [{:keys [kind accepted-result execution-error]} (deterministic-ops/operation-result->invoke-step-result operation-result)]
     (case kind
-      :accepted-result {:pending-kind :success
+      :accepted-result {:attempt-data {:effective-args effective-args}
+                        :pending-kind :success
                         :payload accepted-result}
-      :execution-error {:pending-kind :failure
+      :execution-error {:attempt-data {:effective-args effective-args}
+                        :pending-kind :failure
                         :payload execution-error})))
 
 (defn- resolve-delegate-target-definition
@@ -418,8 +422,10 @@
           (try
             (cond
               invoke-step?
-              (let [operation-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
-                    {:keys [pending-kind payload]} (apply-invoke-step-result operation-result)]
+              (let [invoke-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
+                    {:keys [attempt-data pending-kind payload]} (apply-invoke-step-result invoke-result)]
+                (swap! (:state* ctx)
+                       workflow-progression-recording/merge-latest-attempt-data run-id step-id attempt-data)
                 (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
                                                                     :payload payload
                                                                     :step-id step-id

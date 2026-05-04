@@ -40,6 +40,31 @@
 
 ;; ── Summary projection ───────────────────────────────────────────────────────
 
+(defn- workflow-attempt-summary
+  [attempt]
+  (cond-> {:attempt-id (:attempt-id attempt)
+           :status (:status attempt)
+           :execution-session-id (:execution-session-id attempt)
+           :effective-args (:effective-args attempt)
+           :result-envelope (:result-envelope attempt)
+           :validation-outcome (:validation-outcome attempt)
+           :execution-error (:execution-error attempt)
+           :blocked (:blocked attempt)
+           :judge-session-id (:judge-session-id attempt)
+           :judge-output (:judge-output attempt)
+           :judge-event (:judge-event attempt)
+           :created-at (:created-at attempt)
+           :updated-at (:updated-at attempt)}
+    (:finished-at attempt)
+    (assoc :finished-at (:finished-at attempt))))
+
+(defn- workflow-step-run-summary
+  [step-run]
+  {:step-id (:step-id step-run)
+   :iteration-count (:iteration-count step-run)
+   :accepted-result (:accepted-result step-run)
+   :attempts (mapv workflow-attempt-summary (:attempts step-run))})
+
 (defn workflow-run-summary
   [workflow-run]
   {:run-id               (:run-id workflow-run)
@@ -51,7 +76,12 @@
    :updated-at           (:updated-at workflow-run)
    :finished-at          (:finished-at workflow-run)
    :blocked              (:blocked workflow-run)
-   :terminal-outcome     (:terminal-outcome workflow-run)})
+   :terminal-outcome     (:terminal-outcome workflow-run)
+   :step-runs            (into {}
+                               (map (fn [[step-id step-run]]
+                                      [step-id (workflow-step-run-summary step-run)]))
+                               (:step-runs workflow-run))
+   :history              (:history workflow-run)})
 
 (defn- find-required-fn
   [ns-name var-name]

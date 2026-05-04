@@ -135,7 +135,67 @@
     (testing "workflow read-run requires run-id"
       (let [result ((:execute tool) {"action" "workflow" "op" "read-run"})]
         (is (true? (:is-error result)))
-        (is (re-find #"requires `run-id`" (:content result)))))))
+        (is (re-find #"requires `run-id`" (:content result)))))
+
+    (testing "workflow read-run returns canonical step-run and attempt introspection surfaces"
+      (let [[ctx session-id] (create-session-context {:persist? false})
+            _ (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (psi.agent-session.workflow-runtime/create-run
+                                      state
+                                      {:definition {:definition-id "invoke-proof"
+                                                    :name "invoke-proof"
+                                                    :steps [{:name "discover"
+                                                             :type :invoke
+                                                             :operation "github/search-issues-by-label"
+                                                             :args {:repo {:from :workflow-input :path [:repo]}
+                                                                    :labels {:from :workflow-input :path [:labels]}}
+                                                             :outputs {:data {:source :invoke/data}
+                                                                       :summary {:source :invoke/summary}
+                                                                       :result {:source :invoke/result}}
+                                                             :yields {:type :data :data :data}}]}
+                                       :run-id "run-read-proof"
+                                       :workflow-input {:repo "psi" :labels ["bug"]}})]
+                         s)))
+            _ (swap! (:state* ctx)
+                     assoc-in
+                     [:workflows :runs "run-read-proof" :step-runs "discover" :attempts]
+                     [{:attempt-id "discover-a1"
+                       :status :succeeded
+                       :effective-args {:repo "psi" :labels ["bug"]}
+                       :result-envelope {:outcome :ok
+                                         :outputs {:data {:issues [{:id 1}]}
+                                                   :summary "1 issue"
+                                                   :result {:status :ok
+                                                            :data {:issues [{:id 1}]}
+                                                            :summary "1 issue"}}}
+                       :created-at (java.time.Instant/now)
+                       :updated-at (java.time.Instant/now)
+                       :finished-at (java.time.Instant/now)}])
+            _ (swap! (:state* ctx)
+                     assoc-in
+                     [:workflows :runs "run-read-proof" :step-runs "discover" :accepted-result]
+                     {:outcome :ok
+                      :outputs {:data {:issues [{:id 1}]}
+                                :summary "1 issue"
+                                :result {:status :ok
+                                         :data {:issues [{:id 1}]}
+                                         :summary "1 issue"}}})
+            tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+            result ((:execute tool) {"action" "workflow" "op" "read-run" "run-id" "run-read-proof"})
+            parsed (read-string (:content result))
+            run (get-in parsed [:psi-tool/workflow :run])]
+        (is (false? (:is-error result)))
+        (is (= "run-read-proof" (:run-id run)))
+        (is (= {:repo "psi" :labels ["bug"]}
+               (get-in run [:step-runs "discover" :attempts 0 :effective-args])))
+        (is (= {:outcome :ok
+                :outputs {:data {:issues [{:id 1}]}
+                          :summary "1 issue"
+                          :result {:status :ok
+                                   :data {:issues [{:id 1}]}
+                                   :summary "1 issue"}}}
+               (get-in run [:step-runs "discover" :accepted-result])))))))
 
 (deftest make-psi-tool-invalid-edn-test
   (testing "invalid EDN returns error"

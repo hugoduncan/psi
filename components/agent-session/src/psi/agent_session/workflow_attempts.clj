@@ -25,13 +25,14 @@
     (str attempt-id)))
 
 (defn new-attempt
-  [{:keys [attempt-id status execution-session-id result-envelope validation-outcome execution-error blocked]}]
+  [{:keys [attempt-id status execution-session-id effective-args result-envelope validation-outcome execution-error blocked]}]
   (let [ts (now)]
     (cond-> {:attempt-id attempt-id
              :status status
              :created-at ts
              :updated-at ts}
       execution-session-id (assoc :execution-session-id execution-session-id)
+      effective-args (assoc :effective-args effective-args)
       result-envelope (assoc :result-envelope result-envelope)
       validation-outcome (assoc :validation-outcome validation-outcome)
       execution-error (assoc :execution-error execution-error)
