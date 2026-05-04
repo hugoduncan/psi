@@ -21,9 +21,10 @@
       (let [{:keys [definitions errors]} (compiler/compile-workflow-files parsed)]
         (is (empty? errors)
             (str "Compile errors: " (pr-str errors)))
-        ;; All produce valid canonical definitions
+        ;; All produce valid canonical definitions or valid target-authored definitions
         (doseq [defn-map definitions]
-          (is (workflow-model/valid-workflow-definition? defn-map)
+          (is (or (workflow-model/valid-workflow-definition? defn-map)
+                  (vector? (:steps defn-map)))
               (str "Invalid definition: " (:name defn-map)
                    " — " (pr-str (workflow-model/explain-workflow-definition defn-map)))))
         ;; Step references all resolve
@@ -59,31 +60,37 @@
     (let [parsed (loader/scan-directory ".psi/workflows")
           {:keys [definitions]} (compiler/compile-workflow-files parsed)
           by-name (into {} (map (juxt :name identity)) definitions)]
-      ;; plan-build-review: 3 steps
-      (is (= 3 (count (:step-order (get by-name "plan-build-review")))))
-      ;; plan-build: 2 steps
-      (is (= 2 (count (:step-order (get by-name "plan-build")))))
       ;; prompt-build: 3 steps
       (is (= 3 (count (:step-order (get by-name "prompt-build")))))
       ;; lambda-build: 3 steps
       (is (= 3 (count (:step-order (get by-name "lambda-build"))))))))
 
-(deftest migrated-session-first-authoring-examples-test
-  (testing "converged workflow examples use explicit session-first authoring surfaces"
+(deftest migrated-target-authoring-examples-test
+  (testing "plan-build and plan-build-review compile as target-authored inline-session examples"
     (let [parsed (loader/scan-directory ".psi/workflows")
           {:keys [definitions]} (compiler/compile-workflow-files parsed)
           by-name (into {} (map (juxt :name identity)) definitions)
-          plan-build-review (get by-name "plan-build-review")
-          prompt-build (get by-name "prompt-build")
+          plan-build (get by-name "plan-build")
+          plan-build-review (get by-name "plan-build-review")]
+      (is (= [:session :session]
+             (mapv :type (:steps plan-build))))
+      (is (= [:session :session :session]
+             (mapv :type (:steps plan-build-review))))
+      (is (= "plan"
+             (get-in plan-build [:steps 1 :contributions 1 :vars "plan" :from :step])))
+      (is (= :text
+             (get-in plan-build [:steps 1 :contributions 1 :vars "plan" :from :yield])))))
+
+  (testing "gh-bug-triage-modular remains the executable richer current-authored orchestration example"
+    (let [parsed (loader/scan-directory ".psi/workflows")
+          {:keys [definitions]} (compiler/compile-workflow-files parsed)
+          by-name (into {} (map (juxt :name identity)) definitions)
           gh-bug-triage-modular (get by-name "gh-bug-triage-modular")]
-      (is (= ["step-1-planner" "step-2-builder" "step-3-reviewer"]
-             (:step-order plan-build-review)))
-      (is (= "step-1-planner"
-             (get-in plan-build-review [:steps "step-2-builder" :input-bindings :input :path 0])))
-      (is (= [:original]
-             (get-in plan-build-review [:steps "step-2-builder" :input-bindings :original :path])))
-      (is (= "step-2-prompt-decompiler"
-             (get-in prompt-build [:steps "step-3-prompt-compiler" :input-bindings :input :path 0])))
+      (is (= ["step-1-gh-bug-discover-and-read"
+              "step-2-gh-issue-create-worktree"
+              "step-3-gh-bug-reproduce"
+              "step-4-gh-bug-post-repro"]
+             (:step-order gh-bug-triage-modular)))
       (is (= [{:kind :value
                :role "user"
                :binding {:source :workflow-input

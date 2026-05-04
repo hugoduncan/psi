@@ -40,7 +40,8 @@ Flow:
 
 Notes:
 - This workflow remains intentionally linear at the orchestration layer.
-- Current dogfood update uses explicit `:session :input` source selection and `:session :preload` reference context rather than relying on implicit file-order-only wiring.
-- `post-repro` now receives the reproduction report as `$INPUT` and also preloads original request, upstream accepted results, and a tail of the reproduction transcript for constrained context.
+- It remains the authoritative executable bug-triage example while target-grammar delegate guidance is taught in `doc/workflows.md` with explicit implementation-boundary notes.
+- Current executable shape uses explicit `:session :input` source selection and `:session :preload` reference context rather than relying on implicit file-order-only wiring.
+- `post-repro` receives the reproduction report as `$INPUT` and also preloads original request, upstream accepted results, and a tail of the reproduction transcript for constrained context.
 - Use the issue worktree as authoritative for all reproduction activity after creation.
 - This workflow classifies and hands off; it does not create a Munera task, implement a fix, or create a PR.

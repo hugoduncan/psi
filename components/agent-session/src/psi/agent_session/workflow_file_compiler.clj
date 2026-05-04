@@ -10,7 +10,8 @@
    each step references another workflow by name."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.workflow-file-authoring-resolution :as authoring-resolution]))
+   [psi.agent-session.workflow-file-authoring-resolution :as authoring-resolution]
+   [psi.agent-session.workflow-target-ir-compiler :as workflow-target-ir-compiler]))
 
 ;;; Shared constants
 
@@ -186,11 +187,31 @@
 
 ;;; Top-level compilation
 
+(defn- target-authored-config?
+  [config]
+  (and (map? config)
+       (vector? (:steps config))
+       (every? map? (:steps config))
+       (every? #(contains? % :type) (:steps config))))
+
+(defn- compile-target-authored-workflow-file
+  [{:keys [name description config body]}]
+  (let [workflow-definition (cond-> {:steps (:steps config)}
+                              name (assoc :definition-id name
+                                          :name name)
+                              description (assoc :summary description
+                                                 :description description)
+                              body (assoc :workflow-file-meta {:framing-prompt body}))]
+    (when-not (workflow-target-ir-compiler/target-authored-workflow-definition? workflow-definition)
+      (throw (ex-info "Target-authored workflow file must define `{:steps [...]}`"
+                      {:workflow-definition workflow-definition})))
+    workflow-definition))
+
 (defn compile-workflow-file
   "Compile a parsed workflow file into a canonical workflow definition.
 
-   Dispatches to single-step or multi-step compilation based on presence
-   of `:steps` in the config block.
+   Dispatches to single-step, current multi-step, or target-authored compilation
+   based on the config block shape.
 
    Returns {:definition <map>} on success, {:error <string>} on failure."
   [{:keys [name config error] :as parsed}]
@@ -201,6 +222,9 @@
 
       (nil? name)
       {:error "Cannot compile: missing workflow name"}
+
+      (target-authored-config? config)
+      {:definition (compile-target-authored-workflow-file parsed)}
 
       (seq (:steps config))
       {:definition (compile-multi-step parsed)}
@@ -222,15 +246,21 @@
           {:definitions [] :errors []}
           parsed-files))
 
+(defn- target-authored-definition?
+  [definition]
+  (workflow-target-ir-compiler/target-authored-workflow-definition? definition))
+
 (defn validate-step-references
-  "Validate that all multi-step workflow definitions reference known workflow names.
+  "Validate that all current-authored multi-step workflow definitions reference known workflow names.
+   Target-authored definitions use explicit runtime compilation and are skipped here.
    Returns {:valid? true} or {:valid? false :errors [{:definition ... :step ... :missing ...} ...]}."
   [definitions]
   (let [known-names (set (map :name definitions))
         errors (into []
                      (mapcat
                       (fn [definition]
-                        (when (> (count (:step-order definition)) 1)
+                        (when (and (not (target-authored-definition? definition))
+                                   (> (count (:step-order definition)) 1))
                           (keep (fn [[step-id step-def]]
                                   (let [profile (get-in step-def [:executor :profile])]
                                     (when (and profile (not (contains? known-names profile)))
@@ -255,36 +285,38 @@
 
 (defn validate-judge-routing
   "Validate judge/routing constraints across definitions.
-   Checks:
+   Checks current-authored definitions only:
    - :on without :judge is an error
    - :goto string targets reference known step-ids within the definition
+   Target-authored definitions are validated through the target compiler + IR path.
    Returns {:valid? true} or {:valid? false :errors [...]}"
   [definitions]
   (let [errors (into []
                      (mapcat
                       (fn [definition]
-                        (let [step-ids (set (:step-order definition))]
-                          (mapcat
-                           (fn [[step-id step-def]]
-                             (let [has-on? (some? (:on step-def))
-                                   has-judge? (some? (:judge step-def))
-                                   on-table (:on step-def)]
-                               (concat
-                                (when (and has-on? (not has-judge?))
-                                  [{:definition (:name definition)
-                                    :step step-id
-                                    :error :on-without-judge}])
-                                (when on-table
-                                  (keep (fn [[signal directive]]
-                                          (when (and (string? (:goto directive))
-                                                     (not (contains? step-ids (:goto directive))))
-                                            {:definition (:name definition)
-                                             :step step-id
-                                             :signal signal
-                                             :error :unknown-goto-target
-                                             :target (:goto directive)}))
-                                        on-table)))))
-                           (:steps definition)))))
+                        (when-not (target-authored-definition? definition)
+                          (let [step-ids (set (:step-order definition))]
+                            (mapcat
+                             (fn [[step-id step-def]]
+                               (let [has-on? (some? (:on step-def))
+                                     has-judge? (some? (:judge step-def))
+                                     on-table (:on step-def)]
+                                 (concat
+                                  (when (and has-on? (not has-judge?))
+                                    [{:definition (:name definition)
+                                      :step step-id
+                                      :error :on-without-judge}])
+                                  (when on-table
+                                    (keep (fn [[signal directive]]
+                                            (when (and (string? (:goto directive))
+                                                       (not (contains? step-ids (:goto directive))))
+                                              {:definition (:name definition)
+                                               :step step-id
+                                               :signal signal
+                                               :error :unknown-goto-target
+                                               :target (:goto directive)}))
+                                          on-table)))))
+                             (:steps definition))))))
                      definitions)]
     (if (seq errors)
       {:valid? false :errors errors}

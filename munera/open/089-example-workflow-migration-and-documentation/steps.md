@@ -1,9 +1,9 @@
-- [ ] Choose representative workflows or workflow slices for migration/example use
-- [ ] Ensure the example set covers invoke/session/delegate and shared data-flow semantics where practical
-- [ ] Migrate or add target-grammar variants for the chosen examples
-- [ ] Add or update docs showing the preferred target authoring style
-- [ ] Add concise current->target mapping notes where they reduce author confusion
-- [ ] Run focused verification for migrated examples
-- [ ] Tighten examples/docs if migration reveals readability or ergonomics issues
-- [ ] Reconcile examples/docs with task `077` and executable runtime behavior
+- [x] Choose representative workflows or workflow slices for migration/example use
+- [x] Ensure the example set covers invoke/session/delegate and shared data-flow semantics where practical
+- [x] Migrate or add target-grammar variants for the chosen examples
+- [x] Add or update docs showing the preferred target authoring style
+- [x] Add concise current->target mapping notes where they reduce author confusion
+- [x] Run focused verification for migrated examples
+- [x] Tighten examples/docs if migration reveals readability or ergonomics issues
+- [x] Reconcile examples/docs with task `077` and executable runtime behavior
   - [x] Bound task/design-plan documentation claims to the currently taught `:session` input/reference/preload and shared-reference surfaces; do not imply concrete example-led `outputs`/`yields` coverage until the guide teaches them explicitly
