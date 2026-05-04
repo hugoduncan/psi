@@ -4,6 +4,17 @@ Open tasks in suggested execution order:
 
 Queue:
 
+`munera/open/077-deterministic-workflow-steps/`
+`munera/open/083-runtime-execution-support-for-deterministic-invoke-steps/`
+`munera/open/085-inline-session-contribution-compilation-into-child-session-conversations/`
+`munera/open/086-delegated-boundary-model-and-workflow-invocation-plumbing/`
+`munera/open/084-deterministic-result-recording-and-introspection-surfaces/`
+`munera/open/089-example-workflow-migration-and-documentation/`
+`munera/open/090-eventual-compatibility-retirement-for-current-authored-workflow-grammar/`
+
+
+Backlog:
+
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
@@ -15,13 +26,6 @@ Queue:
 `munera/open/070-delegate-command-posts-workflow-result-into-chat/`
 `munera/open/073-workflow-child-session-prompt-composition/`
 `munera/open/076-auto-session-name-helper-model-fallback/`
-`munera/open/077-deterministic-workflow-steps/`
-`munera/open/083-runtime-execution-support-for-deterministic-invoke-steps/`
-`munera/open/085-inline-session-contribution-compilation-into-child-session-conversations/`
-`munera/open/086-delegated-boundary-model-and-workflow-invocation-plumbing/`
-`munera/open/084-deterministic-result-recording-and-introspection-surfaces/`
-`munera/open/089-example-workflow-migration-and-documentation/`
-`munera/open/090-eventual-compatibility-retirement-for-current-authored-workflow-grammar/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.
