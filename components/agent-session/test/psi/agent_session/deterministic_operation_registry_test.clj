@@ -60,6 +60,26 @@
          #"malformed result"
          (reg/invoke-operation-in registry "github/bad" {:args {}})))))
 
+(deftest unregister-operations-by-extension-test
+  (let [registry (reg/create-registry)]
+    (reg/register-operation-in! registry
+                                {:id "github/search"
+                                 :ext-path "/ext/a"
+                                 :handler (fn [_] {:status :ok :data {}})})
+    (reg/register-operation-in! registry
+                                {:id "github/create"
+                                 :ext-path "/ext/a"
+                                 :handler (fn [_] {:status :ok :data {}})})
+    (reg/register-operation-in! registry
+                                {:id "jira/search"
+                                 :ext-path "/ext/b"
+                                 :handler (fn [_] {:status :ok :data {}})})
+    (reg/unregister-operations-by-extension-in! registry "/ext/a")
+    (is (= ["jira/search"] (reg/operation-ids-in registry)))
+    (is (nil? (reg/get-operation-in registry "github/search")))
+    (is (nil? (reg/get-operation-in registry "github/create")))
+    (is (= "jira/search" (:id (reg/get-operation-in registry "jira/search"))))))
+
 (deftest thrown-operation-becomes-canonical-error-result-test
   (let [registry (reg/create-registry)]
     (reg/register-operation-in! registry

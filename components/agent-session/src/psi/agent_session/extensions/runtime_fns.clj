@@ -64,4 +64,7 @@
          (extensions/register-operation-in! (:extension-registry ctx) ext-path* operation)
          (deterministic-op-reg/register-operation-in! op-reg
                                                       (assoc operation :ext-path ext-path* :source :extension))
-         {:id (:id operation)}))}))
+         {:id (:id operation)}))
+
+     :deterministic-operation-registry
+     (:deterministic-operation-registry ctx)}))

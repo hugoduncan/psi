@@ -27,3 +27,12 @@
     - `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.extensions-test --focus psi.agent-session.workflow-statechart-runtime-test --skip-meta :integration`
     - `clj-kondo --lint ...` across changed source/test files (0 warnings)
 - Review: cleanup gap — extension/runtime registration records deterministic operations in both the extension registry and the separate runtime-owned `:deterministic-operation-registry`, but this task's proof/read-through does not show an unload/reload cleanup path removing an extension's operation ids from the runtime registry when the extension is unregistered. That risks stale invoke ids surviving extension removal or reload and diverging from extension introspection. Add runtime-owned unregister wiring and a focused reload/unregister regression proof.
+- 2026-05-04 follow-up executed:
+  - wired `extensions/unregister-extension-in!` and `extensions/unregister-all-in!` to optionally remove extension-owned deterministic operation ids from the runtime-owned registry via `deterministic_operation_registry/unregister-operations-by-extension-in!`
+  - threaded the runtime deterministic operation registry through extension load/init-var activation/reload cleanup paths by wrapping loader-supplied unregister fns with runtime-owned cleanup in `components/agent-session/src/psi/agent_session/extensions.clj`
+  - exposed `:deterministic-operation-registry` in extension runtime fns so reload paths can perform runtime-owned cleanup without guessing at global state
+  - added focused registry cleanup proof in `components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj`
+  - added focused extension unload/reload regressions in `components/agent-session/test/psi/agent_session/extensions_test.clj` proving stale deterministic invoke ids are not resolvable after extension removal or reload
+  - verification green:
+    - `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.extensions-test --skip-meta :integration` (`30 tests, 114 assertions, 0 failures`)
+    - `clj-kondo --lint components/agent-session/src/psi/agent_session/extensions.clj components/agent-session/src/psi/agent_session/extensions/runtime_fns.clj components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj components/agent-session/test/psi/agent_session/extensions_test.clj` (0 warnings)

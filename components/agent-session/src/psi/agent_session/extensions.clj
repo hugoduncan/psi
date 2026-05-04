@@ -1,6 +1,7 @@
 (ns psi.agent-session.extensions
   "Extension registry, loading, dispatch, tool wrapping, and introspection."
   (:require
+   [psi.agent-session.deterministic-operation-registry :as deterministic-op-reg]
    [psi.agent-session.deterministic-operations :as deterministic-ops]
    [psi.agent-session.extensions.api :as api]
    [psi.agent-session.extensions.loader :as loader]
@@ -157,22 +158,43 @@
 
 (defn unregister-extension-in!
   "Remove one registered extension from `reg`.
-   Preserves other extension state, flag-values, and event-bus."
-  [reg path]
-  (swap! (:state reg)
-         (fn [s]
-           (-> s
-               (update :extensions dissoc path)
-               (update :registration-order (fn [order]
-                                             (vec (remove #(= path %) order)))))))
-  reg)
+   Preserves other extension state, flag-values, and event-bus.
+
+   When `deterministic-operation-registry` is provided, also removes any
+   runtime-owned deterministic operations registered by the extension so invoke
+   resolution cannot outlive extension ownership."
+  ([reg path]
+   (unregister-extension-in! reg path nil))
+  ([reg path deterministic-operation-registry]
+   (when deterministic-operation-registry
+     (deterministic-op-reg/unregister-operations-by-extension-in!
+      deterministic-operation-registry
+      path))
+   (swap! (:state reg)
+          (fn [s]
+            (-> s
+                (update :extensions dissoc path)
+                (update :registration-order (fn [order]
+                                              (vec (remove #(= path %) order)))))))
+   reg))
 
 (defn unregister-all-in!
   "Remove all registered extensions from `reg`. Used during reload.
-   Preserves flag-values and event-bus."
-  [reg]
-  (swap! (:state reg) assoc :extensions {} :registration-order [])
-  reg)
+   Preserves flag-values and event-bus.
+
+   When `deterministic-operation-registry` is provided, clears all extension-
+   owned deterministic operations from the runtime registry before removing the
+   extension records."
+  ([reg]
+   (unregister-all-in! reg nil))
+  ([reg deterministic-operation-registry]
+   (when deterministic-operation-registry
+     (doseq [path (:registration-order @(:state reg))]
+       (deterministic-op-reg/unregister-operations-by-extension-in!
+        deterministic-operation-registry
+        path)))
+   (swap! (:state reg) assoc :extensions {} :registration-order [])
+   reg))
 
 (defn get-flag-in
   "Get the current value of flag `name` from `reg`."
@@ -509,13 +531,23 @@
    `runtime-fns` is passed through to `create-extension-api`.
    Returns {:extension ext-path :error nil} or {:extension nil :error msg}."
   [reg ext-path runtime-fns]
-  (loader/load-extension-in! reg ext-path runtime-fns register-extension-in! unregister-extension-in! create-extension-api))
+  (let [unregister-extension* (fn [reg* ext-path*]
+                                (unregister-extension-in!
+                                 reg*
+                                 ext-path*
+                                 (:deterministic-operation-registry runtime-fns)))]
+    (loader/load-extension-in! reg ext-path runtime-fns register-extension-in! unregister-extension* create-extension-api)))
 
 (defn load-init-var-extension-in!
   "Load a manifest-installed extension by stable id + init var.
    Returns {:extension ext-id :error nil} or {:extension nil :error msg}."
   [reg ext-id init-var runtime-fns]
-  (loader/load-init-var-extension-in! reg ext-id init-var runtime-fns register-extension-in! unregister-extension-in! create-extension-api))
+  (let [unregister-extension* (fn [reg* ext-id*]
+                                (unregister-extension-in!
+                                 reg*
+                                 ext-id*
+                                 (:deterministic-operation-registry runtime-fns)))]
+    (loader/load-init-var-extension-in! reg ext-id init-var runtime-fns register-extension-in! unregister-extension* create-extension-api)))
 
 (defn load-extension-init-in!
   "Compatibility alias for init-var-backed manifest activation."
@@ -527,7 +559,12 @@
    See `psi.agent-session.extensions.loader/activate-extensions-in!` for the
    supported entry shapes."
   [reg runtime-fns activation-entries]
-  (loader/activate-extensions-in! reg runtime-fns activation-entries register-extension-in! unregister-extension-in! create-extension-api))
+  (let [unregister-extension* (fn [reg* ext-id*]
+                                (unregister-extension-in!
+                                 reg*
+                                 ext-id*
+                                 (:deterministic-operation-registry runtime-fns)))]
+    (loader/activate-extensions-in! reg runtime-fns activation-entries register-extension-in! unregister-extension* create-extension-api)))
 
 (defn load-extensions-in!
   "Discover and load all extensions into `reg`.
@@ -546,4 +583,8 @@
   ([reg runtime-fns configured-paths]
    (reload-extensions-in! reg runtime-fns configured-paths nil))
   ([reg runtime-fns configured-paths cwd]
-   (loader/reload-extensions-in! reg runtime-fns configured-paths cwd unregister-all-in! load-extensions-in!)))
+   (let [unregister-all* (fn [reg*]
+                           (unregister-all-in!
+                            reg*
+                            (:deterministic-operation-registry runtime-fns)))]
+     (loader/reload-extensions-in! reg runtime-fns configured-paths cwd unregister-all* load-extensions-in!))))

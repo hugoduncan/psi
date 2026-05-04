@@ -2,9 +2,11 @@
   "Tests for the extension registry, tool wrapping, introspection, and extension API."
   (:require
    [clojure.test :refer [deftest testing is]]
+   [psi.agent-session.deterministic-operation-registry :as op-reg]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
+   [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.test-support :as test-support]))
 
 ;; ── Registry isolation ──────────────────────────────────────────────────────
@@ -270,7 +272,20 @@
       (ext/register-handler-in! reg "/ext/a" "e" (fn [_] nil))
       (ext/unregister-all-in! reg)
       (is (= 0 (ext/extension-count-in reg)))
-      (is (= 0 (ext/handler-count-in reg))))))
+      (is (= 0 (ext/handler-count-in reg)))))
+
+  (testing "unregister-all-in! also clears runtime deterministic operations when provided"
+    (let [reg    (ext/create-registry)
+          op-reg (op-reg/create-registry)]
+      (ext/register-extension-in! reg "/ext/a")
+      (ext/register-operation-in! reg "/ext/a" {:id "github/search"
+                                                :handler (fn [_] {:status :ok :data {}})})
+      (op-reg/register-operation-in! op-reg {:id "github/search"
+                                             :ext-path "/ext/a"
+                                             :handler (fn [_] {:status :ok :data {}})})
+      (ext/unregister-all-in! reg op-reg)
+      (is (= 0 (ext/extension-count-in reg)))
+      (is (= [] (op-reg/operation-ids-in op-reg))))))
 
 ;; ── Summary ─────────────────────────────────────────────────────────────────
 
@@ -528,6 +543,50 @@
       (is (nil? (ext/get-tool-in reg "nope"))))))
 
 ;; ── Extension API (factory invocation) ──────────────────────────────────────
+
+(deftest unregister-extension-removes-runtime-deterministic-operations-test
+  (let [reg    (ext/create-registry)
+        op-reg (op-reg/create-registry)]
+    (ext/register-extension-in! reg "/ext/a")
+    (ext/register-extension-in! reg "/ext/b")
+    (ext/register-operation-in! reg "/ext/a" {:id "github/search"
+                                              :handler (fn [_] {:status :ok :data {}})})
+    (ext/register-operation-in! reg "/ext/b" {:id "jira/search"
+                                              :handler (fn [_] {:status :ok :data {}})})
+    (op-reg/register-operation-in! op-reg {:id "github/search"
+                                           :ext-path "/ext/a"
+                                           :handler (fn [_] {:status :ok :data {}})})
+    (op-reg/register-operation-in! op-reg {:id "jira/search"
+                                           :ext-path "/ext/b"
+                                           :handler (fn [_] {:status :ok :data {}})})
+    (ext/unregister-extension-in! reg "/ext/a" op-reg)
+    (is (= #{"/ext/b"} (set (ext/extensions-in reg))))
+    (is (= ["jira/search"] (op-reg/operation-ids-in op-reg)))
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"not found"
+         (op-reg/invoke-operation-in op-reg "github/search" {:args {}})))))
+
+(deftest reload-extensions-removes-stale-runtime-deterministic-operation-ids-test
+  (let [[ctx session-id] (test-support/create-test-session {:persist? false})
+        runtime-fns      (runtime-fns/make-extension-runtime-fns ctx session-id nil)
+        reg              (:extension-registry ctx)
+        op-registry      (:deterministic-operation-registry ctx)
+        ext-path         "/ext/test"]
+    (ext/register-extension-in! reg ext-path)
+    ((:register-deterministic-operation-fn runtime-fns)
+     ext-path
+     {:id "github/search-issues-by-label"
+      :handler (fn [_] {:status :ok :data {:issues []}})})
+    (is (= ["github/search-issues-by-label"]
+           (op-reg/operation-ids-in op-registry)))
+    (ext/reload-extensions-in! reg runtime-fns [])
+    (is (= [] (ext/extensions-in reg)))
+    (is (= [] (op-reg/operation-ids-in op-registry)))
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"not found"
+         (op-reg/invoke-operation-in op-registry "github/search-issues-by-label" {:args {}})))))
 
 (deftest extension-api-registration-test
   (testing "API :on registers handlers"
