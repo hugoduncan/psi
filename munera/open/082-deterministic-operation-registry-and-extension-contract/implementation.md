@@ -26,3 +26,4 @@
     - `clojure -M:test --focus psi.agent-session.workflow-invoke-runtime-test --skip-meta :integration`
     - `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.extensions-test --focus psi.agent-session.workflow-statechart-runtime-test --skip-meta :integration`
     - `clj-kondo --lint ...` across changed source/test files (0 warnings)
+- Review: cleanup gap — extension/runtime registration records deterministic operations in both the extension registry and the separate runtime-owned `:deterministic-operation-registry`, but this task's proof/read-through does not show an unload/reload cleanup path removing an extension's operation ids from the runtime registry when the extension is unregistered. That risks stale invoke ids surviving extension removal or reload and diverging from extension introspection. Add runtime-owned unregister wiring and a focused reload/unregister regression proof.

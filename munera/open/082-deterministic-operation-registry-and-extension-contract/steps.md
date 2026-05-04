@@ -13,3 +13,5 @@
 - [x] Add focused tests for registration and lookup behavior
 - [x] Add focused tests for representative invocation and result-shape enforcement
 - [x] Reconcile the implemented contract with task `077` and `doc/workflow-ir.md`
+- [ ] Add runtime-owned deterministic operation unregister wiring so extension unload/reload removes that extension's operation ids from `:deterministic-operation-registry`, not only from extension-registry introspection.
+- [ ] Add a focused regression proving extension unload/reload cannot leave stale deterministic invoke ids resolvable after the owning extension is removed.
