@@ -12,4 +12,4 @@
 - [x] Add golden tests for representative target-authored workflow -> IR compilation
 - [x] Add selected cross-grammar equivalence tests where current-authored and target-authored workflows overlap semantically
 - [x] Reconcile compiler behavior with `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
-- [ ] Align target-authored inline `create-run` effective-definition snapshots with existing inline-definition provenance by avoiding generated `:definition-id` values when `:source-definition-id` is nil, and add a regression test.
+- [x] Align target-authored inline `create-run` effective-definition snapshots with existing inline-definition provenance by avoiding generated `:definition-id` values when `:source-definition-id` is nil, and add a regression test.

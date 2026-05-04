@@ -106,10 +106,14 @@
 (defn- normalize-effective-definition
   [definition source]
   (let [canonical-ir (compile-definition-to-ir! definition source)
-        target-authored? (workflow-target-ir-compiler/target-authored-workflow-definition? definition)]
+        target-authored? (workflow-target-ir-compiler/target-authored-workflow-definition? definition)
+        definition-id (when (some? (:definition-id definition))
+                        (normalize-id (:definition-id definition)))]
     (cond-> (assoc definition
-                   :definition-id (normalize-id (:definition-id definition))
                    :canonical-ir canonical-ir)
+      definition-id
+      (assoc :definition-id definition-id)
+
       target-authored?
       (assoc :step-order (mapv :name (:steps canonical-ir))
              :steps (into {}

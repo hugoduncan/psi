@@ -217,4 +217,19 @@
       (is (= "target-run" run-id))
       (is (= :workflow-ir/v1 (get-in run [:effective-definition :canonical-ir :version])))
       (is (= ["discover" "report" "report-call"]
-             (mapv :name (get-in run [:effective-definition :canonical-ir :steps])))))))
+             (mapv :name (get-in run [:effective-definition :canonical-ir :steps]))))
+      (is (nil? (get-in run [:effective-definition :definition-id]))))))
+
+(deftest create-run-preserves-registered-target-definition-provenance-without-inline-definition-id-test
+  (testing "registered target-authored runs keep source provenance while inline snapshots remain source-id free"
+    (let [state {:workflows {:definitions {} :runs {} :run-order []}}
+          [state definition-id _] (workflow-runtime/register-definition state
+                                                                        (assoc target-invoke-session-delegate-definition
+                                                                               :definition-id "target-authored"))
+          [_ _ run] (workflow-runtime/create-run state {:definition-id definition-id
+                                                        :run-id "registered-target-run"
+                                                        :workflow-input {:repo "org/repo"
+                                                                         :labels ["bug"]}})]
+      (is (= "target-authored" definition-id))
+      (is (= "target-authored" (:source-definition-id run)))
+      (is (= "target-authored" (get-in run [:effective-definition :definition-id]))))))

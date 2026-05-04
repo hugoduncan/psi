@@ -19,3 +19,8 @@
 - focused verification green via `bb clojure:test:unit --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-runtime-test`
 
 2026-05-04 review: actionable runtime contract drift remains — target-authored inline `create-run` definitions are normalized with a generated `:definition-id` in `:effective-definition`, unlike current inline definitions whose snapshot remains source-id-free while provenance is carried only by `:source-definition-id nil`. Align the target-authored inline snapshot contract with the existing inline-definition behavior and add a regression test.
+
+2026-05-04 execution: aligned target-authored inline `create-run` provenance with the existing inline-definition snapshot contract.
+- `workflow_runtime.clj` now preserves `:definition-id` only when the authored definition actually provides one, so inline target-authored effective-definition snapshots no longer gain synthetic ids while registered definitions still retain their source ids
+- extended `workflow_target_ir_compiler_test.clj` with regression coverage for both inline target-authored runs (`:effective-definition :definition-id` stays nil) and registered target-authored runs (`:source-definition-id` and effective-definition `:definition-id` stay aligned)
+- focused verification green via `bb clojure:test:unit --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-runtime-test` (`1511 tests, 11028 assertions, 0 failures`)
