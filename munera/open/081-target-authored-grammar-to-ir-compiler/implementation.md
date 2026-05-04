@@ -7,3 +7,5 @@
 - updated `design.md` and `plan.md` to record these decisions so later implementation work has an unambiguous compile boundary and proof contract
 
 2026-05-04 review: actionable inconsistency remains — `steps.md` still lists the compile seam decision as open (`Identify the loader/compiler seam for target-authored workflow normalization`) even though `design.md`, `plan.md`, `design-steps.md`, and this implementation log already record that seam as decided at `workflow-runtime/create-run` effective-definition normalization. The task files should align so unresolved design work in `steps.md` does not contradict recorded design decisions.
+
+2026-05-04 execution: reconciled `steps.md` with the recorded design decisions by marking the compile-seam item done and annotating it with the authoritative `workflow-runtime/create-run` effective-definition normalization seam. No further newly added design follow-up items remained open after this alignment pass.

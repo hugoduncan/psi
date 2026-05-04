@@ -1,4 +1,5 @@
-- [ ] Identify the loader/compiler seam for target-authored workflow normalization
+- [x] Identify the loader/compiler seam for target-authored workflow normalization
+  - authoritative seam is `workflow-runtime/create-run` effective-definition normalization; runtime execution continues to consume canonical IR only
 - [ ] Compile target workflow definition shape into ordered IR steps
 - [ ] Normalize authored `:type :invoke` hoisted fields into IR `:invoke` payloads
 - [ ] Normalize authored `:type :session` hoisted fields into IR `:session` payloads

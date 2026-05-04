@@ -1,4 +1,4 @@
 - [x] Decide and record the authoritative compile seam for target-authored workflows: whether runtime/loader registration accepts a new target-authored definition form directly, compiles target-authored data before `create-run`, or first lowers target-authored workflow files through a separate loader path.
 - [x] Define the authored input surface for this compiler slice: exact in-memory target-authored workflow shape, where it comes from, and whether workflow-file parsing/loader changes are in scope or explicitly deferred.
 - [x] Define the equivalence assertion contract for cross-grammar tests: whether semantic comparison uses exact IR equality, equality after stripping `:compat`, normalization of step ids/names, or another explicit comparator.
-- [ ] Reconcile `steps.md` with the now-decided design surfaces so it no longer lists already-resolved design decisions (especially the target-authored compile seam) as still open work.
+- [x] Reconcile `steps.md` with the now-decided design surfaces so it no longer lists already-resolved design decisions (especially the target-authored compile seam) as still open work.
