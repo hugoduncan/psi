@@ -8,5 +8,4 @@
 - [ ] Compile current routing tables and loop bounds into IR control-flow forms
 - [ ] Add golden tests for representative current-authored workflow -> IR compilation
 - [ ] Add focused edge-case tests for preload/binding/override compatibility behavior
-- [ ] Document or encode minimal `:compat` metadata only where required to preserve current semantics
 - [ ] Reconcile compiler behavior with `doc/workflow-grammar-migration.md`

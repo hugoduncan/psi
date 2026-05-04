@@ -1,0 +1,8 @@
+- [x] Decide how current `:step-output` bindings that read accepted-result envelope fields outside `:outputs` (for example `:diagnostics`, `:blocked`, or whole `:result`) compile into IR source refs and declared outputs.
+  - Current runtime/tests read paths such as `["step-1-discover" :diagnostics :summary]`, but `doc/workflow-ir.md` describes prior-step refs in terms of declared `:outputs` and `:yields` only.
+  - Settled rule: preserve non-canonical accepted-result-envelope reads via narrowly-scoped `:compat` metadata while keeping canonical IR refs limited to explicit `:outputs` and `:yields`.
+  - Follow-up: add golden tests proving the chosen mapping behavior.
+- [x] Decide how current required `:result-schema` participates in current-grammar -> IR compilation.
+  - `doc/workflow-grammar-current.md` requires `:result-schema` on every step, but `doc/workflow-ir.md` and `components/agent-session/src/psi/agent_session/workflow_ir.clj` do not model an IR result-schema field.
+  - Settled rule: preserve current `:result-schema` only as narrow `:compat` metadata; do not add a canonical IR `:result-schema` field in this slice.
+  - Follow-up: add golden tests proving the chosen behavior and keep it consistent with the accepted-result-envelope compatibility rule.
