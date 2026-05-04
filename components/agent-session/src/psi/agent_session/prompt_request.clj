@@ -73,7 +73,7 @@
 
 (defn- resolve-runtime-model
   [session-model]
-  (let [provider (some-> (:provider session-model) keyword)
+  (let [provider (provider-auth/normalize-provider-id (:provider session-model))
         model-id (:id session-model)]
     (model-registry/find-model provider model-id)))
 

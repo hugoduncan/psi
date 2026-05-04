@@ -4,25 +4,37 @@
    Keeps provider-scoped auth precedence consistent across canonical request
    preparation and runtime-facing helper paths."
   (:require
+   [clojure.string :as str]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.oauth.core :as oauth]))
+
+(defn normalize-provider-id
+  "Normalize provider identity to the keyword form used by shared provider
+   registries. Blank strings normalize to nil."
+  [provider]
+  (cond
+    (keyword? provider) provider
+    (string? provider)  (when-not (str/blank? provider)
+                          (keyword provider))
+    :else               nil))
 
 (defn provider-auth-config
   "Return model-registry auth for `provider` or nil."
   [provider]
-  (when provider
-    (model-registry/get-auth provider)))
+  (when-let [provider-id (normalize-provider-id provider)]
+    (model-registry/get-auth provider-id)))
 
 (defn provider-api-key
   "Resolve a provider-scoped API key using shared precedence:
    1. OAuth/runtime credential for the selected provider
    2. model-registry auth for the selected provider when auth headers are enabled"
   [ctx provider]
-  (or (when-let [oauth-ctx (:oauth-ctx ctx)]
-        (oauth/get-api-key oauth-ctx provider))
-      (when-let [auth (provider-auth-config provider)]
-        (when (:auth-header? auth)
-          (:api-key auth)))))
+  (let [provider-id (normalize-provider-id provider)]
+    (or (when (and provider-id (:oauth-ctx ctx))
+          (oauth/get-api-key (:oauth-ctx ctx) provider-id))
+        (when-let [auth (provider-auth-config provider-id)]
+          (when (:auth-header? auth)
+            (:api-key auth))))))
 
 (defn provider-request-options
   "Return provider-scoped request options derived from model-registry auth.
