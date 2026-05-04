@@ -39,6 +39,7 @@ In scope:
 - define invoke-operation error control flow explicitly: a deterministic operation result `{:status :error ...}` records the canonical parent-step error-yield/result surfaces and then fails the current step/run immediately rather than routing that error through shared judge semantics first
 - allow successful invoke steps to participate in judge/routing behavior through the same normalized control-flow model as other step types
 - add focused tests for representative invoke-step execution flows
+- treat mixed invoke→session execution as the main cross-form runtime proof for this slice; delegate-step execution remains a separate runtime capability and is therefore only a source-resolution/IR-alignment concern here unless delegate execution lands concurrently
 
 Out of scope:
 
@@ -57,5 +58,5 @@ A normalized workflow containing `:type :invoke` steps can execute end-to-end, p
 - invoke results are recorded coherently in attempts/history and surfaced for downstream references
 - invoke success/failure integrates correctly with workflow progression and terminal outcomes
 - invoke steps can participate in judge/routing using the shared control-flow model
-- focused tests prove representative invoke-only and invoke-to-session/delegate flows
+- focused tests prove representative invoke-only and invoke-to-session cross-form execution flows, and preserve delegate-path alignment at the IR/source-resolution level until delegate runtime execution is in scope
 - runtime behavior matches the design intent from task `077`, `doc/workflow-ir.md`, and the operation contract from task `082`

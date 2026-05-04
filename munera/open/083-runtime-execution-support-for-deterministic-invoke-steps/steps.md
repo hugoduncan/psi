@@ -8,6 +8,7 @@
 - [x] Integrate invoke success/failure with workflow progression and terminal outcomes
 - [ ] Prove invoke-step participation in shared judge/routing behavior
 - [x] Add focused invoke-only workflow execution tests
-- [ ] Add focused mixed invoke/session/delegate workflow execution tests
+- [ ] Add focused mixed invoke/session workflow execution tests
+- [ ] Record that delegate-path coverage for this slice remains IR/source-resolution proof rather than runtime execution proof unless delegate execution support lands concurrently
 - [ ] Reconcile runtime behavior with task `077`, `doc/workflow-ir.md`, and task `082`
 - [x] Clarify and align task artifacts on invoke-operation error control flow and canonical nested IR invoke execution boundary

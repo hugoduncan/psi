@@ -13,7 +13,7 @@ Likely steps:
 5. record invoke attempt/result data so downstream refs can read `:output` and `:yield` surfaces
 6. integrate invoke success/failure into progression, terminal status, and routing
 7. prove invoke-step routing behavior with both direct transitions and judge-driven transitions where appropriate
-8. add focused regression tests for invoke-only and mixed-form workflows
+8. add focused regression tests for invoke-only and mixed-form workflows, using invoke→session execution as the cross-form runtime proof and relying on existing IR/source-resolution delegate proofs unless delegate execution support lands in the same slice
 
 Proof target:
 - a workflow with `:type :invoke` steps executes through the canonical runtime path and its outputs/yields are consumable by downstream workflow steps
