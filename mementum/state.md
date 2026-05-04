@@ -14,6 +14,13 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 086 delegated-boundary runtime invocation plumbing is now landed:
+  - canonical IR `:type :delegate` steps now execute through `workflow_statechart_runtime.clj`
+  - delegate execution resolves target workflow definitions, renders delegated `:prompt-string`, materializes ordered delegated `:context`, creates a callee workflow run via the canonical runtime seam, and executes it through the same Phase A statechart runtime path
+  - workflow runs now support explicit top-level `:workflow-original` in addition to `:workflow-input`; source resolution now prefers that explicit field when present so delegated callees see the exact boundary payload promised by task 077/086
+  - delegating step accepted results default to the callee workflow terminal accepted-result envelope, with delegate boundary diagnostics recorded under `[:diagnostics :delegate]`
+  - focused delegate execution proofs landed in `workflow_execution_test.clj` (delegate-only and mixed session→delegate)
+  - focused verification green: `35 tests, 178 assertions, 0 failures`
 - Task 057 optional shaping follow-on is now green:
   - added `workflow_progression_recording.clj` as the canonical Phase A record/update substrate
   - split compatibility compiler concerns into `workflow_statechart_compat.clj`

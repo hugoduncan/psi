@@ -43,8 +43,10 @@
     (:workflow-input workflow-run)
 
     (= source-ref :workflow-original)
-    (or (get-in (:workflow-input workflow-run) [:original])
-        (:workflow-input workflow-run))
+    (if (contains? workflow-run :workflow-original)
+      (:workflow-original workflow-run)
+      (or (get-in (:workflow-input workflow-run) [:original])
+          (:workflow-input workflow-run)))
 
     (and (map? source-ref) (:output source-ref))
     (let [step-id (:step source-ref)

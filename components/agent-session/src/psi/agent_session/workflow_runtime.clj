@@ -156,26 +156,28 @@
 
 (defn create-run
   "Return [state run-id workflow-run] after creating a new canonical workflow run."
-  [state {:keys [run-id workflow-input] :as opts}]
+  [state {:keys [run-id workflow-input workflow-original] :as opts}]
   (let [{:keys [effective-definition source-definition-id]}
         (resolve-effective-definition state opts)
         initial-step-id (workflow-statechart/initial-step-id effective-definition)
         run-id'         (normalize-id run-id)
         ts              (now)
-        run             {:run-id run-id'
-                         :status :pending
-                         :effective-definition effective-definition
-                         :source-definition-id source-definition-id
-                         :workflow-input (or workflow-input {})
-                         :current-step-id initial-step-id
-                         :step-runs (initial-step-runs effective-definition)
-                         :history [{:event :workflow/run-created
-                                    :timestamp ts
-                                    :data {:run-id run-id'
-                                           :source-definition-id source-definition-id
-                                           :current-step-id initial-step-id}}]
-                         :created-at ts
-                         :updated-at ts}]
+        run             (cond-> {:run-id run-id'
+                                 :status :pending
+                                 :effective-definition effective-definition
+                                 :source-definition-id source-definition-id
+                                 :workflow-input (or workflow-input {})
+                                 :current-step-id initial-step-id
+                                 :step-runs (initial-step-runs effective-definition)
+                                 :history [{:event :workflow/run-created
+                                            :timestamp ts
+                                            :data {:run-id run-id'
+                                                   :source-definition-id source-definition-id
+                                                   :current-step-id initial-step-id}}]
+                                 :created-at ts
+                                 :updated-at ts}
+                          (contains? opts :workflow-original)
+                          (assoc :workflow-original workflow-original))]
     (when-not (workflow-model/valid-workflow-run? run)
       (throw (ex-info "Invalid workflow run"
                       {:explanation (workflow-model/explain-workflow-run run)})))

@@ -32,6 +32,8 @@
    [psi.agent-session.workflow-statechart :as workflow-statechart]
    [psi.agent-session.workflow-step-prep :as workflow-step-prep]))
 
+(declare create-workflow-context send-and-drain!)
+
 (defn- runtime-step-order
   [workflow-run]
   (workflow-statechart/effective-step-order (:effective-definition workflow-run)))
@@ -233,6 +235,78 @@
                               :message (:message yield)
                               :details (:details yield)}})))
 
+(defn- resolve-delegate-target-definition
+  [ctx target]
+  (let [definition (workflow-runtime/workflow-definition-in @(:state* ctx) target)]
+    (when-not definition
+      (throw (ex-info "Delegated workflow definition not found"
+                      {:target target})))
+    definition))
+
+(defn- terminal-step-result-envelope
+  [workflow-run]
+  (or (get-in workflow-run [:terminal-outcome :result-envelope])
+      (some (fn [step-id]
+              (get-in workflow-run [:step-runs step-id :accepted-result]))
+            (reverse (runtime-step-order workflow-run)))))
+
+(defn- delegate-step-runtime-result
+  [ctx parent-session-id step-id step-def workflow-run]
+  (let [delegate-spec (:delegate step-def)
+        target (:target delegate-spec)
+        _ (resolve-delegate-target-definition ctx target)
+        prompt-string (workflow-source-resolution/render-delegate-prompt-string workflow-run (:prompt-string delegate-spec))
+        context (workflow-source-resolution/resolve-delegate-context workflow-run (:context delegate-spec))
+        [state' delegate-run-id _]
+        (workflow-runtime/create-run @(:state* ctx)
+                                     {:definition-id target
+                                      :workflow-input prompt-string
+                                      :workflow-original context})
+        _ (reset! (:state* ctx) state')
+        delegate-wf-ctx (create-workflow-context ctx parent-session-id delegate-run-id)
+        _ (send-and-drain! delegate-wf-ctx (:wm delegate-wf-ctx) :workflow/start nil)
+        delegate-run (workflow-runtime/workflow-run-in @(:state* ctx) delegate-run-id)
+        boundary {:delegate {:target target
+                             :run-id delegate-run-id
+                             :step-id step-id
+                             :prompt-string prompt-string
+                             :context context}}]
+    (case (:status delegate-run)
+      :completed
+      {:pending-kind :success
+       :payload (cond-> (terminal-step-result-envelope delegate-run)
+                  true (update :diagnostics #(merge boundary (or % {}))))}
+
+      :blocked
+      {:pending-kind :blocked
+       :payload {:outcome :blocked
+                 :blocked {:delegate-run-id delegate-run-id
+                           :target target
+                           :step-id (get-in delegate-run [:blocked :step-id])}
+                 :diagnostics boundary}}
+
+      :failed
+      {:pending-kind :failure
+       :payload {:message "Delegated workflow failed"
+                 :delegate-run-id delegate-run-id
+                 :target target
+                 :details (or (:terminal-outcome delegate-run)
+                              {:status (:status delegate-run)})}}
+
+      :cancelled
+      {:pending-kind :failure
+       :payload {:message "Delegated workflow cancelled"
+                 :delegate-run-id delegate-run-id
+                 :target target
+                 :details (or (:terminal-outcome delegate-run)
+                              {:status (:status delegate-run)})}}
+
+      {:pending-kind :failure
+       :payload {:message "Delegated workflow did not reach terminal or blocked status"
+                 :delegate-run-id delegate-run-id
+                 :target target
+                 :details {:status (:status delegate-run)}}})))
+
 (defn- enqueue-event!
   [event-queue* working-memory* event data]
   (swap! event-queue* conj {:event event
@@ -276,25 +350,23 @@
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
               step-def (runtime-step-def workflow-run step-id)
               invoke-step? (= :invoke (:type step-def))
-              step-config (when-not invoke-step?
+              delegate-step? (= :delegate (:type step-def))
+              session-step? (= :session (:type step-def))
+              step-config (when session-step?
                             (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id))
-              session-conversation (when-not invoke-step?
+              session-conversation (when session-step?
                                      (workflow-step-prep/materialize-step-session-conversation workflow-run step-id))
               {:keys [preloaded-messages prompt]}
-              (if invoke-step?
-                {}
-                (workflow-step-prep/split-step-session-conversation session-conversation))
-              compat-preload-messages (when-not invoke-step?
+              (if session-step?
+                (workflow-step-prep/split-step-session-conversation session-conversation)
+                {})
+              compat-preload-messages (when session-step?
                                         (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id))
-              combined-preloaded-messages (when-not invoke-step?
+              combined-preloaded-messages (when session-step?
                                             (not-empty (vec (concat (or preloaded-messages [])
                                                                     (or compat-preload-messages [])))))
               {:keys [attempt execution-session]}
-              (if invoke-step?
-                {:attempt {:attempt-id attempt-id
-                           :status :pending
-                           :execution-session-id nil}
-                 :execution-session nil}
+              (if session-step?
                 (workflow-attempts/create-step-attempt-session!
                  ctx
                  parent-session-id
@@ -321,7 +393,11 @@
                    (assoc :prompt-component-selection (:prompt-component-selection step-config))
 
                    combined-preloaded-messages
-                   (assoc :preloaded-messages combined-preloaded-messages))))]
+                   (assoc :preloaded-messages combined-preloaded-messages)))
+                {:attempt {:attempt-id attempt-id
+                           :status :pending
+                           :execution-session-id nil}
+                 :execution-session nil})]
           (swap! working-memory*
                  (fn [wm]
                    (cond-> (-> wm
@@ -342,7 +418,8 @@
                        (workflow-progression-recording/start-latest-attempt run-id step-id)
                        (workflow-progression-recording/increment-iteration-count run-id step-id))))
           (try
-            (if invoke-step?
+            (cond
+              invoke-step?
               (let [operation-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
                     {:keys [pending-kind payload]} (apply-invoke-step-result operation-result)]
                 (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
@@ -357,6 +434,23 @@
                                   :failure :actor/failed
                                   :actor/failed)
                                 {}))
+
+              delegate-step?
+              (let [{:keys [pending-kind payload]} (delegate-step-runtime-result ctx parent-session-id step-id step-def workflow-run)]
+                (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
+                                                                    :payload payload
+                                                                    :step-id step-id
+                                                                    :attempt-id attempt-id
+                                                                    :updated-at (now)})
+                (enqueue-event! event-queue* working-memory*
+                                (case pending-kind
+                                  :success :actor/done
+                                  :blocked :actor/blocked
+                                  :failure :actor/failed
+                                  :actor/failed)
+                                {}))
+
+              :else
               (let [execution-result (prompt-control/prompt-execution-result-in! ctx (:session-id execution-session) prompt)
                     assistant-message (:execution-result/assistant-message execution-result)
                     {:keys [turn/outcome]} (assistant-turn-classification assistant-message)

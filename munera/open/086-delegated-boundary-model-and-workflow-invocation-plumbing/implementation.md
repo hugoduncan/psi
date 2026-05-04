@@ -16,3 +16,14 @@
   - `plan.md` now says the execution boundary is compiled normalized IR and adds an explicit compiler-seam confirmation step.
   - `steps.md` now uses normalized-IR wording for the delegate execution seam and delegate prompt/context materialization steps.
   - no code changes were required in this pass because the follow-up was artifact-consistency work, and the preloaded focused proof in `workflow_source_resolution_test.clj` remained green.
+- 2026-05-04 implementation pass:
+  - landed first-class runtime dispatch for canonical IR `:type :delegate` steps in `workflow_statechart_runtime.clj`
+  - delegate execution now resolves the target workflow definition, renders delegated `:prompt-string`, materializes ordered delegated `:context`, creates a callee workflow run through the canonical runtime seam, and executes that callee through the same Phase A statechart runtime path
+  - delegated callee runs now carry explicit top-level `:workflow-original` in addition to `:workflow-input`; `workflow_model.clj`, `workflow_runtime.clj`, and `workflow_source_resolution.clj` were updated so runtime source resolution prefers explicit top-level `:workflow-original` when present
+  - delegating step accepted results now default to the callee workflow's terminal accepted-result envelope, with delegate boundary diagnostics recorded under `[:diagnostics :delegate]` (`:target`, delegated callee `:run-id`, rendered `:prompt-string`, materialized `:context`, caller `:step-id`)
+  - blocked and failure delegate outcomes now surface explicit delegate metadata rather than silently collapsing into generic local failures
+  - `canonical_workflows.clj` now returns non-string terminal yielded values via `pr-str`, so delegated completion remains visible through mutation surfaces even when the callee yield is not plain text
+  - added focused execution proofs in `workflow_execution_test.clj` for:
+    - delegate-only execution with explicit callee `:workflow-input` / `:workflow-original` boundary assertions
+    - mixed session → delegate execution proving callee yielded value propagation back through the delegating step
+  - verification: `clojure -M:test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-source-resolution-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-ir-test --focus psi.agent-session.workflow-runtime-test` → `35 tests, 178 assertions, 0 failures`

@@ -98,10 +98,16 @@
                         (let [last-step-id (last (:step-order (:effective-definition final-run)))
                               step-def (some #(when (= last-step-id (:name %)) %)
                                              (get-in final-run [:effective-definition :canonical-ir :steps]))
-                              accepted-result (get-in final-run [:step-runs last-step-id :accepted-result])]
-                          (some-> (workflow-ir/step-yield-field-value step-def accepted-result :text)
-                                  str/trim
-                                  not-empty)))]
+                              accepted-result (get-in final-run [:step-runs last-step-id :accepted-result])
+                              text-yield (workflow-ir/step-yield-field-value step-def accepted-result :text)]
+                          (cond
+                            (string? text-yield)
+                            (some-> text-yield str/trim not-empty)
+
+                            (some? text-yield)
+                            (pr-str text-yield)
+
+                            :else nil)))]
       {:psi.workflow/run-id run-id
        :psi.workflow/status (:status exec-result)
        :psi.workflow/steps-executed (:steps-executed exec-result)

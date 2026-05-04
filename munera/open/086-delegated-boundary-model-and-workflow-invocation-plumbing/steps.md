@@ -1,14 +1,14 @@
-- [ ] Identify the compiled normalized IR execution seam for `:type :delegate` dispatch
-- [ ] Confirm authored hoisted delegate fields compile through the compiler seam into normalized IR `:delegate` payloads
-- [ ] Resolve target workflow definitions through canonical runtime/loading facilities
-- [ ] Render delegated IR `:prompt-string` to a final string
-- [ ] Resolve delegated IR `:context` items from normalized workflow/prior-step sources
-- [ ] Preserve authored delegated-context order
-- [ ] Establish explicit callee local `:workflow-input` semantics from rendered prompt string
-- [ ] Establish explicit callee local `:workflow-original` semantics for delegated invocation
-- [ ] Execute the callee workflow through the canonical runtime path
-- [ ] Propagate the callee yielded value back as the delegating step's default yielded value
-- [ ] Keep delegated boundary recording/introspection coherent enough for debugging
-- [ ] Add focused delegate-only workflow execution tests
-- [ ] Add focused mixed delegate/session/invoke workflow execution tests
-- [ ] Reconcile implementation with task `077` and `doc/workflow-ir.md`
+- [x] Identify the compiled normalized IR execution seam for `:type :delegate` dispatch
+- [x] Confirm authored hoisted delegate fields compile through the compiler seam into normalized IR `:delegate` payloads
+- [x] Resolve target workflow definitions through canonical runtime/loading facilities
+- [x] Render delegated IR `:prompt-string` to a final string
+- [x] Resolve delegated IR `:context` items from normalized workflow/prior-step sources
+- [x] Preserve authored delegated-context order
+- [x] Establish explicit callee local `:workflow-input` semantics from rendered prompt string
+- [x] Establish explicit callee local `:workflow-original` semantics for delegated invocation
+- [x] Execute the callee workflow through the canonical runtime path
+- [x] Propagate the callee yielded value back as the delegating step's default yielded value
+- [x] Keep delegated boundary recording/introspection coherent enough for debugging
+- [x] Add focused delegate-only workflow execution tests
+- [x] Add focused mixed delegate/session/invoke workflow execution tests
+- [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`

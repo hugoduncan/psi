@@ -393,6 +393,159 @@
                    :prompt "Review [\"i-1\" \"i-2\"] / 2 issues found"}]
                  @prompts*)))))))
 
+(deftest execute-run-delegate-step-invokes-callee-workflow-with-explicit-boundary-test
+  (testing "IR delegate steps invoke the target workflow with rendered workflow-input and ordered workflow-original context"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          callee-definition {:steps [{:name "callee"
+                                      :type :session
+                                      :contributions [{:type :source
+                                                       :from :workflow-original}
+                                                      {:type :template
+                                                       :text "Do {{input}}"
+                                                       :vars {"input" {:from :workflow-input}}}]}]}
+          caller-definition {:definition-id "delegate-caller"
+                             :steps [{:name "discover"
+                                      :type :invoke
+                                      :operation "demo/discover"
+                                      :args {}}
+                                     {:name "report-call"
+                                      :type :delegate
+                                      :target "builder"
+                                      :prompt-string {:type :template
+                                                      :text "Ship {{issues}}"
+                                                      :vars {"issues" {:from {:step "discover" :output :data}
+                                                                       :path [:issues]}}}
+                                      :context [{:type :source
+                                                 :from :workflow-original}
+                                                {:type :source
+                                                 :from {:step "discover" :output :data}
+                                                 :path [:issues]}]}]}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/register-definition state (assoc callee-definition :definition-id "builder"))
+                           [s _ _] (workflow-runtime/create-run s {:definition caller-definition
+                                                                   :run-id "run-delegate"
+                                                                   :workflow-input {:original {:ticket 123
+                                                                                               :request "Please triage"}}})]
+                       s)))
+          created* (atom [])
+          prompts* (atom [])]
+      (with-redefs [psi.agent-session.deterministic-operation-registry/invoke-operation-in
+                    (fn [_registry operation-id invocation]
+                      (if (= operation-id "demo/discover")
+                        {:status :succeeded
+                         :data {:issues ["i-1" "i-2"]
+                                :summary "2 issues found"}
+                         :summary "2 issues found"}
+                        (throw (ex-info "unexpected operation" {:operation-id operation-id
+                                                                :invocation invocation}))))
+                    psi.agent-session.deterministic-operations/operation-result->invoke-step-result
+                    (fn [operation-result]
+                      {:kind :accepted-result
+                       :accepted-result {:outcome :ok
+                                         :outputs {:data (:data operation-result)
+                                                   :summary (:summary operation-result)}}})
+                    psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        (swap! created* conj {:step-id (:workflow-step-id opts)
+                                              :workflow-run-id (:workflow-run-id opts)
+                                              :preloaded-messages (:preloaded-messages opts)})
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session (valid-child-session sid)}))
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:content "delegated output"}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-delegate")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-delegate")
+              delegate-created (last @created*)
+              delegated-run-id (:workflow-run-id delegate-created)
+              delegated-run (workflow-runtime/workflow-run-in @(:state* ctx) delegated-run-id)]
+          (is (= :completed (:status result)))
+          (is (= "delegated output"
+                 (get-in run [:step-runs "report-call" :accepted-result :outputs :final-llm-reply])))
+          (is (= "Ship [\"i-1\" \"i-2\"]"
+                 (:workflow-input delegated-run)))
+          (is (= [{:ticket 123 :request "Please triage"}
+                  ["i-1" "i-2"]]
+                 (:workflow-original delegated-run)))
+          (is (= [{:role "user"
+                   :content "[{:ticket 123, :request \"Please triage\"} [\"i-1\" \"i-2\"]]"}]
+                 (:preloaded-messages delegate-created)))
+          (is (= [{:session-id "callee-child"
+                   :prompt "Do Ship [\"i-1\" \"i-2\"]"}]
+                 @prompts*))
+          (is (= {:target "builder"
+                  :run-id delegated-run-id
+                  :step-id "report-call"
+                  :prompt-string "Ship [\"i-1\" \"i-2\"]"
+                  :context [{:ticket 123 :request "Please triage"}
+                            ["i-1" "i-2"]]}
+                 (get-in run [:step-runs "report-call" :accepted-result :diagnostics :delegate]))))))))
+
+(deftest execute-run-mixed-session-then-delegate-propagates-callee-yield-test
+  (testing "mixed session and delegate workflows propagate the callee yielded value back through the delegating step"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          callee-definition {:steps [{:name "callee"
+                                      :type :session
+                                      :contributions [{:type :template
+                                                       :text "Build {{input}}"
+                                                       :vars {"input" {:from :workflow-input}}}]}]}
+          caller-definition {:definition-id "mixed-delegate-caller"
+                             :steps [{:name "plan"
+                                      :type :session
+                                      :contributions [{:type :template
+                                                       :text "Plan {{input}}"
+                                                       :vars {"input" {:from :workflow-input
+                                                                       :path [:task]}}}]}
+                                     {:name "build"
+                                      :type :delegate
+                                      :target "builder"
+                                      :prompt-string {:type :template
+                                                      :text "{{plan}}"
+                                                      :vars {"plan" {:from {:step "plan" :yield :text}}}}
+                                      :context [{:type :source
+                                                 :from :workflow-original}
+                                                {:type :source
+                                                 :from {:step "plan" :yield :text}}]}]}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/register-definition state (assoc callee-definition :definition-id "builder"))
+                           [s _ _] (workflow-runtime/create-run s {:definition caller-definition
+                                                                   :run-id "run-mixed-delegate"
+                                                                   :workflow-input {:task "ship it"
+                                                                                    :original {:request-id 7}}})]
+                       s)))
+          prompts* (atom [])]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session (valid-child-session sid)}))
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:content (if (= child-session-id "plan-child")
+                                   "plan output"
+                                   "delegated build output")}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-mixed-delegate")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mixed-delegate")]
+          (is (= :completed (:status result)))
+          (is (= "delegated build output"
+                 (get-in run [:step-runs "build" :accepted-result :outputs :final-llm-reply])))
+          (is (= [{:session-id "plan-child"
+                   :prompt "Plan ship it"}
+                  {:session-id "callee-child"
+                   :prompt "Build plan output"}]
+                 @prompts*)))))))
+
 (deftest resolve-step-session-config-inherits-parent-prompt-mode-test
   (testing "workflow child sessions inherit parent prompt mode into step session config"
     (let [[ctx session-id] (create-session-context {:persist? false})
