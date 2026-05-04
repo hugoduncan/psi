@@ -74,6 +74,13 @@ This task's canonical shared resolution owner is a workflow-runtime substrate na
 
 The intended convergence target is runtime-owned and IR-shaped, not step-form-owned. The current `workflow_step_prep.clj` helpers are therefore only a temporary host for the semantics and must converge onto the shared runtime substrate in scope for this task rather than remain the long-term owner.
 
+Projection-language compatibility note for this task:
+
+- canonical runtime semantics are the normalized IR source-spec contract from `doc/workflow-ir.md`: `{:from ...}` with optional sibling `:path` or sibling `:projection`
+- the older workflow-file `:session` authoring surface in `workflow_file_authoring_session.clj` intentionally remains a compatibility authoring seam during task 088
+- that authored surface may continue to accept `:projection :text|:full|{:path ...}` while compiling into canonical runtime refs/bindings for current-grammar definitions
+- task 088 does not require retiring that authored compatibility syntax yet, but it does require making the translation explicit so the task does not imply that authored workflow-file projection syntax and canonical IR projection syntax are already identical
+
 Authoring/compiler helpers remain separate when they are only translating authored syntax into canonical IR and are not themselves resolving runtime values. In particular:
 
 - `workflow_file_authoring_session.clj` remains authoring-only compilation/validation for workflow-file `:session` authoring

@@ -8,11 +8,15 @@ Approach:
 
 Resolved boundary notes:
 - canonical owner in scope for task 088: a shared workflow runtime source-resolution substrate for normalized IR refs/specs, path traversal, and projection application
-- temporary current host: `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
+- temporary current host was `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`; follow-up execution now extracts the shared runtime owner to `components/agent-session/src/psi/agent_session/workflow_source_resolution.clj`
 - authoring-only / compatibility seams that should remain separate from runtime resolution ownership:
   - `workflow_file_authoring_session.clj`
   - `workflow_current_ir_compiler.clj`
   - `workflow_target_ir_compiler.clj`
+- explicit compatibility decision for projection syntax:
+  - preserve the legacy workflow-file `:session` authoring projection contract as a compatibility surface for now
+  - require that compiler/authoring seams translate it explicitly into the canonical IR source-spec contract
+  - do not treat `:projection :text|:full|{:path ...}` on authored workflow-file `:session` inputs as the same language as canonical IR `{:from ... :path ...}` / `{:from ... :projection ...}`
 
 Likely steps:
 1. identify existing source-selection/projection helpers that can be reused or must be converged

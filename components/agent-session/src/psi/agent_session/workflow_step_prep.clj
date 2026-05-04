@@ -9,8 +9,8 @@
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
    [psi.agent-session.workflow-statechart :as workflow-statechart]))
 
 (defn- authored-step-def
@@ -21,60 +21,7 @@
   [workflow-run step-id]
   (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
 
-(defn- get-path*
-  [m path]
-  (reduce (fn [acc k]
-            (when (some? acc)
-              (get acc k)))
-          m
-          path))
-
-(defn binding-source-value
-  [workflow-run {:keys [source path]}]
-  (case source
-    :workflow-input
-    (get-path* (:workflow-input workflow-run) path)
-
-    :step-output
-    (let [[step-id & more] path
-          accepted-result (get-in workflow-run [:step-runs step-id :accepted-result])]
-      (get-path* accepted-result more))
-
-    :workflow-runtime
-    (get-path* {:run-id (:run-id workflow-run)
-                :current-step-id (:current-step-id workflow-run)
-                :status (:status workflow-run)}
-               path)
-
-    nil))
-
-(defn- source-spec-value
-  [workflow-run {:keys [from path]}]
-  (let [base (cond
-               (= :workflow-input from)
-               (:workflow-input workflow-run)
-
-               (= :workflow-original from)
-               (or (get-in (:workflow-input workflow-run) [:original])
-                   (:workflow-input workflow-run))
-
-               (and (map? from) (:output from))
-               (let [step-id (:step from)
-                     output-key (:output from)
-                     accepted (get-in workflow-run [:step-runs step-id :accepted-result])
-                     step-def (effective-step-def workflow-run step-id)]
-                 (workflow-ir/step-output-value step-def accepted output-key))
-
-               (and (map? from) (:yield from))
-               (let [step-id (:step from)
-                     accepted (get-in workflow-run [:step-runs step-id :accepted-result])
-                     step-def (effective-step-def workflow-run step-id)]
-                 (workflow-ir/step-yield-field-value step-def accepted (:yield from)))
-
-               :else nil)]
-    (if (seq path)
-      (get-path* base path)
-      base)))
+(def binding-source-value workflow-source-resolution/resolve-binding-ref)
 
 (defn materialize-step-inputs
   [workflow-run step-id]
@@ -87,7 +34,7 @@
     (if (seq ir-template-vars)
       (into {}
             (map (fn [[var-name source-spec]]
-                   [(keyword var-name) (source-spec-value workflow-run source-spec)]))
+                   [(keyword var-name) (workflow-source-resolution/apply-source-spec workflow-run source-spec)]))
             ir-template-vars)
       (reduce-kv (fn [acc k ref]
                    (assoc acc k (binding-source-value workflow-run ref)))
@@ -148,7 +95,7 @@
   (let [vars (:vars contribution)
         values (into {}
                      (map (fn [[var-name source-spec]]
-                            [var-name (source-spec-value workflow-run source-spec)]))
+                            [var-name (workflow-source-resolution/apply-source-spec workflow-run source-spec)]))
                      vars)]
     (reduce-kv (fn [text var-name value]
                  (str/replace text
