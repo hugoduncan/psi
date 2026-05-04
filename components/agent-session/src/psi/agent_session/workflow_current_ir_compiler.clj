@@ -52,13 +52,18 @@
         (cond-> {:from {:step step-id :output output-key}}
           (seq output-path) (assoc :path (vec output-path))))
 
-      :else
+      (#{:diagnostics :blocked} (first more))
       {:from {:step step-id :output :result}
        :path (vec more)
        :compat {:current-binding-ref {:source :step-output
                                       :path path
                                       :accepted-result-envelope true
-                                      :surface (first more)}}})))
+                                      :surface (first more)}}}
+
+      :else
+      (throw (ex-info "Unsupported current `:step-output` accepted-result envelope surface"
+                      {:path path
+                       :supported-surfaces #{:outputs :diagnostics :blocked :whole-envelope}})))))
 
 (defn- compile-binding-ref
   [{:keys [source path] :as ref}]

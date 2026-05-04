@@ -75,3 +75,5 @@
   - removed redundant per-type submaps now that `:type` determines which fields are valid
 - [x] Rename delegated execution vocabulary to match `/delegate`
   - `:type :delegate` + `:target` + `:prompt-string` + `:context`
+- [ ] Align `doc/workflow-ir.md` session output naming with the target grammar's `:final-llm-reply` surface
+  - make the IR output map, default `:yields`, and surrounding prose use one canonical session output key so the authoring-to-IR boundary stays simple and explicit

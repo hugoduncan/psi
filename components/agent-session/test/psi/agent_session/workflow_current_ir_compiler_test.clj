@@ -171,3 +171,66 @@
         (is (false? valid?))
         (is (some? structural-errors))
         (is (= [] semantic-errors))))))
+
+(deftest compile-current-step-output-envelope-surface-compatibility-test
+  (testing "supported accepted-result envelope surfaces still compile through IR result compat"
+    (let [definition {:definition-id "compat-surfaces"
+                      :name "compat-surfaces"
+                      :step-order ["step-1" "step-2"]
+                      :steps {"step-1" {:executor {:type :agent :profile "planner"}
+                                        :prompt-template "$INPUT"
+                                        :input-bindings {:input {:source :workflow-input :path [:input]}}
+                                        :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                        :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
+                              "step-2" {:executor {:type :agent :profile "reviewer"}
+                                        :prompt-template "Summary: $SUMMARY\nBlocked: $BLOCKED\nEnvelope: $ENVELOPE"
+                                        :input-bindings {:summary {:source :step-output
+                                                                   :path ["step-1" :diagnostics :summary]}
+                                                         :blocked {:source :step-output
+                                                                   :path ["step-1" :blocked :reason]}
+                                                         :envelope {:source :step-output
+                                                                    :path ["step-1"]}}
+                                        :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                        :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}}
+          ir (compiler/compile-workflow-definition definition)
+          vars (get-in ir [:steps 1 :session :contributions 0 :vars])]
+      (is (= {:from {:step "step-1" :output :result}
+              :path [:diagnostics :summary]
+              :compat {:current-binding-ref {:source :step-output
+                                             :path ["step-1" :diagnostics :summary]
+                                             :accepted-result-envelope true
+                                             :surface :diagnostics}}}
+             (get vars "summary")))
+      (is (= {:from {:step "step-1" :output :result}
+              :path [:blocked :reason]
+              :compat {:current-binding-ref {:source :step-output
+                                             :path ["step-1" :blocked :reason]
+                                             :accepted-result-envelope true
+                                             :surface :blocked}}}
+             (get vars "blocked")))
+      (is (= {:from {:step "step-1" :output :result}
+              :compat {:current-binding-ref {:source :step-output
+                                             :path ["step-1"]
+                                             :accepted-result-envelope true
+                                             :surface :whole-envelope}}}
+             (get vars "envelope")))))
+
+  (testing "unsupported accepted-result envelope surfaces fail at compile time"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Unsupported current `:step-output` accepted-result envelope surface"
+         (compiler/compile-workflow-definition
+          {:definition-id "bad-surface"
+           :name "bad-surface"
+           :step-order ["step-1" "step-2"]
+           :steps {"step-1" {:executor {:type :agent :profile "planner"}
+                             :prompt-template "$INPUT"
+                             :input-bindings {:input {:source :workflow-input :path [:input]}}
+                             :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                             :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
+                   "step-2" {:executor {:type :agent :profile "reviewer"}
+                             :prompt-template "Value: $VALUE"
+                             :input-bindings {:value {:source :step-output
+                                                      :path ["step-1" :foo :bar]}}
+                             :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                             :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})))))

@@ -52,3 +52,4 @@
 - Tightened `doc/workflow-grammar-current.md` to better match the current Malli schemas: clarified optionality notation, corrected `:input-bindings` shape, made binding paths explicit as vectors of keywords/strings/ints, and called out the current optional map-shaped `:workflow-input` run field.
 - Added cross-links among `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-grammar-current.md` so target-design and current-implementation surfaces are explicitly navigable.
 - Wrote initial design/plan/steps surfaces.
+- Code-shaper review: found a new consistency gap between the target grammar and `doc/workflow-ir.md`; the target docs standardize the session output key as `:final-llm-reply`, but the IR examples/defaults still expose that surface via `:text`, which makes the normalization boundary less obvious.
