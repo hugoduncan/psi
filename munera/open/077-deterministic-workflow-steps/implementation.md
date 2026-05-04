@@ -58,3 +58,7 @@
   - aligned the current-grammar compatibility compiler in `workflow_current_ir_compiler.clj` so compiled session steps now expose `:final-llm-reply` instead of `:text`
   - aligned focused proof in `workflow_current_ir_compiler_test.clj`
   - this removes an avoidable naming drift between target grammar docs and normalized IR for session outputs
+- 2026-05-04 — Code-shaper review found one new actionable consistency seam.
+  - `workflow_step_prep.clj` still resolves canonical IR session refs through legacy accepted-result `[:outputs :text]` lookups for `:output :final-llm-reply` and `:yield :text`
+  - this duplicates session-output translation outside the IR/output-normalization boundary and risks future drift against the now-canonical `:final-llm-reply` surface
+  - follow-up should centralize or normalize session output lookup so runtime step prep consumes the same canonical output naming as the IR/compiler/docs

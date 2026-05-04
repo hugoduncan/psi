@@ -78,3 +78,6 @@
 - [x] Align `doc/workflow-ir.md` session output naming with the target grammar's `:final-llm-reply` surface
   - made the IR output map, default `:yields`, and surrounding prose use one canonical session output key so the authoring-to-IR boundary stays simple and explicit
   - aligned the current-grammar compatibility compiler and its focused proof to the same canonical session output key
+- [ ] Remove legacy `[:outputs :text]` lookups from `components/agent-session/src/psi/agent_session/workflow_step_prep.clj` when resolving canonical IR session refs
+  - make `:output :final-llm-reply` and `:yield :text` read through the canonical session output surface instead of a local legacy translation branch
+  - keep runtime step-prep output resolution aligned with `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, and `doc/workflow-ir.md`
