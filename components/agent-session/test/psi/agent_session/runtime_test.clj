@@ -211,6 +211,8 @@
         (model-registry/init! {:user-models-path path})
         (is (= "minimax-inline-key"
                (runtime/resolve-api-key-in {} "sid" {:provider :minimax :id "MiniMax-M2.7"})))
+        (is (= "minimax-inline-key"
+               (runtime/resolve-api-key-in {} "sid" {:provider "minimax" :id "MiniMax-M2.7"})))
         (finally
           (java.io.File/.delete (java.io.File. path))))))
 
@@ -227,9 +229,12 @@
         (model-registry/init! {:user-models-path path})
         (is (= "oauth-key"
                (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider :minimax :id "MiniMax-M2.7"})))
+        (is (= "oauth-key"
+               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider "minimax" :id "MiniMax-M2.7"})))
         (finally
           (java.io.File/.delete (java.io.File. path))))))
 
   (testing "built-in anthropic remains unresolved without oauth or registry auth"
     (model-registry/init! {})
-    (is (nil? (runtime/resolve-api-key-in {} "sid" {:provider :anthropic :id "claude-sonnet-4-6"})))))
+    (is (nil? (runtime/resolve-api-key-in {} "sid" {:provider :anthropic :id "claude-sonnet-4-6"})))
+    (is (nil? (runtime/resolve-api-key-in {} "sid" {:provider "anthropic" :id "claude-sonnet-4-6"})))))

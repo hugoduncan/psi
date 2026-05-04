@@ -128,10 +128,20 @@
     (try
       (model-registry/init! {:user-models-path path})
 
-      (testing "custom anthropic-compatible provider injects provider-scoped api-key"
+      (testing "custom anthropic-compatible provider injects provider-scoped api-key for keyword provider identity"
         (let [opts (prompt-request/session->request-options
                     {}
                     (session-data-for :minimax "MiniMax-M2.7")
+                    {})]
+          (is (= "minimax-inline-key" (:api-key opts)))
+          (is (nil? (:no-auth-header opts)))
+          (is (nil? (:headers opts)))))
+
+      (testing "custom anthropic-compatible provider injects provider-scoped api-key for live session string provider identity"
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    {:model {:provider "minimax" :id "MiniMax-M2.7"}
+                     :thinking-level :off}
                     {})]
           (is (= "minimax-inline-key" (:api-key opts)))
           (is (nil? (:no-auth-header opts)))
