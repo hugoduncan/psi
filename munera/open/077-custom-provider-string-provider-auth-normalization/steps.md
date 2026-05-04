@@ -11,3 +11,6 @@
 - [x] Verify the new string-provider regression test(s) fail on the pre-fix implementation and pass after the fix
 - [x] Run focused regression tests and record the result
 - [x] Capture any implementation notes or edge-case decisions in `implementation.md`
+- [x] Add string-provider regression coverage for provider-request option shaping with `:auth-header? false` proving `:no-auth-header true`
+- [x] Add string-provider regression coverage for provider-request option shaping proving custom `:headers` propagation
+- [x] Re-run focused `prompt-request` and `runtime` tests and record the updated result after the review follow-up

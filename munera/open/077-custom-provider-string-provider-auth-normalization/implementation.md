@@ -27,6 +27,7 @@ Created to track the custom-provider auth regression where real session-shaped s
 - `prompt_request_test.clj`
   - preserved keyword-shaped custom Anthropic-compatible provider coverage
   - added live session-shaped string-provider coverage using `{:model {:provider "minimax" :id "MiniMax-M2.7"}}`
+  - added string-provider regression coverage for provider-request option shaping on both `:auth-header? false -> :no-auth-header true` and custom `:headers` propagation
 - `runtime_test.clj`
   - added string-provider coverage for registry-backed auth lookup
   - added string-provider coverage for OAuth-over-registry precedence
@@ -41,9 +42,18 @@ After correction:
 - `bb clojure:test:unit --focus psi.agent-session.prompt-request-test --focus psi.agent-session.runtime-test`
   - `1497 tests, 10943 assertions, 0 failures`
 
+After review follow-up coverage:
+
+- `bb clojure:test:unit --focus psi.agent-session.prompt-request-test --focus psi.agent-session.runtime-test`
+  - `1497 tests, 11025 assertions, 0 failures`
+
 Additional checks run during the session:
 
 - `bb test:agent-core`
   - `11 tests, 75 assertions, 0 failures`
 - `bb test:query`
   - `11 tests, 33 assertions, 0 failures`
+
+## Review note
+
+Implementation review: accept with small follow-up. Shared-boundary normalization is correct, but string-shaped regression coverage should be extended to prove provider-request option shaping too, especially `:auth-header? false -> :no-auth-header true` and custom `:headers` propagation.

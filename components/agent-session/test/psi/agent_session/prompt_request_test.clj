@@ -59,13 +59,22 @@
     (try
       (model-registry/init! {:user-models-path path})
 
-      (testing "auth-header? false sets :no-auth-header and omits api-key"
+      (testing "auth-header? false sets :no-auth-header and omits api-key for keyword provider identity"
         (let [opts (prompt-request/session->request-options
                     {}
                     (session-data-for :ollama "llama")
                     {})]
           (is (true? (:no-auth-header opts)))
           ;; api-key should NOT be injected because auth-header? is false
+          (is (nil? (:api-key opts)))))
+
+      (testing "auth-header? false sets :no-auth-header and omits api-key for live session string provider identity"
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    {:model {:provider "ollama" :id "llama"}
+                     :thinking-level :off}
+                    {})]
+          (is (true? (:no-auth-header opts)))
           (is (nil? (:api-key opts)))))
 
       (finally
@@ -84,10 +93,20 @@
     (try
       (model-registry/init! {:user-models-path path})
 
-      (testing "custom headers merged into options"
+      (testing "custom headers merged into options for keyword provider identity"
         (let [opts (prompt-request/session->request-options
                     {}
                     (session-data-for :custom "model-a")
+                    {})]
+          (is (= {"X-Custom" "value" "X-Project" "psi"}
+                 (:headers opts)))
+          (is (= "key123" (:api-key opts)))))
+
+      (testing "custom headers merged into options for live session string provider identity"
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    {:model {:provider "custom" :id "model-a"}
+                     :thinking-level :off}
                     {})]
           (is (= {"X-Custom" "value" "X-Project" "psi"}
                  (:headers opts)))
