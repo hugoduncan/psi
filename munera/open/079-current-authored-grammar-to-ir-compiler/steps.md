@@ -1,11 +1,15 @@
-- [ ] Identify the existing workflow loader/compiler seam for current-grammar normalization
-- [ ] Compile current workflow definition shape into ordered IR steps
-- [ ] Compile current `:executor` to IR `:type :session`
-- [ ] Compile current `:prompt-template` + `:input-bindings` into template contributions
-- [ ] Compile current `:session-preload` into ordered contribution items
-- [ ] Compile current `:session-overrides` into the IR session payload
-- [ ] Compile current judge shape into typed IR judge forms
-- [ ] Compile current routing tables and loop bounds into IR control-flow forms
-- [ ] Add golden tests for representative current-authored workflow -> IR compilation
-- [ ] Add focused edge-case tests for preload/binding/override compatibility behavior
+- [x] Identify the existing workflow loader/compiler seam for current-grammar normalization
+  - implemented as a dedicated compatibility compiler namespace: `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
+  - kept separate from `workflow_file_compiler.clj` so current authored file compilation and current-authored-definition -> IR normalization remain distinct phases
+- [x] Compile current workflow definition shape into ordered IR steps
+- [x] Compile current `:executor` to IR `:type :session`
+- [x] Compile current `:prompt-template` + `:input-bindings` into template contributions
+- [x] Compile current `:session-preload` into ordered contribution items
+- [x] Compile current `:session-overrides` into the IR session payload
+- [x] Compile current judge shape into typed IR judge forms
+- [x] Compile current routing tables and loop bounds into IR control-flow forms
+- [x] Add golden tests for representative current-authored workflow -> IR compilation
+  - proof lives in `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
+- [x] Add focused edge-case tests for preload/binding/override compatibility behavior
+  - focused proof currently covers accepted-result envelope reads, transcript preload, result-schema compat retention, and the present `:workflow-runtime` structural-boundary mismatch
 - [ ] Reconcile compiler behavior with `doc/workflow-grammar-migration.md`
