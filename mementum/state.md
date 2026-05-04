@@ -225,6 +225,11 @@ Bootstrapped on 2026-04-02.
     - `064` workflow authoring convergence and examples
   - default step-session construction is now explicitly documented as: delegated workflow/default profile shape, prompt composition, inherited tools/skills/model/thinking plus runtime extension/workflow environment, existing default data-flow bindings, and no extra reference preload unless explicitly requested
 
+## Current work update
+- Reviewed task `085-inline-session-contribution-compilation-into-child-session-conversations` for ambiguities.
+- Found one actionable task-artifact ambiguity: the task required appending review notes to `implementation.md` and adding follow-ups to `design-steps.md`, but neither file existed in the task directory.
+- Created `munera/open/085-inline-session-contribution-compilation-into-child-session-conversations/implementation.md` and `design-steps.md` to make the canonical review/output surface explicit.
+
 ## Suggested next step
 - Active munera tasks are now:
   1. `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
