@@ -73,3 +73,7 @@
 - 2026-05-04 — Code-shaper pass found no new actionable feedback.
   - re-read task artifacts plus referenced `workflow_step_prep.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `workflow_source_resolution.clj`, `workflow_file_authoring_session.clj`, and focused tests/docs
   - confirmed the only live shaping seam remains the already-recorded unchecked `workflow_step_prep.clj` follow-up; no new simplicity/consistency/robustness issues were identified without duplicating prior notes
+- 2026-05-04 — Code-shaper pass found no new actionable feedback.
+  - re-read the task artifacts and the referenced runtime/docs/tests with the prior implementation-review/code-shaper notes in mind
+  - confirmed the only still-live shaping seam is the already-recorded unchecked `workflow_step_prep.clj` output-normalization follow-up; no additional simplicity/consistency/robustness issues were found without duplicating existing notes or steps
+  - spot-checking the broader focused workflow test surface showed an already-known unrelated regression in `workflow_statechart_runtime_test.clj` preload expectations, not a new task-077-specific shaping issue
