@@ -7,15 +7,19 @@ Approach:
 Likely steps:
 1. identify the canonical runtime seam where authored definitions become executable workflow definitions
 2. thread normalized IR through that seam without broadening external API churn more than necessary
-3. adapt step lookup/progression/routing to IR step names and execution payloads
-4. adapt judge execution to typed IR judge forms
-5. adapt session-style step execution to IR `:session` payloads while preserving behavior
-6. ensure attempt/result/history recording still exposes coherent data after the pivot
-7. add focused IR-execution tests and keep representative existing workflow tests green
-8. remove or isolate any execution-time dependence on current authored field names discovered during the migration
+3. make execution-entry validation explicit: current-authored definitions may compile through compatibility, but runtime execution accepts only canonical execution-valid IR and rejects compiled `:workflow-runtime` refs until a later IR surface exists for them
+4. adapt step lookup/progression/routing to IR step names and execution payloads
+5. adapt judge execution to typed IR judge forms
+6. adapt session-style step execution to IR `:session` payloads while preserving behavior
+7. keep run/step-run/attempt/history observer surfaces shape-stable for this slice while moving their internal recording logic onto IR-owned execution concepts
+8. add focused IR-execution and observability regression tests and keep representative existing workflow tests green
+9. remove or isolate any execution-time dependence on current authored field names discovered during the migration
 
 Proof target:
-- runtime executes normalized IR workflows and existing current-authored workflows still pass once compiled to IR first
+- runtime executes normalized IR workflows directly
+- existing current-authored workflows still pass once compiled to IR first, provided the compiled IR is execution-valid
+- compiled current-authored workflows that still carry `:workflow-runtime` refs are rejected explicitly at execution entry
+- execution and observer-facing run/attempt/history surfaces stay regression-locked together across the pivot
 
 Risks:
 - hidden authored-shape assumptions may exist deep in execution or observability code
