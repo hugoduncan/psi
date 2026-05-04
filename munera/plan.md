@@ -16,7 +16,6 @@ Queue:
 `munera/open/073-workflow-child-session-prompt-composition/`
 `munera/open/076-auto-session-name-helper-model-fallback/`
 `munera/open/077-deterministic-workflow-steps/`
-`munera/open/080-runtime-execution-adoption-of-ir/`
 `munera/open/087-step-output-surface-normalization-and-validation-across-invoke-session-and-delegate/`
 `munera/open/088-shared-source-reference-and-projection-support-across-invoke-session-and-delegate/`
 `munera/open/081-target-authored-grammar-to-ir-compiler/`
