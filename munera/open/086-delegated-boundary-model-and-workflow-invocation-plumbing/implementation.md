@@ -6,3 +6,4 @@
     - callee local `:workflow-original` is the materialized delegated `:context` bare ordered vector
     - forwarded delegated `:context` is not wrapped in a boundary envelope at the callee local source-ref surface in this slice
   - added focused executable proof in `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` to assert the concrete callee-visible `:workflow-input` and `:workflow-original` values implied by that shape
+- 2026-05-04 review: actionable inconsistency remains — `design.md` and `plan.md` both say this slice should reuse task `088` as a dependency for shared source/reference/projection resolution, but `munera/plan.md` queues `086` ahead of `084` and does not list `088` at all, so the task-local dependency story and the project-level execution order/orchestration surface disagree about what must land first.
