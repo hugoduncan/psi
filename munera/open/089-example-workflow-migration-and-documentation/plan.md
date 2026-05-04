@@ -6,7 +6,7 @@ Approach:
 
 Likely steps:
 1. use `plan-build`, `plan-build-review`, and `gh-bug-triage-modular` as the minimum authoritative migration/example set
-2. ensure that set collectively covers invoke/session/delegate plus shared refs/outputs/yields/context semantics where the current task-077 implementation makes them executable and teachable
+2. ensure that set collectively covers invoke/session/delegate plus shared refs and `:session` input/reference/preload context semantics where the current task-077 implementation makes them executable and teachable
 3. migrate those workflows or add target-grammar example variants
 4. update `doc/workflows.md` as the primary example-led guide for the preferred target authoring style
 5. include concise current->target mapping notes there or in tightly linked secondary docs only where they reduce author confusion

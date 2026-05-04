@@ -34,7 +34,7 @@ Without this slice:
 In scope:
 
 - choose a small authoritative set of representative workflows to migrate or dual-express in target grammar
-- ensure the authoritative example set covers invoke/session/delegate semantics and shared data-flow semantics, allowing that coverage to be distributed across a small coherent workflow set rather than forced into one monolithic example
+- ensure the authoritative example set covers invoke/session/delegate semantics and the currently teachable shared data-flow semantics, allowing that coverage to be distributed across a small coherent workflow set rather than forced into one monolithic example
 - update or add user/developer-facing docs that explain the preferred target authoring model
 - add notes where helpful about how current-grammar concepts map to target-grammar concepts
 - add focused tests or verification for migrated example workflows as needed
@@ -61,7 +61,7 @@ Coverage does not need to be concentrated into one executable example. It may be
 
 - target-grammar step authoring shape
 - invoke/session/delegate semantics
-- shared data references, outputs, yields, and contextual preload/reference flow where those surfaces are currently implemented and teachable
+- shared data references plus contextual `:session` input/reference/preload flow where those surfaces are currently implemented and teachable
 
 If implementation reality in task `077` still leaves one of those surfaces partially unavailable in authored examples, the docs must name that boundary explicitly rather than silently implying broader support.
 
@@ -80,6 +80,7 @@ Required secondary documentation updates may include:
 
 - at least one representative workflow using the target grammar exists and runs
 - examples/documentation cover invoke, session, and delegate semantics directly or through a small coherent set of migrated workflows
+- docs bound example-led authoring guidance to the currently taught surfaces in `doc/workflows.md`; they do not implicitly claim concrete `outputs`/`yields` authoring coverage unless that guidance is added explicitly
 - docs explain the preferred target authoring model clearly enough for future workflow authors
 - any current->target mapping guidance included in docs is concise and practical rather than compatibility-heavy
 - migrated examples remain aligned with executable runtime behavior

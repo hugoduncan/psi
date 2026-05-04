@@ -6,3 +6,4 @@
 - [ ] Run focused verification for migrated examples
 - [ ] Tighten examples/docs if migration reveals readability or ergonomics issues
 - [ ] Reconcile examples/docs with task `077` and executable runtime behavior
+  - [x] Bound task/design-plan documentation claims to the currently taught `:session` input/reference/preload and shared-reference surfaces; do not imply concrete example-led `outputs`/`yields` coverage until the guide teaches them explicitly
