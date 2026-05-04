@@ -1,0 +1,1 @@
+- [ ] Decide whether registered deterministic operations return the full canonical invoke-step output envelope, a lower-level operation result that runtime wraps, or an explicit tagged success/failure contract; document the authoritative boundary and add focused tests for malformed return handling.
