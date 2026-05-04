@@ -2,8 +2,9 @@
 - [ ] Choose the canonical runtime home for deterministic operation registration and lookup
 - [ ] Define the operation registration shape, including stable id and minimal metadata
 - [ ] Define the operation invocation input contract
-- [ ] Define the canonical structured success result contract
-- [ ] Define the canonical failure/diagnostic contract
+- [ ] Define the canonical tagged success operation-result contract
+- [ ] Define the canonical tagged failure/diagnostic operation-result contract
+- [ ] Make runtime-owned invoke-step output wrapping explicit (`:data` / `:summary` / `:result` come from the operation result boundary rather than from operation-authored step envelopes)
 - [ ] Define handling for duplicate ids, missing ids, and malformed returned values
 - [ ] Add focused tests for registration and lookup behavior
 - [ ] Add focused tests for representative invocation and result-shape enforcement
