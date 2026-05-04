@@ -12,4 +12,5 @@
   - proof lives in `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
 - [x] Add focused edge-case tests for preload/binding/override compatibility behavior
   - focused proof currently covers accepted-result envelope reads, transcript preload, result-schema compat retention, and the present `:workflow-runtime` structural-boundary mismatch
-- [ ] Reconcile compiler behavior with `doc/workflow-grammar-migration.md`
+- [x] Reconcile compiler behavior with `doc/workflow-grammar-migration.md`
+  - updated `doc/workflow-ir.md` and `doc/workflow-grammar-migration.md` to reflect the implemented current-grammar compatibility compiler contract, including the current `:workflow-runtime` seam

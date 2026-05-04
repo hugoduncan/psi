@@ -147,10 +147,11 @@ Illustrative shape:
                             :text "Review these issues:\n\n{{issues}}"
                             :vars {"issues" {:from {:step "discover" :output :data}
                                               :path [:issues]}}}]}
- :outputs {:final-llm-reply {:source :session/final-llm-reply}
-           :transcript {:source :session/transcript}}
+ :outputs {:text {:source :session/final-llm-reply}
+           :transcript {:source :session/transcript}
+           :result {:source :session/result}}
  :yields {:type :text
-          :text :final-llm-reply}}
+          :text :text}}
 ```
 
 ### Session semantics
@@ -202,7 +203,7 @@ Each step may expose step-local outputs by logical output key.
 Illustrative common output keys:
 
 - invoke step: `:data`, `:summary`, `:result`
-- session step: `:final-llm-reply`, `:transcript`, optional `:result`
+- session step: commonly `:text`, `:transcript`, `:result`
 - delegate step: optional debug/result outputs only if justified later
 
 The `:outputs` map should describe what logical output keys exist for a step and, at minimum, give runtime a canonical local meaning for each key.
@@ -264,7 +265,7 @@ The IR validator treats missing `:yields` as invalid normalized IR rather than f
 This aligns with the target grammar's preferred defaults:
 
 - deterministic/invoke steps yield their canonical machine-readable `:data`
-- inline session steps yield their terminal `:final-llm-reply`
+- inline session steps yield their canonical terminal text output key for the chosen compilation path; the current-grammar compatibility compiler currently normalizes this as `:text`
 - delegated steps yield the callee's yielded value unchanged
 
 ## Control flow
@@ -385,6 +386,12 @@ These align with the target grammar's shared data-reference model and replace cu
 - `{:step s :output k}` -> step-local output surface `k` from prior step `s`
 - `{:step s :yield f}` -> yielded-value field `f` from prior step `s`
 
+Current implementation note:
+
+- canonical normalized IR currently admits `:workflow-input`, `:workflow-original`, prior-step `:output`, and prior-step `:yield`
+- the current-authored compatibility compiler also encounters current `:workflow-runtime` refs from the legacy grammar, but `workflow_ir.clj` does not yet admit `:workflow-runtime` as a canonical IR `:from` source-ref
+- therefore `:workflow-runtime` is currently a known migration seam rather than a settled canonical IR feature
+
 ## Contributions
 
 Session construction and delegated context reuse normalized contribution items.
@@ -456,6 +463,8 @@ Examples of things that may temporarily need compatibility metadata include:
 
 - role-shaping details compiled from current `:session-preload`
 - distinctions preserved from current `workflow-binding-ref` sources during translation
+- accepted-result-envelope breadcrumbs preserved from current `:step-output` reads that target whole-envelope, `:diagnostics`, or `:blocked` surfaces outside canonical declared outputs
+- current required `:result-schema`, preserved as compile-time breadcrumbs rather than a canonical execution field
 - authored-source breadcrumbs useful for debugging compiler output while both grammars coexist
 
 ## Workflow result composition
@@ -570,6 +579,10 @@ source-ref ::= :workflow-input
              | :workflow-original
              | {:step step-name :output output-key}
              | {:step step-name :yield yield-field}
+
+;; current-grammar migration note:
+;; legacy `:workflow-runtime` refs exist in the current grammar but are not yet
+;; admitted as canonical normalized IR source-refs.
 
 output-key ::= keyword
 yield-field ::= keyword

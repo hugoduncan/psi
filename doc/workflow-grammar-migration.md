@@ -200,6 +200,12 @@ This translation may require a dedicated compatibility compiler for old `:source
 
 The compatibility translation belongs in the current-grammar compiler, not in runtime execution.
 
+Current implementation note:
+
+- the first current-grammar compatibility compiler now maps canonical `:outputs` reads directly to IR source refs
+- non-canonical accepted-result-envelope reads from current `:step-output` refs, including whole-envelope, `:diagnostics`, and `:blocked`, currently compile through the canonical IR `:result` output plus narrow source-spec `:compat` breadcrumbs
+- current `:workflow-runtime` refs remain an explicit unresolved seam: they can still appear in current-authored input, but canonical `workflow_ir.clj` validation does not yet admit `:workflow-runtime` as an IR source-ref
+
 ### Current `:session-preload` maps to normalized source contributions
 
 Current session preload items should compile to normalized contributions wherever possible.
@@ -208,6 +214,11 @@ Likely mapping:
 
 - `{:kind :value ...}` -> source contribution or compatibility-shaped sourced conversation item in IR
 - `{:kind :session-transcript ...}` -> source contribution with projection
+
+Current implementation note:
+
+- the first compatibility compiler normalizes both preload forms as ordered IR source contributions, preserving preload order before the terminal template contribution
+- current preload role semantics are preserved only in `:compat` metadata on the compiled source contribution
 
 If some current preload semantics carry author-invisible transport details such as role shaping that are not directly expressible in the target grammar, those details may exist temporarily as IR-level compatibility fields.
 
@@ -228,6 +239,10 @@ Likely carried fields include:
 - `:model`
 - `:thinking-level`
 - `:prompt-component-selection`
+
+Current implementation note:
+
+- the current compatibility compiler also folds executor-local `:skill` into IR session `:skills` when present, while preserving the original executor under step `:compat`
 
 This means the normalized IR session form should allow canonical session-configuration fields plus possible compatibility metadata when required for semantic preservation.
 
@@ -253,6 +268,10 @@ Should compile to a typed normalized judge form, conceptually equivalent to:
 The migration should normalize judge execution mode explicitly even before the final target authoring surface for judge details is settled.
 
 This gives runtime one execution concept for LLM-backed judges and a separate one for invoke-style deterministic judges.
+
+Current implementation note:
+
+- the first current-grammar compatibility compiler normalizes the current judge shape to IR `{:type :llm ...}` with a one-item template contribution containing the current judge prompt
 
 ### Current routing table outcomes normalize without coercion
 
