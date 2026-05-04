@@ -1,4 +1,8 @@
-- [ ] Specify whether task 084 extends existing workflow run/step-run/attempt introspection surfaces or introduces new invoke-specific query attrs, and name the canonical public contract explicitly.
-- [ ] Specify the canonical storage/projection location for effective invoke args (`attempt`, `history`, `accepted-result diagnostics`, or derived-only introspection) so recording and tests target one surface.
-- [ ] Specify whether invoke yielded-value visibility remains derived from `accepted-result` + step `:yields` or becomes an explicitly recorded runtime/introspection surface.
-- [ ] Specify the failure-side contract for invoke operations returning `{:status :error ...}`: attempt-only `:execution-error`, invoke-specific diagnostics surface, or another canonical inspectable result shape.
+- [x] Specify whether task 084 extends existing workflow run/step-run/attempt introspection surfaces or introduces new invoke-specific query attrs, and name the canonical public contract explicitly.
+  - Resolved in `design.md`: task 084 extends the canonical workflow run / step-run / step-attempt / accepted-result / history contract and broadens existing workflow read projections when needed; it does not create a parallel invoke-only query family.
+- [x] Specify the canonical storage/projection location for effective invoke args (`attempt`, `history`, `accepted-result diagnostics`, or derived-only introspection) so recording and tests target one surface.
+  - Resolved in `design.md` and `plan.md`: effective invoke args are recorded on the executing step attempt; history may carry supplementary breadcrumbs only.
+- [x] Specify whether invoke yielded-value visibility remains derived from `accepted-result` + step `:yields` or becomes an explicitly recorded runtime/introspection surface.
+  - Resolved in `design.md`: invoke yield visibility remains derived from accepted-result outputs plus normalized `:yields`; any direct yield projection is convenience-only, not an independent source of truth.
+- [x] Specify the failure-side contract for invoke operations returning `{:status :error ...}`: attempt-only `:execution-error`, invoke-specific diagnostics surface, or another canonical inspectable result shape.
+  - Resolved in `design.md` and `plan.md`: invoke failure centers on canonical attempt `:execution-error`, with status/history/projections derived from that same record.

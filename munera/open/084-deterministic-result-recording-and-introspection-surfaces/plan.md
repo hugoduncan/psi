@@ -3,13 +3,16 @@ Approach:
 - treat recording and introspection as part of the runtime contract for invoke steps, not as incidental byproducts
 - stay as close as possible to existing workflow attempt/result/history patterns while making invoke-specific data first-class and explicit
 - prefer stable logical surfaces (`:data`, `:summary`, yielded value, diagnostics) over exposing only raw registry-return values
-- use existing workflow query/debug surfaces where possible, extending them only where invoke-step execution would otherwise remain opaque
+- use the existing canonical workflow run/step-run/attempt contract as the public surface; broaden read projections from that source-of-truth rather than creating invoke-only top-level query attrs
+- record effective invoke args on the attempt that executed them
+- keep invoke yielded-value visibility derived from accepted-result outputs plus normalized `:yields`, with any direct yield projection treated as convenience-only
+- center invoke failures on the canonical attempt `:execution-error` surface, with history/read projections derived from it
 
 Likely steps:
 1. inspect current workflow attempt/result/introspection surfaces and identify session-oriented assumptions
 2. define the canonical invoke recording shape for attempt-local and accepted-result data
-3. decide where effective invoke args, canonical outputs, yielded value, and diagnostics live in runtime state
-4. expose or extend workflow introspection/query surfaces to read those values cleanly
+3. record effective invoke args on attempts and canonical invoke outputs on accepted-result/result-envelope surfaces
+4. expose or extend workflow introspection/query surfaces to read those values cleanly from workflow run state
 5. add focused tests for representative success recording, failure recording, and introspection/query behavior
 6. tighten implementation or docs if recording surfaces drift from IR/result-contract intent
 

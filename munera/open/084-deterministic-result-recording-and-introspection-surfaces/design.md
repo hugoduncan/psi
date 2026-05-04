@@ -58,11 +58,68 @@ After an invoke step runs, the runtime exposes one coherent story for:
 - what yielded value the step produced
 - what failure/diagnostic information exists when the step does not succeed
 
+## Canonical contract decisions
+
+### Public introspection/query contract
+
+Task `084` extends the existing canonical workflow runtime surfaces:
+
+- workflow run
+- step run
+- step attempt
+- accepted result envelope
+- workflow history
+
+It does **not** introduce a parallel invoke-only query family.
+
+The canonical public contract remains the workflow run state model already exposed through workflow read/list surfaces. If existing read projections are too narrow for invoke debugging, they should be broadened from that same canonical run/step-run/attempt data rather than publishing new invoke-specific top-level attrs.
+
+### Effective invoke args location
+
+Effective invoke args belong to the attempt-local execution record.
+
+Reasoning:
+
+- they are materialized per execution attempt
+- retries may resolve different values
+- they are part of "what this attempt actually invoked", not merely historical narration
+
+Therefore the canonical recording target is the step attempt surface, with history entries allowed only as supplementary breadcrumbs. Accepted-result diagnostics must not become the primary storage location for effective args.
+
+### Yielded-value visibility
+
+Invoke yielded-value visibility remains derived from the canonical accepted-result outputs plus the step's normalized `:yields` definition.
+
+Task `084` does not require a second independently recorded invoke-yield field when the runtime can deterministically derive yield from:
+
+- the accepted result envelope's canonical `:outputs`
+- the step definition's canonical `:yields`
+
+If a projection/read surface exposes the yielded value directly for convenience, that projection is derived from those canonical sources and must not become a divergent source of truth.
+
+### Failure-side contract
+
+When an invoke operation returns `{:status :error ...}`, the canonical inspectable runtime result is attempt-local failure data, not a synthetic accepted result.
+
+The primary failure surface is:
+
+- step attempt `:execution-error` for the canonical structured failure record
+
+Allowed accompanying surfaces:
+
+- attempt status/finished timestamps
+- workflow history breadcrumbs
+- derived read/introspection projections built from the same attempt failure record
+
+This task should not introduce an invoke-only diagnostics store separate from the attempt record unless an existing shared workflow failure surface requires it.
+
 ## Acceptance
 
 - invoke attempt/result recording is explicit and coherent in runtime state
-- canonical invoke outputs and yielded values are visible through workflow runtime surfaces
-- diagnostics/failure details are preserved in a structured, inspectable way
+- canonical invoke outputs are visible through accepted-result surfaces
+- effective invoke args are inspectable on the canonical attempt surface
+- yielded-value visibility is coherent with accepted-result outputs plus normalized `:yields`
+- diagnostics/failure details are preserved in a structured, inspectable way, with invoke failure centered on canonical attempt failure recording
 - introspection/query surfaces expose invoke-step result data consistently enough for debugging and downstream reasoning
 - focused tests prove representative success and failure recording/query cases
 - the implemented surfaces align with task `077`, task `083`, and `doc/workflow-ir.md`

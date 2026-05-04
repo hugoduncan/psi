@@ -1,1 +1,8 @@
 - Review 2026-05-04: actionable ambiguities found. Created missing `implementation.md` and `design-steps.md` review surfaces. Follow-ups added for invoke introspection contract shape, effective-args recording location, yielded-value visibility contract, and failure-surface contract.
+- 2026-05-04 follow-up execution: resolved the four review-added design ambiguities in task artifacts.
+  - `design.md` now names the canonical public contract as the existing workflow run / step-run / attempt / accepted-result / history model, explicitly rejecting a parallel invoke-only query family.
+  - `design.md` now fixes effective invoke args to the attempt-local execution record, with history as supplementary only.
+  - `design.md` now fixes invoke yielded-value visibility as derived from accepted-result outputs plus normalized `:yields`, with any direct yield projection treated as convenience-only.
+  - `design.md` now fixes invoke failure introspection on canonical attempt `:execution-error`, with read/history projections derived from that record.
+  - `plan.md` was aligned to those contract decisions.
+  - `design-steps.md` review follow-ups were marked done after the task artifacts became explicit enough for implementation.
