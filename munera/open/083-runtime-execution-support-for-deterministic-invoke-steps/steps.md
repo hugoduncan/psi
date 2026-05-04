@@ -13,3 +13,4 @@
 - [x] Reconcile runtime behavior with task `077`, `doc/workflow-ir.md`, and task `082`
 - [x] Clarify and align task artifacts on invoke-operation error control flow and canonical nested IR invoke execution boundary
 - [x] Reconcile invoke-judge claims with runtime/proof surfaces: either implement `:judge {:type :invoke ...}` through the deterministic operation registry with focused tests, or narrow task/documentation claims so shared judge/routing proof does not overstate current prompt-only judge execution
+- [ ] Reconcile remaining repo documentation/runtime contract drift for invoke-typed judges: either implement `:judge {:type :invoke ...}` execution in `workflow_judge.clj` with focused proof, or narrow `doc/workflow-ir.md` so canonical/current runtime docs do not present invoke-judge as an available executed path before it exists.
