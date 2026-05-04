@@ -5,4 +5,4 @@
 - [ ] Keep `:yield` ref validation distinct from `:output` ref validation
 - [ ] Add focused valid-reference tests across invoke/session/delegate workflows
 - [ ] Add focused invalid-reference tests across invoke/session/delegate workflows
-- [ ] Reconcile implementation with task `077` and `doc/workflow-ir.md`
+- [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`

@@ -87,7 +87,7 @@ source-ref ::= :workflow-input
 
 output-key ::= keyword
 
-yield-field ::= :data | :text | :error | :reason | :message | :details
+yield-field ::= keyword
 
 arg-map ::= {keyword (literal | source-spec)}*
 

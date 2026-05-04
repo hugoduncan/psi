@@ -77,6 +77,7 @@
     (is (m/validate workflow-ir/source-ref-schema :workflow-original))
     (is (m/validate workflow-ir/source-ref-schema {:step "discover" :output :data}))
     (is (m/validate workflow-ir/source-ref-schema {:step "discover" :yield :data}))
+    (is (m/validate workflow-ir/source-ref-schema {:step "discover" :yield :custom-field}))
     (is (m/validate workflow-ir/source-spec-schema {:from :workflow-input :path [:repo]}))
     (is (m/validate workflow-ir/source-spec-schema {:from {:step "discover" :output :data}
                                                     :projection {:type :tail :turns 1}})))
@@ -235,6 +236,21 @@
           result (workflow-ir/validate-workflow-ir ir)]
       (is (false? (:valid? result)))
       (is (= :missing-yield-field (-> result :semantic-errors first :type)))))
+
+  (testing "yield refs allow keyword-shaped fields structurally but validate against the referenced yield form semantically"
+    (let [step-2 (assoc valid-session-step
+                        :session {:contributions [{:type :template
+                                                   :text "{{missing}}"
+                                                   :vars {"missing" {:from {:step "discover" :yield :custom-field}}}}]})
+          ir {:version :workflow-ir/v1
+              :steps [valid-invoke-step step-2]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :missing-yield-field
+               :step "report"
+               :ref {:step "discover" :yield :custom-field}
+               :available-yield-fields [:data]}]
+             (:semantic-errors result)))))
 
   (testing "compat source-ref-shaped breadcrumbs do not participate in semantic validation"
     (let [ir {:version :workflow-ir/v1
