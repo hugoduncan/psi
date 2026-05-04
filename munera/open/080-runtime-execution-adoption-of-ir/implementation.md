@@ -23,3 +23,6 @@
 - Focused regression proof green:
   - `clojure -M:test --focus psi.agent-session.workflow-current-ir-compiler-test --focus psi.agent-session.workflow-ir-runtime-adoption-test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-lifecycle-test --focus psi.agent-session.workflow-resolvers-test --focus psi.agent-session.workflow-runtime-test`
   - result: `29 tests, 161 assertions, 0 failures`.
+
+2026-05-04 — implementation review pass
+- Review: no new actionable feedback after reading task artifacts plus runtime execution, statechart, progression/recording, judge, resolver, and focused IR adoption tests; reran the focused regression suite and it stayed green (`29 tests, 161 assertions, 0 failures`).
