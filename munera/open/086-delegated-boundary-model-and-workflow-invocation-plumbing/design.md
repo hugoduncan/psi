@@ -1,4 +1,4 @@
-Goal: implement the delegated workflow boundary and runtime invocation plumbing for workflow IR `:type :delegate` steps.
+Goal: implement the delegated workflow boundary and runtime invocation plumbing for compiled normalized workflow IR `:type :delegate` steps, with target-authored hoisted delegate syntax reaching runtime only through the existing compiler seam.
 
 ## Intent
 
@@ -20,6 +20,13 @@ For this task's first cut, the delegated boundary payload reaching the callee ru
 - any richer delegated-boundary recording for debugging belongs in caller-side execution/introspection surfaces, not in the callee's local `:workflow-input` / `:workflow-original` values themselves
 
 This task makes that delegated boundary executable and explicit in runtime plumbing.
+
+Layering decision for this task:
+
+- authored target-workflow syntax remains the hoisted user-facing surface described in `doc/workflow-grammar.md`
+- the compiler seam (`workflow_target_ir_compiler.clj` and equivalent compatibility compilation for current authored forms) is responsible for translating that authored surface into canonical normalized workflow IR
+- runtime execution for this task is explicitly over compiled normalized IR delegate payloads (`:type :delegate` with nested `:delegate {...}`)
+- therefore this task's execution/invocation plumbing, payload semantics, and proofs should speak in terms of the runtime IR boundary, while still noting when authored hoisted fields are expected to compile into that boundary
 
 Dependency/orchestration note:
 

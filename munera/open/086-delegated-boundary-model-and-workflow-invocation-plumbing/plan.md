@@ -1,4 +1,5 @@
 Approach:
+- execution boundary decision: task `086` targets compiled normalized workflow IR as the runtime execution surface; target-authored hoisted delegate fields (`:target`, `:prompt-string`, `:context`) are in scope only insofar as they must compile through the named compiler seam into IR `:delegate` payloads before runtime consumes them
 - dependency note: this slice should reuse the shared source/reference/projection semantics defined in task `077` and already exercised by the landed deterministic workflow runtime/compiler slices (`081`, `083`, `085`) so delegated `:context` and templated `:prompt-string` resolution match the rest of workflow data flow; any later extraction into a separate dedicated task can remain a follow-on rather than a prerequisite for this slice
 - treat delegated execution as a distinct workflow boundary, not as a disguised child-session call
 - keep the boundary explicit: rendered prompt string, ordered forwarded context, target workflow identity, and propagated yielded value should all be visible in data and recording surfaces
@@ -10,14 +11,15 @@ Approach:
   - richer boundary metadata, if recorded, stays in caller-side delegated execution/introspection surfaces rather than being wrapped into the callee input/original values
 
 Likely steps:
-1. identify the IR execution seam where `:type :delegate` dispatch should be added or converged
-2. resolve the target workflow definition through existing loader/runtime facilities
-3. render delegated `:prompt-string` to a final string from literal or template form
-4. resolve delegated `:context` items from workflow input/original and prior step outputs/yields while preserving authored order
-5. establish the callee invocation payload so local `:workflow-input` is the rendered prompt string and local `:workflow-original` follows delegated-boundary semantics
-6. execute the callee workflow through the canonical workflow runtime path
-7. propagate the callee yielded value and relevant execution outcome back into the delegating step runtime surfaces
-8. add focused tests for delegate-only and mixed delegate/session/invoke flows
+1. identify the compiled normalized IR execution seam where `:type :delegate` dispatch should be added or converged
+2. confirm the compiler seam keeps authored hoisted delegate fields compiling into runtime IR `:delegate` payloads rather than bypassing the IR boundary
+3. resolve the target workflow definition through existing loader/runtime facilities
+4. render delegated IR `:prompt-string` to a final string from literal or template form
+5. resolve delegated IR `:context` items from workflow input/original and prior step outputs/yields while preserving authored order
+6. establish the callee invocation payload so local `:workflow-input` is the rendered prompt string and local `:workflow-original` follows delegated-boundary semantics
+7. execute the callee workflow through the canonical workflow runtime path
+8. propagate the callee yielded value and relevant execution outcome back into the delegating step runtime surfaces
+9. add focused tests for delegate-only and mixed delegate/session/invoke flows
 
 Proof target:
 - an IR delegate step invokes a target workflow through an explicit delegated boundary and returns the callee yielded value coherently to the caller workflow
