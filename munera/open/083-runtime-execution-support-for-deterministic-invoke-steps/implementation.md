@@ -45,3 +45,8 @@
   - Focused test execution attempt used the repo's Kaocha-based `-M:test` entrypoint and failed with `Unknown option: "-m"`; no new code was changed in this pass, so there was no additional proof run to record beyond that invocation-shape discovery.
 - Review 2026-05-04 ψ: actionable shaping feedback.
   - Remaining consistency/robustness drift: task 083 artifacts say the invoke-judge claim was reconciled, but current repo docs still expose `:judge {:type :invoke ...}` as part of the canonical/current IR surface while runtime execution remains prompt-only (`workflow_judge.clj`, `workflow_statechart_runtime.clj`, `doc/workflow-grammar-current.md`). Follow up by either implementing invoke-typed judge execution with focused proof or narrowing `doc/workflow-ir.md` so current docs do not overstate the executed contract.
+- 2026-05-04 ψ: executed the newly added actionable follow-up for invoke-judge doc/runtime reconciliation.
+  - Narrowed `doc/workflow-ir.md` so current docs distinguish executed runtime support (`:judge {:type :llm ...}`) from documented-but-not-yet-executed invoke-judge shape (`:judge {:type :invoke ...}`).
+  - Added an explicit runtime support note pointing at `components/agent-session/src/psi/agent_session/workflow_judge.clj` as the current prompt/session-only judge execution boundary.
+  - Clarified the compact grammar note so `invoke-judge` is documented as IR shape only until runtime support lands.
+  - Marked the final unchecked task step complete in `steps.md` because the repo documentation no longer overstates invoke-typed judge execution as part of the current executed contract.

@@ -300,10 +300,29 @@ Illustrative shape:
 
 The IR should normalize judge execution mode explicitly.
 
-First-cut judge forms:
+Current executed runtime support:
 
 - `:type :llm`
+
+Documented-but-not-yet-executed schema shape:
+
 - `:type :invoke`
+
+### Runtime support note
+
+The current runtime judge execution path is prompt/session-based only.
+`components/agent-session/src/psi/agent_session/workflow_judge.clj` executes
+LLM judges by creating a judge child session and prompting it. There is not yet
+an executed runtime branch for `:judge {:type :invoke ...}` through the
+deterministic operation registry.
+
+Therefore:
+
+- `:judge {:type :llm ...}` is part of the current executed IR contract
+- `:judge {:type :invoke ...}` is currently a schema/documentation shape for a
+  future follow-on, not a landed executed runtime path
+- task 083 proves invoke-step execution plus shared judged routing at the
+  workflow level, but does not prove invoke-typed judge execution specifically
 
 ### LLM judge
 
@@ -535,7 +554,7 @@ control-flow ::= :judge judge-spec
                | :on outcome-map
                | :max-iterations pos-int
 
-judge-spec ::= llm-judge | invoke-judge
+judge-spec ::= llm-judge | invoke-judge   ;; invoke-judge is documented IR shape; current runtime executes llm-judge only
 
 llm-judge ::= {:type :llm
                :session judge-session-spec
