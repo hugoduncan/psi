@@ -14,9 +14,14 @@
   - Shared source-spec application now owns canonical `:projection` application, delegating transcript/message projections to `workflow-judge/project-messages`.
 - [x] Enforce the exclusivity rule for `:path` vs `:projection`
   - Shared source-spec application now rejects specs that carry both siblings at runtime as well as at schema/compiler boundaries.
-- [ ] Thread the shared substrate into invoke arg resolution
-- [ ] Thread the shared substrate into session contribution/template-var resolution
-- [ ] Thread the shared substrate into delegate context and templated prompt-string resolution
-- [ ] Add focused mixed-form resolution tests
-- [ ] Add focused invalid-source/invalid-spec tests
+- [x] Thread the shared substrate into invoke arg resolution
+  - Added canonical `workflow_source_resolution/resolve-invoke-args` for normalized IR invoke-arg materialization.
+- [x] Thread the shared substrate into session contribution/template-var resolution
+  - Template var materialization/rendering now lives canonically in `workflow_source_resolution` and `workflow_step_prep` delegates to it.
+- [x] Thread the shared substrate into delegate context and templated prompt-string resolution
+  - Added canonical `resolve-delegate-context` and `render-delegate-prompt-string` helpers for normalized IR delegate boundaries.
+- [x] Add focused mixed-form resolution tests
+  - Added `workflow_source_resolution_test.clj` proving shared semantics across invoke/session/delegate consumers.
+- [x] Add focused invalid-source/invalid-spec tests
+  - Added focused runtime exclusivity proof for invalid source-specs carrying both `:path` and `:projection`.
 - [ ] Reconcile implementation with task `077` and `doc/workflow-ir.md`

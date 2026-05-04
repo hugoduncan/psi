@@ -6,11 +6,15 @@
    - source specs (`{:from ...}` with optional `:path` or `:projection`)
    - first-cut path traversal
    - first-cut projection application
+   - invoke arg materialization
+   - template var resolution / rendering
+   - delegate context / prompt-string materialization
 
    This substrate is runtime-owned. Authoring/compiler namespaces may translate
    authored syntax into canonical IR-compatible source specs, but they should
    delegate runtime value resolution semantics here rather than re-encode them."
   (:require
+   [clojure.string :as str]
    [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-statechart :as workflow-statechart]))
@@ -26,6 +30,11 @@
               (get acc k)))
           m
           path))
+
+(defn source-spec?
+  [x]
+  (and (map? x)
+       (contains? x :from)))
 
 (defn resolve-source-ref
   [workflow-run source-ref]
@@ -71,6 +80,54 @@
 
       :else
       base)))
+
+(defn materialize-template-vars
+  [workflow-run vars]
+  (into {}
+        (map (fn [[var-name source-spec]]
+               [var-name (apply-source-spec workflow-run source-spec)]))
+        vars))
+
+(defn render-template-contribution
+  [workflow-run contribution]
+  (let [values (materialize-template-vars workflow-run (:vars contribution))]
+    (reduce-kv (fn [text var-name value]
+                 (str/replace text
+                              (str "{{" var-name "}}")
+                              (str (or value ""))))
+               (:text contribution)
+               values)))
+
+(defn materialize-contribution
+  [workflow-run contribution]
+  (case (:type contribution)
+    :source (apply-source-spec workflow-run contribution)
+    :template (render-template-contribution workflow-run contribution)
+    contribution))
+
+(defn materialize-contributions
+  [workflow-run contributions]
+  (mapv #(materialize-contribution workflow-run %) contributions))
+
+(defn resolve-invoke-args
+  [workflow-run args]
+  (into {}
+        (map (fn [[arg-k arg-v]]
+               [arg-k (if (source-spec? arg-v)
+                        (apply-source-spec workflow-run arg-v)
+                        arg-v)]))
+        args))
+
+(defn resolve-delegate-context
+  [workflow-run context]
+  (mapv #(materialize-contribution workflow-run %) context))
+
+(defn render-delegate-prompt-string
+  [workflow-run prompt-string]
+  (if (and (map? prompt-string)
+           (= :template (:type prompt-string)))
+    (render-template-contribution workflow-run prompt-string)
+    prompt-string))
 
 (defn resolve-binding-ref
   [workflow-run {:keys [source path]}]

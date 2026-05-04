@@ -90,19 +90,8 @@
         (str/replace "$INPUT" (str input-text))
         (str/replace "$ORIGINAL" (str original-text)))))
 
-(defn- render-template-contribution
-  [workflow-run contribution]
-  (let [vars (:vars contribution)
-        values (into {}
-                     (map (fn [[var-name source-spec]]
-                            [var-name (workflow-source-resolution/apply-source-spec workflow-run source-spec)]))
-                     vars)]
-    (reduce-kv (fn [text var-name value]
-                 (str/replace text
-                              (str "{{" var-name "}}")
-                              (str (or value ""))))
-               (:text contribution)
-               values)))
+(def render-template-contribution
+  workflow-source-resolution/render-template-contribution)
 
 (defn step-prompt
   [workflow-run step-id]
