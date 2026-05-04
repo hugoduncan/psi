@@ -12,8 +12,9 @@ Likely steps:
 5. adapt judge execution to typed IR judge forms
 6. adapt session-style step execution to IR `:session` payloads while preserving behavior
 7. keep run/step-run/attempt/history observer surfaces shape-stable for this slice while moving their internal recording logic onto IR-owned execution concepts
-8. add focused IR-execution and observability regression tests and keep representative existing workflow tests green
-9. remove or isolate any execution-time dependence on current authored field names discovered during the migration
+8. keep workflow definition/detail resolver surfaces intentionally compatibility-shaped for this slice even though execution pivots fully to IR
+9. add focused IR-execution and observability regression tests and keep representative existing workflow tests green, including proof that definition/detail output remains compatibility-shaped while run/attempt/history behavior stays stable
+10. remove or isolate any execution-time dependence on current authored field names discovered during the migration
 
 Proof target:
 - runtime executes normalized IR workflows directly

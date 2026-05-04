@@ -24,6 +24,7 @@ In scope:
 - adapt attempt/result recording and observability surfaces to IR concepts internally while keeping current observer-facing workflow run / step-run / attempt contracts shape-stable for this slice
 - keep current authored workflows running by compiling them to IR first
 - reject current-grammar workflows that still rely on `:workflow-runtime` source refs at the runtime execution-entry seam until a later slice defines a canonical IR runtime-source surface
+- preserve current compatibility-shaped workflow definition/detail resolver output in this slice, including authored-step fields such as `:psi.workflow.step/executor`, `:psi.workflow.step/prompt-template`, and `:psi.workflow.step/input-bindings`; execution must stop depending on those fields even though observer-facing definition/detail projection still exposes them
 - prove runtime behavior remains green for representative existing workflows
 
 Out of scope:
@@ -43,5 +44,6 @@ Runtime code can execute normalized IR values directly, and existing authored wo
 - current authored workflows still run through current-grammar -> IR compilation when the compiled IR passes canonical execution validation
 - workflows whose compiled IR still contains current-grammar `:workflow-runtime` refs fail fast at the runtime execution-entry seam with an explicit validation error
 - observer-facing workflow run / step-run / attempt / history resolver surfaces stay shape-stable in this slice even as execution internals pivot to IR
+- workflow definition/detail resolver surfaces also stay intentionally compatibility-shaped in this slice, including authored-step fields such as `:psi.workflow.step/executor`, `:psi.workflow.step/prompt-template`, and `:psi.workflow.step/input-bindings`
 - observability/attempt recording surfaces remain coherent after the pivot and do not drift independently from execution
 - execution no longer depends on current authored field names such as `:executor`, `:prompt-template`, or `:input-bindings`

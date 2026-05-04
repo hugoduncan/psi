@@ -7,6 +7,7 @@
 - [ ] Adapt existing session-style workflow step execution to IR `:session` payloads
 - [ ] Keep attempt/result/history recording coherent after IR adoption
 - [ ] Keep observer-facing workflow run / step-run / attempt / history surfaces shape-stable while execution pivots to IR
+- [ ] Keep workflow definition/detail resolver surfaces intentionally compatibility-shaped while execution pivots to IR
 - [ ] Add focused IR-native execution and observability regression tests
 - [ ] Re-run representative workflow lifecycle/execution/routing regression suites
 - [ ] Remove or isolate execution-time dependence on current authored field names
