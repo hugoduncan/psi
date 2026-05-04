@@ -18,3 +18,5 @@
 - [x] Decide whether local `:yields` output-key references (for example session `{:type :text :text :final-llm-reply}`) must correspond to declared step-local `:outputs`, and encode/document the invariant explicitly.
 - [x] Decide whether normalized workflow IR permits an empty `:steps` vector or must require at least one step; align `doc/workflow-ir.md`, schema, and tests.
 - [x] Decide whether a present `:judge` must also require a non-empty `:on` routing table at the normalized IR boundary, and prove the chosen rule with focused tests.
+- [x] Narrow `workflow_ir` semantic source-ref collection so validation inspects only canonical IR execution fields, not optional `:compat` metadata or arbitrary nested breadcrumbs.
+- [x] Add a focused regression test proving `:compat` may contain source-ref-shaped data without affecting normalized IR validation.
