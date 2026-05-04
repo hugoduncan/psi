@@ -1,0 +1,1 @@
+- Review 2026-05-04: actionable ambiguities found. Created missing `implementation.md` and `design-steps.md` review surfaces. Follow-ups added for invoke introspection contract shape, effective-args recording location, yielded-value visibility contract, and failure-surface contract.

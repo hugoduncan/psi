@@ -1,0 +1,4 @@
+- [ ] Specify whether task 084 extends existing workflow run/step-run/attempt introspection surfaces or introduces new invoke-specific query attrs, and name the canonical public contract explicitly.
+- [ ] Specify the canonical storage/projection location for effective invoke args (`attempt`, `history`, `accepted-result diagnostics`, or derived-only introspection) so recording and tests target one surface.
+- [ ] Specify whether invoke yielded-value visibility remains derived from `accepted-result` + step `:yields` or becomes an explicitly recorded runtime/introspection surface.
+- [ ] Specify the failure-side contract for invoke operations returning `{:status :error ...}`: attempt-only `:execution-error`, invoke-specific diagnostics surface, or another canonical inspectable result shape.
