@@ -65,12 +65,33 @@
 
 (deftest resolve-delegate-prompt-and-context-share-canonical-source-spec-semantics-test
   (let [run (workflow-run-with-results)
-        delegate-step (nth (get-in run [:effective-definition :canonical-ir :steps]) 2)]
+        delegate-step (nth (get-in run [:effective-definition :canonical-ir :steps]) 2)
+        rendered-prompt (workflow-source-resolution/render-delegate-prompt-string run (get-in delegate-step [:delegate :prompt-string]))
+        resolved-context (workflow-source-resolution/resolve-delegate-context run (get-in delegate-step [:delegate :context]))]
     (is (= "Ship [\"i-1\" \"i-2\"]"
-           (workflow-source-resolution/render-delegate-prompt-string run (get-in delegate-step [:delegate :prompt-string]))))
+           rendered-prompt))
     (is (= [{:ticket 123 :request "Please triage"}
             ["i-1" "i-2"]]
-           (workflow-source-resolution/resolve-delegate-context run (get-in delegate-step [:delegate :context]))))))
+           resolved-context))
+    (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                         {:definition {:steps [{:name "callee"
+                                                                                :type :session
+                                                                                :contributions [{:type :source
+                                                                                                 :from :workflow-input}
+                                                                                                {:type :source
+                                                                                                 :from :workflow-original}]}]}
+                                                          :run-id "run-delegate-callee"
+                                                          :workflow-input {:original resolved-context
+                                                                           :prompt-string rendered-prompt}})
+          callee-run (-> state2
+                         (assoc-in [:workflows :runs run-id :workflow-input] rendered-prompt)
+                         (assoc-in [:workflows :runs run-id :workflow-original] resolved-context)
+                         (workflow-runtime/workflow-run-in run-id))]
+      (is (= rendered-prompt
+             (workflow-source-resolution/resolve-source-ref callee-run :workflow-input)))
+      (is (= resolved-context
+             (or (:workflow-original callee-run)
+                 (workflow-source-resolution/resolve-source-ref callee-run :workflow-original)))))))
 
 (deftest apply-source-spec-rejects-both-path-and-projection-test
   (let [run (workflow-run-with-results)]

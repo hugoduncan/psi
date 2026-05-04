@@ -12,6 +12,13 @@ A delegated step should:
 - establish a new delegated workflow invocation boundary
 - yield the callee workflow's yielded value unchanged by default
 
+For this task's first cut, the delegated boundary payload reaching the callee runtime is explicit and minimal:
+
+- callee local `:workflow-input` is the final rendered delegated `:prompt-string` string
+- callee local `:workflow-original` is the ordered forwarded delegated `:context` vector exactly as materialized from the caller workflow run
+- forwarded `:context` remains a bare ordered vector at the callee boundary; it is not wrapped in an additional envelope carrying target/prompt/caller metadata in this slice
+- any richer delegated-boundary recording for debugging belongs in caller-side execution/introspection surfaces, not in the callee's local `:workflow-input` / `:workflow-original` values themselves
+
 This task makes that delegated boundary executable and explicit in runtime plumbing.
 
 ## Problem statement

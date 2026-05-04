@@ -4,6 +4,10 @@ Approach:
 - keep the boundary explicit: rendered prompt string, ordered forwarded context, target workflow identity, and propagated yielded value should all be visible in data and recording surfaces
 - reuse existing workflow-loading and workflow-execution machinery where possible, but normalize delegated semantics through the IR execution path
 - preserve first-cut simplicity by forbidding delegated session overrides and keeping context forwarding source-shaped
+- authoritative first-cut callee payload shape for this task:
+  - callee `:workflow-input` = final rendered delegated `:prompt-string`
+  - callee `:workflow-original` = materialized delegated `:context` as a bare ordered vector
+  - richer boundary metadata, if recorded, stays in caller-side delegated execution/introspection surfaces rather than being wrapped into the callee input/original values
 
 Likely steps:
 1. identify the IR execution seam where `:type :delegate` dispatch should be added or converged

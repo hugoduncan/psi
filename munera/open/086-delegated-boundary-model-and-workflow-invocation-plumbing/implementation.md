@@ -1,1 +1,8 @@
 - 2026-05-04 review: actionable ambiguities remain — this task lacks the canonical review/follow-up artifacts (`implementation.md` and `design-steps.md`) that the review workflow expects, and the delegated-boundary contract still does not specify the concrete callee invocation payload shape well enough to tell exactly what local `:workflow-original` becomes at runtime (for example whether it is the ordered forwarded `:context`, a boundary envelope containing `:prompt-string`/`:context`/caller metadata, or another normalized form).
+- 2026-05-04 ambiguity follow-up pass:
+  - confirmed the canonical review/output surface is now explicit for this task because both `implementation.md` and `design-steps.md` exist in the task directory and are being used as the review-note/follow-up surfaces
+  - resolved the remaining design ambiguity by specifying the authoritative first-cut delegated callee payload shape in `design.md` and `plan.md`:
+    - callee local `:workflow-input` is the final rendered delegated `:prompt-string`
+    - callee local `:workflow-original` is the materialized delegated `:context` bare ordered vector
+    - forwarded delegated `:context` is not wrapped in a boundary envelope at the callee local source-ref surface in this slice
+  - added focused executable proof in `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` to assert the concrete callee-visible `:workflow-input` and `:workflow-original` values implied by that shape
