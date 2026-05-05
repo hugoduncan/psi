@@ -58,3 +58,7 @@
 - Added focused execution proof for the checked-in example in `workflow_delegate_example_execution_test.clj` through `workflow-execution/execute-run!`.
 - Updated `doc/workflows.md` so the primary delegate story is now executable and example-led rather than purely conceptual.
 - Net effect for task `090`: one major blocker is reduced because the project now has one explicit, tested, teachable downstream delegate-result contract instead of a vague delegate mapping.
+
+2026-05-05 review pass
+- Reviewed task artifacts, delegate runtime/source-resolution/IR tests, checked-in workflow examples, and `doc/workflows.md`.
+- No new actionable feedback found; the implemented delegate yielded-text surface, realistic checked-in example, focused semantic/source/execution proof, and migration-status documentation remain aligned.
