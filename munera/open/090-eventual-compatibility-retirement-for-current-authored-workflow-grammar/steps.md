@@ -1,5 +1,11 @@
 - [x] Inventory remaining current-authored workflow definitions, tests, loaders, and docs
 - [x] Define explicit retirement gates
+- [ ] Resolve review ambiguities before execution:
+  - [ ] define repository scope explicitly as this repo's checked-in `.psi/workflows/*.md`
+  - [ ] choose one documentation end state for `doc/workflow-grammar-current.md` and `doc/workflow-grammar-migration.md`
+  - [ ] inventory the exact compatibility code paths/seams to delete versus retain
+  - [ ] name the authoritative focused and broader verification command sets
+  - [ ] choose one final retirement end state: disable temporarily or remove outright
 - [ ] Migrate remaining compact current-authored checked-in workflows:
   - [ ] `lambda-build.md`
   - [ ] `prompt-build.md`
