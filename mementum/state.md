@@ -42,6 +42,10 @@ Bootstrapped on 2026-04-02.
   - full unit suite is green again via `bb clojure:test:unit` (`1420 tests, 10554 assertions, 0 failures`)
   - follow-on fix was test hardening in `query_graph_test.clj`: RPC trace mutation assertions no longer assume the global dispatch event log's last entry belongs to the mutation under test; they now clear the log, snapshot pre-count, and inspect newly appended `:session/set-rpc-trace` events only
 - Compatibility scaffold removal has advanced materially.
+- Task 093 delegated terminal-contract follow-up is now closed at the IR validation boundary:
+  - added a focused regression in `components/agent-session/test/psi/agent_session/workflow_ir_test.clj` proving undeclared delegated `:output :handoff` reads are rejected with `:missing-output-key`
+  - this makes the documented fallback rule explicit: callers must not rely on `:output :handoff` unless the delegate step declares that output surface
+  - focused verification green via `bb clojure:test:unit --focus psi.agent-session.workflow-ir-test` (`1539 tests, 11229 assertions, 0 failures`)
 - Session directory semantics were tightened into an explicit invariant:
   - runtime sessions now require `:worktree-path`
   - runtime/tool/resolver/app-runtime code no longer falls back from session worktree to context `:cwd`

@@ -241,6 +241,21 @@
                :available-outputs []}]
              (:semantic-errors result)))))
 
+  (testing "semantic validation rejects delegated handoff refs when the delegate step does not declare handoff output"
+    (let [step-2 (assoc valid-session-step
+                        :session {:contributions [{:type :template
+                                                   :text "{{handoff}}"
+                                                   :vars {"handoff" {:from {:step "report-call" :output :handoff}}}}]})
+          ir {:version :workflow-ir/v1
+              :steps [valid-invoke-step valid-delegate-step step-2]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :missing-output-key
+               :step "report"
+               :ref {:step "report-call" :output :handoff}
+               :available-outputs []}]
+             (:semantic-errors result)))))
+
   (testing "semantic validation accepts delegate yielded text refs as the minimal canonical downstream surface"
     (let [step-2 (assoc valid-session-step
                         :session {:contributions [{:type :template
