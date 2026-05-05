@@ -35,3 +35,26 @@
   - "supported runtime path" was underspecified
   - the checked-in example execution proof could be interpreted as weaker than the delegated-result focused-test requirement
 - Resolved by tightening all task surfaces to require focused automated proof through the authoritative canonical workflow execution path intended to remain after compatibility retirement.
+
+2026-05-05 implementation
+- Inventoried the live delegate boundary and found the narrowest converged surface already latent in the runtime: delegate steps return the callee terminal accepted-result envelope, but canonical IR semantic validation still treated delegated yields as exposing no downstream fields.
+- Chose the minimum canonical author-facing model for this slice:
+  - downstream consumers read delegated results through `{:from {:step "..." :yield :text}}`
+  - delegated step-local outputs do not become a new general downstream authoring surface in this task
+  - debug/diagnostic details remain non-primary runtime surfaces
+- Converged canonical IR semantics accordingly:
+  - delegated yields now validate `:text` as the only canonical downstream delegated yield field
+  - delegated yield resolution now returns the delegating step's canonical `:final-llm-reply`, i.e. the callee terminal yielded text already propagated onto the delegate accepted-result envelope
+- Added focused proof at three levels:
+  - IR semantic validation accepts delegated `:yield :text` and still rejects undeclared delegated yield/output refs
+  - source resolution proves delegated `:yield :text` can feed downstream template rendering
+  - execution tests prove a later step consumes delegated yielded text through the authoritative canonical execution path
+- Attempted the preferred `gh-bug-triage-modular` anchor mentally against current scope and kept it out of this slice intentionally: migrating it directly would still entangle richer multi-phase contract/dataflow questions beyond the minimum delegated-result seam resolved here.
+- Added `delegate-build-review.md` as the narrower honest checked-in target-authored delegate-heavy example:
+  - one delegate step feeding another delegate step via `:yield :text`
+  - one later session step consuming delegated build output via `:yield :text`
+  - explicit delegate `:prompt-string`
+  - explicit delegate `:context`
+- Added focused execution proof for the checked-in example in `workflow_delegate_example_execution_test.clj` through `workflow-execution/execute-run!`.
+- Updated `doc/workflows.md` so the primary delegate story is now executable and example-led rather than purely conceptual.
+- Net effect for task `090`: one major blocker is reduced because the project now has one explicit, tested, teachable downstream delegate-result contract instead of a vague delegate mapping.

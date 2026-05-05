@@ -230,7 +230,7 @@
       :data #{:data}
       :text #{:text}
       :error #{:reason :message :details}
-      :delegated #{}
+      :delegated #{:text}
       #{})))
 
 (defn- yield-output-key
@@ -429,7 +429,11 @@
 
    Yielded-value resolution is distinct from step-local output-surface resolution:
    `:yield` addresses fields of the step's yielded tagged union, not arbitrary
-   logical outputs."
+   logical outputs.
+
+   Delegate steps intentionally expose the delegated callee terminal yielded text
+   as the minimal canonical downstream-consumable surface for this slice. They do
+   not expose arbitrary delegated step-local outputs through `:yield`."
   [step accepted-result yield-field]
   (let [yield-spec (:yields step)]
     (case (:type yield-spec)
@@ -438,5 +442,6 @@
       :text (when (= :text yield-field)
               (step-output-value step accepted-result (:text yield-spec)))
       :error (get-in accepted-result [:blocked yield-field])
-      :delegated nil
+      :delegated (when (= :text yield-field)
+                   (step-output-value step accepted-result :final-llm-reply))
       nil)))

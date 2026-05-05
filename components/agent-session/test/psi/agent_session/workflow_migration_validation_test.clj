@@ -81,7 +81,24 @@
       (is (= :text
              (get-in plan-build [:steps 1 :contributions 1 :vars "plan" :from :yield])))))
 
-  (testing "gh-bug-triage-modular remains the executable richer current-authored orchestration example"
+  (testing "delegate-build-review compiles as the executable target-authored delegate-heavy example"
+    (let [parsed (loader/scan-directory ".psi/workflows")
+          {:keys [definitions]} (compiler/compile-workflow-files parsed)
+          by-name (into {} (map (juxt :name identity)) definitions)
+          delegate-build-review (get by-name "delegate-build-review")]
+      (is (= [:delegate :delegate :session]
+             (mapv :type (:steps delegate-build-review))))
+      (is (= :text
+             (get-in delegate-build-review [:steps 1 :prompt-string :vars "plan" :from :yield])))
+      (is (= :text
+             (get-in delegate-build-review [:steps 2 :contributions 1 :vars "implementation" :from :yield])))
+      (is (= [{:type :source
+               :from :workflow-original}
+              {:type :source
+               :from {:step "plan" :yield :text}}]
+             (get-in delegate-build-review [:steps 1 :context])))))
+
+  (testing "gh-bug-triage-modular remains the executable richer current-authored orchestration example until compatibility retirement"
     (let [parsed (loader/scan-directory ".psi/workflows")
           {:keys [definitions]} (compiler/compile-workflow-files parsed)
           by-name (into {} (map (juxt :name identity)) definitions)

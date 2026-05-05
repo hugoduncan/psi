@@ -226,7 +226,7 @@
       (is (false? (:valid? result)))
       (is (= :missing-output-key (-> result :semantic-errors first :type)))))
 
-  (testing "semantic validation rejects delegate output refs because first-cut delegates expose no local outputs"
+  (testing "semantic validation rejects delegate output refs because delegates expose yielded text rather than local outputs"
     (let [step-2 (assoc valid-session-step
                         :session {:contributions [{:type :template
                                                    :text "{{missing}}"
@@ -239,6 +239,32 @@
                :step "report"
                :ref {:step "report-call" :output :data}
                :available-outputs []}]
+             (:semantic-errors result)))))
+
+  (testing "semantic validation accepts delegate yielded text refs as the minimal canonical downstream surface"
+    (let [step-2 (assoc valid-session-step
+                        :session {:contributions [{:type :template
+                                                   :text "{{report}}"
+                                                   :vars {"report" {:from {:step "report-call" :yield :text}}}}]})
+          ir {:version :workflow-ir/v1
+              :steps [valid-invoke-step valid-delegate-step step-2]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             result))))
+
+  (testing "yield refs to undeclared delegated fields remain invalid"
+    (let [step-2 (assoc valid-session-step
+                        :session {:contributions [{:type :template
+                                                   :text "{{missing}}"
+                                                   :vars {"missing" {:from {:step "report-call" :yield :data}}}}]})
+          ir {:version :workflow-ir/v1
+              :steps [valid-invoke-step valid-delegate-step step-2]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :missing-yield-field
+               :step "report"
+               :ref {:step "report-call" :yield :data}
+               :available-yield-fields [:text]}]
              (:semantic-errors result)))))
 
   (testing "semantic validation rejects refs to undeclared yield fields"

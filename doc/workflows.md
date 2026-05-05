@@ -37,6 +37,7 @@ This repository includes many examples there, including:
 
 - `plan-build`
 - `plan-build-review`
+- `delegate-build-review`
 - `gh-bug-triage-modular`
 - `planner`
 - `builder`
@@ -46,7 +47,8 @@ For this migration slice, the authoritative example set is:
 
 - `plan-build` — compact inline-session authoring example
 - `plan-build-review` — compact multi-step inline-session example
-- `gh-bug-triage-modular` — richer orchestration/context/reference example used to teach the delegate-oriented target model and to anchor the real executable bug-triage flow
+- `delegate-build-review` — executable delegate-heavy target-authored example proving canonical downstream delegated yielded-text consumption
+- `gh-bug-triage-modular` — richer orchestration/context/reference example that remains current-authored until broader compatibility retirement work
 
 ## User-facing workflow commands
 
@@ -193,14 +195,74 @@ What this adds:
 - repeated use of prior-step text yields for downstream authoring
 - a clear separation between sourced context and newly authored task text
 
-## Example 3: richer orchestration and delegate-oriented mapping
+## Example 3: executable delegate-heavy workflow
 
-`gh-bug-triage-modular` is the authoritative richer orchestration example for
-context/reference flow in a realistic workflow. Today, its checked-in executable
-file still uses the older current-authored multi-step shape, because that path
-remains the repository's concrete bug-triage implementation surface.
+`delegate-build-review` is the authoritative checked-in target-authored example
+for delegate-heavy downstream authoring.
 
-The delegate-oriented target-model reading for that workflow is:
+```markdown
+---
+name: delegate-build-review
+description: Delegate planning and building, then review the delegated build result
+---
+{:steps [{:name "plan"
+          :type :delegate
+          :target "planner"
+          :prompt-string {:type :template
+                          :text "{{input}}"
+                          :vars {"input" {:from :workflow-input
+                                           :path [:input]}}}
+          :context [{:type :source
+                     :from :workflow-original}]}
+         {:name "build"
+          :type :delegate
+          :target "builder"
+          :prompt-string {:type :template
+                          :text "Execute this plan:\n\n{{plan}}\n\nOriginal request: {{original}}"
+                          :vars {"plan" {:from {:step "plan" :yield :text}}
+                                 "original" {:from :workflow-original
+                                             :path [:original]}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "plan" :yield :text}}]}
+         {:name "review"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :source
+                           :from :workflow-original}
+                          {:type :template
+                           :text "Review the following delegated implementation:\n\n{{implementation}}\n\nOriginal request: {{original}}"
+                           :vars {"implementation" {:from {:step "build" :yield :text}}
+                                  "original" {:from :workflow-original
+                                              :path [:original]}}}]}]}
+```
+
+What this teaches:
+
+- explicit `:type :delegate` boundaries for reusable named workflows
+- canonical downstream delegate-result consumption through `{:from {:step "..." :yield :text}}`
+- delegate `:prompt-string` as the new immediate ask for the callee
+- ordered delegate `:context` as forwarded reference material
+- later inline-session steps consuming delegated results with the same `:yield :text` ref shape used for prior session results
+
+Minimum canonical delegated result model:
+
+- downstream steps should read the delegated step's yielded text through
+  `{:from {:step "..." :yield :text}}`
+- this slice does not make delegated step-local outputs a new canonical author-facing
+  downstream surface
+- delegate diagnostics and other callee-internal detail remain runtime/debug
+  surfaces, not the primary authoring contract for normal downstream flow
+
+## Example 4: richer orchestration and current executable bug triage
+
+`gh-bug-triage-modular` remains the richer orchestration/context/reference
+example for realistic bug triage. Its checked-in executable file still uses the
+older current-authored multi-step shape because broader compatibility-retirement
+work has not landed yet.
+
+The target-model reading for that workflow remains useful:
 
 - each named bug-triage phase is conceptually a delegated workflow boundary
 - the next phase receives a new ask derived from the prior phase result
@@ -208,7 +270,7 @@ The delegate-oriented target-model reading for that workflow is:
   explicitly rather than assumed implicitly
 
 A representative target-style delegate sketch for the final classification step
-looks like:
+still looks like:
 
 ```clojure
 {:name "post-repro"
@@ -228,18 +290,12 @@ looks like:
             :projection {:type :tail :turns 4 :tool-output false}}]}
 ```
 
-What this teaches:
+What this still teaches:
 
-- how the richer orchestration maps onto explicit delegated workflow boundaries
-- a new delegated ask through `:prompt-string`
+- how richer orchestration maps onto explicit delegated workflow boundaries
 - carried caller material through ordered `:context`
 - shared reference syntax across prompt rendering and forwarded context
 - transcript-tail projection as constrained delegated context
-
-Implementation boundary note:
-
-- `plan-build` and `plan-build-review` are now migrated checked-in target-grammar examples
-- `gh-bug-triage-modular` remains executable in the current-authored surface while this guide teaches the delegate-oriented target mapping explicitly rather than silently claiming the file is already migrated end-to-end
 
 ## Input and context flow
 
@@ -247,7 +303,7 @@ The most important authoring references in this guide are:
 
 - `:workflow-input` — the current workflow's input value
 - `:workflow-original` — carried original request/reference context
-- `{:from {:step "..." :yield :text}}` — prior step result used as the next ask
+- `{:from {:step "..." :yield :text}}` — prior step result used as the next ask, including delegate-step yielded text
 - `{:from {:step "..." :output :transcript}}` with `:projection` — projected
   transcript/reference context
 
@@ -284,11 +340,14 @@ This guide intentionally teaches the currently migrated example-led surfaces:
 - target-grammar step authoring shape
 - inline `:session` authoring
 - delegated `:prompt-string` and `:context`
+- canonical downstream delegated yielded-text consumption
 - shared reference syntax for `:workflow-input`, `:workflow-original`, prior
   step yields, and projected transcript context
 
 It does not yet try to be the authoritative example-led guide for all
 `outputs`/`yields` variations beyond what the examples above use directly.
+In particular, this slice teaches delegated downstream `:yield :text` as the
+minimal canonical authoring surface rather than a broad delegated-output menu.
 When you need the full formal surface, use the grammar/reference docs.
 
 ## Authoring guidelines

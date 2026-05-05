@@ -1,9 +1,9 @@
-- [ ] Inventory current delegate result assumptions across docs, runtime, tests, and example workflows
-- [ ] Choose one minimal canonical delegated result model for downstream authoring
-- [ ] Converge runtime/source-resolution/compiler behavior on that delegated result boundary
-- [ ] Add focused tests for canonical downstream consumption of delegated results
-- [ ] Attempt direct migration of `gh-bug-triage-modular` as the preferred anchor example
-- [ ] If direct migration is not the narrowest honest proof target, replace it with another realistic checked-in target-authored delegate-heavy example and record why
-- [ ] Add focused automated proof that the checked-in example still runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
-- [ ] Update `doc/workflows.md` to teach the executable delegate example instead of only a conceptual mapping
-- [ ] Verify that the resulting surface removes or materially reduces a blocker for task `090`
+- [x] Inventory current delegate result assumptions across docs, runtime, tests, and example workflows
+- [x] Choose one minimal canonical delegated result model for downstream authoring
+- [x] Converge runtime/source-resolution/compiler behavior on that delegated result boundary
+- [x] Add focused tests for canonical downstream consumption of delegated results
+- [x] Attempt direct migration of `gh-bug-triage-modular` as the preferred anchor example
+- [x] If direct migration is not the narrowest honest proof target, replace it with another realistic checked-in target-authored delegate-heavy example and record why
+- [x] Add focused automated proof that the checked-in example still runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
+- [x] Update `doc/workflows.md` to teach the executable delegate example instead of only a conceptual mapping
+- [x] Verify that the resulting surface removes or materially reduces a blocker for task `090`

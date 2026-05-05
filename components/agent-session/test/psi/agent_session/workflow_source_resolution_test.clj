@@ -93,6 +93,33 @@
              (or (:workflow-original callee-run)
                  (workflow-source-resolution/resolve-source-ref callee-run :workflow-original)))))))
 
+(deftest resolve-delegate-yielded-text-from-canonical-terminal-envelope-test
+  (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                       {:definition {:steps [{:name "delegate-step"
+                                                                              :type :delegate
+                                                                              :target "builder"
+                                                                              :prompt-string "Do it"
+                                                                              :yields {:type :delegated}}
+                                                                             {:name "report"
+                                                                              :type :session
+                                                                              :contributions [{:type :template
+                                                                                               :text "Report {{delegated}}"
+                                                                                               :vars {"delegated" {:from {:step "delegate-step" :yield :text}}}}]}]}
+                                                        :run-id "run-delegate-yield"
+                                                        :workflow-input {}})
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "delegate-step" :accepted-result]
+                         {:outcome :ok
+                          :outputs {:final-llm-reply "delegated terminal text"
+                                    :result {:outcome :ok}}
+                          :diagnostics {:delegate {:target "builder"}}})
+        run (workflow-runtime/workflow-run-in state3 run-id)]
+    (is (= "delegated terminal text"
+           (workflow-source-resolution/resolve-source-ref run {:step "delegate-step" :yield :text})))
+    (is (= "Report delegated terminal text"
+           (workflow-source-resolution/render-template-contribution
+            run
+            (-> run :effective-definition :canonical-ir :steps second :session :contributions first))))))
+
 (deftest apply-source-spec-rejects-both-path-and-projection-test
   (let [run (workflow-run-with-results)]
     (is (thrown-with-msg?

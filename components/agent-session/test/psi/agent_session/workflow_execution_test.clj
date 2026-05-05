@@ -572,7 +572,12 @@
                                       :context [{:type :source
                                                  :from :workflow-original}
                                                 {:type :source
-                                                 :from {:step "plan" :yield :text}}]}]}
+                                                 :from {:step "plan" :yield :text}}]}
+                                     {:name "report"
+                                      :type :session
+                                      :contributions [{:type :template
+                                                       :text "Summarize {{build-result}}"
+                                                       :vars {"build-result" {:from {:step "build" :yield :text}}}}]}]}
           _ (swap! (:state* ctx)
                    (fn [state]
                      (let [[s _ _] (workflow-runtime/register-definition state (assoc callee-definition :definition-id "builder"))
@@ -593,18 +598,23 @@
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
                       {:execution-result/assistant-message
-                       {:content (if (= child-session-id "plan-child")
-                                   "plan output"
+                       {:content (case child-session-id
+                                   "plan-child" "plan output"
+                                   "report-child" "final summary"
                                    "delegated build output")}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-mixed-delegate")
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mixed-delegate")]
           (is (= :completed (:status result)))
           (is (= "delegated build output"
                  (get-in run [:step-runs "build" :accepted-result :outputs :final-llm-reply])))
+          (is (= "final summary"
+                 (get-in run [:step-runs "report" :accepted-result :outputs :final-llm-reply])))
           (is (= [{:session-id "plan-child"
                    :prompt "Plan ship it"}
                   {:session-id "callee-child"
-                   :prompt "Build plan output"}]
+                   :prompt "Build plan output"}
+                  {:session-id "report-child"
+                   :prompt "Summarize delegated build output"}]
                  @prompts*)))))))
 
 (deftest resolve-step-session-config-inherits-parent-prompt-mode-test
