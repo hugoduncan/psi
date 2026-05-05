@@ -30,3 +30,8 @@
 - Kept cross-step machine context explicit by forwarding prior yielded text and original request material through ordered delegate/session context contributions.
 - Preserved loop semantics by splitting the design-clarity checkpoint into a dedicated status step with typed LLM judge routing back to the refinement step.
 - Kept the heavy operational bodies in builder delegates so the workflows preserve behavior while removing the current `:workflow`/`:session` compatibility grammar from the checked-in authored surface.
+
+2026-05-06 implementation slice 4
+- Migrated the remaining PR check-healing workflows (`gh-pr-heal-check-loop.md`, `gh-pr-fix-current-checks.md`, and `gh-pr-fix-checks.md`) to target-authored delegate/session forms.
+- Replaced compatibility step-to-step handoff wiring with explicit delegate prompt/context flow and dedicated typed status steps for PASS/PENDING/FAIL/BLOCKED and WAIT/BLOCKED routing.
+- Preserved the original operational prompts and loop bounds while removing checked-in uses of current-authored multi-step `:workflow` entries, compatibility `:session` maps, and current judge syntax from the repo-owned workflow set.
