@@ -1,22 +1,57 @@
 Approach:
-- treat retirement as the last migration step, not as an opportunistic cleanup hidden inside earlier implementation work
-- define explicit gates so removal happens only after examples, runtime, docs, and dependent workflows are ready
-- remove compatibility surgically and verify that the remaining model is simpler and coherent rather than merely smaller
-- keep the cleanup user- and author-facing: docs and guidance matter as much as code deletion here
+- treat retirement as the final cleanup after the representative target-authored path has already been proven by `089`, `092`, and `093`
+- make the remaining blockers explicit and execute them in three ordered layers:
+  1. migrate the remaining checked-in current-authored workflows
+  2. remove the current-authored compiler/runtime/loader path and its compatibility-oriented tests/helpers
+  3. remove or rewrite docs that still present the current grammar as a live authored option
+- keep the work repo-specific and evidence-driven: only retire compatibility after the checked-in workflow set, tests, and docs no longer need it
 
-Likely steps:
-1. inventory remaining current-authored workflow definitions, tests, loaders, and docs
-2. define explicit retirement gates for migrated workflows, runtime support, and documentation readiness
-3. migrate or replace remaining blockers
-4. remove current-authored grammar loading/compilation support
-5. delete compatibility-only tests/docs/helpers no longer needed
-6. update guidance so the target grammar is the sole supported authored surface
-7. run focused and broader verification to prove the simplified model still works end-to-end
+Current concrete blockers identified from the repo:
+1. Remaining current-authored checked-in workflows:
+   - `lambda-build.md`
+   - `prompt-build.md`
+   - `gh-issue-refine.md`
+   - `gh-issue-implement.md`
+   - `gh-pr-heal-check-loop.md`
+   - `gh-pr-fix-current-checks.md`
+   - `gh-pr-fix-checks.md`
+   - `review-implementation.md`
+   - `review-task-until-clear.md`
+2. Remaining current-grammar compiler/runtime path:
+   - `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
+   - current-grammar branch in `workflow_runtime.clj`
+   - current-authored validation helpers in `workflow_file_compiler.clj`
+   - compat-oriented seams in step prep / statechart runtime that only exist to preserve current-authored behavior
+3. Remaining current-grammar tests/docs:
+   - `workflow_current_ir_compiler_test.clj`
+   - current-authored/compat equivalence assertions that cease to matter after retirement
+   - `doc/workflow-grammar-current.md`
+   - `doc/workflow-grammar-migration.md`
+   - live references from `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
+
+Explicit retirement gates:
+- Gate 1: all checked-in `.psi/workflows/*.md` files compile as target-authored workflows; no checked-in workflow depends on `:workflow` multi-step entries, `:kind :accepted-result`, or current-authored `:session` maps.
+- Gate 2: no runtime code path used by workflow loading/run creation depends on `workflow_current_ir_compiler.clj`.
+- Gate 3: no user-facing documentation presents `doc/workflow-grammar-current.md` as a supported authored workflow surface.
+- Gate 4: targeted workflow compilation/execution verification is green after compatibility removal.
+
+Likely execution order:
+1. migrate the remaining current-authored checked-in workflows in the smallest coherent groups
+   - compact builder/compiler loops (`lambda-build`, `prompt-build`)
+   - review loops (`review-implementation`, `review-task-until-clear`)
+   - PR/issue orchestration flows (`gh-issue-refine`, `gh-issue-implement`, `gh-pr-heal-check-loop`, `gh-pr-fix-current-checks`, `gh-pr-fix-checks`)
+2. tighten migration validation tests so checked-in workflows are asserted target-authored only
+3. remove current-authored file compilation/runtime support
+4. delete compatibility-only tests/docs/helpers
+5. rewrite docs so target grammar + IR are the only live workflow story
+6. run focused then broader verification
 
 Proof target:
-- the project can author and execute workflows using only the target grammar plus the normalized IR runtime model
+- all checked-in workflows are target-authored
+- workflow loading and run creation accept only the target-authored workflow surface
+- docs and tests no longer preserve the old authored grammar as a live option
 
 Risks:
-- hidden dependencies on current-authored grammar may survive in tests, examples, or loader seams
-- removing compatibility too early could strand workflows not yet migrated
-- leaving stale docs behind would preserve conceptual confusion even if code cleanup is complete
+- some remaining checked-in workflows may still rely on current-authored preload/reference semantics that need careful target-authored restatement
+- some tests currently proving migration equivalence will need replacement rather than deletion so target-only invariants remain strong
+- stale migration/history docs may preserve conceptual confusion if not rewritten decisively

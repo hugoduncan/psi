@@ -1,8 +1,30 @@
-- [ ] Inventory remaining current-authored workflow definitions, tests, loaders, and docs
-- [ ] Define explicit retirement gates
-- [ ] Migrate or replace remaining current-grammar blockers
+- [x] Inventory remaining current-authored workflow definitions, tests, loaders, and docs
+- [x] Define explicit retirement gates
+- [ ] Migrate remaining compact current-authored checked-in workflows:
+  - [ ] `lambda-build.md`
+  - [ ] `prompt-build.md`
+- [ ] Migrate remaining review-loop current-authored workflows:
+  - [ ] `review-implementation.md`
+  - [ ] `review-task-until-clear.md`
+- [ ] Migrate remaining PR/issue orchestration current-authored workflows:
+  - [ ] `gh-issue-refine.md`
+  - [ ] `gh-issue-implement.md`
+  - [ ] `gh-pr-heal-check-loop.md`
+  - [ ] `gh-pr-fix-current-checks.md`
+  - [ ] `gh-pr-fix-checks.md`
+- [ ] Tighten migration validation so checked-in workflow examples are target-authored only
 - [ ] Remove current-authored grammar loading/compilation support
-- [ ] Delete compatibility-only tests/docs/helpers no longer needed
+  - [ ] remove `workflow_current_ir_compiler.clj` runtime use
+  - [ ] remove current-grammar branch from workflow run creation
+  - [ ] remove current-authored file-compilation/validation paths that only support legacy multi-step grammar
+- [ ] Delete compatibility-only workflow tests/helpers no longer needed
+  - [ ] remove `workflow_current_ir_compiler_test.clj`
+  - [ ] remove current-vs-target equivalence tests that only defend retirement-ready compatibility
+  - [ ] prune compatibility-only helper/seam tests after replacement target-only proofs exist
 - [ ] Update project guidance so the target grammar is the only supported authored workflow surface
-- [ ] Run focused and broader verification after compatibility removal
+  - [ ] remove or archive `doc/workflow-grammar-current.md`
+  - [ ] remove or archive `doc/workflow-grammar-migration.md`
+  - [ ] rewrite references in `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
+- [ ] Run focused verification after compatibility removal
+- [ ] Run broader verification after compatibility removal
 - [ ] Reconcile final cleanup with task `077` migration intent
