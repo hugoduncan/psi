@@ -80,7 +80,7 @@ For this task, "realistic" means the checked-in example must have at least:
 - at least one later step that consumes the delegated step result through the chosen canonical delegated result model
 - explicit delegated `:prompt-string`
 - explicit delegated `:context` or an explicit documented decision that omitted `:context` is the intended proof case
-- focused execution proof in tests or verification notes that the checked-in example still runs through the supported runtime path
+- focused automated proof that the checked-in example still runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
 
 Preferred anchor order:
 
@@ -136,5 +136,6 @@ A future reader should be able to answer by reading one small set of files:
 - one authoritative downstream-consumption model for delegated results is chosen and reflected consistently in runtime behavior, focused tests, and docs
 - focused tests prove the minimum chosen canonical delegated result surface, including at least one later-step delegated-result consumption path
 - the repository contains a realistic checked-in target-authored delegate-heavy workflow example, or the task explicitly records why the chosen anchor was replaced
+- focused automated proof shows that checked-in example running through the authoritative canonical workflow execution path intended to remain after compatibility retirement
 - `doc/workflows.md` teaches a delegate example that is executable in checked-in target-authored form rather than only conceptually mapped
 - the resulting implementation reduces a real blocker to task `090` rather than shifting compatibility burden sideways

@@ -4,6 +4,6 @@
 - [ ] Add focused tests for canonical downstream consumption of delegated results
 - [ ] Attempt direct migration of `gh-bug-triage-modular` as the preferred anchor example
 - [ ] If direct migration is not the narrowest honest proof target, replace it with another realistic checked-in target-authored delegate-heavy example and record why
-- [ ] Add explicit execution proof that the checked-in example still runs through the supported runtime path
+- [ ] Add focused automated proof that the checked-in example still runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
 - [ ] Update `doc/workflows.md` to teach the executable delegate example instead of only a conceptual mapping
 - [ ] Verify that the resulting surface removes or materially reduces a blocker for task `090`

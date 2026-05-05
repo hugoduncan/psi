@@ -29,3 +29,9 @@
 2026-05-04 consistency review
 - Found one actionable design/plan/steps gap: the design required focused execution proof for the checked-in example, but plan/steps did not carry that obligation explicitly as an execution task.
 - Resolved by adding an explicit execution-proof step to `plan.md` and `steps.md` so the task surfaces stay aligned on the required runtime proof.
+
+2026-05-04 final refinement
+- Found two remaining ambiguities:
+  - "supported runtime path" was underspecified
+  - the checked-in example execution proof could be interpreted as weaker than the delegated-result focused-test requirement
+- Resolved by tightening all task surfaces to require focused automated proof through the authoritative canonical workflow execution path intended to remain after compatibility retirement.

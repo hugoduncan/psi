@@ -12,7 +12,7 @@ Likely steps:
 4. add focused tests for downstream delegated-result consumption
 5. try direct migration of `gh-bug-triage-modular`
 6. if direct migration is not the narrowest honest proof target, replace it with a different realistic delegate-heavy example and record why
-7. add explicit execution proof that the checked-in example still runs through the supported runtime path
+7. add focused automated proof that the checked-in example still runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
 8. update `doc/workflows.md` to teach the executable target-authored delegate example
 9. verify the resulting surface clearly reduces a blocker for `090`
 
