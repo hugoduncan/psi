@@ -18,3 +18,15 @@
 - Preserved the original ask/reference material explicitly with ordered delegate `:context` entries sourced from `:workflow-original`.
 - Switched downstream chaining to canonical prior-step yielded-text refs (`{:from {:step ... :yield :text}}`) so these workflows now exercise the same delegate result contract already taught by `delegate-build-review.md`.
 - Kept the prompts explicit in `:prompt-string` template form instead of relying on `$INPUT` substitution.
+
+2026-05-06 implementation slice 2
+- Migrated `review-implementation.md` and `review-task-until-clear.md` from current multi-step `:workflow`/`:session` compatibility forms to target-authored inline `:type :session` steps.
+- Replaced compatibility `:preload` usage with explicit ordered `:contributions`, carrying prior review/follow-up yields as text context into later steps.
+- Re-expressed the review-loop routing stage as an explicit terminal status step plus typed LLM judge/routing instead of a current-grammar step-local judge surface.
+- Kept builder-like capabilities explicit per inline session step so the workflows still describe their file-editing behavior through the target grammar rather than through inherited current-grammar workflow profiles.
+
+2026-05-06 implementation slice 3
+- Migrated `gh-issue-refine.md` and `gh-issue-implement.md` from current-authored orchestration steps to target-authored delegate/session flows.
+- Kept cross-step machine context explicit by forwarding prior yielded text and original request material through ordered delegate/session context contributions.
+- Preserved loop semantics by splitting the design-clarity checkpoint into a dedicated status step with typed LLM judge routing back to the refinement step.
+- Kept the heavy operational bodies in builder delegates so the workflows preserve behavior while removing the current `:workflow`/`:session` compatibility grammar from the checked-in authored surface.

@@ -10,11 +10,11 @@
   - [x] `lambda-build.md`
   - [x] `prompt-build.md`
 - [ ] Migrate remaining review-loop current-authored workflows:
-  - [ ] `review-implementation.md`
-  - [ ] `review-task-until-clear.md`
+  - [x] `review-implementation.md`
+  - [x] `review-task-until-clear.md`
 - [ ] Migrate remaining PR/issue orchestration current-authored workflows:
-  - [ ] `gh-issue-refine.md`
-  - [ ] `gh-issue-implement.md`
+  - [x] `gh-issue-refine.md`
+  - [x] `gh-issue-implement.md`
   - [ ] `gh-pr-heal-check-loop.md`
   - [ ] `gh-pr-fix-current-checks.md`
   - [ ] `gh-pr-fix-checks.md`
