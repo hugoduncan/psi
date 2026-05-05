@@ -98,29 +98,18 @@
                :from {:step "plan" :yield :text}}]
              (get-in delegate-build-review [:steps 1 :context])))))
 
-  (testing "gh-bug-triage-modular remains the executable richer current-authored orchestration example until compatibility retirement"
+  (testing "gh-bug-triage-modular now compiles as the richer target-authored delegate example with distinct yielded text and structured handoff surfaces"
     (let [parsed (loader/scan-directory ".psi/workflows")
           {:keys [definitions]} (compiler/compile-workflow-files parsed)
           by-name (into {} (map (juxt :name identity)) definitions)
           gh-bug-triage-modular (get by-name "gh-bug-triage-modular")]
-      (is (= ["step-1-gh-bug-discover-and-read"
-              "step-2-gh-issue-create-worktree"
-              "step-3-gh-bug-reproduce"
-              "step-4-gh-bug-post-repro"]
-             (:step-order gh-bug-triage-modular)))
-      (is (= [{:kind :value
-               :role "user"
-               :binding {:source :workflow-input
-                         :path [:original]}}
-              {:kind :value
-               :role "assistant"
-               :binding {:source :step-output
-                         :path ["step-1-gh-bug-discover-and-read" :outputs :text]}}
-              {:kind :value
-               :role "assistant"
-               :binding {:source :step-output
-                         :path ["step-2-gh-issue-create-worktree" :outputs :text]}}
-              {:kind :session-transcript
-               :step-id "step-3-gh-bug-reproduce"
-               :projection {:type :tail :turns 4 :tool-output false}}]
-             (get-in gh-bug-triage-modular [:steps "step-4-gh-bug-post-repro" :session-preload]))))))
+      (is (= [:delegate :delegate :delegate :delegate]
+             (mapv :type (:steps gh-bug-triage-modular))))
+      (is (= :text
+             (get-in gh-bug-triage-modular [:steps 1 :prompt-string :vars "discover_report" :from :yield])))
+      (is (= :handoff
+             (get-in gh-bug-triage-modular [:steps 1 :context 1 :from :output])))
+      (is (= :handoff
+             (get-in gh-bug-triage-modular [:steps 2 :context 2 :from :output])))
+      (is (= :transcript
+             (get-in gh-bug-triage-modular [:steps 3 :context 3 :from :output]))))))

@@ -2,8 +2,13 @@
 name: gh-bug-discover-and-read
 description: Discover and read one GitHub bug-triage issue, then emit a structured handoff brief
 ---
-{:tools ["read" "bash"]
- :thinking-level :high}
+{:terminal-contract {:handoff {:type :markdown-handoff-data}}
+ :steps [{:name "discover"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :template
+                           :text "{{input}}"
+                           :vars {"input" {:from :workflow-input}}}]}]}
 
 You are the discovery and issue-reading phase of a GitHub bug-triage workflow.
 
@@ -13,8 +18,8 @@ Goal:
 - Emit a structured handoff brief for downstream workflow steps.
 
 Selection rules:
-- If `$INPUT` is empty, list open issues labeled `bug` and `triage` and choose the lowest issue number.
-- If `$INPUT` narrows the target, use it to select exactly one matching issue. The narrowing hint may be an issue number, URL, repo-qualified reference, or short textual hint.
+- If the input is empty, list open issues labeled `bug` and `triage` and choose the lowest issue number.
+- If the input narrows the target, use it to select exactly one matching issue. The narrowing hint may be an issue number, URL, repo-qualified reference, or short textual hint.
 - Treat the current repository as authoritative unless the input explicitly points elsewhere.
 - If no matching issue exists, stop and say that no matching issue was found.
 

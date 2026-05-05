@@ -1,13 +1,13 @@
-- [ ] Inventory the concrete multi-phase structured data items needed across delegated bug-triage phases
-- [ ] Choose the minimum workflow-level terminal export contract shape
-- [ ] Choose the canonical caller-side delegated structured-handoff consumption surface
-- [ ] Decide the first-cut standard contract keys and fallback behavior for undeclared structured exports
-- [ ] Converge IR/runtime/compiler/source-resolution behavior on that contract boundary
-- [ ] Add focused tests for delegated yielded-text and delegated structured-handoff downstream reads
-- [ ] Add focused proof that delegated yielded text and delegated structured handoff remain distinct surfaces
-- [ ] Migrate child workflow terminal contracts to expose required handoff data
-- [ ] Attempt direct migration of `gh-bug-triage-modular` to target-authored delegate syntax
-- [ ] If direct migration is broader than the intended slice, replace it with a narrower realistic multi-phase delegate-heavy example and record why
-- [ ] Add focused automated proof that the checked-in example runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
-- [ ] Update `doc/workflows.md` and any necessary grammar/concepts docs to teach the dual-plane delegated contract clearly
-- [ ] Verify that the resulting implementation materially reduces a blocker for task `090`
+- [x] Inventory the concrete multi-phase structured data items needed across delegated bug-triage phases
+- [x] Choose the minimum workflow-level terminal export contract shape
+- [x] Choose the canonical caller-side delegated structured-handoff consumption surface
+- [x] Decide the first-cut standard contract keys and fallback behavior for undeclared structured exports
+- [x] Converge IR/runtime/compiler/source-resolution behavior on that contract boundary
+- [x] Add focused tests for delegated yielded-text and delegated structured-handoff downstream reads
+- [x] Add focused proof that delegated yielded text and delegated structured handoff remain distinct surfaces
+- [x] Migrate child workflow terminal contracts to expose required handoff data
+- [x] Attempt direct migration of `gh-bug-triage-modular` to target-authored delegate syntax
+- [x] If direct migration is broader than the intended slice, replace it with a narrower realistic multi-phase delegate-heavy example and record why
+- [x] Add focused automated proof that the checked-in example runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
+- [x] Update `doc/workflows.md` and any necessary grammar/concepts docs to teach the dual-plane delegated contract clearly
+- [x] Verify that the resulting implementation materially reduces a blocker for task `090`

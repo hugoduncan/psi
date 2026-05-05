@@ -2,8 +2,13 @@
 name: gh-issue-create-worktree
 description: Refresh origin/master and create an issue worktree using the structured work-on tool
 ---
-{:tools ["bash" "work-on"]
- :thinking-level :high}
+{:terminal-contract {:handoff {:type :markdown-handoff-data}}
+ :steps [{:name "prepare-worktree"
+          :type :session
+          :tools ["bash" "work-on"]
+          :contributions [{:type :template
+                           :text "{{input}}"
+                           :vars {"input" {:from :workflow-input}}}]}]}
 
 You are the worktree-preparation phase of a GitHub issue workflow.
 
@@ -13,7 +18,7 @@ Goal:
 - Emit an authoritative worktree handoff for downstream steps.
 
 Input expectations:
-- `$INPUT` should include enough issue context from an upstream step to identify the selected issue.
+- The input should include enough issue context from an upstream step to identify the selected issue.
 - Expect at least an issue number, title, and a suggested worktree description in the upstream handoff.
 
 Required procedure:

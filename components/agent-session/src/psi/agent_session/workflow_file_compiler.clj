@@ -201,6 +201,7 @@
                                           :name name)
                               description (assoc :summary description
                                                  :description description)
+                              (contains? config :terminal-contract) (assoc :terminal-contract (:terminal-contract config))
                               body (assoc :workflow-file-meta {:framing-prompt body}))]
     (when-not (workflow-target-ir-compiler/target-authored-workflow-definition? workflow-definition)
       (throw (ex-info "Target-authored workflow file must define `{:steps [...]}`"

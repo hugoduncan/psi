@@ -2,8 +2,15 @@
 name: gh-bug-post-repro
 description: Classify a bug after reproduction: either request more information or publish a reproducible branch and relabel for fixing
 ---
-{:tools ["read" "bash"]
- :thinking-level :high}
+{:terminal-contract {:handoff {:type :markdown-handoff-data}}
+ :steps [{:name "classify"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :template
+                           :text "{{input}}"
+                           :vars {"input" {:from :workflow-input}}}
+                          {:type :source
+                           :from :workflow-original}]}]}
 
 You are the post-reproduction classification phase of a GitHub bug-triage workflow.
 
@@ -24,7 +31,7 @@ Goal:
 This workflow classifies and hands off. It must not create a Munera task, design a fix, implement a fix, or create a PR.
 
 Input expectations:
-- `$INPUT` should be the reproduction report from the upstream reproduction step.
+- The input should be the reproduction report from the upstream reproduction step.
 - Expect at least:
   - issue number/title/URL
   - worktree path

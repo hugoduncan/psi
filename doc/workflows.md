@@ -48,7 +48,7 @@ For this migration slice, the authoritative example set is:
 - `plan-build` — compact inline-session authoring example
 - `plan-build-review` — compact multi-step inline-session example
 - `delegate-build-review` — executable delegate-heavy target-authored example proving canonical downstream delegated yielded-text consumption
-- `gh-bug-triage-modular` — richer orchestration/context/reference example that remains current-authored until broader compatibility retirement work
+- `gh-bug-triage-modular` — richer target-authored orchestration example proving delegated yielded text plus structured delegated handoff consumption
 
 ## User-facing workflow commands
 
@@ -250,52 +250,55 @@ Minimum canonical delegated result model:
 
 - downstream steps should read the delegated step's yielded text through
   `{:from {:step "..." :yield :text}}`
-- this slice does not make delegated step-local outputs a new canonical author-facing
-  downstream surface
+- workflows that want to export stable machine-facing handoff data should declare
+  `:terminal-contract {:handoff {:type :markdown-handoff-data}}`
+- callers should read that structured delegated handoff through
+  `{:from {:step "..." :output :handoff}}`
 - delegate diagnostics and other callee-internal detail remain runtime/debug
   surfaces, not the primary authoring contract for normal downstream flow
+- first-cut fallback is explicit: if a workflow does not declare a terminal
+  handoff contract, callers should not rely on `:output :handoff`
 
-## Example 4: richer orchestration and current executable bug triage
+## Example 4: richer orchestration and executable bug triage
 
-`gh-bug-triage-modular` remains the richer orchestration/context/reference
-example for realistic bug triage. Its checked-in executable file still uses the
-older current-authored multi-step shape because broader compatibility-retirement
-work has not landed yet.
+`gh-bug-triage-modular` is now the richer orchestration/context/reference
+example for realistic bug triage.
 
-The target-model reading for that workflow remains useful:
+It proves the dual-plane delegated model directly:
 
-- each named bug-triage phase is conceptually a delegated workflow boundary
-- the next phase receives a new ask derived from the prior phase result
+- each named bug-triage phase is an explicit delegated workflow boundary
+- the next phase receives its immediate ask from prior delegated yielded text
+- stable machine-facing bug-triage data flows through delegated `:output :handoff`
 - original request context and constrained transcript context are carried
   explicitly rather than assumed implicitly
 
-A representative target-style delegate sketch for the final classification step
-still looks like:
+Representative target-style classification step:
 
 ```clojure
 {:name "post-repro"
  :type :delegate
  :target "gh-bug-post-repro"
+ :outputs {:handoff {:source :delegate/handoff}}
  :prompt-string {:type :template
                  :text "{{report}}"
                  :vars {"report" {:from {:step "reproduce" :yield :text}}}}
  :context [{:type :source
             :from :workflow-original}
            {:type :source
-            :from {:step "discover" :yield :text}}
+            :from {:step "discover" :output :handoff}}
            {:type :source
-            :from {:step "worktree" :yield :text}}
+            :from {:step "worktree" :output :handoff}}
            {:type :source
             :from {:step "reproduce" :output :transcript}
             :projection {:type :tail :turns 4 :tool-output false}}]}
 ```
 
-What this still teaches:
+What this teaches:
 
-- how richer orchestration maps onto explicit delegated workflow boundaries
-- carried caller material through ordered `:context`
-- shared reference syntax across prompt rendering and forwarded context
-- transcript-tail projection as constrained delegated context
+- yielded text and structured handoff are distinct delegated contracts
+- `:yield :text` is the human-facing chaining surface
+- `:output :handoff` is the machine-facing orchestration surface
+- transcript-tail projection remains support context rather than the main machine contract
 
 ## Input and context flow
 
@@ -304,6 +307,7 @@ The most important authoring references in this guide are:
 - `:workflow-input` — the current workflow's input value
 - `:workflow-original` — carried original request/reference context
 - `{:from {:step "..." :yield :text}}` — prior step result used as the next ask, including delegate-step yielded text
+- `{:from {:step "..." :output :handoff}}` — prior delegated workflow's structured terminal handoff
 - `{:from {:step "..." :output :transcript}}` with `:projection` — projected
   transcript/reference context
 
@@ -313,6 +317,8 @@ Interpretation:
 - `:workflow-original` is the carried reference context
 - prior-step `:yield` refs are the simplest way to feed one step's result into
   the next step's authored text
+- delegated `:output :handoff` refs are the stable way to consume machine-facing
+  exported workflow data without parsing markdown heuristically downstream
 - `:context` on a delegate step carries forwarded material without changing the
   delegated workflow's prompt string
 
@@ -341,13 +347,13 @@ This guide intentionally teaches the currently migrated example-led surfaces:
 - inline `:session` authoring
 - delegated `:prompt-string` and `:context`
 - canonical downstream delegated yielded-text consumption
+- canonical downstream delegated structured-handoff consumption through `:output :handoff`
 - shared reference syntax for `:workflow-input`, `:workflow-original`, prior
-  step yields, and projected transcript context
+  step yields, delegated handoffs, and projected transcript context
 
-It does not yet try to be the authoritative example-led guide for all
-`outputs`/`yields` variations beyond what the examples above use directly.
-In particular, this slice teaches delegated downstream `:yield :text` as the
-minimal canonical authoring surface rather than a broad delegated-output menu.
+It does not try to turn arbitrary delegate-local runtime envelopes or diagnostics
+into a broad author-facing output menu. This slice standardizes one structured
+export key, `:handoff`, and keeps other delegated internal details non-contractual.
 When you need the full formal surface, use the grammar/reference docs.
 
 ## Authoring guidelines

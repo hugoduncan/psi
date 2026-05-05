@@ -11,7 +11,10 @@ For the currently implemented schema surface, see `doc/workflow-grammar-current.
 ```clojure
 workflow ::= workflow-map
 
-workflow-map ::= {:steps [step+]}
+workflow-map ::= {:steps [step+]
+                  terminal-contract?}
+
+terminal-contract ::= :terminal-contract {:handoff {:type :markdown-handoff-data}}
 
 step ::= invoke-step | session-step | delegate-step
 
@@ -34,6 +37,7 @@ delegate-step ::= {:name step-name
                    :target workflow-name
                    :prompt-string (string | template-contribution)
                    :context? [source-item*]
+                   outputs?
                    yields?
                    control-flow*}
 
@@ -85,6 +89,8 @@ source-ref ::= :workflow-input
              | {:step step-name :output output-key}
              | {:step step-name :yield yield-field}
 
+outputs ::= {:handoff {:source :delegate/handoff}}
+
 output-key ::= keyword
 
 yield-field ::= keyword
@@ -106,6 +112,7 @@ model-selection-spec ::= external-nonterminal-defined-in-doc-model-selection-gra
 yields ::= {:type :data :data output-keyword}
          | {:type :text :text output-keyword}
          | {:type :error :reason keyword :message string :details? map}
+         | {:type :delegated}
 
 output-keyword ::= keyword
 
