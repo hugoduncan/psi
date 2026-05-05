@@ -46,6 +46,7 @@ Bootstrapped on 2026-04-02.
   - added a focused regression in `components/agent-session/test/psi/agent_session/workflow_ir_test.clj` proving undeclared delegated `:output :handoff` reads are rejected with `:missing-output-key`
   - this makes the documented fallback rule explicit: callers must not rely on `:output :handoff` unless the delegate step declares that output surface
   - focused verification green via `bb clojure:test:unit --focus psi.agent-session.workflow-ir-test` (`1539 tests, 11229 assertions, 0 failures`)
+  - a later follow-up execution pass re-checked `steps.md` plus the preloaded code-shape-review result and found no newly added unchecked actionable items, so no further task work remained to execute in that pass
 - Session directory semantics were tightened into an explicit invariant:
   - runtime sessions now require `:worktree-path`
   - runtime/tool/resolver/app-runtime code no longer falls back from session worktree to context `:cwd`
