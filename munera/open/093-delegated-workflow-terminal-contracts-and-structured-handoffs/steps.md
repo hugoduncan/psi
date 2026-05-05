@@ -11,3 +11,4 @@
 - [x] Add focused automated proof that the checked-in example runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
 - [x] Update `doc/workflows.md` and any necessary grammar/concepts docs to teach the dual-plane delegated contract clearly
 - [x] Verify that the resulting implementation materially reduces a blocker for task `090`
+- [ ] Add a focused failing-proof for undeclared delegated `:output :handoff` reads so the documented fallback rule is enforced or explicitly bounded at the compiler/validation/runtime boundary
