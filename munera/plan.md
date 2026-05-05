@@ -8,6 +8,7 @@ Queue:
 `munera/open/089-example-workflow-migration-and-documentation/`
 `munera/open/090-eventual-compatibility-retirement-for-current-authored-workflow-grammar/`
 `munera/open/091-canonical-session-output-normalization-in-step-prep-and-runtime/`
+`munera/open/092-delegate-result-surface-convergence-and-rich-example-migration/`
 
 
 Backlog:
