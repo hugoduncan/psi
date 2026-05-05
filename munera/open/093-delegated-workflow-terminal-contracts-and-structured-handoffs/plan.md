@@ -11,14 +11,15 @@ Likely steps:
 1. inventory the concrete multi-phase data items `gh-bug-triage-modular` and its child workflows must pass structurally
 2. choose the minimum workflow-level terminal export contract shape
 3. choose the canonical caller-side consumption surface for delegated structured handoffs
-4. converge IR/runtime/compiler/source-resolution behavior on that contract boundary
-5. add focused proof for both delegated yielded-text and delegated structured-handoff downstream reads
-6. migrate the child workflows' terminal contracts as needed to expose the required handoff data
-7. migrate `gh-bug-triage-modular` to target-authored delegate syntax if the resulting first cut is honest and narrow
-8. if direct migration still proves broader than intended, replace it with a narrower realistic multi-phase delegate-heavy example and record why
-9. add focused automated proof that the checked-in example runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
-10. update workflow docs so the dual-plane delegated contract is taught explicitly
-11. verify the task materially reduces a blocker for `090`
+4. decide the first-cut standard contract keys and fallback behavior for undeclared structured exports
+5. converge IR/runtime/compiler/source-resolution behavior on that contract boundary
+6. add focused proof for both delegated yielded-text and delegated structured-handoff downstream reads
+7. migrate the child workflows' terminal contracts as needed to expose the required handoff data
+8. migrate `gh-bug-triage-modular` to target-authored delegate syntax if the resulting first cut is honest and narrow
+9. if direct migration still proves broader than intended, replace it with a narrower realistic multi-phase delegate-heavy example and record why
+10. add focused automated proof that the checked-in example runs through the authoritative canonical workflow execution path intended to remain after compatibility retirement
+11. update workflow docs so the dual-plane delegated contract is taught explicitly
+12. verify the task materially reduces a blocker for `090`
 
 Key design constraints:
 - preserve delegated `:yield :text` as the canonical simple path from task `092`

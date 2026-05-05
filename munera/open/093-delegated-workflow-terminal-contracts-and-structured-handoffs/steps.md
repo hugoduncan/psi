@@ -1,8 +1,10 @@
 - [ ] Inventory the concrete multi-phase structured data items needed across delegated bug-triage phases
 - [ ] Choose the minimum workflow-level terminal export contract shape
 - [ ] Choose the canonical caller-side delegated structured-handoff consumption surface
+- [ ] Decide the first-cut standard contract keys and fallback behavior for undeclared structured exports
 - [ ] Converge IR/runtime/compiler/source-resolution behavior on that contract boundary
 - [ ] Add focused tests for delegated yielded-text and delegated structured-handoff downstream reads
+- [ ] Add focused proof that delegated yielded text and delegated structured handoff remain distinct surfaces
 - [ ] Migrate child workflow terminal contracts to expose required handoff data
 - [ ] Attempt direct migration of `gh-bug-triage-modular` to target-authored delegate syntax
 - [ ] If direct migration is broader than the intended slice, replace it with a narrower realistic multi-phase delegate-heavy example and record why

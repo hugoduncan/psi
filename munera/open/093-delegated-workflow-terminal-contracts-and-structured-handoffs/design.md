@@ -77,6 +77,28 @@ That answer must make explicit:
 
 The task should prefer one explicit dual-plane model over a broad menu of ad hoc delegated surfaces.
 
+## First-cut decision obligations
+
+To avoid implementers satisfying the task with materially different contract shapes, this task must explicitly decide all of the following in the first cut:
+
+1. **workflow-level declaration shape**
+   - where a reusable workflow declares its exported terminal contract
+   - whether that declaration is workflow-level metadata, terminal-step metadata, or another explicit authored surface
+
+2. **caller-side reference shape**
+   - the exact canonical downstream ref form for reading structured delegated handoff data
+   - whether that is an `:output` ref, a `:yield` ref, or another explicit ref form
+
+3. **first-cut standard contract keys**
+   - whether `:handoff` is the only newly canonical structured export key in this slice
+   - whether `:transcript` and `:result` are part of the declared caller contract or remain separate/non-primary surfaces
+
+4. **fallback behavior**
+   - whether delegated workflows without an explicit structured export declaration are invalid for structured downstream reads
+   - or whether there is a narrow compatibility/defaulting rule for the first cut
+
+The task should prefer one explicit answer for each item over leaving multiple equally plausible implementation paths.
+
 ## Minimum concept set
 
 This task should stay centered on the smallest set of concepts that can solve the broader orchestration problem:
@@ -176,6 +198,13 @@ For this task, a valid anchor workflow must include at least:
 - explicit delegated `:context` when contextual support material is part of the example
 - focused automated proof through the authoritative canonical workflow execution path intended to remain after compatibility retirement
 
+For `gh-bug-triage-modular`, the minimum honest proof strength is:
+
+- at least one downstream step consuming a prior delegated `:handoff` field canonically
+- at least one downstream step consuming prior delegated yielded text canonically
+- at least one contextual transcript projection carried as support context rather than primary machine contract
+- at least one child workflow in the chain exposing a declared structured terminal handoff rather than relying only on markdown output
+
 ## Contract-shaping constraints
 
 The task should preserve these architectural constraints unless proof shows otherwise:
@@ -226,7 +255,9 @@ A future reader should be able to answer by reading a small set of files:
 - the broader delegated multi-phase contract/dataflow problem is made explicit and solved with one authoritative canonical model rather than text parsing or compatibility-era hidden assumptions
 - delegated yielded text remains supported canonically and is clearly distinguished from structured delegated handoff data
 - the first-cut structured delegated contract surface is explicitly named and documented
+- the task records one explicit answer for workflow-level declaration shape, caller-side ref shape, standard contract keys, and fallback behavior for undeclared structured exports
 - focused tests prove downstream canonical consumption of structured delegated handoff data
+- focused tests also prove that delegated yielded text and structured delegated handoff data remain distinct surfaces rather than aliases of the same downstream contract
 - at least one realistic checked-in target-authored multi-phase delegate-heavy workflow proves the structured handoff model through the authoritative canonical workflow execution path intended to remain after compatibility retirement
 - documentation teaches the dual-plane delegated model clearly enough that future workflow authors do not need to infer it from compatibility examples
 - the resulting implementation materially reduces a real remaining blocker for task `090`
