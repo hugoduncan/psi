@@ -52,5 +52,6 @@
 2026-05-06 execution
 - Read preloaded review result plus `steps.md`, `implementation.md`, `design.md`, and `plan.md` for task `091`.
 - Confirmed there were no newly added unchecked follow-up items left to execute in `steps.md`; task state already reflects the preceding review pass as complete.
-- Did not touch unrelated dirty worktree changes outside the task slice (`workflow_execution_test.clj` split/move in progress elsewhere).
-- No blocking reason for task `091`; no additional code or test changes were required in this execution pass.
+- Verified the unrelated dirty worktree split around `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` by running `clojure -M:test --focus psi.agent-session.workflow-execution-resume-test`; the extracted resume test passes green (`1 test, 4 assertions, 0 failures`).
+- Left unrelated dirty worktree changes intact; no task-091 code or test edits were required in this execution pass.
+- No blocking reason for task `091`; execution reduced to verification plus task-artifact synchronization.

@@ -12,8 +12,7 @@
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
-   [psi.agent-session.workflow-statechart-runtime :as workflow-statechart-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -777,35 +776,4 @@
           (is (= 2 (get-in run [:step-runs "step-2-builder" :iteration-count])))
           (is (= 2 (get-in run [:step-runs "step-3-reviewer" :iteration-count]))))))))
 
-(deftest resume-and-execute-run-test
-  (testing "resume-and-execute-run! reports the resumed run state without interaction-heavy choreography"
-    (let [[ctx session-id] (create-session-context {:persist? false})
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
-                                                                   :run-id "run-resume"
-                                                                   :workflow-input {:input "plan it"}})]
-                       (-> s
-                           (assoc-in [:workflows :runs "run-resume" :status] :completed)
-                           (assoc-in [:workflows :runs "run-resume" :current-step-id] nil)
-                           (assoc-in [:workflows :runs "run-resume" :step-runs "step-1" :attempts]
-                                     [{:attempt-id "a1"
-                                       :status :succeeded
-                                       :execution-session-id "child-1"}])))))
-          seen* (atom [])]
-      (with-redefs [psi.agent-session.workflow-statechart-runtime/create-workflow-context
-                    (fn [_ctx _parent-session-id run-id]
-                      (swap! seen* conj [:create run-id])
-                      {:wm :stub-wm})
-                    psi.agent-session.workflow-statechart-runtime/send-and-drain!
-                    (fn [_wf-ctx _wm event _data]
-                      (swap! seen* conj [:event event])
-                      :stubbed)]
-        (let [result (workflow-execution/resume-and-execute-run! ctx session-id "run-resume")]
-          (is (= :completed (:status result)))
-          (is (true? (:terminal? result)))
-          (is (false? (:blocked? result)))
-          (is (= [[:create "run-resume"]
-                  [:event :workflow/resume]]
-                 @seen*)))))))
+
