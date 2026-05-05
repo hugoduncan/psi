@@ -19,11 +19,13 @@ This task exists to make retirement an explicit, gated cleanup rather than an un
 
 ## Scope
 
+Repository scope for this task is explicit: it governs this repo's checked-in workflow authoring surface under `.psi/workflows/*.md`, plus the loader/compiler/runtime/tests/docs in this repo that exist to support the current-authored workflow grammar.
+
 In scope:
 
-- identify the prerequisites for retiring current-authored grammar support
+- identify the prerequisites for retiring current-authored grammar support for this repo's checked-in workflows
 - enumerate dependent workflows/tests/docs that must be migrated first
-- remove or disable current-authored grammar loading/compilation once the prerequisites are satisfied
+- remove current-authored grammar loading/compilation once the prerequisites are satisfied
 - clean up compatibility-only code, tests, and docs that are no longer needed
 - update project guidance so the target grammar is the only supported authored workflow language
 
@@ -39,12 +41,17 @@ The project has one authored workflow grammar and one runtime model:
 - target authored grammar
 - normalized workflow IR runtime model
 
-The current authored grammar and its compatibility compiler are gone.
+For this repo, retirement means removal, not temporary disablement:
+
+- the current authored grammar and its compatibility compiler are deleted from the live loading/run-creation path
+- checked-in docs no longer keep the current grammar as a live authored option
+- historical context is preserved by git history rather than by keeping live compatibility docs in the active documentation set
 
 ## Acceptance
 
 - explicit retirement prerequisites are identified and satisfied before removal
-- current-authored grammar loading/compilation support is removed or disabled intentionally
+- current-authored grammar loading/compilation support is removed intentionally from the live repo path; the task does not stop at a temporary disable flag
 - compatibility-only tests/docs/code are cleaned up
 - project guidance no longer presents the current grammar as an active authored workflow option
 - runtime and documentation converge on the target grammar + IR model only
+- the remaining checked-in `.psi/workflows/*.md` files in this repo compile/run through the target-authored path only

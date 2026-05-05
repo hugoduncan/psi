@@ -1,11 +1,11 @@
 - [x] Inventory remaining current-authored workflow definitions, tests, loaders, and docs
 - [x] Define explicit retirement gates
-- [ ] Resolve review ambiguities before execution:
-  - [ ] define repository scope explicitly as this repo's checked-in `.psi/workflows/*.md`
-  - [ ] choose one documentation end state for `doc/workflow-grammar-current.md` and `doc/workflow-grammar-migration.md`
-  - [ ] inventory the exact compatibility code paths/seams to delete versus retain
-  - [ ] name the authoritative focused and broader verification command sets
-  - [ ] choose one final retirement end state: disable temporarily or remove outright
+- [x] Resolve review ambiguities before execution:
+  - [x] define repository scope explicitly as this repo's checked-in `.psi/workflows/*.md`
+  - [x] choose one documentation end state for `doc/workflow-grammar-current.md` and `doc/workflow-grammar-migration.md`
+  - [x] inventory the exact compatibility code paths/seams to delete versus retain
+  - [x] name the authoritative focused and broader verification command sets
+  - [x] choose one final retirement end state: disable temporarily or remove outright
 - [ ] Migrate remaining compact current-authored checked-in workflows:
   - [ ] `lambda-build.md`
   - [ ] `prompt-build.md`
@@ -20,17 +20,21 @@
   - [ ] `gh-pr-fix-checks.md`
 - [ ] Tighten migration validation so checked-in workflow examples are target-authored only
 - [ ] Remove current-authored grammar loading/compilation support
-  - [ ] remove `workflow_current_ir_compiler.clj` runtime use
-  - [ ] remove current-grammar branch from workflow run creation
-  - [ ] remove current-authored file-compilation/validation paths that only support legacy multi-step grammar
+  - [ ] remove `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
+  - [ ] remove current-grammar branch from `components/agent-session/src/psi/agent_session/workflow_runtime.clj`
+  - [ ] remove current-authored file-compilation/validation paths from `components/agent-session/src/psi/agent_session/workflow_file_compiler.clj`
+  - [ ] remove compat binding / prompt-template / executor-profile fallbacks from `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
+  - [ ] remove compat session-preload shaping from `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` when no longer needed by any checked-in workflow
 - [ ] Delete compatibility-only workflow tests/helpers no longer needed
-  - [ ] remove `workflow_current_ir_compiler_test.clj`
-  - [ ] remove current-vs-target equivalence tests that only defend retirement-ready compatibility
-  - [ ] prune compatibility-only helper/seam tests after replacement target-only proofs exist
+  - [ ] remove `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
+  - [ ] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility
+  - [ ] replace compat-oriented mixed-path tests with target-only proofs before deleting them
 - [ ] Update project guidance so the target grammar is the only supported authored workflow surface
-  - [ ] remove or archive `doc/workflow-grammar-current.md`
-  - [ ] remove or archive `doc/workflow-grammar-migration.md`
+  - [ ] delete `doc/workflow-grammar-current.md`
+  - [ ] delete `doc/workflow-grammar-migration.md`
   - [ ] rewrite references in `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
 - [ ] Run focused verification after compatibility removal
+  - [ ] `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test`
 - [ ] Run broader verification after compatibility removal
+  - [ ] `bb clojure:test:unit`
 - [ ] Reconcile final cleanup with task `077` migration intent

@@ -7,7 +7,8 @@ Approach:
 - keep the work repo-specific and evidence-driven: only retire compatibility after the checked-in workflow set, tests, and docs no longer need it
 
 Current concrete blockers identified from the repo:
-1. Remaining current-authored checked-in workflows:
+1. Repository scope for workflow migration is the checked-in workflow set under `.psi/workflows/*.md` in this repo only; global workflow directories are out of scope for retirement gating here.
+2. Remaining current-authored checked-in workflows:
    - `lambda-build.md`
    - `prompt-build.md`
    - `gh-issue-refine.md`
@@ -17,12 +18,13 @@ Current concrete blockers identified from the repo:
    - `gh-pr-fix-checks.md`
    - `review-implementation.md`
    - `review-task-until-clear.md`
-2. Remaining current-grammar compiler/runtime path:
+3. Remaining current-grammar compiler/runtime path to remove or explicitly justify retaining:
    - `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
-   - current-grammar branch in `workflow_runtime.clj`
-   - current-authored validation helpers in `workflow_file_compiler.clj`
-   - compat-oriented seams in step prep / statechart runtime that only exist to preserve current-authored behavior
-3. Remaining current-grammar tests/docs:
+   - current-grammar branch in `components/agent-session/src/psi/agent_session/workflow_runtime.clj`
+   - current-authored target detection / compilation / validation branches in `components/agent-session/src/psi/agent_session/workflow_file_compiler.clj`
+   - compat binding / prompt-template / executor-profile fallbacks in `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
+   - compat session-preload shaping in `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj`
+4. Remaining current-grammar tests/docs:
    - `workflow_current_ir_compiler_test.clj`
    - current-authored/compat equivalence assertions that cease to matter after retirement
    - `doc/workflow-grammar-current.md`
@@ -30,9 +32,9 @@ Current concrete blockers identified from the repo:
    - live references from `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
 
 Explicit retirement gates:
-- Gate 1: all checked-in `.psi/workflows/*.md` files compile as target-authored workflows; no checked-in workflow depends on `:workflow` multi-step entries, `:kind :accepted-result`, or current-authored `:session` maps.
+- Gate 1: all checked-in `.psi/workflows/*.md` files in this repo compile as target-authored workflows; no checked-in workflow depends on `:workflow` multi-step entries, `:kind :accepted-result`, or current-authored `:session` maps.
 - Gate 2: no runtime code path used by workflow loading/run creation depends on `workflow_current_ir_compiler.clj`.
-- Gate 3: no user-facing documentation presents `doc/workflow-grammar-current.md` as a supported authored workflow surface.
+- Gate 3: active docs no longer rely on `doc/workflow-grammar-current.md` or `doc/workflow-grammar-migration.md`; for this task the chosen end state is deletion, with history preserved in git.
 - Gate 4: targeted workflow compilation/execution verification is green after compatibility removal.
 
 Likely execution order:
@@ -43,8 +45,10 @@ Likely execution order:
 2. tighten migration validation tests so checked-in workflows are asserted target-authored only
 3. remove current-authored file compilation/runtime support
 4. delete compatibility-only tests/docs/helpers
-5. rewrite docs so target grammar + IR are the only live workflow story
-6. run focused then broader verification
+5. delete the current-grammar docs and rewrite remaining workflow docs so target grammar + IR are the only live workflow story
+6. run focused then broader verification using these authoritative commands:
+   - focused: `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test`
+   - broader: `bb clojure:test:unit`
 
 Proof target:
 - all checked-in workflows are target-authored
