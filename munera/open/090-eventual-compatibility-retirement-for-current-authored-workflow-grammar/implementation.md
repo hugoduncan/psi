@@ -12,3 +12,9 @@
   3. add an explicit code-path inventory for retirement targets
   4. name the focused and broader verification commands
   5. choose one final compatibility outcome (`remove`, not merely `disable`, if that is the intended repo end state)
+
+2026-05-06 implementation slice 1
+- Migrated `lambda-build.md` and `prompt-build.md` from current multi-step `:workflow` entries to target-authored `:type :delegate` steps.
+- Preserved the original ask/reference material explicitly with ordered delegate `:context` entries sourced from `:workflow-original`.
+- Switched downstream chaining to canonical prior-step yielded-text refs (`{:from {:step ... :yield :text}}`) so these workflows now exercise the same delegate result contract already taught by `delegate-build-review.md`.
+- Kept the prompts explicit in `:prompt-string` template form instead of relying on `$INPUT` substitution.

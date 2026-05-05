@@ -60,10 +60,14 @@
     (let [parsed (loader/scan-directory ".psi/workflows")
           {:keys [definitions]} (compiler/compile-workflow-files parsed)
           by-name (into {} (map (juxt :name identity)) definitions)]
-      ;; prompt-build: 3 steps
-      (is (= 3 (count (:step-order (get by-name "prompt-build")))))
-      ;; lambda-build: 3 steps
-      (is (= 3 (count (:step-order (get by-name "lambda-build"))))))))
+      ;; prompt-build: 3 target-authored delegate steps
+      (is (= 3 (count (:steps (get by-name "prompt-build")))))
+      (is (= [:delegate :delegate :delegate]
+             (mapv :type (:steps (get by-name "prompt-build")))))
+      ;; lambda-build: 3 target-authored delegate steps
+      (is (= 3 (count (:steps (get by-name "lambda-build")))))
+      (is (= [:delegate :delegate :delegate]
+             (mapv :type (:steps (get by-name "lambda-build"))))))))
 
 (deftest migrated-target-authoring-examples-test
   (testing "plan-build and plan-build-review compile as target-authored inline-session examples"

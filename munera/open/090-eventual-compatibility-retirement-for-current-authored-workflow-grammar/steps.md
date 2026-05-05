@@ -7,8 +7,8 @@
   - [x] name the authoritative focused and broader verification command sets
   - [x] choose one final retirement end state: disable temporarily or remove outright
 - [ ] Migrate remaining compact current-authored checked-in workflows:
-  - [ ] `lambda-build.md`
-  - [ ] `prompt-build.md`
+  - [x] `lambda-build.md`
+  - [x] `prompt-build.md`
 - [ ] Migrate remaining review-loop current-authored workflows:
   - [ ] `review-implementation.md`
   - [ ] `review-task-until-clear.md`
