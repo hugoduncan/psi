@@ -74,6 +74,12 @@
    [:source :keyword]
    [:metadata {:optional true} [:maybe :map]]])
 
+(def terminal-contract-schema
+  [:map
+   [:handoff {:optional true}
+    [:map
+     [:type [:= :markdown-handoff-data]]]]])
+
 (def outputs-schema
   [:map-of output-key-schema output-spec-schema])
 
@@ -213,6 +219,7 @@
 (def workflow-ir-schema
   [:map
    [:version workflow-ir-version-schema]
+   [:terminal-contract {:optional true} [:maybe terminal-contract-schema]]
    [:steps [:vector {:min 1} ir-step-schema]]])
 
 (def valid-workflow-ir? (m/validator workflow-ir-schema))
@@ -408,6 +415,7 @@
       :result accepted-result
       :final-llm-reply (or (get raw-outputs :final-llm-reply)
                            (get raw-outputs :text))
+      :handoff (get raw-outputs :handoff)
       (get raw-outputs output-key))))
 
 (defn step-output-surfaces

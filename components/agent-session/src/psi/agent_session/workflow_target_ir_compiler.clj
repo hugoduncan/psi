@@ -26,6 +26,9 @@
   {:type :text
    :text :final-llm-reply})
 
+(def ^:private default-delegate-outputs
+  {:handoff {:source :delegate/handoff}})
+
 (def ^:private default-delegate-yields
   {:type :delegated})
 
@@ -119,7 +122,7 @@
   (case step-type
     :invoke default-invoke-outputs
     :session default-session-outputs
-    :delegate nil
+    :delegate default-delegate-outputs
     nil))
 
 (defn- step-default-yields
@@ -186,8 +189,10 @@
   (when-not (target-authored-workflow-definition? workflow-definition)
     (throw (ex-info "Target workflow definition must be of the form `{:steps [...]}`"
                     {:workflow-definition workflow-definition})))
-  {:version :workflow-ir/v1
-   :steps (mapv compile-step (:steps workflow-definition))})
+  (cond-> {:version :workflow-ir/v1
+           :steps (mapv compile-step (:steps workflow-definition))}
+    (contains? workflow-definition :terminal-contract)
+    (assoc :terminal-contract (:terminal-contract workflow-definition))))
 
 (defn compile-and-validate-workflow-definition
   "Compile target-authored workflow definition and validate the resulting IR.

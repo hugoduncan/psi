@@ -99,23 +99,29 @@
                                                                               :type :delegate
                                                                               :target "builder"
                                                                               :prompt-string "Do it"
+                                                                              :outputs {:handoff {:source :delegate/handoff}}
                                                                               :yields {:type :delegated}}
                                                                              {:name "report"
                                                                               :type :session
                                                                               :contributions [{:type :template
-                                                                                               :text "Report {{delegated}}"
-                                                                                               :vars {"delegated" {:from {:step "delegate-step" :yield :text}}}}]}]}
+                                                                                               :text "Report {{delegated}} / {{issue}}"
+                                                                                               :vars {"delegated" {:from {:step "delegate-step" :yield :text}}
+                                                                                                      "issue" {:from {:step "delegate-step" :output :handoff}
+                                                                                                               :path [:issue_number]}}}]}]}
                                                         :run-id "run-delegate-yield"
                                                         :workflow-input {}})
         state3 (assoc-in state2 [:workflows :runs run-id :step-runs "delegate-step" :accepted-result]
                          {:outcome :ok
                           :outputs {:final-llm-reply "delegated terminal text"
+                                    :handoff {:issue_number "42"}
                                     :result {:outcome :ok}}
                           :diagnostics {:delegate {:target "builder"}}})
         run (workflow-runtime/workflow-run-in state3 run-id)]
     (is (= "delegated terminal text"
            (workflow-source-resolution/resolve-source-ref run {:step "delegate-step" :yield :text})))
-    (is (= "Report delegated terminal text"
+    (is (= {:issue_number "42"}
+           (workflow-source-resolution/resolve-source-ref run {:step "delegate-step" :output :handoff})))
+    (is (= "Report delegated terminal text / 42"
            (workflow-source-resolution/render-template-contribution
             run
             (-> run :effective-definition :canonical-ir :steps second :session :contributions first))))))

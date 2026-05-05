@@ -30,7 +30,8 @@
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
-   [psi.agent-session.workflow-step-prep :as workflow-step-prep]))
+   [psi.agent-session.workflow-step-prep :as workflow-step-prep]
+   [psi.agent-session.workflow-terminal-contract :as workflow-terminal-contract]))
 
 (declare create-workflow-context send-and-drain!)
 
@@ -247,10 +248,7 @@
 
 (defn- terminal-step-result-envelope
   [workflow-run]
-  (or (get-in workflow-run [:terminal-outcome :result-envelope])
-      (some (fn [step-id]
-              (get-in workflow-run [:step-runs step-id :accepted-result]))
-            (reverse (runtime-step-order workflow-run)))))
+  (workflow-terminal-contract/terminal-result-envelope workflow-run))
 
 (defn- delegate-step-runtime-result
   [ctx parent-session-id step-id step-def workflow-run]
@@ -275,9 +273,11 @@
                              :context context}}]
     (case (:status delegate-run)
       :completed
-      {:pending-kind :success
-       :payload (cond-> (terminal-step-result-envelope delegate-run)
-                  true (update :diagnostics #(merge boundary (or % {}))))}
+      (let [contract-outputs (workflow-terminal-contract/terminal-contract-outputs delegate-run)]
+        {:pending-kind :success
+         :payload (cond-> (terminal-step-result-envelope delegate-run)
+                    (seq contract-outputs) (update :outputs #(merge contract-outputs (or % {})))
+                    true (update :diagnostics #(merge boundary (or % {}))))})
 
       :blocked
       {:pending-kind :blocked

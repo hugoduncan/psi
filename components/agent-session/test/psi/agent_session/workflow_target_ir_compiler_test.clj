@@ -151,6 +151,7 @@
                                             {:type :source
                                              :from {:step "discover" :output :data}
                                              :path [:issues]}]}
+                       :outputs {:handoff {:source :delegate/handoff}}
                        :yields {:type :delegated}}]}
              ir))
       (is (= {:valid? true :structural-errors nil :semantic-errors []}
@@ -182,11 +183,11 @@
               {:outcome :ok
                :outputs {:text "done"
                          :transcript [{:role "assistant" :content "done"}]}})))
-      (is (= {}
+      (is (= {:handoff {:issue_number "12"}}
              (workflow-ir/step-output-surfaces
               delegate-step
               {:outcome :ok
-               :outputs {:data {:ignored true}}}))))))
+               :outputs {:handoff {:issue_number "12"}}}))))))
 
 (deftest compile-target-judge-routing-and-loop-bounds-test
   (testing "target authored judges, routing, and loop bounds compile into canonical IR"
