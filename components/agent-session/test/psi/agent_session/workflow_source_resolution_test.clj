@@ -130,3 +130,30 @@
             run
             {:from {:step "report" :output :transcript}
              :projection {:type :tail :turns 1 :tool-output false}})))))
+
+(deftest resolve-binding-ref-normalizes-session-output-paths-through-canonical-ir-test
+  (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                       {:definition {:steps [{:name "report"
+                                                                              :type :session
+                                                                              :session {:contributions [{:type :template
+                                                                                                         :text "x"
+                                                                                                         :vars {}}]}
+                                                                              :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                                                                              :yields {:type :text :text :final-llm-reply}}]}
+                                                        :run-id "run-binding-ref"
+                                                        :workflow-input {}})
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "report" :accepted-result]
+                         {:outcome :ok
+                          :outputs {:final-llm-reply "Done"
+                                    :text "legacy text"}})
+        run (workflow-runtime/workflow-run-in state3 run-id)]
+    (is (= "Done"
+           (workflow-source-resolution/resolve-binding-ref
+            run
+            {:source :step-output
+             :path ["report" :outputs :final-llm-reply]})))
+    (is (= "Done"
+           (workflow-source-resolution/resolve-binding-ref
+            run
+            {:source :step-output
+             :path ["report" :outputs :text]})))))

@@ -1,6 +1,6 @@
-- [ ] Trace current session-output normalization responsibility across step prep, source resolution, and statechart runtime
-- [ ] Choose and implement one authoritative normalization boundary for canonical session outputs/yields
-- [ ] Remove redundant local session-output translation logic from runtime callers
-- [ ] Add or update focused tests for `:output :final-llm-reply` and `:yield :text`
-- [ ] Add or update focused tests for canonical session contributions vs compat preload interaction where still supported
-- [ ] Run focused verification and reconcile any drift exposed by the refactor
+- [x] Trace current session-output normalization responsibility across step prep, source resolution, and statechart runtime
+- [x] Choose and implement one authoritative normalization boundary for canonical session outputs/yields
+- [x] Remove redundant local session-output translation logic from runtime callers
+- [x] Add or update focused tests for `:output :final-llm-reply` and `:yield :text`
+- [x] Add or update focused tests for canonical session contributions vs compat preload interaction where still supported
+- [x] Run focused verification and reconcile any drift exposed by the refactor
