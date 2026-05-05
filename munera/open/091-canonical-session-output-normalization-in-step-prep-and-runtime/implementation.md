@@ -20,3 +20,6 @@
 - Verification run:
   - `clojure -M:test --focus psi.agent-session.workflow-source-resolution-test --focus psi.agent-session.workflow-step-prep-test --focus psi.agent-session.workflow-ir-runtime-adoption-test` → green (`10 tests, 20 assertions, 0 failures`)
   - `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.workflow-execution-test` → green (`31 tests, 127 assertions, 0 failures`)
+
+2026-05-06 review
+- Actionable: task acceptance/steps claim focused proof for canonical session contributions vs compat preload interaction, but current coverage proves the two paths separately rather than in one mixed scenario with explicit precedence/combination semantics.
