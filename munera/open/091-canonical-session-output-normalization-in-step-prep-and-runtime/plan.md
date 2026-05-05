@@ -1,10 +1,11 @@
 Approach:
 - trace the current canonical and compatibility-shaped session-result reads across:
   - `workflow_step_prep.clj`
-  - `workflow_source_resolution.clj`
   - `workflow_statechart_runtime.clj`
+  - `workflow_source_resolution.clj` only if it already contains or is the clearest home for the authoritative output interpretation, not as a pretext for broadening the slice
   - any helper already closest to authoritative output interpretation
 - choose one authoritative normalization boundary rather than adding another wrapper layer
+- prefer moving runtime callers downward to an existing authoritative interpretation surface rather than introducing a second peer compatibility seam
 - move runtime callers to that boundary
 - simplify or delete now-redundant translation logic
 - tighten focused tests around canonical session outputs and compat preload interaction

@@ -30,14 +30,19 @@ The most important architectural issue is not a single failing test. It is that 
 In scope:
 
 - identify the single authoritative boundary where session-step accepted-result data is normalized to canonical output/yield semantics
+- prefer an existing layer already closest to canonical output interpretation over introducing a new parallel helper/seam; runtime callers should delegate to that authoritative layer rather than restating translation logic sideways or upward
 - remove duplicated or competing session-output translation logic from runtime step-preparation and/or statechart execution paths
 - make direct workflow execution and statechart workflow execution consume the same canonical session-output interpretation
-- preserve current externally visible workflow behavior while simplifying internal lookup/translation responsibilities
+- preserve intended current externally visible workflow behavior while simplifying internal lookup/translation responsibilities
 - add or update focused tests that prove canonical behavior for:
   - `:output :final-llm-reply`
   - `:yield :text`
   - interaction between canonical session contributions and compat preload handling where still supported
 - document any narrow remaining compatibility rule if one must still exist temporarily
+
+Behavior-change rule:
+
+- accidental or compatibility-era duplication may be removed when doing so makes canonical behavior more internally consistent, provided the resulting behavior is made explicit in focused tests and the change does not broaden the task into a larger workflow-runtime redesign
 
 Out of scope:
 
