@@ -270,6 +270,83 @@
       (is (= [{:role "user" :content "Original request"}]
              (:preloaded-messages @created*))))))
 
+(deftest statechart-runtime-combines-canonical-session-contributions-with-compat-session-preload-test
+  (let [[ctx session-id] (create-session-context)
+        definition {:definition-id "statechart-mixed-session-inputs"
+                    :step-order ["plan" "review"]
+                    :steps {"plan" {:executor {:type :agent :profile "planner"}
+                                    :prompt-template "$INPUT"
+                                    :input-bindings {:input {:source :workflow-input :path [:input]}}
+                                    :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                    :retry-policy {:max-attempts 1 :retry-on #{}}}
+                            "review" {:type :session
+                                      :executor {:type :agent :profile "reviewer"}
+                                      :prompt-template "$INPUT"
+                                      :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
+                                      :session-preload [{:kind :value
+                                                         :role "user"
+                                                         :binding {:source :workflow-input :path [:original]}}]
+                                      :session {:contributions [{:type :source
+                                                                 :from {:step "plan" :yield :text}}
+                                                                {:type :template
+                                                                 :text "Review {{reply}}"
+                                                                 :vars {"reply" {:from {:step "plan" :output :final-llm-reply}}}}]}
+                                      :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                      :retry-policy {:max-attempts 1 :retry-on #{}}}}}
+        created* (atom [])
+        prompts* (atom [])
+        response-texts* (atom ["review output"])]
+    (install-run! ctx definition "run-statechart-mixed-session-inputs")
+    (swap! (:state* ctx)
+           (fn [state]
+             (-> state
+                 (assoc-in [:workflows :runs "run-statechart-mixed-session-inputs" :workflow-input]
+                           {:input "Ship it" :original "Original request"})
+                 (assoc-in [:workflows :runs "run-statechart-mixed-session-inputs" :current-step-id] "review")
+                 (assoc-in [:workflows :runs "run-statechart-mixed-session-inputs" :step-runs "plan" :accepted-result]
+                           {:outcome :ok
+                            :outputs {:final-llm-reply "plan text"
+                                      :text "plan text"
+                                      :result {:outcome :ok
+                                               :outputs {:final-llm-reply "plan text"
+                                                         :text "plan text"}}}})
+                 (assoc-in [:workflows :runs "run-statechart-mixed-session-inputs" :step-runs "plan" :attempts]
+                           [{:attempt-id "a1" :status :succeeded :execution-session-id session-id}]))))
+    (let [wf-ctx (runtime/create-workflow-context ctx session-id "run-statechart-mixed-session-inputs")]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (swap! created* conj {:workflow-step-id (:workflow-step-id opts)
+                                            :preloaded-messages (:preloaded-messages opts)})
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        {:attempt {:attempt-id (:attempt-id opts)
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session {:session-id sid}}))
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx sid prompt]
+                      (swap! prompts* conj {:session-id sid :prompt prompt})
+                      (let [response (if (= sid "plan-child")
+                                       "plan text"
+                                       (first @response-texts*))]
+                        (when (= sid "review-child")
+                          (swap! response-texts* subvec 1))
+                        {:execution-result/assistant-message
+                         {:role "assistant"
+                          :content [{:type :text :text response}]
+                          :stop-reason :stop}}))]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-statechart-mixed-session-inputs")
+            review-created (last @created*)
+            review-prompts (filterv #(= "review-child" (:session-id %)) @prompts*)]
+        (is (= {:workflow-step-id "review"
+                :preloaded-messages [{:role "user" :content "Original request"}]}
+               review-created))
+        (is (= [{:session-id "review-child"
+                 :prompt "plan text"}]
+               review-prompts))
+        (is (= "review output"
+               (get-in run [:step-runs "review" :accepted-result :outputs :final-llm-reply])))))))
+
 (deftest judged-review-revise-routes-to-build-test
   (testing "REVISE routing belongs in workflow_execution/integration shape; runtime test only asserts judged recording path here"
     (let [[ctx session-id] (create-session-context)

@@ -32,3 +32,13 @@
   - resulting accepted result still exposes canonical `[:outputs :final-llm-reply]`
 - Focused verification green:
   - `clojure -M:test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.workflow-step-prep-test --focus psi.agent-session.workflow-source-resolution-test --focus psi.agent-session.workflow-ir-runtime-adoption-test` → green (`42 tests, 151 assertions, 0 failures`)
+
+2026-05-06 code-shape follow-up
+- Added the same mixed canonical-session-contributions + compat-session-preload proof on the Phase A statechart runtime path in `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`.
+- Statechart-path proved behavior is now explicit at the currently implemented boundary:
+  - compat `:session-preload` remains the child preloaded-message input
+  - when the Phase A runtime runs an authored compat-shaped step graph, canonical `:session :contributions` are not being materialized there; the submitted prompt remains the compat-shaped prompt (`plan text`) rather than the canonical template contribution prompt
+  - the statechart-recorded accepted result still exposes canonical `[:outputs :final-llm-reply]`
+- This follow-up therefore shaped the proof to record the current Phase A behavior precisely rather than assume direct-path canonical conversation shaping had already converged there.
+- Focused verification green:
+  - `clojure -M:test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.workflow-step-prep-test --focus psi.agent-session.workflow-source-resolution-test --focus psi.agent-session.workflow-ir-runtime-adoption-test` → green (`42 tests, 150 assertions, 0 failures`)

@@ -5,3 +5,4 @@
 - [x] Add or update focused tests for canonical session contributions vs compat preload interaction where still supported
 - [x] Run focused verification and reconcile any drift exposed by the refactor
 - [x] Add one focused mixed-session-step proof that exercises canonical `:session :contributions` and legacy `:session-preload` in the same runtime path, making the intended precedence/combination behavior explicit.
+- [x] Add the same mixed canonical-contributions + compat-preload proof on the Phase A statechart runtime path so both runtime execution paths make the combination behavior explicit.
