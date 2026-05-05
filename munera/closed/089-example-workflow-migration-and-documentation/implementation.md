@@ -12,9 +12,17 @@
 - Test coverage added:
   - `workflow_file_compiler_target_authoring_test.clj` for target-authored file compilation vs legacy current-authored compatibility.
   - updated `workflow_migration_validation_test.clj` to assert `plan-build` and `plan-build-review` now compile as target-authored workflows, while `gh-bug-triage-modular` remains the richer executable current-authored orchestration example.
-- Verification/reconciliation outcome:
+- Verification/reconciliation outcome at the time of the first 089 implementation pass:
   - extending the workflow file compiler to accept target-authored `.psi/workflows/*.md` definitions is viable and covered.
   - migrating `plan-build` and `plan-build-review` all the way to checked-in target-authored workflow files is executable today.
-  - attempting to migrate `gh-bug-triage-modular` all the way to a checked-in target-authored delegate workflow surfaced a real implementation boundary: current target delegate semantics do not yet provide the exact yield/output surfaces needed to preserve the existing executable bug-triage flow without redesigning downstream callee contracts.
-  - resolved by tightening the final implementation to keep `gh-bug-triage-modular` executable in the current-authored surface while making `doc/workflows.md` explicitly teach the delegate-oriented target mapping and call out the boundary rather than implying full end-to-end migration already exists.
-- 2026-05-04 review follow-up: aligned the earlier implementation note with the checked-in workflow state so this task record now matches the repository: `gh-bug-triage-modular.md` remains current-authored, while `doc/workflows.md` teaches the delegate-oriented target mapping and names the implementation boundary explicitly.
+  - attempting to migrate `gh-bug-triage-modular` all the way to a checked-in target-authored delegate workflow surfaced a real implementation boundary: target delegate semantics did not yet provide the exact yield/output surfaces needed to preserve the existing executable bug-triage flow without redesigning downstream callee contracts.
+  - resolved in that pass by keeping `gh-bug-triage-modular` executable in the current-authored surface while making `doc/workflows.md` explicitly teach the delegate-oriented target mapping and call out the boundary rather than implying full end-to-end migration already existed.
+- 2026-05-04 review follow-up: aligned the earlier implementation note with the then-current checked-in workflow state so this task record matched the repository: `gh-bug-triage-modular.md` remained current-authored, while `doc/workflows.md` taught the delegate-oriented target mapping and named the implementation boundary explicitly.
+- 2026-05-06 reconciliation after tasks `092` and `093`:
+  - the missing delegate-heavy migration piece originally deferred from `089` has now landed through later focused tasks.
+  - current repo state now satisfies the intended representative example set directly:
+    - `plan-build.md` is target-authored
+    - `plan-build-review.md` is target-authored
+    - `gh-bug-triage-modular.md` is now also target-authored and serves as the richer delegate-heavy orchestration example
+  - `doc/workflows.md` now teaches the example-led target authoring path against the current checked-in workflow state rather than a deferred delegate boundary.
+  - `089` is therefore complete in aggregate even though the delegate-heavy representative example was only fully realized by the later `092`/`093` follow-on work.

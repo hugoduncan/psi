@@ -5,7 +5,6 @@ Open tasks in suggested execution order:
 Queue:
 
 `munera/open/077-deterministic-workflow-steps/`
-`munera/open/089-example-workflow-migration-and-documentation/`
 `munera/open/090-eventual-compatibility-retirement-for-current-authored-workflow-grammar/`
 
 
@@ -26,5 +25,5 @@ Notes:
 - The previous TUI parity umbrella (`047`) and discoverable navigation slice (`049`) are complete and should live under `munera/closed/`.
 - `003` is the broader prompt-lifecycle convergence umbrella; `006` is the concrete remaining skill-prelude/cache-breakpoint slice that currently drives its unfinished acceptance.
 - `070` tracks the `/delegate` slash-command UX gap so delegated workflow completion comes back into the originating conversation transcript.
-- Tasks `091`, `092`, and `093` are now complete and live under `munera/closed/`.
+- Tasks `089`, `091`, `092`, and `093` are now complete and live under `munera/closed/`.
 - Close or replace tasks as scope sharpens; do not merge task contents.
