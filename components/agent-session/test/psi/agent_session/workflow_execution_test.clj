@@ -393,6 +393,68 @@
                    :prompt "Review [\"i-1\" \"i-2\"] / 2 issues found"}]
                  @prompts*)))))))
 
+(deftest execute-run-combines-canonical-session-contributions-with-compat-session-preload-test
+  (testing "runtime path combines canonical session contributions and legacy session-preload in a stable order"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          definition {:definition-id "mixed-session-inputs"
+                      :name "mixed-session-inputs"
+                      :step-order ["plan" "review"]
+                      :steps {"plan" {:executor {:type :agent :profile "planner"}
+                                      :prompt-template "$INPUT"
+                                      :input-bindings {:input {:source :workflow-input :path [:input]}}
+                                      :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                      :retry-policy {:max-attempts 1 :retry-on #{}}}
+                              "review" {:executor {:type :agent :profile "reviewer"}
+                                        :prompt-template "$INPUT"
+                                        :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
+                                        :session-preload [{:kind :value
+                                                           :role "user"
+                                                           :binding {:source :workflow-input :path [:original]}}]
+                                        :session {:contributions [{:type :source
+                                                                   :from {:step "plan" :yield :text}}
+                                                                  {:type :template
+                                                                   :text "Review {{reply}}"
+                                                                   :vars {"reply" {:from {:step "plan" :output :final-llm-reply}}}}]}
+                                        :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
+                                        :retry-policy {:max-attempts 1 :retry-on #{}}}}}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/register-definition state definition)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "mixed-session-inputs"
+                                                                   :run-id "run-mixed-session-inputs"
+                                                                   :workflow-input {:input "Ship it"
+                                                                                    :original "Original request"}})]
+                       (assoc-in s [:workflows :runs "run-mixed-session-inputs" :step-runs "plan" :accepted-result]
+                                 {:outcome :ok
+                                  :outputs {:final-llm-reply "plan text"}}))))
+          created* (atom [])
+          prompts* (atom [])]
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (swap! created* conj {:step-id (:workflow-step-id opts)
+                                            :preloaded-messages (:preloaded-messages opts)})
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session (valid-child-session sid)}))
+                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:content "review output"}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-mixed-session-inputs")
+              review-created (second @created*)
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mixed-session-inputs")
+              review-accepted (get-in run [:step-runs "review" :accepted-result])]
+          (is (= :completed (:status result)))
+          (is (= {:step-id "review"
+                  :preloaded-messages [{:role "user" :content "Original request"}]}
+                 review-created))
+          (is (= :ok (:outcome review-accepted)))
+          (is (= "review output"
+                 (get-in review-accepted [:outputs :final-llm-reply]))))))))
+
 (deftest execute-run-delegate-step-invokes-callee-workflow-with-explicit-boundary-test
   (testing "IR delegate steps invoke the target workflow with rendered workflow-input and ordered workflow-original context"
     (let [[ctx session-id] (create-session-context {:persist? false})

@@ -23,3 +23,12 @@
 
 2026-05-06 review
 - Actionable: task acceptance/steps claim focused proof for canonical session contributions vs compat preload interaction, but current coverage proves the two paths separately rather than in one mixed scenario with explicit precedence/combination semantics.
+
+2026-05-06 implementation
+- Added focused mixed runtime proof in `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` covering one review step that uses both legacy `:session-preload` and canonical `:session :contributions`.
+- Explicit proved behavior on the direct execution path:
+  - compat `:session-preload` still contributes child `:preloaded-messages`
+  - canonical `:session :contributions` still own canonical session conversation shaping for the step
+  - resulting accepted result still exposes canonical `[:outputs :final-llm-reply]`
+- Focused verification green:
+  - `clojure -M:test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.workflow-step-prep-test --focus psi.agent-session.workflow-source-resolution-test --focus psi.agent-session.workflow-ir-runtime-adoption-test` → green (`42 tests, 151 assertions, 0 failures`)

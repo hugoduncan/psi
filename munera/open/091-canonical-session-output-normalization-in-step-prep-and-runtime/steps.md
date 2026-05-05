@@ -4,4 +4,4 @@
 - [x] Add or update focused tests for `:output :final-llm-reply` and `:yield :text`
 - [x] Add or update focused tests for canonical session contributions vs compat preload interaction where still supported
 - [x] Run focused verification and reconcile any drift exposed by the refactor
-- [ ] Add one focused mixed-session-step proof that exercises canonical `:session :contributions` and legacy `:session-preload` in the same runtime path, making the intended precedence/combination behavior explicit.
+- [x] Add one focused mixed-session-step proof that exercises canonical `:session :contributions` and legacy `:session-preload` in the same runtime path, making the intended precedence/combination behavior explicit.
