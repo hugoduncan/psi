@@ -362,7 +362,8 @@
               (if session-step?
                 (workflow-step-prep/split-step-session-conversation session-conversation)
                 {})
-              compat-preload-messages (when session-step?
+              compat-preload-messages (when (and session-step?
+                                                 (not session-conversation))
                                         (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id))
               combined-preloaded-messages (when session-step?
                                             (not-empty (vec (concat (or preloaded-messages [])
