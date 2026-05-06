@@ -228,3 +228,9 @@ Review notes — 2026-05-06
   - narrowed `dispatch_pure_result_test.clj` so schema authority comes from `psi.agent-session.dispatch-schema/validate-dispatch-schemas` rather than routing that helper through the compat wrapper.
   - kept the file on `psi.agent-session.dispatch` for the actual compat dispatch/runtime behavior it is intentionally proving, including replay through the wrapper-owned dispatch entrypoint and interceptor/application semantics.
   - this aligns the test with the same ownership split already used elsewhere: schema authority from `dispatch-schema`, dispatch behavior from the compat wrapper where that is the subject under test.
+- Dispatch test registry ownership narrowing follow-up — 2026-05-06
+  - inspected `dispatch_test.clj` and classified it as mostly legitimate compat/wrapper coverage because it explicitly proves wrapper-owned interceptor composition, compat dispatch entry semantics, permission/statechart interception, and wrapper-mediated dispatch tracing/event logging.
+  - tightened the file's remaining non-behavioral registry setup by moving its handler registration calls from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`, which is the authoritative kernel-owned registry surface.
+  - kept the file on `psi.agent-session.dispatch` for actual dispatch execution, interceptor override/default assertions, and other wrapper-local behavior that remains the intended subject under test.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test` → `10 tests, 113 assertions, 0 failures`
