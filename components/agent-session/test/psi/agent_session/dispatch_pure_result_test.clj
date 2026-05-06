@@ -3,46 +3,47 @@
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.service-protocol]
-   [psi.agent-session.services]))
+   [psi.agent-session.services]
+   [psi.state-kernel.dispatch :as kernel]))
 
 (defn- clean-state [f]
-  (dispatch/clear-handlers!)
-  (dispatch/clear-event-log!)
-  (dispatch/clear-dispatch-trace!)
+  (kernel/clear-handlers!)
+  (kernel/clear-event-log!)
+  (kernel/clear-dispatch-trace!)
   (dispatch/set-interceptors! nil)
   (try (f)
        (finally
-         (dispatch/clear-handlers!)
-         (dispatch/clear-event-log!)
-         (dispatch/clear-dispatch-trace!)
+         (kernel/clear-handlers!)
+         (kernel/clear-event-log!)
+         (kernel/clear-dispatch-trace!)
          (dispatch/set-interceptors! nil))))
 
 (use-fixtures :each clean-state)
 
 (deftest pure-result-detection-test
   (testing "map with :db is a pure result"
-    (is (true? (dispatch/pure-result? {:db {} :effects []}))))
+    (is (true? (kernel/pure-result? {:db {} :effects []}))))
 
   (testing "map with :root-state-update is a pure result"
-    (is (true? (dispatch/pure-result? {:root-state-update identity}))))
+    (is (true? (kernel/pure-result? {:root-state-update identity}))))
 
   (testing "map with :effects is a pure result"
-    (is (true? (dispatch/pure-result? {:effects []}))))
+    (is (true? (kernel/pure-result? {:effects []}))))
 
   (testing "map with both is a pure result"
-    (is (true? (dispatch/pure-result? {:root-state-update identity :effects []}))))
+    (is (true? (kernel/pure-result? {:root-state-update identity :effects []}))))
 
   (testing "map with :return-key is a pure result"
-    (is (true? (dispatch/pure-result? {:return-key [:agent-session :data]}))))
+    (is (true? (kernel/pure-result? {:return-key [:agent-session :data]}))))
 
   (testing "nil is not a pure result"
-    (is (false? (dispatch/pure-result? nil))))
+    (is (false? (kernel/pure-result? nil))))
 
   (testing "plain keyword is not a pure result"
-    (is (false? (dispatch/pure-result? :ok))))
+    (is (false? (kernel/pure-result? :ok))))
 
   (testing "map without session-update or effects is not a pure result"
-    (is (false? (dispatch/pure-result? {:foo :bar})))))
+    (is (false? (kernel/pure-result? {:foo :bar})))))
 
 (deftest pure-handler-apply-test
   (testing "pure handler session-update is applied via ctx fn"
@@ -151,15 +152,15 @@
                      :name name}]
           :return :ok}))
       (dispatch/dispatch! ctx :session/set-session-name {:name "after"})
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (reset! session-data {:session-name "before"})
         (reset! seen-effects [])
-        (is (= :ok (dispatch/replay-event-entry! ctx entry)))
+        (is (= :ok (kernel/replay-event-entry! dispatch/dispatch! ctx entry)))
         (is (= "after" (:session-name @session-data)))
         (is (= [] @seen-effects)))))
 
   (testing "replay-event-log! replays entries in order"
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (let [session-data (atom {:session-name "before"
                               :worktree-path "/repo/main"})
           seen-effects (atom [])
@@ -181,12 +182,12 @@
           :return :path-updated}))
       (dispatch/dispatch! ctx :session/set-session-name {:name "after"})
       (dispatch/dispatch! ctx :session/set-worktree-path {:worktree-path "/repo/feature"})
-      (let [entries (dispatch/event-log-entries)]
+      (let [entries (kernel/event-log-entries)]
         (reset! session-data {:session-name "before"
                               :worktree-path "/repo/main"})
         (reset! seen-effects [])
         (is (= [:name-updated :path-updated]
-               (dispatch/replay-event-log! ctx entries)))
+               (kernel/replay-event-log! dispatch/dispatch! ctx entries)))
         (is (= {:session-name "after"
                 :worktree-path "/repo/feature"}
                @session-data))
@@ -268,7 +269,7 @@
       (is (= :ok (dispatch/dispatch! ctx :invalid-after-apply)))
       (is (= 1 (:retry-attempt @session-data)))
       (is (= [] @seen-effects))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (true? (:blocked? entry)))
         (is (= :test-invalid (:block-reason entry))))))
 
@@ -285,7 +286,7 @@
           :return :ok}))
       (is (= :ok (dispatch/dispatch! ctx :invalid-effects-only)))
       (is (= [] @seen-effects))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (true? (:blocked? entry)))
         (is (= :validation-failed (:block-reason entry))))))
 
@@ -316,7 +317,7 @@
           :return :ok}))
       (is (= :ok (dispatch/dispatch! ctx :validator-throws)))
       (is (= [] @seen-effects))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (true? (:blocked? entry)))
         (is (= :validator-exception (get-in entry [:block-reason :type])))))))
 
@@ -325,7 +326,7 @@
     (dispatch/register-handler! :throws
                                 (fn [_ _] (throw (ex-info "boom" {}))))
     (is (nil? (dispatch/dispatch! {} :throws)))
-    (let [entry (last (dispatch/event-log-entries))]
+    (let [entry (last (kernel/event-log-entries))]
       (is (= :throws (:event-type entry)))
       (is (= :pure (:pure-result-kind entry))))))
 
@@ -334,7 +335,7 @@
     (dispatch/register-handler! :handler-throws
                                 (fn [_ _] (throw (ex-info "boom" {}))))
     (is (nil? (dispatch/dispatch! {} :handler-throws {:x 1})))
-    (let [entries (dispatch/dispatch-trace-entries)
+    (let [entries (kernel/dispatch-trace-entries)
           dispatch-id (:dispatch-id (first entries))
           by-id (filter #(= dispatch-id (:dispatch-id %)) entries)]
       (is (some #(and (= :dispatch/received (:trace/kind %))
@@ -354,7 +355,7 @@
                 by-id))))
 
   (testing "effect execution exception records effect-start effect-finish error and failed dispatch"
-    (dispatch/clear-dispatch-trace!)
+    (kernel/clear-dispatch-trace!)
     (let [ctx {:execute-dispatch-effect-fn (fn [_ _]
                                              (throw (ex-info "effect boom" {})))}]
       (dispatch/register-handler! :effect-throws
@@ -364,7 +365,7 @@
                                      :return :ok}))
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"effect boom"
                             (dispatch/dispatch! ctx :effect-throws {:x 1})))
-      (let [entries (dispatch/dispatch-trace-entries)
+      (let [entries (kernel/dispatch-trace-entries)
             dispatch-id (:dispatch-id (first entries))
             by-id (filter #(= dispatch-id (:dispatch-id %)) entries)]
         (is (some #(and (= :dispatch/effect-start (:trace/kind %))
@@ -380,8 +381,8 @@
                   by-id)))))
 
   (testing "service request error payload is traced as service-response is-error"
-    (dispatch/clear-dispatch-trace!)
-    (let [dispatch-id (dispatch/next-dispatch-id)
+    (kernel/clear-dispatch-trace!)
+    (let [dispatch-id (kernel/next-dispatch-id)
           request-fn-var (resolve 'psi.agent-session.service-protocol/send-service-request!)]
       (with-redefs [psi.agent-session.services/service-in
                     (fn [_ctx _service-key]
@@ -394,7 +395,7 @@
           :payload {"jsonrpc" "2.0" "id" "r-err" "method" "explode"}
           :timeout-ms 100}
          {:dispatch-id dispatch-id})
-        (let [entries (dispatch/dispatch-trace-entries)]
+        (let [entries (kernel/dispatch-trace-entries)]
           (is (some #(and (= :dispatch/service-response (:trace/kind %))
                           (= dispatch-id (:dispatch-id %))
                           (= "explode" (:method %))
@@ -446,7 +447,7 @@
         (is (= :ok (dispatch/dispatch! ctx :schema-bad-effect)))
         (is (= [] @seen-effects)
             "effects suppressed on schema failure")
-        (let [entry (last (dispatch/event-log-entries))]
+        (let [entry (last (kernel/event-log-entries))]
           (is (true? (:blocked? entry)))
           (is (= :schema-validation-failed
                  (get-in entry [:block-reason :type]))))))
@@ -463,7 +464,7 @@
             :return :ok}))
         (is (= :ok (dispatch/dispatch! ctx :schema-missing-key)))
         (is (= [] @seen-effects))
-        (let [entry (last (dispatch/event-log-entries))]
+        (let [entry (last (kernel/event-log-entries))]
           (is (true? (:blocked? entry)))
           (is (= :schema-validation-failed
                  (get-in entry [:block-reason :type]))))))
