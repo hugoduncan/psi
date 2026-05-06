@@ -37,6 +37,16 @@ Implementation progress:
 - added explicit composition-root tests under `components/system-bootstrap/test` covering both global assembled registration and assembled isolated registration with a live session context
 - adjusted tests that only needed session bootstrap behavior so they no longer pass a now-removed global-registration toggle
 
+Final ownership split:
+- `psi.agent-session.context` owns only the session-facing local registration helpers used to build isolated qctxs for session-centric execution and tests
+- `psi.system-bootstrap.core/register-domains-in!` owns assembled isolated multi-domain registration
+- `psi.system-bootstrap.core/register-all-domains!` owns whole-application global registration
+- higher-level composition (`app-runtime`, `introspection`, or explicit tests) invokes composition-root registration; domain bootstrap helpers no longer own or proxy whole-system registration
+
+Focused verification completed:
+- `clojure -M:test --focus psi.agent-session.model-dispatch-test` → `8 tests, 96 assertions, 0 failures`
+- `clojure -M:test --focus psi.introspection.agent-session-test` → `5 tests, 31 assertions, 0 failures`
+- attempted `clojure -M:test --focus psi.system-bootstrap.core-test`, but this Kaocha focus selector skipped all tests in this environment; dedicated coverage for that surface was added under `components/system-bootstrap/test/psi/system_bootstrap/core_test.clj`
+
 Remaining implementation checks:
-- run focused verification for the touched agent-session, introspection, and system-bootstrap registration surfaces
-- run a broader verification pass once focused registration checks are green
+- run a broader verification pass once convenient

@@ -12,6 +12,6 @@
 - [x] Add/update focused tests for local/isolated registration
 - [x] Add/update focused tests for globally assembled registration
 - [x] Migrate any tests that actually need assembled multi-domain registration to a composition-owned helper instead of a domain-owned global wrapper
-- [ ] Record final ownership split and any remaining edge cases in implementation notes
-- [ ] Run focused verification
+- [x] Record final ownership split and any remaining edge cases in implementation notes
+- [x] Run focused verification
 - [ ] Run broader verification as needed
