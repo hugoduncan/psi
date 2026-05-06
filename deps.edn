@@ -21,6 +21,7 @@
         psi/ui-state                                  {:local/root "components/ui-state"}
         psi/system-bootstrap                          {:local/root "components/system-bootstrap"}
         psi/state-kernel                              {:local/root "components/state-kernel"}
+        psi/session-state                             {:local/root "components/session-state"}
         psi/main                                      {:local/root "bases/main"}}
  :aliases
  {:dev   {:extra-paths ["dev"]}
@@ -29,6 +30,8 @@
                         "components/app-runtime/src"
                         "components/agent-session/src"
                         "components/state-kernel/src"
+                        "components/session-state/src"
+                        "components/session-state/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -148,6 +151,7 @@
                              "components/rpc/test"
                              "components/agent-core/test"
                              "components/agent-session/test"
+                             "components/session-state/test"
                              "extensions/auto-session-name/test"
                              "extensions/commit-checks/test"
                              "extensions/hello-ext/test"
@@ -178,6 +182,7 @@
                         "components/rpc/test"
                         "components/agent-core/test"
                         "components/agent-session/test"
+                        "components/session-state/test"
                         "components/state-kernel/test"
                         "extensions/auto-session-name/test"
                         "extensions/commit-checks/test"
@@ -201,6 +206,7 @@
                         "components/agent-core/src"
                         "components/agent-session/src"
                         "components/state-kernel/src"
+                        "components/session-state/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
                         "components/system-bootstrap/test"

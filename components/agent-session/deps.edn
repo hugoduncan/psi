@@ -10,4 +10,5 @@
         psi/recursion               {:local/root "../recursion"}
         psi/graph                   {:local/root "../graph"}
         psi/ui-state               {:local/root "../ui-state"}
-        psi/state-kernel           {:local/root "../state-kernel"}}}
+        psi/state-kernel           {:local/root "../state-kernel"}
+        psi/session-state          {:local/root "../session-state"}}}
