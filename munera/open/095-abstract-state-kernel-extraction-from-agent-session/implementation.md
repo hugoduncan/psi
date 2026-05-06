@@ -175,3 +175,10 @@ Review notes — 2026-05-06
   - this keeps `psi.agent-session.dispatch` more narrowly aligned with true compat/composition testing while preserving existing production ownership; no deeper production changes were needed for this slice.
   - focused verification green for this migration batch:
     - `clojure -M:test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.commands-test --focus psi.agent-session.background-jobs-test` → `83 tests, 292 assertions, 0 failures`.
+- Additional test entrypoint narrowing follow-up — 2026-05-06
+  - migrated another batch of agent-session tests from `psi.agent-session.dispatch/dispatch!` to `psi.agent-session.core/dispatch-in!` where they used dispatch only to seed domain events and then asserted scheduler/session/child-session behavior above the compat layer.
+  - updated `scheduler_lifecycle_test.clj`, `scheduler_cancel_job_test.clj`, `scheduler_end_to_end_test.clj`, `extension_schedule_event_test.clj`, `scheduler_timer_seam_test.clj`, `scheduler_context_shutdown_test.clj`, `session_close_test.clj`, and `child_session_mutation_test.clj` to stop requiring `psi.agent-session.dispatch`.
+  - retained direct `psi.state-kernel.dispatch` usage in `scheduler_lifecycle_test.clj` only for authoritative kernel-owned event-log assertions.
+  - this further concentrates `psi.agent-session.dispatch` in compat/composition-specific tests without forcing production ownership changes or disturbing dispatch-focused proof surfaces.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.extension-schedule-event-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.session-close-test --focus psi.agent-session.child-session-mutation-test` → `20 tests, 99 assertions, 0 failures`.

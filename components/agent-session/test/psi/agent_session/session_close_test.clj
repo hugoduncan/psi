@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.session-state :as ss]))
@@ -20,20 +19,20 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           sibling          (session/new-session-in! ctx session-id {:session-name "sibling"})
           sibling-id       (:session-id sibling)
-          _                (dispatch/dispatch! ctx :scheduler/create
-                                               {:session-id session-id
-                                                :schedule-id "sch-pending"
-                                                :label "pending"
-                                                :message "pending"
-                                                :fire-at (.plusSeconds (java.time.Instant/now) 60)}
-                                               {:origin :core})
-          _                (dispatch/dispatch! ctx :scheduler/create
-                                               {:session-id session-id
-                                                :schedule-id "sch-queued"
-                                                :label "queued"
-                                                :message "queued"
-                                                :fire-at (.plusSeconds (java.time.Instant/now) 60)}
-                                               {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/create
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-pending"
+                                                  :label "pending"
+                                                  :message "pending"
+                                                  :fire-at (.plusSeconds (java.time.Instant/now) 60)}
+                                                 {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/create
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-queued"
+                                                  :label "queued"
+                                                  :message "queued"
+                                                  :fire-at (.plusSeconds (java.time.Instant/now) 60)}
+                                                 {:origin :core})
           _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :schedules "sch-queued" :status] :queued)
           _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :queue] ["sch-queued"])
           result           (session/close-session-in! ctx session-id)]
@@ -46,13 +45,13 @@
 
   (testing "close-session-in! closes the last remaining session and leaves no active session"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          _                (dispatch/dispatch! ctx :scheduler/create
-                                               {:session-id session-id
-                                                :schedule-id "sch-1"
-                                                :label "pending"
-                                                :message "pending"
-                                                :fire-at (.plusSeconds (java.time.Instant/now) 60)}
-                                               {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/create
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-1"
+                                                  :label "pending"
+                                                  :message "pending"
+                                                  :fire-at (.plusSeconds (java.time.Instant/now) 60)}
+                                                 {:origin :core})
           result           (session/close-session-in! ctx session-id)]
       (is (true? (:closed? result)))
       (is (nil? (:active-session-id result)))

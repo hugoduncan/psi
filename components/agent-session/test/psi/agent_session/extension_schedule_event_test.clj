@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.test-support :as test-support]))
 
@@ -23,14 +22,14 @@
                                 (fn [event]
                                   (swap! fired conj event)
                                   nil))
-      (let [result (dispatch/dispatch! ctx
-                                       :session/schedule-extension-event
-                                       {:session-id session-id
-                                        :delay-ms 20
-                                        :event-name "rename-checkpoint"
-                                        :payload {:session-id session-id
-                                                  :turn-count 2}}
-                                       {:origin :core})]
+      (let [result (session/dispatch-in! ctx
+                                         :session/schedule-extension-event
+                                         {:session-id session-id
+                                          :delay-ms 20
+                                          :event-name "rename-checkpoint"
+                                          :payload {:session-id session-id
+                                                    :turn-count 2}}
+                                         {:origin :core})]
         (is (= {:scheduled? true
                 :delay-ms 20
                 :event-name "rename-checkpoint"}

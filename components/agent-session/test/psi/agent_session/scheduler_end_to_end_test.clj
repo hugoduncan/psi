@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
@@ -17,18 +16,18 @@
 (deftest scheduler-fired-end-to-end-delivers-when-idle-test
   (testing "create -> fired -> deliver appends scheduled user message and returns to idle"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          _                (dispatch/dispatch! ctx :scheduler/create
-                                               {:session-id session-id
-                                                :schedule-id "sch-1"
-                                                :kind :message
-                                                :label "check-build"
-                                                :message "check build"
-                                                :fire-at (java.time.Instant/now)}
-                                               {:origin :core})
-          _                (dispatch/dispatch! ctx :scheduler/fired
-                                               {:session-id session-id
-                                                :schedule-id "sch-1"}
-                                               {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/create
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-1"
+                                                  :kind :message
+                                                  :label "check-build"
+                                                  :message "check build"
+                                                  :fire-at (java.time.Instant/now)}
+                                                 {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/fired
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-1"}
+                                                 {:origin :core})
           journal          (ss/get-state-value-in ctx (ss/state-path :journal session-id))
           scheduled-msg    (some->> journal
                                     (keep #(get-in % [:data :message]))

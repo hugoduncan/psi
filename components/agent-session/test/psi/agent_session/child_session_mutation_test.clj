@@ -4,7 +4,6 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.prompt-runtime]
@@ -128,21 +127,21 @@
                         op))]
       (session/register-resolvers-in! qctx false)
       (session/register-mutations-in! qctx mutations/all-mutations true)
-      (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
-                          {:session-id session-id
-                           :opts {:selected-tools ["read" "bash" "psi-tool"]
-                                  :skills [{:name "lambda-compiler" :description "Compile lambda expressions"
-                                            :file-path "/s/SKILL.md" :base-dir "/s"
-                                            :source :user :disable-model-invocation false}]}}
-                          {:origin :test})
-      (dispatch/dispatch! ctx :session/register-prompt-contribution
-                          {:session-id session-id
-                           :ext-path "/ext/work-on"
-                           :id "work-on"
-                           :contribution {:section "Extension Capabilities"
-                                          :content "tool: /work-on"
-                                          :enabled true}}
-                          {:origin :test})
+      (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                            {:session-id session-id
+                             :opts {:selected-tools ["read" "bash" "psi-tool"]
+                                    :skills [{:name "lambda-compiler" :description "Compile lambda expressions"
+                                              :file-path "/s/SKILL.md" :base-dir "/s"
+                                              :source :user :disable-model-invocation false}]}}
+                            {:origin :test})
+      (session/dispatch-in! ctx :session/register-prompt-contribution
+                            {:session-id session-id
+                             :ext-path "/ext/work-on"
+                             :id "work-on"
+                             :contribution {:section "Extension Capabilities"
+                                            :content "tool: /work-on"
+                                            :enabled true}}
+                            {:origin :test})
       (let [child-id (:psi.agent-session/session-id
                       (mutate 'psi.extension/create-child-session
                               {:session-name "child"
@@ -216,14 +215,14 @@
                         op))]
       (session/register-resolvers-in! qctx false)
       (session/register-mutations-in! qctx mutations/all-mutations true)
-      (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
-                          {:session-id session-id
-                           :opts {:context-files [{:path "/AGENTS.md" :content "Context text"}]
-                                  :skills [{:name "skill-a" :description "A"
-                                            :file-path "/s/SKILL.md" :base-dir "/s"
-                                            :source :user :disable-model-invocation false}]
-                                  :selected-tools ["read" "bash"]}}
-                          {:origin :test})
+      (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                            {:session-id session-id
+                             :opts {:context-files [{:path "/AGENTS.md" :content "Context text"}]
+                                    :skills [{:name "skill-a" :description "A"
+                                              :file-path "/s/SKILL.md" :base-dir "/s"
+                                              :source :user :disable-model-invocation false}]
+                                    :selected-tools ["read" "bash"]}}
+                            {:origin :test})
       (let [selection {:agents-md? false
                        :extension-prompt-contributions []
                        :tool-names ["read"]
@@ -280,7 +279,7 @@
                          :execution-result/tool-calls []
                          :execution-result/stop-reason :stop})]
           ;; Force the parent session into :streaming. Child execution must still work.
-          (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
+          (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
           (is (= :streaming (ss/sc-phase-in ctx session-id)))
           (is (ss/idle-in? ctx child-id))
           (let [result (mutate 'psi.extension/run-agent-loop-in-session
