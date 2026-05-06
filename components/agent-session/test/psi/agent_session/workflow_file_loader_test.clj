@@ -252,7 +252,7 @@
             (is (= {:type :tail :turns 4 :tool-output false}
                    (get-in definition [:steps 2 :contributions 2 :projection]))))))))
 
-  (testing "unresolved step references reported as errors"
+  (testing "delegate targets remain loader-time data and do not require local target definitions to compile"
     (with-temp-workflow-dir
       {"plan-build-review.md" chain-md}
       (fn [dir]
@@ -260,8 +260,9 @@
                       loader/project-workflow-dir (constantly dir)]
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
             (is (= 1 (count definitions)))
-            (is (seq errors))
-            (is (some #(re-find #"unknown workflow" (:error %)) errors)))))))
+            (is (empty? errors))
+            (is (= [:delegate :delegate :delegate]
+                   (mapv :type (:steps (get definitions "plan-build-review"))))))))))
 
   (testing "parse errors collected separately from successful compilations"
     (with-temp-workflow-dir
@@ -275,84 +276,42 @@
             (is (contains? definitions "planner"))
             (is (= 1 (count errors)))))))))
 
-(deftest load-workflow-definitions-judge-validation-test
-  (testing ":on without :judge surfaces as a load error"
-    (let [bad-judge-md (str "---\nname: bad-chain\ndescription: Bad chain\n---\n"
-                            "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}\n"
-                            "         {:name \"review\" :workflow \"reviewer\" :prompt \"Review: $INPUT\"\n"
-                            "          :on {\"OK\" {:goto :next}}}]}\n\n"
-                            "Bad chain.")]
+(deftest load-workflow-definitions-target-only-compilation-test
+  (testing "current-authored workflow files are rejected after retirement"
+    (let [current-authored-md (str "---\nname: current-authored\ndescription: Old grammar\n---\n"
+                                   "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}]}\n")]
       (with-temp-workflow-dir
-        {"planner.md" planner-md
-         "reviewer.md" reviewer-md
-         "bad-chain.md" bad-judge-md}
+        {"current-authored.md" current-authored-md}
         (fn [dir]
           (with-redefs [loader/global-workflow-dirs (constantly [])
                         loader/project-workflow-dir (constantly dir)]
-            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
+            (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
+              (is (empty? definitions))
               (is (seq errors))
-              (is (some #(re-find #"no `:judge`" (:error %)) errors)))))))))
+              (is (some #(re-find #"Workflow files must define target-authored `\{:steps \[\.\.\.\]\}` config" (:error %)) errors))))))))
 
-(deftest load-workflow-definitions-session-source-validation-test
-  (testing "missing multi-step step names surface as load errors"
-    (let [bad-missing-name-md (str "---\nname: bad-missing-name\ndescription: Bad missing name\n---\n"
-                                   "{:steps [{:workflow \"planner\" :prompt \"$INPUT\"}\n"
-                                   "         {:name \"review\" :workflow \"reviewer\" :prompt \"$INPUT\"}]}\n\n"
-                                   "Bad missing-name chain.")]
+  (testing "malformed EDN still surfaces as a parse/compile error"
+    (let [bad-edn-md (str "---\nname: bad-edn\ndescription: Bad edn\n---\n"
+                          "{:steps [")]
       (with-temp-workflow-dir
-        {"planner.md" planner-md
-         "reviewer.md" reviewer-md
-         "bad-missing-name.md" bad-missing-name-md}
+        {"bad-edn.md" bad-edn-md}
         (fn [dir]
           (with-redefs [loader/global-workflow-dirs (constantly [])
                         loader/project-workflow-dir (constantly dir)]
             (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
               (is (seq errors))
-              (is (some #(re-find #"Multi-step workflow steps must have unique string `:name`" (:error %)) errors))))))))
-
-  (testing "forward step references surface as load errors"
-    (let [bad-forward-md (str "---\nname: bad-forward\ndescription: Bad forward\n---\n"
-                              "{:steps [{:name \"plan\"\n"
-                              "          :workflow \"planner\"\n"
-                              "          :session {:input {:from {:step \"review\" :kind :accepted-result}}}\n"
-                              "          :prompt \"$INPUT\"}\n"
-                              "         {:name \"review\"\n"
-                              "          :workflow \"reviewer\"\n"
-                              "          :prompt \"$INPUT\"}]}\n\n"
-                              "Bad forward chain.")]
-      (with-temp-workflow-dir
-        {"planner.md" planner-md
-         "reviewer.md" reviewer-md
-         "bad-forward.md" bad-forward-md}
-        (fn [dir]
-          (with-redefs [loader/global-workflow-dirs (constantly [])
-                        loader/project-workflow-dir (constantly dir)]
-            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
-              (is (seq errors))
-              (is (some #(re-find #"Forward step reference" (:error %)) errors))))))))
-
-  (testing "malformed projections surface as load errors"
-    (let [bad-projection-md (str "---\nname: bad-projection\ndescription: Bad projection\n---\n"
-                                 "{:steps [{:name \"plan\"\n"
-                                 "          :workflow \"planner\"\n"
-                                 "          :session {:input {:from :workflow-input\n"
-                                 "                            :projection {:path :oops}}}\n"
-                                 "          :prompt \"$INPUT\"}]}\n\n"
-                                 "Bad projection chain.")]
-      (with-temp-workflow-dir
-        {"planner.md" planner-md
-         "bad-projection.md" bad-projection-md}
-        (fn [dir]
-          (with-redefs [loader/global-workflow-dirs (constantly [])
-                        loader/project-workflow-dir (constantly dir)]
-            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
-              (is (seq errors))
-              (is (some #(re-find #"expected vector path" (:error %)) errors)))))))))
+              (is (some #(re-find #"EOF while reading" (:error %)) errors)))))))))
 
 (deftest directory-precedence-test
   (testing "project definitions override global definitions with same name"
-    (let [global-planner "---\nname: planner\ndescription: Global planner\n---\nGlobal."
-          project-planner "---\nname: planner\ndescription: Project planner\n---\nProject."]
+    (let [global-planner planner-md
+          project-planner (str "---\nname: planner\ndescription: Project planner\n---\n"
+                               "{:steps [{:name \"plan\"\n"
+                               "          :type :session\n"
+                               "          :tools [\"read\"]\n"
+                               "          :contributions [{:type :template\n"
+                               "                           :text \"Project planner: {{input}}\"\n"
+                               "                           :vars {\"input\" {:from :workflow-input}}}]}]}")]
       (with-temp-workflow-dir
         {"planner.md" global-planner}
         (fn [global-dir]
@@ -362,4 +321,6 @@
               (with-redefs [loader/global-workflow-dirs (constantly [global-dir])
                             loader/project-workflow-dir (constantly project-dir)]
                 (let [{:keys [definitions]} (loader/load-workflow-definitions project-dir)]
-                  (is (= "Project planner" (:summary (get definitions "planner")))))))))))))
+                  (is (= "Project planner" (:summary (get definitions "planner"))))
+                  (is (= "Project planner: {{input}}"
+                         (get-in definitions ["planner" :steps 0 :contributions 0 :text]))))))))))))

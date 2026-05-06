@@ -27,8 +27,8 @@
   - [x] remove compat session-preload shaping from `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` when no longer needed by any checked-in workflow
 - [ ] Delete compatibility-only workflow tests/helpers no longer needed
   - [x] remove `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
-  - [ ] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility
-  - [ ] replace compat-oriented mixed-path tests with target-only proofs before deleting them
+  - [x] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility
+  - [x] replace compat-oriented mixed-path tests with target-only proofs before deleting them
 - [ ] Update project guidance so the target grammar is the only supported authored workflow surface
   - [ ] delete `doc/workflow-grammar-current.md`
   - [ ] delete `doc/workflow-grammar-migration.md`

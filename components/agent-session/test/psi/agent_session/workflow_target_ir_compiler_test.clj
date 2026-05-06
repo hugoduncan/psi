@@ -170,7 +170,21 @@
                                  :step "build"
                                  :ref {:step "build" :output :final-llm-reply}}]}
              (select-keys (workflow-ir/validate-workflow-ir bad-ir)
-                          [:valid? :structural-errors :semantic-errors]))))))
+                          [:valid? :structural-errors :semantic-errors])))))
+
+  (testing "target-authored source specs reject non-canonical workflow-runtime refs at validation time"
+    (let [{:keys [valid? structural-errors semantic-errors compile-error]}
+          (target-compiler/compile-and-validate-workflow-definition
+           {:steps [{:name "status"
+                     :type :session
+                     :contributions [{:type :template
+                                      :text "Status: {{status}}"
+                                      :vars {"status" {:from :workflow-runtime
+                                                       :path [:status]}}}]}]})]
+      (is (false? valid?))
+      (is (some? structural-errors))
+      (is (= [] semantic-errors))
+      (is (nil? compile-error)))))
 
 (deftest create-run-compiles-target-authored-definition-at-effective-definition-seam-test
   (testing "create-run compiles target-authored definitions at the effective-definition seam"

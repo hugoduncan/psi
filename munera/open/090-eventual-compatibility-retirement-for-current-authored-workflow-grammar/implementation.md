@@ -50,3 +50,10 @@
 - Deleted `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj` and its dedicated test file because repo-owned workflow loading and run creation are now target-authored only.
 - Confirmed `workflow_runtime.clj` and `workflow_file_compiler.clj` already run target-only validation/compilation paths, so the remaining retirement step was removal of the dead current-grammar compiler artifact rather than further runtime branching changes.
 - Identified remaining follow-on cleanup after this slice as target-only test/doc rewrites: retire lingering current-grammar fixture tests and remove live doc references to the deleted migration/current-grammar guidance pages.
+
+2026-05-06 implementation slice 8
+- Rewrote residual loader/runtime/compiler tests so they assert the target-only world explicitly instead of preserving current-grammar assumptions.
+- `workflow_file_loader_test.clj` now proves two retirement-facing invariants: delegate targets can remain unresolved at load time as named boundary data, and old current-authored workflow files are rejected with target-authored-only compile errors.
+- `workflow_ir_runtime_adoption_test.clj` now uses target-authored fixtures while still proving that non-canonical `:workflow-runtime` refs fail at the canonical IR validation seam.
+- `workflow_target_ir_compiler_test.clj` now carries the non-canonical source-ref rejection proof directly, replacing reliance on deleted current-grammar compiler coverage.
+- Focused verification green: `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-ir-runtime-adoption-test`.

@@ -18,28 +18,26 @@
 (def runtime-ref-definition
   {:definition-id "runtime-ref"
    :name "runtime-ref"
-   :step-order ["step-1"]
-   :steps {"step-1" {:executor {:type :agent :profile "planner"}
-                     :prompt-template "Status: $STATUS"
-                     :input-bindings {:status {:source :workflow-runtime
-                                               :path [:status]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})
+   :steps [{:name "step-1"
+            :type :session
+            :contributions [{:type :template
+                             :text "Status: {{status}}"
+                             :vars {"status" {:from :workflow-runtime
+                                              :path [:status]}}}]}]})
 
 (def plan-build-definition
   {:definition-id "plan-build"
    :name "plan-build"
-   :step-order ["plan" "build"]
-   :steps {"plan" {:executor {:type :agent :profile "planner"}
-                   :prompt-template "$INPUT"
-                   :input-bindings {:input {:source :workflow-input :path [:input]}}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                   :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-           "build" {:executor {:type :agent :profile "builder"}
-                    :prompt-template "Build: $INPUT"
-                    :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                    :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}}}]}
+           {:name "build"
+            :type :session
+            :contributions [{:type :template
+                             :text "Build: {{input}}"
+                             :vars {"input" {:from {:step "plan" :output :final-llm-reply}}}}]}]})
 
 (defn- valid-child-session
   [child-session-id]
@@ -58,8 +56,8 @@
    :agent {:messages []}
    :statechart {:phase :idle}})
 
-(deftest create-run-rejects-compiled-runtime-refs-test
-  (testing "run creation fails fast when current grammar compiles to non-canonical workflow-runtime refs"
+(deftest create-run-rejects-non-canonical-workflow-runtime-refs-test
+  (testing "run creation fails fast when target-authored definitions use non-canonical workflow-runtime refs"
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"execution-valid canonical IR"
@@ -68,7 +66,7 @@
           {:definition runtime-ref-definition
            :run-id "runtime-ref-run"}))))
 
-  (testing "registered definitions with runtime refs also fail at run creation seam"
+  (testing "registered definitions with workflow-runtime refs also fail at run creation seam"
     (let [[state1 definition-id _]
           (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
                                                 runtime-ref-definition)]
