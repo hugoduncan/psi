@@ -5,7 +5,6 @@ Open tasks in suggested execution order:
 Queue:
 
 `munera/open/077-deterministic-workflow-steps/`
-`munera/open/090-eventual-compatibility-retirement-for-current-authored-workflow-grammar/`
 
 
 Backlog:
