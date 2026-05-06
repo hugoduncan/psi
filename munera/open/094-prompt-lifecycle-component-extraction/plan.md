@@ -3,18 +3,19 @@ Approach:
 - extract a distinct turn component with a distinctive name (`psi.turn`) so ownership is not blurred by the overloaded word `prompt`
 - first map the current prepare → execute → record → finish ownership across namespaces and identify the smallest coherent turn boundary that can become authoritative
 - then move orchestration behind that boundary, simplify callers so they delegate to it, and keep any proof changes tightly limited to what the extraction requires
+- keep `prompt-control` as the temporary public compatibility facade while moving implementation ownership behind it into `psi.turn`
 
 Likely steps:
-1. inspect current prompt lifecycle code paths, responsibilities, tests, and dependency edges
+1. inspect current turn lifecycle code paths, responsibilities, tests, and dependency edges
 2. establish the dependency slope explicitly: shared leaves below `psi.turn`; `core` / `context` / workflows / mutations / adapters above it
 3. introduce the authoritative `psi.turn` public owner while keeping `prompt-control` as a thin delegating facade
 4. record the chosen ownership split, naming rationale, and dependency boundary explicitly in implementation notes before or during extraction
 5. move or extract request preparation, execution, and record orchestration into the `psi.turn` family with minimal semantic drift
 6. rebind `context` callback wiring to turn-owned functions
-7. thin turn handler ownership so `dispatch-handlers.prompt-lifecycle` is registration/adaptation only, or replace it with `psi.turn.handlers`
-8. simplify surrounding callers to use the component rather than partial local orchestration
+7. thin turn handler ownership so `dispatch-handlers.prompt-lifecycle` is registration/adaptation only
+8. simplify the key caller seams (`prompt-control` and `context`) to use the component rather than partial local orchestration
 9. update focused documentation/comments for the new ownership model
-10. make only the minimal focused test updates needed for extraction safety
+10. make only the minimal focused test updates needed for extraction safety, covering at least the canonical submit/start → prepare → execute → record → continue/finish flow after extraction
 11. run focused verification and widen if needed
 
 Risks:
@@ -31,4 +32,5 @@ Notes:
 - maintain a one-way dependency slope: shared helpers below `psi.turn`, façades/orchestrators/adapters above it
 - keep `prompt-control` as the migration seam until callers and callback wiring are safely redirected
 - use the component name `turn` consistently in new ownership docs so the boundary is described in the same vocabulary as the namespace
+- treat `context` callback rewiring as a required migration milestone, not an optional cleanup step
 - do not expand this task into test-architecture cleanup; preserve existing test structure unless a narrow extraction-driven change is necessary
