@@ -6,7 +6,6 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
    [psi.agent-session.session-state :as ss]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
    [psi.agent-session.mutations :as mutations]
@@ -120,14 +119,14 @@
                                     developer-prompt)
         resolved-source (when-not (= developer-prompt ::unset)
                           developer-prompt-source)]
-    (dispatch/dispatch! ctx
-                        :session/bootstrap-prompt-state
-                        {:session-id              session-id
-                         :system-prompt           system-prompt
-                         :developer-prompt        resolved-developer-prompt
-                         :developer-prompt-source resolved-source}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core}))
+    (session/dispatch-in! ctx
+                          :session/bootstrap-prompt-state
+                          {:session-id              session-id
+                           :system-prompt           system-prompt
+                           :developer-prompt        resolved-developer-prompt
+                           :developer-prompt-source resolved-source}
+                          {:origin :core})
+    (session/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core}))
   (let [startup-tools (into (vec base-tools) (vec tools))
         {:keys [prompt-count skill-count tool-count extension-results]}
         (load-startup-resources-via-mutations-in!
@@ -143,7 +142,7 @@
                          extension-results)
         ext-tools (ext/all-tools-in (:extension-registry ctx))
         active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
-        _         (dispatch/dispatch! ctx :session/set-active-tools {:session-id session-id :tool-maps (into (vec active-tools) ext-tools)} {:origin :core})
+        _         (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps (into (vec active-tools) ext-tools)} {:origin :core})
         summary   {:timestamp              (java.time.Instant/now)
                    :prompt-count           prompt-count
                    :skill-count            skill-count
@@ -155,5 +154,5 @@
                                             'psi.extension/add-skill
                                             'psi.extension/add-tool
                                             'psi.extension/add-extension]}]
-    (dispatch/dispatch! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
+    (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
     summary))

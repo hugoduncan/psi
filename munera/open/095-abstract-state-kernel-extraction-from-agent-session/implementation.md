@@ -146,3 +146,10 @@ Review notes — 2026-05-06
   - wrapper status after this pass: `psi.agent-session.dispatch` still exists because agent-session-owned composition concerns remain there, but it is no longer the canonical home for the migrated generic telemetry/replay helper consumers.
   - focused verification green after the compat-seam consumer migration:
     - `clojure -M:test --focus psi.agent-session.post-tool-test --focus psi.introspection.agent-session-test --focus psi.agent-session.eql-introspection-test --focus psi.agent-session.resolvers-test --focus psi.agent-session.dispatch-test --focus psi.state-kernel.dispatch-test` → `46 tests, 404 assertions, 0 failures`.
+- Higher-layer dispatch entrypoint follow-up — 2026-05-06
+  - introduced `psi.agent-session.core/dispatch-in!` as the public higher-layer dispatch entrypoint so app-runtime, rpc, bootstrap, and higher-layer tests no longer require `psi.agent-session.dispatch` directly just to send agent-session events.
+  - migrated higher-layer runtime callers in `app_runtime.clj`, `background_job_ui.clj`, `rpc/runtime.clj`, `rpc/session.clj`, `rpc/session/prompt.clj`, and `agent_session/bootstrap.clj` to call `session/dispatch-in!`.
+  - migrated higher-layer tests in app-runtime, rpc, and introspection to use `session/dispatch-in!`, and moved app-runtime event-log assertions to the kernel-owned event-log surface where they only needed generic dispatch telemetry.
+  - result: `psi.agent-session.dispatch` is now absent from the app-runtime/rpc/introspection higher layers and remains concentrated in agent-session-owned composition code plus dispatch-focused tests.
+  - focused verification green for the higher-layer migration pass:
+    - `clojure -M:test --focus psi.app-runtime-test --focus psi.app-runtime.context-test --focus psi.app-runtime.background-job-ui-test --focus psi.app-runtime.session-summary-test --focus psi.rpc-ops-test --focus psi.rpc-prompt-test --focus psi.rpc-events-test --focus psi.rpc-test --focus psi.introspection.agent-session-test` → `71 tests, 386 assertions, 0 failures`.

@@ -7,6 +7,7 @@
   (:require
    [psi.agent-session.compaction-runtime :as compaction-runtime]
    [psi.agent-session.context :as context]
+   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.introspection :as introspection]
    [psi.agent-session.prompt-control :as prompt-control]
    [psi.agent-session.session-lifecycle :as lifecycle]
@@ -63,6 +64,18 @@
 (defn close-session-tree-in!
   [ctx root-id]
   (lifecycle/close-session-tree-in! ctx root-id))
+
+(defn dispatch-in!
+  "Public agent-session dispatch entrypoint.
+
+   Keeps higher layers off the compatibility dispatch namespace while the
+   domain-owned dispatch composition remains internal."
+  ([ctx event-type]
+   (dispatch/dispatch! ctx event-type))
+  ([ctx event-type event-data]
+   (dispatch/dispatch! ctx event-type event-data))
+  ([ctx event-type event-data opts]
+   (dispatch/dispatch! ctx event-type event-data opts)))
 
 (defn prompt-in!
   ([ctx session-id text]

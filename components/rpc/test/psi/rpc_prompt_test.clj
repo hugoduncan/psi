@@ -7,7 +7,6 @@
    [clojure.test :refer [deftest is testing]]
    [psi.ai.models :as ai-models]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.tools :as tools]
@@ -16,7 +15,7 @@
 (deftest rpc-prompt-streams-events-and-interleaves-test
   (testing "prompt emits canonical events that interleave with accepted response"
     (let [[ctx _] (support/create-session-context)
-          _   (dispatch/dispatch! ctx :session/ui-set-status {:extension-id "ext.demo" :text "ready"} {:origin :test})
+          _   (session/dispatch-in! ctx :session/ui-set-status {:extension-id "ext.demo" :text "ready"} {:origin :test})
           state (atom {:transport {:ready? true :pending {}}
                        :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                        :execute-prepared-request-fn (fn [_ai-ctx _ctx _session-id _prepared-request progress-queue]
@@ -163,7 +162,7 @@
 (deftest rpc-openai-codex-prompt-emits-tool-events-with-final-args-test
   (testing "openai codex tool args from response.output_item.done flow through RPC tool events"
     (let [[ctx session-id]   (support/create-session-context)
-          _                  (dispatch/dispatch! ctx :session/set-active-tools {:session-id session-id :tool-maps [tools/bash-tool]} {:origin :core})
+          _                  (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps [tools/bash-tool]} {:origin :core})
           state              (atom {:transport {:ready? true :pending {}}
                                     :sync-on-git-head-change? false
                                     :rpc-ai-model (ai-models/get-model :gpt-5.3-codex)})

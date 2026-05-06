@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.mutations :as mutations]
@@ -89,15 +88,15 @@
 (deftest session-updated-payload-includes-model-metadata-test
   (testing "session payload includes model metadata for frontend header projection"
     (let [[ctx sid] (support/create-session-context)
-          _         (dispatch/dispatch! ctx :session/set-model
-                                        {:session-id sid
-                                         :model {:provider "openai"
-                                                 :id "gpt-5.3-codex"
-                                                 :reasoning true}}
-                                        {:origin :core})
-          _         (dispatch/dispatch! ctx :session/set-thinking-level
-                                        {:session-id sid :level :xhigh}
-                                        {:origin :core})
+          _         (session/dispatch-in! ctx :session/set-model
+                                          {:session-id sid
+                                           :model {:provider "openai"
+                                                   :id "gpt-5.3-codex"
+                                                   :reasoning true}}
+                                          {:origin :core})
+          _         (session/dispatch-in! ctx :session/set-thinking-level
+                                          {:session-id sid :level :xhigh}
+                                          {:origin :core})
           _         (ss/apply-root-state-update-in! ctx
                                                     (ss/session-update sid #(assoc %
                                                                                    :retry-attempt 2
@@ -178,11 +177,11 @@
 (deftest footer-updated-payload-includes-model-and-thinking-when-session-reasoning-enabled-test
   (testing "footer payload includes model/thinking details from active session query"
     (let [[ctx session-id] (support/create-session-context)
-          _          (dispatch/dispatch! ctx :session/set-model
-                                         {:session-id session-id :model {:provider "openai" :id "gpt-5.3-codex" :reasoning true}}
-                                         {:origin :core})
-          _          (dispatch/dispatch! ctx :session/set-thinking-level {:session-id session-id :level :high} {:origin :core})
-          _          (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 4000 :window 100000} {:origin :core})
+          _          (session/dispatch-in! ctx :session/set-model
+                                           {:session-id session-id :model {:provider "openai" :id "gpt-5.3-codex" :reasoning true}}
+                                           {:origin :core})
+          _          (session/dispatch-in! ctx :session/set-thinking-level {:session-id session-id :level :high} {:origin :core})
+          _          (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 4000 :window 100000} {:origin :core})
           _          (ss/journal-append-in! ctx session-id
                                             {:kind :message
                                              :session-id session-id
@@ -232,7 +231,7 @@
     (let [cwd     (str (System/getProperty "java.io.tmpdir") "/psi-rpc-fork-" (java.util.UUID/randomUUID))
           _       (.mkdirs (java.io.File. cwd))
           [ctx session-id] (support/create-session-context {:cwd cwd})
-          _       (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "anthropic" :id "claude-sonnet"}} {:origin :core})
+          _       (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "anthropic" :id "claude-sonnet"}} {:origin :core})
           ;; Append a message entry so fork has an entry-id to branch from
           entry   (persist/message-entry {:role "user" :content "hi"})
           _       (ss/journal-append-in! ctx session-id entry)

@@ -6,7 +6,7 @@
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
    [psi.agent-session.session-state :as ss]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.app-runtime :as app-runtime]
@@ -238,7 +238,7 @@
     (try
       (with-main-bootstrap-stubs
         (fn []
-          (dispatch/clear-event-log!)
+          (kernel/clear-event-log!)
           (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                         (fn [_ai-ctx _ctx sid prepared _progress-queue]
                           {:execution-result/turn-id (:prepared-request/id prepared)
@@ -260,7 +260,7 @@
             (app-runtime/run-session :ignored)
             (let [ctx        (:ctx @app-runtime/session-state)
                   session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
-                  entries    (dispatch/event-log-entries)
+                  entries    (kernel/event-log-entries)
                   roles      (->> (persist/all-entries-in ctx session-id)
                                   (filter #(= :message (:kind %)))
                                   (map #(get-in % [:data :message :role]))
@@ -279,7 +279,7 @@
     (try
       (with-main-bootstrap-stubs
         (fn []
-          (dispatch/clear-event-log!)
+          (kernel/clear-event-log!)
           (with-redefs [clojure.core/read-line
                         (let [calls (atom 0)]
                           (fn []
@@ -327,7 +327,7 @@
     (try
       (with-main-bootstrap-stubs
         (fn []
-          (dispatch/clear-event-log!)
+          (kernel/clear-event-log!)
           (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                         (fn [_ai-ctx _ctx sid prepared progress-queue]
                           (reset! queued progress-queue)
@@ -349,7 +349,7 @@
                           :ignored {} {})
                   ctx     (:ctx @app-runtime/session-state)
                   sid     (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
-                  entries (dispatch/event-log-entries)
+                  entries (kernel/event-log-entries)
                   roles   (->> (persist/all-entries-in ctx sid)
                                (filter #(= :message (:kind %)))
                                (map #(get-in % [:data :message :role]))

@@ -3,7 +3,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.core :as session]
    [psi.agent-session.state-accessors :as sa]
    [psi.rpc.events :as rpc.events]
    [psi.rpc.session :as rpc.session]
@@ -94,7 +94,7 @@
               {:keys [ctx oauth-ctx session-id]} (session-ctx-factory ai-model session-config)
               _             (bootstrap-fn! ctx session-id ai-model memory-runtime-opts)
               trace-file*   (normalize-trace-file rpc-trace-file)
-              _             (dispatch/dispatch! ctx :session/set-rpc-trace {:session-id session-id :enabled? (boolean trace-file*) :file trace-file*} {:origin :core})
+              _             (session/dispatch-in! ctx :session/set-rpc-trace {:session-id session-id :enabled? (boolean trace-file*) :file trace-file*} {:origin :core})
               trace-fn      (make-trace-fn ctx)
               state         (rpc.state/make-rpc-state {:session-id session-id
                                                        :err *err*})

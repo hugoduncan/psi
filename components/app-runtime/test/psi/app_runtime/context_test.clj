@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.test-support :as test-support]
@@ -34,7 +33,7 @@
   (let [[ctx sid1] (create-session-context {:persist? false})
         sd2        (session/new-session-in! ctx sid1 {})
         sid2       (:session-id sd2)
-        _          (dispatch/dispatch! ctx :session/prompt {:session-id sid2} {:origin :test})
+        _          (session/dispatch-in! ctx :session/prompt {:session-id sid2} {:origin :test})
         snapshot   (app-context/context-snapshot ctx sid2 sid2)
         session1   (some #(when (= sid1 (:id %)) %) (:sessions snapshot))
         session2   (some #(when (= sid2 (:id %)) %) (:sessions snapshot))]
