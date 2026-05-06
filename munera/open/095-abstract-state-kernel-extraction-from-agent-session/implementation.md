@@ -120,3 +120,6 @@ Review notes — 2026-05-06
   - removed residual compatibility-layer `:statechart-claimed?` ictx writing from `statechart-interceptor`; claimed events now only block and optionally return structured result/block metadata.
   - focused verification green after the shaping pass:
     - `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.model-dispatch-test` → `25 tests, 247 assertions, 0 failures`.
+  - verification re-run after the shaping follow-up:
+    - repeated focused proof stayed green: `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.model-dispatch-test` → `25 tests, 247 assertions, 0 failures`
+    - full unit suite is now green again: `bb clojure:test:unit` → `1514 tests, 11098 assertions, 0 failures`.
