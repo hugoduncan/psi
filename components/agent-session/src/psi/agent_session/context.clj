@@ -8,6 +8,7 @@
    [psi.agent-session.deterministic-operation-registry :as deterministic-ops-reg]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
+   [psi.agent-session.dispatch-schema :as schema]
    [psi.agent-session.dispatch-handlers :as dispatch-handlers]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
@@ -184,8 +185,8 @@
                                   (.interrupt ^Thread handle)))
    :daemon-thread-fn dispatch-handlers/daemon-thread
    :drop-trailing-overflow-error-fn dispatch-effects/drop-trailing-overflow-error!
-   :validate-dispatch-result-fn dispatch/validate-dispatch-schemas
-   :validate-result-fn dispatch/validate-dispatch-schemas
+   :validate-dispatch-result-fn schema/validate-dispatch-schemas
+   :validate-result-fn schema/validate-dispatch-schemas
    :register-projection-listener-fn (fn [_ctx listener-fn] (register-projection-listener! projection-listeners* listener-fn))
    :unregister-projection-listener-fn (fn [_ctx listener-id] (unregister-projection-listener! projection-listeners* listener-id))
    :publish-projection-change-fn (fn [_ctx change] (publish-projection-change! projection-listeners* change))

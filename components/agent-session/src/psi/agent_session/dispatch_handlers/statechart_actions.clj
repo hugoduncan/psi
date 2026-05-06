@@ -4,8 +4,8 @@
    on-compacting-entered, on-compact-done, on-retry-triggered, on-retrying-entered,
    on-retry-resume."
   (:require
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.session :as session-data]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.session-state :as session]))
 
 ;;; Thread utilities
@@ -67,12 +67,12 @@
   "Register all statechart action handlers.
    Called once during context creation. Handlers are context-independent."
   [_ctx]
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-streaming-entered
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :is-streaming true))}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-agent-done
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
@@ -83,7 +83,7 @@
                 {:effect/type :runtime/emit-background-job-terminal-messages}
                 {:effect/type :scheduler/drain-queue}]}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-abort
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
@@ -92,7 +92,7 @@
       :effects [{:effect/type :runtime/agent-abort}
                 {:effect/type :scheduler/drain-queue}]}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-auto-compact-triggered
    (fn [_ctx {:keys [session-id] :as data}]
      (let [reason      (or (auto-compaction-reason session-id data) :threshold)
@@ -102,18 +102,18 @@
                    :reason      reason
                    :will-retry? will-retry?}]})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-compacting-entered
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :is-compacting true))}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-compact-done
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :is-compacting false))
       :effects [{:effect/type :scheduler/drain-queue}]}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-retry-triggered
    (fn [ctx {:keys [session-id]}]
      (let [sd       (session/get-session-data-in ctx session-id)
@@ -126,12 +126,12 @@
                    :delay-ms    delay-ms
                    :event       :session/retry-done}]})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-retrying-entered
    (fn [_ctx _data]
      {:effects []}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :on-retry-resume
    (fn [_ctx _data]
      {:effects [{:effect/type :runtime/agent-start-loop}]})))

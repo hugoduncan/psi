@@ -4,11 +4,11 @@
    Turn lifecycle orchestration lives under `psi.turn` and
    `psi.turn.handlers`; this namespace only registers dispatch handlers."
   (:require
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.turn.handlers :as turn.handlers]))
 
 (defn- register-core-handler! [event handler]
-  (dispatch/register-handler! event handler))
+  (kernel/register-handler! event handler))
 
 (defn register!
   "Register prompt lifecycle handlers. Called once during context creation."

@@ -5,8 +5,8 @@
    bootstrap-prompt-state, ensure-base-system-prompt,
    reset-prompt-contributions, register-prompt-template."
   (:require
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.session-state :as session]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.system-prompt :as sys-prompt]))
 
 ;;; Prompt contribution pure helpers
@@ -46,12 +46,12 @@
 (defn register!
   "Register all prompt and system-prompt handlers. Called once during context creation."
   [_ctx]
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/set-system-prompt-build-opts
    (fn [_ctx {:keys [session-id opts]}]
      {:root-state-update (session/session-update session-id #(assoc % :system-prompt-build-opts opts))}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/refresh-system-prompt
    (fn [ctx {:keys [session-id]}]
      (let [sd      (session/get-session-data-in ctx session-id)
@@ -77,7 +77,7 @@
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt}]})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/set-system-prompt
    (fn [ctx {:keys [session-id prompt]}]
      (let [base*     (or prompt "")
@@ -90,7 +90,7 @@
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt*}]})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/register-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id contribution]}]
      (let [ext-path* (str ext-path)
@@ -115,7 +115,7 @@
                  :contribution norm
                  :count (count (session/list-prompt-contributions-in ctx session-id))}})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/update-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id patch]}]
      (let [ext-path* (str ext-path)
@@ -147,7 +147,7 @@
                      :contribution @updated
                      :count (count (session/sorted-prompt-contributions next*))}})))))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/unregister-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id]}]
      (let [ext-path* (str ext-path)
@@ -169,12 +169,12 @@
                        :prompt prompt*}]
             :return {:removed? true :count (count next*)}})))))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/reset-prompt-contributions
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :prompt-contributions []))}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/bootstrap-prompt-state
    (fn [_ctx {:keys [session-id system-prompt developer-prompt developer-prompt-source]}]
      {:root-state-update (session/session-update session-id #(assoc %
@@ -183,7 +183,7 @@
                                                                     :developer-prompt developer-prompt
                                                                     :developer-prompt-source developer-prompt-source))}))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/ensure-base-system-prompt
    (fn [ctx {:keys [session-id]}]
      (let [sd (session/get-session-data-in ctx session-id)]
@@ -191,7 +191,7 @@
          {:effects []}
          {:root-state-update (session/session-update session-id #(assoc % :base-system-prompt (or (:system-prompt sd) "")))}))))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/register-prompt-template
    (fn [ctx {:keys [session-id template]}]
      (let [templates  (vec (:prompt-templates (session/get-session-data-in ctx session-id)))

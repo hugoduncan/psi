@@ -8,6 +8,7 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-handlers.session-state :as ss]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.session :as session-data]
    [psi.agent-session.session-state :as session]
@@ -15,7 +16,7 @@
    [psi.agent-session.tool-execution :as tool-exec]))
 
 (defn- register-core-handler! [event handler]
-  (dispatch/register-handler! event handler))
+  (kernel/register-handler! event handler))
 
 (defn- schedule-record
   [session-data schedule-id]

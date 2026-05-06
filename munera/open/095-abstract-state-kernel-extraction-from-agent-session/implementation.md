@@ -153,3 +153,11 @@ Review notes — 2026-05-06
   - result: `psi.agent-session.dispatch` is now absent from the app-runtime/rpc/introspection higher layers and remains concentrated in agent-session-owned composition code plus dispatch-focused tests.
   - focused verification green for the higher-layer migration pass:
     - `clojure -M:test --focus psi.app-runtime-test --focus psi.app-runtime.context-test --focus psi.app-runtime.background-job-ui-test --focus psi.app-runtime.session-summary-test --focus psi.rpc-ops-test --focus psi.rpc-prompt-test --focus psi.rpc-events-test --focus psi.rpc-test --focus psi.introspection.agent-session-test` → `71 tests, 386 assertions, 0 failures`.
+- Dispatch-handler registration reduction follow-up — 2026-05-06
+  - migrated dispatch handler registration namespaces to use `psi.state-kernel.dispatch/register-handler!` directly where they only needed registry access.
+  - updated `ui-handlers`, `session-lifecycle`, `prompt-handlers`, `statechart-actions`, `prompt-lifecycle`, `session-mutations`, and `scheduler` so registration ownership now points straight at the kernel-owned handler registry instead of the compat wrapper.
+  - kept direct compat-wrapper dispatch usage only where handlers synchronously dispatch nested domain events during execution (`session-mutations`, `scheduler`), because those calls need the agent-session-owned composition/interceptor path rather than raw kernel dispatch.
+  - also moved context validation wiring to `psi.agent-session.dispatch-schema/validate-dispatch-schemas` directly, so schema authority no longer has to travel through the compat wrapper.
+  - result: within agent-session source, `psi.agent-session.dispatch` is now narrowed further toward true composition/runtime-dispatch responsibilities, while pure registry/schema consumers point directly at their authoritative owners.
+  - focused verification green for the handler-registration reduction pass:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.statechart-actions-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.post-tool-test` → `49 tests, 324 assertions, 0 failures`.

@@ -4,15 +4,15 @@
    new-initialize, resume-loaded, fork-initialize, create-child,
    resume-missing-initialize, context-closed."
   (:require
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-handlers.session-state :as ss]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.session :as session-data]
    [psi.agent-session.session-state :as session]))
 
 (defn register!
   "Register session lifecycle handlers. Called once during context creation."
   [_ctx]
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/new-initialize
    (fn [ctx {:keys [session-id new-session-id worktree-path session-name spawn-mode session-file scheduled-origin-session-id scheduled-from-schedule-id scheduled-from-label]}]
      (let [current-sd (or (session/get-session-data-in ctx session-id)
@@ -34,7 +34,7 @@
                    :active-session-id new-session-id
                    :reason :session/new-initialize}]})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/create-top-level
    (fn [ctx {:keys [session-id new-session-id worktree-path session-name session-file scheduled-origin-session-id scheduled-from-schedule-id scheduled-from-label]}]
      (let [current-sd (or (session/get-session-data-in ctx session-id)
@@ -54,7 +54,7 @@
                    :session-id new-session-id
                    :reason :session/create-top-level}]})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/resume-loaded
    (fn [ctx {:keys [session-id source-session-id session-path header entries model thinking-level messages]}]
      (let [source-sid (or source-session-id session-id)
@@ -78,7 +78,7 @@
                    model    (conj {:effect/type :runtime/agent-set-model :model model})
                    messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/fork-initialize
    (fn [ctx {:keys [session-id new-session-id branch-entries session-file messages]}]
      (let [parent-sd (session/get-session-data-in ctx session-id)
@@ -93,7 +93,7 @@
                            :reason :session/fork-initialize}]
                    messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/create-child
    (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
      (let [parent-sd (or (session/get-session-data-in ctx session-id)
@@ -121,14 +121,14 @@
                    :reason :session/create-child}]
         :return child-session-id})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/resume-missing-initialize
    (fn [ctx {:keys [session-id session-path]}]
      (let [current-sd (session/get-session-data-in ctx session-id)]
        {:root-state-update #(ss/initialize-resume-missing-state % current-sd session-path)
         :return-key        (ss/session-data-path session-id)})))
 
-  (dispatch/register-handler!
+  (kernel/register-handler!
    :session/context-closed
    (fn [_ctx {:keys [session-id active-session-id]}]
      {:effects [{:effect/type :projection/context-changed
