@@ -5,9 +5,9 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session-core]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-handlers :as dispatch-handlers]
+   [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
@@ -136,7 +136,7 @@
                                                        {:continued? true})
                        :refresh-system-prompt-fn     (fn
                                                        ([_ctx] (throw (ex-info "refresh-system-prompt-fn requires explicit session-id" {:callback :refresh-system-prompt-fn})))
-                                                       ([ctx session-id] (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})))
+                                                       ([ctx session-id] (session-core/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})))
                        :execute-prepared-request-fn  (fn [_ai-ctx _ctx sid prepared _progress-queue]
                                                        {:execution-result/turn-id (:prepared-request/id prepared)
                                                         :execution-result/session-id sid
@@ -157,10 +157,10 @@
                                                                    custom-type (assoc :custom-type custom-type)
                                                                    (not custom-type) (assoc :custom-type "extension-notification"))
                                                              session-id (some-> (ss/list-context-sessions-in ctx) first :session-id)]
-                                                         (dispatch/dispatch! ctx
-                                                                             :session/notify-extension
-                                                                             {:session-id session-id :message msg}
-                                                                             {:origin :core})
+                                                         (session-core/dispatch-in! ctx
+                                                                                    :session/notify-extension
+                                                                                    {:session-id session-id :message msg}
+                                                                                    {:origin :core})
                                                          msg))
                                                       ([ctx session-id role content custom-type]
                                                        (let [msg {:role      role
@@ -169,10 +169,10 @@
                                                              msg (cond-> msg
                                                                    custom-type (assoc :custom-type custom-type)
                                                                    (not custom-type) (assoc :custom-type "extension-notification"))]
-                                                         (dispatch/dispatch! ctx
-                                                                             :session/notify-extension
-                                                                             {:session-id session-id :message msg}
-                                                                             {:origin :core})
+                                                         (session-core/dispatch-in! ctx
+                                                                                    :session/notify-extension
+                                                                                    {:session-id session-id :message msg}
+                                                                                    {:origin :core})
                                                          msg)))
                        :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
                        :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
@@ -188,8 +188,8 @@
                                                          (.interrupt ^Thread handle)))
                        :daemon-thread-fn             (fn [f] (doto (Thread. ^Runnable f) (.setDaemon true) (.start)))
                        :effective-cwd-fn             (fn [ctx session-id] (ss/session-worktree-path-in ctx session-id))
-                       :validate-dispatch-result-fn  dispatch/validate-dispatch-schemas
-                       :validate-result-fn           dispatch/validate-dispatch-schemas
+                       :validate-dispatch-result-fn  dispatch-schema/validate-dispatch-schemas
+                       :validate-result-fn           dispatch-schema/validate-dispatch-schemas
                        :journal-append-fn            persistence/append-entry-in!}
         _             (dispatch-handlers/register-all! ctx)
         actions-fn     (dispatch-handlers/make-actions-fn ctx)

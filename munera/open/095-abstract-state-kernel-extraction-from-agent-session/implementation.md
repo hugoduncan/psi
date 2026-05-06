@@ -196,3 +196,10 @@ Review notes — 2026-05-06
   - this preserved the one dispatch-focused proof in the file (`:session/submit-synthetic-user-prompt` handler effect shaping) without keeping the compat wrapper as the authority for generic registry or telemetry helpers.
   - focused verification green for this migration batch:
     - `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test` → `17 tests, 82 assertions, 0 failures`.
+- Session lifecycle/model/test-support ownership narrowing follow-up — 2026-05-06
+  - migrated `session_lifecycle_test.clj` and `model_dispatch_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` where they were using dispatch as the public domain event entrypoint rather than testing compat-wrapper-specific semantics.
+  - kept their generic event-log assertions on `psi.state-kernel.dispatch`, which remains the authoritative owner for dispatch telemetry.
+  - updated `test_support.clj` so helper-owned public event submission now goes through `psi.agent-session.core/dispatch-in!`, and so test validation wiring points directly at `psi.agent-session.dispatch-schema/validate-dispatch-schemas` instead of routing schema authority through the compat wrapper.
+  - this reduces incidental compat-wrapper coupling in both the tests and the shared session test harness while preserving the same runtime behavior and focused proof surface.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.session-lifecycle-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.prompt-lifecycle-test` → `39 tests, 346 assertions, 0 failures`.

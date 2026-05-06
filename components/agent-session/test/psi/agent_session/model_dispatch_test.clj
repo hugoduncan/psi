@@ -6,7 +6,6 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.project-preferences :as project-prefs]
@@ -34,19 +33,19 @@
   (testing "set-model-in! updates model and persists entry"
     (let [[ctx session-id] (create-session-context)
           model      {:provider "anthropic" :id "claude-3-5-sonnet" :reasoning false}]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
       (let [sd (ss/get-session-data-in ctx session-id)]
         (is (= model (:model sd))))
       (is (pos? (count (persist/all-entries-in ctx session-id))))))
 
   (testing "set-model-in! clamps thinking level for non-reasoning model"
     (let [[ctx session-id] (create-session-context {:session-defaults {:thinking-level :high}})]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
       (is (= :off (:thinking-level (ss/get-session-data-in ctx session-id))))))
 
   (testing "set-model-in! preserves thinking level for reasoning model"
     (let [[ctx session-id] (create-session-context {:session-defaults {:thinking-level :high}})]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
       (is (= :high (:thinking-level (ss/get-session-data-in ctx session-id)))))))
 
 ;; ── Thinking level ──────────────────────────────────────────────────────────
@@ -56,7 +55,7 @@
     (let [[ctx session-id] (create-session-context)
           _                  (kernel/clear-event-log!)
           model      {:provider "anthropic" :id "claude-3-5-sonnet" :reasoning false}]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
       (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= model (:model sd)))
@@ -67,9 +66,9 @@
   (testing "set-thinking-level-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
       (kernel/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
       (kernel/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-thinking-level {:session-id session-id :level :medium} {:origin :core})
+      (session/dispatch-in! ctx :session/set-thinking-level {:session-id session-id :level :medium} {:origin :core})
       (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= :medium (:thinking-level sd)))
@@ -80,7 +79,7 @@
   (testing "set-system-prompt-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
       (kernel/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-system-prompt {:session-id session-id :prompt "graph-aware system prompt"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt "graph-aware system prompt"} {:origin :core})
       (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= "graph-aware system prompt" (:system-prompt sd)))
@@ -91,7 +90,7 @@
   (testing "refresh-system-prompt-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
       (kernel/clear-event-log!)
-      (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})
+      (session/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})
       (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (string? (:system-prompt sd)))
@@ -102,20 +101,20 @@
   (testing "register/update/unregister prompt contributions route through dispatch and preserve return payloads"
     (let [[ctx session-id] (create-session-context)
           _                  (kernel/clear-event-log!)
-          r1  (dispatch/dispatch! ctx :session/register-prompt-contribution
-                                  {:session-id session-id :ext-path "/ext/a" :id "c1"
-                                   :contribution {:section "Extension Capabilities"
-                                                  :content "tool: x"
-                                                  :priority 10}}
-                                  {:origin :core})
+          r1  (session/dispatch-in! ctx :session/register-prompt-contribution
+                                    {:session-id session-id :ext-path "/ext/a" :id "c1"
+                                     :contribution {:section "Extension Capabilities"
+                                                    :content "tool: x"
+                                                    :priority 10}}
+                                    {:origin :core})
           e1  (last (kernel/event-log-entries))
-          r2  (dispatch/dispatch! ctx :session/update-prompt-contribution
-                                  {:session-id session-id :ext-path "/ext/a" :id "c1" :patch {:content "tool: y"}}
-                                  {:origin :core})
+          r2  (session/dispatch-in! ctx :session/update-prompt-contribution
+                                    {:session-id session-id :ext-path "/ext/a" :id "c1" :patch {:content "tool: y"}}
+                                    {:origin :core})
           e2  (last (kernel/event-log-entries))
-          r3  (dispatch/dispatch! ctx :session/unregister-prompt-contribution
-                                  {:session-id session-id :ext-path "/ext/a" :id "c1"}
-                                  {:origin :core})
+          r3  (session/dispatch-in! ctx :session/unregister-prompt-contribution
+                                    {:session-id session-id :ext-path "/ext/a" :id "c1"}
+                                    {:origin :core})
           e3  (last (kernel/event-log-entries))]
       (is (true? (:registered? r1)))
       (is (= :session/register-prompt-contribution (:event-type e1)))
@@ -146,7 +145,7 @@
   (testing "query-in resolves dispatch event log attrs"
     (let [[ctx session-id] (create-session-context)]
       (kernel/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "dispatch-visible"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-session-name {:session-id session-id :name "dispatch-visible"} {:origin :core})
       (let [result (session/query-in ctx
                                      [:psi.agent-session/dispatch-event-log-count
                                       {:psi.agent-session/dispatch-event-log
@@ -188,8 +187,8 @@
   (testing "replay-dispatch-event-log-in! replays retained entries against session state"
     (let [[ctx session-id] (create-session-context)]
       (kernel/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "replay me"} {:origin :core})
-      (dispatch/dispatch! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/replay"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-session-name {:session-id session-id :name "replay me"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/replay"} {:origin :core})
       (is (= "replay me" (:session-name (ss/get-session-data-in ctx session-id))))
       (is (= "/repo/replay" (:worktree-path (ss/get-session-data-in ctx session-id))))
       (ss/apply-root-state-update-in! ctx (ss/session-update session-id #(assoc % :session-name "before" :worktree-path "/repo/main")))
@@ -276,7 +275,7 @@
   (testing "projection setters still route through dispatch after transition-helper extraction"
     (let [[ctx session-id] (create-session-context)]
       (kernel/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-rpc-trace {:enabled? true :file "/tmp/rpc-trace.ndedn"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-rpc-trace {:enabled? true :file "/tmp/rpc-trace.ndedn"} {:origin :core})
       (sa/set-nrepl-runtime-in! ctx session-id {:host "localhost" :port 5555 :endpoint "localhost:5555"})
       (sa/set-oauth-projection-in! ctx {:authenticated-providers ["anthropic"]})
       (sa/set-recursion-state-in! ctx session-id {:status :idle})
@@ -378,8 +377,8 @@
 (deftest thinking-level-test
   (testing "set-thinking-level-in! updates level"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
-      (dispatch/dispatch! ctx :session/set-thinking-level {:session-id session-id :level :medium} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-thinking-level {:session-id session-id :level :medium} {:origin :core})
       (is (= :medium (:thinking-level (ss/get-session-data-in ctx session-id))))))
 
   (testing "set-model-in! persists project preferences to the local project layer"
@@ -392,7 +391,7 @@
                                              :agent-session {:prompt-mode :prose}}))
           [ctx session-id] (create-session-context {:cwd cwd})
           model      {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
       (let [prefs (project-prefs/read-preferences cwd)]
         (is (= "anthropic" (get-in prefs [:agent-session :model-provider])))
         (is (= "claude-sonnet-4-6" (get-in prefs [:agent-session :model-id])))
@@ -413,8 +412,8 @@
           _        (spit shared-f (pr-str {:version 1
                                            :agent-session {:prompt-mode :prose}}))
           [ctx session-id] (create-session-context {:cwd cwd})]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
-      (dispatch/dispatch! ctx :session/set-thinking-level {:session-id session-id :level :high} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-thinking-level {:session-id session-id :level :high} {:origin :core})
       (let [prefs (project-prefs/read-preferences cwd)]
         (is (= :high (get-in prefs [:agent-session :thinking-level])))
         (is (= :prose (get-in prefs [:agent-session :prompt-mode]))))
@@ -425,12 +424,12 @@
 
   (testing "cycle-thinking-level-in! advances level for reasoning model"
     (let [[ctx session-id] (create-session-context {:session-defaults {:thinking-level :off}})]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
       (session/cycle-thinking-level-in! ctx session-id)
       (is (= :minimal (:thinking-level (ss/get-session-data-in ctx session-id))))))
 
   (testing "cycle-thinking-level-in! is no-op for non-reasoning model"
     (let [[ctx session-id] (create-session-context {:session-defaults {:thinking-level :off}})]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
       (session/cycle-thinking-level-in! ctx session-id)
       (is (= :off (:thinking-level (ss/get-session-data-in ctx session-id)))))))

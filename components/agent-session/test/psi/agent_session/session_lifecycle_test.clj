@@ -5,7 +5,6 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
@@ -32,7 +31,7 @@
   (testing "two contexts are independent"
     (let [[ctx-a sid-a] (create-session-context)
           [ctx-b sid-b] (create-session-context)]
-      (dispatch/dispatch! ctx-a :session/set-session-name {:session-id sid-a :name "alpha"} {:origin :core})
+      (session/dispatch-in! ctx-a :session/set-session-name {:session-id sid-a :name "alpha"} {:origin :core})
       (is (= "alpha" (:session-name (ss/get-session-data-in ctx-a sid-a))))
       (is (nil? (:session-name (ss/get-session-data-in ctx-b sid-b))))))
 
@@ -82,7 +81,7 @@
           session-id        (:session-id sd)
           ctx               (retarget ctx sd)]
       (is (false? (:is-streaming (ss/get-session-data-in ctx session-id))))
-      (dispatch/dispatch! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+      (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
       (let [sd    (ss/get-session-data-in ctx session-id)
             entry (last (kernel/event-log-entries))]
         (is (true? (:is-streaming sd)))
@@ -306,7 +305,7 @@
   (let [[ctx _session-id] (test-support/make-session-ctx {})
         parent-sd        (session/new-session-in! ctx nil {})
         parent-id        (:session-id parent-sd)
-        _                (dispatch/dispatch! ctx :session/update-context-usage {:session-id parent-id :tokens 22000 :window 200000} {:origin :core})
+        _                (session/dispatch-in! ctx :session/update-context-usage {:session-id parent-id :tokens 22000 :window 200000} {:origin :core})
         ctx              (retarget ctx parent-sd)
         user-entry       (persist/message-entry {:role "user"
                                                  :content [{:type :text :text "branch-here"}]
@@ -366,7 +365,7 @@
   (testing "resume-session-in! preserves context usage baseline for footer/query projections"
     (let [initial-model {:provider "openai" :id "gpt-5.4" :reasoning false}
           [ctx session-id] (create-session-context {:session-defaults {:model initial-model}})
-          _                (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 22000 :window 200000} {:origin :core})
+          _                (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 22000 :window 200000} {:origin :core})
           f                (File/createTempFile "psi-resume-context" ".ndedn")]
       (.deleteOnExit f)
       (persist/flush-journal! f "sess-resume-context" "/tmp/project" nil [])
