@@ -1,0 +1,10 @@
+- [ ] Inspect current `journal-append-in!` ownership and call graph
+- [ ] Choose and record the canonical dispatch/effect shape for journal append
+- [ ] Define the lower pure state-update responsibility versus higher persistence/effect responsibility
+- [ ] Refactor the canonical append path away from primary `ctx :journal-append-fn` ownership
+- [ ] Keep or introduce only the minimum compatibility seam needed for migration
+- [ ] Migrate representative callers to the new canonical path
+- [ ] Add or update focused tests for in-memory append and persistence side-effect behavior
+- [ ] Run focused verification
+- [ ] Run full unit verification
+- [ ] Record final ownership and any remaining compatibility in `implementation.md`
