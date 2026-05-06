@@ -4,8 +4,7 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.resolvers.support :as support]
    [psi.agent-session.resolvers.telemetry-basics :as basics]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as accessors]
    [psi.agent-session.turn-statechart :as turn-sc]))
 (declare tool-lifecycle-summaries)
@@ -427,7 +426,7 @@
         (second (re-find #"\[request-id\s+([^\]\s]+)\]" error-text)))))
 (defn- api-errors-from-messages
   [agent-session-ctx session-id]
-  (if-not (ss/agent-ctx-in agent-session-ctx session-id)
+  (if-not (session/agent-ctx-in agent-session-ctx session-id)
     []
     (let [msgs (support/agent-core-messages agent-session-ctx session-id)]
       (->> msgs

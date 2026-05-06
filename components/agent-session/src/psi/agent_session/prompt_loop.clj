@@ -6,7 +6,7 @@
   (:require
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.prompt-turn :as prompt-turn]
-   [psi.agent-session.session-state :as session]
+   [psi.session-state.state :as session]
    [psi.agent-session.statechart :as sc]))
 
 (defn finish-agent-loop!

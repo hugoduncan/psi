@@ -15,7 +15,7 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.psi-tool :as psi-tool]
-   [psi.agent-session.session-state :as session]
+   [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.tool-output :as tool-output]
    [psi.agent-session.turn-accumulator :as accum]))

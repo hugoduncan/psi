@@ -8,11 +8,10 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.session-state.init :as ss]
-   [psi.session-state.state :as session-state]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.session :as session-data]
-   [psi.agent-session.session-state :as session]
+   [psi.session-state.state :as session]
    [psi.agent-session.tool-defs :as tool-defs]
    [psi.agent-session.tool-execution :as tool-exec]))
 
@@ -280,14 +279,14 @@
    :session/set-turn-context
    (fn [_ctx {:keys [session-id turn-ctx]}]
      {:root-state-update (fn [state]
-                           (assoc-in state (session-state/session-turn-ctx-path session-id) turn-ctx))})))
+                           (assoc-in state (session/session-turn-ctx-path session-id) turn-ctx))})))
 
 (defn- register-telemetry-handlers! []
   (register-core-handler!
    :session/append-tool-call-attempt
    (fn [_ctx {:keys [session-id attempt]}]
      {:root-state-update (fn [state]
-                           (update-in state (session-state/session-telemetry-path session-id :tool-call-attempts)
+                           (update-in state (session/session-telemetry-path session-id :tool-call-attempts)
                                       (fnil conj [])
                                       (assoc attempt :timestamp (java.time.Instant/now))))}))
 
@@ -297,7 +296,7 @@
      (let [entry (assoc capture :timestamp (java.time.Instant/now))]
        {:root-state-update
         (fn [state]
-          (update-in state (session-state/session-telemetry-path session-id :provider-requests)
+          (update-in state (session/session-telemetry-path session-id :provider-requests)
                      #(ss/bounded-append 100 % entry)))})))
 
   (register-core-handler!
@@ -306,7 +305,7 @@
      (let [entry (assoc capture :timestamp (java.time.Instant/now))]
        {:root-state-update
         (fn [state]
-          (update-in state (session-state/session-telemetry-path session-id :provider-replies)
+          (update-in state (session/session-telemetry-path session-id :provider-replies)
                      #(ss/bounded-append 1000 % entry)))})))
 
   (register-core-handler!
@@ -314,7 +313,7 @@
    (fn [_ctx {:keys [session-id stat context-bytes-added limit-hit?]}]
      {:root-state-update
       (fn [state]
-        (update-in state (session-state/session-telemetry-path session-id :tool-output-stats)
+        (update-in state (session/session-telemetry-path session-id :tool-output-stats)
                    (fn [ts]
                      (-> ts
                          (update :calls (fnil conj []) stat)
@@ -328,7 +327,7 @@
    :session/tool-lifecycle-event
    (fn [_ctx {:keys [session-id entry]}]
      {:root-state-update (fn [state]
-                           (update-in state (session-state/session-telemetry-path session-id :tool-lifecycle-events)
+                           (update-in state (session/session-telemetry-path session-id :tool-lifecycle-events)
                                       (fnil conj [])
                                       (assoc entry :timestamp (java.time.Instant/now))))})))
 

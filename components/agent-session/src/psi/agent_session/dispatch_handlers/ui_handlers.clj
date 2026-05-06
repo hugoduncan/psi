@@ -1,7 +1,7 @@
 (ns psi.agent-session.dispatch-handlers.ui-handlers
   "Handlers for session/ui-* events — widget, dialog, status, renderer, tool-renderer."
   (:require
-   [psi.agent-session.session-state :as session]
+   [psi.session-state.state :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.ui.state :as ui-state]))
 

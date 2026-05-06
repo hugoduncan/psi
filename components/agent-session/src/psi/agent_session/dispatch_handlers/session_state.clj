@@ -73,41 +73,45 @@
      :base-system-prompt        resolved-base-prompt
      :system-prompt             (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}))
 
-(defn initialize-child-session-state
-  [state* parent-sd {:keys [child-session-id session-name thinking-level model prompt-mode developer-prompt developer-prompt-source preloaded-messages cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
+(defn- child-session-base-state
+  [parent-sd {:keys [child-session-id session-name thinking-level model prompt-mode developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
   (let [{:keys [prompt-component-selection tool-defs skills system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state parent-sd child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
                                              (when (not= :fallback source)
                                                source))
-        ts (java.time.Instant/now)
-        child-sd (merge (session-data-ns/initial-session
-                         {:worktree-path (:worktree-path parent-sd)})
-                        {:session-id                child-session-id
-                         :session-name              session-name
-                         :spawn-mode                :agent
-                         :parent-session-id         (:session-id parent-sd)
-                         :workflow-run-id           workflow-run-id
-                         :workflow-step-id          workflow-step-id
-                         :workflow-attempt-id       workflow-attempt-id
-                         :workflow-owned?           (boolean workflow-owned?)
-                         :system-prompt             system-prompt
-                         :base-system-prompt        base-system-prompt
-                         :prompt-mode               (or prompt-mode (:prompt-mode parent-sd))
-                         :developer-prompt          (or developer-prompt (:developer-prompt parent-sd))
-                         :developer-prompt-source   normalized-developer-prompt-source
-                         :thinking-level            (or thinking-level :off)
-                         :tool-defs                 tool-defs
-                         :skills                    skills
-                         :system-prompt-build-opts  system-prompt-build-opts
-                         :cache-breakpoints         (or cache-breakpoints
-                                                        (:cache-breakpoints parent-sd)
-                                                        (:cache-breakpoints (session-data-ns/initial-session)))
-                         :prompt-component-selection prompt-component-selection
-                         :prompt-contributions      (vec (or (:prompt-contributions parent-sd) []))
-                         :model                     (or model (:model parent-sd))
-                         :created-at                ts
-                         :updated-at                ts})]
+        ts (java.time.Instant/now)]
+    (merge (session-data-ns/initial-session
+            {:worktree-path (:worktree-path parent-sd)})
+           {:session-id                 child-session-id
+            :session-name               session-name
+            :spawn-mode                 :agent
+            :parent-session-id          (:session-id parent-sd)
+            :workflow-run-id            workflow-run-id
+            :workflow-step-id           workflow-step-id
+            :workflow-attempt-id        workflow-attempt-id
+            :workflow-owned?            (boolean workflow-owned?)
+            :system-prompt              system-prompt
+            :base-system-prompt         base-system-prompt
+            :prompt-mode                (or prompt-mode (:prompt-mode parent-sd))
+            :developer-prompt           (or developer-prompt (:developer-prompt parent-sd))
+            :developer-prompt-source    normalized-developer-prompt-source
+            :thinking-level             (or thinking-level :off)
+            :tool-defs                  tool-defs
+            :skills                     skills
+            :system-prompt-build-opts   system-prompt-build-opts
+            :cache-breakpoints          (or cache-breakpoints
+                                            (:cache-breakpoints parent-sd)
+                                            (:cache-breakpoints (session-data-ns/initial-session)))
+            :prompt-component-selection prompt-component-selection
+            :prompt-contributions       (vec (or (:prompt-contributions parent-sd) []))
+            :model                      (or model (:model parent-sd))
+            :created-at                 ts
+            :updated-at                 ts})))
+
+(defn initialize-child-session-state
+  [state* parent-sd {:keys [child-session-id preloaded-messages] :as child-opts}]
+  (let [child-sd (child-session-base-state parent-sd child-opts)]
     (-> state*
         (assoc-in (state/session-data-path child-session-id) child-sd)
         (assoc-in [:agent-session :sessions child-session-id :persistence]

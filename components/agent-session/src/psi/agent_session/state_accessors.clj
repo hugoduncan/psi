@@ -4,7 +4,7 @@
   (:require
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.oauth.core :as oauth]
-   [psi.agent-session.session-state :as session]))
+   [psi.session-state.state :as session]))
 
 ;;; Readers — non-session-scoped (no session-id required)
 

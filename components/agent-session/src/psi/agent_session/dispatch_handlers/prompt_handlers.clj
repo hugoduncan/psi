@@ -5,7 +5,7 @@
    bootstrap-prompt-state, ensure-base-system-prompt,
    reset-prompt-contributions, register-prompt-template."
   (:require
-   [psi.agent-session.session-state :as session]
+   [psi.session-state.state :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.system-prompt :as sys-prompt]))
 

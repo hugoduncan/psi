@@ -66,7 +66,8 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.session :as session])
+   [psi.session-state.model :as session-model]
+   [psi.session-state.state :as session-state])
   (:import
    (java.io File RandomAccessFile)
    (java.nio.channels FileLock OverlappingFileLockException)
@@ -89,12 +90,12 @@
 (defn- journal-path
   "Build the per-session journal path for `session-id` in ctx."
   [_ctx session-id]
-  (session/state-path :journal session-id))
+  (session-state/state-path :journal session-id))
 
 (defn- flush-state-path
   "Build the per-session flush-state path for `session-id` in ctx."
   [_ctx session-id]
-  (session/state-path :flush-state session-id))
+  (session-state/state-path :flush-state session-id))
 
 (defn- state*
   [ctx]
@@ -725,39 +726,39 @@
 ;;; ============================================================
 
 (defn message-entry [message]
-  (session/make-entry :message {:message message}))
+  (session-model/make-entry :message {:message message}))
 
 (defn thinking-level-entry [level]
-  (session/make-entry :thinking-level {:thinking-level level}))
+  (session-model/make-entry :thinking-level {:thinking-level level}))
 
 (defn model-entry [provider model-id]
-  (session/make-entry :model {:provider provider :model-id model-id}))
+  (session-model/make-entry :model {:provider provider :model-id model-id}))
 
 (defn compaction-entry [result from-hook?]
-  (session/make-entry :compaction
-                      {:summary             (:summary result)
-                       :first-kept-entry-id (:first-kept-entry-id result)
-                       :tokens-before       (:tokens-before result)
-                       :details             (:details result)
-                       :from-hook           (boolean from-hook?)}))
+  (session-model/make-entry :compaction
+                            {:summary             (:summary result)
+                             :first-kept-entry-id (:first-kept-entry-id result)
+                             :tokens-before       (:tokens-before result)
+                             :details             (:details result)
+                             :from-hook           (boolean from-hook?)}))
 
 (defn branch-summary-entry [from-id summary details label from-hook?]
-  (session/make-entry :branch-summary
-                      {:from-id   from-id
-                       :summary   summary
-                       :details   details
-                       :label     label
-                       :from-hook (boolean from-hook?)}))
+  (session-model/make-entry :branch-summary
+                            {:from-id   from-id
+                             :summary   summary
+                             :details   details
+                             :label     label
+                             :from-hook (boolean from-hook?)}))
 
 (defn custom-message-entry [custom-type content details display?]
-  (session/make-entry :custom-message
-                      {:custom-type custom-type
-                       :content     content
-                       :details     details
-                       :display     (boolean display?)}))
+  (session-model/make-entry :custom-message
+                            {:custom-type custom-type
+                             :content     content
+                             :details     details
+                             :display     (boolean display?)}))
 
 (defn label-entry [target-id label]
-  (session/make-entry :label {:target-id target-id :label label}))
+  (session-model/make-entry :label {:target-id target-id :label label}))
 
 (defn session-info-entry [name]
-  (session/make-entry :session-info {:name name}))
+  (session-model/make-entry :session-info {:name name}))

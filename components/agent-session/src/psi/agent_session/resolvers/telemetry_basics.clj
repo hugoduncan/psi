@@ -6,7 +6,7 @@
    [psi.agent-session.resolvers.support :as support]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
-   [psi.agent-session.session :as session]
+   [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as accessors]
    [psi.agent-session.tool-output :as tool-output]))
 

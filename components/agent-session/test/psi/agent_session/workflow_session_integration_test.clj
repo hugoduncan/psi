@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.context :as context]
-   [psi.agent-session.session :as session]
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.workflow-model :as workflow-model]
    [psi.agent-session.workflow-runtime :as workflow-runtime]))
@@ -27,8 +26,8 @@
       (try
         (is (= {:definitions {} :runs {} :run-order []}
                (session-state/get-state-value-in ctx (session-state/state-path :workflow-state))))
-        (is (= [:workflows] (session/state-path :workflow-state)))
-        (is (= [:workflows :definitions] (session/state-path :workflow-definitions)))
+        (is (= [:workflows] (session-state/state-path :workflow-state)))
+        (is (= [:workflows :definitions] (session-state/state-path :workflow-definitions)))
         (is (= [:workflows :runs] (session-state/state-path :workflow-runs)))
         (is (= [:workflows :run-order] (session-state/state-path :workflow-run-order)))
         (finally

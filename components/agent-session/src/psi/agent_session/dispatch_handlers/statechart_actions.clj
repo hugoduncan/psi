@@ -4,9 +4,9 @@
    on-compacting-entered, on-compact-done, on-retry-triggered, on-retrying-entered,
    on-retry-resume."
   (:require
-   [psi.agent-session.session :as session-data]
+   [psi.session-state.model :as session-data]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.agent-session.session-state :as session]))
+   [psi.session-state.state :as session]))
 
 ;;; Thread utilities
 

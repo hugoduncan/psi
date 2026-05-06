@@ -410,8 +410,16 @@ Review note — 2026-05-06
 Code-shaper review note — 2026-05-06
 - review verdict: pass
 - shape improved materially: lower-level ownership is clearer and `agent-session` is less of an accidental substrate
-- non-blocking follow-ons remain:
-  - narrow or retire `psi.agent-session.session` compat re-exports that still blur model vs state ownership
-  - decide whether session display-name shaping belongs permanently in `psi.session-state.state` or should move to a smaller shared helper
-  - split child-session prompt derivation from lower child session init so the remaining mixed seam above `session-state` gets smaller
 - `journal-append-in!` effect convergence is intentionally excluded from this follow-on list because it is now tracked separately in task `098`
+
+Code-shaper follow-up implementation — 2026-05-06
+- narrowed `psi.agent-session.session` back toward model-only compatibility by removing the temporary state-helper re-exports that had blurred model vs state ownership
+- migrated remaining task-local/test-visible callers that still relied on those re-exports toward `psi.session-state.state` or existing `session-state` compat instead
+- made the session display-name decision explicit by extracting lower-level display-name shaping into `psi.session-state.display-name` and having `psi.session-state.state` depend on that focused helper instead of carrying the logic inline
+- reduced the remaining child-session mixed seam by splitting:
+  - `child-session-base-state`
+  - `initialize-child-session-state`
+  so lower child-session base state assembly is more explicit even though prompt derivation still remains above `session-state`
+- verification after the shaping follow-up remained green:
+  - focused targeted set green
+  - full unit suite green (`1514 tests, 11692 assertions, 0 failures`)

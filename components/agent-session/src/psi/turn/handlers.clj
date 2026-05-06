@@ -8,7 +8,7 @@
    [clojure.string :as str]
    [psi.agent-core.core :as agent]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.session-state :as session]))
+   [psi.session-state.state :as session]))
 
 (defn- now-inst []
   (java.time.Instant/now))
