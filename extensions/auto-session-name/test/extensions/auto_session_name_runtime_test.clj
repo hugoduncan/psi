@@ -44,18 +44,18 @@
      :last-run-params* last-run-params*}))
 
 (defn- seed-conversation! [ctx session-id]
-  (ss/journal-append-in! ctx session-id
-                         {:id "m1"
-                          :kind :message
-                          :timestamp (java.time.Instant/now)
-                          :data {:message {:role "user"
-                                           :content [{:type :text :text "Fix footer rendering"}]}}})
-  (ss/journal-append-in! ctx session-id
-                         {:id "m2"
-                          :kind :message
-                          :timestamp (java.time.Instant/now)
-                          :data {:message {:role "assistant"
-                                           :content [{:type :text :text "I will inspect the selector path."}]}}}))
+  (ss/append-journal-entry-in! ctx session-id
+                               {:id "m1"
+                                :kind :message
+                                :timestamp (java.time.Instant/now)
+                                :data {:message {:role "user"
+                                                 :content [{:type :text :text "Fix footer rendering"}]}}})
+  (ss/append-journal-entry-in! ctx session-id
+                               {:id "m2"
+                                :kind :message
+                                :timestamp (java.time.Instant/now)
+                                :data {:message {:role "assistant"
+                                                 :content [{:type :text :text "I will inspect the selector path."}]}}}))
 
 (defn- checkpoint-handler [ctx ext-path]
   (-> (get-in @(:state (:extension-registry ctx)) [:extensions ext-path :handlers "auto_session_name/rename_checkpoint"])

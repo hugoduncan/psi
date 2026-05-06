@@ -146,10 +146,10 @@
 
   (testing "list-context-sessions-in carries canonical inferred display-name"
     (let [[ctx session-id] (create-session-context)]
-      (ss/journal-append-in! ctx session-id
-                             (persist/message-entry {:role "user"
-                                                     :content [{:type :text :text "Investigate failing tests"}]
-                                                     :timestamp (java.time.Instant/parse "2026-03-16T10:47:00Z")}))
+      (ss/append-journal-entry-in! ctx session-id
+                                   (persist/message-entry {:role "user"
+                                                           :content [{:type :text :text "Investigate failing tests"}]
+                                                           :timestamp (java.time.Instant/parse "2026-03-16T10:47:00Z")}))
       (let [listed (ss/list-context-sessions-in ctx)
             slot   (first (filter #(= session-id (:session-id %)) listed))]
         (is (= "Investigate failing tests" (:display-name slot))))))
@@ -278,12 +278,12 @@
         parent-id          (:session-id parent-sd)
         ctx                (retarget ctx parent-sd)
         parent-file        (:session-file parent-sd)
-        entry-id           (:id (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "user"
-                                                                                             :content [{:type :text :text "branch-here"}]
-                                                                                             :timestamp (java.time.Instant/now)})))
-        _                  (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "assistant"
-                                                                                        :content [{:type :text :text "reply-here"}]
-                                                                                        :timestamp (java.time.Instant/now)}))
+        entry-id           (:id (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "user"
+                                                                                                   :content [{:type :text :text "branch-here"}]
+                                                                                                   :timestamp (java.time.Instant/now)})))
+        _                  (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "assistant"
+                                                                                              :content [{:type :text :text "reply-here"}]
+                                                                                              :timestamp (java.time.Instant/now)}))
         child-sd           (session/fork-session-in! ctx parent-id entry-id)
         child-id           (:session-id child-sd)
         ctx                (retarget ctx child-sd)
@@ -310,15 +310,15 @@
         user-entry       (persist/message-entry {:role "user"
                                                  :content [{:type :text :text "branch-here"}]
                                                  :timestamp (java.time.Instant/now)})
-        _                (ss/journal-append-in! ctx parent-id user-entry)
-        _                (ss/journal-append-in! ctx parent-id
-                                                (persist/message-entry {:role "assistant"
-                                                                        :content [{:type :text :text "reply-here"}]
-                                                                        :timestamp (java.time.Instant/now)}))
-        _                (ss/journal-append-in! ctx parent-id
-                                                (persist/message-entry {:role "user"
-                                                                        :content [{:type :text :text "later-turn"}]
-                                                                        :timestamp (java.time.Instant/now)}))
+        _                (ss/append-journal-entry-in! ctx parent-id user-entry)
+        _                (ss/append-journal-entry-in! ctx parent-id
+                                                      (persist/message-entry {:role "assistant"
+                                                                              :content [{:type :text :text "reply-here"}]
+                                                                              :timestamp (java.time.Instant/now)}))
+        _                (ss/append-journal-entry-in! ctx parent-id
+                                                      (persist/message-entry {:role "user"
+                                                                              :content [{:type :text :text "later-turn"}]
+                                                                              :timestamp (java.time.Instant/now)}))
         child-sd         (session/fork-session-in! ctx parent-id (:id user-entry))
         child-id         (:session-id child-sd)
         ctx              (retarget ctx child-sd)

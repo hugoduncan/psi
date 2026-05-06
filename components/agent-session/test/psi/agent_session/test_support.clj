@@ -13,7 +13,6 @@
    [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
    [psi.agent-session.services :as services]
    [psi.session-state.model :as session-data]
-   [psi.agent-session.persistence :as persistence]
    [psi.session-state.state :as ss]
    [psi.turn]
    [psi.agent-session.statechart :as session-sc]
@@ -189,8 +188,7 @@
                        :daemon-thread-fn             (fn [f] (doto (Thread. ^Runnable f) (.setDaemon true) (.start)))
                        :effective-cwd-fn             (fn [ctx session-id] (ss/session-worktree-path-in ctx session-id))
                        :validate-dispatch-result-fn  dispatch-schema/validate-dispatch-schemas
-                       :validate-result-fn           dispatch-schema/validate-dispatch-schemas
-                       :journal-append-fn            persistence/append-entry-in!}
+                       :validate-result-fn           dispatch-schema/validate-dispatch-schemas}
         _             (dispatch-handlers/register-all! ctx)
         actions-fn     (dispatch-handlers/make-actions-fn ctx)
         ctx            (assoc ctx :session-actions-fn actions-fn)]

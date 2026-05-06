@@ -18,10 +18,10 @@
 (deftest context-snapshot-uses-canonical-context-session-display-names-test
   (let [[ctx sid] (create-session-context {:persist? false})
         user-ts   (java.time.Instant/parse "2026-03-16T10:47:00Z")
-        _         (ss/journal-append-in! ctx sid
-                                         (persist/message-entry {:role "user"
-                                                                 :content [{:type :text :text "hi"}]
-                                                                 :timestamp user-ts}))
+        _         (ss/append-journal-entry-in! ctx sid
+                                               (persist/message-entry {:role "user"
+                                                                       :content [{:type :text :text "hi"}]
+                                                                       :timestamp user-ts}))
         snapshot  (app-context/context-snapshot ctx sid sid)
         session   (some #(when (= sid (:id %)) %) (:sessions snapshot))]
     (is (= sid (:active-session-id snapshot)))

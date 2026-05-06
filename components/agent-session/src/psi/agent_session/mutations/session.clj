@@ -257,8 +257,10 @@
   {::pco/op-name 'psi.extension/append-entry
    ::pco/params  [:psi/agent-session-ctx :session-id :custom-type]
    ::pco/output  [:psi.agent-session/session-entry-count]}
-  (ss/journal-append-in! agent-session-ctx session-id
-                         (persist/custom-message-entry custom-type (str data) nil false))
+  (dispatch/dispatch! agent-session-ctx :session/append-journal-entry
+                      {:session-id session-id
+                       :entry (persist/custom-message-entry custom-type (str data) nil false)}
+                      {:origin :extension})
   {:psi.agent-session/session-entry-count
    (count (ss/get-state-value-in agent-session-ctx (ss/state-path :journal session-id)))})
 

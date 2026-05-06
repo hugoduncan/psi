@@ -56,7 +56,7 @@
         user-msg    {:role "user" :content [{:type :text :text "hi"}]}]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream!
                   (stub-text-stream "response")]
-      (ss/journal-append-in! session-ctx session-ctx-id (persist/message-entry user-msg))
+      (ss/append-journal-entry-in! session-ctx session-ctx-id (persist/message-entry user-msg))
       (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id stub-model)
       (let [session-id session-ctx-id
             msgs       (journal-messages session-ctx session-id)]
@@ -121,7 +121,7 @@
                       (consume-fn {:type :start})
                       (consume-fn {:type :done :reason :stop}))]
     (with-redefs [psi.agent-session.prompt-runtime/do-stream! stream-fn]
-      (ss/journal-append-in! session-ctx session-ctx-id (persist/message-entry user-msg))
+      (ss/append-journal-entry-in! session-ctx session-ctx-id (persist/message-entry user-msg))
       (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id stub-model)
       (is (= "base\n\n# Agent Profile: builder\n\nFollow the build plan carefully.\n\n# Extension Prompt Contributions\n\n<prompt_contribution id=\"c1\" ext_path=\"/ext/a\">\nHint A\n</prompt_contribution>"
              (:system-prompt @seen-conv)))
@@ -204,7 +204,7 @@
                       (swap! calls conj [:finish (:stop-reason result)])
                       result)]
         ;; Caller is responsible for journaling before invoking the loop
-        (ss/journal-append-in! session-ctx session-ctx-id (persist/message-entry user-msg))
+        (ss/append-journal-entry-in! session-ctx session-ctx-id (persist/message-entry user-msg))
         (let [result (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id stub-model
                                                   {:api-key "k"})]
           (is (= :stop (:stop-reason result)))
@@ -557,7 +557,7 @@
             "parent ctx still sees parent session")))))
 
 (deftest child-session-journal-isolation-test
-  ;; Writes via journal-append-in! on a scoped ctx land in the child journal
+  ;; Writes via append-journal-entry-in! on a scoped ctx land in the child journal
   ;; without touching the parent journal.
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
@@ -571,7 +571,7 @@
                      :content [{:type :text :text "child msg"}]
                      :timestamp (java.time.Instant/now)}]
     (testing "child session journal isolation"
-      (ss/journal-append-in! scoped child-id (persist/message-entry test-msg))
+      (ss/append-journal-entry-in! scoped child-id (persist/message-entry test-msg))
       (testing "entry appears in child journal"
         (let [child-journal (journal-for-session session-ctx child-id)]
           (is (= 1 (count child-journal))
@@ -603,7 +603,7 @@
     (testing "prompt execution child session end-to-end"
       (with-redefs [psi.agent-session.prompt-runtime/do-stream!
                     (stub-text-stream "child response")]
-        (ss/journal-append-in! scoped child-id (persist/message-entry user-msg))
+        (ss/append-journal-entry-in! scoped child-id (persist/message-entry user-msg))
         (prompt-loop/run-agent-loop! nil scoped child-id stub-model))
       (testing "child journal contains both user and assistant messages"
         (let [child-journal  (journal-for-session session-ctx child-id)

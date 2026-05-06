@@ -93,6 +93,8 @@
      [:schedule-id :string]]]
    [:scheduler/drain-queue
     [:map [:effect/type [:= :scheduler/drain-queue]]]]
+   [:persist/journal-append-entry
+    [:map [:effect/type [:= :persist/journal-append-entry]] [:entry :map]]]
    [:persist/journal-append-model-entry
     [:map [:effect/type [:= :persist/journal-append-model-entry]]
      [:provider :string] [:model-id :string]]]

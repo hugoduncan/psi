@@ -463,13 +463,13 @@
           t0  (java.time.Instant/now)
           t1  (.plusMillis t0 10)
           t2  (.plusMillis t0 20)]
-      (ss/journal-append-in! ctx session-id
-                             {:kind :message
-                              :data {:message {:role "toolResult"
-                                               :tool-call-id "call-journal-1"
-                                               :tool-name "read"
-                                               :content [{:type :text :text "ok"}]
-                                               :is-error false}}})
+      (ss/append-journal-entry-in! ctx session-id
+                                   {:kind :message
+                                    :data {:message {:role "toolResult"
+                                                     :tool-call-id "call-journal-1"
+                                                     :tool-name "read"
+                                                     :content [{:type :text :text "ok"}]
+                                                     :is-error false}}})
       (test-support/update-state! ctx :tool-lifecycle-events into
                                   [{:event-kind :tool-start
                                     :tool-id "call-life-1"

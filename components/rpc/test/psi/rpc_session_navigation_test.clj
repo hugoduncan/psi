@@ -169,7 +169,7 @@
           _                   (session/set-session-name-in! ctx child-id "child")
           entry               (persist/message-entry {:role    "user"
                                                       :content [{:type :text :text "Branch from this prompt"}]})
-          _                   (ss/journal-append-in! ctx session-id entry)
+          _                   (ss/append-journal-entry-in! ctx session-id entry)
           state               (atom {:transport {:ready? true :pending {}}
                                      :connection {:focus-session-id session-id
                                                   :subscribed-topics #{"ui/frontend-action-requested"}}})
@@ -209,7 +209,7 @@
           canonical-messages  [{:role "user" :content "who are you?"}
                                {:role "assistant" :content [{:type :text :text "I am psi."}]}]
           _                   (doseq [m canonical-messages]
-                                (ss/journal-append-in! ctx sid1 (persist/message-entry m)))
+                                (ss/append-journal-entry-in! ctx sid1 (persist/message-entry m)))
           _                   (agent/replace-messages-in! (ss/agent-ctx-in ctx sid1)
                                                           [{:role    "assistant"
                                                             :content [{:type :text :text "stale in-memory tail"}]}])

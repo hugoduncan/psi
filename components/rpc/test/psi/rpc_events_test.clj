@@ -159,12 +159,12 @@
           _                (session/dispatch-in! ctx :session/update-context-usage
                                                  {:session-id session-id :tokens 4000 :window 100000}
                                                  {:origin :core})
-          _                (ss/journal-append-in! ctx session-id
-                                                  {:kind :message
-                                                   :session-id session-id
-                                                   :data {:message {:role "assistant"
-                                                                    :usage {:input-tokens 111
-                                                                            :output-tokens 22}}}})
+          _                (ss/append-journal-entry-in! ctx session-id
+                                                        {:kind :message
+                                                         :session-id session-id
+                                                         :data {:message {:role "assistant"
+                                                                          :usage {:input-tokens 111
+                                                                                  :output-tokens 22}}}})
           payload          (rpc.events/footer-updated-payload ctx session-id)]
       (is (= ["↑111" "↓22" "4.0%/100k"]
              (:usage-parts payload)))

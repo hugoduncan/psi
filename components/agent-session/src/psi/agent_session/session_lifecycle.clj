@@ -49,12 +49,20 @@
     (dispatch/dispatch! ctx :session/ensure-base-system-prompt {:session-id new-session-id} {:origin :core})
     (dispatch/dispatch! ctx :session/retarget-runtime-prompt-metadata {:session-id new-session-id} {:origin :core})
     (when session-name
-      (session/journal-append-in! ctx new-session-id (persist/session-info-entry session-name)))
-    (session/journal-append-in! ctx new-session-id
-                                (persist/thinking-level-entry
-                                 (:thinking-level (session/get-session-data-in ctx new-session-id))))
+      (dispatch/dispatch! ctx :session/append-journal-entry
+                          {:session-id new-session-id
+                           :entry (persist/session-info-entry session-name)}
+                          {:origin :core}))
+    (dispatch/dispatch! ctx :session/append-journal-entry
+                        {:session-id new-session-id
+                         :entry (persist/thinking-level-entry
+                                 (:thinking-level (session/get-session-data-in ctx new-session-id)))}
+                        {:origin :core})
     (when-let [model (:model (session/get-session-data-in ctx new-session-id))]
-      (session/journal-append-in! ctx new-session-id (persist/model-entry (:provider model) (:id model))))
+      (dispatch/dispatch! ctx :session/append-journal-entry
+                          {:session-id new-session-id
+                           :entry (persist/model-entry (:provider model) (:id model))}
+                          {:origin :core}))
     (session/get-session-data-in ctx new-session-id)))
 
 (defn new-session-in!

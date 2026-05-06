@@ -200,6 +200,7 @@
       (is (= :idle (ss/sc-phase-in ctx session-id)))
       (let [event-types (mapv :event-type (kernel/event-log-entries))]
         (is (= [:session/compact-start
+                :session/append-journal-entry
                 :session/compaction-finished
                 :session/manual-compaction-execute
                 :session/compact-done]
@@ -250,6 +251,7 @@
         (is (= "ext summary" (:summary result)))
         (let [event-types (mapv :event-type (kernel/event-log-entries))]
           (is (= [:session/compact-start
+                  :session/append-journal-entry
                   :session/compaction-finished
                   :session/manual-compaction-execute
                   :session/compact-done]

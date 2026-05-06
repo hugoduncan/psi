@@ -91,9 +91,15 @@
                       {:session-id session-id
                        :callback :session-worktree-path-in}))))
 
-(defn journal-append-in!
+(defn append-journal-entry-root-update
+  [session-id entry]
+  (fn [state]
+    (update-in state (session-journal-path session-id) (fnil conj []) entry)))
+
+(defn append-journal-entry-in!
   [ctx session-id entry]
-  ((:journal-append-fn ctx) ctx session-id entry))
+  (apply-root-state-update-in! ctx (append-journal-entry-root-update session-id entry))
+  entry)
 
 (defn get-sessions-map-in [ctx] (get-state-in* ctx [:agent-session :sessions]))
 

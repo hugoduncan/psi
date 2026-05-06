@@ -38,7 +38,7 @@
                                                  :parent-session-id root-id)
         entry         (persist/message-entry {:role "user"
                                               :content [{:type :text :text "Branch from here"}]})
-        _             (ss/journal-append-in! ctx root-id entry)
+        _             (ss/append-journal-entry-in! ctx root-id entry)
         items         (selectors/context-session-selector-items ctx root-id)]
     (is (= [[:session root-id]
             [:session child-id]
@@ -79,7 +79,7 @@
   (let [[ctx root-id] (create-session-context {:persist? false})
         entry         (persist/message-entry {:role "user"
                                               :content [{:type :text :text "Branch from here"}]})
-        _             (ss/journal-append-in! ctx root-id entry)
+        _             (ss/append-journal-entry-in! ctx root-id entry)
         items         (selectors/context-session-selector-items ctx root-id)
         session-item  (first items)
         fork-item     (some #(when (= :fork-point (:item/kind %)) %) items)]

@@ -42,6 +42,15 @@ Bootstrapped on 2026-04-02.
   - full unit suite is green again via `bb clojure:test:unit` (`1420 tests, 10554 assertions, 0 failures`)
   - follow-on fix was test hardening in `query_graph_test.clj`: RPC trace mutation assertions no longer assume the global dispatch event log's last entry belongs to the mutation under test; they now clear the log, snapshot pre-count, and inspect newly appended `:session/set-rpc-trace` events only
 - Compatibility scaffold removal has advanced materially.
+- Task 098 journal-append dispatch-effect convergence is now landed:
+  - added canonical generic dispatch effect `:persist/journal-append-entry`
+  - typed journal append effects now funnel through the generic append executor path
+  - `psi.session-state.state` now owns pure append via `append-journal-entry-root-update` and `append-journal-entry-in!`
+  - `psi.agent-session.persistence/append-entry-in!` now performs canonical in-memory append first and then reaches the existing persistence boundary explicitly
+  - removed context ownership via `:journal-append-fn`
+  - migrated representative production callers to dispatch-owned append: session lifecycle initial writes, prompt-runtime assistant append, runtime raw user append helper, extension `append-entry`, and compaction runtime append
+  - added focused convergence proofs in `journal_append_convergence_test.clj`
+  - full unit suite green again via `bb clojure:test:unit` (`1521 tests, 11721 assertions, 0 failures`)
 - Task 093 delegated terminal-contract follow-up is now closed at the IR validation boundary:
   - added a focused regression in `components/agent-session/test/psi/agent_session/workflow_ir_test.clj` proving undeclared delegated `:output :handoff` reads are rejected with `:missing-output-key`
   - this makes the documented fallback rule explicit: callers must not rely on `:output :handoff` unless the delegate step declares that output surface

@@ -29,7 +29,10 @@
                                   ((:compaction-fn ctx) sd preparation custom-instructions))
                 entry           (persist/compaction-entry result from-extension?)
                 new-msgs        (compaction/rebuild-messages-from-entries result sd)]
-            (ss/journal-append-in! ctx session-id entry)
+            (dispatch/dispatch! ctx :session/append-journal-entry
+                                {:session-id session-id
+                                 :entry entry}
+                                {:origin :core})
             (dispatch/dispatch! ctx :session/compaction-finished
                                 {:session-id session-id :messages new-msgs} {:origin :core})
             (ext/dispatch-in reg "session_compact"

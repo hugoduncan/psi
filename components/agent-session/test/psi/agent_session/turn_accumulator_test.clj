@@ -326,7 +326,7 @@
                         (consume-fn {:type :text-delta :content-index 1 :delta "Done"})
                         (consume-fn {:type :done :reason :stop}))]
       (with-redefs [psi.agent-session.prompt-runtime/do-stream! openai-turn]
-        (ss/journal-append-in! session-ctx session-ctx-id (persist/message-entry user-msg))
+        (ss/append-journal-entry-in! session-ctx session-ctx-id (persist/message-entry user-msg))
         (let [result (prompt-loop/run-agent-loop! nil session-ctx session-ctx-id openai-model)]
           (is (= :stop (:stop-reason result)))
           (is (= "Done"
@@ -374,7 +374,7 @@
                         (consume-fn {:type :done :reason :tool_use}))]
       (with-redefs [psi.agent-session.prompt-runtime/do-stream! stream-fn]
         (agent/start-loop-in! agent-ctx [user-msg])
-        (ss/journal-append-in! session-ctx session-ctx-id (persist/message-entry user-msg))
+        (ss/append-journal-entry-in! session-ctx session-ctx-id (persist/message-entry user-msg))
         (let [result (#'prompt-turn/stream-turn! nil session-ctx session-ctx-id anthropic-model nil nil)
               msgs   (let [journal (ss/get-state-value-in session-ctx (ss/state-path :journal session-ctx-id))]
                        (->> journal

@@ -21,3 +21,35 @@ Origin:
 Current review judgment:
 - `design.md`, `plan.md`, and `steps.md` are now aligned
 - implementation should follow the refined ownership boundary and remove the temporary seam before closure
+
+2026-05-06 implementation notes:
+- added canonical generic effect `:persist/journal-append-entry`
+- made typed append effects thin shapers over the generic append executor path
+- added `psi.session-state.state/append-journal-entry-root-update` as the pure in-memory journal update surface
+- added `psi.session-state.state/append-journal-entry-in!` as the extracted component helper for pure in-memory root-state mutation
+- changed `psi.agent-session.persistence/append-entry-in!` to orchestrate the full canonical append path: pure in-memory append first, then existing persistence reachability via `persist-entry-in!`
+- removed context wiring for `:journal-append-fn`
+- removed production ownership of `psi.session-state.state/journal-append-in!`
+- migrated required production callers to dispatch-owned append:
+  - session lifecycle initial journal writes
+  - prompt runtime assistant append
+  - runtime raw user append helper
+  - extension `append-entry` mutation
+  - compaction runtime append was also migrated to the canonical dispatch-owned path to avoid leaving a residual production seam
+- added focused convergence proofs in `components/agent-session/test/psi/agent_session/journal_append_convergence_test.clj`
+- updated state and dispatch expectation tests where the new canonical append event is now intentionally visible in the event log
+
+Verification:
+- focused verification green:
+  - `bb clojure:test:unit --focus psi.session-state.state-test --focus psi.agent-session.journal-append-convergence-test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.dispatch-test --focus psi.agent-session.session-lifecycle-test --focus psi.agent-session.runtime-test --focus psi.agent-session.prompt-lifecycle-test`
+  - `1521 tests, 11721 assertions, 0 failures`
+- full unit verification green:
+  - `bb clojure:test:unit`
+  - `1521 tests, 11721 assertions, 0 failures`
+
+Final ownership boundary:
+- authoritative production append API is dispatch event `:session/append-journal-entry` → effect `:persist/journal-append-entry`
+- `session-state` owns only pure in-memory root-state append logic
+- `agent-session.persistence/append-entry-in!` owns explicit higher-level append orchestration and optional persistence reachability
+- typed journal append effects remain only as thin shapers over the authoritative generic append effect executor path
+- no `ctx :journal-append-fn` compatibility ownership remains in production context wiring

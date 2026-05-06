@@ -39,6 +39,13 @@
       :return {:submitted? true
                :user-msg user-msg}}))
 
+  (register-core-handler!
+   :session/append-journal-entry
+   (fn [_ctx {:keys [entry]}]
+     {:effects [{:effect/type :persist/journal-append-entry
+                 :entry entry}]
+      :return entry}))
+
   (register-core-handler! :session/prompt-prepare-request turn.handlers/prompt-prepare-request-handler)
   (register-core-handler! :session/prompt-record-response turn.handlers/prompt-record-response-handler)
   (register-core-handler! :session/prompt-continue turn.handlers/prompt-continue-handler)

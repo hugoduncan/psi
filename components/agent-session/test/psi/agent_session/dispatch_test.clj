@@ -584,6 +584,7 @@
         (is (= [:session/new-initialize
                 :session/ensure-base-system-prompt
                 :session/retarget-runtime-prompt-metadata
+                :session/append-journal-entry
                 :session/set-startup-bootstrap-summary]
                event-types))))))
 

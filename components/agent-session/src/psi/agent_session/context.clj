@@ -13,7 +13,6 @@
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
-   [psi.agent-session.persistence :as persistence]
    [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
    [psi.agent-session.prompt-chain :as prompt-chain]
    [psi.turn :as turn]
@@ -161,7 +160,6 @@
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
    :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
    :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
-   :journal-append-fn persistence/append-entry-in!
    :effective-cwd-fn (fn
                        ([_ctx] (throw (ex-info "effective-cwd-fn requires explicit session-id" {:callback :effective-cwd-fn})))
                        ([ctx session-id] (ss/session-worktree-path-in ctx session-id)))

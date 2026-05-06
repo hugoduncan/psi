@@ -250,9 +250,9 @@
         _                 (kernel/clear-event-log!)
         parent-sd          (session/new-session-in! ctx nil {})
         parent-id          (:session-id parent-sd)
-        entry-id  (:id (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "user"
-                                                                                    :content [{:type :text :text "fork-dispatch"}]
-                                                                                    :timestamp (java.time.Instant/now)})))]
+        entry-id  (:id (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "user"
+                                                                                          :content [{:type :text :text "fork-dispatch"}]
+                                                                                          :timestamp (java.time.Instant/now)})))]
     (session/fork-session-in! ctx parent-id entry-id)
     (let [entry (first (filter #(= :session/fork-initialize (:event-type %))
                                (kernel/event-log-entries)))]

@@ -21,8 +21,8 @@
   (let [[ctx sid1] (create-session-context {:persist? false})
         sd2        (session/new-session-in! ctx sid1 {})
         sid2       (:session-id sd2)
-        _          (ss/journal-append-in! ctx sid2 (persist/message-entry {:role "assistant"
-                                                                           :content [{:type :text :text "hello"}]}))
+        _          (ss/append-journal-entry-in! ctx sid2 (persist/message-entry {:role "assistant"
+                                                                                 :content [{:type :text :text "hello"}]}))
         state      (atom {:focus-session-id sid1})
         nav        (navigation/switch-session-result ctx state sid1 sid2)]
     (is (= :switch-session (:nav/op nav)))
@@ -36,9 +36,9 @@
 (deftest fork-session-result-builds_rehydration_and_context_test
   (let [[ctx sid] (create-session-context {:persist? false})
         entry     (persist/message-entry {:role "user" :content "branch here"})
-        _         (ss/journal-append-in! ctx sid entry)
-        _         (ss/journal-append-in! ctx sid (persist/message-entry {:role "assistant"
-                                                                         :content [{:type :text :text "reply"}]}))
+        _         (ss/append-journal-entry-in! ctx sid entry)
+        _         (ss/append-journal-entry-in! ctx sid (persist/message-entry {:role "assistant"
+                                                                               :content [{:type :text :text "reply"}]}))
         state     (atom {:focus-session-id sid})
         nav       (navigation/fork-session-result ctx state sid (:id entry))]
     (is (= :fork-session (:nav/op nav)))

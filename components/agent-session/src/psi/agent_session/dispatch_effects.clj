@@ -219,14 +219,20 @@
 (defmethod execute-effect! :statechart/send-event [ctx effect]
   (sc/send-event! (:sc-env ctx) (effect-sc-session-id ctx effect) (:event effect)))
 
+(defn- execute-journal-append-effect!
+  [ctx effect entry]
+  (persist/append-entry-in! ctx (effect-session-id ctx effect) entry))
+
+(defmethod execute-effect! :persist/journal-append-entry [ctx effect]
+  (execute-journal-append-effect! ctx effect (:entry effect)))
 (defmethod execute-effect! :persist/journal-append-model-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/model-entry (:provider effect) (:model-id effect))))
+  (execute-journal-append-effect! ctx effect (persist/model-entry (:provider effect) (:model-id effect))))
 (defmethod execute-effect! :persist/journal-append-message-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/message-entry (:message effect))))
+  (execute-journal-append-effect! ctx effect (persist/message-entry (:message effect))))
 (defmethod execute-effect! :persist/journal-append-thinking-level-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/thinking-level-entry (:level effect))))
+  (execute-journal-append-effect! ctx effect (persist/thinking-level-entry (:level effect))))
 (defmethod execute-effect! :persist/journal-append-session-info-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/session-info-entry (:name effect))))
+  (execute-journal-append-effect! ctx effect (persist/session-info-entry (:name effect))))
 
 (defmethod execute-effect! :persist/project-prefs-update [ctx effect]
   (try

@@ -5,6 +5,7 @@
    It now keeps only the prepared-request execution path and turn abort entry."
   (:require
    [psi.ai.models :as models]
+   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-stream :as prompt-stream]
@@ -222,5 +223,8 @@
   [ai-ctx ctx session-id prepared-request progress-queue]
   (let [execution-result (execute-prepared-request! ai-ctx ctx session-id prepared-request progress-queue)
         assistant-msg    (:execution-result/assistant-message execution-result)]
-    (ss/journal-append-in! ctx session-id (persist/message-entry assistant-msg))
+    (dispatch/dispatch! ctx :session/append-journal-entry
+                        {:session-id session-id
+                         :entry (persist/message-entry assistant-msg)}
+                        {:origin :core})
     execution-result))

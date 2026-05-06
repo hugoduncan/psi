@@ -109,10 +109,6 @@
   [ctx path value]
   (swap! (state* ctx) assoc-in path value))
 
-(defn- update-state-in!
-  [ctx path f & args]
-  (apply swap! (state* ctx) update-in path f args))
-
 ;;; ============================================================
 ;;; Journal operations (in-memory atom)
 ;;; ============================================================
@@ -171,10 +167,19 @@
             (get-in entry [:data :message])))
         (entries-up-to journal-atom entry-id)))
 
+(declare persist-entry-in!)
+
 (defn append-entry-in!
-  "Append `entry` to the canonical journal for `session-id` in ctx. Returns `entry`."
+  "Append `entry` to the canonical journal for `session-id` in ctx and preserve
+   existing persistence semantics. Returns `entry`."
   [ctx session-id entry]
-  (update-state-in! ctx (journal-path ctx session-id) conj entry)
+  (session-state/append-journal-entry-in! ctx session-id entry)
+  (let [sd (session-state/get-session-data-in ctx session-id)]
+    (persist-entry-in! ctx
+                       session-id
+                       (:worktree-path sd)
+                       (:parent-session-id sd)
+                       (:parent-session-path sd)))
   entry)
 
 (defn- entry-coll

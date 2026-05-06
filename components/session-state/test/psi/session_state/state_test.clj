@@ -43,11 +43,16 @@
       (is (= "after" (:session-name (ss/get-session-data-in ctx sid)))))))
 
 (deftest journal-append-test
-  (testing "journal-append-in! appends entries through extracted component"
+  (testing "append-journal-entry-root-update appends entries purely"
+    (let [entry  (persist/message-entry {:role "user" :content [{:type :text :text "hi"}]})
+          state' ((ss/append-journal-entry-root-update "sid" entry) {})]
+      (is (= [entry] (get-in state' [:agent-session :sessions "sid" :persistence :journal])))))
+
+  (testing "append-journal-entry-in! appends entries through extracted component"
     (let [ctx   (create-ctx)
           sid   (add-session! ctx nil {})
           entry (persist/message-entry {:role "user" :content [{:type :text :text "hi"}]})]
-      (ss/journal-append-in! ctx sid entry)
+      (ss/append-journal-entry-in! ctx sid entry)
       (is (= [entry] (ss/get-state-value-in ctx (ss/state-path :journal sid)))))))
 
 (deftest children-of-in-empty-test

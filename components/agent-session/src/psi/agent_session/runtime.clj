@@ -40,7 +40,10 @@
   [ctx session-id text images]
   (require-session-id! session-id)
   (let [user-msg (make-user-message text images)]
-    (ss/journal-append-in! ctx session-id (persist/message-entry user-msg))
+    (dispatch/dispatch! ctx :session/append-journal-entry
+                        {:session-id session-id
+                         :entry (persist/message-entry user-msg)}
+                        {:origin :core})
     user-msg))
 
 (defn resolve-api-key-in

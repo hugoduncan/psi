@@ -158,12 +158,12 @@
           state      (atom {:transport {:ready? true :pending {}}
                             :connection {:subscribed-topics #{"footer/updated"}}})
           handler (support/make-handler ctx state)
-          _          (ss/journal-append-in! ctx session-id
-                                            {:kind :message
-                                             :session-id session-id
-                                             :data {:message {:role "assistant"
-                                                              :usage {:input-tokens 111
-                                                                      :output-tokens 22}}}})
+          _          (ss/append-journal-entry-in! ctx session-id
+                                                  {:kind :message
+                                                   :session-id session-id
+                                                   :data {:message {:role "assistant"
+                                                                    :usage {:input-tokens 111
+                                                                            :output-tokens 22}}}})
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                        "{:id \"n1\" :kind :request :op \"new_session\"}\n")
           {:keys [out-lines]} (support/run-loop input handler state)
@@ -182,12 +182,12 @@
                                            {:origin :core})
           _          (session/dispatch-in! ctx :session/set-thinking-level {:session-id session-id :level :high} {:origin :core})
           _          (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 4000 :window 100000} {:origin :core})
-          _          (ss/journal-append-in! ctx session-id
-                                            {:kind :message
-                                             :session-id session-id
-                                             :data {:message {:role "assistant"
-                                                              :usage {:input-tokens 111
-                                                                      :output-tokens 22}}}})
+          _          (ss/append-journal-entry-in! ctx session-id
+                                                  {:kind :message
+                                                   :session-id session-id
+                                                   :data {:message {:role "assistant"
+                                                                    :usage {:input-tokens 111
+                                                                            :output-tokens 22}}}})
           payload (rpc.events/footer-updated-payload ctx session-id)]
       (is (= ["↑111" "↓22" "4.0%/100k"]
              (:usage-parts payload)))
@@ -198,10 +198,10 @@
   (testing "subscribe emits context/updated with active-session-id and sessions list"
     (let [[ctx session-id] (support/create-session-context)
           user-ts          (java.time.Instant/parse "2026-03-16T10:47:00Z")
-          _                (ss/journal-append-in! ctx session-id
-                                                  (persist/message-entry {:role "user"
-                                                                          :content [{:type :text :text "hi"}]
-                                                                          :timestamp user-ts}))
+          _                (ss/append-journal-entry-in! ctx session-id
+                                                        (persist/message-entry {:role "user"
+                                                                                :content [{:type :text :text "hi"}]
+                                                                                :timestamp user-ts}))
           state            (atom {:transport {:ready? true :pending {}}
                                   :connection {:subscribed-topics #{"context/updated"}}})
           handler          (support/make-handler ctx state)
@@ -234,8 +234,8 @@
           _       (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "anthropic" :id "claude-sonnet"}} {:origin :core})
           ;; Append a message entry so fork has an entry-id to branch from
           entry   (persist/message-entry {:role "user" :content "hi"})
-          _       (ss/journal-append-in! ctx session-id entry)
-          _       (ss/journal-append-in! ctx session-id (persist/message-entry {:role "assistant" :content [{:type :text :text "reply"}]}))
+          _       (ss/append-journal-entry-in! ctx session-id entry)
+          _       (ss/append-journal-entry-in! ctx session-id (persist/message-entry {:role "assistant" :content [{:type :text :text "reply"}]}))
           entry-id (:id entry)
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{"context/updated" "session/rehydrated"}}})
@@ -270,8 +270,8 @@
           _        (.mkdirs (java.io.File. cwd))
           [ctx sid] (support/create-session-context {:cwd cwd})
           entry     (persist/message-entry {:role "user" :content "branch here"})
-          _         (ss/journal-append-in! ctx sid entry)
-          _         (ss/journal-append-in! ctx sid (persist/message-entry {:role "assistant" :content [{:type :text :text "reply here"}]}))
+          _         (ss/append-journal-entry-in! ctx sid entry)
+          _         (ss/append-journal-entry-in! ctx sid (persist/message-entry {:role "assistant" :content [{:type :text :text "reply here"}]}))
           state     (atom {:transport {:ready? true :pending {}}
                            :connection {:subscribed-topics #{"session/resumed" "session/rehydrated" "context/updated"}}})
           handler   (support/make-handler ctx state)
