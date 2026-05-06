@@ -1,8 +1,6 @@
 (ns psi.agent-session.workflow-target-ir-compiler-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [clojure.walk :as walk]
-   [psi.agent-session.workflow-current-ir-compiler :as current-compiler]
    [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-target-ir-compiler :as target-compiler]))
@@ -54,61 +52,6 @@
             :on {"APPROVED" {:goto :done}
                  "REVISE" {:goto "build" :max-iterations 3}}
             :max-iterations 5}]})
-
-(def current-single-step-definition
-  {:definition-id "planner"
-   :name "planner"
-   :step-order ["step-1"]
-   :steps {"step-1" {:executor {:type :agent :profile "planner"}
-                     :prompt-template "$INPUT"
-                     :input-bindings {:input {:source :workflow-input :path [:input]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}
-                     :capability-policy {:tools #{"read" "bash"}}}}})
-
-(def target-single-step-equivalent-definition
-  {:steps [{:name "step-1"
-            :type :session
-            :tools ["bash" "read"]
-            :contributions [{:type :template
-                             :text "{{input}}"
-                             :vars {"input" {:from :workflow-input :path [:input]}}}]}]})
-
-(def current-plan-build-definition
-  {:definition-id "plan-build"
-   :name "plan-build"
-   :step-order ["plan" "build"]
-   :steps {"plan" {:executor {:type :agent :profile "planner"}
-                   :prompt-template "$INPUT"
-                   :input-bindings {:input {:source :workflow-input :path [:input]}}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                   :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-           "build" {:executor {:type :agent :profile "builder"}
-                    :prompt-template "Build: $INPUT"
-                    :input-bindings {:input {:source :step-output :path ["plan" :outputs :final-llm-reply]}}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                    :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})
-
-(def target-plan-build-equivalent-definition
-  {:steps [{:name "plan"
-            :type :session
-            :contributions [{:type :template
-                             :text "{{input}}"
-                             :vars {"input" {:from :workflow-input :path [:input]}}}]}
-           {:name "build"
-            :type :session
-            :contributions [{:type :template
-                             :text "Build: {{input}}"
-                             :vars {"input" {:from {:step "plan" :output :result}
-                                             :path [:outputs :final-llm-reply]}}}]}]})
-
-(defn- strip-compat
-  [x]
-  (walk/postwalk (fn [form]
-                   (if (map? form)
-                     (dissoc form :compat)
-                     form))
-                 x))
 
 (deftest compile-target-invoke-session-delegate-workflow-test
   (testing "target authored invoke/session/delegate workflows compile into canonical IR"
@@ -228,17 +171,6 @@
                                  :ref {:step "build" :output :final-llm-reply}}]}
              (select-keys (workflow-ir/validate-workflow-ir bad-ir)
                           [:valid? :structural-errors :semantic-errors]))))))
-
-(deftest cross-grammar-semantic-equivalence-test
-  (testing "current-authored and target-authored overlapping forms normalize to equivalent canonical IR after compat stripping"
-    (let [current-single-ir (current-compiler/compile-workflow-definition current-single-step-definition)
-          target-single-ir (target-compiler/compile-workflow-definition target-single-step-equivalent-definition)
-          current-plan-build-ir (current-compiler/compile-workflow-definition current-plan-build-definition)
-          target-plan-build-ir (target-compiler/compile-workflow-definition target-plan-build-equivalent-definition)]
-      (is (= (strip-compat current-single-ir)
-             target-single-ir))
-      (is (= (strip-compat current-plan-build-ir)
-             target-plan-build-ir)))))
 
 (deftest create-run-compiles-target-authored-definition-at-effective-definition-seam-test
   (testing "create-run compiles target-authored definitions at the effective-definition seam"

@@ -7,23 +7,29 @@
 (def registered-definition
   {:definition-id "plan-build-review"
    :name "Plan Build Review"
-   :step-order ["plan" "build" "review"]
-   :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}}
-           "build" {:executor {:type :agent :profile "builder" :mode :async}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed}}}
-           "review" {:executor {:type :agent :profile "reviewer" :mode :sync}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :contributions [{:type :template
+                             :text "Plan {{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}
+           {:name "build"
+            :type :session
+            :contributions [{:type :template
+                             :text "Build {{plan}}"
+                             :vars {"plan" {:from {:step "plan" :yield :text}}}}]}
+           {:name "review"
+            :type :session
+            :contributions [{:type :template
+                             :text "Review {{build}}"
+                             :vars {"build" {:from {:step "build" :yield :text}}}}]}]})
 
 (def inline-definition
   {:name "Inline"
-   :step-order ["only-step"]
-   :steps {"only-step" {:executor {:type :agent :profile "builder" :mode :sync}
-                        :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                        :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})
+   :steps [{:name "only-step"
+            :type :session
+            :contributions [{:type :template
+                             :text "{{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}]})
 
 (deftest register-definition-test
   (testing "register-definition stores validated definitions under canonical workflow root state"
@@ -57,7 +63,13 @@
       (is (= :pending (:status run)))
       (is (= "plan" (:current-step-id run)))
       (is (= definition-id (:source-definition-id run)))
-      (is (= registered-definition (dissoc (:effective-definition run) :canonical-ir)))
+      (is (= ["plan" "build" "review"]
+             (get-in run [:effective-definition :step-order])))
+      (is (= [:session :session :session]
+             (->> (get-in run [:effective-definition :steps])
+                  vals
+                  (sort-by :name)
+                  (mapv :type))))
       (is (= :workflow-ir/v1 (get-in run [:effective-definition :canonical-ir :version])))
       (is (= #{"plan" "build" "review"}
              (set (keys (:step-runs run)))))

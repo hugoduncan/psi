@@ -2,8 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-file-loader :as loader]
-   [psi.agent-session.workflow-model :as workflow-model]))
+   [psi.agent-session.workflow-file-loader :as loader]))
 
 (defn- with-temp-workflow-dir
   "Create a temp directory with workflow files, call f with the dir path, then cleanup."
@@ -21,92 +20,115 @@
 
 (def planner-md
   (str "---\nname: planner\ndescription: Plans tasks\n---\n"
-       "You are a planner."))
+       "{:steps [{:name \"plan\"\n"
+       "          :type :session\n"
+       "          :tools [\"read\" \"bash\"]\n"
+       "          :contributions [{:type :template\n"
+       "                           :text \"You are a planner.\\n\\n{{input}}\"\n"
+       "                           :vars {\"input\" {:from :workflow-input}}}]}]}"))
 
 (def builder-md
   (str "---\nname: builder\ndescription: Builds code\n---\n"
-       "{:tools [\"read\" \"bash\" \"edit\" \"write\"]}\n\n"
-       "You are a builder agent."))
+       "{:steps [{:name \"build\"\n"
+       "          :type :session\n"
+       "          :tools [\"read\" \"bash\" \"edit\" \"write\"]\n"
+       "          :contributions [{:type :template\n"
+       "                           :text \"You are a builder agent.\\n\\n{{input}}\"\n"
+       "                           :vars {\"input\" {:from :workflow-input}}}]}]}"))
 
 (def reviewer-md
   (str "---\nname: reviewer\ndescription: Reviews code\n---\n"
-       "You are a reviewer."))
+       "{:steps [{:name \"review\"\n"
+       "          :type :session\n"
+       "          :tools [\"read\" \"bash\"]\n"
+       "          :contributions [{:type :template\n"
+       "                           :text \"You are a reviewer.\\n\\n{{input}}\"\n"
+       "                           :vars {\"input\" {:from :workflow-input}}}]}]}"))
 
 (def chain-md
   (str "---\nname: plan-build-review\ndescription: Plan, build, and review\n---\n"
-       "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}\n"
-       "         {:name \"build\" :workflow \"builder\" :prompt \"Execute: $INPUT\\nOriginal: $ORIGINAL\"}\n"
-       "         {:name \"review\" :workflow \"reviewer\" :prompt \"Review: $INPUT\\nOriginal: $ORIGINAL\"}]}\n\n"
+       "{:steps [{:name \"plan\"\n"
+       "          :type :delegate\n"
+       "          :target \"planner\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\" :vars {\"input\" {:from :workflow-input}}}}\n"
+       "         {:name \"build\"\n"
+       "          :type :delegate\n"
+       "          :target \"builder\"\n"
+       "          :prompt-string {:type :template :text \"Execute: {{input}}\\nOriginal: {{original}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"plan\" :yield :text}}\n"
+       "                                 \"original\" {:from :workflow-original}}}}\n"
+       "         {:name \"review\"\n"
+       "          :type :delegate\n"
+       "          :target \"reviewer\"\n"
+       "          :prompt-string {:type :template :text \"Review: {{input}}\\nOriginal: {{original}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"build\" :yield :text}}\n"
+       "                                 \"original\" {:from :workflow-original}}}}]}\n\n"
        "Coordinate a plan-build-review cycle."))
 
 (def explicit-source-chain-md
   (str "---\nname: bug-triage\ndescription: Modular bug triage\n---\n"
        "{:steps [{:name \"discover\"\n"
-       "          :workflow \"planner\"\n"
-       "          :session {:input {:from :workflow-input}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"planner\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\" :vars {\"input\" {:from :workflow-input}}}}\n"
        "         {:name \"reproduce\"\n"
-       "          :workflow \"builder\"\n"
-       "          :session {:input {:from {:step \"discover\" :kind :accepted-result}}\n"
-       "                    :reference {:from :workflow-original}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"builder\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"discover\" :yield :text}}}}}\n"
        "         {:name \"request-more-info\"\n"
-       "          :workflow \"reviewer\"\n"
-       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}}\n"
-       "                    :reference {:from :workflow-original}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"reviewer\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"reproduce\" :yield :text}}}}}\n"
        "         {:name \"fix\"\n"
-       "          :workflow \"reviewer\"\n"
-       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}}\n"
-       "                    :reference {:from :workflow-original}}\n"
-       "          :prompt \"$INPUT\"}]}\n\n"
+       "          :type :delegate\n"
+       "          :target \"reviewer\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"reproduce\" :yield :text}}}}}]}\n\n"
        "Coordinate modular bug triage."))
 
 (def projected-chain-md
   (str "---\nname: projection-chain\ndescription: Projection chain\n---\n"
        "{:steps [{:name \"discover\"\n"
-       "          :workflow \"planner\"\n"
-       "          :session {:input {:from :workflow-input\n"
-       "                            :projection {:path [:task]}}\n"
-       "                    :reference {:from :workflow-original\n"
-       "                                :projection :full}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"planner\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\" :vars {\"input\" {:from :workflow-input :path [:task]}}}\n"
+       "          :context [{:type :source :from :workflow-original :projection :full}]}\n"
        "         {:name \"reproduce\"\n"
-       "          :workflow \"builder\"\n"
-       "          :session {:input {:from {:step \"discover\" :kind :accepted-result}\n"
-       "                            :projection {:path [:outputs :final-llm-reply]}}\n"
-       "                    :reference {:from :workflow-input\n"
-       "                                :projection {:path [:ticket :title]}}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"builder\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"discover\" :yield :text}}}}\n"
+       "          :context [{:type :source :from :workflow-input :path [:ticket :title]}]}\n"
        "         {:name \"request-more-info\"\n"
-       "          :workflow \"reviewer\"\n"
-       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}\n"
-       "                            :projection :full}\n"
-       "                    :reference {:from :workflow-original\n"
-       "                                :projection :text}}\n"
-       "          :prompt \"$INPUT\"}]}\n\n"
+       "          :type :delegate\n"
+       "          :target \"reviewer\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"reproduce\" :yield :text}}}}\n"
+       "          :context [{:type :source :from :workflow-original :projection :text}]}]}\n\n"
        "Projection chain."))
 
 (def preload-chain-md
   (str "---\nname: preload-chain\ndescription: Preload chain\n---\n"
        "{:steps [{:name \"discover\"\n"
-       "          :workflow \"planner\"\n"
-       "          :session {:input {:from :workflow-input}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"planner\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\" :vars {\"input\" {:from :workflow-input}}}}\n"
        "         {:name \"reproduce\"\n"
-       "          :workflow \"builder\"\n"
-       "          :session {:input {:from {:step \"discover\" :kind :accepted-result}}\n"
-       "                    :reference {:from :workflow-original}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"builder\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"discover\" :yield :text}}}}}\n"
        "         {:name \"post-repro\"\n"
-       "          :workflow \"reviewer\"\n"
-       "          :session {:input {:from {:step \"reproduce\" :kind :accepted-result}}\n"
-       "                    :reference {:from :workflow-original}\n"
-       "                    :preload [{:from :workflow-original}\n"
-       "                              {:from {:step \"discover\" :kind :accepted-result}}\n"
-       "                              {:from {:step \"reproduce\" :kind :session-transcript}\n"
-       "                               :projection {:type :tail :turns 4 :tool-output false}}]}\n"
-       "          :prompt \"$INPUT\"}]}\n\n"
+       "          :type :session\n"
+       "          :tools [\"read\" \"bash\"]\n"
+       "          :contributions [{:type :source :from :workflow-original}\n"
+       "                          {:type :source :from {:step \"discover\" :yield :text} :projection :text}\n"
+       "                          {:type :source :from {:step \"reproduce\" :output :transcript}\n"
+       "                           :projection {:type :tail :turns 4 :tool-output false}}\n"
+       "                          {:type :template :text \"{{input}}\"\n"
+       "                           :vars {\"input\" {:from {:step \"reproduce\" :yield :text}}}}]}]}\n\n"
        "Preload chain."))
 
 (def bad-md
@@ -139,8 +161,10 @@
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
             (is (= #{"planner" "builder"} (set (keys definitions))))
             (is (empty? errors))
-            (is (every? workflow-model/valid-workflow-definition?
-                        (vals definitions))))))))
+            (is (= [:session]
+                   (mapv :type (:steps (get definitions "planner")))))
+            (is (= [:session]
+                   (mapv :type (:steps (get definitions "builder"))))))))))
 
   (testing "multi-step definitions compile with step references resolved"
     (with-temp-workflow-dir
@@ -154,7 +178,9 @@
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
             (is (= 4 (count definitions)))
             (is (contains? definitions "plan-build-review"))
-            (is (= 3 (count (get-in definitions ["plan-build-review" :step-order]))))
+            (is (= 3 (count (get-in definitions ["plan-build-review" :steps]))))
+            (is (= [:delegate :delegate :delegate]
+                   (mapv :type (get-in definitions ["plan-build-review" :steps]))))
             (is (empty? errors)))))))
 
   (testing "explicit named prior-step source selection loads and compiles"
@@ -167,21 +193,18 @@
         (with-redefs [loader/global-workflow-dirs (constantly [])
                       loader/project-workflow-dir (constantly dir)]
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
-                definition (get definitions "bug-triage")
-                [discover-id reproduce-id request-more-info-id fix-id] (:step-order definition)]
+                definition (get definitions "bug-triage")]
             (is (empty? errors))
-            (is (= {:input {:source :workflow-input :path [:input]}
-                    :original {:source :workflow-input :path [:original]}}
-                   (get-in definition [:steps discover-id :input-bindings])))
-            (is (= {:input {:source :step-output :path [discover-id :outputs :text]}
-                    :original {:source :workflow-input :path [:original]}}
-                   (get-in definition [:steps reproduce-id :input-bindings])))
-            (is (= {:input {:source :step-output :path [reproduce-id :outputs :text]}
-                    :original {:source :workflow-input :path [:original]}}
-                   (get-in definition [:steps request-more-info-id :input-bindings])))
-            (is (= {:input {:source :step-output :path [reproduce-id :outputs :text]}
-                    :original {:source :workflow-input :path [:original]}}
-                   (get-in definition [:steps fix-id :input-bindings]))))))))
+            (is (= [:delegate :delegate :delegate :delegate]
+                   (mapv :type (:steps definition))))
+            (is (= :workflow-input
+                   (get-in definition [:steps 0 :prompt-string :vars "input" :from])))
+            (is (= :text
+                   (get-in definition [:steps 1 :prompt-string :vars "input" :from :yield])))
+            (is (= :text
+                   (get-in definition [:steps 2 :prompt-string :vars "input" :from :yield])))
+            (is (= :text
+                   (get-in definition [:steps 3 :prompt-string :vars "input" :from :yield]))))))))
 
   (testing "projected source selection loads and compiles"
     (with-temp-workflow-dir
@@ -193,18 +216,18 @@
         (with-redefs [loader/global-workflow-dirs (constantly [])
                       loader/project-workflow-dir (constantly dir)]
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
-                definition (get definitions "projection-chain")
-                [discover-id reproduce-id request-more-info-id] (:step-order definition)]
+                definition (get definitions "projection-chain")]
             (is (empty? errors))
-            (is (= {:input {:source :workflow-input :path [:task]}
-                    :original {:source :workflow-input :path [:original]}}
-                   (get-in definition [:steps discover-id :input-bindings])))
-            (is (= {:input {:source :step-output :path [discover-id :outputs :final-llm-reply]}
-                    :original {:source :workflow-input :path [:ticket :title]}}
-                   (get-in definition [:steps reproduce-id :input-bindings])))
-            (is (= {:input {:source :step-output :path [reproduce-id]}
-                    :original {:source :workflow-input :path [:original]}}
-                   (get-in definition [:steps request-more-info-id :input-bindings]))))))))
+            (is (= [:delegate :delegate :delegate]
+                   (mapv :type (:steps definition))))
+            (is (= [:task]
+                   (get-in definition [:steps 0 :prompt-string :vars "input" :path])))
+            (is (= :full
+                   (get-in definition [:steps 0 :context 0 :projection])))
+            (is (= [:ticket :title]
+                   (get-in definition [:steps 1 :context 0 :path])))
+            (is (= :text
+                   (get-in definition [:steps 2 :context 0 :projection]))))))))
 
   (testing "session preload loads and compiles"
     (with-temp-workflow-dir
@@ -216,19 +239,18 @@
         (with-redefs [loader/global-workflow-dirs (constantly [])
                       loader/project-workflow-dir (constantly dir)]
           (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
-                definition (get definitions "preload-chain")
-                [discover-id _reproduce-id post-repro-id] (:step-order definition)]
+                definition (get definitions "preload-chain")]
             (is (empty? errors))
-            (is (= [{:kind :value
-                     :role "user"
-                     :binding {:source :workflow-input :path [:original]}}
-                    {:kind :value
-                     :role "assistant"
-                     :binding {:source :step-output :path [discover-id :outputs :text]}}
-                    {:kind :session-transcript
-                     :step-id "step-2-builder"
-                     :projection {:type :tail :turns 4 :tool-output false}}]
-                   (get-in definition [:steps post-repro-id :session-preload]))))))))
+            (is (= [:delegate :delegate :session]
+                   (mapv :type (:steps definition))))
+            (is (= :workflow-original
+                   (get-in definition [:steps 2 :contributions 0 :from])))
+            (is (= :text
+                   (get-in definition [:steps 2 :contributions 1 :from :yield])))
+            (is (= :transcript
+                   (get-in definition [:steps 2 :contributions 2 :from :output])))
+            (is (= {:type :tail :turns 4 :tool-output false}
+                   (get-in definition [:steps 2 :contributions 2 :projection]))))))))
 
   (testing "unresolved step references reported as errors"
     (with-temp-workflow-dir

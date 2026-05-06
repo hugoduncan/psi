@@ -34,15 +34,13 @@
       (is (= [:session :session]
              (mapv :type (:steps definition))))))
 
-  (testing "legacy current-authored multi-step files still compile through the existing path"
-    (let [parsed {:name "plan-build-review"
+  (testing "non-target workflow files now fail compilation explicitly"
+    (let [parsed {:name "legacy-plan-build-review"
                   :description "Plan, build, and review"
                   :config {:steps [{:name "plan" :workflow "planner" :prompt "$INPUT"}
                                    {:name "build" :workflow "builder" :prompt "Build: $INPUT"}]}
                   :body "Coordinate the cycle."}
           {:keys [definition error]} (compiler/compile-workflow-file parsed)]
-      (is (nil? error))
-      (is (= ["step-1-planner" "step-2-builder"]
-             (:step-order definition)))
-      (is (= "builder"
-             (get-in definition [:steps "step-2-builder" :executor :profile]))))))
+      (is (nil? definition))
+      (is (= "Workflow files must define target-authored `{:steps [...]}` config"
+             error)))))

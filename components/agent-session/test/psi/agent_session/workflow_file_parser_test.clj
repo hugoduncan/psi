@@ -5,8 +5,7 @@
    [psi.agent-session.workflow-file-parser :as parser]))
 
 (deftest parse-workflow-file-test
-  (testing "single-step with no config"
-    ;; Simplest case: frontmatter + body text only
+  (testing "body-only workflow files are no longer valid authored workflow files"
     (let [raw "---\nname: planner\ndescription: Plans tasks\n---\nYou are a planner."
           result (parser/parse-workflow-file raw)]
       (is (= "planner" (:name result)))
@@ -15,8 +14,7 @@
       (is (= "You are a planner." (:body result)))
       (is (nil? (:error result)))))
 
-  (testing "single-step with EDN config"
-    ;; EDN config block followed by body text
+  (testing "single-step with non-steps EDN config remains parseable but is no longer a valid workflow compile shape"
     (let [raw (str "---\nname: planner\ndescription: Plans tasks\n---\n"
                    "{:tools [\"read\" \"bash\"]\n :thinking-level :off}\n\n"
                    "You are a planner.")
@@ -26,8 +24,7 @@
       (is (= {:tools ["read" "bash"] :thinking-level :off} (:config result)))
       (is (= "You are a planner." (:body result)))))
 
-  (testing "single-step with EDN config only, no body"
-    ;; EDN config but nothing after it
+  (testing "single-step with non-steps EDN config only, no body remains parseable"
     (let [raw "---\nname: planner\ndescription: Plans tasks\n---\n{:tools [\"read\"]}"
           result (parser/parse-workflow-file raw)]
       (is (= "planner" (:name result)))

@@ -3,8 +3,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-file-compiler :as compiler]
-   [psi.agent-session.workflow-file-loader :as loader]
-   [psi.agent-session.workflow-model :as workflow-model]))
+   [psi.agent-session.workflow-file-loader :as loader]))
 
 (deftest migrated-workflow-files-test
   (testing "all .psi/workflows/ files parse, compile, and validate"
@@ -21,12 +20,10 @@
       (let [{:keys [definitions errors]} (compiler/compile-workflow-files parsed)]
         (is (empty? errors)
             (str "Compile errors: " (pr-str errors)))
-        ;; All produce valid canonical definitions or valid target-authored definitions
+        ;; All produce target-authored definitions
         (doseq [defn-map definitions]
-          (is (or (workflow-model/valid-workflow-definition? defn-map)
-                  (vector? (:steps defn-map)))
-              (str "Invalid definition: " (:name defn-map)
-                   " — " (pr-str (workflow-model/explain-workflow-definition defn-map)))))
+          (is (vector? (:steps defn-map))
+              (str "Expected target-authored definition: " (:name defn-map))))
         ;; Step references all resolve
         (let [ref-result (compiler/validate-step-references definitions)]
           (is (true? (:valid? ref-result))
