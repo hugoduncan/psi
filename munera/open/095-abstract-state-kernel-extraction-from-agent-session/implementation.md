@@ -208,3 +208,7 @@ Review notes — 2026-05-06
   - migrated `post_tool_test.clj` off the compat wrapper for handler-registry access by switching its local test registration from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`, which is the authoritative owner for the dispatch registry.
   - classified the remaining `psi.agent-session.dispatch` use in `tool_execution_test.clj` as currently legitimate compat/composition coverage because those tests intentionally observe nested domain redispatch through the wrapper-owned `dispatch!` path during `:session/tool-run` orchestration.
   - this narrows two more test namespaces without forcing production changes, while preserving the remaining wrapper dependency only where the test is explicitly about wrapper-mediated dispatch composition.
+- Scheduler effects test ownership narrowing follow-up — 2026-05-06
+  - migrated `scheduler_effects_test.clj` off `psi.agent-session.dispatch` for its public scheduler create setup calls.
+  - those setup events now enter through `psi.agent-session.core/dispatch-in!`, while the file keeps its legitimate direct compat-wrapper redefs of `psi.agent-session.dispatch/dispatch!` for timer-fired effect interception.
+  - this keeps the production boundary unchanged and narrows the file so its remaining wrapper dependence is only the intentional dispatch-effect seam under test.
