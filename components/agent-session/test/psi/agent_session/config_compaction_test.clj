@@ -7,6 +7,7 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session :as session-data]
@@ -31,9 +32,9 @@
 (deftest session-config-dispatch-test
   (testing "set-session-name-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "my session"} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))
+      (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= "my session" (:session-name sd)))
         (is (= :session/set-session-name (:event-type entry)))
@@ -42,27 +43,27 @@
 
   (testing "set-worktree-path-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/feature-z"} {:origin :core})
       (is (= "/repo/feature-z" (:worktree-path (ss/get-session-data-in ctx session-id))))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-worktree-path (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:worktree-path "/repo/feature-z"} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-cache-breakpoints-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-cache-breakpoints {:session-id session-id :breakpoints #{:system :tools}} {:origin :core})
       (is (= #{:system :tools} (:cache-breakpoints (ss/get-session-data-in ctx session-id))))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-cache-breakpoints (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:breakpoints #{:system :tools}} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-active-tools-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           tool-maps  [{:name "read"} {:name "bash"}]]
       (dispatch/dispatch! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-maps} {:origin :core})
       (is (= #{"read" "bash"} (:active-tools (ss/get-session-data-in ctx session-id))))
@@ -70,7 +71,7 @@
               {:name "bash" :label "bash" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}]
              (:tool-defs (ss/get-session-data-in ctx session-id))))
       (let [entry (last (filter #(= :session/set-active-tools (:event-type %))
-                                (dispatch/event-log-entries)))]
+                                (kernel/event-log-entries)))]
         (is (= :session/set-active-tools (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:tool-maps tool-maps} (dissoc (:event-data entry) :session-id)))))))
@@ -87,9 +88,9 @@
 
   (testing "update-context-usage-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 5000 :window 100000} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/update-context-usage (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:tokens 5000 :window 100000} (dissoc (:event-data entry) :session-id))))))
@@ -102,7 +103,7 @@
 
   (testing "queued input helpers and bootstrap resource registration route through dispatch"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           template   {:name "greet" :description "d" :content "c" :source :project :file-path "/tmp/greet.md"}
           skill      {:name "coding" :description "d" :file-path "/tmp/SKILL.md"
                       :base-dir "/tmp" :source :project :disable-model-invocation false}]
@@ -112,7 +113,7 @@
       (dispatch/dispatch! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
       (session/consume-queued-input-text-in! ctx session-id)
       (let [sd         (ss/get-session-data-in ctx session-id)
-            entries    (dispatch/event-log-entries)
+            entries    (kernel/event-log-entries)
             event-types (mapv :event-type entries)]
         (is (= [] (:steering-messages sd)))
         (is (= [] (:follow-up-messages sd)))
@@ -163,28 +164,28 @@
 (deftest config-flags-dispatch-test
   (testing "set-auto-retry-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-auto-retry {:session-id session-id :enabled? false} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-auto-retry (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:enabled? false} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-auto-compaction-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-auto-compaction {:session-id session-id :enabled? true} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-auto-compaction (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:enabled? true} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-ui-type-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-ui-type {:session-id session-id :ui-type :emacs} {:origin :core})
       (is (= :emacs (:ui-type (ss/get-session-data-in ctx session-id))))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-ui-type (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:ui-type :emacs} (dissoc (:event-data entry) :session-id)))))))
@@ -194,11 +195,11 @@
 (deftest manual-compaction-test
   (testing "manual-compact-in! runs stub compaction and returns to idle"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           result     (session/manual-compact-in! ctx session-id nil)]
       (is (string? (:summary result)))
       (is (= :idle (ss/sc-phase-in ctx session-id)))
-      (let [event-types (mapv :event-type (dispatch/event-log-entries))]
+      (let [event-types (mapv :event-type (kernel/event-log-entries))]
         (is (= [:session/compact-start
                 :session/compaction-finished
                 :session/manual-compaction-execute
@@ -206,7 +207,7 @@
                event-types)))))
 
   (testing "manual-compact-in! with custom compaction-fn uses that fn"
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (let [custom-fn  (fn [_sd _prep _instr]
                        {:summary "custom summary"
                         :first-kept-entry-id nil
@@ -216,20 +217,20 @@
           result     (session/manual-compact-in! ctx session-id nil)]
       (is (= "custom summary" (:summary result)))
       (let [entry (first (filter #(= :session/manual-compaction-execute (:event-type %))
-                                 (dispatch/event-log-entries)))]
+                                 (kernel/event-log-entries)))]
         (is (= :core (:origin entry)))
         (is (= {:custom-instructions nil} (dissoc (:event-data entry) :session-id))))))
 
   (testing "manual-compact-in! can be cancelled by extension"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           reg        (:extension-registry ctx)]
       (ext/register-extension-in! reg "/ext/c")
       (ext/register-handler-in! reg "/ext/c" "session_before_compact"
                                 (fn [_] {:cancel true}))
       (let [result (session/manual-compact-in! ctx session-id nil)]
         (is (nil? result))
-        (let [event-types (mapv :event-type (dispatch/event-log-entries))]
+        (let [event-types (mapv :event-type (kernel/event-log-entries))]
           (is (= [:session/compact-start
                   :session/manual-compaction-execute
                   :session/compact-done]
@@ -241,14 +242,14 @@
                          :tokens-before nil
                          :details nil}
           [ctx session-id] (create-session-context)
-          _             (dispatch/clear-event-log!)
+          _             (kernel/clear-event-log!)
           reg           (:extension-registry ctx)]
       (ext/register-extension-in! reg "/ext/c")
       (ext/register-handler-in! reg "/ext/c" "session_before_compact"
                                 (fn [_] {:compaction custom-result}))
       (let [result (session/manual-compact-in! ctx session-id nil)]
         (is (= "ext summary" (:summary result)))
-        (let [event-types (mapv :event-type (dispatch/event-log-entries))]
+        (let [event-types (mapv :event-type (kernel/event-log-entries))]
           (is (= [:session/compact-start
                   :session/compaction-finished
                   :session/manual-compaction-execute

@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.persistence :as persist]
@@ -40,7 +40,7 @@
         sd               (session/new-session-in! ctx nil {})
         session-id       (:session-id sd)
         sync-calls       (atom [])]
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (with-redefs [runtime/safe-maybe-sync-on-git-head-change!
                   (fn [ctx sid]
                     (swap! sync-calls conj {:ctx ctx :session-id sid})
@@ -61,7 +61,7 @@
         (is (fn? run-fn))
         (run-fn "hello from extension" :test-source)
         (Thread/sleep 50)
-        (let [entries   (dispatch/event-log-entries)
+        (let [entries   (kernel/event-log-entries)
               messages  (->> (persist/all-entries-in ctx session-id)
                              (filter #(= :message (:kind %)))
                              (map #(get-in % [:data :message]))

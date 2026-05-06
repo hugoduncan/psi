@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-runtime]
    [psi.agent-session.session-state :as ss]
@@ -24,7 +25,7 @@
 
 (deftest scheduled-deliver-runs-canonical-prompt-lifecycle-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
@@ -49,7 +50,7 @@
                           {:session-id session-id
                            :schedule-id "sch-e2e-1"}
                           {:origin :core})
-      (let [entries (dispatch/event-log-entries)
+      (let [entries (kernel/event-log-entries)
             messages (journal-messages ctx session-id)
             user-msg (first messages)
             assistant-msg (second messages)]

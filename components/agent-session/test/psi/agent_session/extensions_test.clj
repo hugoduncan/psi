@@ -3,7 +3,7 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.deterministic-operation-registry :as op-reg]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
@@ -717,7 +717,7 @@
           _                (ext/register-extension-in! (:extension-registry ctx) ext-path)
           ui               (#'ext-rt/extension-ui-context ctx session-id (fn [] {:ui-type :emacs}) ext-path)]
       ((:set-widget ui) "w1" :below-editor ["hello"])
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/ui-set-widget (:event-type entry)))
         (is (= :extension (:origin entry)))
         (is (= ext-path (:ext-id entry)))

@@ -6,6 +6,7 @@
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-runtime]
@@ -42,7 +43,7 @@
 
   (testing "session lifecycle events can be routed through dispatch statechart boundary"
     (let [[ctx _session-id] (create-session-context {:persist? false})
-          _                 (dispatch/clear-event-log!)
+          _                 (kernel/clear-event-log!)
           sd                (session/new-session-in! ctx nil {})
           session-id        (:session-id sd)
           ctx               (retarget ctx sd)]
@@ -60,7 +61,7 @@
                        :execution-result/stop-reason :stop})]
         (session/prompt-in! ctx session-id "hello"))
       (is (= :idle (ss/sc-phase-in ctx session-id)))
-      (let [entries   (dispatch/event-log-entries)
+      (let [entries   (kernel/event-log-entries)
             submit-e  (first (filter #(= :session/prompt-submit (:event-type %)) entries))
             prompt-e  (first (filter #(= :session/prompt (:event-type %)) entries))
             prepare-e (first (filter #(= :session/prompt-prepare-request (:event-type %)) entries))
@@ -76,14 +77,14 @@
 
   (testing "statechart action handlers use pure session-update results"
     (let [[ctx _session-id] (create-session-context {:persist? false})
-          _                 (dispatch/clear-event-log!)
+          _                 (kernel/clear-event-log!)
           sd                (session/new-session-in! ctx nil {})
           session-id        (:session-id sd)
           ctx               (retarget ctx sd)]
       (is (false? (:is-streaming (ss/get-session-data-in ctx session-id))))
       (dispatch/dispatch! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
       (let [sd    (ss/get-session-data-in ctx session-id)
-            entry (last (dispatch/event-log-entries))]
+            entry (last (kernel/event-log-entries))]
         (is (true? (:is-streaming sd)))
         (is (= :root-state-update (:pure-result-kind entry)))))))
 
@@ -413,12 +414,12 @@
   (testing "resume-session-in! missing-file fallback is logged through dispatch"
     (let [f          (str (System/getProperty "java.io.tmpdir") "/psi-missing-" (java.util.UUID/randomUUID) ".ndedn")
           [ctx session-id] (create-session-context {:persist? false})
-          _          (dispatch/clear-event-log!)
+          _          (kernel/clear-event-log!)
           sd         (session/resume-session-in! ctx session-id f)
           session-id (:session-id sd)
           ctx        (retarget ctx sd)
           entry      (first (filter #(= :session/resume-missing-initialize (:event-type %))
-                                    (dispatch/event-log-entries)))]
+                                    (kernel/event-log-entries)))]
       (is (= f (:session-file sd)))
       (is (= [] (persist/all-entries-in ctx session-id)))
       (is (= :core (:origin entry)))
