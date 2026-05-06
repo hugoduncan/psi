@@ -20,6 +20,8 @@
 
 (def binding-source-value workflow-step-prep/binding-source-value)
 (def materialize-step-inputs workflow-step-prep/materialize-step-inputs)
+(def materialize-step-session-conversation workflow-step-prep/materialize-step-session-conversation)
+(def split-step-session-conversation workflow-step-prep/split-step-session-conversation)
 (def step-prompt workflow-step-prep/step-prompt)
 
 (defn resolve-step-session-config

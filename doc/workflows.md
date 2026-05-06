@@ -6,10 +6,9 @@ A workflow is a named prompt or orchestration loaded from `.psi/workflows/*.md`
 by the `psi/workflow-loader` extension. Some workflows are single focused agents;
 others are multi-step flows that pass results from one step to the next.
 
-This document is the primary example-led guide for the preferred workflow
-authoring path. It covers the user-facing workflow surface, how to enable and run
-workflows, and the converged target grammar that new workflow authors should
-prefer when the current implementation supports the needed surface.
+This document is the primary example-led guide for workflow authoring. It
+covers the user-facing workflow surface, how to enable and run workflows, and
+the supported target-authored grammar.
 
 ## Prerequisite: enable workflow loading
 
@@ -43,7 +42,7 @@ This repository includes many examples there, including:
 - `builder`
 - `reviewer`
 
-For this migration slice, the authoritative example set is:
+The authoritative example set is:
 
 - `plan-build` — compact inline-session authoring example
 - `plan-build-review` — compact multi-step inline-session example
@@ -108,11 +107,9 @@ At a high level:
 - use `:session` when you want to assemble a child conversation inline
 - use `:delegate` when you want to call a reusable named workflow
 
-For the formal target grammar, see [`doc/workflow-grammar.md`](workflow-grammar.md).
+For the formal grammar, see [`doc/workflow-grammar.md`](workflow-grammar.md).
 For the conceptual explanation, see
 [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md).
-For the older currently implemented authored shape, see
-[`doc/workflow-grammar-current.md`](workflow-grammar-current.md).
 
 ## Example 1: compact inline session workflow
 
@@ -322,18 +319,9 @@ Interpretation:
 - `:context` on a delegate step carries forwarded material without changing the
   delegated workflow's prompt string
 
-## Concise current → target mapping
+## Authoring choices
 
-When reading older workflow examples, the simplest mapping is:
-
-- old multi-step `:workflow` step entry → usually new `:type :delegate`
-- old `:session :input` / `:reference` / `:preload` → new explicit
-  `:contributions` for inline sessions, or `:prompt-string` + `:context` for
-  delegates
-- old prompt strings using `$INPUT` / `$ORIGINAL` → new template contributions
-  using `:text` + `:vars`
-
-Keep the mapping practical:
+Keep the authoring choices practical:
 
 - if you are assembling a child conversation inline, use `:session`
 - if you are calling another workflow by name, use `:delegate`
@@ -377,10 +365,8 @@ Good first workflow authoring loop:
 
 ## Related docs
 
-- [`doc/workflow-grammar.md`](workflow-grammar.md) — target workflow grammar
-- [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md) — target concepts and semantics
-- [`doc/workflow-grammar-current.md`](workflow-grammar-current.md) — older authored shape still present during migration
-- [`doc/workflow-grammar-migration.md`](workflow-grammar-migration.md) — migration strategy and layers
+- [`doc/workflow-grammar.md`](workflow-grammar.md) — workflow grammar
+- [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md) — workflow concepts and semantics
 - [`doc/extensions-install.md`](extensions-install.md) — enable `psi/workflow-loader`
 - [`doc/extensions.md`](extensions.md) — extension/tool details for `workflow-loader`
 - [`doc/tui.md`](tui.md) — general in-session command usage

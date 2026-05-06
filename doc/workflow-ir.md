@@ -1,15 +1,13 @@
 # Workflow IR
 
-This document defines the **normalized workflow IR** for deterministic workflow steps.
+This document defines the **normalized workflow IR** for deterministic workflow
+steps.
 
-The workflow IR is the canonical runtime execution model used to bridge:
+The workflow IR is the canonical runtime execution model for authored workflow
+files compiled from `doc/workflow-grammar.md`.
 
-- the **current implemented workflow grammar** documented in `doc/workflow-grammar-current.md`
-- the **target converged workflow grammar** documented in `doc/workflow-grammar.md`
-
-It is intentionally not a user-facing authoring grammar. It is the normalized execution boundary that both authored grammars should compile into.
-
-For the migration architecture that introduces this IR, see `doc/workflow-grammar-migration.md`.
+It is intentionally not a user-facing authoring grammar. It is the normalized
+execution boundary used by runtime execution.
 
 ## Purpose
 
@@ -34,11 +32,10 @@ The runtime should execute IR, not raw authored workflow documents.
 
 The IR should have these properties:
 
-- **Canonical** — one execution model regardless of authored grammar source
+- **Canonical** — one execution model for all authored workflow files
 - **Explicit** — execution form, references, outputs, and yielded value are visible in data
 - **Typed by tag** — execution form and yielded-value semantics use explicit `:type` discrimination
 - **Observable** — runtime can record inspectable effective boundary inputs for each step form
-- **Compatibility-capable** — current-grammar semantics can be preserved during migration without leaking compatibility fields into the target authoring surface
 - **Small** — only execution-relevant concepts belong here
 
 ## IR overview
@@ -54,7 +51,9 @@ Illustrative top-level shape:
 
 The normalized IR boundary requires at least one step. Empty workflows are invalid IR and should be rejected before execution.
 
-This IR is the **compiled execution model**, not an authored workflow surface. It is intentionally close to the target grammar, but it is allowed to contain additional normalization and temporary compatibility detail needed for runtime execution and migration.
+This IR is the **compiled execution model**, not an authored workflow surface.
+It is intentionally close to the workflow grammar while remaining free to carry
+runtime-oriented normalization detail.
 
 The ordered `:steps` vector is the canonical authored/program order.
 
@@ -89,7 +88,6 @@ All step forms share these conceptual fields:
 - optional `:judge`
 - optional `:on`
 - optional `:max-iterations`
-- optional compatibility metadata during migration
 
 The IR should validate execution-specific fields according to step type.
 
@@ -403,7 +401,8 @@ Illustrative source refs:
 {:step "discover" :yield :data}
 ```
 
-These align with the target grammar's shared data-reference model and replace current-grammar compatibility references such as `{:source ... :path ...}` at the runtime boundary.
+These align with the workflow grammar's shared data-reference model and form
+the runtime boundary.
 
 ### Meaning of refs
 
@@ -415,8 +414,7 @@ These align with the target grammar's shared data-reference model and replace cu
 Current implementation note:
 
 - canonical normalized IR currently admits `:workflow-input`, `:workflow-original`, prior-step `:output`, and prior-step `:yield`
-- the current-authored compatibility compiler also encounters current `:workflow-runtime` refs from the legacy grammar, but `workflow_ir.clj` does not yet admit `:workflow-runtime` as a canonical IR `:from` source-ref
-- therefore `:workflow-runtime` is currently a known migration seam rather than a settled canonical IR feature
+- `:workflow-runtime` is not a canonical IR `:from` source-ref and target-authored definitions using it are rejected at validation time
 
 ## Contributions
 
@@ -467,31 +465,6 @@ or
 ```
 
 Before actual delegated execution, runtime should materialize this to a final string.
-
-## Compatibility metadata
-
-During migration, the IR may temporarily carry compatibility metadata required to preserve semantics from the current grammar.
-
-Illustrative shape:
-
-```clojure
-:compat {...}
-```
-
-Rules:
-
-- compatibility metadata is allowed only when needed to preserve current behavior during migration
-- execution semantics should still be driven by canonical IR fields
-- compatibility metadata must not be treated as part of the target authored grammar
-- long-term goal is to shrink and remove compatibility metadata as current grammar is retired
-
-Examples of things that may temporarily need compatibility metadata include:
-
-- role-shaping details compiled from current `:session-preload`
-- distinctions preserved from current `workflow-binding-ref` sources during translation
-- accepted-result-envelope breadcrumbs preserved from current `:step-output` reads that target whole-envelope, `:diagnostics`, or `:blocked` surfaces outside canonical declared outputs
-- current required `:result-schema`, preserved as compile-time breadcrumbs rather than a canonical execution field
-- authored-source breadcrumbs useful for debugging compiler output while both grammars coexist
 
 ## Workflow result composition
 
@@ -606,9 +579,7 @@ source-ref ::= :workflow-input
              | {:step step-name :output output-key}
              | {:step step-name :yield yield-field}
 
-;; current-grammar migration note:
-;; legacy `:workflow-runtime` refs exist in the current grammar but are not yet
-;; admitted as canonical normalized IR source-refs.
+;; `:workflow-runtime` is intentionally not a canonical normalized IR source-ref.
 
 output-key ::= keyword
 yield-field ::= keyword
@@ -633,12 +604,8 @@ boolean ::= true | false
 nil ::= nil
 ```
 
-## Recommended next use
+## Recommended use
 
-This IR should be used to drive implementation slicing for task `077`:
-
-1. define IR validation/schema
-2. compile current grammar to IR
-3. execute IR in runtime
-4. compile target grammar to IR
-5. land invoke/session/delegate execution on that substrate
+Use this document together with `doc/workflow-grammar.md` and
+`doc/workflow-grammar-concepts.md` when changing workflow compilation,
+validation, or runtime execution.

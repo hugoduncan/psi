@@ -24,14 +24,14 @@
 (def single-step-definition-with-meta
   {:definition-id "planner"
    :name "planner"
-   :step-order ["step-1"]
-   :steps {"step-1" {:executor {:type :agent :profile "planner"}
-                     :prompt-template "$INPUT"
-                     :input-bindings {:input {:source :workflow-input :path [:input]}
-                                      :original {:source :workflow-input :path [:original]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                     :capability-policy {:tools #{"read" "bash"}}}}
+   :steps [{:name "step-1"
+            :type :session
+            :tools ["read" "bash"]
+            :skills ["clojure-coding-standards"]
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}
+                                    "original" {:from :workflow-input :path [:original]}}}]}]
    :workflow-file-meta {:system-prompt "You are a planner."
                         :tools ["read" "bash"]
                         :skills ["clojure-coding-standards"]
@@ -40,49 +40,50 @@
 (def builder-definition-with-meta
   {:definition-id "builder"
    :name "builder"
-   :step-order ["step-1"]
-   :steps {"step-1" {:executor {:type :agent :profile "builder"}
-                     :prompt-template "$INPUT"
-                     :input-bindings {:input {:source :workflow-input :path [:input]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                     :capability-policy {:tools #{"read" "bash" "edit" "write"}}}}
+   :steps [{:name "step-1"
+            :type :session
+            :tools ["read" "bash" "edit" "write"]
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}}}]}]
    :workflow-file-meta {:system-prompt "You are a builder."
                         :tools ["read" "bash" "edit" "write"]
+                        :skills ["clojure-coding-standards"]
                         :thinking-level :off}})
 
 (def multi-step-definition-with-meta
   {:definition-id "plan-build"
    :name "plan-build"
-   :step-order ["step-1-planner" "step-2-builder"]
-   :steps {"step-1-planner" {:executor {:type :agent :profile "planner"}
-                             :prompt-template "$INPUT"
-                             :input-bindings {:input {:source :workflow-input :path [:input]}
-                                              :original {:source :workflow-input :path [:original]}}
-                             :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                             :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-           "step-2-builder" {:executor {:type :agent :profile "builder"}
-                             :prompt-template "Execute: $INPUT"
-                             :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :final-llm-reply]}
-                                              :original {:source :workflow-input :path [:original]}}
-                             :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                             :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}
+   :steps [{:name "step-1-planner"
+            :type :session
+            :tools ["read" "bash"]
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}
+                                    "original" {:from :workflow-input :path [:original]}}}]}
+           {:name "step-2-builder"
+            :type :session
+            :system-prompt "You are a builder."
+            :tools ["read" "bash" "edit" "write"]
+            :contributions [{:type :template
+                             :text "Execute: {{input}}"
+                             :vars {"input" {:from {:step "step-1-planner" :output :final-llm-reply}}
+                                    "original" {:from :workflow-input :path [:original]}}}]}]
    :workflow-file-meta {:framing-prompt "Coordinate a plan-build cycle."}})
 
 (def workflow-selection-definition
   {:definition-id "planner-selection"
    :name "planner-selection"
-   :step-order ["step-1"]
-   :steps {"step-1" {:executor {:type :agent :profile "planner"}
-                     :prompt-template "$INPUT"
-                     :input-bindings {:input {:source :workflow-input :path [:input]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                     :session-overrides {:prompt-component-selection {:components #{:skills}
-                                                                      :tool-names ["read"]
-                                                                      :skill-names ["testing-best-practices"]
-                                                                      :extension-prompt-contributions []
-                                                                      :agents-md? false}}}}
+   :steps [{:name "step-1"
+            :type :session
+            :prompt-component-selection {:components #{:skills}
+                                         :tool-names ["read"]
+                                         :skill-names ["testing-best-practices"]
+                                         :extension-prompt-contributions []
+                                         :agents-md? false}
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}}}]}]
    :workflow-file-meta {:system-prompt "You are a planner."
                         :tools ["read" "bash"]
                         :skills ["testing-best-practices"]
@@ -91,30 +92,31 @@
 (def judged-definition
   {:definition-id "plan-build-review-judged"
    :name "plan-build-review-judged"
-   :step-order ["step-1-planner" "step-2-builder" "step-3-reviewer"]
-   :steps {"step-1-planner" {:executor {:type :agent :profile "planner"}
-                             :prompt-template "$INPUT"
-                             :input-bindings {:input {:source :workflow-input :path [:input]}
-                                              :original {:source :workflow-input :path [:original]}}
-                             :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                             :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-           "step-2-builder" {:executor {:type :agent :profile "builder"}
-                             :prompt-template "Execute: $INPUT\nOriginal: $ORIGINAL"
-                             :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :text]}
-                                              :original {:source :workflow-input :path [:original]}}
-                             :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                             :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-           "step-3-reviewer" {:executor {:type :agent :profile "reviewer"}
-                              :prompt-template "Review: $INPUT\nOriginal: $ORIGINAL"
-                              :input-bindings {:input {:source :step-output :path ["step-2-builder" :outputs :final-llm-reply]}
-                                               :original {:source :workflow-input :path [:original]}}
-                              :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                              :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                              :judge {:prompt "APPROVED or REVISE?"
-                                      :system-prompt "You are a routing judge."
-                                      :projection {:type :tail :turns 1}}
-                              :on {"APPROVED" {:goto :next}
-                                   "REVISE" {:goto "step-2-builder" :max-iterations 3}}}}})
+   :steps [{:name "step-1-planner"
+            :type :session
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}
+                                    "original" {:from :workflow-input :path [:original]}}}]}
+           {:name "step-2-builder"
+            :type :session
+            :contributions [{:type :template
+                             :text "Execute: {{input}}\nOriginal: {{original}}"
+                             :vars {"input" {:from {:step "step-1-planner" :yield :text}}
+                                    "original" {:from :workflow-input :path [:original]}}}]}
+           {:name "step-3-reviewer"
+            :type :session
+            :contributions [{:type :template
+                             :text "Review: {{input}}\nOriginal: {{original}}"
+                             :vars {"input" {:from {:step "step-2-builder" :output :final-llm-reply}}
+                                    "original" {:from :workflow-input :path [:original]}}}]
+            :judge {:type :llm
+                    :contributions [{:type :template
+                                     :text "APPROVED or REVISE?"
+                                     :vars {}}]
+                    :projection {:type :tail :turns 1}}
+            :on {"APPROVED" {:goto :next}
+                 "REVISE" {:goto "step-2-builder" :max-iterations 3}}}]})
 
 (deftest resolve-step-session-config-single-step-test
   (testing "single-step workflow pulls config from its own workflow-file-meta"
@@ -154,7 +156,7 @@
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-2")
           planner-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-1-planner")
           builder-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-2-builder")]
-      (is (= "You are a planner.\n\nCoordinate a plan-build cycle." (:developer-prompt planner-config)))
+      (is (= "Coordinate a plan-build cycle." (:developer-prompt planner-config)))
       (is (= "You are a builder.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
       (is (= ["read" "bash"] (mapv :name (:tool-defs planner-config))))
       (is (= ["read" "bash" "edit" "write"] (mapv :name (:tool-defs builder-config))))
@@ -166,22 +168,21 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           override-definition {:definition-id "plan-build-overrides"
                                :name "plan-build-overrides"
-                               :step-order ["step-1-planner" "step-2-builder"]
-                               :steps {"step-1-planner" {:executor {:type :agent :profile "planner"}
-                                                         :prompt-template "$INPUT"
-                                                         :input-bindings {:input {:source :workflow-input :path [:input]}}
-                                                         :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                                                         :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-                                       "step-2-builder" {:executor {:type :agent :profile "builder"}
-                                                         :prompt-template "$INPUT"
-                                                         :input-bindings {:input {:source :step-output :path ["step-1-planner" :outputs :final-llm-reply]}}
-                                                         :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                                                         :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                                                         :session-overrides {:system-prompt "Focus only on correctness."
-                                                                             :tools []
-                                                                             :skills ["testing-best-practices"]
-                                                                             :model "gpt-5"
-                                                                             :thinking-level :high}}}
+                               :steps [{:name "step-1-planner"
+                                        :type :session
+                                        :contributions [{:type :template
+                                                         :text "{{input}}"
+                                                         :vars {"input" {:from :workflow-input :path [:input]}}}]}
+                                       {:name "step-2-builder"
+                                        :type :session
+                                        :system-prompt "Focus only on correctness."
+                                        :tools []
+                                        :skills ["testing-best-practices"]
+                                        :model "gpt-5"
+                                        :thinking-level :high
+                                        :contributions [{:type :template
+                                                         :text "{{input}}"
+                                                         :vars {"input" {:from {:step "step-1-planner" :output :final-llm-reply}}}}]}]
                                :workflow-file-meta {:framing-prompt "Coordinate a plan-build cycle."}}
           _ (swap! (:state* ctx)
                    (fn [state]
@@ -228,21 +229,20 @@
 (deftest materialize-step-inputs-and-prompt-with-projections-test
   (let [definition {:definition-id "projection-proof"
                     :name "projection-proof"
-                    :step-order ["step-1-discover" "step-2-request-more-info"]
-                    :steps {"step-1-discover" {:executor {:type :agent :profile "planner"}
-                                               :prompt-template "$INPUT"
-                                               :input-bindings {:input {:source :workflow-input :path [:ticket :body]}
-                                                                :original {:source :workflow-input :path [:original]}}
-                                               :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                                               :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-                            "step-2-request-more-info" {:executor {:type :agent :profile "reviewer"}
-                                                        :prompt-template "Need: $INPUT | Original: $ORIGINAL"
-                                                        :input-bindings {:input {:source :step-output
-                                                                                 :path ["step-1-discover" :diagnostics :summary]}
-                                                                         :original {:source :workflow-input
-                                                                                    :path [:original :issue :title]}}
-                                                        :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                                                        :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}
+                    :steps [{:name "step-1-discover"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "{{input}}"
+                                              :vars {"input" {:from :workflow-input :path [:ticket :body]}
+                                                     "original" {:from :workflow-input :path [:original]}}}]}
+                            {:name "step-2-request-more-info"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "Need: {{input}} | Original: {{original}}"
+                                              :vars {"input" {:from {:step "step-1-discover" :output :result}
+                                                              :path [:diagnostics :summary]}
+                                                     "original" {:from :workflow-input
+                                                                 :path [:original :issue :title]}}}]}]
                     :workflow-file-meta {:framing-prompt "Projection proof."}}
         [state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
                                                            definition)
@@ -392,10 +392,9 @@
                    :prompt "Review [\"i-1\" \"i-2\"] / 2 issues found"}]
                  @prompts*)))))))
 
-(deftest execute-run-materializes-canonical-session-contributions-only-test
-  (testing "runtime path uses canonical session contributions without legacy session-preload support"
-    (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "mixed-session-inputs"
+(deftest split-step-session-conversation-canonical-contributions-test
+  (testing "canonical source and template contributions split into preload plus final prompt in author order"
+    (let [definition {:definition-id "mixed-session-inputs"
                       :name "mixed-session-inputs"
                       :steps [{:name "plan"
                                :type :session
@@ -407,53 +406,31 @@
                                :contributions [{:type :source
                                                 :from :workflow-original}
                                                {:type :source
-                                                :from {:step "plan" :yield :text}
-                                                :projection :text}
+                                                :from {:step "plan" :output :final-llm-reply}}
                                                {:type :template
                                                 :text "Review {{reply}}"
-                                                :vars {"reply" {:from {:step "plan" :output :final-llm-reply}}}}]}]}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state definition)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "mixed-session-inputs"
-                                                                   :run-id "run-mixed-session-inputs"
-                                                                   :workflow-input {:input "Ship it"
-                                                                                    :original "Original request"}})]
-                       (assoc-in s [:workflows :runs "run-mixed-session-inputs" :step-runs "plan" :accepted-result]
-                                 {:outcome :ok
-                                  :outputs {:final-llm-reply "plan text"
-                                            :text "plan text"}}))))
-          created* (atom [])
-          prompts* (atom [])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
-                    (fn [_ctx _parent-session-id opts]
-                      (swap! created* conj {:step-id (:workflow-step-id opts)
-                                            :preloaded-messages (:preloaded-messages opts)})
-                      (let [sid (str (:workflow-step-id opts) "-child")]
-                        {:attempt {:attempt-id (str sid "-attempt")
-                                   :status :pending
-                                   :execution-session-id sid}
-                         :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
-                    (fn [_ctx child-session-id prompt]
-                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
-                      {:execution-result/assistant-message
-                       {:content "review output"}})]
-        (let [result (workflow-execution/execute-run! ctx session-id "run-mixed-session-inputs")
-              review-created (second @created*)
-              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mixed-session-inputs")
-              review-accepted (get-in run [:step-runs "review" :accepted-result])]
-          (is (= :completed (:status result)))
-          (is (= {:step-id "review"
-                  :preloaded-messages [{:role "user" :content "Original request"}
-                                       {:role "user" :content "plan text"}]}
-                 review-created))
-          (is (= [{:session-id "review-child"
-                   :prompt "Review plan text"}]
-                 (filterv #(= "review-child" (:session-id %)) @prompts*)))
-          (is (= :ok (:outcome review-accepted)))
-          (is (= "review output"
-                 (get-in review-accepted [:outputs :final-llm-reply]))))))))
+                                                :vars {"reply" {:from {:step "plan" :yield :text}}}}]}]}
+          [state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
+                                                             definition)
+          [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "mixed-session-inputs"
+                                                                 :run-id "run-mixed-session-inputs"
+                                                                 :workflow-input {:input "Ship it"
+                                                                                  :original "Original request"}})
+          state3 (assoc-in state2 [:workflows :runs run-id :step-runs "plan" :accepted-result]
+                           {:outcome :ok
+                            :outputs {:final-llm-reply "plan text"
+                                      :text "plan text"}})
+          workflow-run (workflow-runtime/workflow-run-in state3 run-id)
+          conversation (workflow-execution/materialize-step-session-conversation workflow-run "review")
+          split (workflow-execution/split-step-session-conversation conversation)]
+      (is (= [{:role "user" :content "Original request"}
+              {:role "user" :content "plan text"}
+              {:role "user" :content "Review plan text"}]
+             conversation))
+      (is (= {:preloaded-messages [{:role "user" :content "Original request"}
+                                   {:role "user" :content "plan text"}]
+              :prompt "Review plan text"}
+             split)))))
 
 (deftest execute-run-delegate-step-invokes-callee-workflow-with-explicit-boundary-test
   (testing "IR delegate steps invoke the target workflow with rendered workflow-input and ordered workflow-original context"

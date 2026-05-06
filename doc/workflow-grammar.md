@@ -1,12 +1,11 @@
 # Workflow Grammar
 
-This document describes the **target workflow authoring grammar** for the converged deterministic-workflow-step design.
+This document describes the supported workflow authoring grammar for the
+deterministic-workflow-step design.
 
-It is a design artifact for the intended end-state surface discussed in task `077-deterministic-workflow-steps`, not a verbatim description of the currently implemented `workflow_model.clj` Malli schemas.
-
-In particular, this grammar describes the proposed author-facing `:type :invoke | :session | :delegate` model, while the current runtime implementation still uses older step-definition shapes such as `:executor`, `:prompt-template`, `:input-bindings`, `:session-preload`, and `:session-overrides`.
-
-For the currently implemented schema surface, see `doc/workflow-grammar-current.md`. For the conceptual explanation of this target design, see `doc/workflow-grammar-concepts.md`.
+It documents the author-facing `:type :invoke | :session | :delegate` model.
+For the conceptual explanation of this design, see
+`doc/workflow-grammar-concepts.md`.
 
 ```clojure
 workflow ::= workflow-map

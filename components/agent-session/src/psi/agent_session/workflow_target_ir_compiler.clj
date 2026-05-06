@@ -91,7 +91,7 @@
   (when judge
     (case type
       :llm
-      (let [session-config (select-keys judge [:model :tools :skills])]
+      (let [session-config (select-keys judge [:model :tools :skills :system-prompt :thinking-level :prompt-component-selection])]
         (cond-> {:type :llm
                  :session (assoc session-config
                                  :contributions (mapv compile-contribution (:contributions judge)))}
@@ -162,7 +162,7 @@
 
     :session
     (assoc (compile-common-step-fields step)
-           :session (cond-> (select-keys step [:model :tools :skills])
+           :session (cond-> (select-keys step [:model :tools :skills :system-prompt :thinking-level :prompt-component-selection])
                       true (assoc :contributions (mapv compile-contribution (:contributions step)))))
 
     :delegate

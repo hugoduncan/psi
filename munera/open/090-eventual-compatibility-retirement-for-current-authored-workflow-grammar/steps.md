@@ -30,9 +30,9 @@
   - [x] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility
   - [x] replace compat-oriented mixed-path tests with target-only proofs before deleting them
 - [ ] Update project guidance so the target grammar is the only supported authored workflow surface
-  - [ ] delete `doc/workflow-grammar-current.md`
-  - [ ] delete `doc/workflow-grammar-migration.md`
-  - [ ] rewrite references in `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
+  - [x] delete `doc/workflow-grammar-current.md`
+  - [x] delete `doc/workflow-grammar-migration.md`
+  - [x] rewrite references in `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
 - [ ] Run focused verification after compatibility removal
   - [ ] `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test`
 - [ ] Run broader verification after compatibility removal

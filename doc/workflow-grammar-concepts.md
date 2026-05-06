@@ -2,13 +2,13 @@
 
 ## Overview
 
-The workflow grammar is a compact, EBNF-like documentation grammar for authored workflow data. It is not intended to be a complete executable parser specification.
+The workflow grammar is a compact, EBNF-like documentation grammar for authored
+workflow data. It is not intended to be a complete executable parser
+specification.
 
-It describes the target converged authoring surface for task `077-deterministic-workflow-steps`, not the current `workflow_model.clj` implementation schemas.
-
-The current implementation still exposes an older workflow model centered on fields such as `:executor`, `:prompt-template`, `:input-bindings`, `:session-preload`, `:session-overrides`, and a narrower judge schema. This document instead explains the intended future authoring model built around explicit step `:type` values, contributions, delegated boundaries, and yielded-value semantics.
-
-For the currently implemented schema surface, see `doc/workflow-grammar-current.md`.
+This document explains the supported authoring model built around explicit step
+`:type` values, contributions, delegated boundaries, and yielded-value
+semantics.
 
 The grammar separates workflow authoring into a small number of orthogonal concerns:
 

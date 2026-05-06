@@ -7,6 +7,7 @@
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
    [psi.agent-session.workflow-statechart :as workflow-statechart]))
 
@@ -174,12 +175,18 @@
             tool-config))))
 
 (defn- step-meta-for
-  [_ctx workflow-run step-id]
+  [ctx workflow-run step-id]
   (let [step-def (effective-step-def workflow-run step-id)
-        run-meta (or (get-in workflow-run [:effective-definition :workflow-file-meta]) {})]
+        run-meta (or (get-in workflow-run [:effective-definition :workflow-file-meta]) {})
+        source-definition-id (:source-definition-id workflow-run)
+        source-definition (when source-definition-id
+                            (workflow-runtime/workflow-definition-in @(:state* ctx) source-definition-id))
+        source-meta (or (get-in source-definition [:workflow-file-meta]) {})
+        base-meta (merge source-meta run-meta)
+        framing-prompt (:framing-prompt run-meta)]
     {:step-def step-def
-     :base-meta run-meta
-     :framing-prompt nil}))
+     :base-meta base-meta
+     :framing-prompt framing-prompt}))
 
 (defn resolve-step-session-config
   "Resolve child session configuration for a workflow step.
@@ -201,7 +208,8 @@
         parent-session (session-state/get-session-data-in ctx parent-session-id)
         parent-session-model (:model parent-session)
         session-spec (:session step-def)
-        developer-prompt (:system-prompt base-meta)]
+        developer-prompt (or (:system-prompt session-spec)
+                             (:system-prompt base-meta))]
     {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
      :prompt-mode (:prompt-mode parent-session)
      :tool-defs (resolve-step-tool-defs ctx parent-session-id (:tools session-spec))

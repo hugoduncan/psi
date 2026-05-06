@@ -57,3 +57,9 @@
 - `workflow_ir_runtime_adoption_test.clj` now uses target-authored fixtures while still proving that non-canonical `:workflow-runtime` refs fail at the canonical IR validation seam.
 - `workflow_target_ir_compiler_test.clj` now carries the non-canonical source-ref rejection proof directly, replacing reliance on deleted current-grammar compiler coverage.
 - Focused verification green: `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-ir-runtime-adoption-test`.
+
+2026-05-06 implementation slice 9
+- Deleted `doc/workflow-grammar-current.md` and `doc/workflow-grammar-migration.md`; the live docs now treat git history as the historical record for the retired current-authored grammar.
+- Rewrote `doc/workflows.md` so it teaches only the supported grammar and removed the transitional current→target mapping plus migration-era related-doc links.
+- Rewrote `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md` to remove references that presented the deleted current grammar as a live authored option.
+- Clarified the remaining `workflow_ir.md` note on `:workflow-runtime`: it is now documented only as a rejected non-canonical source-ref, not as an active migration seam.
