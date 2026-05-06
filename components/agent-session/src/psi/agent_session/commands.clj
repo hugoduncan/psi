@@ -29,7 +29,7 @@
    [psi.app-runtime.background-job-view :as app-bg-view]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as ext-runtime-fns]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.prompt-templates :as pt]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.project-nrepl-commands :as project-nrepl-commands]

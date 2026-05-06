@@ -9,7 +9,7 @@
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.app-runtime.background-job-view :as app-bg-view]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.ai.models :as ai-models]
    [psi.ai.model-registry :as model-registry]

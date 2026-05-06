@@ -8,7 +8,7 @@
    - task 062 per-step session-shaping override compilation"
   (:require
    [malli.core :as m]
-   [psi.agent-session.session :as session]
+   [psi.session-state.model :as session]
    [psi.agent-session.workflow-file-authoring-errors :as authoring-errors]))
 
 (def ^:private binding-session-keys

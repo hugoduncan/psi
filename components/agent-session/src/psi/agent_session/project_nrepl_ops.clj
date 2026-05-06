@@ -9,7 +9,7 @@
    [psi.agent-session.project-nrepl-eval :as project-nrepl-eval]
    [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
    [psi.agent-session.project-nrepl-started :as project-nrepl-started]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn resolved-worktree-path!
   [ctx session-id explicit-worktree-path]

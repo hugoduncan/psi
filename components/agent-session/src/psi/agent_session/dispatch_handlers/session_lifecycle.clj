@@ -4,11 +4,11 @@
    new-initialize, resume-loaded, fork-initialize, create-child,
    resume-missing-initialize, context-closed."
   (:require
-   [psi.agent-session.dispatch-handlers.session-state :as child-session-state]
+   [psi.agent-session.child-session-state :as child-session-state]
    [psi.session-state.init :as ss]
    [psi.session-state.state :as session]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.agent-session.session :as session-data]))
+   [psi.session-state.model :as session-data]))
 
 (defn register!
   "Register session lifecycle handlers. Called once during context creation."

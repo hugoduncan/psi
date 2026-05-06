@@ -8,8 +8,8 @@
    to avoid a load cycle through mutations/session → core → context."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as session-state]))
+   [psi.session-state.model :as session]
+   [psi.session-state.state :as session-state]))
 
 (defn- now []
   (java.time.Instant/now))

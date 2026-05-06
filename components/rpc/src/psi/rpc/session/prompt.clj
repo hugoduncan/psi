@@ -5,7 +5,7 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.rpc.events :as events]
    [psi.rpc.session.commands :as rpc.commands]
    [psi.rpc.session.emit :as emit]

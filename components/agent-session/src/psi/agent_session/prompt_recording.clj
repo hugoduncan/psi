@@ -1,7 +1,7 @@
 (ns psi.agent-session.prompt-recording
   "Deterministic prompt response classification/recording scaffold."
   (:require
-   [psi.agent-session.session-state :as session]))
+   [psi.session-state.state :as session]))
 
 (defn extract-tool-calls
   [assistant-msg]

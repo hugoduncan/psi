@@ -4,7 +4,7 @@
    [clojure.string :as str]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.app-runtime.context :as app-context]
    [psi.app-runtime.context-summary :as context-summary]
    [psi.app-runtime.footer :as footer]

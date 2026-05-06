@@ -4,7 +4,7 @@
    materialization, prompt rendering, and child-session configuration shaping so
    prompt/config semantics stay aligned across workflow paths."
   (:require
-   [psi.agent-session.session-state :as session-state]
+   [psi.session-state.state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
    [psi.agent-session.workflow-runtime :as workflow-runtime]

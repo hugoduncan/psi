@@ -9,7 +9,7 @@
    [psi.agent-session.conversation :as conv]
    [psi.agent-session.prompt-templates :as prompt-templates]
    [psi.agent-session.provider-auth :as provider-auth]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.system-prompt :as system-prompt]))
 

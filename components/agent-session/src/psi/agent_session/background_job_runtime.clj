@@ -9,7 +9,7 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.tool-output :as tool-output]
    [psi.agent-session.workflows :as wf]))
 

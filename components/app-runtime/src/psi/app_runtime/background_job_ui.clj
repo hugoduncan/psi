@@ -4,7 +4,7 @@
    [clojure.string :as str]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.app-runtime.background-job-widgets :as bg-widgets]))
 
 (def ^:private widget-extension-id "psi-background-jobs")

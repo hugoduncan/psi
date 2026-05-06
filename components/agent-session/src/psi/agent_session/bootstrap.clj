@@ -5,7 +5,7 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
    [psi.agent-session.mutations :as mutations]

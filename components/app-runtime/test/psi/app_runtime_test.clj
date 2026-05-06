@@ -5,7 +5,7 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]

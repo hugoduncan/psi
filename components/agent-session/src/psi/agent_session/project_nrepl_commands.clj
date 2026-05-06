@@ -5,7 +5,7 @@
    [psi.agent-session.project-nrepl-config :as project-nrepl-config]
    [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
    [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn format-project-nrepl-status
   [ctx session-id]

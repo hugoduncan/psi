@@ -35,7 +35,7 @@
    [com.fulcrologic.statecharts.events :as evts]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
-   [psi.agent-session.session :as session]))
+   [psi.session-state.model :as session]))
 
 ;; ============================================================
 ;; Guard helpers — operate on flat working memory data

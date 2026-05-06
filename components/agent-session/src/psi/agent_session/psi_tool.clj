@@ -12,7 +12,7 @@
    [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.psi-tool-workflow :as psi-tool-workflow]
-   [psi.agent-session.session-state :as session-state]
+   [psi.session-state.state :as session-state]
    [psi.agent-session.tool-output :as tool-output]
    [psi.query.core :as query]))
 

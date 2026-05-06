@@ -14,9 +14,9 @@
    [psi.memory.runtime :as memory-runtime]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.project-preferences :as project-prefs]
-   [psi.agent-session.session :as session-data]
+   [psi.session-state.model :as session-data]
    [psi.agent-session.user-config :as user-cfg]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.tool-defs :as tool-defs]
    [psi.agent-session.turn-statechart :as turn-sc]))

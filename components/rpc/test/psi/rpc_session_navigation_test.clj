@@ -7,7 +7,7 @@
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.rpc-test-support :as support]))
 
 (deftest rpc-extension-command-after-new-emits-assistant-message-for-new-session-test

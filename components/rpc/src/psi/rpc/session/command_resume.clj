@@ -3,7 +3,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.app-runtime.messages :as app-messages]
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.rpc.events :as events]

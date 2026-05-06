@@ -423,3 +423,21 @@ Code-shaper follow-up implementation — 2026-05-06
 - verification after the shaping follow-up remained green:
   - focused targeted set green
   - full unit suite green (`1514 tests, 11692 assertions, 0 failures`)
+
+Compat-wrapper retirement implementation — 2026-05-06
+- used `clj-surgeon` plus repo-wide require search to prove the old wrapper namespaces no longer had direct callers:
+  - `psi.agent-session.session`
+  - `psi.agent-session.session-state`
+  - `psi.agent-session.dispatch-handlers.session-state`
+- moved the remaining higher-level child-session seam into a dedicated namespace:
+  - new `psi.agent-session.child-session-state`
+  - this keeps prompt/tool/skill/system-prompt derivation above `session-state` without preserving the old misleading compat namespace name
+- repointed repo callers from wrapper namespaces to canonical authorities:
+  - `psi.session-state.model`
+  - `psi.session-state.state`
+  - `psi.agent-session.child-session-state`
+- deleted the three retired wrapper namespaces entirely once no direct callers remained
+- focused verification after wrapper retirement stayed green:
+  - `clojure -M:test --focus psi.session-state.model-test --focus psi.session-state.state-test --focus psi.session-state.init-test --focus psi.agent-session.child-session-mutation-test --focus psi.agent-session.session-lifecycle-test --focus psi.app-runtime.context-test --focus psi.rpc-events-test`
+  - result: `25 tests, 175 assertions, 0 failures`
+- this closes the explicit compat-removal step for task `097`; follow-on task `098` remains separate for journal-append dispatch-effect convergence

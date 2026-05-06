@@ -4,7 +4,7 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.tool-plan :as tool-plan]))
 
 (pco/defmutation add-tool

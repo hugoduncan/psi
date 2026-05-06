@@ -10,7 +10,7 @@
    [psi.session-state.init :as ss]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.post-tool :as post-tool]
-   [psi.agent-session.session :as session-data]
+   [psi.session-state.model :as session-data]
    [psi.session-state.state :as session]
    [psi.agent-session.tool-defs :as tool-defs]
    [psi.agent-session.tool-execution :as tool-exec]))

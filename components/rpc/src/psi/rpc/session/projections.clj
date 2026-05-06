@@ -1,7 +1,7 @@
 (ns psi.rpc.session.projections
   "Subscriber-aware RPC projection invalidation delivery helpers."
   (:require
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.rpc.events :as events]
    [psi.rpc.state :as rpc.state]))
 

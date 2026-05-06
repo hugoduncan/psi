@@ -5,8 +5,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.resolvers :as resolvers]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.model :as session]
+   [psi.session-state.state :as ss]
    [psi.agent-session.workflows :as wf]))
 
 (defn replay-dispatch-event-log-in!

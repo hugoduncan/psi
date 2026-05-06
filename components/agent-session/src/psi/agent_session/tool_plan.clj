@@ -8,7 +8,7 @@
    [clojure.walk :as walk]
    [psi.agent-core.core :as agent]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.tools :as tools]
    [psi.query.core :as query]))
 

@@ -58,7 +58,7 @@
    [psi.agent-session.mutations :as mutations]
 
    [psi.agent-session.extension-runtime :as extension-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.oauth.core :as oauth]
@@ -76,7 +76,7 @@
    [psi.agent-session.prompt-templates :as pt]
    [psi.agent-session.config-resolution :as config-res]
    [psi.agent-session.skills :as skills]
-   [psi.agent-session.session :as session-data]
+   [psi.session-state.model :as session-data]
    [psi.agent-session.system-prompt :as sys-prompt]
    [psi.agent-session.tools :as tools]
    [psi.agent-core.core :as agent]

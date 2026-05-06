@@ -47,4 +47,4 @@
 - [x] Narrow or retire `psi.agent-session.session` compat re-exports that still blur model vs state ownership
 - [x] Decide whether session display-name shaping should remain in `psi.session-state.state` as canonical lower-level session-list summary policy or move to a smaller shared helper
 - [x] Split child-session prompt derivation from lower child session init so the remaining mixed seam above `session-state` gets smaller
-- [ ] Retire the compat wrappers introduced by the extraction once direct callers no longer depend on them (`psi.agent-session.session`, `psi.agent-session.session-state`, and the remaining compat surface in `psi.agent-session.dispatch-handlers.session-state`)
+- [x] Retire the compat wrappers introduced by the extraction once direct callers no longer depend on them (`psi.agent-session.session`, `psi.agent-session.session-state`, and the remaining compat surface in `psi.agent-session.dispatch-handlers.session-state`)

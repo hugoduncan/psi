@@ -5,7 +5,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-control :as prompt-control]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn execute-compaction-in!
   "Execute a compaction cycle: prepare → dispatch before-compact → run

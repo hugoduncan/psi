@@ -6,7 +6,7 @@
    [psi.agent-session.extensions.runtime-ui :as runtime-ui]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.services :as services]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (def ^:dynamic *active-extension-session-id*
   nil)

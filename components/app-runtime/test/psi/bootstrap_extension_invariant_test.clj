@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.extension-test-helpers.nullable-api :as nullable-api]))
 

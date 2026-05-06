@@ -3,7 +3,7 @@
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.rpc.state :as rpc.state]))
 
 (def protocol-version "1.0")

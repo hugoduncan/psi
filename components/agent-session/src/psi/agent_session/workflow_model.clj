@@ -10,7 +10,7 @@
    - [:workflows :run-order]   => [run-id ...] creation order"
   (:require
    [malli.core :as m]
-   [psi.agent-session.session :as session]))
+   [psi.session-state.model :as session]))
 
 (def workflow-definition-id-schema :string)
 (def workflow-run-id-schema :string)
