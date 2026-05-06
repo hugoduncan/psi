@@ -242,35 +242,43 @@
       (get-in @(:state* env) return-key)
       (get @(:state* env) return-key))))
 
+(defn apply-pure-result
+  [ictx {:keys [apply-root-state-update-fn read-root-state-value-fn session-id-fn event-type-fn append-trace-entry-fn]
+         :or {apply-root-state-update-fn apply-root-state-update!
+              read-root-state-value-fn read-root-state-value
+              session-id-fn event-session-id-of
+              event-type-fn event-type-of
+              append-trace-entry-fn append-trace-entry!}}]
+  (if-let [pure-result (:pure-result ictx)]
+    (let [env (:env ictx)
+          root-update-fn (:root-state-update pure-result)
+          return-key (:return-key pure-result)
+          return-effect-result? (:return-effect-result? pure-result)]
+      (when (fn? root-update-fn)
+        (apply-root-state-update-fn env root-update-fn))
+      (when (contains? pure-result :effects)
+        (append-trace-entry-fn env
+                               {:trace/kind :dispatch/effects-emitted
+                                :dispatch-id (dispatch-id-of ictx)
+                                :session-id (session-id-fn ictx)
+                                :event-type (event-type-fn ictx)
+                                :effects (vec (:effects pure-result))}))
+      (cond-> ictx
+        (contains? pure-result :effects)
+        (assoc :applied-effects (:effects pure-result))
+        return-effect-result?
+        (assoc :return-effect-result? true)
+        (contains? pure-result :return)
+        (assoc :result (:return pure-result))
+        return-key
+        (assoc :result (read-root-state-value-fn env return-key))))
+    ictx))
+
 (def apply-interceptor
   (->interceptor
    {:id :apply
-    :after
-    (fn [ictx]
-      (if-let [pure-result (:pure-result ictx)]
-        (let [env (:env ictx)
-              root-update-fn (:root-state-update pure-result)
-              return-key (:return-key pure-result)
-              return-effect-result? (:return-effect-result? pure-result)]
-          (when (fn? root-update-fn)
-            (apply-root-state-update! env root-update-fn))
-          (when (contains? pure-result :effects)
-            (append-trace-entry! env
-                                 {:trace/kind :dispatch/effects-emitted
-                                  :dispatch-id (dispatch-id-of ictx)
-                                  :session-id (event-session-id-of ictx)
-                                  :event-type (event-type-of ictx)
-                                  :effects (vec (:effects pure-result))}))
-          (cond-> ictx
-            (contains? pure-result :effects)
-            (assoc :applied-effects (:effects pure-result))
-            return-effect-result?
-            (assoc :return-effect-result? true)
-            (contains? pure-result :return)
-            (assoc :result (:return pure-result))
-            return-key
-            (assoc :result (read-root-state-value env return-key))))
-        ictx))}))
+    :after (fn [ictx]
+             (apply-pure-result ictx {}))}))
 
 (def effect-interceptor
   (->interceptor

@@ -110,3 +110,13 @@ Review notes — 2026-05-06
   - recommended shaping direction for env prep: either rename that helper to reflect broader dispatch-env shaping or split kernel-env preparation from wrapper-only env augmentation.
   - minor shaping note: `statechart-interceptor` still writes `:statechart-claimed?` into interceptor context even though kernel-owned logging no longer consumes it; if that flag no longer serves a clear local control-flow role, remove or generalize it.
   - closure posture from code-shaper review: task 095 is in good architectural shape, but a final shaping pass that removes duplicated apply orchestration would reduce future maintenance burden and make the lower boundary more robust.
+- Code-shaper follow-up implementation notes — 2026-05-06
+  - centralized the generic apply-path algorithm in new `psi.state-kernel.dispatch/apply-pure-result` so the kernel remains the sole owner of apply-flow orchestration.
+  - simplified kernel `apply-interceptor` to delegate directly to `apply-pure-result` with kernel-default hooks.
+  - rewired `psi.agent-session.dispatch/apply-interceptor` to reuse `kernel/apply-pure-result` while injecting only the compatibility-layer read/apply hooks plus local event/session id accessors.
+  - clarified environment shaping in `psi.agent-session.dispatch` by splitting the old `->kernel-env` into:
+    - `->kernel-contract-env` for true kernel-contract projection
+    - `->dispatch-env` for wrapper-local augmentation with compatibility-only keys
+  - removed residual compatibility-layer `:statechart-claimed?` ictx writing from `statechart-interceptor`; claimed events now only block and optionally return structured result/block metadata.
+  - focused verification green after the shaping pass:
+    - `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.model-dispatch-test` → `25 tests, 247 assertions, 0 failures`.

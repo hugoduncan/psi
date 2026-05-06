@@ -4,7 +4,7 @@
    [psi.agent-session.dispatch-schema :as schema]
    [psi.state-kernel.dispatch :as kernel]))
 
-(declare dispatch! ->kernel-env apply-interceptor)
+(declare dispatch! ->dispatch-env ->kernel-contract-env apply-interceptor)
 
 (def effect-schema schema/effect-schema)
 (def pure-result-schema schema/pure-result-schema)
@@ -31,7 +31,7 @@
   ([entry]
    (kernel/append-trace-entry! nil entry))
   ([ctx entry]
-   (kernel/append-trace-entry! (->kernel-env ctx) entry)))
+   (kernel/append-trace-entry! (->dispatch-env ctx) entry)))
 (def assoc-dispatch-id kernel/assoc-dispatch-id)
 (def dispatch-id-of kernel/dispatch-id-of)
 (def replay-event-entry! (fn [ctx entry] (kernel/replay-event-entry! dispatch! ctx entry)))
@@ -98,7 +98,7 @@
                              (map? result) (boolean (:claimed? result))
                              :else (boolean result))]
               (if claimed?
-                (let [claimed-ictx (assoc ictx :statechart-claimed? true :blocked? true)]
+                (let [claimed-ictx (assoc ictx :blocked? true)]
                   (if (map? result)
                     (cond-> claimed-ictx
                       (contains? result :result) (assoc :result (:result result))
@@ -145,32 +145,17 @@
    {:id :apply
     :after
     (fn [ictx]
-      (if-let [pure-result (:pure-result ictx)]
-        (let [ctx (:env ictx)
-              root-update-fn (:root-state-update pure-result)
-              return-key (:return-key pure-result)
-              return-effect-result? (:return-effect-result? pure-result)]
-          (when (fn? root-update-fn)
-            (apply-root-state-update! ctx root-update-fn))
-          (when (contains? pure-result :effects)
-            (append-trace-entry! ctx
-                                 {:trace/kind :dispatch/effects-emitted
-                                  :dispatch-id (dispatch-id-of ictx)
-                                  :session-id (or (:session-id ictx)
-                                                  (get-in ictx [:event :event/session-id]))
-                                  :event-type (or (:event-type ictx)
-                                                  (get-in ictx [:event :event/type]))
-                                  :effects (vec (:effects pure-result))}))
-          (cond-> ictx
-            (contains? pure-result :effects)
-            (assoc :applied-effects (:effects pure-result))
-            return-effect-result?
-            (assoc :return-effect-result? true)
-            (contains? pure-result :return)
-            (assoc :result (:return pure-result))
-            return-key
-            (assoc :result (read-root-state-value ctx return-key))))
-        ictx))}))
+      (kernel/apply-pure-result
+       ictx
+       {:apply-root-state-update-fn apply-root-state-update!
+        :read-root-state-value-fn read-root-state-value
+        :session-id-fn (fn [ictx]
+                         (or (:session-id ictx)
+                             (get-in ictx [:event :event/session-id])))
+        :event-type-fn (fn [ictx]
+                         (or (:event-type ictx)
+                             (get-in ictx [:event :event/type])))
+        :append-trace-entry-fn append-trace-entry!}))}))
 
 (def default-interceptors
   [permission-interceptor
@@ -185,14 +170,17 @@
 (defn current-interceptors []
   (or @interceptor-chain-override default-interceptors))
 
-(defn- ->kernel-env [ctx]
+(defn- ->kernel-contract-env [ctx]
   (cond-> ctx
     (and (not (:execute-effect-fn ctx)) (:execute-dispatch-effect-fn ctx))
     (assoc :execute-effect-fn (:execute-dispatch-effect-fn ctx))
 
     (and (not (:validate-result-fn ctx)) (:validate-dispatch-result-fn ctx))
-    (assoc :validate-result-fn (:validate-dispatch-result-fn ctx))
+    (assoc :validate-result-fn (:validate-dispatch-result-fn ctx))))
 
+(defn- ->dispatch-env
+  [ctx]
+  (cond-> (->kernel-contract-env ctx)
     (:apply-root-state-update-fn ctx)
     (assoc :apply-root-state-update-fn (:apply-root-state-update-fn ctx))
 
@@ -201,8 +189,8 @@
 
 (defn dispatch!
   ([ctx event-type]
-   (kernel/dispatch! (->kernel-env ctx) event-type nil nil (current-interceptors)))
+   (kernel/dispatch! (->dispatch-env ctx) event-type nil nil (current-interceptors)))
   ([ctx event-type event-data]
-   (kernel/dispatch! (->kernel-env ctx) event-type event-data nil (current-interceptors)))
+   (kernel/dispatch! (->dispatch-env ctx) event-type event-data nil (current-interceptors)))
   ([ctx event-type event-data opts]
-   (kernel/dispatch! (->kernel-env ctx) event-type event-data opts (current-interceptors))))
+   (kernel/dispatch! (->dispatch-env ctx) event-type event-data opts (current-interceptors))))

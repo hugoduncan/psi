@@ -19,7 +19,7 @@
 - [x] Remove or generalize kernel-owned `:statechart-claimed?` logging so the state-kernel event-log/trace surface no longer embeds composition-layer statechart semantics
 - [x] Add or update focused tests proving the tightened kernel trace/log boundary after the db-summary and statechart-log cleanup
 - [ ] Re-run focused and full unit verification after the final kernel-boundary cleanup
-- [ ] Remove duplicated apply-interceptor orchestration between `components/state-kernel/src/psi/state_kernel/dispatch.clj` and `components/agent-session/src/psi/agent_session/dispatch.clj` by centralizing the generic apply algorithm and leaving only injected read/apply hooks in the compatibility layer
-- [ ] Clarify environment shaping in `psi.agent-session.dispatch` by either renaming `->kernel-env` or splitting kernel-vs-wrapper environment preparation so compatibility-only keys are not presented as kernel contract keys
-- [ ] Remove or generalize residual `:statechart-claimed?` compatibility-layer ictx state if it no longer serves a clear local control-flow purpose after the kernel log cleanup
-- [ ] Add/update focused proofs for the apply-path shaping follow-up and rerun focused verification
+- [x] Remove duplicated apply-interceptor orchestration between `components/state-kernel/src/psi/state_kernel/dispatch.clj` and `components/agent-session/src/psi/agent_session/dispatch.clj` by centralizing the generic apply algorithm and leaving only injected read/apply hooks in the compatibility layer
+- [x] Clarify environment shaping in `psi.agent-session.dispatch` by either renaming `->kernel-env` or splitting kernel-vs-wrapper environment preparation so compatibility-only keys are not presented as kernel contract keys
+- [x] Remove or generalize residual `:statechart-claimed?` compatibility-layer ictx state if it no longer serves a clear local control-flow purpose after the kernel log cleanup
+- [x] Add/update focused proofs for the apply-path shaping follow-up and rerun focused verification
