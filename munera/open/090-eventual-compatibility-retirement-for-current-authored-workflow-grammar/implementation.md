@@ -45,3 +45,8 @@
 - Removed compatibility step-prep fallbacks for current `:input-bindings`, `:prompt-template`, profile-derived workflow meta lookup, and `:session-overrides` in favor of canonical target-authored session fields only.
 - Removed compatibility `:session-preload` merging from the Phase A statechart runtime so child-session preload now comes solely from canonical session contributions.
 - Replaced the old preload/compat regression proofs with canonical contribution-order tests in workflow step-prep, statechart runtime, and workflow execution.
+
+2026-05-06 implementation slice 7
+- Deleted `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj` and its dedicated test file because repo-owned workflow loading and run creation are now target-authored only.
+- Confirmed `workflow_runtime.clj` and `workflow_file_compiler.clj` already run target-only validation/compilation paths, so the remaining retirement step was removal of the dead current-grammar compiler artifact rather than further runtime branching changes.
+- Identified remaining follow-on cleanup after this slice as target-only test/doc rewrites: retire lingering current-grammar fixture tests and remove live doc references to the deleted migration/current-grammar guidance pages.
