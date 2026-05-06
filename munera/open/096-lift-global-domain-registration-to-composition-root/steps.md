@@ -14,4 +14,6 @@
 - [x] Migrate any tests that actually need assembled multi-domain registration to a composition-owned helper instead of a domain-owned global wrapper
 - [x] Record final ownership split and any remaining edge cases in implementation notes
 - [x] Run focused verification
+- [x] Add a small follow-up shaping pass in `psi.system-bootstrap.core` that extracts the registration domain catalog as data while preserving the explicit distinction between global registration and assembled isolated registration
+- [x] Re-run focused registration tests after that shaping pass
 - [ ] Run broader verification as needed

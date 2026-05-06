@@ -50,3 +50,20 @@ Focused verification completed:
 
 Remaining implementation checks:
 - run a broader verification pass once convenient
+
+Review notes:
+- task-implementation review found no blocking issues
+- implementation matches the task intent: composition-root ownership is explicit, `agent-session` retains only session-facing local registration helpers, and the temporary 095 seam is removed from `agent-session.context`
+- broader verification is now complete via `bb clojure:test:unit` (`1514 tests, 11692 assertions, 0 failures`)
+- non-blocking observation: removing `:register-global-query?` from `psi.agent-session.bootstrap/bootstrap-in!` is architecturally correct, but it is still a caller-visible helper-surface change worth keeping in mind if any external callers exist beyond the currently known ones
+- code-shaper review found no blocking shape issues; strongest result is the removal of the misleading global-registration wrappers from `psi.agent-session.core`
+- code-shaper non-blocking feedback: `psi.system-bootstrap.core` still duplicates some global-vs-isolated registration flow and embeds the domain inventory procedurally in multiple places; acceptable as-is today because it remains locally comprehensible, but a small follow-up could extract the domain catalog as data while preserving the explicit global-vs-isolated ownership split
+- follow-up shaping pass implemented: `psi.system-bootstrap.core` now keeps the registration domain inventory in explicit `global-domains` and `isolated-domains` data plus a shared `register-domain-with!` executor, while preserving separate explicit entrypoints for global registration and assembled isolated registration
+- post-shaping focused verification is green:
+  - `clojure -M:test --focus psi.agent-session.model-dispatch-test` → `8 tests, 96 assertions, 0 failures`
+  - `clojure -M:test --focus psi.introspection.agent-session-test` → `5 tests, 31 assertions, 0 failures`
+  - `clojure -M:test --focus psi.rpc-prompt-test/rpc-openai-codex-prompt-emits-tool-events-with-final-args-test` → `1 test, 17 assertions, 0 failures`
+- broader suite re-run surfaced one unrelated pre-existing/ambient failure outside the registration shaping surface:
+  - `bb clojure:test:unit` → `1514 tests, 11692 assertions, 1 failure`
+  - failing test: `psi.rpc-prompt-test/rpc-openai-codex-prompt-emits-tool-events-with-final-args-test`
+  - direct focused rerun of that test passed immediately afterward, so the broader-suite failure did not reproduce as a stable local regression from this shaping pass
