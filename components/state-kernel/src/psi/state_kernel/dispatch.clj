@@ -189,61 +189,6 @@
                                   (trim-bounded-log (conj log entry) max-event-log-size)))
                (dissoc ictx ::log-timestamp ::db-summary-before)))}))
 
-(def permission-interceptor
-  (->interceptor
-   {:id :permission
-    :before
-    (fn [ictx]
-      (if (= :extension (event-origin-of ictx))
-        (let [ext-id (event-ext-id-of ictx)
-              event-type (event-type-of ictx)
-              env (:env ictx)
-              reg (:extension-registry env)
-              state (when reg @(:state reg))
-              ext-record (when (and ext-id state)
-                           (get-in state [:extensions ext-id]))
-              known? (some? ext-record)
-              allowed-set (:allowed-events ext-record)]
-          (cond
-            (not known?)
-            (assoc ictx :blocked? true :block-reason :unknown-extension)
-
-            (and (set? allowed-set)
-                 (contains? allowed-set event-type))
-            ictx
-
-            :else
-            (assoc ictx :blocked? true
-                   :block-reason {:reason :permission-denied
-                                  :event-type event-type
-                                  :ext-id ext-id})))
-        ictx))}))
-
-(def statechart-interceptor
-  (->interceptor
-   {:id :statechart
-    :before
-    (fn [ictx]
-      (if (:blocked? ictx)
-        ictx
-        (let [env (:env ictx)
-              dispatch-fn (:dispatch-statechart-event-fn env)]
-          (if-not (fn? dispatch-fn)
-            ictx
-            (let [result (dispatch-fn env (event-type-of ictx) (event-data-of ictx) ictx)
-                  claimed? (cond
-                             (map? result) (boolean (:claimed? result))
-                             :else (boolean result))]
-              (if claimed?
-                (let [claimed-ictx (assoc ictx :statechart-claimed? true :blocked? true)]
-                  (if (map? result)
-                    (cond-> claimed-ictx
-                      (contains? result :result) (assoc :result (:result result))
-                      (contains? result :blocked?) (assoc :blocked? (boolean (:blocked? result)))
-                      (contains? result :block-reason) (assoc :block-reason (:block-reason result)))
-                    claimed-ictx))
-                ictx))))))}))
-
 (defn pure-result? [x]
   (and (map? x)
        (or (contains? x :root-state-update)
@@ -290,23 +235,15 @@
           ictx)))}))
 
 (defn apply-root-state-update! [env root-update-fn]
-  (cond
-    (and (fn? root-update-fn) (:state* env))
-    (swap! (:state* env) root-update-fn)
-
-    (and (fn? root-update-fn) (fn? (:apply-root-state-update-fn env)))
-    ((:apply-root-state-update-fn env) env root-update-fn)
-
-    :else nil)
+  (when (and (fn? root-update-fn) (:state* env))
+    (swap! (:state* env) root-update-fn))
   nil)
 
 (defn read-root-state-value [env return-key]
-  (if (fn? (:read-session-state-fn env))
-    ((:read-session-state-fn env) env return-key)
-    (when (:state* env)
-      (if (vector? return-key)
-        (get-in @(:state* env) return-key)
-        (get @(:state* env) return-key)))))
+  (when (:state* env)
+    (if (vector? return-key)
+      (get-in @(:state* env) return-key)
+      (get @(:state* env) return-key))))
 
 (def apply-interceptor
   (->interceptor
@@ -431,9 +368,7 @@
                ictx))}))
 
 (def default-interceptors
-  [permission-interceptor
-   log-interceptor
-   statechart-interceptor
+  [log-interceptor
    handler-interceptor
    effect-interceptor
    trim-effects-on-replay
@@ -446,10 +381,12 @@
 
 (defn dispatch!
   ([env event-type]
-   (dispatch! env event-type nil nil))
+   (dispatch! env event-type nil nil (current-interceptors)))
   ([env event-type event-data]
-   (dispatch! env event-type event-data nil))
+   (dispatch! env event-type event-data nil (current-interceptors)))
   ([env event-type event-data opts]
+   (dispatch! env event-type event-data opts (current-interceptors)))
+  ([env event-type event-data opts interceptors]
    (let [event (normalize-event event-type event-data opts)
          session-id (event-session-id-of {:event event})
          dispatch-id (:event/dispatch-id event)
@@ -473,7 +410,7 @@
                            :origin (:event/origin event)
                            :replaying? (:event/replaying? event)})
      (try
-       (let [result-ictx (run-interceptor-chain ictx (current-interceptors))
+       (let [result-ictx (run-interceptor-chain ictx interceptors)
              failed? (boolean (and (:blocked? result-ictx)
                                    (:validation-error result-ictx)))]
          (append-trace-entry! env

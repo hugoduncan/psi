@@ -123,10 +123,10 @@
                        :tool-batch-executor          tool-batch-executor
                        :extension-run-fn-atom        (atom nil)
                        :scheduler-timers*            (atom {})
-                       :execute-dispatch-effect-fn   (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
-                       :execute-effect-fn            (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
                        :apply-root-state-update-fn   ss/apply-root-state-update-in!
                        :read-session-state-fn        ss/get-state-value-in
+                       :execute-dispatch-effect-fn   (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
+                       :execute-effect-fn            (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
                        :dispatch-statechart-event-fn dispatch-statechart-event-fn
                        :runtime-tool-executor-fn     tool-plan/default-execute-runtime-tool-in!
                        :execute-tool-runtime-fn      #'tool-plan/execute-tool-runtime-in!

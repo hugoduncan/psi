@@ -12,6 +12,6 @@
 - [x] Add/update focused tests for the extracted kernel boundary and preserved behavior, covering at least pure-result apply, bounded event-log/trace, and one consuming `agent-session` path
 - [x] Record moved-vs-split decisions, kernel-contract decisions, and cycle-status rationale in implementation notes
 - [x] Run focused verification
-- [ ] Move `permission-interceptor` and `statechart-interceptor` out of `psi.state-kernel.dispatch` into higher-layer composition/injection so kernel defaults are fully domain-independent
-- [ ] Remove the remaining kernel compatibility fallbacks to `:apply-root-state-update-fn` and `:read-session-state-fn`, or explicitly document and isolate them as temporary migration-only seams
-- [ ] Re-run focused and wider unit verification after the boundary-tightening follow-up
+- [x] Move `permission-interceptor` and `statechart-interceptor` out of `psi.state-kernel.dispatch` into higher-layer composition/injection so kernel defaults are fully domain-independent
+- [x] Remove the remaining kernel compatibility fallbacks to `:apply-root-state-update-fn` and `:read-session-state-fn`, or explicitly document and isolate them as temporary migration-only seams
+- [x] Re-run focused and wider unit verification after the boundary-tightening follow-up
