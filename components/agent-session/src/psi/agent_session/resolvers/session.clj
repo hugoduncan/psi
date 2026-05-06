@@ -260,7 +260,7 @@
                (update :cost + (usage-cost-total u))))
          acc)))
    {:input 0 :output 0 :cache-read 0 :cache-write 0 :cost 0.0}
-   (session/get-state-value-in agent-session-ctx (session/state-path :journal session-id))))
+   (ss/get-state-value-in agent-session-ctx (ss/state-path :journal session-id))))
 
 (defn- find-git-head-path
   [cwd]

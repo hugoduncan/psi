@@ -5,7 +5,8 @@
    Keep this namespace temporarily so existing higher-level callers can migrate
    incrementally without changing all require sites at once."
   (:require
-   [psi.session-state.model :as model]))
+   [psi.session-state.model :as model]
+   [psi.session-state.state :as state]))
 
 (def thinking-level-schema model/thinking-level-schema)
 (def ui-type-schema model/ui-type-schema)
@@ -46,6 +47,15 @@
 (def next-model model/next-model)
 (def make-entry model/make-entry)
 (def append-entry model/append-entry)
+(def session-data-path state/session-data-path)
+(def session-telemetry-path state/session-telemetry-path)
+(def session-journal-path state/session-journal-path)
+(def session-flush-state-path state/session-flush-state-path)
+(def session-turn-ctx-path state/session-turn-ctx-path)
+(def state-path state/state-path)
+(def get-state-value-in state/get-state-value-in)
+(def assoc-state-value-in! state/assoc-state-value-in!)
+(def get-session-data-in state/get-session-data-in)
 (def retry-error? model/retry-error?)
 (def context-overflow-error? model/context-overflow-error?)
 (def exponential-backoff-ms model/exponential-backoff-ms)

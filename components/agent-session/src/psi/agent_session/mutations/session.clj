@@ -9,7 +9,6 @@
    [psi.agent-session.core :as core]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.persistence :as persist]
-   [psi.session-state.model :as session]
    [psi.agent-session.session-runtime :as runtime]
    [psi.session-state.state :as ss]))
 
@@ -211,8 +210,8 @@
    ::pco/params  [:psi/agent-session-ctx :session-id]
    ::pco/output  [:psi.agent-session/rpc-trace-enabled
                   :psi.agent-session/rpc-trace-file]}
-  (let [current       (or (session/get-state-value-in agent-session-ctx
-                                                      (session/state-path :rpc-trace))
+  (let [current       (or (ss/get-state-value-in agent-session-ctx
+                                                 (ss/state-path :rpc-trace))
                           {:enabled? false :file nil})
         enabled?      (if (contains? params :enabled)
                         (boolean enabled)
@@ -250,7 +249,7 @@
   (core/manual-compact-in! agent-session-ctx session-id instructions)
   {:psi.agent-session/is-compacting     false
    :psi.agent-session/session-entry-count
-   (count (session/get-state-value-in agent-session-ctx (session/state-path :journal session-id)))})
+   (count (ss/get-state-value-in agent-session-ctx (ss/state-path :journal session-id)))})
 
 (pco/defmutation append-entry
   "Append a custom journal entry to the current session."
@@ -261,7 +260,7 @@
   (ss/journal-append-in! agent-session-ctx session-id
                          (persist/custom-message-entry custom-type (str data) nil false))
   {:psi.agent-session/session-entry-count
-   (count (session/get-state-value-in agent-session-ctx (session/state-path :journal session-id)))})
+   (count (ss/get-state-value-in agent-session-ctx (ss/state-path :journal session-id)))})
 
 (pco/defmutation reload-models
   "Reload user + project custom models from disk for the session worktree path.

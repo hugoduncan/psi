@@ -4,9 +4,8 @@
    session registry helpers, hierarchy traversal, and worktree invariants."
   (:require
    [clojure.string :as str]
-   [psi.agent-core.core :as agent-core]
-   [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.persistence :as persist]))
+   [com.fulcrologic.statecharts :as sc]
+   [com.fulcrologic.statecharts.protocols :as sp]))
 
 (defn agent-ctx-in
   [ctx session-id]
@@ -93,15 +92,7 @@
 
 (defn journal-append-in!
   [ctx session-id entry]
-  (persist/append-entry-in! ctx session-id entry)
-  (when (:persist? ctx)
-    (let [sd (get-session-data-in ctx session-id)
-          session-file (:session-file sd)]
-      (when session-file
-        (persist/persist-entry-in!
-         ctx session-id (session-worktree-path-in ctx session-id)
-         (:parent-session-id sd) session-file))))
-  entry)
+  ((:journal-append-fn ctx) ctx session-id entry))
 
 (defn get-sessions-map-in [ctx] (get-state-in* ctx [:agent-session :sessions]))
 
@@ -117,6 +108,45 @@
           nil
           (or entries [])))
 
+(def ^:private default-display-name-max-chars 48)
+
+(defn- short-display-text [text]
+  (let [normalized (some-> text str (str/replace #"\s+" " ") str/trim)]
+    (when (seq normalized)
+      (if (> (count normalized) default-display-name-max-chars)
+        (str (subs normalized 0 (dec default-display-name-max-chars)) "…")
+        normalized))))
+
+(defn- slash-command-text? [text]
+  (let [trimmed (some-> text str/trim)]
+    (and (seq trimmed)
+         (str/starts-with? trimmed "/"))))
+
+(defn- message-content-text [content]
+  (cond
+    (nil? content) nil
+    (string? content) content
+    (sequential? content) (some->> content
+                                   (keep (fn [block]
+                                           (when (map? block)
+                                             (or (:text block)
+                                                 (:message block)
+                                                 (:thinking block)))))
+                                   seq
+                                   (str/join "\n"))
+    :else nil))
+
+(defn- user-message-display-text [message]
+  (when (= "user" (:role message))
+    (let [text (short-display-text (message-content-text (:content message)))]
+      (when-not (slash-command-text? text)
+        text))))
+
+(defn- session-display-name [session-name messages]
+  (or (short-display-text session-name)
+      (some->> (reverse (vec (or messages [])))
+               (some user-message-display-text))))
+
 (defn list-context-sessions-in
   [ctx]
   (let [sessions (get-sessions-map-in ctx)]
@@ -126,14 +156,12 @@
                    (when-not (str/blank? sid)
                      (let [journal       (:journal persistence)
                            messages      (keep (fn [entry]
-                                                 (when (= (:kind entry) :message)
+                                                 (when (= :message (:kind entry))
                                                    (get-in entry [:data :message])))
                                                journal)
                            updated-at    (or (:updated-at data)
                                              (latest-message-timestamp journal))
-                           display-name  (message-text/session-display-name
-                                          (:session-name data)
-                                          messages)]
+                           display-name  (session-display-name (:session-name data) messages)]
                        (assoc (select-keys data [:session-id :session-file :session-name
                                                  :worktree-path :parent-session-id
                                                  :parent-session-path :created-at :updated-at])
@@ -142,8 +170,12 @@
          (sort-by (juxt :updated-at :session-id))
          vec)))
 
+(defn- sc-working-memory [sc-env session-id]
+  (sp/get-working-memory (::sc/working-memory-store sc-env) sc-env session-id))
+
 (defn sc-phase-in [ctx session-id]
-  (some-> (agent-ctx-in ctx session-id) agent-core/sc-phase-in))
+  (when-let [wm (sc-working-memory (:sc-env ctx) (sc-session-id-in ctx session-id))]
+    (first (::sc/configuration wm))))
 
 (defn idle-in? [ctx session-id]
   (= :idle (sc-phase-in ctx session-id)))

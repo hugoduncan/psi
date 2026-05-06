@@ -307,3 +307,95 @@ Post-review closure posture
   - treat qctx/helper movement as optional
   - allow temporary compat wrappers while migrating core consumers toward the new authority
 - if implementation uncovers a second seam as mixed as the child-session prompt derivation path, record it immediately before widening scope.
+
+Implementation pass — 2026-05-06
+- created new component `components/session-state/` with first-cut authorities:
+  - `src/psi/session_state/model.clj`
+  - `src/psi/session_state/state.clj`
+  - `src/psi/session_state/init.clj`
+  - `deps.edn`
+- wired root/component deps so the new component is on the normal runtime and test classpaths:
+  - root `deps.edn`
+  - `components/agent-session/deps.edn`
+  - `components/app-runtime/deps.edn`
+  - `components/rpc/deps.edn`
+- moved canonical pure session model ownership to `psi.session-state.model`
+- moved canonical root-state path/read/update/tree/worktree ownership to `psi.session-state.state`
+- moved canonical pure init/update transforms to `psi.session-state.init`
+
+Compatibility posture after extraction
+- replaced the old mixed authorities with thin compat wrappers:
+  - `psi.agent-session.session` now delegates to `psi.session-state.model` and re-exports a small set of state helpers still depended on by older mixed callers
+  - `psi.agent-session.session-state` now delegates to `psi.session-state.state`
+  - `psi.agent-session.dispatch-handlers.session-state` now delegates to `psi.session-state.init` for pure init/update transforms
+- intentionally kept one mixed seam above the lower boundary:
+  - `initialize-child-session-state`
+  - its prompt/tool/skill/system-prompt derivation still depends on `psi.agent-session.system-prompt`, so it remains in the compat namespace for now rather than being pushed down into `session-state.init`
+
+Direct consumer migration completed in this slice
+- repointed representative higher-level consumers directly onto the new component authorities:
+  - `psi.agent-session.session-lifecycle` → `psi.session-state.state`
+  - `psi.agent-session.resolvers.session` → `psi.session-state.model` + `psi.session-state.state`
+  - `psi.agent-session.mutations.session` → `psi.session-state.model` + `psi.session-state.state`
+  - `psi.agent-session.dispatch-handlers.session-lifecycle` → `psi.session-state.init` + `psi.session-state.state`, while still using the compat seam for child-session init
+  - `psi.agent-session.dispatch-handlers.session-mutations` → `psi.session-state.init` + `psi.session-state.state`
+  - `psi.rpc.session.ops` → `psi.session-state.state`
+  - `psi.app-runtime.context` → `psi.session-state.state`
+- this satisfied the task requirement to migrate at least one real non-`agent-session` consumer path; both RPC and app-runtime now consume the extracted component directly.
+
+Important boundary corrections discovered during implementation
+- first cut of `psi.session-state.state` accidentally depended on higher-level `agent-session` namespaces (`persistence`, `message-text`, `statechart`), which violated the desired slope and created load/cycle issues.
+- corrected final posture:
+  - `journal-append-in!` no longer requires `persistence`; it delegates through `ctx :journal-append-fn`
+  - context wiring now points `:journal-append-fn` at `psi.agent-session.persistence/append-entry-in!` rather than back at `ss/journal-append-in!`, avoiding recursion
+  - display-name shaping in `list-context-sessions-in` is now implemented locally in `psi.session-state.state` rather than depending on `message-text`
+  - `sc-phase-in` no longer depends on `psi.agent-session.statechart`; it reads the session statechart working memory directly via Fulcro Statecharts protocols, preserving correct session phase semantics without recreating a namespace cycle
+- one transient regression came from mistakenly reading the child agent-core phase instead of the session statechart phase; fixing that restored the expected `:streaming` / `:idle` semantics across runtime/UI tests.
+
+Focused proof added at the new component layer
+- added component-local tests:
+  - `components/session-state/test/psi/session_state/model_test.clj`
+  - `components/session-state/test/psi/session_state/state_test.clj`
+  - `components/session-state/test/psi/session_state/init_test.clj`
+- proof now covers:
+  - session creation defaults and model predicates
+  - session creation/lookup/update through extracted state helpers
+  - journal append via extracted state helper
+  - session tree traversal (`children-of-in`, `descendants-of-in`)
+  - worktree-path invariant
+  - pure init transforms for new/resume-missing/resumed/forked sessions
+
+Verification
+- representative focused regressions green after fallout cleanup:
+  - `psi.app-runtime.context-test`
+  - `psi.rpc-events-test`
+  - `psi.agent-session.model-dispatch-test`
+  - `psi.agent-session.background-jobs-test`
+  - `psi.agent-session.child-session-mutation-test`
+  - `psi.agent-session.prompt-lifecycle-test`
+  - result: `1514 tests, 11692 assertions, 0 failures`
+- full unit suite green:
+  - `1514 tests, 11692 assertions, 0 failures`
+
+Settled ownership split after implementation
+- `state-kernel`
+  - still owns the generic dispatch/state/effect substrate only
+- `session-state`
+  - now owns canonical session model/data
+  - root-state session access/update/path helpers
+  - worktree/session identity invariants
+  - session tree traversal
+  - pure non-child init/update transforms
+  - session phase read helper over session statechart working memory
+- `agent-session`
+  - still owns prompt lifecycle
+  - session runtime creation/installation
+  - persistence orchestration/wiring
+  - extension notifications and dispatch orchestration
+  - child-session prompt/tool/skill/system-prompt derivation seam
+  - Pathom/API façades and broader runtime composition
+
+Follow-on candidates exposed by this slice
+- split `initialize-child-session-state` so lower child identity/hierarchy/default-slot state can move fully into `session-state.init` while prompt derivation stays above
+- continue direct caller migration away from compat wrappers until `psi.agent-session.session` no longer needs to re-export any state helpers
+- consider whether the lightweight local display-name shaping in `session-state.state` should remain there as the lower-level session-listing authority, or whether a later shared lower utility component is warranted
