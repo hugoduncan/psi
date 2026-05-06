@@ -1,7 +1,7 @@
 (ns psi.agent-session.service-protocol
   "Shared request/response semantics for managed services."
-  (:require [psi.agent-session.dispatch :as dispatch]
-            [psi.agent-session.services :as services]))
+  (:require [psi.agent-session.services :as services]
+            [psi.state-kernel.dispatch :as kernel]))
 
 (defn send-service-request!
   "Send a correlated request to a managed service.
@@ -17,12 +17,12 @@
    (send-service-request! ctx service-key request nil))
   ([ctx service-key {:keys [request-id payload timeout-ms] :as request} {:keys [dispatch-id]}]
    (let [svc (services/service-in ctx service-key)]
-     (dispatch/append-trace-entry! {:trace/kind  :dispatch/service-request
-                                    :dispatch-id dispatch-id
-                                    :service-key service-key
-                                    :request-id  request-id
-                                    :method      (get payload "method")
-                                    :payload     payload})
+     (kernel/append-trace-entry! ctx {:trace/kind  :dispatch/service-request
+                                      :dispatch-id dispatch-id
+                                      :service-key service-key
+                                      :request-id  request-id
+                                      :method      (get payload "method")
+                                      :payload     payload})
      (let [response (cond
                       (:request-fn svc)
                       ((:request-fn svc) {:request-id request-id
@@ -43,13 +43,13 @@
                         (when-let [send-fn (:send-fn svc)]
                           (send-fn payload))
                         nil))]
-       (dispatch/append-trace-entry! {:trace/kind  :dispatch/service-response
-                                      :dispatch-id dispatch-id
-                                      :service-key service-key
-                                      :request-id  request-id
-                                      :method      (get payload "method")
-                                      :response    response
-                                      :is-error    (boolean (:is-error response))})
+       (kernel/append-trace-entry! ctx {:trace/kind  :dispatch/service-response
+                                        :dispatch-id dispatch-id
+                                        :service-key service-key
+                                        :request-id  request-id
+                                        :method      (get payload "method")
+                                        :response    response
+                                        :is-error    (boolean (:is-error response))})
        {:service-key service-key
         :request-id request-id
         :payload payload
@@ -61,11 +61,11 @@
    (send-service-notification! ctx service-key payload nil))
   ([ctx service-key payload {:keys [dispatch-id]}]
    (let [svc (services/service-in ctx service-key)]
-     (dispatch/append-trace-entry! {:trace/kind  :dispatch/service-notify
-                                    :dispatch-id dispatch-id
-                                    :service-key service-key
-                                    :method      (get payload "method")
-                                    :payload     payload})
+     (kernel/append-trace-entry! ctx {:trace/kind  :dispatch/service-notify
+                                      :dispatch-id dispatch-id
+                                      :service-key service-key
+                                      :method      (get payload "method")
+                                      :payload     payload})
      (when-let [send-fn (:send-fn svc)]
        (send-fn payload))
      {:service-key service-key

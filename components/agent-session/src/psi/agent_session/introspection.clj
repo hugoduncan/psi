@@ -3,6 +3,7 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.session :as session]
    [psi.agent-session.session-state :as ss]
@@ -17,9 +18,9 @@
 
    Returns the updated root state map."
   ([ctx]
-   (replay-dispatch-event-log-in! ctx (dispatch/event-log-entries)))
+   (replay-dispatch-event-log-in! ctx (kernel/event-log-entries)))
   ([ctx entries]
-   (dispatch/replay-event-log! ctx entries)
+   (kernel/replay-event-log! dispatch/dispatch! ctx entries)
    @(:state* ctx)))
 
 (defn diagnostics-in

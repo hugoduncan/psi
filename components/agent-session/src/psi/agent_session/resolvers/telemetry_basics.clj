@@ -3,8 +3,8 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.background-job-runtime :as bg-runtime]
    [psi.agent-session.background-jobs :as bg-jobs]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.resolvers.support :as support]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
    [psi.agent-session.session :as session]
    [psi.agent-session.state-accessors :as accessors]
@@ -52,7 +52,7 @@
                  {:psi.agent-session/registered-dispatch-events
                   [:psi.dispatch-handler/event-type]}]}
   (let [_       agent-session-ctx
-        types   (sort (dispatch/registered-event-types))
+        types   (sort (kernel/registered-event-types))
         entries (mapv (fn [event-type]
                         {:psi.dispatch-handler/event-type event-type})
                       types)]
@@ -97,7 +97,7 @@
                    :psi.dispatch-event/db-summary-after
                    :psi.dispatch-event/timestamp
                    :psi.dispatch-event/duration-ms]}]}
-  (let [entries (dispatch/event-log-entries)]
+  (let [entries (kernel/event-log-entries)]
     {:psi.agent-session/dispatch-event-log-count (count entries)
      :psi.agent-session/dispatch-event-log       (mapv dispatch-event->eql entries)}))
 

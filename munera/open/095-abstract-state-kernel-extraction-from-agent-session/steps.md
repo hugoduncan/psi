@@ -9,7 +9,7 @@
 - [x] Rewire `agent-session` to consume the extracted kernel through explicit dependencies and the narrowed contract
 - [x] Verify the kernel has no dependency back into `agent-session`
 - [x] Remove the `agent-session` -> `system-bootstrap` dependency, or record the exact remaining blocker and why the cycle persists
-- [ ] Retire the temporary `psi.agent-session.dispatch` compatibility wrapper by moving remaining generic dispatch consumers onto `psi.state-kernel.dispatch` directly, then reduce `psi.agent-session.dispatch` to only true domain-composition surfaces or remove it entirely if no wrapper-local entrypoints remain
+- [x] Retire the temporary `psi.agent-session.dispatch` compatibility wrapper by moving remaining generic dispatch consumers onto `psi.state-kernel.dispatch` directly, then reduce `psi.agent-session.dispatch` to only true domain-composition surfaces or remove it entirely if no wrapper-local entrypoints remain
 - [x] Add/update focused tests for the extracted kernel boundary and preserved behavior, covering at least pure-result apply, bounded event-log/trace, and one consuming `agent-session` path
 - [x] Record moved-vs-split decisions, kernel-contract decisions, and cycle-status rationale in implementation notes
 - [x] Run focused verification

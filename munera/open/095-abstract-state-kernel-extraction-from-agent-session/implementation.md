@@ -136,3 +136,13 @@ Review notes — 2026-05-06
   - implication for the remaining unchecked step: the next work is not further reshaping of this namespace first, but migration of remaining generic consumers onto `psi.state-kernel.dispatch` directly.
   - target end-state for this namespace: either disappear entirely or shrink to a small domain-composition surface containing only agent-session-specific composition concerns such as permission/statechart interception and wrapper-local dispatch adaptation.
   - closure note for this review pass: task 095 can treat `psi.agent-session.dispatch` as an acceptable temporary compatibility seam, but should keep the final unchecked step focused on consumer migration rather than local namespace cleanup.
+- Consumer migration follow-up — 2026-05-06
+  - completed the remaining unchecked compat-seam step by moving generic non-composition consumers off `psi.agent-session.dispatch` and onto `psi.state-kernel.dispatch` directly where they only needed kernel-owned facilities.
+  - migrated `psi.agent-session.post-tool` to use kernel-owned `assoc-dispatch-id` and `handler-entry`, keeping only actual dispatch invocation on the agent-session wrapper.
+  - migrated `psi.agent-session.introspection` replay/event-log usage to kernel-owned event-log replay substrate while still invoking replay through the agent-session dispatch entrypoint.
+  - migrated `psi.agent-session.service-protocol` trace appends to `psi.state-kernel.dispatch/append-trace-entry!` so service telemetry now depends directly on the kernel trace substrate.
+  - migrated telemetry/query surfaces in `psi.agent-session.resolvers.telemetry-basics` and `psi.agent-session.resolvers.services` to read dispatch registry, event-log, and trace data directly from the kernel.
+  - result: the remaining wrapper usage is now concentrated around actual domain dispatch composition surfaces (`dispatch!`, handler registration, interceptors, validation wiring) rather than generic log/trace/replay helpers.
+  - wrapper status after this pass: `psi.agent-session.dispatch` still exists because agent-session-owned composition concerns remain there, but it is no longer the canonical home for the migrated generic telemetry/replay helper consumers.
+  - focused verification green after the compat-seam consumer migration:
+    - `clojure -M:test --focus psi.agent-session.post-tool-test --focus psi.introspection.agent-session-test --focus psi.agent-session.eql-introspection-test --focus psi.agent-session.resolvers-test --focus psi.agent-session.dispatch-test --focus psi.state-kernel.dispatch-test` → `46 tests, 404 assertions, 0 failures`.

@@ -1,7 +1,8 @@
 (ns psi.agent-session.post-tool
   "Ctx-owned post-tool processor registry and additive result composition."
   (:require [clojure.string :as str]
-            [psi.agent-session.dispatch :as dispatch]))
+            [psi.agent-session.dispatch :as dispatch]
+            [psi.state-kernel.dispatch :as kernel]))
 
 (defn create-registry []
   {:state (atom {:processors []
@@ -80,7 +81,7 @@
      (fn [result {:keys [name timeout-ms handler]}]
        (let [started (System/nanoTime)
              outcome (try
-                       (run-with-timeout timeout-ms #(handler (dispatch/assoc-dispatch-id input dispatch-id)))
+                       (run-with-timeout timeout-ms #(handler (kernel/assoc-dispatch-id input dispatch-id)))
                        (catch Throwable t t))
              duration-ms (long (/ (- (System/nanoTime) started) 1000000))]
          (cond
@@ -120,7 +121,7 @@
 
 (defn run-post-tool-processing-in!
   [ctx {:keys [session-id] :as input}]
-  (if (and session-id (dispatch/handler-entry :session/post-tool-run))
+  (if (and session-id (kernel/handler-entry :session/post-tool-run))
     (dispatch/dispatch! ctx :session/post-tool-run input {:origin :core})
     (run-post-tool-processing-direct-in! ctx input)))
 
