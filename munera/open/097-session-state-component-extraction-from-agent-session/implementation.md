@@ -399,3 +399,10 @@ Follow-on candidates exposed by this slice
 - split `initialize-child-session-state` so lower child identity/hierarchy/default-slot state can move fully into `session-state.init` while prompt derivation stays above
 - continue direct caller migration away from compat wrappers until `psi.agent-session.session` no longer needs to re-export any state helpers
 - consider whether the lightweight local display-name shaping in `session-state.state` should remain there as the lower-level session-listing authority, or whether a later shared lower utility component is warranted
+
+Review note — 2026-05-06
+- review verdict: pass
+- extraction matches task intent and preserves the intended dependency slope
+- compat wrappers are acceptable for this slice
+- deferred seams are explicit and appropriate, especially child-session prompt derivation and journal-append ownership
+- no blocking design/architecture issue found for task `097`
