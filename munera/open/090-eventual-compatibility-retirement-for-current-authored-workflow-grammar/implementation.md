@@ -35,3 +35,8 @@
 - Migrated the remaining PR check-healing workflows (`gh-pr-heal-check-loop.md`, `gh-pr-fix-current-checks.md`, and `gh-pr-fix-checks.md`) to target-authored delegate/session forms.
 - Replaced compatibility step-to-step handoff wiring with explicit delegate prompt/context flow and dedicated typed status steps for PASS/PENDING/FAIL/BLOCKED and WAIT/BLOCKED routing.
 - Preserved the original operational prompts and loop bounds while removing checked-in uses of current-authored multi-step `:workflow` entries, compatibility `:session` maps, and current judge syntax from the repo-owned workflow set.
+
+2026-05-06 implementation slice 5
+- Migrated the remaining checked-in single-purpose helper workflows (`planner`, `builder`, `reviewer`, `lambda-compiler`, `lambda-decompiler`, `prompt-compiler`, `prompt-decompiler`, and `allium-check`) to target-authored single-step `:type :session` files.
+- This removes the last repo-owned dependence on single-step current-authored file compilation, so repo checked-in `.psi/workflows/*.md` are now uniformly target-authored.
+- Kept tool/skill behavior explicit in canonical session fields and moved the old prompt bodies into template contributions that read the full workflow input directly.

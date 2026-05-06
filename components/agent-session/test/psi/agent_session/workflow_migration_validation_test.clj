@@ -37,23 +37,27 @@
               (str "Name collisions: " (pr-str (:duplicates collision-result)))))))))
 
 (deftest migrated-single-step-workflows-test
-  (testing "single-step workflows carry expected metadata"
+  (testing "single-step workflows carry expected target-authored session configuration"
     (let [parsed (loader/scan-directory ".psi/workflows")
           {:keys [definitions]} (compiler/compile-workflow-files parsed)
           by-name (into {} (map (juxt :name identity)) definitions)]
       ;; planner
       (let [p (get by-name "planner")]
         (is (some? p))
-        (is (= 1 (count (:step-order p))))
-        (is (= #{"read" "bash"} (get-in p [:steps "step-1" :capability-policy :tools])))
-        (is (some? (get-in p [:workflow-file-meta :system-prompt]))))
+        (is (= [:session]
+               (mapv :type (:steps p))))
+        (is (= ["read" "bash"]
+               (get-in p [:steps 0 :tools])))
+        (is (= :workflow-input
+               (get-in p [:steps 0 :contributions 0 :vars "input" :from]))))
       ;; builder has 4 tools
       (let [b (get by-name "builder")]
-        (is (= #{"read" "bash" "edit" "write"}
-               (get-in b [:steps "step-1" :capability-policy :tools]))))
+        (is (= ["read" "bash" "edit" "write"]
+               (get-in b [:steps 0 :tools]))))
       ;; lambda-compiler has skill
       (let [lc (get by-name "lambda-compiler")]
-        (is (= ["lambda-compiler"] (get-in lc [:workflow-file-meta :skills])))))))
+        (is (= ["lambda-compiler"]
+               (get-in lc [:steps 0 :skills])))))))
 
 (deftest migrated-multi-step-workflows-test
   (testing "multi-step workflows have correct step counts"

@@ -2,13 +2,10 @@
 name: prompt-decompiler
 description: Decompiles a prompt from EDN
 ---
-{:tools ["read" "bash"]
- :skills ["prompt-compiler"]}
-
-Use the prompt-compiler skill.
-Decompile the specified EDN prompt to prose.
-
-Requirements:
-- Return concise prose only
-- Preserve semantics of states/transitions/guards/actions
-- Keep output brief
+{:steps [{:name "decompile"
+          :type :session
+          :tools ["read" "bash"]
+          :skills ["prompt-compiler"]
+          :contributions [{:type :template
+                           :text "Use the prompt-compiler skill.\nDecompile the specified EDN prompt to prose.\n\nRequirements:\n- Return concise prose only\n- Preserve semantics of states/transitions/guards/actions\n- Keep output brief\n\nInput:\n{{input}}"
+                           :vars {"input" {:from :workflow-input}}}]}]}

@@ -18,7 +18,7 @@
   - [x] `gh-pr-heal-check-loop.md`
   - [x] `gh-pr-fix-current-checks.md`
   - [x] `gh-pr-fix-checks.md`
-- [ ] Tighten migration validation so checked-in workflow examples are target-authored only
+- [x] Tighten migration validation so checked-in workflow examples are target-authored only
 - [ ] Remove current-authored grammar loading/compilation support
   - [ ] remove `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
   - [ ] remove current-grammar branch from `components/agent-session/src/psi/agent_session/workflow_runtime.clj`
