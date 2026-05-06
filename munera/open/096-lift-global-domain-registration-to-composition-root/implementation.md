@@ -67,3 +67,15 @@ Review notes:
   - `bb clojure:test:unit` → `1514 tests, 11692 assertions, 1 failure`
   - failing test: `psi.rpc-prompt-test/rpc-openai-codex-prompt-emits-tool-events-with-final-args-test`
   - direct focused rerun of that test passed immediately afterward, so the broader-suite failure did not reproduce as a stable local regression from this shaping pass
+- system-bootstrap test review feedback:
+  - current tests are a good smoke-test baseline at the correct ownership layer
+  - missing behavioral coverage remains for `register-domains-in!` without `session-ctx`, for idempotence of both public entrypoints, and for one global queryability proof after `register-all-domains!`
+  - style follow-up: add more explicit test names for the branch and idempotence cases so the public guarantees are easier to read from the test file
+- follow-up test expansion implemented in `components/system-bootstrap/test/psi/system_bootstrap/core_test.clj`:
+  - added no-`session-ctx` branch coverage with explicit session-domain absence assertions
+  - added idempotence tests for `register-all-domains!` and `register-domains-in!`
+  - added a global queryability proof for `register-all-domains!` via `:ai/all-models` and `:ai/registered-providers`
+  - tightened test var names so the public branch and idempotence guarantees are visible from the file outline
+- verification after the test expansion:
+  - `clojure -M:test --focus psi.system-bootstrap.core-test` still skipped under the current Kaocha focus invocation in this environment
+  - full broader verification is green again via `bb clojure:test:unit` (`1514 tests, 11692 assertions, 0 failures`)

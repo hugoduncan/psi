@@ -16,4 +16,8 @@
 - [x] Run focused verification
 - [x] Add a small follow-up shaping pass in `psi.system-bootstrap.core` that extracts the registration domain catalog as data while preserving the explicit distinction between global registration and assembled isolated registration
 - [x] Re-run focused registration tests after that shaping pass
-- [ ] Run broader verification as needed
+- [x] Add `register-domains-in!` coverage for the no-`session-ctx` branch, asserting base-domain presence and session-domain absence
+- [x] Add idempotence tests for both `register-all-domains!` and `register-domains-in!`
+- [x] Add one global queryability proof after `register-all-domains!`, not just symbol-presence assertions
+- [x] Tighten system-bootstrap test naming so branch and idempotence guarantees are explicit from the test var names
+- [x] Run broader verification as needed
