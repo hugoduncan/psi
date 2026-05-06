@@ -76,3 +76,8 @@
 - For resolver coverage, kept the assertions aligned with current resolver projection reality instead of preserving removed prompt-template/capability-policy expectations from pre-retirement stored-step shapes.
 - Focused verification for these follow-on rewrites is green: `clojure -M:test --focus psi.agent-session.workflow-progression-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.agent-session.workflow-lifecycle-test --focus psi.agent-session.workflow-resolvers-test` (`11 tests, 69 assertions, 0 failures`).
 - A fresh broad run still needs to be rerun after this slice to discover whether any further legacy canonical-definition fixtures remain outside this now-updated set.
+
+2026-05-06 implementation slice 12
+- Reran the full unit suite after the remaining runtime/resolver fixture rewrites.
+- Full broader verification is now green: `bb clojure:test:unit` (`1513 tests, 11015 assertions, 0 failures`).
+- This confirms the task-090 retirement end state now holds across the full unit suite: repo-owned checked-in workflows, loader/compiler/runtime seams, docs, and the remaining unit fixtures all converge on target-authored workflow definitions only, with no live current-authored registration path left in the exercised repo surfaces.
