@@ -18,7 +18,7 @@
 
 (deftest scheduler-create-stores-schedule-and-starts-timer-test
   (let [[ctx session-id] (test-support/make-session-ctx {})
-        fire-at          (java.time.Instant/now)
+        fire-at          (.plusMillis (java.time.Instant/now) 1000)
         result           (dispatch/dispatch! ctx :scheduler/create
                                              {:session-id session-id
                                               :schedule-id "sch-1"
