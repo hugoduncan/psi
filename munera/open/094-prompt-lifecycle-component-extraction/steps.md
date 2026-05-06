@@ -1,7 +1,10 @@
-- [ ] Inspect current prompt lifecycle ownership and test surfaces
+- [ ] Inspect current prompt lifecycle ownership, dependency edges, and test surfaces
 - [ ] Choose and document the extracted component boundary/API
-- [ ] Record the chosen ownership split in implementation notes
-- [ ] Extract prepare → execute → record → finish orchestration into the new component
+- [ ] Record the chosen ownership split and dependency slope in implementation notes
+- [ ] Introduce `psi.turn` as the authoritative owner while keeping `prompt-control` as a thin delegating facade
+- [ ] Extract prepare → execute → record → finish orchestration into the `psi.turn` family
+- [ ] Rebind `context` callback wiring to turn-owned functions
+- [ ] Thin lifecycle handler ownership so dispatch registration/adaptation no longer co-owns the logic
 - [ ] Simplify at least one higher-level caller to use the extracted component
 - [ ] Align docs/comments with the new ownership model
 - [ ] Make only the minimal focused test updates needed for extraction safety

@@ -7,7 +7,8 @@ Refinement intent:
 Context:
 - prompt lifecycle ownership has been converging under the existing prompt lifecycle umbrella task (`003-prompt-lifecycle-architectural-convergence`)
 - the lifecycle scaffold already exists end-to-end, but the implementation is still spread across broader runtime/session namespaces rather than living behind one dedicated component boundary
-- prompt behavior is important enough to deserve a component-local home for lifecycle orchestration, contracts, and focused proof
+- the extracted component should use a more distinctive name than `prompt`, because prompt terminology is already overloaded across prompt text, system prompts, prompt templates, and prompt submission
+- the component is really about the turn lifecycle, so the component name and namespace should reflect turn ownership directly
 - tests for this work should stay focused and minimal; broad test-architecture rewrites are out of scope for this extraction task
 
 Problem:
@@ -82,18 +83,35 @@ Planning decisions:
 - Testing stance: do not use this task to rewrite tests toward a new testing architecture. Only make the minimum focused test updates needed to keep the extraction safe, understandable, and behaviorally covered.
 
 Concrete namespace decisions:
-- Authoritative lifecycle owner: introduce a `psi.agent-session.prompt-lifecycle` namespace family as the singular owner of prompt turn orchestration.
+- Authoritative lifecycle owner: introduce a top-level `psi.turn` namespace family as the singular owner of turn orchestration.
 - Recommended initial shape:
-  - `psi.agent-session.prompt-lifecycle` — canonical public API and orchestration entrypoint for submit/start and execution-result submission
-  - `psi.agent-session.prompt-lifecycle.prepare` — prepared-request construction and prompt-layer/request projection
-  - `psi.agent-session.prompt-lifecycle.execute` — effectful prepared-request execution against the provider turn runtime
-  - `psi.agent-session.prompt-lifecycle.record` — assistant-message classification, record-response shaping, and next-step decision logic
-  - `psi.agent-session.prompt-lifecycle.handlers` — thin dispatch registration/adaptation only
-- `psi.agent-session.prompt-control` should not remain a co-owner. Preferred direction: keep it only as a thin compatibility/public facade during migration, delegating to `psi.agent-session.prompt-lifecycle`.
-- `psi.agent-session.dispatch-handlers.prompt-lifecycle` should be reduced to registration/adaptation or replaced by `psi.agent-session.prompt-lifecycle.handlers`; the real lifecycle logic should move out of the dispatch-handlers area.
+  - `psi.turn` — canonical public API and orchestration entrypoint for submit/start and execution-result submission
+  - `psi.turn.prepare` — prepared-request construction and turn/request projection
+  - `psi.turn.execute` — effectful prepared-request execution against the provider turn runtime
+  - `psi.turn.record` — assistant-message classification, record-response shaping, and next-step decision logic
+  - `psi.turn.handlers` — thin dispatch registration/adaptation only
+- `psi.agent-session.prompt-control` should not remain a co-owner. Preferred direction: keep it only as a thin compatibility/public facade during migration, delegating to `psi.turn`.
+- `psi.agent-session.dispatch-handlers.prompt-lifecycle` should be reduced to registration/adaptation or replaced by `psi.turn.handlers`; the real lifecycle logic should move out of the dispatch-handlers area.
+- Naming rationale: the second namespace segment should match the component name directly; keeping `agent-session` in the namespace would misstate the extracted boundary and preserve unnecessary ownership confusion.
+
+Concrete dependency boundary decisions:
+- Safe for the `psi.turn` family to depend on:
+  - `session-state`
+  - `state-accessors`
+  - `conversation`
+  - `system-prompt`
+  - `skills`
+  - `prompt-templates`
+  - `provider-auth`
+  - `prompt-stream`
+  - `turn-accumulator`
+  - `turn-statechart`
+  - persistence primitives
+  - model-registry / ai-model helpers where needed
+- These are treated as leaf/shared mechanisms, not as lifecycle-owned orchestration.
 
 Concrete keep-vs-move decisions:
-- Move into the lifecycle family:
+- Move into the `psi.turn` family:
   - current `prompt_control` prompt turn entrypoints
   - current `prompt_request/build-prepared-request` and closely coupled request-preparation helpers
   - current `prompt_runtime/execute-prepared-request!` and closely coupled execution helpers
@@ -110,15 +128,31 @@ Concrete keep-vs-move decisions:
   - raw `turn-sc` / turn-statechart helpers
   - persistence primitives such as `persist/message-entry`
   - session-state primitives such as `journal-append-in!`
-- Rationale: these shared helpers are used as lower-level mechanisms or broader utilities. Moving them under the lifecycle owner would blur the boundary by turning the lifecycle component into the owner of infrastructure or general prompt-shaping primitives it merely consumes.
+- Must stay above the `psi.turn` family and depend on it rather than being required by it:
+  - `core`
+  - `context`
+  - `dispatch-handlers`
+  - `dispatch-handlers.prompt-lifecycle`
+  - `workflow-statechart-runtime`
+  - `workflow-judge`
+  - `mutations.session`
+  - adapter / RPC / UI callers
+- Rationale: shared helpers are lower-level mechanisms the lifecycle consumes, while higher-level orchestrators and adapters must remain callers so the dependency slope stays one-way and circular dependencies are avoided.
+
+Cycle-avoidance guidance:
+- keep `prompt-control` as a thin delegating facade during migration so existing callers do not need to move immediately
+- move real lifecycle logic out of `dispatch-handlers.prompt-lifecycle`; registration/adaptation may remain thin there or move to `psi.turn.handlers`
+- rewire `context` callback ownership early so callback bindings point at turn-owned functions rather than scattered prompt internals
+- do not make `psi.turn` depend on workflows, `core`, `context`, or mutation namespaces
 
 Migration guidance:
-- first make `prompt-lifecycle` authoritative while keeping `prompt-control` as a thin delegating facade for compatibility
-- then move request preparation, execution, and record logic under the lifecycle family
-- finally thin or replace the current dispatch-handler namespace so it only wires events to the lifecycle owner
+- first introduce `psi.turn` as the authoritative owner while keeping `prompt-control` as a thin delegating facade for compatibility
+- then move request preparation, execution, and record logic under the `psi.turn` family
+- then rebind `context` callback fns to turn-owned functions
+- finally thin or replace the current dispatch-handler namespace so it only wires events to the turn owner
 
 Ambiguity resolutions for this task:
 - “new component” does not require a new deployable/package boundary; a coherent component-local namespace family inside the current repo is sufficient
 - “preserve behavior” means preserve externally relevant prompt-lifecycle semantics and current acceptance surfaces; internal call structure may change freely
 - test style is not being standardized by this task; existing tests may remain in their current style unless a narrow extraction-driven change is needed
-- “clear boundary” means a future reader can identify one obvious lifecycle owner for prepare/execute/record/finish, and neighboring namespaces can be described as callers, adapters, or utilities instead of co-owners
+- “clear boundary” means a future reader can identify one obvious turn owner for prepare/execute/record/finish, and neighboring namespaces can be described as callers, adapters, or utilities instead of co-owners

@@ -19,20 +19,21 @@ Settled planning answers:
 - Testing posture: do not use this task to convert tests to a different testing architecture. Keep or adjust tests only where needed to preserve confidence in the extraction.
 
 Current likely concrete destination shape:
-- one authoritative `prompt-lifecycle` namespace family should become the lifecycle owner
+- one authoritative `psi.turn` namespace family should become the turn owner
 - current `dispatch-handlers/prompt_lifecycle.clj` should become thin registration/adaptation rather than the real owner
-- current `prompt-control` should either become the public facade of that family or a thin compatibility wrapper over it
+- current `prompt-control` should remain only as a thin facade/compatibility wrapper over `psi.turn`
 
 Resolved concrete namespace/layout decisions:
-- exact authoritative lifecycle family: `psi.agent-session.prompt-lifecycle`
+- exact authoritative turn family: `psi.turn`
 - recommended namespace split:
-  - `psi.agent-session.prompt-lifecycle` — public orchestration API
-  - `psi.agent-session.prompt-lifecycle.prepare` — prepared-request construction
-  - `psi.agent-session.prompt-lifecycle.execute` — effectful prepared-request execution
-  - `psi.agent-session.prompt-lifecycle.record` — assistant-message classification and record-response shaping
-  - `psi.agent-session.prompt-lifecycle.handlers` — thin dispatch registration/adaptation
-- `prompt-control` should survive only as a thin facade/compatibility wrapper during migration, not as a co-owner of lifecycle logic.
-- `dispatch-handlers/prompt_lifecycle.clj` should be thinned substantially or replaced by the lifecycle-family handler namespace once the extraction lands.
+  - `psi.turn` — public orchestration API
+  - `psi.turn.prepare` — prepared-request construction
+  - `psi.turn.execute` — effectful prepared-request execution
+  - `psi.turn.record` — assistant-message classification and record-response shaping
+  - `psi.turn.handlers` — thin dispatch registration/adaptation
+- `prompt-control` should survive only as a thin facade/compatibility wrapper during migration, not as a co-owner of turn logic.
+- `dispatch-handlers/prompt_lifecycle.clj` should be thinned substantially or replaced by the turn-family handler namespace once the extraction lands.
+- naming rationale: the second namespace segment should match the component name directly; dropping `agent-session` keeps the component boundary distinct and avoids implying that turn ownership still fundamentally lives under agent-session.
 
 Resolved helper-boundary decision:
 - keep broadly reused lower-level helpers outside the lifecycle owner, including skill/template expansion primitives, conversation projection helpers, system-prompt contribution helpers, provider auth/model lookup, raw stream helpers, raw turn-statechart helpers, persistence primitives, and generic session-state helpers.
@@ -40,10 +41,10 @@ Resolved helper-boundary decision:
 - rationale: if the lifecycle component owns reusable infrastructure or generic shaping helpers, the boundary becomes larger but less clear.
 
 Practical migration sequence chosen:
-1. introduce `prompt-lifecycle` as the new authoritative owner
+1. introduce `psi.turn` as the new authoritative owner
 2. make `prompt-control` delegate to it
-3. move request preparation / execution / record logic under the lifecycle family
-4. thin the dispatch registration layer so it only adapts events into the lifecycle owner
+3. move request preparation / execution / record logic under the `psi.turn` family
+4. thin the dispatch registration layer so it only adapts events into the turn owner
 5. make only the minimal test adjustments needed as the moved seams stabilize
 
 No unresolved planning questions remain at the task-design level; remaining work is implementation planning and execution.
