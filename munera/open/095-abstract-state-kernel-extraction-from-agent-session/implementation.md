@@ -212,3 +212,7 @@ Review notes — 2026-05-06
   - migrated `scheduler_effects_test.clj` off `psi.agent-session.dispatch` for its public scheduler create setup calls.
   - those setup events now enter through `psi.agent-session.core/dispatch-in!`, while the file keeps its legitimate direct compat-wrapper redefs of `psi.agent-session.dispatch/dispatch!` for timer-fired effect interception.
   - this keeps the production boundary unchanged and narrows the file so its remaining wrapper dependence is only the intentional dispatch-effect seam under test.
+- Scheduler dispatch test ownership narrowing follow-up — 2026-05-06
+  - migrated `scheduler_dispatch_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` for public scheduler event submission.
+  - the file only exercises public scheduler domain behavior and session state outcomes, so compat-wrapper entrypoint ownership was unnecessary there.
+  - this further concentrates the remaining compat-wrapper test usage on explicit dispatch composition seams and direct wrapper behavior.
