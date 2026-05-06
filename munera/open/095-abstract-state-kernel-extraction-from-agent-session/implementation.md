@@ -216,3 +216,7 @@ Review notes — 2026-05-06
   - migrated `scheduler_dispatch_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` for public scheduler event submission.
   - the file only exercises public scheduler domain behavior and session state outcomes, so compat-wrapper entrypoint ownership was unnecessary there.
   - this further concentrates the remaining compat-wrapper test usage on explicit dispatch composition seams and direct wrapper behavior.
+- Scheduler handlers test ownership narrowing follow-up — 2026-05-06
+  - reviewed `scheduler_handlers_test.clj` and confirmed it is already correctly split for ownership in most places: kernel-owned handler lookup/registration surfaces are used directly, while compat-wrapper dispatch is only needed for the intentional nested redispatch interception path.
+  - kept a minimal `psi.agent-session.dispatch` alias in the file because `with-redefs` on wrapper `dispatch!` is still the legitimate seam for the failed prompt-submit delivery scenario.
+  - tightened that remaining usage so the wrapper dependency is explicit and local to the single compat-oriented scenario rather than implying broader wrapper ownership elsewhere in the file.

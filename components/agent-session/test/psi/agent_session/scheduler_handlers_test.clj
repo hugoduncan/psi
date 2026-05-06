@@ -200,8 +200,8 @@
   (let [[ctx session-id] (test-support/make-session-ctx {:persist? false})]
     (with-registered-handlers
       ctx
-      #(with-redefs [psi.agent-session.dispatch/dispatch!
-                     (let [real-dispatch psi.agent-session.dispatch/dispatch!]
+      #(with-redefs [dispatch/dispatch!
+                     (let [real-dispatch dispatch/dispatch!]
                        (fn [ctx* event-type event-data opts]
                          (if (= :session/submit-synthetic-user-prompt event-type)
                            (throw (ex-info "boom" {:created-session-id (:session-id event-data)
