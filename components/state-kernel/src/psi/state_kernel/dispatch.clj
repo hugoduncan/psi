@@ -150,9 +150,7 @@
 (defn- summarize-dispatch-db [db]
   (when (map? db)
     {:root-keys (-> db keys vec sort)
-     :session-count (count (get-in db [:agent-session :sessions]))
-     :has-background-jobs? (boolean (get-in db [:background-jobs :store]))
-     :has-turn-ctx? (boolean (get-in db [:turn :ctx]))}))
+     :root-key-count (count db)}))
 
 (defn- dispatch-log-entry [ictx]
   (cond-> {:event-type (event-type-of ictx)
@@ -162,7 +160,6 @@
            :timestamp (::log-timestamp ictx)
            :duration-ms (- (System/currentTimeMillis) (or (::log-timestamp ictx) 0))
            :replaying? (boolean (event-replaying?-of ictx))
-           :statechart-claimed? (boolean (:statechart-claimed? ictx))
            :validation-error (:validation-error ictx)
            :declared-effects (or (some-> ictx :pure-result :effects vec) [])
            :applied-effects (or (:applied-effects ictx) [])

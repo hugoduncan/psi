@@ -46,3 +46,20 @@
                                    :return-effect-result? true}))
     (is (= :done (dispatch/dispatch! env :emit {})))
     (is (= [{:effect/type :demo/ping :x 1}] @effects*))))
+
+(deftest kernel-event-log-summary-is-domain-independent
+  (let [state* (atom {:agent-session {:sessions {:s1 {}}}
+                      :background-jobs {:store {:j1 {}}}
+                      :turn {:ctx {:active true}}
+                      :other {:x 1}})
+        env {:state* state*}]
+    (dispatch/register-handler! :noop (fn [_ _] :ok))
+    (is (= :ok (dispatch/dispatch! env :noop {})))
+    (let [entry (last (dispatch/event-log-entries))]
+      (is (= {:root-keys [:agent-session :background-jobs :other :turn]
+              :root-key-count 4}
+             (:db-summary-before entry)))
+      (is (= {:root-keys [:agent-session :background-jobs :other :turn]
+              :root-key-count 4}
+             (:db-summary-after entry)))
+      (is (not (contains? entry :statechart-claimed?))))))

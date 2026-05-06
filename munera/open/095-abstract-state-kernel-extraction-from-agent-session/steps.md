@@ -15,3 +15,7 @@
 - [x] Move `permission-interceptor` and `statechart-interceptor` out of `psi.state-kernel.dispatch` into higher-layer composition/injection so kernel defaults are fully domain-independent
 - [x] Remove the remaining kernel compatibility fallbacks to `:apply-root-state-update-fn` and `:read-session-state-fn`, or explicitly document and isolate them as temporary migration-only seams
 - [x] Re-run focused and wider unit verification after the boundary-tightening follow-up
+- [x] Remove agent-session-shaped db summary logic from `components/state-kernel/src/psi/state_kernel/dispatch.clj` by reducing it to a truly generic kernel summary or injecting a higher-layer summary callback
+- [x] Remove or generalize kernel-owned `:statechart-claimed?` logging so the state-kernel event-log/trace surface no longer embeds composition-layer statechart semantics
+- [x] Add or update focused tests proving the tightened kernel trace/log boundary after the db-summary and statechart-log cleanup
+- [ ] Re-run focused and full unit verification after the final kernel-boundary cleanup

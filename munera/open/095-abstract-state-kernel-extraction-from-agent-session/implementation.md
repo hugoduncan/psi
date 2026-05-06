@@ -82,3 +82,22 @@ Review notes — 2026-05-06
   - result: green (`1514 tests, 11103 assertions, 0 failures`)
   - `bb clojure:test:unit`
   - result: green (`1514 tests, 11103 assertions, 0 failures`)
+- Additional review notes — 2026-05-06
+  - review verdict: extraction direction is strong, but task 095 should not close unchanged because the kernel still contains two composition/domain leaks.
+  - remaining leak 1: `components/state-kernel/src/psi/state_kernel/dispatch.clj` still contains `summarize-dispatch-db`, which inspects agent-session-shaped root-state paths such as `[:agent-session :sessions]`, `[:background-jobs :store]`, and `[:turn :ctx]`.
+  - why leak 1 matters: the task boundary requires the kernel to be reusable unchanged in a different domain; embedding agent-session-shaped db knowledge in kernel-owned event-log/trace summarization violates that boundary even if it is only for diagnostics.
+  - intended follow-up for leak 1: either reduce kernel db summaries to truly generic state facts or move summary shaping behind a higher-layer injected callback so agent-session-specific diagnostics remain above the kernel.
+  - remaining leak 2: kernel-owned event-log entries still record `:statechart-claimed?`, which reflects a higher-layer composition concern rather than domain-independent kernel semantics.
+  - why leak 2 matters: statechart claiming is not part of the narrowed kernel environment contract, so carrying that field in kernel-owned log semantics keeps composition-layer assumptions embedded below the boundary.
+  - intended follow-up for leak 2: remove `:statechart-claimed?` from kernel-owned logging, or replace it only if a clearly domain-independent claimed/intercepted concept is justified.
+  - recommended closure posture: do one more small boundary-tightening pass, update focused proofs around kernel trace/log behavior, rerun focused plus full verification, then reassess task closure readiness.
+- Follow-up implementation notes — 2026-05-06
+  - tightened `psi.state-kernel.dispatch` db summarization so the kernel now records only generic root-state facts: sorted top-level `:root-keys` plus `:root-key-count`.
+  - removed kernel-owned `:statechart-claimed?` logging from dispatch event-log entries so composition-layer statechart semantics no longer leak into the kernel trace/log surface.
+  - updated agent-session telemetry projection to stop exposing `:psi.dispatch-event/statechart-claimed?` from the dispatch event log surface.
+  - strengthened focused proof in `components/state-kernel/test/psi/state_kernel/dispatch_test.clj` so kernel event-log summaries are asserted as domain-independent and event-log entries are asserted not to carry `:statechart-claimed?`.
+  - updated `components/agent-session/test/psi/agent_session/model_dispatch_test.clj` to assert the narrowed generic db summary shape on the public dispatch-event log query surface.
+  - focused verification green:
+    - `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.model-dispatch-test` → `8 tests, 96 assertions, 0 failures`
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test` → `17 tests, 151 assertions, 0 failures`
+  - full unit verification attempt via `bb clojure:test:unit` is currently blocked by an unrelated pre-existing failure in `psi.app-runtime-test/submit-prompt-in-runs-git-head-sync-after-successful-turn-test`; this failure reproduces while the task-focused proof surface remains green and does not point at the state-kernel boundary cleanup itself.

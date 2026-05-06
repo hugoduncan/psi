@@ -153,7 +153,6 @@
                                         :psi.dispatch-event/origin
                                         :psi.dispatch-event/event-data
                                         :psi.dispatch-event/replaying?
-                                        :psi.dispatch-event/statechart-claimed?
                                         :psi.dispatch-event/pure-result-kind
                                         :psi.dispatch-event/declared-effects
                                         :psi.dispatch-event/applied-effects
@@ -165,7 +164,6 @@
           (is (= :core (:psi.dispatch-event/origin entry)))
           (is (= {:name "dispatch-visible"} (dissoc (:psi.dispatch-event/event-data entry) :session-id)))
           (is (false? (:psi.dispatch-event/replaying? entry)))
-          (is (false? (:psi.dispatch-event/statechart-claimed? entry)))
           (is (= :root-state-update (:psi.dispatch-event/pure-result-kind entry)))
           (is (= [{:effect/type :persist/journal-append-session-info-entry
                    :name "dispatch-visible"}
@@ -179,8 +177,12 @@
                    :session-id session-id
                    :reason :session/set-session-name}]
                  (:psi.dispatch-event/applied-effects entry)))
-          (is (map? (:psi.dispatch-event/db-summary-before entry)))
-          (is (map? (:psi.dispatch-event/db-summary-after entry)))))))
+          (is (= {:root-keys [:agent-session :background-jobs :oauth :recursion :runtime :ui :workflows]
+                  :root-key-count 7}
+                 (:psi.dispatch-event/db-summary-before entry)))
+          (is (= {:root-keys [:agent-session :background-jobs :oauth :recursion :runtime :ui :workflows]
+                  :root-key-count 7}
+                 (:psi.dispatch-event/db-summary-after entry)))))))
 
   (testing "replay-dispatch-event-log-in! replays retained entries against session state"
     (let [[ctx session-id] (create-session-context)]
