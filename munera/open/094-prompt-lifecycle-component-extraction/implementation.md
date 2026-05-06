@@ -52,3 +52,11 @@ Practical migration sequence chosen:
 6. make only the minimal test adjustments needed as the moved seams stabilize, covering at least the canonical submit/start → prepare → execute → record → continue/finish flow
 
 No unresolved planning questions remain at the task-design level; remaining work is implementation planning and execution.
+
+2026-05-06 — implementation slice 1
+- Introduced `components/agent-session/src/psi/turn.clj` as the authoritative public turn API.
+- Introduced `components/agent-session/src/psi/turn/handlers.clj` for dispatch-visible turn lifecycle orchestration.
+- Reduced `psi.agent-session.prompt-control` to a compatibility facade delegating to `psi.turn`.
+- Rewired context callback ownership so `:build-prepared-request-fn`, `:execute-prepared-request-fn`, and `:build-record-response-fn` now point at `psi.turn`.
+- Reduced `psi.agent-session.dispatch-handlers.prompt-lifecycle` to registration/adaptation only; prepare/record/continue/finish logic now lives under `psi.turn.handlers`.
+- Added focused proof that `prompt-control` delegates to `psi.turn`, keeping the extraction boundary explicit without broad test rewrites.

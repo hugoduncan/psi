@@ -14,9 +14,8 @@
    [psi.agent-session.services :as services]
    [psi.agent-session.session :as session-data]
    [psi.agent-session.persistence :as persistence]
-   [psi.agent-session.prompt-recording :as prompt-recording]
-   [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.session-state :as ss]
+   [psi.turn]
    [psi.agent-session.statechart :as session-sc]
    [psi.agent-session.tool-plan :as tool-plan]
    [psi.agent-session.workflows :as wf]
@@ -130,8 +129,8 @@
                        :dispatch-statechart-event-fn dispatch-statechart-event-fn
                        :runtime-tool-executor-fn     tool-plan/default-execute-runtime-tool-in!
                        :execute-tool-runtime-fn      #'tool-plan/execute-tool-runtime-in!
-                       :build-prepared-request-fn    #'prompt-request/build-prepared-request
-                       :build-record-response-fn     #'prompt-recording/build-record-response
+                       :build-prepared-request-fn    #'psi.turn/build-prepared-request
+                       :build-record-response-fn     #'psi.turn/build-record-response
                        :continue-prompt-chain-fn     (fn [_ctx _session-id _execution-result _progress-queue]
                                                        {:continued? true})
                        :refresh-system-prompt-fn     (fn

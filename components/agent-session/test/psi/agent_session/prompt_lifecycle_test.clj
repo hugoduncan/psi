@@ -3,12 +3,14 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.prompt-control]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions]
    [psi.agent-session.prompt-chain]
    [psi.agent-session.prompt-request]
    [psi.agent-session.prompt-runtime]
    [psi.agent-session.runtime :as runtime]
+   [psi.turn]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.test-support :as test-support]
    [clojure.java.io :as io]
@@ -42,6 +44,37 @@
        ~@body
        (finally
          (delete-tree! ~sym)))))
+
+(deftest prompt-control-delegates-to-psi-turn-test
+  (let [calls (atom [])]
+    (with-redefs [psi.turn/prompt-in! (fn [& args] (swap! calls conj [:prompt-in args]) :prompted)
+                  psi.turn/prompt-execution-result-in! (fn [& args] (swap! calls conj [:prompt-execution-result-in args]) :execution-result)
+                  psi.turn/last-assistant-message-in (fn [& args] (swap! calls conj [:last-assistant-message-in args]) :assistant)
+                  psi.turn/steer-in! (fn [& args] (swap! calls conj [:steer-in args]) :steered)
+                  psi.turn/follow-up-in! (fn [& args] (swap! calls conj [:follow-up-in args]) :followed)
+                  psi.turn/queue-while-streaming-in! (fn [& args] (swap! calls conj [:queue-while-streaming-in args]) :queued)
+                  psi.turn/request-interrupt-in! (fn [& args] (swap! calls conj [:request-interrupt-in args]) :interrupted)
+                  psi.turn/abort-in! (fn [& args] (swap! calls conj [:abort-in args]) :aborted)
+                  psi.turn/consume-queued-input-text-in! (fn [& args] (swap! calls conj [:consume-queued-input-text-in args]) :consumed)]
+      (is (= :prompted (psi.agent-session.prompt-control/prompt-in! :ctx :sid "hi")))
+      (is (= :execution-result (psi.agent-session.prompt-control/prompt-execution-result-in! :ctx :sid "hi")))
+      (is (= :assistant (psi.agent-session.prompt-control/last-assistant-message-in :ctx :sid)))
+      (is (= :steered (psi.agent-session.prompt-control/steer-in! :ctx :sid "guide")))
+      (is (= :followed (psi.agent-session.prompt-control/follow-up-in! :ctx :sid "next")))
+      (is (= :queued (psi.agent-session.prompt-control/queue-while-streaming-in! :ctx :sid "q" :queue)))
+      (is (= :interrupted (psi.agent-session.prompt-control/request-interrupt-in! :ctx :sid)))
+      (is (= :aborted (psi.agent-session.prompt-control/abort-in! :ctx :sid)))
+      (is (= :consumed (psi.agent-session.prompt-control/consume-queued-input-text-in! :ctx :sid)))
+      (is (= [:prompt-in
+              :prompt-execution-result-in
+              :last-assistant-message-in
+              :steer-in
+              :follow-up-in
+              :queue-while-streaming-in
+              :request-interrupt-in
+              :abort-in
+              :consume-queued-input-text-in]
+             (mapv first @calls))))))
 
 (deftest submit-synthetic-user-prompt-enters-canonical-prompt-lifecycle-test
   (let [[ctx session-id] (create-session-context {:persist? false})
