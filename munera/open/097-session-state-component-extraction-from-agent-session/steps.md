@@ -44,3 +44,6 @@
   - [x] Run focused consumer regression tests for `agent-session`, `rpc`, and `app-runtime`
 - [x] Run full unit verification
 - [x] Record final ownership split, compat seams, unresolved child-session prompt-state decisions, and follow-on candidates in `implementation.md`
+- [ ] Narrow or retire `psi.agent-session.session` compat re-exports that still blur model vs state ownership
+- [ ] Decide whether session display-name shaping should remain in `psi.session-state.state` as canonical lower-level session-list summary policy or move to a smaller shared helper
+- [ ] Split child-session prompt derivation from lower child session init so the remaining mixed seam above `session-state` gets smaller

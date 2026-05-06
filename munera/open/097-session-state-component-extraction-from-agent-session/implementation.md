@@ -406,3 +406,12 @@ Review note — 2026-05-06
 - compat wrappers are acceptable for this slice
 - deferred seams are explicit and appropriate, especially child-session prompt derivation and journal-append ownership
 - no blocking design/architecture issue found for task `097`
+
+Code-shaper review note — 2026-05-06
+- review verdict: pass
+- shape improved materially: lower-level ownership is clearer and `agent-session` is less of an accidental substrate
+- non-blocking follow-ons remain:
+  - narrow or retire `psi.agent-session.session` compat re-exports that still blur model vs state ownership
+  - decide whether session display-name shaping belongs permanently in `psi.session-state.state` or should move to a smaller shared helper
+  - split child-session prompt derivation from lower child session init so the remaining mixed seam above `session-state` gets smaller
+- `journal-append-in!` effect convergence is intentionally excluded from this follow-on list because it is now tracked separately in task `098`
