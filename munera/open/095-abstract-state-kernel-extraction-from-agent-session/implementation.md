@@ -182,3 +182,9 @@ Review notes — 2026-05-06
   - this further concentrates `psi.agent-session.dispatch` in compat/composition-specific tests without forcing production ownership changes or disturbing dispatch-focused proof surfaces.
   - focused verification green for this migration batch:
     - `clojure -M:test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.extension-schedule-event-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.session-close-test --focus psi.agent-session.child-session-mutation-test` → `20 tests, 99 assertions, 0 failures`.
+- Config/resolver test entrypoint narrowing follow-up — 2026-05-06
+  - migrated `config_compaction_test.clj` and `resolvers_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` where they were using dispatch only to drive session/domain events before asserting config, diagnostics, scheduler, and resolver behavior.
+  - kept direct `psi.state-kernel.dispatch` usage in `config_compaction_test.clj` for authoritative kernel-owned event-log assertions.
+  - this leaves those tests aligned with the same ownership split already used elsewhere: public domain event entry via `session/dispatch-in!`, generic dispatch telemetry read from `psi.state-kernel.dispatch` when needed.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.resolvers-test` → `27 tests, 191 assertions, 0 failures`.

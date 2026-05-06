@@ -17,7 +17,6 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
    [psi.agent-session.session-state :as ss]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.persistence :as persist]
@@ -388,18 +387,18 @@
   (testing "background job attrs resolve from session root and include nested job entities"
     (let [[ctx session-id] (test-support/create-test-session)
           thread-id     session-id
-          _         (dispatch/dispatch! ctx :session/update-background-jobs-state
-                                        {:update-fn (fn [store]
-                                                      (:state (bg-jobs/start-background-job
-                                                               store
-                                                               {:tool-call-id "tc-bg-1"
-                                                                :thread-id    thread-id
-                                                                :tool-name    "delegate"
-                                                                :job-id       "job-bg-1"
-                                                                :job-kind     :workflow
-                                                                :workflow-ext-path "extensions/workflow_loader.clj"
-                                                                :workflow-id  "planner"})))}
-                                        {:origin :core})
+          _         (session/dispatch-in! ctx :session/update-background-jobs-state
+                                          {:update-fn (fn [store]
+                                                        (:state (bg-jobs/start-background-job
+                                                                 store
+                                                                 {:tool-call-id "tc-bg-1"
+                                                                  :thread-id    thread-id
+                                                                  :tool-name    "delegate"
+                                                                  :job-id       "job-bg-1"
+                                                                  :job-kind     :workflow
+                                                                  :workflow-ext-path "extensions/workflow_loader.clj"
+                                                                  :workflow-id  "planner"})))}
+                                          {:origin :core})
           result    (session/query-in ctx session-id
                                       [:psi.agent-session/background-job-count
                                        :psi.agent-session/background-job-statuses
@@ -431,15 +430,15 @@
 (deftest scheduler-resolver-test
   (testing "scheduler attrs resolve from session root and background-job projection includes scheduled prompts"
     (let [[ctx session-id] (test-support/create-test-session)
-          _ (dispatch/dispatch! ctx :scheduler/create
-                                {:session-id session-id
-                                 :schedule-id "sch-1"
-                                 :label "check-build"
-                                 :message "check build"
-                                 :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                                 :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                                 :delay-ms 1000}
-                                {:origin :core})
+          _ (session/dispatch-in! ctx :scheduler/create
+                                  {:session-id session-id
+                                   :schedule-id "sch-1"
+                                   :label "check-build"
+                                   :message "check build"
+                                   :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                                   :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                                   :delay-ms 1000}
+                                  {:origin :core})
           result (session/query-in ctx session-id
                                    [:psi.scheduler/pending-count
                                     {:psi.scheduler/schedules
@@ -467,15 +466,15 @@
 
   (testing "scheduler supports entity-seeded single schedule lookup"
     (let [[ctx session-id] (test-support/create-test-session)
-          _ (dispatch/dispatch! ctx :scheduler/create
-                                {:session-id session-id
-                                 :schedule-id "sch-one"
-                                 :label "one"
-                                 :message "wake"
-                                 :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                                 :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                                 :delay-ms 1000}
-                                {:origin :core})
+          _ (session/dispatch-in! ctx :scheduler/create
+                                  {:session-id session-id
+                                   :schedule-id "sch-one"
+                                   :label "one"
+                                   :message "wake"
+                                   :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                                   :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                                   :delay-ms 1000}
+                                  {:origin :core})
           result (session/query-in ctx
                                    [:psi.scheduler/schedule-id
                                     :psi.scheduler/label
