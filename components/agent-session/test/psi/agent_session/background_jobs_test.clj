@@ -14,7 +14,6 @@
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.background-jobs :as bj]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.mutations :as mutations]
@@ -289,18 +288,18 @@
   (testing "E7: idle terminal outcome requests next turn boundary"
     (let [[ctx session-id] (test-support/make-session-ctx {})
           thread-id session-id]
-      (dispatch/dispatch! ctx :session/update-background-jobs-state
-                          {:update-fn (fn [store]
-                                        (-> store
-                                            (-> (bj/start-background-job {:tool-call-id "tc-e7"
-                                                                          :thread-id thread-id
-                                                                          :tool-name "workflow/test"
-                                                                          :job-id "job-e7"})
-                                                :state)
-                                            (bj/mark-terminal {:job-id "job-e7"
-                                                               :outcome :completed
-                                                               :payload {:ok true}})))}
-                          {:origin :core})
+      (session/dispatch-in! ctx :session/update-background-jobs-state
+                            {:update-fn (fn [store]
+                                          (-> store
+                                              (-> (bj/start-background-job {:tool-call-id "tc-e7"
+                                                                            :thread-id thread-id
+                                                                            :tool-name "workflow/test"
+                                                                            :job-id "job-e7"})
+                                                  :state)
+                                              (bj/mark-terminal {:job-id "job-e7"
+                                                                 :outcome :completed
+                                                                 :payload {:ok true}})))}
+                            {:origin :core})
       (is (= 0 (pending-background-terminal-message-count ctx thread-id)))
       (ext-rt/set-extension-run-fn-in! ctx thread-id (fn [_ _] nil))
       (Thread/sleep 30)
@@ -377,15 +376,15 @@
   (testing "E13: internal retryable LLM HTTP errors do not trigger external injection"
     (let [[ctx session-id] (test-support/make-session-ctx {})
           thread-id session-id]
-      (dispatch/dispatch! ctx :session/update-background-jobs-state
-                          {:update-fn (fn [store]
-                                        (:state (bj/start-background-job
-                                                 store
-                                                 {:tool-call-id "tc-e13"
-                                                  :thread-id thread-id
-                                                  :tool-name "workflow/test"
-                                                  :job-id "job-e13"})))}
-                          {:origin :core})
+      (session/dispatch-in! ctx :session/update-background-jobs-state
+                            {:update-fn (fn [store]
+                                          (:state (bj/start-background-job
+                                                   store
+                                                   {:tool-call-id "tc-e13"
+                                                    :thread-id thread-id
+                                                    :tool-name "workflow/test"
+                                                    :job-id "job-e13"})))}
+                            {:origin :core})
       ;; Simulate internal retryable error handling path: job remains running and no terminal outcome marked.
       (is (= :running (:status (bj/get-job-in (ss/get-state-value-in ctx (ss/state-path :background-jobs)) "job-e13"))))
       (ext-rt/set-extension-run-fn-in! ctx thread-id (fn [_ _] nil))
@@ -465,16 +464,16 @@
   (testing "B4: concurrent emit attempts still produce one terminal message"
     (let [[ctx session-id] (test-support/make-session-ctx {})
           thread-id session-id
-          _     (dispatch/dispatch! ctx :session/update-background-jobs-state
-                                    {:update-fn (fn [store]
-                                                  (-> store
-                                                      (-> (bj/start-background-job {:tool-call-id "tc-b4"
-                                                                                    :thread-id thread-id
-                                                                                    :tool-name "tool-z"
-                                                                                    :job-id "job-b4"})
-                                                          :state)
-                                                      (bj/mark-terminal {:job-id "job-b4" :outcome :completed :payload {:ok true}})))}
-                                    {:origin :core})
+          _     (session/dispatch-in! ctx :session/update-background-jobs-state
+                                      {:update-fn (fn [store]
+                                                    (-> store
+                                                        (-> (bj/start-background-job {:tool-call-id "tc-b4"
+                                                                                      :thread-id thread-id
+                                                                                      :tool-name "tool-z"
+                                                                                      :job-id "job-b4"})
+                                                            :state)
+                                                        (bj/mark-terminal {:job-id "job-b4" :outcome :completed :payload {:ok true}})))}
+                                      {:origin :core})
           f1    (future (ext-rt/set-extension-run-fn-in! ctx thread-id (fn [_ _] nil)) true)
           f2    (future (ext-rt/set-extension-run-fn-in! ctx thread-id (fn [_ _] nil)) true)
           _     @f1
@@ -591,18 +590,18 @@
       (is (true? (:done? (wf/workflow-in reg ext-path wf-id)))
           "workflow should be done before we register the background job")
       ;; Register a background job that is linked to the now-done workflow
-      (dispatch/dispatch! ctx :session/update-background-jobs-state
-                          {:update-fn (fn [store]
-                                        (:state (bj/start-background-job
-                                                 store
-                                                 {:tool-call-id      "tc-sm-regression"
-                                                  :thread-id         thread-id
-                                                  :tool-name         "workflow/instant-done"
-                                                  :job-id            "job-sm-1"
-                                                  :job-kind          :workflow
-                                                  :workflow-ext-path ext-path
-                                                  :workflow-id       wf-id})))}
-                          {:origin :core})
+      (session/dispatch-in! ctx :session/update-background-jobs-state
+                            {:update-fn (fn [store]
+                                          (:state (bj/start-background-job
+                                                   store
+                                                   {:tool-call-id      "tc-sm-regression"
+                                                    :thread-id         thread-id
+                                                    :tool-name         "workflow/instant-done"
+                                                    :job-id            "job-sm-1"
+                                                    :job-kind          :workflow
+                                                    :workflow-ext-path ext-path
+                                                    :workflow-id       wf-id})))}
+                            {:origin :core})
       (is (= :running (:status (bj/get-job-in (ss/get-state-value-in ctx (ss/state-path :background-jobs)) "job-sm-1")))
           "job should start as running before notify is called")
       ;; Invoke notify via the real Pathom mutation surface — this exercises the fix
@@ -650,18 +649,18 @@
       (wf/register-type-in! reg ext-path {:type :delayed-done :chart delayed-done-chart})
       (wf/ensure-pump! reg)
       (wf/create-workflow-in! reg ext-path {:type :delayed-done :id wf-id :auto-start? true})
-      (dispatch/dispatch! ctx :session/update-background-jobs-state
-                          {:update-fn (fn [store]
-                                        (:state (bj/start-background-job
-                                                 store
-                                                 {:tool-call-id      "tc-sm-race"
-                                                  :thread-id         thread-id
-                                                  :tool-name         "workflow/delayed-done"
-                                                  :job-id            "job-sm-race"
-                                                  :job-kind          :workflow
-                                                  :workflow-ext-path ext-path
-                                                  :workflow-id       wf-id})))}
-                          {:origin :core})
+      (session/dispatch-in! ctx :session/update-background-jobs-state
+                            {:update-fn (fn [store]
+                                          (:state (bj/start-background-job
+                                                   store
+                                                   {:tool-call-id      "tc-sm-race"
+                                                    :thread-id         thread-id
+                                                    :tool-name         "workflow/delayed-done"
+                                                    :job-id            "job-sm-race"
+                                                    :job-kind          :workflow
+                                                    :workflow-ext-path ext-path
+                                                    :workflow-id       wf-id})))}
+                            {:origin :core})
       ;; Fire notify before workflow reaches :done.
       (mutate 'psi.extension/notify
               {:role "assistant" :content "chain result" :custom-type "chain-result"})
@@ -693,18 +692,18 @@
             (Thread/sleep 10)
             (recur (inc i)))))
       ;; Seed stale running job linked to done workflow
-      (dispatch/dispatch! ctx :session/update-background-jobs-state
-                          {:update-fn (fn [store]
-                                        (:state (bj/start-background-job
-                                                 store
-                                                 {:tool-call-id      "tc-resolve-1"
-                                                  :thread-id         thread-id
-                                                  :tool-name         "workflow/instant-done"
-                                                  :job-id            "job-resolve-1"
-                                                  :job-kind          :workflow
-                                                  :workflow-ext-path ext-path
-                                                  :workflow-id       wf-id})))}
-                          {:origin :core})
+      (session/dispatch-in! ctx :session/update-background-jobs-state
+                            {:update-fn (fn [store]
+                                          (:state (bj/start-background-job
+                                                   store
+                                                   {:tool-call-id      "tc-resolve-1"
+                                                    :thread-id         thread-id
+                                                    :tool-name         "workflow/instant-done"
+                                                    :job-id            "job-resolve-1"
+                                                    :job-kind          :workflow
+                                                    :workflow-ext-path ext-path
+                                                    :workflow-id       wf-id})))}
+                            {:origin :core})
       (is (= :running (:status (bj/get-job-in (ss/get-state-value-in ctx (ss/state-path :background-jobs)) "job-resolve-1"))))
       ;; Querying background-jobs should reconcile and expose terminal status.
       (let [resp (session/query-in ctx session-id [:psi.agent-session/background-jobs])

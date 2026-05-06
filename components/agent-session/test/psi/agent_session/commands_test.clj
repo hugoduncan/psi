@@ -10,7 +10,6 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.session-state :as ss]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.extensions :as ext]
    [psi.agent-core.core :as agent]
@@ -190,15 +189,15 @@
 (deftest dispatch-background-jobs-commands-test
   (let [[ctx session-id] (make-test-ctx)
         thread-id session-id]
-    (dispatch/dispatch! ctx :session/update-background-jobs-state
-                        {:update-fn (fn [store]
-                                      (:state (bg-jobs/start-background-job
-                                               store
-                                               {:tool-call-id "tc-cmd-j1"
-                                                :thread-id thread-id
-                                                :tool-name "delegate"
-                                                :job-id "job-cmd-j1"})))}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/update-background-jobs-state
+                          {:update-fn (fn [store]
+                                        (:state (bg-jobs/start-background-job
+                                                 store
+                                                 {:tool-call-id "tc-cmd-j1"
+                                                  :thread-id thread-id
+                                                  :tool-name "delegate"
+                                                  :job-id "job-cmd-j1"})))}
+                          {:origin :core})
 
     (let [jobs-result (commands/dispatch-in ctx thread-id "/jobs" cmd-opts)]
       (is (= :text (:type jobs-result)))
@@ -228,20 +227,20 @@
       (is (str/includes? (:message cancel-result) "Cancellation requested"))
       (is (= :pending-cancel (:status job))))
 
-    (let [_ (dispatch/dispatch! ctx :scheduler/create
-                                {:session-id thread-id
-                                 :schedule-id "sch-cmd-queued"
-                                 :label "queued"
-                                 :message "queued"
-                                 :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                                 :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                                 :delay-ms 1000}
-                                {:origin :core})
+    (let [_ (session/dispatch-in! ctx :scheduler/create
+                                  {:session-id thread-id
+                                   :schedule-id "sch-cmd-queued"
+                                   :label "queued"
+                                   :message "queued"
+                                   :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                                   :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                                   :delay-ms 1000}
+                                  {:origin :core})
           _ (swap! (:state* ctx) (ss/session-update thread-id #(assoc % :is-streaming true)))
-          _ (dispatch/dispatch! ctx :scheduler/fired
-                                {:session-id thread-id
-                                 :schedule-id "sch-cmd-queued"}
-                                {:origin :core})
+          _ (session/dispatch-in! ctx :scheduler/fired
+                                  {:session-id thread-id
+                                   :schedule-id "sch-cmd-queued"}
+                                  {:origin :core})
           jobs-result (commands/dispatch-in ctx thread-id "/jobs running" cmd-opts)]
       (is (= :text (:type jobs-result)))
       (is (str/includes? (:message jobs-result) "schedule/sch-cmd-queued")))
@@ -252,15 +251,15 @@
 
 (deftest dispatch-scheduled-background-job-cancel-command-test
   (let [[ctx session-id] (make-test-ctx)
-        _ (dispatch/dispatch! ctx :scheduler/create
-                              {:session-id session-id
-                               :schedule-id "sch-cancel-1"
-                               :label "cancel-me"
-                               :message "cancel me later"
-                               :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                               :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                               :delay-ms 1000}
-                              {:origin :core})
+        _ (session/dispatch-in! ctx :scheduler/create
+                                {:session-id session-id
+                                 :schedule-id "sch-cancel-1"
+                                 :label "cancel-me"
+                                 :message "cancel me later"
+                                 :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                                 :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                                 :delay-ms 1000}
+                                {:origin :core})
         cancel-result (commands/dispatch-in ctx session-id "/cancel-job schedule/sch-cancel-1" cmd-opts)
         result (session/query-in ctx session-id
                                  [{:psi.scheduler/schedules

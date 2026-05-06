@@ -169,3 +169,9 @@ Review notes — 2026-05-06
   - this leaves the namespace materially smaller without forcing broad test churn or premature removal of helpers still intentionally exercised by dispatch compatibility proofs.
   - focused verification green for the compat wrapper surface reduction:
     - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.post-tool-test` → `21 tests, 168 assertions, 0 failures`.
+- Test entrypoint narrowing follow-up — 2026-05-06
+  - migrated a focused batch of agent-session tests off the compat dispatch entrypoint and onto the higher-layer public entrypoint `psi.agent-session.core/dispatch-in!` where the tests were only using dispatch to seed domain events, not to exercise compat-wrapper-local behavior.
+  - updated `scheduler_background_jobs_test.clj`, `scheduler_resolvers_test.clj`, `commands_test.clj`, and `background_jobs_test.clj` to stop requiring `psi.agent-session.dispatch`.
+  - this keeps `psi.agent-session.dispatch` more narrowly aligned with true compat/composition testing while preserving existing production ownership; no deeper production changes were needed for this slice.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.commands-test --focus psi.agent-session.background-jobs-test` → `83 tests, 292 assertions, 0 failures`.
