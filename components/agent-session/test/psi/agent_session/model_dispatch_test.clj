@@ -7,6 +7,7 @@
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.project-preferences :as project-prefs]
    [psi.agent-session.session-state :as ss]
@@ -53,10 +54,10 @@
 (deftest model-thinking-dispatch-test
   (testing "set-model-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           model      {:provider "anthropic" :id "claude-3-5-sonnet" :reasoning false}]
       (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))
+      (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= model (:model sd)))
         (is (= :session/set-model (:event-type entry)))
@@ -65,11 +66,11 @@
 
   (testing "set-thinking-level-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning true}} {:origin :core})
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-thinking-level {:session-id session-id :level :medium} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))
+      (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= :medium (:thinking-level sd)))
         (is (= :session/set-thinking-level (:event-type entry)))
@@ -78,9 +79,9 @@
 
   (testing "set-system-prompt-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-system-prompt {:session-id session-id :prompt "graph-aware system prompt"} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))
+      (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= "graph-aware system prompt" (:system-prompt sd)))
         (is (= :session/set-system-prompt (:event-type entry)))
@@ -89,9 +90,9 @@
 
   (testing "refresh-system-prompt-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))
+      (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (string? (:system-prompt sd)))
         (is (= :session/refresh-system-prompt (:event-type entry)))
@@ -100,22 +101,22 @@
 (deftest prompt-contribution-dispatch-test
   (testing "register/update/unregister prompt contributions route through dispatch and preserve return payloads"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           r1  (dispatch/dispatch! ctx :session/register-prompt-contribution
                                   {:session-id session-id :ext-path "/ext/a" :id "c1"
                                    :contribution {:section "Extension Capabilities"
                                                   :content "tool: x"
                                                   :priority 10}}
                                   {:origin :core})
-          e1  (last (dispatch/event-log-entries))
+          e1  (last (kernel/event-log-entries))
           r2  (dispatch/dispatch! ctx :session/update-prompt-contribution
                                   {:session-id session-id :ext-path "/ext/a" :id "c1" :patch {:content "tool: y"}}
                                   {:origin :core})
-          e2  (last (dispatch/event-log-entries))
+          e2  (last (kernel/event-log-entries))
           r3  (dispatch/dispatch! ctx :session/unregister-prompt-contribution
                                   {:session-id session-id :ext-path "/ext/a" :id "c1"}
                                   {:origin :core})
-          e3  (last (dispatch/event-log-entries))]
+          e3  (last (kernel/event-log-entries))]
       (is (true? (:registered? r1)))
       (is (= :session/register-prompt-contribution (:event-type e1)))
       (is (= :core (:origin e1)))
@@ -144,7 +145,7 @@
 
   (testing "query-in resolves dispatch event log attrs"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "dispatch-visible"} {:origin :core})
       (let [result (session/query-in ctx
                                      [:psi.agent-session/dispatch-event-log-count
@@ -186,7 +187,7 @@
 
   (testing "replay-dispatch-event-log-in! replays retained entries against session state"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "replay me"} {:origin :core})
       (dispatch/dispatch! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/replay"} {:origin :core})
       (is (= "replay me" (:session-name (ss/get-session-data-in ctx session-id))))
@@ -209,13 +210,13 @@
   (testing "new-session-in! initialization is logged through dispatch"
     (let [[ctx session-id] (create-session-context {:persist? false})
           old-id           session-id
-          _                (dispatch/clear-event-log!)
+          _                (kernel/clear-event-log!)
           sd               (session/new-session-in! ctx nil {:session-name "dispatch-new"
                                                              :worktree-path "/repo/dispatch-new"})
           session-id       (:session-id sd)
           ctx              (retarget ctx sd)
           entry            (first (filter #(= :session/new-initialize (:event-type %))
-                                          (dispatch/event-log-entries)))]
+                                          (kernel/event-log-entries)))]
       (is (some? entry))
       (is (not= old-id session-id))
       (is (= session-id (:session-id (ss/get-session-data-in ctx session-id))))
@@ -228,7 +229,7 @@
                                                                              :id "gpt-5.3-codex"
                                                                              :reasoning true}}
                                                   :persist? false})
-        _   (dispatch/clear-event-log!)
+        _   (kernel/clear-event-log!)
         f   (File/createTempFile "psi-resume-dispatch" ".ndedn")]
     (.deleteOnExit f)
     (spit f (str "{:type :session :version 4 :id \"sess-dispatch\" :timestamp #inst \"2024-01-01T00:00:00Z\" :cwd \"/legacy/cwd\" :worktree-path \"/repo/resume-dispatch\"}\n"
@@ -238,7 +239,7 @@
           session-id         (:session-id sd)
           ctx                (retarget ctx sd)
           entry              (first (filter #(= :session/resume-loaded (:event-type %))
-                                            (dispatch/event-log-entries)))]
+                                            (kernel/event-log-entries)))]
       (is (= "Resume Dispatch" (:session-name (ss/get-session-data-in ctx session-id))))
       (is (= :core (:origin entry)))
       (is (= "sess-dispatch" (get-in entry [:event-data :session-id])))
@@ -247,7 +248,7 @@
 
 (testing "fork-session-in! initialization is logged through dispatch"
   (let [[ctx _session-id] (create-session-context {:persist? false})
-        _                 (dispatch/clear-event-log!)
+        _                 (kernel/clear-event-log!)
         parent-sd          (session/new-session-in! ctx nil {})
         parent-id          (:session-id parent-sd)
         entry-id  (:id (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "user"
@@ -255,7 +256,7 @@
                                                                                     :timestamp (java.time.Instant/now)})))]
     (session/fork-session-in! ctx parent-id entry-id)
     (let [entry (first (filter #(= :session/fork-initialize (:event-type %))
-                               (dispatch/event-log-entries)))]
+                               (kernel/event-log-entries)))]
       (is (= :core (:origin entry)))
       (is (= parent-id (get-in entry [:event-data :parent-session-id])))
       (is (= entry-id (get-in entry [:event-data :entry-id])))
@@ -274,13 +275,13 @@
 (deftest projection-and-transition-helper-dispatch-test
   (testing "projection setters still route through dispatch after transition-helper extraction"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (dispatch/dispatch! ctx :session/set-rpc-trace {:enabled? true :file "/tmp/rpc-trace.ndedn"} {:origin :core})
       (sa/set-nrepl-runtime-in! ctx session-id {:host "localhost" :port 5555 :endpoint "localhost:5555"})
       (sa/set-oauth-projection-in! ctx {:authenticated-providers ["anthropic"]})
       (sa/set-recursion-state-in! ctx session-id {:status :idle})
       (let [state  @(:state* ctx)
-            events (mapv :event-type (dispatch/event-log-entries))]
+            events (mapv :event-type (kernel/event-log-entries))]
         (is (= {:enabled? true :file "/tmp/rpc-trace.ndedn"}
                (get-in state [:runtime :rpc-trace])))
         (is (= {:host "localhost" :port 5555 :endpoint "localhost:5555"}
@@ -297,7 +298,7 @@
 
   (testing "telemetry setters now route through dispatch too"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           stat       {:tool-name "bash" :context-bytes-added 12}
           _          (sa/set-turn-context-in! ctx session-id {:turn-id "t-1"})
           _          (sa/append-tool-call-attempt-in! ctx session-id {:id "tc-1" :name "read"})
@@ -305,7 +306,7 @@
           _          (sa/append-provider-reply-capture-in! ctx session-id {:provider "anthropic" :turn-id "t-1" :event {:type :done}})
           _          (sa/record-tool-output-stat-in! ctx session-id stat 12 false)
           state      @(:state* ctx)
-          events     (mapv :event-type (dispatch/event-log-entries))]
+          events     (mapv :event-type (kernel/event-log-entries))]
       (let [sid session-id]
         (is (= {:turn-id "t-1"} (get-in state [:agent-session :sessions sid :turn :ctx])))
         (is (= "tc-1" (get-in state [:agent-session :sessions sid :telemetry :tool-call-attempts 0 :id])))
@@ -322,7 +323,7 @@
 (deftest interrupt-and-bootstrap-prompt-dispatch-test
   (testing "request-interrupt-in! routes session-data changes through dispatch"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (test-support/update-state! ctx :session-data assoc
                                   :interrupt-pending false
                                   :steering-messages ["queued steer"])
@@ -334,7 +335,7 @@
                       {:ctx ctx :session-id session-id})
       (session/request-interrupt-in! ctx session-id)
       (let [sd    (ss/get-session-data-in ctx session-id)
-            entry (last (dispatch/event-log-entries))]
+            entry (last (kernel/event-log-entries))]
         (is (true? (:interrupt-pending sd)))
         (is (= [] (:steering-messages sd)))
         (is (instance? java.time.Instant (:interrupt-requested-at sd)))
@@ -343,7 +344,7 @@
 
   (testing "bootstrap-in! prompt metadata initialization is logged through dispatch"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
+      (kernel/clear-event-log!)
       (bootstrap/bootstrap-in!
        ctx session-id
        {:register-global-query? false
@@ -352,7 +353,7 @@
         :developer-prompt-source :explicit})
       (let [sd    (ss/get-session-data-in ctx session-id)
             entry (first (filter #(= :session/bootstrap-prompt-state (:event-type %))
-                                 (dispatch/event-log-entries)))]
+                                 (kernel/event-log-entries)))]
         (is (= "sys" (:base-system-prompt sd)))
         (is (= "sys" (:system-prompt sd)))
         (is (= "dev" (:developer-prompt sd)))

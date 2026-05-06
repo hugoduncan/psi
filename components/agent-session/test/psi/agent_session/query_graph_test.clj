@@ -8,7 +8,7 @@
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.session-state :as ss]
@@ -116,7 +116,7 @@
                           op))
         latest-rpc-trace-entry
         (fn [before-count]
-          (->> (dispatch/event-log-entries)
+          (->> (kernel/event-log-entries)
                (drop before-count)
                (filter #(= :session/set-rpc-trace (:event-type %)))
                last))]
@@ -129,8 +129,8 @@
            (session/query-in ctx session-id [:psi.agent-session/rpc-trace-enabled
                                              :psi.agent-session/rpc-trace-file])))
 
-    (dispatch/clear-event-log!)
-    (let [before-count (count (dispatch/event-log-entries))
+    (kernel/clear-event-log!)
+    (let [before-count (count (kernel/event-log-entries))
           r1 (mutate 'psi.extension/set-rpc-trace
                      {:session-id session-id
                       :enabled true
@@ -146,8 +146,8 @@
                 :file "/tmp/psi-rpc-trace-from-mutation.ndedn"}
                (dissoc (:event-data entry) :session-id)))))
 
-    (dispatch/clear-event-log!)
-    (let [before-count (count (dispatch/event-log-entries))
+    (kernel/clear-event-log!)
+    (let [before-count (count (kernel/event-log-entries))
           r2 (mutate 'psi.extension/set-rpc-trace {:session-id session-id :enabled false})]
       (is (= false (:psi.agent-session/rpc-trace-enabled r2)))
       (is (= "/tmp/psi-rpc-trace-from-mutation.ndedn"

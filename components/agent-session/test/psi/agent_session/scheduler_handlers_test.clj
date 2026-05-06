@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-handlers.prompt-handlers :as prompt-handlers]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.dispatch-handlers.prompt-lifecycle :as prompt-lifecycle]
    [psi.agent-session.dispatch-handlers.scheduler :as scheduler-handlers]
    [psi.agent-session.dispatch-handlers.session-lifecycle :as session-lifecycle-handlers]
@@ -14,7 +15,7 @@
 
 (defn- invoke-handler
   [ctx event-type data]
-  (let [handler-fn (get-in (dispatch/handler-entry event-type) [:fn])]
+  (let [handler-fn (get-in (kernel/handler-entry event-type) [:fn])]
     (handler-fn ctx data)))
 
 (defn- apply-root-state-update!
@@ -29,7 +30,7 @@
 
 (defn- with-registered-handlers
   [ctx f]
-  (dispatch/clear-handlers!)
+  (kernel/clear-handlers!)
   (try
     (scheduler-handlers/register! ctx)
     (prompt-handlers/register! ctx)
@@ -39,7 +40,7 @@
     (statechart-actions/register! ctx)
     (f)
     (finally
-      (dispatch/clear-handlers!))))
+      (kernel/clear-handlers!))))
 
 (deftest scheduler-create-cancel-fire-deliver-handlers-test
   (let [[ctx session-id] (test-support/make-session-ctx {})]
