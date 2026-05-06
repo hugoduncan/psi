@@ -13,7 +13,7 @@
    [psi.agent-session.prompt-runtime :as prompt-runtime]
    [psi.agent-session.prompt-stream :as prompt-stream]
    [psi.agent-session.prompt-turn :as prompt-turn]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn-accumulator :as accum]
    [psi.agent-session.turn-statechart :as turn-sc])

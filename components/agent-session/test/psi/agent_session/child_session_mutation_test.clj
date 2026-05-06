@@ -7,7 +7,7 @@
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.prompt-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))
 

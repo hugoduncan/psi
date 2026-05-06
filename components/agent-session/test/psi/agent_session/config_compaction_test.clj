@@ -9,8 +9,8 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session :as session-data]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.model :as session-data]
+   [psi.session-state.state :as ss]))
 (defn- create-session-context
   ([]
    (create-session-context {}))

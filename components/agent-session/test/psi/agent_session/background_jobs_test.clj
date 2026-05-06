@@ -15,7 +15,7 @@
    [psi.agent-session.background-jobs :as bj]
    [psi.agent-session.core :as session]
    [psi.agent-session.extension-runtime :as ext-rt]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-output :as tool-output]

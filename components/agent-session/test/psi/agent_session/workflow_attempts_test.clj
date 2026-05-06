@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session-core]
-   [psi.agent-session.session-state :as session-state]
+   [psi.session-state.state :as session-state]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts :as workflow-attempts]))
 

@@ -6,7 +6,7 @@
    [psi.agent-session.conversation :as conversation]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))
 

@@ -6,7 +6,7 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.service-protocol]
    [psi.agent-session.services]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]))
 
 ;; ── Fixture: clean handler registry and event log between tests ─

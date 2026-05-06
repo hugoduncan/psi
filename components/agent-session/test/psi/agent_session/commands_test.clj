@@ -9,7 +9,7 @@
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.extensions :as ext]
    [psi.agent-core.core :as agent]

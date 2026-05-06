@@ -5,7 +5,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-session-context

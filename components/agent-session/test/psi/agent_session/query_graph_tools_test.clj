@@ -6,7 +6,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-plan :as tool-plan]
    [psi.query.core :as query])

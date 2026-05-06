@@ -13,7 +13,7 @@
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.prompt-runtime :as prompt-runtime]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn build-prepared-request
   [ctx session-id opts]

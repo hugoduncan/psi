@@ -4,7 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn- create-session-context
   ([]

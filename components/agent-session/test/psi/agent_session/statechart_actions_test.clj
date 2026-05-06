@@ -5,7 +5,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
-   [psi.agent-session.session-state :as session-state]
+   [psi.session-state.state :as session-state]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- invoke-handler

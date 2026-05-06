@@ -11,7 +11,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.state-kernel.dispatch :as kernel]
    [psi.turn]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [clojure.java.io :as io]
    [psi.ai.providers.anthropic]

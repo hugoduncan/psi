@@ -8,7 +8,7 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.tool-batch :as tool-batch]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-execution :as tool-exec]
    [psi.agent-session.tool-plan :as tool-plan]

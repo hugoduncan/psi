@@ -4,7 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-session-context

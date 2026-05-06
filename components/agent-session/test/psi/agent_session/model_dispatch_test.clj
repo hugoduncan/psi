@@ -9,7 +9,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.project-preferences :as project-prefs]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.test-support :as test-support])

@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- schedule

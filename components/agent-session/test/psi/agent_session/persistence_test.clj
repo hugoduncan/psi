@@ -8,8 +8,8 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.core :as core]
    [psi.agent-session.persistence :as p]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss])
+   [psi.session-state.model :as session]
+   [psi.session-state.state :as ss])
   (:import
    (java.io File RandomAccessFile)
    (java.nio.channels FileLock)
