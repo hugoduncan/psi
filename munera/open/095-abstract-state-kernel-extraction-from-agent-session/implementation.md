@@ -188,3 +188,11 @@ Review notes — 2026-05-06
   - this leaves those tests aligned with the same ownership split already used elsewhere: public domain event entry via `session/dispatch-in!`, generic dispatch telemetry read from `psi.state-kernel.dispatch` when needed.
   - focused verification green for this migration batch:
     - `clojure -M:test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.resolvers-test` → `27 tests, 191 assertions, 0 failures`.
+- Prompt lifecycle test ownership narrowing follow-up — 2026-05-06
+  - migrated `prompt_lifecycle_test.clj` off `psi.agent-session.dispatch` by splitting its usage along ownership boundaries:
+    - public domain event submission now goes through `psi.agent-session.core/dispatch-in!`
+    - generic event-log and handler-registry reads now go through `psi.state-kernel.dispatch`
+  - specifically moved `clear-event-log!`, `event-log-entries`, and `handler-entry` references to the kernel, while replacing routine event submission calls with `session/dispatch-in!`.
+  - this preserved the one dispatch-focused proof in the file (`:session/submit-synthetic-user-prompt` handler effect shaping) without keeping the compat wrapper as the authority for generic registry or telemetry helpers.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test` → `17 tests, 82 assertions, 0 failures`.

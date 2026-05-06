@@ -4,12 +4,12 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-control]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions]
    [psi.agent-session.prompt-chain]
    [psi.agent-session.prompt-request]
    [psi.agent-session.prompt-runtime]
    [psi.agent-session.runtime :as runtime]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.turn]
    [psi.agent-session.session-state :as ss]
    [psi.agent-session.test-support :as test-support]
@@ -84,12 +84,12 @@
                   :source :scheduled
                   :schedule-id "sch-test"
                   :label "wake"}]
-    (dispatch/clear-event-log!)
-    (let [result (dispatch/dispatch! ctx :session/submit-synthetic-user-prompt
-                                     {:session-id session-id
-                                      :user-msg user-msg}
-                                     {:origin :core})
-          effects (->> (dispatch/handler-entry :session/submit-synthetic-user-prompt)
+    (kernel/clear-event-log!)
+    (let [result (session/dispatch-in! ctx :session/submit-synthetic-user-prompt
+                                       {:session-id session-id
+                                        :user-msg user-msg}
+                                       {:origin :core})
+          effects (->> (kernel/handler-entry :session/submit-synthetic-user-prompt)
                        :fn
                        (#(% ctx {:session-id session-id :user-msg user-msg}))
                        :effects)]
@@ -112,11 +112,11 @@
                           :execution-result/turn-outcome :turn.outcome/stop
                           :execution-result/tool-calls []
                           :execution-result/stop-reason :stop}]
-    (dispatch/clear-event-log!)
-    (dispatch/dispatch! ctx :session/prompt-record-response
-                        {:session-id session-id
-                         :execution-result execution-result}
-                        {:origin :core})
+    (kernel/clear-event-log!)
+    (session/dispatch-in! ctx :session/prompt-record-response
+                          {:session-id session-id
+                           :execution-result execution-result}
+                          {:origin :core})
     (let [msgs (journal-messages ctx session-id)]
       (is (= 1 (count msgs)))
       (is (= "assistant" (:role (first msgs))))
@@ -134,7 +134,7 @@
                           :execution-result/turn-outcome :turn.outcome/tool-use
                           :execution-result/tool-calls [{:id "tc-1" :name "read" :arguments "{}"}]
                           :execution-result/stop-reason :stop}]
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (with-redefs [psi.agent-session.prompt-chain/run-prompt-tools! (fn [_ctx _sid _res _pq]
                                                                      {:continued? true :tool-call-count 1})
                   psi.agent-session.prompt-request/build-prepared-request (fn [_ctx sid {:keys [turn-id]}]
@@ -159,11 +159,11 @@
                                                                                 :execution-result/turn-outcome :turn.outcome/stop
                                                                                 :execution-result/tool-calls []
                                                                                 :execution-result/stop-reason :stop})]
-      (dispatch/dispatch! ctx :session/prompt-record-response
-                          {:session-id session-id
-                           :execution-result execution-result}
-                          {:origin :core})
-      (let [entries (dispatch/event-log-entries)]
+      (session/dispatch-in! ctx :session/prompt-record-response
+                            {:session-id session-id
+                             :execution-result execution-result}
+                            {:origin :core})
+      (let [entries (kernel/event-log-entries)]
         (is (some #(= :session/prompt-continue (:event-type %)) entries))
         (is (some #(= :session/prompt-prepare-request (:event-type %)) entries))
         (is (some #(= :session/prompt-record-response (:event-type %)) entries))
@@ -174,7 +174,7 @@
 
 (deftest prompt-in-end-to-end-updates-prompt-lifecycle-summaries-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
@@ -192,7 +192,7 @@
                                                    :psi.agent-session/last-execution-turn-id
                                                    :psi.agent-session/last-execution-turn-outcome
                                                    :psi.agent-session/last-execution-stop-reason])
-          entries (dispatch/event-log-entries)
+          entries (kernel/event-log-entries)
           msgs    (journal-messages ctx session-id)]
       (is (string? (:psi.agent-session/last-prepared-turn-id result)))
       (is (number? (:psi.agent-session/last-prepared-message-count result)))
@@ -211,7 +211,7 @@
 (deftest prompt-in-runs-git-head-sync-after-turn-test
   (let [[ctx session-id] (create-session-context {:persist? false})
         sync-calls       (atom [])]
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (with-redefs [runtime/safe-maybe-sync-on-git-head-change!
                   (fn [_ctx sid]
                     (swap! sync-calls conj sid)
@@ -254,7 +254,7 @@
         (deliver release true)
         (let [result (deref runner 1000 ::timeout)
               assistant (session/last-assistant-message-in ctx session-id)
-              entries (dispatch/event-log-entries)
+              entries (kernel/event-log-entries)
               execution-summary (get-in (ss/get-session-data-in ctx session-id)
                                         [:last-execution-result-summary :stop-reason])]
           (is (not= ::timeout result))
@@ -272,18 +272,18 @@
 
 (deftest build-prepared-request-surfaces-developer-and-contribution-layers-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
-    (dispatch/dispatch! ctx :session/bootstrap-prompt-state
-                        {:session-id session-id
-                         :system-prompt "sys"
-                         :developer-prompt "dev"
-                         :developer-prompt-source :explicit}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :session/register-prompt-contribution
-                        {:session-id session-id
-                         :ext-path "/ext/a"
-                         :id "c1"
-                         :contribution {:content "Hint A" :priority 10 :enabled true}}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/bootstrap-prompt-state
+                          {:session-id session-id
+                           :system-prompt "sys"
+                           :developer-prompt "dev"
+                           :developer-prompt-source :explicit}
+                          {:origin :core})
+    (session/dispatch-in! ctx :session/register-prompt-contribution
+                          {:session-id session-id
+                           :ext-path "/ext/a"
+                           :id "c1"
+                           :contribution {:content "Hint A" :priority 10 :enabled true}}
+                          {:origin :core})
     (let [prepared (psi.agent-session.prompt-request/build-prepared-request
                     ctx session-id {:turn-id "t1"
                                     :user-message {:role "user"
@@ -302,16 +302,16 @@
 
 (deftest build-prepared-request-reassembles-effective-system-prompt-from-base-and-contributions-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
-    (dispatch/dispatch! ctx :session/bootstrap-prompt-state
-                        {:session-id session-id
-                         :system-prompt "base"}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :session/register-prompt-contribution
-                        {:session-id session-id
-                         :ext-path "/ext/a"
-                         :id "c2"
-                         :contribution {:content "Hint B" :priority 20 :enabled true}}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/bootstrap-prompt-state
+                          {:session-id session-id
+                           :system-prompt "base"}
+                          {:origin :core})
+    (session/dispatch-in! ctx :session/register-prompt-contribution
+                          {:session-id session-id
+                           :ext-path "/ext/a"
+                           :id "c2"
+                           :contribution {:content "Hint B" :priority 20 :enabled true}}
+                          {:origin :core})
     ;; Simulate stale cached :system-prompt state: request preparation should
     ;; rebuild from canonical base prompt + contribution layers instead.
     (test-support/update-state! ctx :session-data assoc :system-prompt "stale")
@@ -397,30 +397,30 @@
                           :tool-name "read"
                           :content [{:type :text :text "file body"}]
                           :timestamp (java.time.Instant/now)}]
-    (dispatch/dispatch! ctx :session/bootstrap-prompt-state
-                        {:session-id session-id
-                         :system-prompt "sys"}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :session/prompt-submit
-                        {:session-id session-id
-                         :user-msg {:role "user"
-                                    :content [{:type :text :text "hi"}]
-                                    :timestamp (java.time.Instant/now)}}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/bootstrap-prompt-state
+                          {:session-id session-id
+                           :system-prompt "sys"}
+                          {:origin :core})
+    (session/dispatch-in! ctx :session/prompt-submit
+                          {:session-id session-id
+                           :user-msg {:role "user"
+                                      :content [{:type :text :text "hi"}]
+                                      :timestamp (java.time.Instant/now)}}
+                          {:origin :core})
     (with-redefs [psi.agent-session.prompt-chain/run-prompt-tools! (fn [_ctx _sid _res _pq]
                                                                      {:continued? true :tool-call-count 1})]
-      (dispatch/dispatch! ctx :session/prompt-record-response
+      (session/dispatch-in! ctx :session/prompt-record-response
+                            {:session-id session-id
+                             :execution-result execution-result}
+                            {:origin :core}))
+    (session/dispatch-in! ctx :session/tool-record-result
                           {:session-id session-id
-                           :execution-result execution-result}
-                          {:origin :core}))
-    (dispatch/dispatch! ctx :session/tool-record-result
-                        {:session-id session-id
-                         :shaped-result {:result-message tool-result-msg}}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :session/enqueue-steering-message
-                        {:session-id session-id
-                         :text "Please be brief."}
-                        {:origin :core})
+                           :shaped-result {:result-message tool-result-msg}}
+                          {:origin :core})
+    (session/dispatch-in! ctx :session/enqueue-steering-message
+                          {:session-id session-id
+                           :text "Please be brief."}
+                          {:origin :core})
     (let [prepared            (psi.agent-session.prompt-request/build-prepared-request
                                ctx session-id {:turn-id "turn-2"
                                                :user-message nil})
@@ -456,10 +456,10 @@
 
 (deftest prompt-prepare-request-consumes-queued-steering-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
-    (dispatch/dispatch! ctx :session/enqueue-steering-message
-                        {:session-id session-id
-                         :text "Please be brief."}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/enqueue-steering-message
+                          {:session-id session-id
+                           :text "Please be brief."}
+                          {:origin :core})
     (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
@@ -471,11 +471,11 @@
                      :execution-result/turn-outcome :turn.outcome/stop
                      :execution-result/tool-calls []
                      :execution-result/stop-reason :stop})]
-      (dispatch/dispatch! ctx :session/prompt-prepare-request
-                          {:session-id session-id
-                           :turn-id "turn-steer"
-                           :user-msg nil}
-                          {:origin :core}))
+      (session/dispatch-in! ctx :session/prompt-prepare-request
+                            {:session-id session-id
+                             :turn-id "turn-steer"
+                             :user-msg nil}
+                            {:origin :core}))
     (is (= [] (:steering-messages (ss/get-session-data-in ctx session-id))))))
 
 (deftest prompt-finish-dispatches-extension-turn-finished-event-test
@@ -491,18 +491,18 @@
                           :execution-result/turn-outcome :turn.outcome/stop
                           :execution-result/tool-calls []
                           :execution-result/stop-reason :stop}]
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (let [reg (:extension-registry ctx)]
       (psi.agent-session.extensions/register-extension-in! reg "/ext/auto-session-name")
       (psi.agent-session.extensions/register-handler-in! reg "/ext/auto-session-name" "session_turn_finished"
                                                          (fn [event]
                                                            (swap! seen conj event)
                                                            nil)))
-    (dispatch/dispatch! ctx :session/prompt-finish
-                        {:session-id session-id
-                         :turn-id "turn-1"
-                         :terminal-result terminal-result}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/prompt-finish
+                          {:session-id session-id
+                           :turn-id "turn-1"
+                           :terminal-result terminal-result}
+                          {:origin :core})
     (is (= [{:session-id session-id
              :turn-id "turn-1"}]
            @seen))))
@@ -519,10 +519,10 @@
                           :execution-result/turn-outcome :turn.outcome/stop
                           :execution-result/tool-calls []
                           :execution-result/stop-reason :stop}]
-    (dispatch/dispatch! ctx :session/enqueue-follow-up-message
-                        {:session-id session-id
-                         :text "next question"}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/enqueue-follow-up-message
+                          {:session-id session-id
+                           :text "next question"}
+                          {:origin :core})
     (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     (is (= "next question"
@@ -536,11 +536,11 @@
                      :execution-result/turn-outcome :turn.outcome/stop
                      :execution-result/tool-calls []
                      :execution-result/stop-reason :stop})]
-      (dispatch/dispatch! ctx :session/prompt-finish
-                          {:session-id session-id
-                           :turn-id "turn-1"
-                           :terminal-result terminal-result}
-                          {:origin :core}))
+      (session/dispatch-in! ctx :session/prompt-finish
+                            {:session-id session-id
+                             :turn-id "turn-1"
+                             :terminal-result terminal-result}
+                            {:origin :core}))
     (let [msgs (journal-messages ctx session-id)]
       (is (= ["user" "assistant"] (mapv :role msgs)))
       (is (= "next question" (get-in (first msgs) [:content 0 :text])))
@@ -559,12 +559,12 @@
                           :execution-result/tool-calls []
                           :execution-result/stop-reason :stop}
         seen-prompts     (atom [])]
-    (dispatch/dispatch! ctx :session/enqueue-follow-up-message
-                        {:session-id session-id :text "q1"}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :session/enqueue-follow-up-message
-                        {:session-id session-id :text "q2"}
-                        {:origin :core})
+    (session/dispatch-in! ctx :session/enqueue-follow-up-message
+                          {:session-id session-id :text "q1"}
+                          {:origin :core})
+    (session/dispatch-in! ctx :session/enqueue-follow-up-message
+                          {:session-id session-id :text "q2"}
+                          {:origin :core})
     (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     (swap! seen-prompts conj (get-in prepared [:prepared-request/user-message :content 0 :text]))
@@ -577,10 +577,10 @@
                      :execution-result/turn-outcome :turn.outcome/stop
                      :execution-result/tool-calls []
                      :execution-result/stop-reason :stop})]
-      (dispatch/dispatch! ctx :session/prompt-finish
-                          {:session-id session-id
-                           :turn-id "turn-1"
-                           :terminal-result terminal-result}
-                          {:origin :core}))
+      (session/dispatch-in! ctx :session/prompt-finish
+                            {:session-id session-id
+                             :turn-id "turn-1"
+                             :terminal-result terminal-result}
+                            {:origin :core}))
     (is (= ["q1" "q2"] @seen-prompts))
     (is (= [] (:follow-up-messages (ss/get-session-data-in ctx session-id))))))
