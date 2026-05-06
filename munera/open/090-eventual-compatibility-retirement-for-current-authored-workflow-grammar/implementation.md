@@ -85,3 +85,8 @@
 2026-05-06 review pass
 - No new actionable feedback from this implementation review.
 - Spot-checks confirmed the task artifacts already record the remaining focused-verification gap and the code/tests reviewed do not expose an additional retirement blocker beyond what is already tracked.
+
+2026-05-06 follow-up execution
+- Executed the remaining authoritative focused verification command from `steps.md`/`plan.md` after the target-authored-only retirement work.
+- Focused verification is green: `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test` (`26 tests, 187 assertions, 0 failures`).
+- The focused run confirms the remaining retirement-facing load/compile/execute surfaces pass without the retired current-authored grammar path.

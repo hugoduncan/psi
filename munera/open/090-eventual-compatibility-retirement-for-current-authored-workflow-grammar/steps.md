@@ -41,8 +41,8 @@
   - [x] delete `doc/workflow-grammar-current.md`
   - [x] delete `doc/workflow-grammar-migration.md`
   - [x] rewrite references in `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
-- [ ] Run focused verification after compatibility removal
-  - [ ] `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test`
+- [x] Run focused verification after compatibility removal
+  - [x] `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test`
 - [x] Run broader verification after compatibility removal
   - [x] `bb clojure:test:unit`
 - [x] Reconcile final cleanup with task `077` migration intent
