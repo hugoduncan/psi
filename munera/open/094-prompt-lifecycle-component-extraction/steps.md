@@ -1,0 +1,8 @@
+- [ ] Inspect current prompt lifecycle ownership and test surfaces
+- [ ] Choose and document the extracted component boundary/API
+- [ ] Record the chosen ownership split in implementation notes
+- [ ] Extract prepare → execute → record → finish orchestration into the new component
+- [ ] Simplify at least one higher-level caller to use the extracted component
+- [ ] Align docs/comments with the new ownership model
+- [ ] Make only the minimal focused test updates needed for extraction safety
+- [ ] Run focused verification
