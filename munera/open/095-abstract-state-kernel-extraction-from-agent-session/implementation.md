@@ -128,3 +128,11 @@ Review notes — 2026-05-06
   - verification re-run after the shaping follow-up:
     - repeated focused proof stayed green: `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.model-dispatch-test` → `25 tests, 247 assertions, 0 failures`
     - full unit suite is now green again: `bb clojure:test:unit` → `1514 tests, 11098 assertions, 0 failures`.
+- Dispatch compat namespace review — 2026-05-06
+  - reviewed `components/agent-session/src/psi/agent_session/dispatch.clj` specifically as the temporary compatibility seam introduced by task 095.
+  - review verdict: the namespace is now well-shaped enough to remain as a temporary migration seam; no new immediate shaping defects were found after the apply-path consolidation and env-shape cleanup.
+  - positive result: apply-path duplication is gone, env projection is clearer via `->kernel-contract-env` and `->dispatch-env`, and residual `:statechart-claimed?` compatibility-layer ictx state has been removed.
+  - current limitation: the namespace still re-exports a broad generic dispatch surface from `psi.state-kernel.dispatch`, so many consumers can still treat `psi.agent-session.dispatch` as the canonical generic dispatch API.
+  - implication for the remaining unchecked step: the next work is not further reshaping of this namespace first, but migration of remaining generic consumers onto `psi.state-kernel.dispatch` directly.
+  - target end-state for this namespace: either disappear entirely or shrink to a small domain-composition surface containing only agent-session-specific composition concerns such as permission/statechart interception and wrapper-local dispatch adaptation.
+  - closure note for this review pass: task 095 can treat `psi.agent-session.dispatch` as an acceptable temporary compatibility seam, but should keep the final unchecked step focused on consumer migration rather than local namespace cleanup.
