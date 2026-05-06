@@ -63,3 +63,9 @@
 - Rewrote `doc/workflows.md` so it teaches only the supported grammar and removed the transitional current→target mapping plus migration-era related-doc links.
 - Rewrote `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md` to remove references that presented the deleted current grammar as a live authored option.
 - Clarified the remaining `workflow_ir.md` note on `:workflow-runtime`: it is now documented only as a rejected non-canonical source-ref, not as an active migration seam.
+
+2026-05-06 implementation slice 10
+- Rewrote the remaining legacy-targeted unit surfaces named in the last broad-suite failure set so they now exercise the target-authored-only world explicitly.
+- `workflow_file_compiler_test.clj` no longer expects retired single-step/multi-step current-grammar compilation outputs; it now proves only target-authored file preservation, explicit rejection of legacy authored files, batch compilation accounting, and the retirement-era no-op loader validation helpers.
+- `workflow_tools_test.clj`, `mutations/canonical_workflows_test.clj`, and `workflow_session_integration_test.clj` now register/create runs from target-authored definitions only, replacing old canonical-runtime fixture shapes that bypassed the target-authored registration seam.
+- Focused verification for these rewritten surfaces is green: `clojure -M:test --focus psi.agent-session.workflow-file-compiler-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-session-integration-test` (`17 tests, 126 assertions, 0 failures`).

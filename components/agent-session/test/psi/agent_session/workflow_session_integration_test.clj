@@ -10,13 +10,16 @@
 (def definition
   {:definition-id "plan-build-review"
    :name "Plan Build Review"
-   :step-order ["plan" "build"]
-   :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}}
-           "build" {:executor {:type :agent :profile "builder" :mode :async}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :contributions [{:type :template
+                             :text "Plan {{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}
+           {:name "build"
+            :type :session
+            :contributions [{:type :template
+                             :text "Build {{plan}}"
+                             :vars {"plan" {:from {:step "plan" :yield :text}}}}]}]})
 
 (deftest workflow-root-state-is-present-in-context-test
   (testing "new contexts initialize canonical workflow root state"
@@ -41,8 +44,11 @@
                                                                             :run-id "run-1"
                                                                             :workflow-input {:task "ship it"}})]
           (reset! (:state* ctx) state2)
+          (is (= "plan-build-review" definition-id))
           (is (= definition (get-in @(:state* ctx) [:workflows :definitions definition-id])))
           (is (= run (get-in @(:state* ctx) [:workflows :runs run-id])))
-          (is (workflow-model/valid-workflow-run? run)))
+          (is (workflow-model/valid-workflow-run? run))
+          (is (= ["plan" "build"] (get-in run [:effective-definition :step-order])))
+          (is (= :workflow-ir/v1 (get-in run [:effective-definition :canonical-ir :version]))))
         (finally
           (context/shutdown-context! ctx))))))

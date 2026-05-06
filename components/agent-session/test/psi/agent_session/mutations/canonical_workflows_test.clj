@@ -5,15 +5,12 @@
    [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
    [psi.agent-session.workflow-model :as workflow-model]))
 
-;;; Test helpers
-
 (defn- make-test-ctx
   "Create a minimal ctx with a state atom for testing pure mutations."
   ([] (make-test-ctx {}))
   ([initial-state]
    (let [state* (atom (merge {:workflows (workflow-model/initial-workflow-state)} initial-state))]
      {:state* state*
-      ;; Stub execution fns (not needed for pure state mutations)
       :execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})
       :resume-and-execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})})))
 
@@ -22,16 +19,12 @@
    :name "test-workflow"
    :summary "A test workflow"
    :description "For testing"
-   :step-order ["step-1"]
-   :steps {"step-1" {:label "step-1"
-                     :executor {:type :agent :profile "test"}
-                     :prompt-template "$INPUT"
-                     :input-bindings {:input {:source :workflow-input :path [:input]}
-                                      :original {:source :workflow-input :path [:original]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}}}})
-
-;;; Tests
+   :steps [{:name "step-1"
+            :type :session
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}
+                                    "original" {:from :workflow-input :path [:original]}}}]}]})
 
 (deftest register-workflow-definition-test
   (testing "registers a valid definition"
@@ -41,7 +34,6 @@
       (is (true? (:psi.workflow/registered? result)))
       (is (= "test-workflow" (:psi.workflow/definition-id result)))
       (is (nil? (:psi.workflow/error result)))
-      ;; Verify in state
       (is (some? (get-in @(:state* ctx) [:workflows :definitions "test-workflow"])))))
 
   (testing "returns error for invalid definition"
@@ -63,7 +55,6 @@
       (is (= "run-1" (:psi.workflow/run-id result)))
       (is (= :pending (:psi.workflow/status result)))
       (is (nil? (:psi.workflow/error result)))
-      ;; Verify run exists in state
       (is (some? (get-in @(:state* ctx) [:workflows :runs "run-1"])))))
 
   (testing "returns error for unknown definition"
@@ -88,7 +79,7 @@
                                                    :workflow-input {:input "hello" :original "hello"}
                                                    :run-id "run-1"})
           _ (swap! (:state* ctx) assoc-in [:workflows :runs "run-1" :step-runs "step-1" :accepted-result]
-                   {:outcome :ok :outputs {:final-llm-reply "final reply"}})
+                   {:outcome :ok :outputs {:text "final reply"}})
           result (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
                                                          :session-id "parent-session"
                                                          :run-id "run-1"})]
@@ -111,32 +102,12 @@
                                                    :workflow-input {:input "hello" :original "hello"}
                                                    :run-id "run-1"})
           _ (swap! (:state* ctx) assoc-in [:workflows :runs "run-1" :step-runs "step-1" :accepted-result]
-                   {:outcome :ok :outputs {:final-llm-reply "   "}})
+                   {:outcome :ok :outputs {:text "   "}})
           result (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
                                                          :session-id "parent-session"
                                                          :run-id "run-1"})]
       (is (= :completed (:psi.workflow/status result)))
-      (is (nil? (:psi.workflow/result result)))))
-
-  (testing "legacy stored session text remains readable through canonical yielded text resolution"
-    (let [ctx (assoc (make-test-ctx)
-                     :execute-workflow-run-fn
-                     (fn [ctx* _session-id run-id]
-                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :status] :completed)
-                       {:status :completed :terminal? true :blocked? false :steps-executed []}))
-          _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
-                                                            :definition sample-definition})
-          _ (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
-                                                   :definition-id "test-workflow"
-                                                   :workflow-input {:input "hello" :original "hello"}
-                                                   :run-id "run-1"})
-          _ (swap! (:state* ctx) assoc-in [:workflows :runs "run-1" :step-runs "step-1" :accepted-result]
-                   {:outcome :ok :outputs {:text "legacy reply"}})
-          result (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
-                                                         :session-id "parent-session"
-                                                         :run-id "run-1"})]
-      (is (= :completed (:psi.workflow/status result)))
-      (is (= "legacy reply" (:psi.workflow/result result))))))
+      (is (nil? (:psi.workflow/result result))))))
 
 (deftest resume-workflow-run-test
   (testing "resume-workflow-run updates workflow input before resuming when provided"

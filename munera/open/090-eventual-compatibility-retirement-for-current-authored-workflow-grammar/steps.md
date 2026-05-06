@@ -29,6 +29,10 @@
   - [x] remove `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
   - [x] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility
   - [x] replace compat-oriented mixed-path tests with target-only proofs before deleting them
+  - [x] rewrite `workflow_file_compiler_test.clj` to assert target-authored-only file compilation behavior
+  - [x] rewrite `workflow_tools_test.clj` workflow fixtures to register/create target-authored definitions only
+  - [x] rewrite `mutations/canonical_workflows_test.clj` to register/create/execute target-authored definitions only
+  - [x] rewrite `workflow_session_integration_test.clj` to store target-authored definitions under canonical workflow root state
 - [ ] Update project guidance so the target grammar is the only supported authored workflow surface
   - [x] delete `doc/workflow-grammar-current.md`
   - [x] delete `doc/workflow-grammar-migration.md`
