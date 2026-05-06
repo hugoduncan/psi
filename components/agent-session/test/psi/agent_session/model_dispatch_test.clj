@@ -346,8 +346,7 @@
       (kernel/clear-event-log!)
       (bootstrap/bootstrap-in!
        ctx session-id
-       {:register-global-query? false
-        :system-prompt          "sys"
+       {:system-prompt          "sys"
         :developer-prompt       "dev"
         :developer-prompt-source :explicit})
       (let [sd    (ss/get-session-data-in ctx session-id)
@@ -367,8 +366,7 @@
     (let [[ctx session-id] (create-session-context)]
       (bootstrap/bootstrap-in!
        ctx session-id
-       {:register-global-query? false
-        :system-prompt          "sys"})
+       {:system-prompt          "sys"})
       (let [sd (ss/get-session-data-in ctx session-id)]
         (is (= "sys" (:base-system-prompt sd)))
         (is (nil? (:developer-prompt sd)))

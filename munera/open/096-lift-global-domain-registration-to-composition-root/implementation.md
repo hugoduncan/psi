@@ -30,11 +30,13 @@ Inspection notes:
 
 Implementation progress:
 - removed the temporary global-registration seam from `psi.agent-session.context`; the namespace now exposes only isolated/session-facing local registration helpers and context construction
-- removed `psi.agent-session.core/register-resolvers!` and `psi.agent-session.core/register-mutations!`; no blocking compatibility shim was needed because the only production bootstrap caller could move directly to composition ownership
-- updated `psi.agent-session.bootstrap/bootstrap-in!` to call `psi.system-bootstrap.core/register-all-domains!` directly when global registration is requested, making composition ownership explicit at the bootstrap layer
+- removed `psi.agent-session.core/register-resolvers!` and `psi.agent-session.core/register-mutations!`; no blocking compatibility shim was needed
+- removed `register-global-query?` from `psi.agent-session.bootstrap/bootstrap-in!`; whole-application registration is now owned by higher-level composition (`app-runtime`, `introspection`, and explicit `system-bootstrap` tests) instead of the domain bootstrap helper
 - clarified `psi.system-bootstrap.core` docs so `register-all-domains!` is the authoritative global assembly entrypoint and `register-domains-in!` is the authoritative assembled-isolated entrypoint
 - corrected composition-owned agent-session mutation registration to use `psi.agent-session.mutations/all-mutations` directly instead of trying to resolve a non-canonical aggregate through `psi.agent-session.core`
+- added explicit composition-root tests under `components/system-bootstrap/test` covering both global assembled registration and assembled isolated registration with a live session context
+- adjusted tests that only needed session bootstrap behavior so they no longer pass a now-removed global-registration toggle
 
-Open questions reduced to implementation checks:
-- confirm whether any existing tests need a new/clearer composition-owned isolated-registration helper instead of domain-local session registration
-- confirm that no remaining `components/agent-session/src/**` source mentions `psi.system-bootstrap` once the task is complete
+Remaining implementation checks:
+- run focused verification for the touched agent-session, introspection, and system-bootstrap registration surfaces
+- run a broader verification pass once focused registration checks are green

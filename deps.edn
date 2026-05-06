@@ -203,6 +203,7 @@
                         "components/state-kernel/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
+                        "components/system-bootstrap/test"
                         "extensions/auto-session-name/src"
                         "extensions/commit-checks/src"
                         "extensions/hello-ext/src"

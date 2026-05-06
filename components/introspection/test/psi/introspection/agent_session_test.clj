@@ -168,16 +168,15 @@
           session-id       (:session-id (session/new-session-in! session-ctx nil {}))
           _               (bootstrap/bootstrap-in!
                            session-ctx session-id
-                           {:register-global-query? false
-                            :base-tools             []
-                            :system-prompt          "sys"
-                            :templates              [{:name "greet"
-                                                      :description "desc"
-                                                      :content "body"
-                                                      :source :project
-                                                      :file-path "/tmp/greet.md"}]
-                            :skills                 []
-                            :extension-paths        []})
+                           {:base-tools      []
+                            :system-prompt   "sys"
+                            :templates       [{:name "greet"
+                                               :description "desc"
+                                               :content "body"
+                                               :source :project
+                                               :file-path "/tmp/greet.md"}]
+                            :skills          []
+                            :extension-paths []})
           ctx         (introspection/create-context {:agent-session-ctx session-ctx})]
       (engine/bootstrap-system-in! (:engine-ctx ctx))
       (introspection/register-resolvers-in! ctx)

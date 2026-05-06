@@ -8,10 +8,10 @@
 - [x] Ensure the composition root also owns any canonical fully assembled isolated-query-context registration helper
 - [x] Update startup/bootstrap/composition call paths so production startup registers all domains only through composition-root-owned entrypoint(s)
 - [x] Remove `requiring-resolve` global registration discovery from `agent-session.context`
-- [ ] Check that `components/agent-session/src/**` no longer mentions `psi.system-bootstrap` for registration ownership
-- [ ] Add/update focused tests for local/isolated registration
-- [ ] Add/update focused tests for globally assembled registration
-- [ ] Migrate any tests that actually need assembled multi-domain registration to a composition-owned helper instead of a domain-owned global wrapper
+- [x] Check that `components/agent-session/src/**` no longer mentions `psi.system-bootstrap` for registration ownership
+- [x] Add/update focused tests for local/isolated registration
+- [x] Add/update focused tests for globally assembled registration
+- [x] Migrate any tests that actually need assembled multi-domain registration to a composition-owned helper instead of a domain-owned global wrapper
 - [ ] Record final ownership split and any remaining edge cases in implementation notes
 - [ ] Run focused verification
 - [ ] Run broader verification as needed

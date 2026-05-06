@@ -9,8 +9,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
    [psi.agent-session.mutations :as mutations]
-   [psi.query.core :as query]
-   [psi.system-bootstrap.core :as system-bootstrap]))
+   [psi.query.core :as query]))
 
 (defn- run-mutation-in!
   "Execute a registered mutation op in `qctx` with `params`.
@@ -82,14 +81,12 @@
    session branch.
 
    Steps:
-   1) optionally register all domains through the composition root
-   2) register base tools and set system prompt
-   3) load prompts/skills/tools/extensions via EQL mutations
-   4) merge extension tools into active tools
-   5) persist startup summary to :startup-bootstrap in session data
+   1) register base tools and set system prompt
+   2) load prompts/skills/tools/extensions via EQL mutations
+   3) merge extension tools into active tools
+   4) persist startup summary to :startup-bootstrap in session data
 
    opts keys:
-   :register-global-query? — register all global query domains through the composition root (default true)
    :base-tools             — base tool schema vector (default [])
    :system-prompt          — prompt string (default empty string)
    :developer-prompt       — optional developer instruction string (default nil)
@@ -101,9 +98,8 @@
    :extension-targets      — activation targets (default [])
 
    Returns startup summary map stored at :startup-bootstrap."
-  [ctx session-id {:keys [register-global-query? base-tools system-prompt developer-prompt developer-prompt-source templates skills tools extension-paths extension-targets]
-                   :or   {register-global-query? true
-                          base-tools             []
+  [ctx session-id {:keys [base-tools system-prompt developer-prompt developer-prompt-source templates skills tools extension-paths extension-targets]
+                   :or   {base-tools             []
                           system-prompt          ""
                           developer-prompt       ::unset
                           developer-prompt-source :fallback
@@ -112,8 +108,6 @@
                           tools                  []
                           extension-paths        []
                           extension-targets      []}}]
-  (when register-global-query?
-    (system-bootstrap/register-all-domains!))
   (let [resolved-developer-prompt (if (= developer-prompt ::unset)
                                     nil
                                     developer-prompt)
