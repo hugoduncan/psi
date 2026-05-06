@@ -40,3 +40,8 @@
 - Migrated the remaining checked-in single-purpose helper workflows (`planner`, `builder`, `reviewer`, `lambda-compiler`, `lambda-decompiler`, `prompt-compiler`, `prompt-decompiler`, and `allium-check`) to target-authored single-step `:type :session` files.
 - This removes the last repo-owned dependence on single-step current-authored file compilation, so repo checked-in `.psi/workflows/*.md` are now uniformly target-authored.
 - Kept tool/skill behavior explicit in canonical session fields and moved the old prompt bodies into template contributions that read the full workflow input directly.
+
+2026-05-06 implementation slice 6
+- Removed compatibility step-prep fallbacks for current `:input-bindings`, `:prompt-template`, profile-derived workflow meta lookup, and `:session-overrides` in favor of canonical target-authored session fields only.
+- Removed compatibility `:session-preload` merging from the Phase A statechart runtime so child-session preload now comes solely from canonical session contributions.
+- Replaced the old preload/compat regression proofs with canonical contribution-order tests in workflow step-prep, statechart runtime, and workflow execution.

@@ -23,8 +23,8 @@
   - [ ] remove `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
   - [ ] remove current-grammar branch from `components/agent-session/src/psi/agent_session/workflow_runtime.clj`
   - [ ] remove current-authored file-compilation/validation paths from `components/agent-session/src/psi/agent_session/workflow_file_compiler.clj`
-  - [ ] remove compat binding / prompt-template / executor-profile fallbacks from `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
-  - [ ] remove compat session-preload shaping from `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` when no longer needed by any checked-in workflow
+  - [x] remove compat binding / prompt-template / executor-profile fallbacks from `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
+  - [x] remove compat session-preload shaping from `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` when no longer needed by any checked-in workflow
 - [ ] Delete compatibility-only workflow tests/helpers no longer needed
   - [ ] remove `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
   - [ ] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility

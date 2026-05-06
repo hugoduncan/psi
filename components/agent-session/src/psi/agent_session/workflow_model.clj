@@ -181,7 +181,7 @@
   [:map
    [:run-id workflow-run-id-schema]
    [:status workflow-run-status-schema]
-   [:effective-definition workflow-definition-schema]
+   [:effective-definition :map]
    [:source-definition-id {:optional true} [:maybe workflow-definition-id-schema]]
    [:workflow-input {:optional true} :any]
    [:workflow-original {:optional true} :any]

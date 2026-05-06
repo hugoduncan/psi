@@ -362,12 +362,6 @@
               (if session-step?
                 (workflow-step-prep/split-step-session-conversation session-conversation)
                 {})
-              compat-preload-messages (when (and session-step?
-                                                 (not session-conversation))
-                                        (workflow-step-prep/materialize-step-session-preload ctx workflow-run step-id))
-              combined-preloaded-messages (when session-step?
-                                            (not-empty (vec (concat (or preloaded-messages [])
-                                                                    (or compat-preload-messages [])))))
               {:keys [attempt execution-session]}
               (if session-step?
                 (workflow-attempts/create-step-attempt-session!
@@ -395,8 +389,8 @@
                    (contains? step-config :prompt-component-selection)
                    (assoc :prompt-component-selection (:prompt-component-selection step-config))
 
-                   combined-preloaded-messages
-                   (assoc :preloaded-messages combined-preloaded-messages)))
+                   preloaded-messages
+                   (assoc :preloaded-messages preloaded-messages)))
                 {:attempt {:attempt-id attempt-id
                            :status :pending
                            :execution-session-id nil}

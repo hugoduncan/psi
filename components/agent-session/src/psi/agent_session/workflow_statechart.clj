@@ -8,8 +8,7 @@
    - `workflow-run-chart` and run event/status helpers describe the canonical run lifecycle surface."
   (:require
    [com.fulcrologic.statecharts.chart :as chart]
-   [com.fulcrologic.statecharts.elements :as ele]
-   [psi.agent-session.workflow-model :as workflow-model]))
+   [com.fulcrologic.statecharts.elements :as ele]))
 
 (defn effective-step-order
   [definition]
@@ -360,9 +359,6 @@
 
    Returns a fulcrologic statechart definition suitable for `simple/register!`."
   [definition]
-  (when-not (workflow-model/valid-workflow-definition? definition)
-    (throw (ex-info "Invalid workflow definition"
-                    {:explanation (workflow-model/explain-workflow-definition definition)})))
   (let [step-order (effective-step-order definition)
         steps      (effective-steps definition)
         step-states (mapv (fn [step-id]

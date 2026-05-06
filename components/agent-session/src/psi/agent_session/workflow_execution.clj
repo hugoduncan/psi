@@ -4,7 +4,6 @@
    This slice bridges canonical workflow definitions/runs to actual bounded
    session execution for workflow attempts. It now provides:
    - materialize step inputs from canonical bindings
-   - render legacy-compatible prompt templates
    - resolve step session config from workflow-file-meta
    - create one attempt child session for the current step
    - prompt that session
@@ -13,12 +12,7 @@
    - resume a blocked run and continue execution with a fresh attempt
 
    Canonical execution note:
-   - Phase A statechart execution is the sole canonical workflow-run execution path
-   - workflow step session preload parity is therefore intentionally centralized in
-     `workflow-statechart-runtime` step entry via
-     `workflow-step-prep/materialize-step-session-preload`
-   - if a future canonical runner is introduced, it must route through the same
-     preload materialization semantics rather than re-deriving them locally"
+   - Phase A statechart execution is the sole canonical workflow-run execution path"
   (:require
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-statechart-runtime :as workflow-statechart-runtime]
@@ -26,7 +20,6 @@
 
 (def binding-source-value workflow-step-prep/binding-source-value)
 (def materialize-step-inputs workflow-step-prep/materialize-step-inputs)
-(def render-prompt-template workflow-step-prep/render-prompt-template)
 (def step-prompt workflow-step-prep/step-prompt)
 
 (defn resolve-step-session-config

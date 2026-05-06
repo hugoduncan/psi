@@ -4,18 +4,11 @@
    materialization, prompt rendering, and child-session configuration shaping so
    prompt/config semantics stay aligned across workflow paths."
   (:require
-   [clojure.string :as str]
-   [psi.agent-session.persistence :as persistence]
    [psi.agent-session.session-state :as session-state]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
    [psi.agent-session.workflow-statechart :as workflow-statechart]))
-
-(defn- authored-step-def
-  [workflow-run step-id]
-  (get-in workflow-run [:effective-definition :steps step-id]))
 
 (defn- effective-step-def
   [workflow-run step-id]
@@ -26,69 +19,14 @@
 (defn materialize-step-inputs
   [workflow-run step-id]
   (let [step-def (effective-step-def workflow-run step-id)
-        compat-bindings (:input-bindings step-def)
         ir-template-vars (some->> (get-in step-def [:session :contributions])
                                   (filter #(= :template (:type %)))
                                   last
                                   :vars)]
-    (if (seq ir-template-vars)
-      (into {}
-            (map (fn [[var-name source-spec]]
-                   [(keyword var-name) (workflow-source-resolution/apply-source-spec workflow-run source-spec)]))
-            ir-template-vars)
-      (reduce-kv (fn [acc k ref]
-                   (assoc acc k (binding-source-value workflow-run ref)))
-                 {}
-                 (or compat-bindings {})))))
-
-(defn materialize-step-session-preload
-  "Materialize compiled `:session-preload` entries into canonical child-session
-   preloaded messages.
-
-   Semantics:
-   - value preload entries become synthetic messages using the compiled preload role
-   - value preload is intentionally constrained to text-like projections (`:text`)
-     so non-text values are not silently stringified from broader structures
-
-   Canonical transcript/message source of truth:
-   - value preload entries read from the workflow run's canonical binding sources
-   - transcript preload entries read from the step execution session's canonical
-     persisted journal via `persistence/messages-from-entries-in`
-   - transcript projection is delegated to `workflow-judge/project-messages` so
-     workflow judge and workflow step preload share one deterministic projection
-     implementation"
-  [ctx workflow-run step-id]
-  (let [preload-spec (get-in workflow-run [:effective-definition :steps step-id :session-preload])]
-    (when (seq preload-spec)
-      (->> preload-spec
-           (mapcat (fn [entry]
-                     (case (:kind entry)
-                       :value
-                       (let [value (binding-source-value workflow-run (:binding entry))]
-                         (if (some? value)
-                           [{:role (:role entry)
-                             :content (str value)}]
-                           []))
-
-                       :session-transcript
-                       (let [attempts (get-in workflow-run [:step-runs (:step-id entry) :attempts])
-                             session-id (some-> attempts last :execution-session-id)
-                             messages (if session-id
-                                        (vec (persistence/messages-from-entries-in ctx session-id))
-                                        [])]
-                         (workflow-judge/project-messages messages (:projection entry)))
-
-                       [])))
-           vec
-           not-empty))))
-
-(defn render-prompt-template
-  [prompt-template step-inputs]
-  (let [input-text (or (:input step-inputs) "")
-        original-text (or (:original step-inputs) "")]
-    (-> (or prompt-template "$INPUT")
-        (str/replace "$INPUT" (str input-text))
-        (str/replace "$ORIGINAL" (str original-text)))))
+    (into {}
+          (map (fn [[var-name source-spec]]
+                 [(keyword var-name) (workflow-source-resolution/apply-source-spec workflow-run source-spec)]))
+          ir-template-vars)))
 
 (def render-template-contribution
   workflow-source-resolution/render-template-contribution)
@@ -182,14 +120,10 @@
 
 (defn step-prompt
   [workflow-run step-id]
-  (let [step-def (effective-step-def workflow-run step-id)
-        step-inputs (materialize-step-inputs workflow-run step-id)
-        session-conversation (materialize-step-session-conversation workflow-run step-id)
-        compat-prompt-template (:prompt-template step-def)]
+  (let [step-inputs (materialize-step-inputs workflow-run step-id)
+        session-conversation (materialize-step-session-conversation workflow-run step-id)]
     {:step-inputs step-inputs
-     :prompt (if session-conversation
-               (:prompt (split-step-session-conversation session-conversation))
-               (render-prompt-template compat-prompt-template step-inputs))}))
+     :prompt (:prompt (split-step-session-conversation session-conversation))}))
 
 (defn- compose-system-prompt
   [base-system-prompt framing-prompt]
@@ -240,24 +174,12 @@
             tool-config))))
 
 (defn- step-meta-for
-  [ctx workflow-run step-id]
+  [_ctx workflow-run step-id]
   (let [step-def (effective-step-def workflow-run step-id)
-        authored-step (authored-step-def workflow-run step-id)
-        profile (or (get-in step-def [:compat :executor :profile])
-                    (get-in step-def [:executor :profile]))
-        run-meta (get-in workflow-run [:effective-definition :workflow-file-meta])
-        delegated-workflow? (and profile
-                                 (not= profile (:definition-id (:effective-definition workflow-run))))
-        base-meta (if delegated-workflow?
-                    (let [ref-def (get-in @(:state* ctx) [:workflows :definitions profile])]
-                      (or (:workflow-file-meta ref-def) {}))
-                    (or run-meta {}))
-        framing-prompt (when delegated-workflow? (:framing-prompt run-meta))
-        step-overrides (or (:session-overrides authored-step) {})]
+        run-meta (or (get-in workflow-run [:effective-definition :workflow-file-meta]) {})]
     {:step-def step-def
-     :base-meta base-meta
-     :framing-prompt framing-prompt
-     :step-overrides step-overrides}))
+     :base-meta run-meta
+     :framing-prompt nil}))
 
 (defn resolve-step-session-config
   "Resolve child session configuration for a workflow step.
@@ -273,25 +195,21 @@
    - the child base system prompt is still rebuilt from structured session state
      downstream during child-session initialization"
   [ctx parent-session-id workflow-run step-id]
-  (let [{:keys [base-meta framing-prompt step-overrides]} (step-meta-for ctx workflow-run step-id)
+  (let [{:keys [step-def base-meta framing-prompt]} (step-meta-for ctx workflow-run step-id)
         parent-session-id (or parent-session-id
                               (some->> (session-state/list-context-sessions-in ctx) first :session-id))
-        parent-session    (session-state/get-session-data-in ctx parent-session-id)
+        parent-session (session-state/get-session-data-in ctx parent-session-id)
         parent-session-model (:model parent-session)
-        developer-prompt  (or (:system-prompt step-overrides)
-                              (:system-prompt base-meta))]
+        session-spec (:session step-def)
+        developer-prompt (:system-prompt base-meta)]
     {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
      :prompt-mode (:prompt-mode parent-session)
-     :tool-defs (if (contains? step-overrides :tools)
-                  (resolve-step-tool-defs ctx parent-session-id (:tools step-overrides))
-                  (resolve-step-tool-defs ctx parent-session-id (:tools base-meta)))
-     :thinking-level (if (contains? step-overrides :thinking-level)
-                       (:thinking-level step-overrides)
-                       (or (:thinking-level base-meta) :off))
-     :skills (if (contains? step-overrides :skills)
-               (resolve-step-skills ctx parent-session-id (:skills step-overrides))
-               (resolve-step-skills ctx parent-session-id (:skills base-meta)))
-     :model (or (:model step-overrides)
+     :tool-defs (resolve-step-tool-defs ctx parent-session-id (:tools session-spec))
+     :thinking-level (or (:thinking-level session-spec)
+                         (:thinking-level base-meta)
+                         :off)
+     :skills (resolve-step-skills ctx parent-session-id (:skills session-spec))
+     :model (or (:model session-spec)
                 (:model base-meta)
                 parent-session-model)
-     :prompt-component-selection (:prompt-component-selection step-overrides)}))
+     :prompt-component-selection (:prompt-component-selection session-spec)}))
