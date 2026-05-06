@@ -1,17 +1,17 @@
 (ns psi.system-bootstrap.core
-  "System-wide resolver registration - breaks circular dependencies via common dependency extraction.
-   
-   This component coordinates resolver registration from all domains without creating
-   circular dependencies. Both introspection and agent-session depend on this component,
-   but this component depends on all resolver domains.
-   
+  "Composition-root query registration.
+
+   Owns whole-application and assembled-isolated registration above the domain
+   components.
+
    Dependency flow:
-   - system-bootstrap → all resolver domains (ai, history, memory, recursion, agent-session, introspection)  
-   - agent-session → system-bootstrap (for registration)
-   - introspection → system-bootstrap (for registration)
-   - Result: Acyclic dependency graph
-   
-   This is the proper architectural solution vs. dynamic loading."
+   - system-bootstrap → all resolver domains (ai, history, memory, recursion,
+     agent-session, introspection)
+   - higher-level composition/startup code → system-bootstrap
+   - domain components expose only their local registration surfaces
+
+   Result: the composition root owns \"register everything\" behavior and
+   domain components do not depend back on application assembly."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.query.core :as query]
@@ -60,19 +60,19 @@
        (println "Warning: Could not load resolvers from" namespace-sym ":" (.getMessage e))))))
 
 (defn register-all-domains!
-  "Register resolvers and mutations from all system domains using dynamic loading.
-   
-   This avoids loading all domains at namespace-load time, which was causing 
-   slow test loading when kaocha loaded test namespaces that depend on this component.
-   
+  "Register resolvers and mutations from all system domains into the global registry.
+
+   This is the authoritative composition-root entrypoint for whole-application
+   query registration.
+
    Domains:
    - AI resolvers
    - History resolvers + mutations
-   - Introspection resolvers  
+   - Introspection resolvers
    - Memory resolvers
    - Recursion resolvers + mutations
    - Agent-session resolvers + mutations
-   
+
    Idempotent: skips operations already present in the global registry."
   []
   ;; Load domains dynamically to avoid eager loading at require-time
@@ -83,23 +83,18 @@
   (load-and-register-domain! 'psi.recursion.resolvers 'all-resolvers 'all-mutations)
   (load-and-register-domain! 'psi.agent-session.resolvers 'all-resolvers)
 
-  ;; Agent-session mutations are in the core namespace
-  (try
-    (require 'psi.agent-session.core)
-    (when-let [mutations-var (resolve 'psi.agent-session.core/all-mutations)]
-      (doseq [m @mutations-var]
-        (register-mutation-if-missing! m)))
-    (catch Exception e
-      (println "Warning: Could not load agent-session mutations:" (.getMessage e))))
+  ;; Agent-session mutations are owned by the mutations aggregate namespace
+  (load-and-register-domain! 'psi.agent-session.mutations nil 'all-mutations)
 
   ;; Single env rebuild after all operations are registered
   (query/rebuild-env!))
 
 (defn register-domains-in!
   "Register resolvers and mutations into an isolated query context.
-   
-   For isolated testing contexts that need full resolver surfaces.
-   
+
+   This is the composition-root entrypoint for assembled isolated query
+   contexts used by tests and higher-level orchestration.
+
    Args:
      qctx - isolated query context from query/create-query-context
      session-ctx - optional agent-session context for session-specific resolvers"

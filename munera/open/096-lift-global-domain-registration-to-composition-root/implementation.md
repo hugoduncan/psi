@@ -28,6 +28,13 @@ Inspection notes:
 - `psi.system-bootstrap.core/register-all-domains!` currently resolves agent-session mutations through `psi.agent-session.core/all-mutations`; the canonical mutation aggregate actually lives in `psi.agent-session.mutations/all-mutations`, so composition ownership should point there directly
 - existing isolated tests in `agent-session` legitimately exercise the session-facing local surface; any test that needs whole assembled registration should target `psi.system-bootstrap.core` instead
 
+Implementation progress:
+- removed the temporary global-registration seam from `psi.agent-session.context`; the namespace now exposes only isolated/session-facing local registration helpers and context construction
+- removed `psi.agent-session.core/register-resolvers!` and `psi.agent-session.core/register-mutations!`; no blocking compatibility shim was needed because the only production bootstrap caller could move directly to composition ownership
+- updated `psi.agent-session.bootstrap/bootstrap-in!` to call `psi.system-bootstrap.core/register-all-domains!` directly when global registration is requested, making composition ownership explicit at the bootstrap layer
+- clarified `psi.system-bootstrap.core` docs so `register-all-domains!` is the authoritative global assembly entrypoint and `register-domains-in!` is the authoritative assembled-isolated entrypoint
+- corrected composition-owned agent-session mutation registration to use `psi.agent-session.mutations/all-mutations` directly instead of trying to resolve a non-canonical aggregate through `psi.agent-session.core`
+
 Open questions reduced to implementation checks:
 - confirm whether any existing tests need a new/clearer composition-owned isolated-registration helper instead of domain-local session registration
 - confirm that no remaining `components/agent-session/src/**` source mentions `psi.system-bootstrap` once the task is complete

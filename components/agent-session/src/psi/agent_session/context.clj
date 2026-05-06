@@ -61,16 +61,6 @@
    (when rebuild?
      (query/rebuild-env-in! qctx))))
 
-(defn- register-all-domains! []
-  (when-let [f (requiring-resolve 'psi.system-bootstrap.core/register-all-domains!)]
-    (f)))
-
-(defn register-resolvers! []
-  (register-all-domains!))
-
-(defn register-mutations! [_mutations]
-  (register-all-domains!))
-
 (defn- resolve-session-defaults [session-defaults resolved-cwd ui-type]
   (cond-> (or session-defaults {})
     (not (contains? (or session-defaults {}) :worktree-path))

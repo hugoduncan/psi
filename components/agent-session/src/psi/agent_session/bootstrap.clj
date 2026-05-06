@@ -9,7 +9,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
    [psi.agent-session.mutations :as mutations]
-   [psi.query.core :as query]))
+   [psi.query.core :as query]
+   [psi.system-bootstrap.core :as system-bootstrap]))
 
 (defn- run-mutation-in!
   "Execute a registered mutation op in `qctx` with `params`.
@@ -81,14 +82,14 @@
    session branch.
 
    Steps:
-   1) optionally register global query resolvers/mutations
+   1) optionally register all domains through the composition root
    2) register base tools and set system prompt
    3) load prompts/skills/tools/extensions via EQL mutations
    4) merge extension tools into active tools
    5) persist startup summary to :startup-bootstrap in session data
 
    opts keys:
-   :register-global-query? — register agent-session resolvers/mutations globally (default true)
+   :register-global-query? — register all global query domains through the composition root (default true)
    :base-tools             — base tool schema vector (default [])
    :system-prompt          — prompt string (default empty string)
    :developer-prompt       — optional developer instruction string (default nil)
@@ -112,8 +113,7 @@
                           extension-paths        []
                           extension-targets      []}}]
   (when register-global-query?
-    (session/register-resolvers!)
-    (session/register-mutations! mutations/all-mutations))
+    (system-bootstrap/register-all-domains!))
   (let [resolved-developer-prompt (if (= developer-prompt ::unset)
                                     nil
                                     developer-prompt)

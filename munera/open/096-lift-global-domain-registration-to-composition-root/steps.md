@@ -2,12 +2,12 @@
 - [x] Record the chosen composition-root namespace/path explicitly in implementation notes (`psi.system-bootstrap.core` unless implementation changes it)
 - [x] Classify each current registration helper as domain-local vs global-assembly and note any mixed surfaces that need splitting
 - [x] Decide and record whether current `agent-session` local registration helpers remain a session-facing local surface that includes history, or should be split further in this task
-- [ ] Refine or preserve local registration helpers so their meaning is strictly domain-local or session-facing-local, never whole-system assembly
-- [ ] Remove `psi.agent-session.core/register-resolvers!` and `psi.agent-session.core/register-mutations!`, or explicitly record any temporary compatibility shim plus follow-on debt if removal is blocked by unrelated broad startup/runtime churn outside this task’s scope
-- [ ] Create/update an explicit composition-root assembly function that owns whole-system registration
-- [ ] Ensure the composition root also owns any canonical fully assembled isolated-query-context registration helper
-- [ ] Update startup/bootstrap/composition call paths so production startup registers all domains only through composition-root-owned entrypoint(s)
-- [ ] Remove `requiring-resolve` global registration discovery from `agent-session.context`
+- [x] Refine or preserve local registration helpers so their meaning is strictly domain-local or session-facing-local, never whole-system assembly
+- [x] Remove `psi.agent-session.core/register-resolvers!` and `psi.agent-session.core/register-mutations!`, or explicitly record any temporary compatibility shim plus follow-on debt if removal is blocked by unrelated broad startup/runtime churn outside this task’s scope
+- [x] Create/update an explicit composition-root assembly function that owns whole-system registration
+- [x] Ensure the composition root also owns any canonical fully assembled isolated-query-context registration helper
+- [x] Update startup/bootstrap/composition call paths so production startup registers all domains only through composition-root-owned entrypoint(s)
+- [x] Remove `requiring-resolve` global registration discovery from `agent-session.context`
 - [ ] Check that `components/agent-session/src/**` no longer mentions `psi.system-bootstrap` for registration ownership
 - [ ] Add/update focused tests for local/isolated registration
 - [ ] Add/update focused tests for globally assembled registration

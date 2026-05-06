@@ -21,14 +21,6 @@
   ([qctx mutations] (context/register-mutations-in! qctx mutations))
   ([qctx mutations rebuild?] (context/register-mutations-in! qctx mutations rebuild?)))
 
-(defn register-resolvers!
-  []
-  (context/register-resolvers!))
-
-(defn register-mutations!
-  [mutations]
-  (context/register-mutations! mutations))
-
 (defn create-context
   ([] (context/create-context))
   ([opts] (context/create-context opts)))
