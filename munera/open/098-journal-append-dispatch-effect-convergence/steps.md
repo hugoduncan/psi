@@ -1,10 +1,19 @@
 - [ ] Inspect current `journal-append-in!` ownership and call graph
-- [ ] Choose and record the canonical dispatch/effect shape for journal append
-- [ ] Define the lower pure state-update responsibility versus higher persistence/effect responsibility
+- [ ] Add the authoritative generic dispatch-owned journal-append effect carrying a canonical journal entry
+- [ ] Define the lower pure state-update responsibility in `session-state`
+- [ ] Wire the canonical effect executor to perform pure in-memory append plus existing higher-level persistence when enabled
+- [ ] Reduce or route existing typed journal-append effects through the authoritative generic append path
 - [ ] Refactor the canonical append path away from primary `ctx :journal-append-fn` ownership
-- [ ] Keep or introduce only the minimum compatibility seam needed for migration
-- [ ] Migrate representative callers to the new canonical path
-- [ ] Add or update focused tests for in-memory append and persistence side-effect behavior
+- [ ] Migrate session-lifecycle initial journal writes to the canonical append path
+- [ ] Migrate prompt-runtime assistant journal append to the canonical append path
+- [ ] Migrate runtime raw user journal append helper to the canonical append path
+- [ ] Migrate extension `append-entry` mutation to the canonical append path
+- [ ] Keep or introduce only the minimum temporary migration seam needed during refactor
+- [ ] Remove the `psi.session-state.state/journal-append-in!` compatibility seam before task completion
+- [ ] Add or update one focused test for pure in-memory append behavior
+- [ ] Add or update one focused test for canonical effect append into in-memory session state
+- [ ] Add or update one focused test proving the canonical append effect reaches the persistence boundary when persistence is enabled
+- [ ] Add or update one focused test covering at least one migrated representative production path
 - [ ] Run focused verification
 - [ ] Run full unit verification
 - [ ] Record final ownership and any remaining compatibility in `implementation.md`
