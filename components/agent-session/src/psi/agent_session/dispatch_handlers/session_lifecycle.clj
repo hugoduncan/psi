@@ -4,7 +4,8 @@
    new-initialize, resume-loaded, fork-initialize, create-child,
    resume-missing-initialize, context-closed."
   (:require
-   [psi.agent-session.dispatch-handlers.session-state :as ss]
+   [psi.agent-session.dispatch-handlers.session-state :as child-session-state]
+   [psi.session-state.init :as ss]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.session :as session-data]
    [psi.agent-session.session-state :as session]))
@@ -98,24 +99,24 @@
    (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
      (let [parent-sd (or (session/get-session-data-in ctx session-id)
                          {:worktree-path worktree-path})]
-       {:root-state-update #(ss/initialize-child-session-state % parent-sd
-                                                               {:child-session-id       child-session-id
-                                                                :session-name           session-name
-                                                                :system-prompt          system-prompt
-                                                                :prompt-mode            prompt-mode
-                                                                :tool-defs              tool-defs
-                                                                :thinking-level         thinking-level
-                                                                :model                  model
-                                                                :skills                 skills
-                                                                :developer-prompt       developer-prompt
-                                                                :developer-prompt-source developer-prompt-source
-                                                                :preloaded-messages     preloaded-messages
-                                                                :cache-breakpoints      cache-breakpoints
-                                                                :prompt-component-selection prompt-component-selection
-                                                                :workflow-run-id        workflow-run-id
-                                                                :workflow-step-id       workflow-step-id
-                                                                :workflow-attempt-id    workflow-attempt-id
-                                                                :workflow-owned?        workflow-owned?})
+       {:root-state-update #(child-session-state/initialize-child-session-state % parent-sd
+                                                                                {:child-session-id       child-session-id
+                                                                                 :session-name           session-name
+                                                                                 :system-prompt          system-prompt
+                                                                                 :prompt-mode            prompt-mode
+                                                                                 :tool-defs              tool-defs
+                                                                                 :thinking-level         thinking-level
+                                                                                 :model                  model
+                                                                                 :skills                 skills
+                                                                                 :developer-prompt       developer-prompt
+                                                                                 :developer-prompt-source developer-prompt-source
+                                                                                 :preloaded-messages     preloaded-messages
+                                                                                 :cache-breakpoints      cache-breakpoints
+                                                                                 :prompt-component-selection prompt-component-selection
+                                                                                 :workflow-run-id        workflow-run-id
+                                                                                 :workflow-step-id       workflow-step-id
+                                                                                 :workflow-attempt-id    workflow-attempt-id
+                                                                                 :workflow-owned?        workflow-owned?})
         :effects [{:effect/type :projection/context-changed
                    :session-id child-session-id
                    :reason :session/create-child}]

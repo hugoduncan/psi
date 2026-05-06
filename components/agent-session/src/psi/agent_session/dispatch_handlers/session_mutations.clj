@@ -7,7 +7,7 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.dispatch-handlers.session-state :as ss]
+   [psi.session-state.init :as ss]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.session :as session-data]

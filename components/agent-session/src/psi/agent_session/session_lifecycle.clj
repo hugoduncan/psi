@@ -9,7 +9,7 @@
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session-close :as session-close]
    [psi.agent-session.session-runtime :as runtime]
-   [psi.agent-session.session-state :as session]
+   [psi.session-state.state :as session]
    [psi.agent-session.workflows :as wf]))
 
 (defn- initialize-top-level-session!

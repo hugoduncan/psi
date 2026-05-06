@@ -2,7 +2,7 @@
   "Adapter-neutral context snapshot projection shared across interactive UIs."
   (:require
    [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn phase->runtime-state
   [phase]

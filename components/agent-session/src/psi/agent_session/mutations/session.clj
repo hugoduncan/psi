@@ -9,9 +9,9 @@
    [psi.agent-session.core :as core]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session :as session]
+   [psi.session-state.model :as session]
    [psi.agent-session.session-runtime :as runtime]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (pco/defmutation set-session-name
   "Set the human-readable name of the current session."
