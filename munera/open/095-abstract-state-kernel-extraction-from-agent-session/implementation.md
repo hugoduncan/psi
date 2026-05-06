@@ -240,3 +240,13 @@ Review notes — 2026-05-06
   - also removed the final two schema-authority calls that still routed through the compat wrapper, so all validation wiring in the file now points directly at `psi.agent-session.dispatch-schema/validate-dispatch-schemas`.
   - focused verification green:
     - `clojure -M:test --focus psi.agent-session.dispatch-pure-result-test` → `6 tests, 70 assertions, 0 failures`
+- Remaining compat test seam review — 2026-05-06
+  - reviewed the last compat-dependent non-dispatch test namespaces: `tool_execution_test.clj`, `scheduler_handlers_test.clj`, and `scheduler_effects_test.clj`.
+  - settled classification: each file now uses `psi.agent-session.dispatch` only for local `with-redefs` interception of wrapper `dispatch!`.
+  - ownership rationale:
+    - `tool_execution_test.clj` intentionally observes nested wrapper-mediated redispatch during `:session/tool-run` orchestration.
+    - `scheduler_handlers_test.clj` intentionally intercepts wrapper `dispatch!` for the failed synthetic prompt-submit delivery path.
+    - `scheduler_effects_test.clj` intentionally intercepts wrapper `dispatch!` for timer-fired `:scheduler/fired` submission.
+  - no further safe narrowing change was applied in this pass because replacing those seams would require deeper production indirection without improving ownership clarity.
+  - `clj-surgeon` assist note: the installed CLI surfaced available ops but rejected the invocation shapes tried during this pass, so it was useful only as a weak probe of tool availability; the final classification came from direct file inspection plus targeted `rg` usage.
+  - current task posture after this review: remaining test-time wrapper dependency is concentrated in explicit compat/composition observation seams rather than incidental registry/schema/public-entrypoint access.
