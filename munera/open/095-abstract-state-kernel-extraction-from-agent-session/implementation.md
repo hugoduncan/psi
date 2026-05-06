@@ -72,3 +72,8 @@ Implementation notes — 2026-05-06
   - result: green (`1514 tests, 11103 assertions, 0 failures`)
 - One stale test expectation surfaced during extraction and was corrected:
   - scheduler drain-queue should leave other queued ids intact, so preserving `"sch-1"` alongside `"missing"` matches the current pure scheduler model and existing handler behavior.
+
+Review notes — 2026-05-06
+- terse review: extraction is structurally good and green, but two boundary leaks remain.
+- Actionable follow-up: `psi.state-kernel.dispatch` still owns `permission-interceptor` and `statechart-interceptor`, and those read `:extension-registry` and `:dispatch-statechart-event-fn` from the environment. That violates the documented kernel contract and the task boundary, because extension authorization and statechart routing are not application-independent dispatch substrate. These should move back above the kernel or be injected as higher-layer interceptors rather than remaining kernel-owned defaults.
+- Actionable follow-up: the kernel implementation still contains compatibility fallbacks to `:apply-root-state-update-fn` and `:read-session-state-fn`, and the agent-session context still injects those legacy keys alongside the narrowed contract. This is acceptable as a migration seam, but it means the implemented kernel contract is not yet as sharp as the task notes claim. A follow-up should either remove those fallbacks or explicitly document them as temporary compatibility keys outside the intended steady-state contract.
