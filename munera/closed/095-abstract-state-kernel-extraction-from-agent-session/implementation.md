@@ -270,3 +270,9 @@ Review notes — 2026-05-06
   - `default-interceptors` in `psi.agent-session.dispatch` now names the kernel authorities directly while preserving the same compat wrapper behavior and ordering.
   - focused verification green:
     - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test` → `17 tests, 151 assertions, 0 failures`
+- State-kernel dispatch coverage strengthening — 2026-05-06
+  - expanded `components/state-kernel/test/psi/state_kernel/dispatch_test.clj` so the kernel now owns direct proofs for more of its dispatch contract instead of relying mainly on higher-layer `agent-session` consumer tests.
+  - added focused kernel tests for event normalization, interceptor ordering/blocking, replay suppression of effects with preserved state updates, validation-failure blocking semantics, validator exception shaping, handler/effect exception trace behavior, non-fatal publish/trace callback failures, `:return-key` post-update reads, and in-order event-log replay.
+  - verification note: repo-local `clojure -M:test --focus psi.state-kernel.dispatch-test` skipped under the current runner configuration, so authoritative verification used `bb clojure:test:unit --focus psi.state-kernel.dispatch-test`.
+  - focused verification green: `bb clojure:test:unit --focus psi.state-kernel.dispatch-test`.
+  - full unit verification green after the coverage pass: `bb clojure:test:unit` → `1514 tests, 11098 assertions, 0 failures`.

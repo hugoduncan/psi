@@ -14,7 +14,6 @@ Backlog:
 `munera/open/002-compatibility-scaffold-removal/`
 `munera/open/077-custom-provider-string-provider-auth-normalization/`
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
-`munera/open/095-abstract-state-kernel-extraction-from-agent-session/`
 `munera/open/096-lift-global-domain-registration-to-composition-root/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`

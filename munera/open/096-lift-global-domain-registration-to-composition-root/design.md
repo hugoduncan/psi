@@ -18,8 +18,25 @@ Intent:
 - remove runtime bootstrap discovery from `agent-session.context`
 - clarify the distinction between:
   - local/isolated domain registration
+  - assembled isolated query-context registration
   - global/application assembly registration
 - preserve current behavior while making ownership and dependency direction explicit
+
+Terminology for this task:
+- `session-facing local surface` means the isolated query/mutation registration surface owned by `agent-session` for session-centric local contexts; for this task, that surface may remain broader than strictly agent-session-only if preserving current isolated session behavior requires including adjacent session-centric capabilities such as history
+- `assembled isolated registration` means a composition-owned helper that wires multiple domains into a provided isolated query context
+- `global/application assembly registration` means composition-owned registration into the global query registry
+
+Explicit decisions for this task:
+- the chosen composition root is `psi.system-bootstrap.core` unless implementation uncovers a stronger reason to rename or relocate it; if that happens, the replacement path must be recorded explicitly in `implementation.md`
+- this task treats `psi.system-bootstrap.core` as the authoritative composition root, not merely a temporary staging location
+- `psi.system-bootstrap.core` is expected to own both:
+  - whole-app/global registration into the global query registry
+  - fully assembled registration into an isolated query context
+- `psi.agent-session.core/register-resolvers!` and `psi.agent-session.core/register-mutations!` should be removed rather than retained as compatibility wrappers, unless a blocking caller makes a temporary compatibility shim unavoidable; blocked here means removal would force unrelated broad startup/runtime churn outside this task’s scope; if a shim is kept, it must be explicitly called out as a follow-on debt and must not preserve dynamic bootstrap discovery
+- `agent-session` local registration helpers should mean “register the session-facing local surface needed by isolated session query/mutation contexts”, not “register the whole application”
+- for this task, the existing session-facing local surface may continue to include the history query/mutation surface if that is required to preserve current isolated session behavior; the key invariant is that composition ownership for “register everything” moves above the domain
+- if some current tests actually require assembled multi-domain registration rather than session-facing local registration, they should migrate to an explicit composition helper owned above the domain rather than stretching `agent-session` helpers to mean “whole system”
 
 In scope:
 - identify all current global registration entrypoints/call sites
@@ -39,6 +56,7 @@ Out of scope:
 Acceptance:
 - `agent-session.context` no longer uses `requiring-resolve` to discover global registration
 - one explicit higher-level composition/bootstrap root owns whole-system registration
+- production startup paths register all domains only through composition-root-owned entrypoints
 - domain components expose only domain-local registration helpers
 - local/isolated context construction remains possible without whole-app bootstrap coupling
 - no static or runtime dependency edge from `agent-session` back into whole-system bootstrap remains for registration ownership
@@ -52,8 +70,10 @@ Concrete done criteria:
 - all `register-all-domains!` ownership lives above domain components
 - `agent-session.context` no longer performs global registration discovery
 - any remaining registration helper in `agent-session` is domain-local in meaning only
+- `agent-session` source no longer mentions `psi.system-bootstrap` for registration ownership
 - tests cover both local registration and global assembled registration
 - the temporary cycle-breaking seam introduced in task 095 is removed
+- any test or helper needing assembled multi-domain registration uses an explicit composition-owned entrypoint rather than a domain-owned “register everything” wrapper
 
 Design constraints:
 - prefer explicit assembly over dynamic discovery
