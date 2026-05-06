@@ -1,0 +1,89 @@
+(ns psi.session-state.init-test
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [psi.session-state.init :as init]
+   [psi.session-state.model :as model]
+   [psi.session-state.state :as state]))
+
+(deftest initialize-new-session-state-test
+  (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/parent"})
+                          :model {:provider "p" :id "m"}
+                          :thinking-level :high
+                          :skills [{:name "s"}]
+                          :tool-defs [{:name "bash"}])
+        state0     {}
+        state1     (init/initialize-new-session-state
+                    state0 current-sd
+                    {:new-session-id "child-1"
+                     :worktree-path "/tmp/new"
+                     :session-name "new child"
+                     :spawn-mode :new-root
+                     :session-file "/tmp/session.ndedn"})
+        sd1        (get-in state1 (state/session-data-path "child-1"))]
+    (testing "session identity and worktree are initialized in extracted state"
+      (is (= "child-1" (:session-id sd1)))
+      (is (= "/tmp/new" (:worktree-path sd1)))
+      (is (= "new child" (:session-name sd1)))
+      (is (= :new-root (:spawn-mode sd1))))
+    (testing "selected inherited lower-level session fields are carried"
+      (is (= {:provider "p" :id "m"} (:model sd1)))
+      (is (= :high (:thinking-level sd1)))
+      (is (= [{:name "s"}] (:skills sd1)))
+      (is (= [{:name "bash"}] (:tool-defs sd1))))
+    (testing "journal, telemetry, and flush slots are initialized"
+      (is (= [] (get-in state1 (state/session-journal-path "child-1"))))
+      (is (= {:ctx nil} (get-in state1 [:agent-session :sessions "child-1" :turn])))
+      (is (= false (get-in state1 (conj (state/session-flush-state-path "child-1") :flushed?)))))))
+
+(deftest initialize-resume-missing-state-test
+  (let [current-sd {:session-id "sid-1" :worktree-path "/tmp/ws"}
+        state1     (init/initialize-resume-missing-state {} current-sd "/tmp/missing.ndedn")]
+    (is (= "/tmp/missing.ndedn" (get-in state1 (conj (state/session-data-path "sid-1") :session-file))))
+    (is (= [] (get-in state1 (state/session-journal-path "sid-1"))))
+    (is (= false (get-in state1 (conj (state/session-flush-state-path "sid-1") :flushed?))))))
+
+(deftest initialize-resumed-session-state-test
+  (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/source"})
+                          :skills [{:name "keep"}])
+        entries    [{:kind :session-info :data {:name "resumed name"}}
+                    {:kind :message :data {:message {:role "user" :content "hi"}}}]
+        state1     (init/initialize-resumed-session-state
+                    {}
+                    current-sd
+                    {:session-id "sid-r"
+                     :session-path "/tmp/resume.ndedn"
+                     :header {:worktree-path "/tmp/resume" :parent-session-id "parent-1" :parent-session "/tmp/parent.ndedn"}
+                     :entries entries
+                     :model {:provider "prov" :id "m"}
+                     :thinking-level :medium})
+        sd1        (get-in state1 (state/session-data-path "sid-r"))]
+    (is (= "resumed name" (:session-name sd1)))
+    (is (= "/tmp/resume" (:worktree-path sd1)))
+    (is (= "parent-1" (:parent-session-id sd1)))
+    (is (= "/tmp/parent.ndedn" (:parent-session-path sd1)))
+    (is (= {:provider "prov" :id "m"} (:model sd1)))
+    (is (= :medium (:thinking-level sd1)))
+    (is (= entries (get-in state1 (state/session-journal-path "sid-r"))))))
+
+(deftest initialize-forked-session-state-test
+  (let [parent-sd {:session-id "parent"
+                   :session-file "/tmp/parent.ndedn"
+                   :worktree-path "/tmp/ws"
+                   :model {:provider "prov" :id "m"}
+                   :thinking-level :low}
+        branch-entries [{:kind :message :data {:message {:role "user" :content "hi"}}}]
+        state0 {:agent-session {:sessions {"parent" {:agent-ctx ::agent :sc-session-id ::sc}}}}
+        state1 (init/initialize-forked-session-state
+                state0 parent-sd
+                {:new-session-id "fork-1"
+                 :branch-entries branch-entries
+                 :session-file "/tmp/fork.ndedn"})
+        sd1    (get-in state1 (state/session-data-path "fork-1"))]
+    (is (= "fork-1" (:session-id sd1)))
+    (is (= "/tmp/ws" (:worktree-path sd1)))
+    (is (= "parent" (:parent-session-id sd1)))
+    (is (= "/tmp/parent.ndedn" (:parent-session-path sd1)))
+    (is (= :fork-head (:spawn-mode sd1)))
+    (is (= branch-entries (get-in state1 (state/session-journal-path "fork-1"))))
+    (is (= ::agent (get-in state1 [:agent-session :sessions "fork-1" :agent-ctx])))
+    (is (= ::sc (get-in state1 [:agent-session :sessions "fork-1" :sc-session-id])))))
