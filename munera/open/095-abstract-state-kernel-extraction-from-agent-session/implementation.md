@@ -224,3 +224,7 @@ Review notes — 2026-05-06
   - narrowed `tool_execution_test.clj` slightly further by moving its direct public `:session/tool-run` submission from `psi.agent-session.dispatch/dispatch!` to `psi.agent-session.core/dispatch-in!`.
   - kept the file's compat-wrapper dependency because the test still intentionally spies on nested wrapper-mediated redispatch through `with-redefs` on `psi.agent-session.dispatch/dispatch!`, and `tool_batch.clj` still canonically enters via that wrapper-owned composition path.
   - result: the remaining wrapper use in this file is now more clearly about compat-layer orchestration observation rather than treating the wrapper as the preferred public submission entrypoint.
+- Dispatch pure-result schema authority narrowing follow-up — 2026-05-06
+  - narrowed `dispatch_pure_result_test.clj` so schema authority comes from `psi.agent-session.dispatch-schema/validate-dispatch-schemas` rather than routing that helper through the compat wrapper.
+  - kept the file on `psi.agent-session.dispatch` for the actual compat dispatch/runtime behavior it is intentionally proving, including replay through the wrapper-owned dispatch entrypoint and interceptor/application semantics.
+  - this aligns the test with the same ownership split already used elsewhere: schema authority from `dispatch-schema`, dispatch behavior from the compat wrapper where that is the subject under test.

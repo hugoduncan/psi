@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.service-protocol]
    [psi.agent-session.services]
    [psi.state-kernel.dispatch :as kernel]))
@@ -408,7 +409,7 @@
       (let [seen-effects (atom [])
             execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
             ctx {:execute-dispatch-effect-fn execute-fn
-                 :validate-dispatch-result-fn dispatch/validate-dispatch-schemas}]
+                 :validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
         (dispatch/register-handler!
          :schema-valid
          (fn [_ctx _data]
@@ -424,7 +425,7 @@
             execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
             ctx {:apply-root-state-update-fn apply-fn
                  :execute-dispatch-effect-fn execute-fn
-                 :validate-dispatch-result-fn dispatch/validate-dispatch-schemas}]
+                 :validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
         (dispatch/register-handler!
          :schema-valid-update
          (fn [_ctx _data]
@@ -470,7 +471,7 @@
                  (get-in entry [:block-reason :type]))))))
 
     (testing "passes when handler returns return-only pure result"
-      (let [ctx {:validate-dispatch-result-fn dispatch/validate-dispatch-schemas}]
+      (let [ctx {:validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
         (dispatch/register-handler!
          :schema-return-only
          (fn [_ctx _data] {:return "plain-value"}))
