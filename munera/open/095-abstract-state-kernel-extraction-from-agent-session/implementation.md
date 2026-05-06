@@ -203,3 +203,8 @@ Review notes — 2026-05-06
   - this reduces incidental compat-wrapper coupling in both the tests and the shared session test harness while preserving the same runtime behavior and focused proof surface.
   - focused verification green for this migration batch:
     - `clojure -M:test --focus psi.agent-session.session-lifecycle-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.prompt-lifecycle-test` → `39 tests, 346 assertions, 0 failures`.
+- EQL/post-tool test ownership narrowing follow-up — 2026-05-06
+  - migrated `eql_introspection_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` where the file was using dispatch only as the public domain event submission path for session model, prompt, usage, prompt-contribution, and worktree updates.
+  - migrated `post_tool_test.clj` off the compat wrapper for handler-registry access by switching its local test registration from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`, which is the authoritative owner for the dispatch registry.
+  - classified the remaining `psi.agent-session.dispatch` use in `tool_execution_test.clj` as currently legitimate compat/composition coverage because those tests intentionally observe nested domain redispatch through the wrapper-owned `dispatch!` path during `:session/tool-run` orchestration.
+  - this narrows two more test namespaces without forcing production changes, while preserving the remaining wrapper dependency only where the test is explicitly about wrapper-mediated dispatch composition.

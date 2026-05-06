@@ -7,7 +7,6 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session-state :as ss]
@@ -63,14 +62,14 @@
   (testing "query-in resolves model after set-model-in!"
     (let [[ctx session-id] (create-session-context)
           model {:provider "x" :id "y" :reasoning false}]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
       (let [result (session/query-in ctx session-id [:psi.agent-session/model])]
         (is (= model (:psi.agent-session/model result))))))
 
   (testing "set-system-prompt-in! updates session + agent-core prompt state"
     (let [[ctx session-id] (create-session-context)
           prompt     "graph-aware system prompt"
-          _          (dispatch/dispatch! ctx :session/set-system-prompt {:session-id session-id :prompt prompt} {:origin :core})
+          _          (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt prompt} {:origin :core})
           result     (session/query-in ctx session-id [:psi.agent-session/system-prompt])]
       (is (= prompt (:psi.agent-session/system-prompt result)))
       (is (= prompt (:system-prompt (agent-core/get-data-in (ss/agent-ctx-in ctx session-id)))))))
@@ -104,9 +103,9 @@
     (let [[ctx active-session-id] (create-session-context)
           child-sd                (session/new-session-in! ctx active-session-id {:session-name "child helper"})
           child-session-id        (:session-id child-sd)
-          _                       (dispatch/dispatch! ctx :session/set-model {:session-id child-session-id
-                                                                              :model {:provider "local" :id "gemma-3" :reasoning false}}
-                                                      {:origin :core})
+          _                       (session/dispatch-in! ctx :session/set-model {:session-id child-session-id
+                                                                                :model {:provider "local" :id "gemma-3" :reasoning false}}
+                                                        {:origin :core})
           result                  (session/query-in ctx
                                                     [:psi.agent-session/session-id
                                                      :psi.agent-session/session-name
@@ -204,7 +203,7 @@
 
   (testing "query-in resolves context fraction"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 4000 :window 10000} {:origin :core})
+      (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 4000 :window 10000} {:origin :core})
       (let [result (session/query-in ctx session-id [:psi.agent-session/context-fraction])]
         (is (= 0.4 (:psi.agent-session/context-fraction result))))))
 
@@ -216,10 +215,10 @@
 
   (testing "query-in resolves prompt contribution attrs"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/register-prompt-contribution
-                          {:session-id session-id :ext-path "/ext/a" :id "c1"
-                           :contribution {:content "Hint" :priority 10 :enabled true}}
-                          {:origin :core})
+      (session/dispatch-in! ctx :session/register-prompt-contribution
+                            {:session-id session-id :ext-path "/ext/a" :id "c1"
+                             :contribution {:content "Hint" :priority 10 :enabled true}}
+                            {:origin :core})
       (let [result (session/query-in ctx session-id [:psi.agent-session/base-system-prompt
                                                      :psi.agent-session/prompt-contributions
                                                      :psi.extension/prompt-contribution-count])]
@@ -300,7 +299,7 @@
   (testing "query-in resolves model provider/id/reasoning attrs"
     (let [[ctx session-id] (create-session-context)
           model {:provider "openai" :id "gpt-5.3-codex" :reasoning true}]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model model} {:origin :core})
       (let [result (session/query-in ctx session-id [:psi.agent-session/model-provider
                                                      :psi.agent-session/model-id
                                                      :psi.agent-session/model-reasoning
@@ -327,7 +326,7 @@
     (let [[ctx session-id] (create-session-context {:cwd "/repo/main"
                                                     :session-defaults {:worktree-path "/repo/feature-x"}})]
       (is (= "/repo/feature-x" (ss/session-worktree-path-in ctx session-id)))
-      (dispatch/dispatch! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/feature-y"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/feature-y"} {:origin :core})
       (is (= "/repo/feature-y" (ss/session-worktree-path-in ctx session-id)))))
 
   (testing "query-in resolves effective reasoning effort for reasoning models"

@@ -1,7 +1,6 @@
 (ns psi.agent-session.post-tool-test
   (:require
    [clojure.test :refer [deftest is use-fixtures]]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.post-tool :as post-tool]
    [psi.state-kernel.dispatch :as kernel]))
 
@@ -99,9 +98,9 @@
              (post-tool/telemetry-counts-in ctx))))))
 
 (deftest canonical-post-tool-trace-failure-and-timeout-test
-  (dispatch/register-handler! :session/post-tool-run
-                              (fn [ctx input]
-                                {:return (post-tool/run-post-tool-processing-direct-in! ctx input)}))
+  (kernel/register-handler! :session/post-tool-run
+                            (fn [ctx input]
+                              {:return (post-tool/run-post-tool-processing-direct-in! ctx input)}))
   (let [ctx (make-ctx)]
     (post-tool/register-processor-in!
      ctx
