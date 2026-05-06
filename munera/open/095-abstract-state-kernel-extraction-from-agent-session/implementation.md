@@ -263,3 +263,10 @@ Review notes — 2026-05-06
   - kept only the wrapper surfaces still justified by live consumers or dispatch-focused compat proofs: `dispatch!`, interceptor override/default/current surfaces, permission/statechart/apply composition, and the kernel interceptor aliases still referenced directly by dispatch-focused tests.
   - focused verification green:
     - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.tool-execution-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.scheduler-effects-test` → `33 tests, 260 assertions, 0 failures`
+- Compat wrapper kernel-interceptor alias reduction follow-up — 2026-05-06
+  - used the explicit `clj-surgeon` skill to inspect remaining candidate production callsites before changing them.
+  - `clj-surgeon :op :deps` on `session_settings.clj`, `compaction_runtime.clj`, and `session_lifecycle.clj`, plus `:ls` on `core.clj`, confirmed those namespaces are leaf modules loaded by `psi.agent-session.core`; routing them back through `core/dispatch-in!` would risk inverting or cycling the current layering.
+  - instead of forcing that deeper change, tightened the compat namespace itself again by removing the remaining dead kernel interceptor aliases (`log-interceptor`, `handler-interceptor`, `effect-interceptor`, `validate-interceptor`, `trim-effects-on-replay`).
+  - `default-interceptors` in `psi.agent-session.dispatch` now names the kernel authorities directly while preserving the same compat wrapper behavior and ordering.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test` → `17 tests, 151 assertions, 0 failures`

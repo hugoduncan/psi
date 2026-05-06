@@ -5,12 +5,6 @@
 
 (declare dispatch! ->dispatch-env ->kernel-contract-env apply-interceptor)
 
-(def log-interceptor kernel/log-interceptor)
-(def handler-interceptor kernel/handler-interceptor)
-(def effect-interceptor kernel/effect-interceptor)
-(def validate-interceptor kernel/validate-interceptor)
-(def trim-effects-on-replay kernel/trim-effects-on-replay)
-
 (def permission-interceptor
   (kernel/->interceptor
    {:id :permission
@@ -127,12 +121,12 @@
 
 (def default-interceptors
   [permission-interceptor
-   log-interceptor
+   kernel/log-interceptor
    statechart-interceptor
-   handler-interceptor
-   effect-interceptor
-   trim-effects-on-replay
-   validate-interceptor
+   kernel/handler-interceptor
+   kernel/effect-interceptor
+   kernel/trim-effects-on-replay
+   kernel/validate-interceptor
    apply-interceptor])
 
 (defn current-interceptors []
