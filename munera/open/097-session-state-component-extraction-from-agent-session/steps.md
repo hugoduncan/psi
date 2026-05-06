@@ -1,46 +1,46 @@
 - [x] Inventory current `agent-session` namespaces and classify helpers as `state-kernel`, `session-state`, or higher-level `agent-session`
 - [x] Choose and record the initial `session-state` public API
-- [ ] Create `components/session-state/` with initial namespaces and deps
-  - [ ] Add component directory and deps wiring
-  - [ ] Create `src/psi/session_state/model.clj`
-  - [ ] Create `src/psi/session_state/state.clj`
-  - [ ] Create `src/psi/session_state/init.clj`
-- [ ] Extract canonical session model authority
-  - [ ] Move pure schema/default/predicate helpers from `psi.agent-session.session` to `psi.session-state.model`
-  - [ ] Remove duplicated root-state/path helpers from the moved model authority instead of copying them forward
-  - [ ] Leave only a temporary compat wrapper in `psi.agent-session.session` if needed
-- [ ] Extract canonical session state authority
-  - [ ] Move root-state path/read/update helpers from `psi.agent-session.session-state` to `psi.session-state.state`
-  - [ ] Move session registry, journal append, prompt-contribution, tree traversal, and worktree lookup helpers to `psi.session-state.state`
-  - [ ] Leave only a temporary compat wrapper in `psi.agent-session.session-state` if needed
-- [ ] Extract pure session initialization/state transforms
-  - [ ] Move clearly pure initialization helpers from `dispatch_handlers/session_state.clj` to `psi.session-state.init`
-  - [ ] Reuse `psi.session-state.state` path helpers from `init.clj` where that keeps authority single-sourced
-  - [ ] Decide whether `initialize-child-session-state` stays in the first cut or is deferred behind a temporary compat seam
-- [ ] Extract session tree traversal and lower-level child-session relationship helpers where they are cleanly lower-level
-  - [ ] Keep `children-of-in` and `descendants-of-in` in `state.clj` unless a separate `tree.clj` becomes clearly worthwhile
-  - [ ] Treat child-session initialization separately from tree traversal
-  - [ ] If child-session prompt-state derivation is split, keep only identity/hierarchy/worktree/default-state logic in `session-state`
-- [ ] Extract authoritative worktree-path/session-directory invariants
-  - [ ] Keep `session-worktree-path-in` as the lower-level authority
-  - [ ] Add or split focused tests so worktree-path invariants are proven at the new component layer
-- [ ] Record the settled first-cut query-context boundary
-  - [ ] Keep isolated session query-context construction above `session-state` in this slice
-  - [ ] Record explicit deferral and rationale in `implementation.md`
-- [ ] Migrate representative real consumer paths to the new component
-  - [ ] Repoint `session_lifecycle.clj`
-  - [ ] Repoint `resolvers/session.clj`
-  - [ ] Repoint `dispatch_handlers/session_lifecycle.clj`
-  - [ ] Repoint `dispatch_handlers/session_mutations.clj`
-  - [ ] Repoint at least one direct lower-level non-`agent-session` consumer path in `rpc` or `app-runtime`
-  - [ ] Record any broader remaining caller cleanup as follow-on work if compat wrappers preserve behavior cleanly
-- [ ] Move or add focused tests for extracted session-state behavior
-  - [ ] Move `session_test.clj` with model ownership or replace with new component-local equivalent
-  - [ ] Move `session_state_enumeration_test.clj` with state ownership or replace with new component-local equivalent
-  - [ ] Add focused pure init tests for new/resume-missing/resumed/forked state transforms
-  - [ ] Add child-session init tests only if that helper remains in the component
-- [ ] Run focused verification
-  - [ ] Run focused component tests
-  - [ ] Run focused consumer regression tests for `agent-session`, `rpc`, and `app-runtime`
-- [ ] Run full unit verification
-- [ ] Record final ownership split, compat seams, unresolved child-session prompt-state decisions, and follow-on candidates in `implementation.md`
+- [x] Create `components/session-state/` with initial namespaces and deps
+  - [x] Add component directory and deps wiring
+  - [x] Create `src/psi/session_state/model.clj`
+  - [x] Create `src/psi/session_state/state.clj`
+  - [x] Create `src/psi/session_state/init.clj`
+- [x] Extract canonical session model authority
+  - [x] Move pure schema/default/predicate helpers from `psi.agent-session.session` to `psi.session-state.model`
+  - [x] Remove duplicated root-state/path helpers from the moved model authority instead of copying them forward
+  - [x] Leave only a temporary compat wrapper in `psi.agent-session.session` if needed
+- [x] Extract canonical session state authority
+  - [x] Move root-state path/read/update helpers from `psi.agent-session.session-state` to `psi.session-state.state`
+  - [x] Move session registry, journal append, prompt-contribution, tree traversal, and worktree lookup helpers to `psi.session-state.state`
+  - [x] Leave only a temporary compat wrapper in `psi.agent-session.session-state` if needed
+- [x] Extract pure session initialization/state transforms
+  - [x] Move clearly pure initialization helpers from `dispatch_handlers/session_state.clj` to `psi.session-state.init`
+  - [x] Reuse `psi.session-state.state` path helpers from `init.clj` where that keeps authority single-sourced
+  - [x] Decide whether `initialize-child-session-state` stays in the first cut or is deferred behind a temporary compat seam
+- [x] Extract session tree traversal and lower-level child-session relationship helpers where they are cleanly lower-level
+  - [x] Keep `children-of-in` and `descendants-of-in` in `state.clj` unless a separate `tree.clj` becomes clearly worthwhile
+  - [x] Treat child-session initialization separately from tree traversal
+  - [x] If child-session prompt-state derivation is split, keep only identity/hierarchy/worktree/default-state logic in `session-state`
+- [x] Extract authoritative worktree-path/session-directory invariants
+  - [x] Keep `session-worktree-path-in` as the lower-level authority
+  - [x] Add or split focused tests so worktree-path invariants are proven at the new component layer
+- [x] Record the settled first-cut query-context boundary
+  - [x] Keep isolated session query-context construction above `session-state` in this slice
+  - [x] Record explicit deferral and rationale in `implementation.md`
+- [x] Migrate representative real consumer paths to the new component
+  - [x] Repoint `session_lifecycle.clj`
+  - [x] Repoint `resolvers/session.clj`
+  - [x] Repoint `dispatch_handlers/session_lifecycle.clj`
+  - [x] Repoint `dispatch_handlers/session_mutations.clj`
+  - [x] Repoint at least one direct lower-level non-`agent-session` consumer path in `rpc` or `app-runtime`
+  - [x] Record any broader remaining caller cleanup as follow-on work if compat wrappers preserve behavior cleanly
+- [x] Move or add focused tests for extracted session-state behavior
+  - [x] Move `session_test.clj` with model ownership or replace with new component-local equivalent
+  - [x] Move `session_state_enumeration_test.clj` with state ownership or replace with new component-local equivalent
+  - [x] Add focused pure init tests for new/resume-missing/resumed/forked state transforms
+  - [x] Add child-session init tests only if that helper remains in the component
+- [x] Run focused verification
+  - [x] Run focused component tests
+  - [x] Run focused consumer regression tests for `agent-session`, `rpc`, and `app-runtime`
+- [x] Run full unit verification
+- [x] Record final ownership split, compat seams, unresolved child-session prompt-state decisions, and follow-on candidates in `implementation.md`
