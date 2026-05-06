@@ -6,26 +6,26 @@
   - [x] inventory the exact compatibility code paths/seams to delete versus retain
   - [x] name the authoritative focused and broader verification command sets
   - [x] choose one final retirement end state: disable temporarily or remove outright
-- [ ] Migrate remaining compact current-authored checked-in workflows:
+- [x] Migrate remaining compact current-authored checked-in workflows:
   - [x] `lambda-build.md`
   - [x] `prompt-build.md`
-- [ ] Migrate remaining review-loop current-authored workflows:
+- [x] Migrate remaining review-loop current-authored workflows:
   - [x] `review-implementation.md`
   - [x] `review-task-until-clear.md`
-- [ ] Migrate remaining PR/issue orchestration current-authored workflows:
+- [x] Migrate remaining PR/issue orchestration current-authored workflows:
   - [x] `gh-issue-refine.md`
   - [x] `gh-issue-implement.md`
   - [x] `gh-pr-heal-check-loop.md`
   - [x] `gh-pr-fix-current-checks.md`
   - [x] `gh-pr-fix-checks.md`
 - [x] Tighten migration validation so checked-in workflow examples are target-authored only
-- [ ] Remove current-authored grammar loading/compilation support
+- [x] Remove current-authored grammar loading/compilation support
   - [x] remove `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
   - [x] remove current-grammar branch from `components/agent-session/src/psi/agent_session/workflow_runtime.clj`
   - [x] remove current-authored file-compilation/validation paths from `components/agent-session/src/psi/agent_session/workflow_file_compiler.clj`
   - [x] remove compat binding / prompt-template / executor-profile fallbacks from `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
   - [x] remove compat session-preload shaping from `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` when no longer needed by any checked-in workflow
-- [ ] Delete compatibility-only workflow tests/helpers no longer needed
+- [x] Delete compatibility-only workflow tests/helpers no longer needed
   - [x] remove `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
   - [x] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility
   - [x] replace compat-oriented mixed-path tests with target-only proofs before deleting them
@@ -37,7 +37,7 @@
   - [x] rewrite `workflow_execution_resume_test.clj` to resume target-authored run fixtures only
   - [x] rewrite `workflow_lifecycle_test.clj` to drive target-authored lifecycle fixtures only
   - [x] rewrite `workflow_resolvers_test.clj` to query target-authored registrations and current resolver projections only
-- [ ] Update project guidance so the target grammar is the only supported authored workflow surface
+- [x] Update project guidance so the target grammar is the only supported authored workflow surface
   - [x] delete `doc/workflow-grammar-current.md`
   - [x] delete `doc/workflow-grammar-migration.md`
   - [x] rewrite references in `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`

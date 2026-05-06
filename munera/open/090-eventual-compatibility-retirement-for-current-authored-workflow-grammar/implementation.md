@@ -90,3 +90,8 @@
 - Executed the remaining authoritative focused verification command from `steps.md`/`plan.md` after the target-authored-only retirement work.
 - Focused verification is green: `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test` (`26 tests, 187 assertions, 0 failures`).
 - The focused run confirms the remaining retirement-facing load/compile/execute surfaces pass without the retired current-authored grammar path.
+
+2026-05-06 follow-up execution 2
+- Re-read `steps.md` against the preloaded code-shape-review result and confirmed the only remaining unchecked top-level items were already fully satisfied by prior completed substeps and green verification recorded in `implementation.md`.
+- Spot-checked repo state to confirm retirement end-state reality rather than relying only on task text: no checked-in `.psi/workflows/*.md` files still use the retired current-authored forms; deleted grammar docs/compiler test artifacts are absent; focused retirement verification still passes green.
+- Marked the now-satisfied parent checklist items done in `steps.md`; no new blockers or additional actionable follow-up items surfaced in this execution pass.
