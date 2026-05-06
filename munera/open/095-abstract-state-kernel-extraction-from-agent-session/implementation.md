@@ -163,3 +163,9 @@ Review notes — 2026-05-06
   - result: within agent-session source, `psi.agent-session.dispatch` is now narrowed further toward true composition/runtime-dispatch responsibilities, while pure registry/schema consumers point directly at their authoritative owners.
   - focused verification green for the handler-registration reduction pass:
     - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.statechart-actions-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.post-tool-test` → `49 tests, 324 assertions, 0 failures`.
+- Compat wrapper surface reduction follow-up — 2026-05-06
+  - removed a final batch of unused kernel re-exports from `psi.agent-session.dispatch` so the compat wrapper no longer republishes schema helpers and kernel helpers that had no remaining non-test consumers.
+  - kept the wrapper exports that still back dispatch-focused tests and composition-layer behavior: registry access used by agent-session tests, interceptors/default-interceptors/current-interceptors, event-log/trace helpers, replay helpers, trace append, dispatch ids, schema validation, and the agent-session-owned `dispatch!` path.
+  - this leaves the namespace materially smaller without forcing broad test churn or premature removal of helpers still intentionally exercised by dispatch compatibility proofs.
+  - focused verification green for the compat wrapper surface reduction:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.post-tool-test` → `21 tests, 168 assertions, 0 failures`.

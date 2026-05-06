@@ -6,22 +6,13 @@
 
 (declare dispatch! ->dispatch-env ->kernel-contract-env apply-interceptor)
 
-(def effect-schema schema/effect-schema)
-(def pure-result-schema schema/pure-result-schema)
-(def valid-effect? schema/valid-effect?)
-(def explain-effect schema/explain-effect)
-(def valid-pure-result?* schema/valid-pure-result?*)
-(def explain-pure-result schema/explain-pure-result)
 (def validate-dispatch-schemas schema/validate-dispatch-schemas)
 
 (def handler-entry kernel/handler-entry)
 (def register-handler! kernel/register-handler!)
 (def registered-event-types kernel/registered-event-types)
-(def registered-handler-entries kernel/registered-handler-entries)
 (def clear-handlers! kernel/clear-handlers!)
 (def ->interceptor kernel/->interceptor)
-(def run-interceptor-chain kernel/run-interceptor-chain)
-(def normalize-event kernel/normalize-event)
 (def event-log-entries kernel/event-log-entries)
 (def dispatch-trace-entries kernel/dispatch-trace-entries)
 (def clear-event-log! kernel/clear-event-log!)
