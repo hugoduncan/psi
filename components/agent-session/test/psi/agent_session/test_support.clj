@@ -123,9 +123,10 @@
                        :tool-batch-executor          tool-batch-executor
                        :extension-run-fn-atom        (atom nil)
                        :scheduler-timers*            (atom {})
+                       :execute-dispatch-effect-fn   (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
+                       :execute-effect-fn            (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
                        :apply-root-state-update-fn   ss/apply-root-state-update-in!
                        :read-session-state-fn        ss/get-state-value-in
-                       :execute-dispatch-effect-fn   (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
                        :dispatch-statechart-event-fn dispatch-statechart-event-fn
                        :runtime-tool-executor-fn     tool-plan/default-execute-runtime-tool-in!
                        :execute-tool-runtime-fn      #'tool-plan/execute-tool-runtime-in!
@@ -187,6 +188,8 @@
                                                          (.interrupt ^Thread handle)))
                        :daemon-thread-fn             (fn [f] (doto (Thread. ^Runnable f) (.setDaemon true) (.start)))
                        :effective-cwd-fn             (fn [ctx session-id] (ss/session-worktree-path-in ctx session-id))
+                       :validate-dispatch-result-fn  dispatch/validate-dispatch-schemas
+                       :validate-result-fn           dispatch/validate-dispatch-schemas
                        :journal-append-fn            persistence/append-entry-in!}
         _             (dispatch-handlers/register-all! ctx)
         actions-fn     (dispatch-handlers/make-actions-fn ctx)

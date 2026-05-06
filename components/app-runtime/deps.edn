@@ -11,4 +11,5 @@
         psi/graph                   {:local/root "../graph"}
         psi/ui-state                {:local/root "../ui-state"}
         psi/system-bootstrap        {:local/root "../system-bootstrap"}
+        psi/state-kernel            {:local/root "../state-kernel"}
         psi/agent-session           {:local/root "../agent-session"}}}

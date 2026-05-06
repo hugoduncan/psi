@@ -42,3 +42,33 @@ Settled refinement answers:
 - `system-bootstrap` cycle decision: the preferred fix is to remove `agent-session -> system-bootstrap`, not to pull bootstrap/query registration into the kernel. `system-bootstrap` should remain a higher-level registration/composition component, while `agent-session` should stop depending on it for generic infrastructure.
 - Bootstrap ownership decision: `agent-session.bootstrap` should own session bootstrap behavior only. Global resolver/mutation registration should move behind higher-level bootstrap/composition entrypoints instead of being callable as an `agent-session` core dependency.
 - Cycle interpretation: the `agent-session` ↔ `system-bootstrap` cycle is not fundamentally a state-kernel responsibility; it is a neighboring ownership problem exposed by the same blurred boundaries. This task should remove the `agent-session` dependency on `system-bootstrap` if that can be done cleanly while extracting the kernel, but should not distort the kernel boundary just to absorb bootstrap responsibilities.
+
+Implementation notes — 2026-05-06
+- Added a real lower component boundary at `components/state-kernel/`.
+- Moved the authoritative generic dispatch pipeline into `psi.state-kernel.dispatch`.
+- Moved the generic pure-result schema/contract into `psi.state-kernel.dispatch-schema`.
+- Kept `psi.agent-session.dispatch` as a compatibility wrapper that re-exports the established public surface while adapting agent-session contexts onto the narrowed kernel environment contract.
+- Kept `psi.agent-session.dispatch-schema` as domain-owned schema authority for concrete effect payload validation. This was necessary because effect catalog validation is application-specific, while the kernel owns only the generic pure dispatch contract.
+- Preserved bounded dispatch event-log / dispatch-trace ownership in the kernel, including db-summary capture for consuming introspection/tests.
+- Preserved `:return-key` semantics by letting the kernel prefer injected higher-layer read callbacks when present; this keeps session-shaped reads above the kernel while retaining the generic apply orchestration below it.
+- Effect execution remains above the kernel in this slice:
+  - kernel owns only the generic `:execute-effect-fn` callback seam
+  - `psi.agent-session.dispatch-effects` remains application-specific and was not moved because its effect handlers encode session/prompt/workflow/tool/extension semantics
+  - this does not violate the boundary because kernel dispatch no longer depends on app-specific effect implementation details
+- Listener/publication helpers remain above the kernel in this slice:
+  - kernel supports optional `:publish-change-fn`
+  - agent-session retains projection-listener registration/publication helpers in `context.clj`
+  - generic kernel dispatch no longer depends on `agent-session/context.clj`
+- Removed the direct component dependency from `agent-session` to `system-bootstrap`:
+  - dropped `psi/system-bootstrap` from `components/agent-session/deps.edn`
+  - changed global registration entrypoints in `context.clj` to use `requiring-resolve` on `psi.system-bootstrap.core/register-all-domains!`
+  - this preserves the higher-level ownership of global registration while removing the static component edge
+- Added focused kernel tests in `components/state-kernel/test/psi/state_kernel/dispatch_test.clj` covering:
+  - pure root-state update apply path
+  - bounded event-log / dispatch-trace retention
+  - effect execution through the narrowed kernel environment contract
+- Verification run:
+  - `bb clojure:test:unit --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.scheduler-dispatch-test --focus psi.state-kernel.dispatch-test`
+  - result: green (`1514 tests, 11103 assertions, 0 failures`)
+- One stale test expectation surfaced during extraction and was corrected:
+  - scheduler drain-queue should leave other queued ids intact, so preserving `"sch-1"` alongside `"missing"` matches the current pure scheduler model and existing handler behavior.

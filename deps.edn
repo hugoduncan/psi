@@ -20,6 +20,7 @@
         psi/recursion                                 {:local/root "components/recursion"}
         psi/ui-state                                  {:local/root "components/ui-state"}
         psi/system-bootstrap                          {:local/root "components/system-bootstrap"}
+        psi/state-kernel                              {:local/root "components/state-kernel"}
         psi/main                                      {:local/root "bases/main"}}
  :aliases
  {:dev   {:extra-paths ["dev"]}
@@ -27,6 +28,7 @@
                         "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
+                        "components/state-kernel/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -52,6 +54,7 @@
                         "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
+                        "components/state-kernel/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -86,6 +89,7 @@
                            "components/memory/src"
                            "components/recursion/src"
                            "components/rpc/src"
+                           "components/state-kernel/src"
                            "components/ui-state/src"
                            "components/system-bootstrap/src"
                            "extensions/auto-session-name/src"
@@ -174,6 +178,7 @@
                         "components/rpc/test"
                         "components/agent-core/test"
                         "components/agent-session/test"
+                        "components/state-kernel/test"
                         "extensions/auto-session-name/test"
                         "extensions/commit-checks/test"
                         "extensions/hello-ext/test"
@@ -195,6 +200,7 @@
                         "components/rpc/src"
                         "components/agent-core/src"
                         "components/agent-session/src"
+                        "components/state-kernel/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
                         "extensions/auto-session-name/src"
@@ -230,4 +236,5 @@
                              "components/recursion/test"
                              "components/tui/test"
                              "components/agent-core/test"
-                             "components/agent-session/test"]}}}
+                             "components/agent-session/test"
+                             "components/state-kernel/test"]}}}

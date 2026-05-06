@@ -108,5 +108,5 @@
     (is (= "sch-2" (:schedule-id (or (:return result) result))))
     (is (= :delivered (get-in (ss/get-session-data-in ctx session-id)
                               [:scheduler :schedules "sch-2" :status])))
-    (is (= ["missing"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+    (is (= ["sch-1" "missing"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
     (is (nil? (:effects result)))))

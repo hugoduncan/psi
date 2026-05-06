@@ -1,0 +1,5 @@
+{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        metosin/malli {:mvn/version "0.16.4"}
+        com.fulcrologic/statecharts {:mvn/version "1.2.25"}
+        com.wsscode/pathom3 {:mvn/version "2025.01.16-alpha"}
+        com.taoensso/timbre {:mvn/version "6.8.0"}}}

@@ -60,15 +60,15 @@
    (when rebuild?
      (query/rebuild-env-in! qctx))))
 
-(defn register-resolvers! []
-  (doseq [r resolvers/all-resolvers]
-    (query/register-resolver! r))
-  (query/rebuild-env!))
+(defn- register-all-domains! []
+  (when-let [f (requiring-resolve 'psi.system-bootstrap.core/register-all-domains!)]
+    (f)))
 
-(defn register-mutations! [mutations]
-  (doseq [m mutations]
-    (query/register-mutation! m))
-  (query/rebuild-env!))
+(defn register-resolvers! []
+  (register-all-domains!))
+
+(defn register-mutations! [_mutations]
+  (register-all-domains!))
 
 (defn- resolve-session-defaults [session-defaults resolved-cwd ui-type]
   (cond-> (or session-defaults {})
@@ -147,6 +147,7 @@
   {:apply-root-state-update-fn ss/apply-root-state-update-in!
    :read-session-state-fn ss/get-state-value-in
    :execute-dispatch-effect-fn (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
+   :execute-effect-fn (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
    :dispatch-statechart-event-fn dispatch-handlers/dispatch-statechart-event-in!
    :runtime-tool-executor-fn tool-plan/default-execute-runtime-tool-in!
    :execute-tool-runtime-fn #'tool-plan/execute-tool-runtime-in!
@@ -184,6 +185,7 @@
    :daemon-thread-fn dispatch-handlers/daemon-thread
    :drop-trailing-overflow-error-fn dispatch-effects/drop-trailing-overflow-error!
    :validate-dispatch-result-fn dispatch/validate-dispatch-schemas
+   :validate-result-fn dispatch/validate-dispatch-schemas
    :register-projection-listener-fn (fn [_ctx listener-fn] (register-projection-listener! projection-listeners* listener-fn))
    :unregister-projection-listener-fn (fn [_ctx listener-id] (unregister-projection-listener! projection-listeners* listener-id))
    :publish-projection-change-fn (fn [_ctx change] (publish-projection-change! projection-listeners* change))
