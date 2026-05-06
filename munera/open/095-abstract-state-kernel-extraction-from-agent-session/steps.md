@@ -1,0 +1,14 @@
+- [ ] Inspect `dispatch.clj`, `dispatch_schema.clj`, `dispatch_effects.clj`, `context.clj`, `agent-session.bootstrap`, and `system-bootstrap.core` in detail for kernel vs domain ownership
+- [ ] Validate the settled narrowed kernel environment contract against current code and record any required refinements, especially how generic code stops depending on the broad global `ctx` shape
+- [ ] Record the settled abstract kernel component name/path explicitly in implementation notes
+- [ ] Create the new component and namespace family for the kernel
+- [ ] Move the generic dispatch pipeline into the new component
+- [ ] Move the generic dispatch schema/pure-result contract into the new component
+- [ ] Either split `dispatch_effects.clj` into generic substrate vs app-specific effect methods, or explicitly record why effect execution remains above the kernel in this slice
+- [ ] Either split generic listener/publication helpers from `context.clj`, or explicitly record why leaving them above the kernel does not keep generic dispatch code coupled to `context.clj`
+- [ ] Rewire `agent-session` to consume the extracted kernel through explicit dependencies and the narrowed contract
+- [ ] Verify the kernel has no dependency back into `agent-session`
+- [ ] Remove the `agent-session` -> `system-bootstrap` dependency, or record the exact remaining blocker and why the cycle persists
+- [ ] Add/update focused tests for the extracted kernel boundary and preserved behavior, covering at least pure-result apply, bounded event-log/trace, and one consuming `agent-session` path
+- [ ] Record moved-vs-split decisions, kernel-contract decisions, and cycle-status rationale in implementation notes
+- [ ] Run focused verification
