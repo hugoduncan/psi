@@ -248,5 +248,18 @@ Review notes — 2026-05-06
     - `scheduler_handlers_test.clj` intentionally intercepts wrapper `dispatch!` for the failed synthetic prompt-submit delivery path.
     - `scheduler_effects_test.clj` intentionally intercepts wrapper `dispatch!` for timer-fired `:scheduler/fired` submission.
   - no further safe narrowing change was applied in this pass because replacing those seams would require deeper production indirection without improving ownership clarity.
-  - `clj-surgeon` assist note: the installed CLI surfaced available ops but rejected the invocation shapes tried during this pass, so it was useful only as a weak probe of tool availability; the final classification came from direct file inspection plus targeted `rg` usage.
+  - `clj-surgeon` assist note: follow-up inspection of `/Users/duncan/bin/clj-surgeon` plus `clj_surgeon/core.clj` showed the actual CLI contract is key/value args like `clj-surgeon :op :deps :file path`, not the op-only invocations tried initially.
   - current task posture after this review: remaining test-time wrapper dependency is concentrated in explicit compat/composition observation seams rather than incidental registry/schema/public-entrypoint access.
+- Compat wrapper dead re-export reduction follow-up — 2026-05-06
+  - used corrected `clj-surgeon` inspection plus exact-string repo searches to reassess `psi.agent-session.dispatch` export usage before making deeper production changes.
+  - confirmed a batch of wrapper re-exports had no remaining in-repo consumers after the earlier migration passes: schema helper aliases, registry/log/trace helper aliases, dispatch-id helpers, replay helper aliases, `pure-result?`, and the wrapper-local `append-trace-entry!` shim.
+  - removed those dead re-exports from `components/agent-session/src/psi/agent_session/dispatch.clj`.
+  - the first focused verification attempt surfaced two local compat-namespace self-dependencies that had been relying on the removed aliases:
+    - compat interceptor definitions still called `->interceptor`
+    - `apply-interceptor` still passed the removed wrapper-local `append-trace-entry!` shim into `kernel/apply-pure-result`
+  - fixed those by pointing the compat namespace directly at kernel authority internally:
+    - `permission-interceptor`, `statechart-interceptor`, and `apply-interceptor` now use `kernel/->interceptor`
+    - compat `apply-interceptor` now passes `kernel/append-trace-entry!`
+  - kept only the wrapper surfaces still justified by live consumers or dispatch-focused compat proofs: `dispatch!`, interceptor override/default/current surfaces, permission/statechart/apply composition, and the kernel interceptor aliases still referenced directly by dispatch-focused tests.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.tool-execution-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.scheduler-effects-test` → `33 tests, 260 assertions, 0 failures`

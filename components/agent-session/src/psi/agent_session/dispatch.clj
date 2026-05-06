@@ -1,41 +1,18 @@
 (ns psi.agent-session.dispatch
   "Compatibility wrapper over the extracted state-kernel dispatch pipeline."
   (:require
-   [psi.agent-session.dispatch-schema :as schema]
    [psi.state-kernel.dispatch :as kernel]))
 
 (declare dispatch! ->dispatch-env ->kernel-contract-env apply-interceptor)
 
-(def validate-dispatch-schemas schema/validate-dispatch-schemas)
-
-(def handler-entry kernel/handler-entry)
-(def register-handler! kernel/register-handler!)
-(def registered-event-types kernel/registered-event-types)
-(def clear-handlers! kernel/clear-handlers!)
-(def ->interceptor kernel/->interceptor)
-(def event-log-entries kernel/event-log-entries)
-(def dispatch-trace-entries kernel/dispatch-trace-entries)
-(def clear-event-log! kernel/clear-event-log!)
-(def clear-dispatch-trace! kernel/clear-dispatch-trace!)
-(def next-dispatch-id kernel/next-dispatch-id)
-(defn append-trace-entry!
-  ([entry]
-   (kernel/append-trace-entry! nil entry))
-  ([ctx entry]
-   (kernel/append-trace-entry! (->dispatch-env ctx) entry)))
-(def assoc-dispatch-id kernel/assoc-dispatch-id)
-(def dispatch-id-of kernel/dispatch-id-of)
-(def replay-event-entry! (fn [ctx entry] (kernel/replay-event-entry! dispatch! ctx entry)))
-(def replay-event-log! (fn [ctx entries] (kernel/replay-event-log! dispatch! ctx entries)))
 (def log-interceptor kernel/log-interceptor)
-(def pure-result? kernel/pure-result?)
 (def handler-interceptor kernel/handler-interceptor)
 (def effect-interceptor kernel/effect-interceptor)
 (def validate-interceptor kernel/validate-interceptor)
 (def trim-effects-on-replay kernel/trim-effects-on-replay)
 
 (def permission-interceptor
-  (->interceptor
+  (kernel/->interceptor
    {:id :permission
     :before
     (fn [ictx]
@@ -69,7 +46,7 @@
         ictx))}))
 
 (def statechart-interceptor
-  (->interceptor
+  (kernel/->interceptor
    {:id :statechart
     :before
     (fn [ictx]
@@ -132,7 +109,7 @@
     :else nil))
 
 (def apply-interceptor
-  (->interceptor
+  (kernel/->interceptor
    {:id :apply
     :after
     (fn [ictx]
@@ -146,7 +123,7 @@
         :event-type-fn (fn [ictx]
                          (or (:event-type ictx)
                              (get-in ictx [:event :event/type])))
-        :append-trace-entry-fn append-trace-entry!}))}))
+        :append-trace-entry-fn kernel/append-trace-entry!}))}))
 
 (def default-interceptors
   [permission-interceptor
