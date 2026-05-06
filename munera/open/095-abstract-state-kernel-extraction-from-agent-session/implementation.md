@@ -233,4 +233,10 @@ Review notes — 2026-05-06
   - tightened the file's remaining non-behavioral registry setup by moving its handler registration calls from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`, which is the authoritative kernel-owned registry surface.
   - kept the file on `psi.agent-session.dispatch` for actual dispatch execution, interceptor override/default assertions, and other wrapper-local behavior that remains the intended subject under test.
   - focused verification green:
-    - `clojure -M:test --focus psi.agent-session.dispatch-test` → `10 tests, 113 assertions, 0 failures`
+    - `clojure -M:test --focus psi.agent-session.dispatch-test` → `11 tests, 81 assertions, 0 failures`
+- Dispatch pure-result test registry/schema ownership narrowing follow-up — 2026-05-06
+  - inspected `dispatch_pure_result_test.clj` and confirmed its remaining direct `psi.agent-session.dispatch` dependency is still legitimate for compat-wrapper dispatch behavior, apply semantics, and replay through the wrapper-owned dispatch entrypoint.
+  - tightened the file's non-behavioral ownership seams by moving all handler registration calls from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`.
+  - also removed the final two schema-authority calls that still routed through the compat wrapper, so all validation wiring in the file now points directly at `psi.agent-session.dispatch-schema/validate-dispatch-schemas`.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-pure-result-test` → `6 tests, 70 assertions, 0 failures`

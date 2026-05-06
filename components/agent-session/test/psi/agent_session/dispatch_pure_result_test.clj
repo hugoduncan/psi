@@ -51,7 +51,7 @@
     (let [session-data (atom {:is-streaming false})
           apply-fn (fn [_ctx f] (swap! session-data f))
           ctx {:apply-root-state-update-fn apply-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :go-streaming
        (fn [_ctx _data]
          {:root-state-update #(assoc % :is-streaming true)}))
@@ -62,7 +62,7 @@
     (let [seen-effects (atom [])
           execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
           ctx {:execute-dispatch-effect-fn execute-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :effects-only
        (fn [_ctx _data]
          {:effects [{:effect/type :notify} {:effect/type :log}]}))
@@ -76,7 +76,7 @@
           execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
           ctx {:apply-root-state-update-fn apply-fn
                :execute-dispatch-effect-fn execute-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :update-and-effect
        (fn [_ctx _data]
          {:root-state-update #(update % :retry-attempt inc)
@@ -94,7 +94,7 @@
                                                 :content [{:type :text :text "ok"}]}
                          :ignored))
           ctx {:execute-dispatch-effect-fn execute-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :effect-result-test
        (fn [_ctx _data]
          {:effects [{:effect/type :runtime/tool-execute
@@ -116,7 +116,7 @@
           execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
           ctx {:apply-root-state-update-fn apply-fn
                :execute-dispatch-effect-fn execute-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :replay-update-and-effect
        (fn [_ctx _data]
          {:root-state-update #(update % :retry-attempt inc)
@@ -130,7 +130,7 @@
     (let [seen-effects (atom [])
           execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
           ctx {:execute-dispatch-effect-fn execute-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :replay-effects-only
        (fn [_ctx _data]
          {:effects [{:effect/type :notify}]
@@ -145,7 +145,7 @@
           execute-fn   (fn [_ctx effect] (swap! seen-effects conj effect))
           ctx          {:apply-root-state-update-fn apply-fn
                         :execute-dispatch-effect-fn execute-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :session/set-session-name
        (fn [_ctx {:keys [name]}]
          {:root-state-update #(assoc % :session-name name)
@@ -169,14 +169,14 @@
           execute-fn   (fn [_ctx effect] (swap! seen-effects conj effect))
           ctx          {:apply-root-state-update-fn apply-fn
                         :execute-dispatch-effect-fn execute-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :session/set-session-name
        (fn [_ctx {:keys [name]}]
          {:root-state-update #(assoc % :session-name name)
           :effects [{:effect/type :persist/journal-append-session-info-entry
                      :name name}]
           :return :name-updated}))
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :session/set-worktree-path
        (fn [_ctx {:keys [worktree-path]}]
          {:root-state-update #(assoc % :worktree-path worktree-path)
@@ -198,7 +198,7 @@
     (let [applied? (atom false)
           apply-fn (fn [_ctx _f] (reset! applied? true))
           ctx {:apply-root-state-update-fn apply-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :return-only
        (fn [_ctx _data] {:return :return-only-result}))
       (let [result (dispatch/dispatch! ctx :return-only)]
@@ -206,7 +206,7 @@
         (is (false? @applied?)))))
 
   (testing "pure handler without apply-fn on ctx does not crash"
-    (dispatch/register-handler!
+    (kernel/register-handler!
      :no-apply-fn
      (fn [_ctx _data]
        {:root-state-update #(assoc % :x true)}))
@@ -218,7 +218,7 @@
           read-fn      (fn [_ctx path] (get-in @session-data path))
           ctx          {:apply-root-state-update-fn apply-fn
                         :read-session-state-fn   read-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :return-key-test
        (fn [_ctx _data]
          {:root-state-update #(assoc-in % [:agent-session :data :session-name] "after")
@@ -230,7 +230,7 @@
     (let [root-state (atom {:runtime {:nrepl nil}})
           apply-root-fn (fn [_ctx f] (swap! root-state f))
           ctx {:apply-root-state-update-fn apply-root-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :root-update-test
        (fn [_ctx _data]
          {:root-state-update #(assoc-in % [:runtime :nrepl] {:port 8888})}))
@@ -243,7 +243,7 @@
           read-fn (fn [_ctx path] (get-in @root-state path))
           ctx {:apply-root-state-update-fn apply-root-fn
                :read-session-state-fn read-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :root-update-return-key-test
        (fn [_ctx _data]
          {:root-state-update #(assoc-in % [:agent-session :data :session-name] "after")
@@ -261,7 +261,7 @@
           ctx {:apply-root-state-update-fn apply-fn
                :execute-dispatch-effect-fn execute-fn
                :validate-dispatch-result-fn validate-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :invalid-after-apply
        (fn [_ctx _data]
          {:root-state-update #(update % :retry-attempt inc)
@@ -280,7 +280,7 @@
           validate-fn (fn [_ctx _ictx] false)
           ctx {:execute-dispatch-effect-fn execute-fn
                :validate-dispatch-result-fn validate-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :invalid-effects-only
        (fn [_ctx _data]
          {:effects [{:effect/type :notify}]
@@ -297,7 +297,7 @@
           validate-fn (fn [_ctx _ictx] {:valid? true})
           ctx {:execute-dispatch-effect-fn execute-fn
                :validate-dispatch-result-fn validate-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :valid-effects-only
        (fn [_ctx _data]
          {:effects [{:effect/type :notify}]
@@ -311,7 +311,7 @@
           validate-fn (fn [_ctx _ictx] (throw (ex-info "validator boom" {})))
           ctx {:execute-dispatch-effect-fn execute-fn
                :validate-dispatch-result-fn validate-fn}]
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :validator-throws
        (fn [_ctx _data]
          {:effects [{:effect/type :notify}]
@@ -324,8 +324,8 @@
 
 (deftest handler-exception-test
   (testing "handler exception is caught and returns nil"
-    (dispatch/register-handler! :throws
-                                (fn [_ _] (throw (ex-info "boom" {}))))
+    (kernel/register-handler! :throws
+                              (fn [_ _] (throw (ex-info "boom" {}))))
     (is (nil? (dispatch/dispatch! {} :throws)))
     (let [entry (last (kernel/event-log-entries))]
       (is (= :throws (:event-type entry)))
@@ -333,8 +333,8 @@
 
 (deftest canonical-dispatch-trace-failure-paths-test
   (testing "dispatch handler exception records handler-result and completes with nil return"
-    (dispatch/register-handler! :handler-throws
-                                (fn [_ _] (throw (ex-info "boom" {}))))
+    (kernel/register-handler! :handler-throws
+                              (fn [_ _] (throw (ex-info "boom" {}))))
     (is (nil? (dispatch/dispatch! {} :handler-throws {:x 1})))
     (let [entries (kernel/dispatch-trace-entries)
           dispatch-id (:dispatch-id (first entries))
@@ -359,11 +359,11 @@
     (kernel/clear-dispatch-trace!)
     (let [ctx {:execute-dispatch-effect-fn (fn [_ _]
                                              (throw (ex-info "effect boom" {})))}]
-      (dispatch/register-handler! :effect-throws
-                                  (fn [_ _]
-                                    {:effects [{:effect/type :effect/fail
-                                                :value 1}]
-                                     :return :ok}))
+      (kernel/register-handler! :effect-throws
+                                (fn [_ _]
+                                  {:effects [{:effect/type :effect/fail
+                                              :value 1}]
+                                   :return :ok}))
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"effect boom"
                             (dispatch/dispatch! ctx :effect-throws {:x 1})))
       (let [entries (kernel/dispatch-trace-entries)
@@ -410,7 +410,7 @@
             execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
             ctx {:execute-dispatch-effect-fn execute-fn
                  :validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
-        (dispatch/register-handler!
+        (kernel/register-handler!
          :schema-valid
          (fn [_ctx _data]
            {:effects [{:effect/type :runtime/agent-abort}]
@@ -426,7 +426,7 @@
             ctx {:apply-root-state-update-fn apply-fn
                  :execute-dispatch-effect-fn execute-fn
                  :validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
-        (dispatch/register-handler!
+        (kernel/register-handler!
          :schema-valid-update
          (fn [_ctx _data]
            {:root-state-update #(assoc % :done true)
@@ -439,8 +439,8 @@
       (let [seen-effects (atom [])
             execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
             ctx {:execute-dispatch-effect-fn execute-fn
-                 :validate-dispatch-result-fn dispatch/validate-dispatch-schemas}]
-        (dispatch/register-handler!
+                 :validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
+        (kernel/register-handler!
          :schema-bad-effect
          (fn [_ctx _data]
            {:effects [{:effect/type :nonexistent/effect}]
@@ -457,8 +457,8 @@
       (let [seen-effects (atom [])
             execute-fn (fn [_ctx effect] (swap! seen-effects conj effect))
             ctx {:execute-dispatch-effect-fn execute-fn
-                 :validate-dispatch-result-fn dispatch/validate-dispatch-schemas}]
-        (dispatch/register-handler!
+                 :validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
+        (kernel/register-handler!
          :schema-missing-key
          (fn [_ctx _data]
            {:effects [{:effect/type :runtime/agent-queue-steering}]
@@ -472,7 +472,7 @@
 
     (testing "passes when handler returns return-only pure result"
       (let [ctx {:validate-dispatch-result-fn dispatch-schema/validate-dispatch-schemas}]
-        (dispatch/register-handler!
+        (kernel/register-handler!
          :schema-return-only
          (fn [_ctx _data] {:return "plain-value"}))
         (is (= "plain-value" (dispatch/dispatch! ctx :schema-return-only)))))))
