@@ -4,6 +4,7 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
+   [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.tool-batch :as tool-batch]
@@ -221,12 +222,12 @@
                       (fn [ctx event-type event-data opts]
                         (swap! events conj event-type)
                         (orig ctx event-type event-data opts)))]
-        (let [result (dispatch/dispatch! session-ctx :session/tool-run
-                                         {:session-id session-ctx-id
-                                          :tool-call tc
-                                          :parsed-args {}
-                                          :progress-queue nil}
-                                         {:origin :core})]
+        (let [result (session/dispatch-in! session-ctx :session/tool-run
+                                           {:session-id session-ctx-id
+                                            :tool-call tc
+                                            :parsed-args {}
+                                            :progress-queue nil}
+                                           {:origin :core})]
           (is (= "call-effect" (:tool-call-id result)))
           (is (some #{:session/tool-execute-prepared} @events))
           (is (some #{:session/tool-record-result} @events))
