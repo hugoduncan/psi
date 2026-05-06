@@ -441,3 +441,23 @@ Compat-wrapper retirement implementation — 2026-05-06
   - `clojure -M:test --focus psi.session-state.model-test --focus psi.session-state.state-test --focus psi.session-state.init-test --focus psi.agent-session.child-session-mutation-test --focus psi.agent-session.session-lifecycle-test --focus psi.app-runtime.context-test --focus psi.rpc-events-test`
   - result: `25 tests, 175 assertions, 0 failures`
 - this closes the explicit compat-removal step for task `097`; follow-on task `098` remains separate for journal-append dispatch-effect convergence
+
+Review note — 2026-05-06
+- review verdict: pass with focused test gaps
+- canonical `session-state` model/state/init coverage is strong
+- missing direct focused proof remains in two extracted/introduced namespaces:
+  - `psi.session-state.display-name`
+  - `psi.agent-session.child-session-state`
+- current confidence is acceptable because real consumer paths exercise both, but direct unit coverage should be added before treating the extraction as fully hardened
+
+Focused test hardening — 2026-05-06
+- added `components/session-state/test/psi/session_state/display_name_test.clj`
+  - covers truncation, whitespace normalization, slash-command suppression, canonical content extraction, and explicit-name vs last-user-message fallback
+- added `components/agent-session/test/psi/agent_session/child_session_state_test.clj`
+  - covers child-session base-state inheritance, developer-prompt-source normalization, explicit/fallback prompt precedence, prompt-component filtering, and canonical child persistence-slot initialization
+- focused verification green:
+  - `clojure -M:test --focus psi.session-state.display-name-test --focus psi.agent-session.child-session-state-test`
+  - `4 tests, 24 assertions, 0 failures`
+- full unit verification green:
+  - `bb clojure:test:unit`
+  - `1518 tests, 11716 assertions, 0 failures`

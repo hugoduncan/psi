@@ -48,3 +48,5 @@
 - [x] Decide whether session display-name shaping should remain in `psi.session-state.state` as canonical lower-level session-list summary policy or move to a smaller shared helper
 - [x] Split child-session prompt derivation from lower child session init so the remaining mixed seam above `session-state` gets smaller
 - [x] Retire the compat wrappers introduced by the extraction once direct callers no longer depend on them (`psi.agent-session.session`, `psi.agent-session.session-state`, and the remaining compat surface in `psi.agent-session.dispatch-handlers.session-state`)
+- [x] Add focused `psi.session-state.display-name` tests for truncation, slash-command suppression, canonical content extraction, and explicit-name vs last-user-message fallback
+- [x] Add focused `psi.agent-session.child-session-state` tests for prompt-state derivation, developer-prompt-source normalization, fallback precedence, and persistence slot initialization
