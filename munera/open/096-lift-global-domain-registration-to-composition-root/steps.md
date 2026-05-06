@@ -1,0 +1,12 @@
+- [ ] Inspect current registration call sites in `agent-session.context`, `agent-session.bootstrap`, `system-bootstrap`, launcher/app-runtime startup, and relevant tests
+- [ ] Record the chosen composition-root namespace/path explicitly in implementation notes
+- [ ] Classify each current registration helper as domain-local vs global-assembly and note any mixed surfaces that need splitting
+- [ ] Refine or preserve domain-local registration helpers so their meaning is strictly local-to-domain
+- [ ] Create/update an explicit composition-root assembly function that owns whole-system registration
+- [ ] Update startup/bootstrap/composition call paths to use the explicit assembly function
+- [ ] Remove `requiring-resolve` global registration discovery from `agent-session.context`
+- [ ] Add/update focused tests for local/isolated registration
+- [ ] Add/update focused tests for globally assembled registration
+- [ ] Record final ownership split and any remaining edge cases in implementation notes
+- [ ] Run focused verification
+- [ ] Run broader verification as needed

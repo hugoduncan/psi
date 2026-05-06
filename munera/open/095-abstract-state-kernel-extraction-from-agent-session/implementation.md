@@ -48,6 +48,8 @@ Implementation notes — 2026-05-06
 - Moved the authoritative generic dispatch pipeline into `psi.state-kernel.dispatch`.
 - Moved the generic pure-result schema/contract into `psi.state-kernel.dispatch-schema`.
 - Kept `psi.agent-session.dispatch` as a compatibility wrapper that re-exports the established public surface while adapting agent-session contexts onto the narrowed kernel environment contract.
+  - This wrapper should be treated as a temporary migration seam rather than a final architectural endpoint.
+  - Intended future direction: downstream consumers should depend directly on `psi.state-kernel.dispatch` for generic dispatch concerns, leaving agent-session to own only domain composition surfaces that genuinely remain above the kernel.
 - Kept `psi.agent-session.dispatch-schema` as domain-owned schema authority for concrete effect payload validation. This was necessary because effect catalog validation is application-specific, while the kernel owns only the generic pure dispatch contract.
 - Preserved bounded dispatch event-log / dispatch-trace ownership in the kernel, including db-summary capture for consuming introspection/tests.
 - Preserved `:return-key` semantics by letting the kernel prefer injected higher-layer read callbacks when present; this keeps session-shaped reads above the kernel while retaining the generic apply orchestration below it.
@@ -63,6 +65,9 @@ Implementation notes — 2026-05-06
   - dropped `psi/system-bootstrap` from `components/agent-session/deps.edn`
   - changed global registration entrypoints in `context.clj` to use `requiring-resolve` on `psi.system-bootstrap.core/register-all-domains!`
   - this preserves the higher-level ownership of global registration while removing the static component edge
+  - this `requiring-resolve` indirection should be treated as a temporary cycle-breaking seam rather than a final architectural endpoint
+  - intended future direction: global domain registration should move fully into an explicit higher-level composition/bootstrap root so `agent-session.context` no longer discovers bootstrap ownership dynamically at runtime
+  - that relocation is substantial enough to warrant a separate follow-on task rather than remaining as unfinished scope inside task 095
 - Added focused kernel tests in `components/state-kernel/test/psi/state_kernel/dispatch_test.clj` covering:
   - pure root-state update apply path
   - bounded event-log / dispatch-trace retention
