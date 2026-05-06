@@ -21,25 +21,24 @@
   {:definition-id "plan-build-review"
    :name "Plan Build Review"
    :summary "Representative chain-like workflow proof"
-   :step-order ["plan" "build" "review"]
-   :steps {"plan" {:label "Plan"
-                   :executor {:type :agent :profile "planner" :mode :sync}
-                   :input-bindings {:task {:source :workflow-input :path [:task]}}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                   :capability-policy {:tools #{"read" "bash"}}}
-           "build" {:label "Build"
-                    :executor {:type :agent :profile "builder" :mode :async}
-                    :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                    :capability-policy {:tools #{"read" "edit" "write"}}}
-           "review" {:label "Review"
-                     :executor {:type :agent :profile "reviewer" :mode :sync}
-                     :input-bindings {:build {:source :step-output :path ["build" :outputs :build]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}
-                     :capability-policy {:tools #{"read"}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :tools ["read" "bash"]
+            :contributions [{:type :template
+                             :text "Plan {{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}
+           {:name "build"
+            :type :session
+            :tools ["read" "edit" "write"]
+            :contributions [{:type :template
+                             :text "Build {{plan}}"
+                             :vars {"plan" {:from {:step "plan" :yield :text}}}}]}
+           {:name "review"
+            :type :session
+            :tools ["read"]
+            :contributions [{:type :template
+                             :text "Review {{build}}"
+                             :vars {"build" {:from {:step "build" :yield :text}}}}]}]})
 
 (defn- install-definition-and-run!
   [ctx]

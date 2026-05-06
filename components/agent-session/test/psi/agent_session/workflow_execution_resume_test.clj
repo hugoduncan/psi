@@ -18,14 +18,13 @@
 (def single-step-definition-with-meta
   {:definition-id "planner"
    :name "planner"
-   :step-order ["step-1"]
-   :steps {"step-1" {:executor {:type :agent :profile "planner"}
-                     :prompt-template "$INPUT"
-                     :input-bindings {:input {:source :workflow-input :path [:input]}
-                                      :original {:source :workflow-input :path [:original]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                     :capability-policy {:tools #{"read" "bash"}}}}
+   :steps [{:name "step-1"
+            :type :session
+            :tools ["read" "bash"]
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}
+                                    "original" {:from :workflow-input :path [:original]}}}]}]
    :workflow-file-meta {:system-prompt "You are a planner."
                         :tools ["read" "bash"]
                         :skills ["clojure-coding-standards"]

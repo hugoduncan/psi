@@ -33,6 +33,10 @@
   - [x] rewrite `workflow_tools_test.clj` workflow fixtures to register/create target-authored definitions only
   - [x] rewrite `mutations/canonical_workflows_test.clj` to register/create/execute target-authored definitions only
   - [x] rewrite `workflow_session_integration_test.clj` to store target-authored definitions under canonical workflow root state
+  - [x] rewrite `workflow_progression_test.clj` to build target-authored run fixtures only
+  - [x] rewrite `workflow_execution_resume_test.clj` to resume target-authored run fixtures only
+  - [x] rewrite `workflow_lifecycle_test.clj` to drive target-authored lifecycle fixtures only
+  - [x] rewrite `workflow_resolvers_test.clj` to query target-authored registrations and current resolver projections only
 - [ ] Update project guidance so the target grammar is the only supported authored workflow surface
   - [x] delete `doc/workflow-grammar-current.md`
   - [x] delete `doc/workflow-grammar-migration.md`

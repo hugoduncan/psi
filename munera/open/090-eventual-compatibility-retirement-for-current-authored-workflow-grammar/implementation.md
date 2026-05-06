@@ -69,3 +69,10 @@
 - `workflow_file_compiler_test.clj` no longer expects retired single-step/multi-step current-grammar compilation outputs; it now proves only target-authored file preservation, explicit rejection of legacy authored files, batch compilation accounting, and the retirement-era no-op loader validation helpers.
 - `workflow_tools_test.clj`, `mutations/canonical_workflows_test.clj`, and `workflow_session_integration_test.clj` now register/create runs from target-authored definitions only, replacing old canonical-runtime fixture shapes that bypassed the target-authored registration seam.
 - Focused verification for these rewritten surfaces is green: `clojure -M:test --focus psi.agent-session.workflow-file-compiler-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-session-integration-test` (`17 tests, 126 assertions, 0 failures`).
+
+2026-05-06 implementation slice 11
+- Rewrote the next broader-suite legacy fixtures still calling `workflow-runtime/register-definition` with retired canonical map-shaped definitions.
+- `workflow_progression_test.clj`, `workflow_execution_resume_test.clj`, `workflow_lifecycle_test.clj`, and `workflow_resolvers_test.clj` now construct runs from target-authored definitions only.
+- For resolver coverage, kept the assertions aligned with current resolver projection reality instead of preserving removed prompt-template/capability-policy expectations from pre-retirement stored-step shapes.
+- Focused verification for these follow-on rewrites is green: `clojure -M:test --focus psi.agent-session.workflow-progression-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.agent-session.workflow-lifecycle-test --focus psi.agent-session.workflow-resolvers-test` (`11 tests, 69 assertions, 0 failures`).
+- A fresh broad run still needs to be rerun after this slice to discover whether any further legacy canonical-definition fixtures remain outside this now-updated set.
