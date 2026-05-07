@@ -1,4 +1,5 @@
 2026-05-07
+- Terse summary: broke the `agent-session <-> turn-runtime` cycle, moved lower turn-context/provider-capture/tool-attempt state ownership into `turn-runtime`, and re-homed generic tool-arg parsing below `agent-session`.
 - Implemented the ownership repair by moving lower turn-runtime state readers/writers into `components/turn-runtime/src/psi/turn_runtime/state.clj`.
 - New lower-owned state surface now owns:
   - live turn context read/write
@@ -37,3 +38,4 @@ Verification results:
 - `psi.agent-session.prompt-lifecycle-test` green: `17 tests, 82 assertions, 0 failures`.
 - repo search over `components/turn-runtime/src` returned no `psi.agent-session.*` requires.
 - `components/turn-runtime/deps.edn` no longer depends on `psi/agent-session`, so the direct `agent-session <-> turn-runtime` component cycle is removed.
+- Review note: implementation shape is good; the only non-blocking follow-on is that `bounded-append` still lives in `session-state.init`, which is slightly less neutral than the repaired lower ownership boundary.

@@ -1,0 +1,36 @@
+- [x] Inspect every `turn-runtime -> agent-session` dependency edge
+  - [x] `psi.turn-runtime.core`
+  - [x] `psi.turn-runtime.accumulator`
+  - [x] `components/turn-runtime/deps.edn`
+- [x] Classify each borrowed concern as turn-runtime-owned, tool-domain-owned, or session-owned
+- [x] Remove the direct `agent-session <-> turn-runtime` component cycle
+- [x] Remove `psi/agent-session` from `components/turn-runtime/deps.edn`
+- [x] Re-home lower turn-execution mutation/state ownership into `components/turn-runtime/` by default
+  - [x] turn-context state
+  - [x] tool-call-attempt telemetry
+  - [x] provider request captures
+  - [x] provider reply captures
+  - [x] if a tiny lower shared namespace is required instead, record the reason explicitly in `implementation.md`
+- [x] Remove `psi.agent-session.state-accessors` require from `psi.turn-runtime.core`
+- [x] Remove `psi.agent-session.state-accessors` require from `psi.turn-runtime.accumulator`
+- [x] Move or extract generic helper logic downward
+  - [x] assistant-message classification authoritative home
+  - [x] generic tool-argument parsing currently borrowed from `psi.agent-session.conversation`
+  - [x] any generic bounded telemetry/update helper needed by repaired lower ownership
+- [x] Remove `psi.agent-session.conversation` require from `psi.turn-runtime.accumulator`
+- [x] Keep journal append ownership above `turn-runtime`
+- [x] Keep tool-output accounting out of `turn-runtime` ownership
+  - [x] move it toward tool-domain ownership in this slice if feasible
+  - [x] otherwise record an explicit deferral in `implementation.md`
+- [x] Verify no callback-based seams were introduced
+  - [x] no callback injection from `agent-session`
+  - [x] no new behavior-passing function hooks introduced to avoid re-homing ownership
+- [x] Update focused tests only where ownership moved
+- [x] Run focused verification
+  - [x] `psi.turn-runtime.core-test`
+  - [x] `psi.turn-runtime.accumulator-test`
+  - [x] `psi.agent-session.prompt-lifecycle-test`
+- [x] Verify repo search shows no `psi.agent-session.*` requires under `components/turn-runtime/src/`
+- [x] Verify deps/config inspection shows the component cycle is gone
+- [x] Record exact focused verification commands in `implementation.md`
+- [x] Record final ownership result and any explicit deferrals in `implementation.md`
