@@ -65,3 +65,7 @@
   - [x] keep canonical `:tool-error` emission and final shaped error result behavior unchanged
   - [x] update/add focused `psi.tool-runtime.core-test` only if the refactor changes the test surface materially
   - [x] record the shaping decision in `implementation.md`
+- [x] Tighten error-lifecycle coverage in `psi.tool-runtime.core-test`
+  - [x] add a focused proof that an execution exception emits canonical `:tool-error` during execute phase and final `:tool-result` during record phase for the same shaped error result
+  - [x] keep the proof component-owned at the `psi.tool-runtime.core-test` boundary unless the test naturally requires a higher-level integration seam
+  - [x] record the added focused verification in `implementation.md`

@@ -135,6 +135,12 @@ Code-shaper follow-up verification run:
 - `clojure -M:test --focus psi.agent-session.tool-execution-test`
   - `9 tests, 49 assertions, 0 failures`
 
+Coverage follow-up verification run:
+- `clojure -M:test --focus psi.tool-runtime.core-test`
+  - `6 tests, 26 assertions, 0 failures`
+- `clojure -M:test --focus psi.agent-session.tool-execution-test`
+  - `9 tests, 49 assertions, 0 failures`
+
 Final repo-search result:
 - no remaining production/test requires of `psi.turn-runtime.tool-args`
 - no remaining production requires of `psi.agent-session.tool-execution`
@@ -152,3 +158,4 @@ Open note:
 Review note:
 - follow-up review items are now addressed: `psi.tool-runtime.core/execute-tool-call-prepared!` emits canonical `:tool-error` on execution exceptions with focused proof in `psi.tool-runtime.core-test`, and the apparently-unused adapter wrapper functions (`tool-content->text`, `normalize-tool-content`, `tool-lifecycle-event`, `start-tool-call!`, `run-tool-call-through-runtime-effect!`) were removed from `psi.agent-session.tool-runtime-adapter` after repo search confirmed no legitimate production use
 - code-shaper follow-up is now addressed: the exception path in `psi.tool-runtime.core/execute-tool-call-prepared!` was shaped into two small local helpers, `emit-tool-error!` and `exception-tool-result`, which remove duplication while keeping the local failure contract explicit
+- coverage/style review follow-up is now addressed: `psi.tool-runtime.core-test` now includes a component-owned end-to-end error lifecycle proof showing execute-phase `:tool-error` emission followed by record-phase final `:tool-result` emission for the same shaped error result

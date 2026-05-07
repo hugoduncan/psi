@@ -58,6 +58,37 @@
     (is (= true (get-in result [:tool-result :details :exception])))
     (is (= "call-err" (get-in result [:result-message :tool-call-id])))))
 
+(deftest error-lifecycle-execute-then-record-test
+  (let [execute-events (atom [])
+        record-events  (atom [])
+        recorded       (atom nil)
+        ended          (atom nil)
+        shaped-result  (core/execute-tool-call-prepared!
+                        {:execute-tool      (fn [_tool-name _args _opts]
+                                              (throw (ex-info "boom" {})))
+                         :post-process      (fn [_tool-call _args raw] raw)
+                         :effective-policy  (fn [_] {:max-lines 10 :max-bytes 20})
+                         :telemetry-args-fn (fn [_ args] args)
+                         :execute-opts      {}
+                         :on-event          #(swap! execute-events conj %)}
+                        {:id "call-err" :name "bash" :arguments "{}"}
+                        {})
+        record-result  (core/record-tool-call-result!
+                        {:on-event #(swap! record-events conj %)
+                         :record-output-stat! (fn [_] nil)
+                         :on-agent-end! (fn [tool-call tool-result is-error?]
+                                          (reset! ended [tool-call tool-result is-error?]))
+                         :record-result! #(reset! recorded %)}
+                        shaped-result)]
+    (is (= [:tool-start :tool-executing :tool-error]
+           (mapv :event-kind @execute-events)))
+    (is (= [:tool-result]
+           (mapv :event-kind @record-events)))
+    (is (= "call-err" (:tool-call-id record-result)))
+    (is (= true (:is-error record-result)))
+    (is (= "call-err" (:tool-call-id @recorded)))
+    (is (= true (last @ended)))))
+
 (deftest record-tool-call-result-test
   (let [events   (atom [])
         recorded (atom nil)
