@@ -1,0 +1,4 @@
+{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        cheshire/cheshire   {:mvn/version "5.13.0"}
+        clj-http/clj-http   {:mvn/version "3.13.0"}
+        psi/ai              {:local/root "../ai"}}}

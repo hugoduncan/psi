@@ -1,6 +1,6 @@
-(ns psi.agent-session.oauth.store-test
+(ns psi.provider-auth.oauth.store-test
   (:require [clojure.test :refer [deftest is testing]]
-            [psi.agent-session.oauth.store :as store]))
+            [psi.provider-auth.oauth.store :as store]))
 
 (deftest null-store-crud-test
   ;; Basic CRUD on a null store

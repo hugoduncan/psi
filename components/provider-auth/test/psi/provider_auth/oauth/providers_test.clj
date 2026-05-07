@@ -1,11 +1,11 @@
-(ns psi.agent-session.oauth.providers-test
+(ns psi.provider-auth.oauth.providers-test
   (:require
    [cheshire.core :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [clj-http.client :as http]
-   [psi.agent-session.oauth.callback-server :as cb]
-   [psi.agent-session.oauth.providers :as providers]))
+   [psi.provider-auth.oauth.callback-server :as cb]
+   [psi.provider-auth.oauth.providers :as providers]))
 
 (deftest default-registry-includes-openai-test
   (testing "register-default-providers! registers both anthropic and openai"
@@ -19,7 +19,7 @@
     (with-redefs [providers/get-env (constantly nil)
                   providers/open-browser! (fn [_] nil)]
       (let [{:keys [url login-state]}
-            (#'psi.agent-session.oauth.providers/anthropic-begin-login)]
+            (#'psi.provider-auth.oauth.providers/anthropic-begin-login)]
         (is (str/includes? url "claude.ai/oauth/authorize"))
         (is (str/includes? url "client_id=a473d7bb-17ac-43a7-abc0-a1343d7c2805"))
         (is (str/includes? url "redirect_uri=https%3A%2F%2Fconsole.anthropic.com%2Foauth%2Fcode%2Fcallback"))
@@ -39,7 +39,7 @@
       (with-redefs [providers/get-env (fn [k] (get env k))
                     providers/open-browser! (fn [_] nil)]
         (let [{:keys [url login-state]}
-              (#'psi.agent-session.oauth.providers/anthropic-begin-login)]
+              (#'psi.provider-auth.oauth.providers/anthropic-begin-login)]
           (is (str/includes? url "auth.example.test/oauth/authorize"))
           (is (str/includes? url "client_id=client-xyz"))
           (is (str/includes? url "redirect_uri=https%3A%2F%2Fconsole.example.test%2Foauth%2Fcb"))
@@ -58,7 +58,7 @@
                                 {:body {:access_token "ant-access"
                                         :refresh_token "ant-refresh"
                                         :expires_in 3600}})]
-        (let [cred (#'psi.agent-session.oauth.providers/anthropic-complete-login
+        (let [cred (#'psi.provider-auth.oauth.providers/anthropic-complete-login
                     "code=test-code#state=test-state"
                     {:verifier "test-state"
                      :client-id "client-override"
@@ -88,7 +88,7 @@
                                 {:body {:access_token "oa-access"
                                         :refresh_token "oa-refresh"
                                         :expires_in 3600}})]
-        (let [cred (#'psi.agent-session.oauth.providers/openai-complete-login
+        (let [cred (#'psi.provider-auth.oauth.providers/openai-complete-login
                     "http://localhost:1455/auth/callback?code=test-code&state=test-state"
                     {:verifier "test-verifier"
                      :state    "test-state"
@@ -114,7 +114,7 @@
                                 {:body {:access_token "oa-access"
                                         :refresh_token "oa-refresh"
                                         :expires_in 3600}})]
-        (let [cred (#'psi.agent-session.oauth.providers/openai-complete-login
+        (let [cred (#'psi.provider-auth.oauth.providers/openai-complete-login
                     nil
                     {:verifier "v"
                      :state "cb-state"
@@ -130,7 +130,7 @@
     (with-redefs [http/post (fn [_url _opts]
                               {:body {:access_token "x" :refresh_token "y" :expires_in 3600}})]
       (is (thrown-with-msg? Exception #"State mismatch"
-                            (#'psi.agent-session.oauth.providers/openai-complete-login
+                            (#'psi.provider-auth.oauth.providers/openai-complete-login
                              "code#wrong-state"
                              {:verifier "v" :state "expected"}))))))
 
@@ -144,7 +144,7 @@
                   providers/open-browser!
                   (fn [_url] nil)]
       (let [{:keys [url login-state]}
-            (#'psi.agent-session.oauth.providers/openai-begin-login)]
+            (#'psi.provider-auth.oauth.providers/openai-begin-login)]
         (is (str/includes? url "auth.openai.com/oauth/authorize"))
         (is (str/includes? url "redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback"))
         (is (string? (:verifier login-state)))

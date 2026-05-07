@@ -8,7 +8,7 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.ai.model-registry :as model-registry]
    [psi.memory.core :as memory]
    [psi.memory.runtime :as memory-runtime]

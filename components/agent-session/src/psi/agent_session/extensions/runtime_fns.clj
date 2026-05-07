@@ -4,7 +4,7 @@
    [psi.agent-session.extensions :as extensions]
    [psi.agent-session.extensions.runtime-eql :as runtime-eql]
    [psi.agent-session.extensions.runtime-ui :as runtime-ui]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.services :as services]
    [psi.session-state.state :as ss]))
 

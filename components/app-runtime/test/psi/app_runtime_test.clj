@@ -14,7 +14,7 @@
    [psi.agent-session.persistence :as persist]
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.prompt-templates :as pt]
    [psi.agent-session.project-preferences :as project-prefs]
    [psi.agent-session.skills :as skills]

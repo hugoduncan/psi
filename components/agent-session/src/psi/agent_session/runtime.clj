@@ -12,7 +12,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.provider-auth :as provider-auth]
+   [psi.provider-auth.core :as provider-auth]
    [psi.recursion.core :as recursion]
    [taoensso.timbre :as timbre]))
 

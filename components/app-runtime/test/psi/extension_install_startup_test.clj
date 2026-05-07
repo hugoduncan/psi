@@ -7,7 +7,7 @@
    [psi.agent-session.extension-installs :as installs]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.prompt-templates :as pt]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.system-prompt :as sys-prompt]

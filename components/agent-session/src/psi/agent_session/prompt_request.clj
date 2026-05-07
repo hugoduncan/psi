@@ -8,7 +8,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.conversation :as conv]
    [psi.agent-session.prompt-templates :as prompt-templates]
-   [psi.agent-session.provider-auth :as provider-auth]
+   [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.system-prompt :as system-prompt]))

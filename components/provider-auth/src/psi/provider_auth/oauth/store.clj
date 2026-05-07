@@ -1,4 +1,4 @@
-(ns psi.agent-session.oauth.store
+(ns psi.provider-auth.oauth.store
   "Credential storage for API keys and OAuth tokens.
 
    Nullable pattern: `create-store` for production (file-backed with locking),

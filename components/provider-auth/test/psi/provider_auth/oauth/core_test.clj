@@ -1,7 +1,7 @@
-(ns psi.agent-session.oauth.core-test
+(ns psi.provider-auth.oauth.core-test
   (:require [clojure.test :refer [deftest is testing]]
-            [psi.agent-session.oauth.core :as oauth]
-            [psi.agent-session.oauth.store :as store])
+            [psi.provider-auth.oauth.core :as oauth]
+            [psi.provider-auth.oauth.store :as store])
   (:import [java.nio.file Files]
            [java.nio.file.attribute FileAttribute]))
 

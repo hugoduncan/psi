@@ -1,4 +1,4 @@
-(ns psi.agent-session.oauth.core
+(ns psi.provider-auth.oauth.core
   "Top-level OAuth API — orchestrates store, providers, and login flows.
 
    Nullable pattern: `create-context` for production (file-backed store,
@@ -9,8 +9,8 @@
      :store        — credential store (see oauth.store)
      :providers-fn — (fn [] providers) to list available providers
      :get-provider — (fn [id] provider) to look up a provider"
-  (:require [psi.agent-session.oauth.store :as store]
-            [psi.agent-session.oauth.providers :as providers]))
+  (:require [psi.provider-auth.oauth.store :as store]
+            [psi.provider-auth.oauth.providers :as providers]))
 
 ;;; Context factories
 

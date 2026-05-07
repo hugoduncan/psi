@@ -1,6 +1,6 @@
-(ns psi.agent-session.oauth.pkce-test
+(ns psi.provider-auth.oauth.pkce-test
   (:require [clojure.test :refer [deftest is testing]]
-            [psi.agent-session.oauth.pkce :as pkce]))
+            [psi.provider-auth.oauth.pkce :as pkce]))
 
 (deftest generate-pkce-test
   ;; PKCE verifier + challenge generation per RFC 7636

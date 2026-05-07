@@ -4,6 +4,7 @@
         psi/ai                {:local/root "../ai"}
         psi/agent-core        {:local/root "../agent-core"}
         psi/agent-session     {:local/root "../agent-session"}
+        psi/provider-auth     {:local/root "../provider-auth"}
         psi/app-runtime       {:local/root "../app-runtime"}
         psi/memory            {:local/root "../memory"}
         psi/session-state     {:local/root "../session-state"}

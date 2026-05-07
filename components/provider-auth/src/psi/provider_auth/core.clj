@@ -1,4 +1,4 @@
-(ns psi.agent-session.provider-auth
+(ns psi.provider-auth.core
   "Shared provider-auth resolution helpers.
 
    Keeps provider-scoped auth precedence consistent across canonical request
@@ -6,7 +6,7 @@
   (:require
    [clojure.string :as str]
    [psi.ai.model-registry :as model-registry]
-   [psi.agent-session.oauth.core :as oauth]))
+   [psi.provider-auth.oauth.core :as oauth]))
 
 (defn normalize-provider-id
   "Normalize provider identity to the keyword form used by shared provider

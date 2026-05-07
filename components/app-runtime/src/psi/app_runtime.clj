@@ -61,7 +61,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
    [psi.app-runtime.context :as app-context]
    [psi.app-runtime.context-summary :as context-summary]

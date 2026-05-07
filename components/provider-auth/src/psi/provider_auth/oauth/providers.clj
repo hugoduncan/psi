@@ -1,4 +1,4 @@
-(ns psi.agent-session.oauth.providers
+(ns psi.provider-auth.oauth.providers
   "OAuth provider registry and provider implementations.
 
    Each provider is a map:
@@ -13,8 +13,8 @@
   (:require [clj-http.client :as http]
             [clojure.string :as str]
             [cheshire.core :as json]
-            [psi.agent-session.oauth.callback-server :as cb]
-            [psi.agent-session.oauth.pkce :as pkce])
+            [psi.provider-auth.oauth.callback-server :as cb]
+            [psi.provider-auth.oauth.pkce :as pkce])
   (:import [java.net URI URLDecoder URLEncoder]
            [java.util UUID]))
 

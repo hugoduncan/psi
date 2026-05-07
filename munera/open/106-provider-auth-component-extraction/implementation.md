@@ -1,56 +1,75 @@
 2026-05-07
 
-Task created as a concrete child of `105-agent-session-component-extraction-map`.
+Implemented the provider-auth / OAuth component extraction as a structural move with no compatibility shim.
 
-Creation rationale:
-- provider-auth / OAuth is one of the clearest bounded subsystems currently latent inside `agent-session`
-- current production consumers span app-runtime, rpc, and agent-session, which is a strong signal that the current `psi.agent-session.*` ownership is incidental rather than essential
-- this is a lower-ambiguity first extraction than turn/prompt decomposition
+What changed
+- Added new component `components/provider-auth/` with `deps.edn`.
+- Moved authoritative namespaces to:
+  - `components/provider-auth/src/psi/provider_auth/core.clj` -> `psi.provider-auth.core`
+  - `components/provider-auth/src/psi/provider_auth/oauth/core.clj` -> `psi.provider-auth.oauth.core`
+  - `components/provider-auth/src/psi/provider_auth/oauth/store.clj` -> `psi.provider-auth.oauth.store`
+  - `components/provider-auth/src/psi/provider_auth/oauth/providers.clj` -> `psi.provider-auth.oauth.providers`
+  - `components/provider-auth/src/psi/provider_auth/oauth/pkce.clj` -> `psi.provider-auth.oauth.pkce`
+  - `components/provider-auth/src/psi/provider_auth/oauth/callback_server.clj` -> `psi.provider-auth.oauth.callback-server`
+- Removed the old authoritative source files from `components/agent-session/src/psi/agent_session/`.
+- Updated root config:
+  - `deps.edn` local component deps plus source/test path aliases now include `components/provider-auth/src` and `components/provider-auth/test`
+  - `tests.edn` unit/integration source and test paths now include the new component
+- Updated consuming component deps:
+  - `components/agent-session/deps.edn`
+  - `components/app-runtime/deps.edn`
+  - `components/rpc/deps.edn`
+- Updated direct production consumers to require `psi.provider-auth.*` instead of `psi.agent-session.*` auth namespaces.
+- Updated higher-level tests that intentionally remain in their owning components to require `psi.provider-auth.oauth.core`.
 
-Initial boundary decision:
-- extract the whole provider-auth / OAuth cluster as one component rather than splitting provider-auth from OAuth in separate tasks
-- keep invocation/orchestration of auth flows in higher-level callers; move the auth implementation itself out of `agent-session`
+clj-surgeon usage
+- Used `clj-surgeon :op :ls` on:
+  - `components/agent-session/src/psi/agent_session/provider_auth.clj`
+  - `components/agent-session/src/psi/agent_session/oauth/core.clj`
+  - `components/agent-session/src/psi/agent_session/oauth/providers.clj`
+- Used `clj-surgeon :op :deps` on:
+  - `components/provider-auth/src/psi/provider_auth/core.clj`
+  - `components/provider-auth/src/psi/provider_auth/oauth/core.clj`
+  - `components/agent-session/src/psi/agent_session/oauth/providers.clj` at `register-default-providers!`
+- Used `clj-surgeon :op :rename-ns` while migrating the copied files into their extracted namespace names.
 
-Known current direct consumer surfaces at task creation time:
-- app runtime login/context creation
-- agent-session runtime/provider request preparation helpers
-- agent-session commands/dispatch effects/state accessors/extensions runtime fns
-- rpc login handling
-- focused oauth/provider-auth tests plus higher-level integration tests
+Test ownership results
+Moved into `components/provider-auth/test/psi/provider_auth/` because they are component-owned proofs of the extracted boundary:
+- `components/provider-auth/test/psi/provider_auth/core_test.clj`
+- `components/provider-auth/test/psi/provider_auth/oauth/core_test.clj`
+- `components/provider-auth/test/psi/provider_auth/oauth/store_test.clj`
+- `components/provider-auth/test/psi/provider_auth/oauth/store_lock_test.clj`
+- `components/provider-auth/test/psi/provider_auth/oauth/providers_test.clj`
+- `components/provider-auth/test/psi/provider_auth/oauth/pkce_test.clj`
+- `components/provider-auth/test/psi/provider_auth/oauth/callback_server_test.clj`
 
-Review pass for ambiguity/tightness:
-- overall this task is materially cleaner than `102`: the provider-auth / OAuth cluster is already coherent and does not show the same ownership blur as turn/prompt work
-- found one namespace-surface ambiguity worth keeping explicit:
-  - the component is named `provider-auth`, but it contains both the small provider-auth helper surface and the larger OAuth subsystem
-  - keep the split explicit in the extracted namespace family:
-    - `psi.provider-auth.core` owns provider-scoped API-key/request-option helpers
-    - `psi.provider-auth.oauth.*` owns OAuth context/store/provider/pkce/callback-server concerns
-  - this avoids a fuzzy “everything in one core namespace” end state
-- found one test-location ambiguity worth tightening:
-  - the design currently says moved tests should live under `components/provider-auth/test/psi/provider_auth/`, which is correct at the component root, but the moved OAuth-focused tests should preserve subfamily ownership under `psi/provider_auth/oauth/` where appropriate rather than flattening everything into one directory
-  - keep provider-auth-helper tests near `psi/provider_auth/core_test.clj` and OAuth-family tests under `psi/provider_auth/oauth/*_test.clj`
-- found one configuration-surface ambiguity worth making explicit during implementation:
-  - production consumers span multiple components (`app-runtime`, `agent-session`, `rpc`), so dependency/config updates are not only a root `deps.edn` concern
-  - this extraction will likely need explicit consuming-component dep updates for at least `components/agent-session`, `components/app-runtime`, and `components/rpc`, and possibly test alias path updates where those are enumerated separately
-- found one boundary note worth preserving:
-  - `oauth/providers.clj` owns provider registration and default-provider bootstrap with process-global behavior
-  - this task should preserve that behavior as-is; do not widen into redesigning provider registration semantics while extracting the component
-- found one migration risk worth making explicit:
-  - namespace relocation can accidentally change load/init timing around provider registration and default-provider bootstrap if the move is not updated carefully
-  - preserve current initialization behavior and treat any registration-timing drift as a regression, not as acceptable extraction fallout
-- after those clarifications, the task remains a strong low-ambiguity first extraction candidate under umbrella task `105`
+Remained in higher-level components because they prove consuming behavior rather than provider-auth component internals:
+- `components/agent-session/test/psi/agent_session/runtime_test.clj`
+- `components/agent-session/test/psi/agent_session/resolvers_test.clj`
+- `components/app-runtime/test/psi/app_runtime_test.clj`
+- `components/app-runtime/test/psi/extension_install_startup_test.clj`
+- `components/rpc/test/psi/rpc_prompt_command_test.clj`
 
-Resolved open questions:
-- component naming:
-  - keep the component named `provider-auth`
-  - keep the internal namespace split explicit as `psi.provider-auth.core` plus `psi.provider-auth.oauth.*`
-- test placement:
-  - provider-auth helper tests move to `components/provider-auth/test/psi/provider_auth/core_test.clj`
-  - OAuth-family tests move under `components/provider-auth/test/psi/provider_auth/oauth/`
-  - higher-level app-runtime/rpc/agent-session integration tests stay in their owning components
-- consuming component dependency updates:
-  - explicitly update `components/agent-session`, `components/app-runtime`, and `components/rpc`
-  - update root `deps.edn` / `tests.edn` and any explicit test alias path lists only where needed
-- provider registration behavior:
-  - preserve existing provider registration/bootstrap semantics exactly
-  - treat load/init timing drift as a regression rather than an acceptable side effect of extraction
+Reason for leaving those higher-level tests in place
+- they verify app-runtime / rpc / agent-session behavior through the extracted auth boundary
+- moving them would blur ownership by making component tests responsible for orchestration behavior owned elsewhere
+
+Boundary verification
+- No compatibility shim was introduced.
+- Old `psi.agent-session.provider-auth` and `psi.agent-session.oauth.*` authoritative source files were removed in the same slice.
+- Repo search after migration found no remaining authoritative old provider-auth/oauth requires/usages in active component source/test/config paths.
+- Extracted authoritative `psi.provider-auth.*` namespaces do not require `psi.agent-session.*` implementation namespaces.
+- Provider registration/bootstrap behavior remained in `psi.provider-auth.oauth.providers` unchanged in semantics; only ownership moved.
+
+Verification run
+- Focused extracted-component verification:
+  - `clojure -M:test --focus psi.provider-auth.core-test --focus psi.provider-auth.oauth.core-test --focus psi.provider-auth.oauth.providers-test --focus psi.provider-auth.oauth.store-test --focus psi.provider-auth.oauth.store-lock-test --focus psi.provider-auth.oauth.pkce-test --focus psi.provider-auth.oauth.callback-server-test`
+  - result: `31 tests, 129 assertions, 0 failures`
+- Focused higher-level consuming-path verification:
+  - `clojure -M:test --focus psi.rpc-prompt-command-test --focus psi.app-runtime-test --focus psi.agent-session.runtime-test --focus psi.agent-session.resolvers-test --focus psi.extension-install-startup-test`
+  - result: `65 tests, 354 assertions, 0 failures`
+
+Outcome
+- Provider-auth is now an explicit lower-level component.
+- Higher-level app/runtime/rpc/agent-session code now depends on `psi.provider-auth.*`.
+- The extracted auth component is authoritative and no longer lives under `agent-session` ownership.

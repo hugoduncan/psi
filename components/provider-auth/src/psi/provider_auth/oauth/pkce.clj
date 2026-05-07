@@ -1,4 +1,4 @@
-(ns psi.agent-session.oauth.pkce
+(ns psi.provider-auth.oauth.pkce
   "PKCE (Proof Key for Code Exchange) for OAuth 2.0.
 
    Generates code verifier and S256 challenge per RFC 7636."

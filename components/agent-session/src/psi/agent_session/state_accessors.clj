@@ -3,7 +3,7 @@
    Thin wrappers over state-path + get-state-value-in / dispatch."
   (:require
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.session-state.state :as session]))
 
 ;;; Readers — non-session-scoped (no session-id required)

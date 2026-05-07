@@ -1,4 +1,4 @@
-(ns psi.agent-session.oauth.callback-server
+(ns psi.provider-auth.oauth.callback-server
   "Ephemeral local HTTP server for OAuth redirect callbacks.
 
    Nullable pattern: use `start-server` for production (real HTTP server

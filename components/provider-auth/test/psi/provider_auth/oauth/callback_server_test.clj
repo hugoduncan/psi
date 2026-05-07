@@ -1,6 +1,6 @@
-(ns psi.agent-session.oauth.callback-server-test
+(ns psi.provider-auth.oauth.callback-server-test
   (:require [clojure.test :refer [deftest is testing]]
-            [psi.agent-session.oauth.callback-server :as cb]))
+            [psi.provider-auth.oauth.callback-server :as cb]))
 
 (deftest null-server-test
   ;; Null server delivers results without network

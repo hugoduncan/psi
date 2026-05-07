@@ -5,7 +5,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.persistence :as persist]
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]

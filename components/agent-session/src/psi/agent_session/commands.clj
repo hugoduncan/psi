@@ -31,7 +31,7 @@
    [psi.agent-session.extensions.runtime-fns :as ext-runtime-fns]
    [psi.session-state.state :as ss]
    [psi.agent-session.prompt-templates :as pt]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.project-nrepl-commands :as project-nrepl-commands]
    [psi.ai.models :as ai-models]
    [psi.ai.model-registry :as model-registry]))

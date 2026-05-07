@@ -17,6 +17,7 @@
         psi/app-runtime                               {:local/root "components/app-runtime"}
         psi/agent-core                                {:local/root "components/agent-core"}
         psi/agent-session                             {:local/root "components/agent-session"}
+        psi/provider-auth                             {:local/root "components/provider-auth"}
         psi/recursion                                 {:local/root "components/recursion"}
         psi/ui-state                                  {:local/root "components/ui-state"}
         psi/system-bootstrap                          {:local/root "components/system-bootstrap"}
@@ -33,6 +34,7 @@
                         "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
+                        "components/provider-auth/src"
                         "components/turn-statechart/src"
                         "components/turn-runtime/src"
                         "components/tool-runtime/src"
@@ -65,6 +67,7 @@
                         "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
+                        "components/provider-auth/src"
                         "components/turn-runtime/src"
                         "components/tool-runtime/src"
                         "components/state-kernel/src"
@@ -96,6 +99,7 @@
                            "components/tui/test"
                            "components/app-runtime/src"
                            "components/agent-session/src"
+                           "components/provider-auth/src"
                            "components/turn-statechart/src"
                            "components/turn-runtime/src"
                            "components/tool-runtime/src"
@@ -167,6 +171,7 @@
                              "components/rpc/test"
                              "components/agent-core/test"
                              "components/agent-session/test"
+                             "components/provider-auth/test"
                              "components/turn-statechart/test"
                              "components/turn-runtime/test"
                              "components/tool-runtime/test"
@@ -202,6 +207,7 @@
                         "components/rpc/test"
                         "components/agent-core/test"
                         "components/agent-session/test"
+                        "components/provider-auth/test"
                         "components/turn-statechart/test"
                         "components/turn-runtime/test"
                         "components/tool-runtime/test"
@@ -229,6 +235,7 @@
                         "components/rpc/src"
                         "components/agent-core/src"
                         "components/agent-session/src"
+                        "components/provider-auth/src"
                         "components/tool-runtime/src"
                         "components/state-kernel/src"
                         "components/session-state/src"

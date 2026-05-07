@@ -9,6 +9,7 @@
         psi/query                   {:local/root "../query"}
         psi/recursion               {:local/root "../recursion"}
         psi/graph                   {:local/root "../graph"}
+        psi/provider-auth           {:local/root "../provider-auth"}
         psi/ui-state                {:local/root "../ui-state"}
         psi/system-bootstrap        {:local/root "../system-bootstrap"}
         psi/state-kernel            {:local/root "../state-kernel"}

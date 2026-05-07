@@ -1,7 +1,7 @@
-(ns psi.agent-session.oauth.store-lock-test
+(ns psi.provider-auth.oauth.store-lock-test
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
-            [psi.agent-session.oauth.store :as store])
+            [psi.provider-auth.oauth.store :as store])
   (:import [java.nio.file Files]
            [java.nio.file.attribute FileAttribute]))
 
