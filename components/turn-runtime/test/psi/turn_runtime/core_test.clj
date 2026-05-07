@@ -9,8 +9,7 @@
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-turn :as prompt-turn]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.tool-batch :as tool-batch]
-   [psi.agent-session.tool-execution :as tool-exec]
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.core :as turn-runtime]
    [psi.turn-statechart.core :as turn-sc])
@@ -207,7 +206,7 @@
                           {:role "assistant"
                            :content [{:type :text :text "done"}]
                            :stop-reason :stop})))
-                    psi.agent-session.tool-batch/run-tool-calls!
+                    psi.agent-session.tool-runtime-adapter/run-tool-calls!
                     (fn [_ _ tool-calls _]
                       (swap! calls conj (mapv :id tool-calls))
                       [{:tool-call-id "call-1"}])]
@@ -234,7 +233,7 @@
                         {:role "assistant"
                          :content [{:type :text :text "done"}]
                          :stop-reason :stop}))
-                    psi.agent-session.tool-batch/run-tool-calls!
+                    psi.agent-session.tool-runtime-adapter/run-tool-calls!
                     (fn [_ _ tool-calls _]
                       (swap! tool-batches conj (mapv :id tool-calls))
                       [{:tool-call-id "call-1"}
@@ -245,20 +244,16 @@
           (is (= :stop (:stop-reason result))))))))
 
 (deftest run-tool-calls-test
-  (testing "run-tool-calls! executes a batch and returns results in tool-call order"
+  (testing "run-tool-calls! executes prepared+record phases and returns results in tool-call order"
     (let [agent-ctx   (setup-agent-ctx!)
           [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
           tool-calls   [{:type :tool-call :id "call-1" :name "read" :arguments "{}"}
                         {:type :tool-call :id "call-2" :name "bash" :arguments "{}"}]
-          starts       (atom [])
-          executes     (atom [])
+          prepared     (atom [])
           records      (atom [])]
-      (with-redefs [psi.agent-session.tool-execution/start-tool-call!
-                    (fn [_ _ tc _]
-                      (swap! starts conj (:id tc)))
-                    psi.agent-session.tool-execution/execute-tool-call!
-                    (fn [_ _ tc _]
-                      (swap! executes conj (:id tc))
+      (with-redefs [psi.agent-session.tool-runtime-adapter/execute-tool-call-prepared!
+                    (fn [_ _ tc _ _]
+                      (swap! prepared conj (:id tc))
                       {:tool-call tc
                        :tool-result {:content (str "ok-" (:id tc)) :is-error false}
                        :result-message {:role "toolResult"
@@ -266,13 +261,12 @@
                                         :tool-name (:name tc)
                                         :content [{:type :text :text (str "ok-" (:id tc))}]}
                        :effective-policy nil})
-                    psi.agent-session.tool-execution/record-tool-call-result!
+                    psi.agent-session.tool-runtime-adapter/record-tool-call-prepared-result!
                     (fn [_ _ shaped _]
                       (swap! records conj (get-in shaped [:result-message :tool-call-id]))
                       (:result-message shaped))]
-        (let [results (#'tool-batch/run-tool-calls! session-ctx session-ctx-id tool-calls nil)]
-          (is (= #{"call-1" "call-2"} (set @starts)))
-          (is (= #{"call-1" "call-2"} (set @executes)))
+        (let [results (#'tool-runtime-adapter/run-tool-calls! session-ctx session-ctx-id tool-calls nil)]
+          (is (= #{"call-1" "call-2"} (set @prepared)))
           (is (= ["call-1" "call-2"] @records))
           (is (= ["call-1" "call-2"] (mapv :tool-call-id results))))))))
 
@@ -288,9 +282,8 @@
           max-active   (atom 0)
           started      (promise)
           release      (promise)]
-      (with-redefs [psi.agent-session.tool-execution/start-tool-call! (fn [_ _ _ _] nil)
-                    psi.agent-session.tool-execution/execute-tool-call!
-                    (fn [_ _ tc _]
+      (with-redefs [psi.agent-session.tool-runtime-adapter/execute-tool-call-prepared!
+                    (fn [_ _ tc _ _]
                       (let [n (swap! active inc)]
                         (swap! max-active max n)
                         (when (= 2 n) (deliver started true))
@@ -306,10 +299,10 @@
                                           :tool-name (:name tc)
                                           :content [{:type :text :text (str "ok-" (:id tc))}]}
                          :effective-policy nil}))
-                    psi.agent-session.tool-execution/record-tool-call-result!
+                    psi.agent-session.tool-runtime-adapter/record-tool-call-prepared-result!
                     (fn [_ _ shaped _]
                       (:result-message shaped))]
-        (let [runner (future (#'tool-batch/run-tool-calls! session-ctx session-ctx-id tool-calls nil))]
+        (let [runner (future (#'tool-runtime-adapter/run-tool-calls! session-ctx session-ctx-id tool-calls nil))]
           @started
           (deliver release true)
           (let [results @runner]

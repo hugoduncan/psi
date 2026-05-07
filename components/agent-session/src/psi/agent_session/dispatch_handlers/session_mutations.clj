@@ -13,7 +13,7 @@
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as session]
    [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.tool-execution :as tool-exec]))
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
 
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))
@@ -381,12 +381,12 @@
   (register-core-handler!
    :session/tool-execute-prepared
    (fn [ctx {:keys [session-id tool-call parsed-args progress-queue]}]
-     {:return (tool-exec/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue)}))
+     {:return (tool-runtime-adapter/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue)}))
 
   (register-core-handler!
    :session/tool-record-result
    (fn [ctx {:keys [session-id shaped-result progress-queue]}]
-     {:return (tool-exec/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue)}))
+     {:return (tool-runtime-adapter/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue)}))
 
   (register-core-handler!
    :session/tool-run

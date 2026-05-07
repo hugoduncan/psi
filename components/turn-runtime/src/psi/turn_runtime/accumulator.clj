@@ -6,7 +6,7 @@
   (:require
    [clojure.string :as str]
    [psi.turn-runtime.state :as trs]
-   [psi.turn-runtime.tool-args :as tool-args]
+   [psi.tool-runtime.args :as tool-args]
    [psi.turn-statechart.core :as turn-sc]))
 
 (defn emit-progress!

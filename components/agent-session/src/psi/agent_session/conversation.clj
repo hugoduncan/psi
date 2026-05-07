@@ -10,7 +10,7 @@
    [psi.ai.conversation :as conv]
    [psi.agent-session.system-prompt :as system-prompt]
    [psi.agent-session.tool-defs :as tool-defs]
-   [psi.turn-runtime.tool-args :as tool-args]))
+   [psi.tool-runtime.args :as tool-args]))
 
 ;; ============================================================
 ;; Cache-control helpers

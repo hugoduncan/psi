@@ -7,7 +7,7 @@
   (:require
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.tool-batch :as tool-batch]
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
    [psi.turn :as turn]))
 
 (defn stream-turn!
@@ -33,7 +33,7 @@
         outcome           (prompt-recording/classify-assistant-message assistant-message)]
     (case (:turn/outcome outcome)
       :turn.outcome/tool-use
-      (do (tool-batch/run-tool-calls! ctx session-id (:tool-calls outcome) progress-queue)
+      (do (tool-runtime-adapter/run-tool-calls! ctx session-id (:tool-calls outcome) progress-queue)
           (run-turn-loop! ai-ctx ctx session-id ai-model
                           extra-ai-options progress-queue))
 

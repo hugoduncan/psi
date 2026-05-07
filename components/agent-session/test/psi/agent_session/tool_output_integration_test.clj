@@ -5,8 +5,8 @@
    [cheshire.core :as json]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.tool-batch :as tool-batch]
-   [psi.agent-session.tool-output :as tool-output]))
+   [psi.agent-session.tool-output :as tool-output]
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
 
 (defn- delete-recursively!
   [f]
@@ -32,7 +32,7 @@
                :name "bash"
                :arguments (json/generate-string
                            {"command" (large-bash-command)})}
-          result (#'psi.agent-session.tool-batch/run-tool-call! ctx session-id tc nil)
+          result (#'psi.agent-session.tool-runtime-adapter/run-tool-call! ctx session-id tc nil)
           truncation (get-in result [:details :truncation])
           full-path  (get-in result [:details :full-output-path])
           eql-result (session/query-in ctx session-id
@@ -68,7 +68,7 @@
                :name "read"
                :arguments (json/generate-string
                            {"filePath" (.getAbsolutePath f)})}
-          _   (#'psi.agent-session.tool-batch/run-tool-call! ctx session-id tc nil)
+          _   (#'psi.agent-session.tool-runtime-adapter/run-tool-call! ctx session-id tc nil)
           eql-result (session/query-in ctx session-id
                                        [{:psi.tool-output/calls
                                          [:psi.tool-output.call/tool-name
@@ -89,9 +89,9 @@
           [ctx session-id] (test-support/create-test-session)
           bash-args (json/generate-string {"command" (large-bash-command)})
           read-args (json/generate-string {"filePath" (.getAbsolutePath f)})]
-      (#'psi.agent-session.tool-batch/run-tool-call! ctx session-id {:id "b1" :name "bash" :arguments bash-args} nil)
-      (#'psi.agent-session.tool-batch/run-tool-call! ctx session-id {:id "r1" :name "read" :arguments read-args} nil)
-      (#'psi.agent-session.tool-batch/run-tool-call! ctx session-id {:id "b2" :name "bash" :arguments bash-args} nil)
+      (#'psi.agent-session.tool-runtime-adapter/run-tool-call! ctx session-id {:id "b1" :name "bash" :arguments bash-args} nil)
+      (#'psi.agent-session.tool-runtime-adapter/run-tool-call! ctx session-id {:id "r1" :name "read" :arguments read-args} nil)
+      (#'psi.agent-session.tool-runtime-adapter/run-tool-call! ctx session-id {:id "b2" :name "bash" :arguments bash-args} nil)
       (let [eql-result (session/query-in ctx session-id
                                          [{:psi.tool-output/calls
                                            [:psi.tool-output.call/tool-name

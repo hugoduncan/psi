@@ -5,7 +5,7 @@
    continuation. Higher-level next-turn orchestration is expressed through
    dispatch-visible continuation events."
   (:require
-   [psi.turn-runtime.tool-args :as tool-args]
+   [psi.tool-runtime.args :as tool-args]
    [psi.agent-session.dispatch :as dispatch]))
 
 (defn run-prompt-tools!

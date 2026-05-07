@@ -1,4 +1,5 @@
 {:deps {org.clojure/clojure   {:mvn/version "1.12.0"}
         psi/ai                {:local/root "../ai"}
         psi/session-state     {:local/root "../session-state"}
-        psi/turn-statechart   {:local/root "../turn-statechart"}}}
+        psi/turn-statechart   {:local/root "../turn-statechart"}
+        psi/tool-runtime      {:local/root "../tool-runtime"}}}

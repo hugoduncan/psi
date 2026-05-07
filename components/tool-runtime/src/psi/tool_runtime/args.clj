@@ -1,6 +1,6 @@
-(ns psi.turn-runtime.tool-args
-  "Generic tool-call argument parsing helpers shared by lower turn/runtime code
-   and higher tool execution code."
+(ns psi.tool-runtime.args
+  "Generic tool-call argument parsing helpers shared by lower tool/runtime code
+   and higher turn/session orchestration code."
   (:require
    [cheshire.core :as json]))
 
