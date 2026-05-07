@@ -1,0 +1,43 @@
+- [ ] Create `components/turn-preparation/src/psi/turn_preparation/` and `components/turn-preparation/test/psi/turn_preparation/`
+- [ ] Update project/test configuration for the new component paths
+  - [ ] add local component dep and source/test paths in `deps.edn`
+  - [ ] add source/test paths in `tests.edn`
+  - [ ] add `psi/turn-preparation` dep in `components/agent-session/deps.edn`
+  - [ ] update `tests-component-isolated.edn` only if needed in this slice
+- [ ] Use `clj-surgeon` structural inspection to confirm move boundaries before editing
+  - [ ] `clj-surgeon -op :deps -file components/agent-session/src/psi/agent_session/prompt_request.clj`
+  - [ ] `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/prompt_request.clj`
+  - [ ] `clj-surgeon -op :deps -file components/agent-session/src/psi/agent_session/prompt_recording.clj`
+  - [ ] `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/prompt_recording.clj`
+  - [ ] `clj-surgeon -op :deps -file components/agent-session/src/psi/turn.clj`
+- [ ] Move `components/agent-session/src/psi/agent_session/prompt_request.clj` to `components/turn-preparation/src/psi/turn_preparation/request.clj`
+- [ ] Rename moved namespace `psi.agent-session.prompt-request` to `psi.turn-preparation.request`
+- [ ] Move `components/agent-session/src/psi/agent_session/prompt_recording.clj` to `components/turn-preparation/src/psi/turn_preparation/recording.clj`
+- [ ] Rename moved namespace `psi.agent-session.prompt-recording` to `psi.turn-preparation.recording`
+- [ ] Update `psi.turn` to require and delegate to the extracted preparation namespaces
+- [ ] Update all direct production consumers to require the extracted namespaces where appropriate
+  - [ ] update `psi.turn` to delegate to `psi.turn-preparation.*`
+  - [ ] preserve `psi.turn` as the public callback boundary in `components/agent-session/src/psi/agent_session/context.clj`
+  - [ ] migrate other consumers according to the API they actually use: public lifecycle callers -> `psi.turn`; helper-level callers -> `psi.turn-preparation.*`
+  - [ ] record any intentional direct lower-level production dependencies on `psi.turn-preparation.*` in `implementation.md`
+  - [ ] update any remaining direct production consumers found by repo search
+- [ ] Update all direct test consumers/test helpers to require the extracted namespaces where appropriate
+- [ ] Move clearly component-owned focused tests into `components/turn-preparation/test/psi/turn_preparation/` where that improves ownership clarity without widening scope
+  - [ ] rename moved tests to `psi.turn-preparation.*-test` namespaces
+  - [ ] prefer moving whole focused test files rather than splitting mixed-purpose higher-level files
+  - [ ] move tests whose primary subject is request option projection, system-prompt assembly, prompt-layer projection, input expansion, or `build-prepared-request`
+  - [ ] move tests whose primary subject is assistant-message classification or `build-record-response`
+  - [ ] when an existing file is mixed-purpose, leave it in place and update requires/usages only, or add a small new component-owned focused test file instead
+  - [ ] keep tests whose primary subject is lifecycle orchestration, dispatch handlers, context wiring, journaling effect execution, scheduling, workflow progression, or session mutation behavior under `components/agent-session/test`
+- [ ] Record in `implementation.md` which focused tests moved into `components/turn-preparation/test/psi/turn_preparation/` and which intentionally remained under `components/agent-session/test`, with a brief reason
+- [ ] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
+- [ ] Remove any temporary compatibility shims before completion
+- [ ] If no shim is used for the old `prompt-request` / `prompt-recording` namespaces, remove the old source files in this slice rather than leaving inert duplicates
+- [ ] Run focused tests from the new component boundary
+  - [ ] at least one moved request-preparation-focused test namespace under `components/turn-preparation/test/psi/turn_preparation/`
+  - [ ] at least one moved recording-focused test namespace under `components/turn-preparation/test/psi/turn_preparation/`
+- [ ] Run focused higher-level consuming-path verification
+  - [ ] `psi.agent-session.prompt-lifecycle-test`
+  - [ ] record exact commands in `implementation.md`
+- [ ] Confirm no remaining authoritative `psi.agent-session.prompt-request` / `prompt-recording` requires/usages remain in the repo
+- [ ] Record final ownership and migration notes in `implementation.md`

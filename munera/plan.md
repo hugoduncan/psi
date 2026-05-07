@@ -9,6 +9,7 @@ Queue:
 
 Backlog:
 
+`munera/open/102-turn-preparation-component-extraction/`
 `munera/open/100-turn-statechart-component-extraction/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
