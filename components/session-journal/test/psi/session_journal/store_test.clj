@@ -19,20 +19,29 @@
 (defn- slurp-lines [^File f]
   (str/split-lines (slurp f)))
 
-(defn- user-msg [text]
-  {:role "user" :content [{:type :text :text text}]
-   :timestamp (Instant/now)})
+(defn- user-msg
+  ([text]
+   (user-msg text (Instant/now)))
+  ([text timestamp]
+   {:role "user" :content [{:type :text :text text}]
+    :timestamp timestamp}))
 
-(defn- assistant-msg [text]
-  {:role "assistant" :content [{:type :text :text text}]
-   :timestamp (Instant/now)})
+(defn- assistant-msg
+  ([text]
+   (assistant-msg text (Instant/now)))
+  ([text timestamp]
+   {:role "assistant" :content [{:type :text :text text}]
+    :timestamp timestamp}))
 
-(defn- message-entry [message]
-  {:id (str (java.util.UUID/randomUUID))
-   :parent-id nil
-   :timestamp (Instant/now)
-   :kind :message
-   :data {:message message}})
+(defn- message-entry
+  ([message]
+   (message-entry message (Instant/now)))
+  ([message timestamp]
+   {:id (str (java.util.UUID/randomUUID))
+    :parent-id nil
+    :timestamp timestamp
+    :kind :message
+    :data {:message message}}))
 
 (defn- thinking-entry [level]
   {:id (str (java.util.UUID/randomUUID))
@@ -163,21 +172,26 @@
       (is (nil? (store/find-most-recent-session dir)))))
 
   (testing "find-most-recent-session and list-sessions preserve discovery return shapes"
-    (let [root (tmp-dir)
-          dir  (store/session-dir-for root "/proj")
-          f1   (io/file dir "s1.ndedn")
-          f2   (io/file dir "s2.ndedn")]
+    (let [root      (tmp-dir)
+          dir       (store/session-dir-for root "/proj")
+          f1        (io/file dir "s1.ndedn")
+          f2        (io/file dir "s2.ndedn")
+          t1        (Instant/parse "2026-01-02T03:04:05Z")
+          t1b       (Instant/parse "2026-01-02T03:04:06Z")
+          t2        (Instant/parse "2026-01-02T03:05:05Z")
+          t2info    (Instant/parse "2026-01-02T03:05:06Z")
+          t2b       (Instant/parse "2026-01-02T03:05:07Z")]
       (store/flush-journal! f1 "sess-a" "/proj" nil
-                            [(message-entry (user-msg "first message"))
-                             (message-entry (assistant-msg "reply"))])
+                            [(message-entry (user-msg "first message" t1) t1)
+                             (message-entry (assistant-msg "reply" t1b) t1b)])
       (store/flush-journal! f2 "sess-b" "/proj" "sess-parent" "/tmp/parent.ndedn"
-                            [(message-entry (user-msg "second message"))
+                            [(message-entry (user-msg "second message" t2) t2)
                              {:id (str (java.util.UUID/randomUUID))
                               :parent-id nil
-                              :timestamp (Instant/now)
+                              :timestamp t2info
                               :kind :session-info
                               :data {:name "Feature X"}}
-                             (message-entry (assistant-msg "reply2"))])
+                             (message-entry (assistant-msg "reply2" t2b) t2b)])
       (.setLastModified f2 (+ (.lastModified f1) 1000))
       (let [result   (store/find-most-recent-session dir)
             sessions (store/list-sessions dir)
@@ -198,9 +212,11 @@
             dir1 (store/session-dir-for root "/proj-a")
             dir2 (store/session-dir-for root "/proj-b")
             f1   (io/file dir1 "a.ndedn")
-            f2   (io/file dir2 "b.ndedn")]
-        (store/flush-journal! f1 "sess-a" "/proj-a" nil [(message-entry (assistant-msg "a"))])
-        (store/flush-journal! f2 "sess-b" "/proj-b" nil [(message-entry (assistant-msg "b"))])
+            f2   (io/file dir2 "b.ndedn")
+            t1   (Instant/parse "2026-01-02T03:04:05Z")
+            t2   (Instant/parse "2026-01-02T03:05:05Z")]
+        (store/flush-journal! f1 "sess-a" "/proj-a" nil [(message-entry (assistant-msg "a" t1) t1)])
+        (store/flush-journal! f2 "sess-b" "/proj-b" nil [(message-entry (assistant-msg "b" t2) t2)])
         (.setLastModified f2 (+ (.lastModified f1) 1000))
         (let [sessions (store/list-all-sessions root)]
           (is (= ["sess-b" "sess-a"] (mapv :id sessions))))))))
