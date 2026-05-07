@@ -69,3 +69,25 @@ Focused verification run after extraction:
 - `clojure -M:test --focus psi.shared-config.user-test --focus psi.shared-config.project-test --focus psi.shared-config.resolution-test --focus psi.project-nrepl.config-test --focus psi.app-runtime-test/bootstrap-runtime-session-applies-project-preferences-test --focus psi.agent-session.model-dispatch-test/thinking-level-test`
 - result: `9 tests, 50 assertions, 0 failures`
 - `clj-kondo` lint on touched sources/tests/deps files: `0 errors, 0 warnings`
+
+Review notes:
+- code/design match is strong: shared file-backed config ownership now lives in one lower component and consuming components depend downward as intended
+- boundary is improved cleanly: project-nREPL keeps domain-specific validation while shedding copied file lookup/read/merge behavior
+- no compatibility shims were left behind; the old `psi.agent-session.*` config owners were removed entirely, which matches the task intent
+- focused verification remains green on re-run after commit: `9 tests, 50 assertions, 0 failures`
+- task-artifact follow-up from the earlier review was addressed: `steps.md` now marks the implementation-notes step complete
+- optional confidence follow-up before closing the task: run a slightly broader consuming-path suite beyond the focused checks if we want stronger repository-wide integration confidence
+
+Code-shaper review note:
+- shape is good overall: lower ownership is clearer, `project-nrepl.config` is narrower, and no unnecessary framework was introduced
+- keep `shared-config.user` and `shared-config.project` separate for now; do not abstract shared file mechanics further without another real consumer
+- clarify whether `psi.shared-config.resolution/agent-session-map` is an intentionally public shared API or a candidate for later helper extraction if more subtree consumers appear
+- add one broader consuming-path verification pass before closing for extra confidence
+
+Follow-up decisions executed:
+- `psi.shared-config.resolution/agent-session-map` is now treated as an intentional small public shared API for first-cut subtree extraction by real lower consumers such as `project-nrepl`; if additional subtree-oriented helpers accumulate later, that will be the signal to extract a more explicitly shared helper namespace rather than change this task's landed shape now
+- the current no-abstraction choice for `shared-config.user` and `shared-config.project` is deliberate and should stand unless another real config owner appears with the same mechanics; the present duplication level is smaller and clearer than introducing a generic config framework prematurely
+
+Broader consuming-path verification:
+- `clojure -M:test --focus psi.project-nrepl.config-test --focus psi.agent-session.model-dispatch-test --focus psi.app-runtime-test/bootstrap-runtime-session-applies-project-preferences-test --focus psi.app-runtime-test/bootstrap-runtime-session-invalid-project-model-falls-back-test`
+- result: `17 tests, 135 assertions, 0 failures`

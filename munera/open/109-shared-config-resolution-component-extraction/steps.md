@@ -23,4 +23,7 @@
 - [x] Move or add focused tests for shared-config user/project/resolution behavior
 - [x] Rerun focused app-runtime config-driven defaulting verification
 - [x] Rerun focused project-nREPL config verification
-- [ ] Record final ownership and migration notes in `implementation.md`
+- [x] Record final ownership and migration notes in `implementation.md`
+- [x] Decide and document whether `psi.shared-config.resolution/agent-session-map` is an intentional public API or should move to a more explicitly shared helper if more subtree consumers appear
+- [x] Preserve the current no-abstraction choice for `shared-config.user` / `shared-config.project` unless another real config owner appears; record that decision tersely in `implementation.md`
+- [x] Run one broader consuming-path verification pass beyond the focused checks and record the result in `implementation.md`
