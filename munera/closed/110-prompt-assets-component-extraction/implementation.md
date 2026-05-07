@@ -93,3 +93,18 @@ Residual boundary notes
 - no hidden lower split pressure emerged during this move
 - `discover-context-files` moved cleanly with `system-prompt`, so the first-cut ownership decision held
 - `conversation`, `tool-defs`, and `message-text` remained outside the extracted component as intended
+
+Review note — task implementation review
+- follow-up found: `components/prompt-assets/test` was not added to the root `deps.edn` test alias path lists
+- impact: the relocated authoritative suites `psi.prompt-assets.prompt-templates-test`, `psi.prompt-assets.skills-test`, and `psi.prompt-assets.system-prompt-test` are not guaranteed to be discoverable via the standard root test aliases until that path is registered
+- recommendation: add `components/prompt-assets/test` to the root `:test-paths` and `:test` aliases, then rerun the authoritative focused suites through the standard project test configuration
+
+Review follow-up execution
+- added `components/prompt-assets/test` to the root `deps.edn` `:test-paths` alias
+- added `components/prompt-assets/test` to the root `deps.edn` `:test` alias
+- initial rerun through `clojure -M:test` still skipped all tests, which exposed the remaining root cause: the standard Kaocha runner configuration in `tests.edn` also needed the new component test path
+- added `components/prompt-assets/test` to the `:unit` and `:integration` `:test-paths` in `tests.edn`
+- reran the authoritative extracted-component suites through the standard root test configuration:
+  - `clojure -M:test --focus psi.prompt-assets.prompt-templates-test --focus psi.prompt-assets.skills-test --focus psi.prompt-assets.system-prompt-test`
+  - result: `47 tests, 326 assertions, 0 failures`
+- conclusion: the relocated prompt-assets suites are now discoverable and executable through the standard root test runner configuration

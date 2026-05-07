@@ -21,3 +21,14 @@
   - [x] `clojure -M:test --focus psi.agent-session.child-session-state-test`
   - [x] `clojure -M:test --focus psi.agent-session.child-session-mutation-test`
 - [x] Record any residual follow-on boundary issues in `implementation.md`, especially if a lower split was required beyond the default first-cut move
+
+Review follow-up steps
+- [x] Add `components/prompt-assets/test` to the root `deps.edn` `:test-paths` alias
+- [x] Add `components/prompt-assets/test` to the root `deps.edn` `:test` alias
+- [x] Add `components/prompt-assets/test` to `tests.edn` unit test-paths
+- [x] Add `components/prompt-assets/test` to `tests.edn` integration test-paths
+- [x] Rerun the authoritative extracted-component suites through the standard root test configuration:
+  - [x] `clojure -M:test --focus psi.prompt-assets.prompt-templates-test`
+  - [x] `clojure -M:test --focus psi.prompt-assets.skills-test`
+  - [x] `clojure -M:test --focus psi.prompt-assets.system-prompt-test`
+- [x] Append the verification result to `implementation.md`
