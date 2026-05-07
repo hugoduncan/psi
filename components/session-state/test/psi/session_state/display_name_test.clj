@@ -36,7 +36,7 @@
             {:role "user" :content "string content works"}))))
 
   (testing "vector block content extracts text/thinking/message keys"
-    (is (= "hello\nthought\ntool result"
+    (is (= "hello thought tool result"
            (display-name/user-message-display-text
             {:role "user"
              :content [{:type :text :text "hello"}

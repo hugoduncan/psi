@@ -57,7 +57,8 @@
     (let [result (query/query {}
                               [:ai/all-models
                                :ai/registered-providers])]
-      (is (vector? (:ai/all-models result)))
+      (is (map? (:ai/all-models result)))
+      (is (contains? (:ai/all-models result) :claude-3-5-sonnet))
       (is (contains? (:ai/registered-providers result) :openai)))))
 
 (deftest register-domains-in!-with-session-assembles-session-surface-test
@@ -95,7 +96,8 @@
         (is (contains? mutation-syms 'git.worktree/add!))
         (is (not (contains? resolver-syms 'psi.agent-session.resolvers.session/agent-session-identity)))
         (is (not (contains? mutation-syms 'psi.extension/add-prompt-template)))
-        (is (vector? (:ai/all-models result)))
+        (is (map? (:ai/all-models result)))
+        (is (contains? (:ai/all-models result) :claude-3-5-sonnet))
         (is (keyword? (:git.repo/status result)))))))
 
 (deftest register-domains-in!-is-idempotent-test

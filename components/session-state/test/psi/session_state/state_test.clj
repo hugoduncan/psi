@@ -49,11 +49,14 @@
       (is (= [entry] (get-in state' [:agent-session :sessions "sid" :persistence :journal])))))
 
   (testing "append-journal-entry-in! appends entries through extracted component"
-    (let [ctx   (create-ctx)
-          sid   (add-session! ctx nil {})
-          entry (persist/message-entry {:role "user" :content [{:type :text :text "hi"}]})]
+    (let [ctx      (create-ctx)
+          sid      (add-session! ctx nil {})
+          before   (vec (ss/get-state-value-in ctx (ss/state-path :journal sid)))
+          entry    (persist/message-entry {:role "user" :content [{:type :text :text "hi"}]})]
       (ss/append-journal-entry-in! ctx sid entry)
-      (is (= [entry] (ss/get-state-value-in ctx (ss/state-path :journal sid)))))))
+      (let [after (vec (ss/get-state-value-in ctx (ss/state-path :journal sid)))]
+        (is (= (conj before entry) after))
+        (is (= entry (last after)))))))
 
 (deftest children-of-in-empty-test
   (testing "children-of-in returns empty vec when no sessions share parent-id"
