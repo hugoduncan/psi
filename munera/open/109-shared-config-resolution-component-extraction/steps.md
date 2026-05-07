@@ -1,11 +1,23 @@
 - [ ] Create `components/shared-config/` with src/test structure and local component dep wiring
 - [ ] Move user-global config ownership into `psi.shared-config.user`
+  - [ ] preserve `~/.psi/agent/config.edn`
+  - [ ] preserve authoritative full-file read/write behavior including `:version`
+  - [ ] preserve existing `:agent-session` persisted subtree shape for current consumers
+  - [ ] preserve explicit user write/update helper surface for consumers
 - [ ] Move project shared/local config ownership into `psi.shared-config.project`
+  - [ ] preserve `<cwd>/.psi/project.edn`
+  - [ ] preserve `<cwd>/.psi/project.local.edn`
+  - [ ] preserve authoritative layered full-file read behavior including `:version`
+  - [ ] preserve current malformed-project-file warning behavior as the shared authoritative policy
+  - [ ] preserve explicit project-local write/update helper surface for consumers
 - [ ] Move layered shared agent-session config resolution into `psi.shared-config.resolution`
-- [ ] Preserve current config precedence and malformed-file handling behavior
+  - [ ] preserve `:agent-session` subtree extraction from full maps
+  - [ ] preserve precedence `system < user < project-shared < project-local`
+  - [ ] preserve current typed accessor behavior used by `app-runtime`
 - [ ] Update `components/app-runtime/src/psi/app_runtime.clj` to depend on `psi.shared-config.resolution`
 - [ ] Update `components/agent-session/src/psi/agent_session/dispatch_effects.clj` to depend on shared-config write helpers
-- [ ] Update `components/project-nrepl/src/psi/project_nrepl/config.clj` to consume shared-config lower-level readers/mergers instead of duplicated logic
+- [ ] Update `components/project-nrepl/src/psi/project_nrepl/config.clj` to consume shared-config full-map readers and/or `:agent-session` subtree extraction instead of duplicated lower-level file logic
+  - [ ] keep project-nREPL-specific validation and target-discovery helpers local to project-nREPL ownership
 - [ ] Remove old authoritative ownership from `psi.agent-session.config-resolution`, `psi.agent-session.project-preferences`, and `psi.agent-session.user-config`
 - [ ] Remove any temporary compatibility shims before completion
 - [ ] Move or add focused tests for shared-config user/project/resolution behavior

@@ -22,3 +22,10 @@ Architectural conclusion:
 - shared config file mechanics are owned too high today
 - this is a good lower-component extraction candidate
 - the extracted component should own generic config file reading/writing/layering, while project-nREPL-specific validation and agent-session runtime override policy stay with their owning domains
+
+Refinement pass completed to remove initial ambiguities:
+- first cut should preserve current file paths and persisted key layout exactly
+- first cut should preserve `app-runtime`'s current typed accessor contract via the extracted resolution namespace rather than forcing a consumer redesign
+- first cut should keep `psi.project-nrepl.config` as the project-nREPL-owned interpretation/validation surface and only remove its duplicated lower-level read/merge mechanics
+- current malformed-project-file warning behavior from `agent-session.project-preferences` is treated as the authoritative policy to consolidate around
+- the task does not attempt to invent a fully generic arbitrary-subtree config framework; it should instead extract the shared mechanics needed by the current real consumers cleanly
