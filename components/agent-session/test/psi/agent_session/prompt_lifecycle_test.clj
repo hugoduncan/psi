@@ -7,7 +7,7 @@
    [psi.agent-session.extensions]
    [psi.agent-session.prompt-chain]
    [psi.agent-session.prompt-request]
-   [psi.agent-session.prompt-runtime]
+   [psi.turn-runtime.core]
    [psi.agent-session.runtime :as runtime]
    [psi.state-kernel.dispatch :as kernel]
    [psi.turn]
@@ -149,16 +149,16 @@
                                                                              :prepared-request/provider-conversation {:system-prompt "sys"
                                                                                                                       :messages []
                                                                                                                       :tools []}})
-                  psi.agent-session.prompt-runtime/execute-prepared-request! (fn [_ai-ctx _ctx sid prepared _pq]
-                                                                               {:execution-result/turn-id (:prepared-request/id prepared)
-                                                                                :execution-result/session-id sid
-                                                                                :execution-result/assistant-message {:role "assistant"
-                                                                                                                     :content [{:type :text :text "after tool"}]
-                                                                                                                     :stop-reason :stop
-                                                                                                                     :timestamp (java.time.Instant/now)}
-                                                                                :execution-result/turn-outcome :turn.outcome/stop
-                                                                                :execution-result/tool-calls []
-                                                                                :execution-result/stop-reason :stop})]
+                  psi.turn-runtime.core/execute-prepared-request! (fn [_ai-ctx _ctx sid prepared _pq]
+                                                                    {:execution-result/turn-id (:prepared-request/id prepared)
+                                                                     :execution-result/session-id sid
+                                                                     :execution-result/assistant-message {:role "assistant"
+                                                                                                          :content [{:type :text :text "after tool"}]
+                                                                                                          :stop-reason :stop
+                                                                                                          :timestamp (java.time.Instant/now)}
+                                                                     :execution-result/turn-outcome :turn.outcome/stop
+                                                                     :execution-result/tool-calls []
+                                                                     :execution-result/stop-reason :stop})]
       (session/dispatch-in! ctx :session/prompt-record-response
                             {:session-id session-id
                              :execution-result execution-result}
@@ -175,7 +175,7 @@
 (deftest prompt-in-end-to-end-updates-prompt-lifecycle-summaries-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
     (kernel/clear-event-log!)
-    (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
                      :execution-result/session-id sid
@@ -216,7 +216,7 @@
                   (fn [_ctx sid]
                     (swap! sync-calls conj sid)
                     {:ok? true})
-                  psi.agent-session.prompt-runtime/execute-prepared-request!
+                  psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
                      :execution-result/session-id sid
@@ -236,7 +236,7 @@
         started (promise)
         release (promise)
         progress-q (java.util.concurrent.LinkedBlockingQueue.)]
-    (with-redefs [psi.agent-session.prompt-runtime/do-stream!
+    (with-redefs [psi.turn-runtime.core/do-stream!
                   (fn [_ai-ctx _conv _model _opts consume-fn]
                     {:future
                      (future
@@ -460,7 +460,7 @@
                           {:session-id session-id
                            :text "Please be brief."}
                           {:origin :core})
-    (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
                      :execution-result/session-id sid
@@ -523,7 +523,7 @@
                           {:session-id session-id
                            :text "next question"}
                           {:origin :core})
-    (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     (is (= "next question"
                            (get-in prepared [:prepared-request/user-message :content 0 :text])))
@@ -565,7 +565,7 @@
     (session/dispatch-in! ctx :session/enqueue-follow-up-message
                           {:session-id session-id :text "q2"}
                           {:origin :core})
-    (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     (swap! seen-prompts conj (get-in prepared [:prepared-request/user-message :content 0 :text]))
                     {:execution-result/turn-id (:prepared-request/id prepared)

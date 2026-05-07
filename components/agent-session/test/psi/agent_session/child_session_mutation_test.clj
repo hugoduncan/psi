@@ -6,7 +6,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.prompt-runtime]
+   [psi.turn-runtime.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))
@@ -267,7 +267,7 @@
                                :system-prompt "child prompt"
                                :tool-defs []
                                :thinking-level :off}))]
-        (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+        (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                       (fn [_ai-ctx _ctx sid prepared _progress-queue]
                         {:execution-result/turn-id (:prepared-request/id prepared)
                          :execution-result/session-id sid

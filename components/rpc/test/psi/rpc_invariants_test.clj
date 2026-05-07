@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
-   [psi.agent-session.prompt-runtime :as prompt-runtime]
+   [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.rpc :as rpc]
    [psi.rpc.events :as rpc.events]
@@ -144,7 +144,7 @@
                               "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"plain text\"}}\n")]
       (with-redefs [commands/dispatch-in (fn [_ctx _session-id _text _opts] nil)
                     runtime/resolve-api-key-in (fn [_ctx _session-id _model] nil)
-                    prompt-runtime/execute-prepared-request!
+                    turn-runtime/execute-prepared-request!
                     (fn [_ai-ctx _ctx session-id prepared _pq]
                       (deliver lifecycle-used? true)
                       {:execution-result/turn-id (:prepared-request/id prepared)

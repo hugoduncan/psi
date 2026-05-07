@@ -12,7 +12,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-execution :as tool-exec]
    [psi.agent-session.tool-plan :as tool-plan]
-   [psi.agent-session.turn-accumulator :as accum])
+   [psi.turn-runtime.accumulator :as accum])
   (:import
    [java.util.concurrent LinkedBlockingQueue TimeUnit]))
 

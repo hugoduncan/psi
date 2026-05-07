@@ -1,25 +1,42 @@
-(ns psi.agent-session.prompt-runtime
-  "Runtime prompt execution scaffold.
+(ns psi.turn-runtime.core
+  "Live turn execution runtime.
 
-   This namespace is the effectful boundary for executing prepared requests.
-   It now keeps only the prepared-request execution path and turn abort entry."
+   Owns prepared-request execution, provider stream consumption, turn-context
+   construction, wait/timeout/abort handling, and canonical execution-result
+   shaping for one prepared turn."
   (:require
    [psi.ai.models :as models]
-   [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.prompt-recording :as prompt-recording]
-   [psi.agent-session.prompt-stream :as prompt-stream]
-   [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
-   [psi.agent-session.turn-accumulator :as accum]
+   [psi.session-state.state :as ss]
+   [psi.turn-runtime.accumulator :as accum]
+   [psi.turn-runtime.stream :as stream]
    [psi.turn-statechart.core :as turn-sc]))
 
-(def ^:dynamic llm-stream-idle-timeout-ms prompt-stream/llm-stream-idle-timeout-ms)
-(def ^:dynamic llm-stream-wait-poll-ms prompt-stream/llm-stream-wait-poll-ms)
+(def ^:dynamic llm-stream-idle-timeout-ms stream/llm-stream-idle-timeout-ms)
+(def ^:dynamic llm-stream-wait-poll-ms stream/llm-stream-wait-poll-ms)
+
+(defn classify-assistant-message
+  [assistant-msg]
+  (let [tool-calls (vec (filter #(= :tool-call (:type %)) (:content assistant-msg)))]
+    (cond
+      (= :error (:stop-reason assistant-msg))
+      {:turn/outcome :turn.outcome/error
+       :assistant-message assistant-msg
+       :tool-calls tool-calls}
+
+      (seq tool-calls)
+      {:turn/outcome :turn.outcome/tool-use
+       :assistant-message assistant-msg
+       :tool-calls tool-calls}
+
+      :else
+      {:turn/outcome :turn.outcome/stop
+       :assistant-message assistant-msg
+       :tool-calls tool-calls})))
 
 (defn do-stream!
   [ai-ctx ai-conv ai-model ai-options consume-fn]
-  (prompt-stream/do-stream! ai-ctx ai-conv ai-model ai-options consume-fn))
+  (stream/do-stream! ai-ctx ai-conv ai-model ai-options consume-fn))
 
 (defn wait-for-turn-result
   "Wait for `done-p` with an idle timeout that resets on any stream progress."
@@ -29,10 +46,10 @@
                  idle-timeout-ms (assoc :idle-timeout-ms idle-timeout-ms)
                  wait-poll-ms    (assoc :wait-poll-ms wait-poll-ms)
                  abort-pred      (assoc :abort-pred abort-pred))
-        result (prompt-stream/wait-for-turn-result done-p last-progress-ms opts)]
+        result (stream/wait-for-turn-result done-p last-progress-ms opts)]
     (case result
-      ::prompt-stream/timeout ::timeout
-      ::prompt-stream/aborted ::aborted
+      ::stream/timeout ::timeout
+      ::stream/aborted ::aborted
       result)))
 
 (defn abort-active-turn-in!
@@ -40,7 +57,7 @@
    Cancels the stream handle and forces an aborted terminal turn result."
   [ctx session-id]
   (when-let [turn-ctx (sa/turn-context-in ctx session-id)]
-    (prompt-stream/abort-turn! turn-ctx)
+    (stream/abort-turn! turn-ctx)
     true))
 
 (defn capture-aware-ai-options
@@ -50,13 +67,13 @@
   (let [opts (or base-ai-options {})]
     (-> opts
         (assoc :on-provider-request
-               (prompt-stream/chain-callbacks
+               (stream/chain-callbacks
                 (:on-provider-request opts)
                 (fn [capture]
                   (sa/append-provider-request-capture-in!
                    ctx session-id (assoc capture :turn-id turn-id)))))
         (assoc :on-provider-response
-               (prompt-stream/chain-callbacks
+               (stream/chain-callbacks
                 (:on-provider-response opts)
                 (fn [capture]
                   (sa/append-provider-reply-capture-in!
@@ -73,7 +90,7 @@
                                                   ai-model thinking-buffers)
         turn-ctx         (turn-sc/create-turn-context actions-fn)
         _                (swap! (:turn-data turn-ctx) assoc :turn-id turn-id)
-        last-progress-ms (atom (prompt-stream/now-ms))
+        last-progress-ms (atom (stream/now-ms))
         timed-out?       (atom false)]
     (sa/set-turn-context-in! ctx session-id turn-ctx)
     (turn-sc/send-event! turn-ctx :turn/start)
@@ -88,10 +105,10 @@
    paths. Handles timestamp refresh, accumulation callbacks, statechart events,
    and optional cancellation checks."
   [turn-ctx actions-fn last-progress-ms timed-out? {:keys [cancelled-pred now-fn]}]
-  (let [cancelled?    (or cancelled-pred (constantly false))
-        now*          (or now-fn prompt-stream/now-ms)
-        call-action!  (fn [action-key extra]
-                        (actions-fn action-key (merge {:turn-data (:turn-data turn-ctx)} extra)))]
+  (let [cancelled?   (or cancelled-pred (constantly false))
+        now*         (or now-fn stream/now-ms)
+        call-action! (fn [action-key extra]
+                       (actions-fn action-key (merge {:turn-data (:turn-data turn-ctx)} extra)))]
     (fn [event]
       (when-not (or @timed-out? (cancelled?))
         (reset! last-progress-ms (now*))
@@ -152,7 +169,7 @@
 
       (= ::aborted result)
       (do
-        (prompt-stream/abort-turn! turn-ctx)
+        (stream/abort-turn! turn-ctx)
         (:final-message @(:turn-data turn-ctx)))
 
       :else
@@ -164,21 +181,21 @@
   [ai-ctx ctx session-id {:keys [ai-conv ai-model base-ai-options progress-queue turn-id]}]
   (let [{:keys [done-p actions-fn turn-ctx last-progress-ms timed-out?]}
         (create-live-turn-context ctx session-id ai-model progress-queue turn-id)
-        ai-options       (capture-aware-ai-options ctx session-id turn-id base-ai-options)
-        cancelled-pred   #(prompt-stream/cancelled-stream-handle? (:stream-handle @(:turn-data turn-ctx)))
-        _stream-handle   (prompt-stream/mark-turn-stream-handle!
-                          turn-ctx
-                          (do-stream! ai-ctx ai-conv ai-model ai-options
-                                      (make-provider-event-consumer
-                                       turn-ctx actions-fn last-progress-ms timed-out?
-                                       {:cancelled-pred cancelled-pred
-                                        :now-fn prompt-stream/now-ms})))
-        assistant-msg    (await-assistant-message!
-                          turn-ctx done-p last-progress-ms timed-out?
-                          {:idle-timeout-ms (:llm-stream-idle-timeout-ms ai-options)
-                           :wait-poll-ms    (:llm-stream-wait-poll-ms ai-options)
-                           :abort-pred      cancelled-pred})
-        _                (swap! (:turn-data turn-ctx) dissoc :stream-handle)]
+        ai-options      (capture-aware-ai-options ctx session-id turn-id base-ai-options)
+        cancelled-pred  #(stream/cancelled-stream-handle? (:stream-handle @(:turn-data turn-ctx)))
+        _stream-handle  (stream/mark-turn-stream-handle!
+                         turn-ctx
+                         (do-stream! ai-ctx ai-conv ai-model ai-options
+                                     (make-provider-event-consumer
+                                      turn-ctx actions-fn last-progress-ms timed-out?
+                                      {:cancelled-pred cancelled-pred
+                                       :now-fn stream/now-ms})))
+        assistant-msg   (await-assistant-message!
+                         turn-ctx done-p last-progress-ms timed-out?
+                         {:idle-timeout-ms (:llm-stream-idle-timeout-ms ai-options)
+                          :wait-poll-ms    (:llm-stream-wait-poll-ms ai-options)
+                          :abort-pred      cancelled-pred})
+        _               (swap! (:turn-data turn-ctx) dissoc :stream-handle)]
     {:turn-id           turn-id
      :model             ai-model
      :ai-options        ai-options
@@ -186,7 +203,7 @@
      :assistant-message assistant-msg}))
 
 (defn execute-prepared-request!
-  "Execute one prepared request through the existing turn-streaming runtime.
+  "Execute one prepared request through the live turn runtime.
    Returns a shaped execution-result map."
   [ai-ctx ctx session-id prepared-request progress-queue]
   (let [turn-id         (:prepared-request/id prepared-request)
@@ -202,7 +219,7 @@
                              :base-ai-options base-ai-options
                              :progress-queue  progress-queue
                              :turn-id         turn-id})
-        outcome        (prompt-recording/classify-assistant-message assistant-message)]
+        outcome         (classify-assistant-message assistant-message)]
     {:execution-result/turn-id             turn-id
      :execution-result/session-id          session-id
      :execution-result/prepared-request-id turn-id
@@ -216,15 +233,3 @@
      :execution-result/error-message       (:error-message assistant-message)
      :execution-result/http-status         (:http-status assistant-message)
      :execution-result/stop-reason         (:stop-reason assistant-message)}))
-
-(defn execute-prepared-request-and-journal!
-  "Execute one prepared request and append the resulting assistant message to
-   the canonical session journal. Returns the shaped execution-result map."
-  [ai-ctx ctx session-id prepared-request progress-queue]
-  (let [execution-result (execute-prepared-request! ai-ctx ctx session-id prepared-request progress-queue)
-        assistant-msg    (:execution-result/assistant-message execution-result)]
-    (dispatch/dispatch! ctx :session/append-journal-entry
-                        {:session-id session-id
-                         :entry (persist/message-entry assistant-msg)}
-                        {:origin :core})
-    execution-result))

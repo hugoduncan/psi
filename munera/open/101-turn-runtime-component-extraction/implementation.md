@@ -1,36 +1,73 @@
 2026-05-07
-- Created task `101-turn-runtime-component-extraction`.
-- Chosen target:
-  - component path: `components/turn-runtime/`
-  - namespace family: `psi.turn-runtime.*`
-  - first-cut authoritative namespaces:
-    - `psi.turn-runtime.stream`
-    - `psi.turn-runtime.accumulator`
-    - `psi.turn-runtime.core`
-- Refactoring-oriented inspection summary:
-  - `prompt_stream.clj` is already a coherent leaf namespace and should move nearly as-is.
-  - `turn_accumulator.clj` is already a coherent leaf namespace and should move nearly as-is.
-  - `prompt_runtime.clj` is nearly the extracted core already.
-  - the one explicit mixed-ownership seam is `execute-prepared-request-and-journal!`; it combines extracted turn execution with session-owned journal append semantics and therefore should not become part of the extracted component.
-- Structural inspection used `clj-surgeon` where available for outline/dependency inspection.
-  - working invocation shape in this environment is flag-based, e.g. `clj-surgeon -op :ls -file <path>` and `clj-surgeon -op :deps -file <path>`.
-- Design direction:
-  - lower-level turn execution machinery moves below `agent-session`
-  - public turn lifecycle orchestration remains above it
-  - session journaling remains above it
-  - no semantic redesign is intended in this slice
-- Review for ambiguities:
-  - Found one primary actionable ambiguity in `design.md`: the final home of `execute-prepared-request-and-journal!` was left open as either `psi.turn` or an `agent-session`/session-owned wrapper namespace.
-  - This was design-significant rather than editorial because it determined the post-extraction dependency slope, the surviving session-owned wrapper surface, and where higher-level callers/tests should bind or stub journal-appending execution.
-  - Resolved in the design: `psi.turn` is now the canonical post-extraction home for `execute-prepared-request-and-journal!` as a thin session-owned wrapper over `psi.turn-runtime.core/execute-prepared-request!` plus journal append.
-  - Secondary ambiguity: verification language said focused proof should cover the extracted component but the representative command `clojure -M:test --focus psi.turn-runtime` was not a concrete test namespace pattern in the current test runner surface.
-  - Resolved in the design: the task now requires concrete moved test namespaces and exact commands to be recorded in `implementation.md` during execution, while keeping `psi.agent-session.prompt-execution-test` and `psi.agent-session.prompt-lifecycle-test` as named higher-level verification surfaces.
-- Second-pass review for ambiguities:
-  - No new major design ambiguity remains around the extraction boundary, ownership split, or journaling placement.
-  - One minor implementation-facing ambiguity remained: the phrase "any context callback wiring currently bound through `prompt-runtime`" was still generic. The actual binding surface should be treated as `components/agent-session/src/psi/agent_session/context.clj`, and the extraction should preserve the existing public callback boundary by keeping context bound to `psi.turn` functions rather than rebinding context directly to low-level `psi.turn-runtime.*` internals.
-  - One additional minor ambiguity remained in test movement language: "move clearly component-owned focused tests" still left judgment to the implementation pass. This was acceptable, but implementation should explicitly record which tests moved versus which stayed under `agent-session`, and why, so ownership stays inspectable after completion.
-- Final tightening pass:
-  - Made the steady-state production dependency slope explicit in `design.md` and `plan.md`.
-  - Clarified that no other production namespace should require `psi.turn-runtime.stream` or `psi.turn-runtime.accumulator` directly unless recorded as an explicit exception in `implementation.md`.
-  - Required moved component-owned tests to adopt `psi.turn-runtime.*-test` namespaces so namespace ownership matches component ownership.
-  - Made old-source-file removal explicit when no temporary compatibility shim is used, so the slice does not leave inert duplicate source files behind.
+- Implemented task 101 as a no-shim extraction into the new component `components/turn-runtime/`.
+- Used `clj-surgeon` before editing to confirm the extraction split:
+  - `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/prompt_stream.clj`
+  - `clj-surgeon -op :deps -file components/agent-session/src/psi/agent_session/prompt_runtime.clj`
+  - `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/turn_accumulator.clj`
+- Created the new component and authoritative namespaces:
+  - `components/turn-runtime/src/psi/turn_runtime/stream.clj` -> `psi.turn-runtime.stream`
+  - `components/turn-runtime/src/psi/turn_runtime/accumulator.clj` -> `psi.turn-runtime.accumulator`
+  - `components/turn-runtime/src/psi/turn_runtime/core.clj` -> `psi.turn-runtime.core`
+- Added component/config wiring:
+  - root `deps.edn` now includes local dep `psi/turn-runtime`
+  - root `deps.edn` run/psi/tui-demo/test/test-paths aliases now include `components/turn-runtime/src` and test aliases include `components/turn-runtime/test`
+  - `tests.edn` unit/integration source/test paths now include `components/turn-runtime/src` and `components/turn-runtime/test`
+  - `components/agent-session/deps.edn` now depends on `../turn-runtime`
+  - `tests-component-isolated.edn` was not changed in this slice
+- Moved the authoritative lower-level implementations off `agent-session`:
+  - removed `components/agent-session/src/psi/agent_session/prompt_stream.clj`
+  - removed `components/agent-session/src/psi/agent_session/turn_accumulator.clj`
+  - removed `components/agent-session/src/psi/agent_session/prompt_runtime.clj`
+- Preserved the intended ownership split:
+  - `psi.turn-runtime.core/execute-prepared-request!` is now the authoritative prepared-turn execution entrypoint
+  - `psi.turn/execute-prepared-request-and-journal!` is now the canonical session-owned wrapper that appends the assistant message to the journal after execution
+  - journal append semantics did not move into `turn-runtime`
+- Updated production consumers:
+  - `components/agent-session/src/psi/turn.clj`
+    - now requires `psi.turn-runtime.core`
+    - now owns `execute-prepared-request-and-journal!`
+    - now delegates abort to `psi.turn-runtime.core/abort-active-turn-in!`
+  - `components/agent-session/src/psi/agent_session/prompt_turn.clj`
+    - now uses `psi.turn/execute-prepared-request-and-journal!`
+  - `components/agent-session/src/psi/agent_session/tool_execution.clj`
+    - now requires `psi.turn-runtime.accumulator` for canonical progress emission
+  - `components/agent-session/src/psi/agent_session/context.clj`
+    - no callback-boundary redesign was needed; it already stayed bound to `psi.turn`, which remains the public callback surface as required
+- Test movement / ownership result:
+  - moved into `components/turn-runtime/test/psi/turn_runtime/`
+    - `core_test.clj` / namespace `psi.turn-runtime.core-test`
+      - reason: these tests primarily exercise live turn execution, prepared request execution, and prompt-loop consumers whose subject is the extracted execution runtime
+    - `accumulator_test.clj` / namespace `psi.turn-runtime.accumulator-test`
+      - reason: these tests primarily exercise stream accumulation, timeout/wait sentinel behavior, and accumulator-owned event/content assembly semantics
+  - intentionally remained under `components/agent-session/test`
+    - `prompt_lifecycle_test.clj`
+      - reason: prompt lifecycle orchestration and dispatch/statechart behavior remain agent-session owned
+    - `scheduler_lifecycle_test.clj`
+      - reason: scheduler ownership remains agent-session owned; it only stubs the extracted executor seam
+    - `runtime_test.clj`
+      - reason: app/runtime integration ownership remains above the extracted component
+    - `session_lifecycle_test.clj`
+      - reason: session creation/resume/fork lifecycle remains agent-session owned
+    - `child_session_mutation_test.clj`
+      - reason: child-session dispatch/mutation behavior remains agent-session owned
+    - `tool_execution_test.clj`
+      - reason: tool execution lifecycle and telemetry remain agent-session owned, even though progress emission now depends on `psi.turn-runtime.accumulator`
+    - `app_runtime_test.clj`, `rpc_prompt_command_test.clj`, `rpc_invariants_test.clj`
+      - reason: higher-level consumers remain adapter/runtime owned and only stub the extracted execution seam
+- Verification and fixes:
+  - initial focused run exposed one syntax error in the newly extracted `psi.turn-runtime.core` (missing closing paren in `execute-prepared-request!`)
+  - re-ran `clj-surgeon -op :ls -file components/turn-runtime/src/psi/turn_runtime/core.clj` successfully after the fix
+  - focused verification command used:
+    - `clojure -M:test --focus psi.turn-runtime.core-test --focus psi.turn-runtime.accumulator-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.runtime-test --focus psi.agent-session.session-lifecycle-test --focus psi.rpc-prompt-command-test --focus psi.rpc-invariants-test --focus psi.app-runtime-test`
+  - result: `91 tests, 506 assertions, 0 failures`
+- Final ownership search result:
+  - no remaining authoritative requires/usages of `psi.agent-session.prompt-runtime`, `psi.agent-session.prompt-stream`, or `psi.agent-session.turn-accumulator`
+  - production ownership now follows the intended slope:
+    - `context.clj` -> `psi.turn`
+    - `psi.turn` -> `psi.turn-runtime.core`
+    - `psi.turn-runtime.core` -> `psi.turn-runtime.stream`
+    - `psi.turn-runtime.core` -> `psi.turn-runtime.accumulator`
+- Notes:
+  - no compatibility shim was introduced
+  - old source files were removed in the same slice
+  - `munera/plan.md` already had unrelated local drift (`102-turn-preparation-component-extraction`) before finalization of this task; left untouched

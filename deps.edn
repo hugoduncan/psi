@@ -24,6 +24,7 @@
         psi/session-state                             {:local/root "components/session-state"}
         psi/session-journal                           {:local/root "components/session-journal"}
         psi/turn-statechart                           {:local/root "components/turn-statechart"}
+        psi/turn-runtime                              {:local/root "components/turn-runtime"}
         psi/main                                      {:local/root "bases/main"}}
  :aliases
  {:dev   {:extra-paths ["dev"]}
@@ -32,6 +33,7 @@
                         "components/app-runtime/src"
                         "components/agent-session/src"
                         "components/turn-statechart/src"
+                        "components/turn-runtime/src"
                         "components/state-kernel/src"
                         "components/session-state/src"
                         "components/session-state/src"
@@ -61,9 +63,11 @@
                         "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
+                        "components/turn-runtime/src"
                         "components/state-kernel/src"
                         "components/session-journal/src"
                         "components/turn-statechart/src"
+                        "components/turn-runtime/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -90,6 +94,7 @@
                            "components/app-runtime/src"
                            "components/agent-session/src"
                            "components/turn-statechart/src"
+                           "components/turn-runtime/src"
                            "components/agent-core/src"
                            "components/ai/src"
                            "components/engine/src"
@@ -159,6 +164,7 @@
                              "components/agent-core/test"
                              "components/agent-session/test"
                              "components/turn-statechart/test"
+                             "components/turn-runtime/test"
                              "components/session-state/test"
                              "components/session-journal/test"
                              "extensions/auto-session-name/test"
@@ -192,6 +198,7 @@
                         "components/agent-core/test"
                         "components/agent-session/test"
                         "components/turn-statechart/test"
+                        "components/turn-runtime/test"
                         "components/session-state/test"
                         "components/session-journal/test"
                         "components/state-kernel/test"

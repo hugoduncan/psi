@@ -11,9 +11,9 @@
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.prompt-runtime :as prompt-runtime]
    [psi.agent-session.runtime :as runtime]
-   [psi.session-state.state :as ss]))
+   [psi.session-state.state :as ss]
+   [psi.turn-runtime.core :as turn-runtime]))
 
 (defn build-prepared-request
   [ctx session-id opts]
@@ -21,7 +21,19 @@
 
 (defn execute-prepared-request!
   [ai-ctx ctx session-id prepared-request progress-queue]
-  (prompt-runtime/execute-prepared-request! ai-ctx ctx session-id prepared-request progress-queue))
+  (turn-runtime/execute-prepared-request! ai-ctx ctx session-id prepared-request progress-queue))
+
+(defn execute-prepared-request-and-journal!
+  "Execute one prepared request and append the resulting assistant message to
+   the canonical session journal. Returns the shaped execution-result map."
+  [ai-ctx ctx session-id prepared-request progress-queue]
+  (let [execution-result (execute-prepared-request! ai-ctx ctx session-id prepared-request progress-queue)
+        assistant-msg    (:execution-result/assistant-message execution-result)]
+    (dispatch/dispatch! ctx :session/append-journal-entry
+                        {:session-id session-id
+                         :entry (persist/message-entry assistant-msg)}
+                        {:origin :core})
+    execution-result))
 
 (defn build-record-response
   [session-id execution-result progress-queue]
@@ -156,7 +168,7 @@
   "Abort the current agent run immediately for `session-id`. Prefer
    `request-interrupt-in!` for deferred semantics."
   [ctx session-id]
-  (prompt-runtime/abort-active-turn-in! ctx session-id)
+  (turn-runtime/abort-active-turn-in! ctx session-id)
   (dispatch/dispatch! ctx :session/abort {:session-id session-id} {:origin :core}))
 
 (defn consume-queued-input-text-in!

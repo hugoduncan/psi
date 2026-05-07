@@ -8,7 +8,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.prompt-runtime]
+   [psi.turn-runtime.core]
    [psi.session-journal.store :as journal-store]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support])
@@ -48,7 +48,7 @@
           session-id        (:session-id sd)
           ctx               (retarget ctx sd)]
       (is (= :idle (ss/sc-phase-in ctx session-id)))
-      (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+      (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                     (fn [_ai-ctx _ctx sid prepared _progress-queue]
                       {:execution-result/turn-id (:prepared-request/id prepared)
                        :execution-result/session-id sid

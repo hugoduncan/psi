@@ -12,7 +12,7 @@
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.transcript]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.prompt-runtime]
+   [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.prompt-templates :as pt]
@@ -239,7 +239,7 @@
       (with-main-bootstrap-stubs
         (fn []
           (kernel/clear-event-log!)
-          (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+          (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                         (fn [_ai-ctx _ctx sid prepared _progress-queue]
                           {:execution-result/turn-id (:prepared-request/id prepared)
                            :execution-result/session-id sid
@@ -290,7 +290,7 @@
                         (fn [_ctx sid]
                           (swap! sync-calls conj sid)
                           {:ok? true})
-                        psi.agent-session.prompt-runtime/execute-prepared-request!
+                        psi.turn-runtime.core/execute-prepared-request!
                         (fn [_ai-ctx _ctx sid prepared _progress-queue]
                           {:execution-result/turn-id (:prepared-request/id prepared)
                            :execution-result/session-id sid
@@ -328,7 +328,7 @@
       (with-main-bootstrap-stubs
         (fn []
           (kernel/clear-event-log!)
-          (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+          (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                         (fn [_ai-ctx _ctx sid prepared progress-queue]
                           (reset! queued progress-queue)
                           {:execution-result/turn-id (:prepared-request/id prepared)

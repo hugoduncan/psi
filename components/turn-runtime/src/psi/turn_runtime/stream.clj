@@ -1,5 +1,5 @@
-(ns psi.agent-session.prompt-stream
-  "Shared prompt streaming helpers used by the executor and prepared-request runtime."
+(ns psi.turn-runtime.stream
+  "Shared turn streaming helpers used by live turn execution."
   (:require
    [psi.ai.core :as ai]
    [psi.turn-statechart.core :as turn-sc])

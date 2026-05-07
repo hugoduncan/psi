@@ -4,7 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.prompt-runtime]
+   [psi.turn-runtime.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
@@ -25,7 +25,7 @@
 (deftest scheduled-deliver-runs-canonical-prompt-lifecycle-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
     (kernel/clear-event-log!)
-    (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
                      :execution-result/session-id sid
@@ -69,7 +69,7 @@
 
 (deftest busy-session-fire-queues-then-idle-drains-fifo-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
-    (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
                      :execution-result/session-id sid

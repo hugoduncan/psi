@@ -7,7 +7,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.prompt-runtime :as prompt-runtime]
+   [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.state-accessors :as sa]
    [psi.memory.core :as memory]
@@ -142,7 +142,7 @@
                           "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"plain text\"}}\n")]
       (with-redefs [runtime/resolve-api-key-in (fn [_ctx _session-id _model] "test-api-key")
                     commands/dispatch-in (fn [_ctx _session-id _text _opts] nil)
-                    prompt-runtime/execute-prepared-request!
+                    turn-runtime/execute-prepared-request!
                     (fn [_ai-ctx _ctx session-id prepared _pq]
                       (deliver captured (:prepared-request/ai-options prepared))
                       {:execution-result/turn-id (:prepared-request/id prepared)

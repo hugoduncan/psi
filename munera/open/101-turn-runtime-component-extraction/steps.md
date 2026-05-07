@@ -1,43 +1,43 @@
-- [ ] Create `components/turn-runtime/src/psi/turn_runtime/` and `components/turn-runtime/test/psi/turn_runtime/`
-- [ ] Update project/test configuration for the new component paths
-  - [ ] add local component dep and source/test paths in `deps.edn`
-  - [ ] add source/test paths in `tests.edn`
-  - [ ] add `psi/turn-runtime` dep in `components/agent-session/deps.edn`
-  - [ ] update `tests-component-isolated.edn` only if needed in this slice
-- [ ] Use `clj-surgeon` structural inspection to confirm move/split boundaries before editing
-  - [ ] `prompt_stream.clj`
-  - [ ] `turn_accumulator.clj`
-  - [ ] `prompt_runtime.clj`
-- [ ] Move `components/agent-session/src/psi/agent_session/prompt_stream.clj` to `components/turn-runtime/src/psi/turn_runtime/stream.clj`
-- [ ] Rename moved namespace `psi.agent-session.prompt-stream` to `psi.turn-runtime.stream`
-- [ ] Move `components/agent-session/src/psi/agent_session/turn_accumulator.clj` to `components/turn-runtime/src/psi/turn_runtime/accumulator.clj`
-- [ ] Rename moved namespace `psi.agent-session.turn-accumulator` to `psi.turn-runtime.accumulator`
-- [ ] Split `components/agent-session/src/psi/agent_session/prompt_runtime.clj`
-  - [ ] move extracted execution runtime forms into `components/turn-runtime/src/psi/turn_runtime/core.clj`
-  - [ ] move `execute-prepared-request-and-journal!` into `psi.turn` as the canonical post-extraction journal-appending wrapper
-  - [ ] keep session-journal append behavior above the extracted boundary
-- [ ] Rename extracted execution namespace to `psi.turn-runtime.core`
-- [ ] Update all direct production consumers to require the extracted namespaces
-  - [ ] `components/agent-session/src/psi/turn.clj`
-  - [ ] `components/agent-session/src/psi/agent_session/context.clj` while preserving `psi.turn` as the public callback boundary and not binding context directly to `psi.turn-runtime.*`
-  - [ ] any remaining direct production consumers found by repo search
-- [ ] Update all direct test consumers/test helpers to require the extracted namespaces
-- [ ] Move clearly component-owned focused tests into `components/turn-runtime/test/psi/turn_runtime/` where that improves ownership clarity without widening scope
-  - [ ] rename moved tests to `psi.turn-runtime.*-test` namespaces
-  - [ ] move tests whose primary subject is stream waiting/cancel/abort behavior
-  - [ ] move tests whose primary subject is accumulator behavior or `make-turn-actions`
-  - [ ] move tests whose primary subject is live turn execution or `execute-prepared-request!`
-  - [ ] keep tests whose primary subject is lifecycle orchestration, dispatch handlers, context wiring, journaling, scheduling, or session mutation behavior under `components/agent-session/test`
-- [ ] Record in `implementation.md` which focused tests moved into `components/turn-runtime/test/psi/turn_runtime/` and which intentionally remained under `components/agent-session/test`, with a brief reason
-- [ ] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
-- [ ] Remove any temporary compatibility shims before completion
-- [ ] If no shim is used for the old `prompt-runtime` / `prompt-stream` / `turn-accumulator` namespaces, remove the old source files in this slice rather than leaving inert duplicates
-- [ ] Run focused tests from the new component boundary
-  - [ ] at least one moved stream-focused or stream-runtime-focused test namespace under `components/turn-runtime/test/psi/turn_runtime/`
-  - [ ] at least one moved accumulator/runtime execution test namespace under `components/turn-runtime/test/psi/turn_runtime/`
-- [ ] Run focused higher-level consuming-path verification
-  - [ ] `psi.agent-session.prompt-execution-test`
-  - [ ] `psi.agent-session.prompt-lifecycle-test`
-  - [ ] record exact commands in `implementation.md`
-- [ ] Confirm no remaining authoritative `psi.agent-session.prompt-runtime` / `prompt-stream` / `turn-accumulator` requires/usages remain in the repo
-- [ ] Record final ownership, journaling split, and migration notes in `implementation.md`
+- [x] Create `components/turn-runtime/src/psi/turn_runtime/` and `components/turn-runtime/test/psi/turn_runtime/`
+- [x] Update project/test configuration for the new component paths
+  - [x] add local component dep and source/test paths in `deps.edn`
+  - [x] add source/test paths in `tests.edn`
+  - [x] add `psi/turn-runtime` dep in `components/agent-session/deps.edn`
+  - [x] update `tests-component-isolated.edn` only if needed in this slice
+- [x] Use `clj-surgeon` structural inspection to confirm move/split boundaries before editing
+  - [x] `prompt_stream.clj`
+  - [x] `turn_accumulator.clj`
+  - [x] `prompt_runtime.clj`
+- [x] Move `components/agent-session/src/psi/agent_session/prompt_stream.clj` to `components/turn-runtime/src/psi/turn_runtime/stream.clj`
+- [x] Rename moved namespace `psi.agent-session.prompt-stream` to `psi.turn-runtime.stream`
+- [x] Move `components/agent-session/src/psi/agent_session/turn_accumulator.clj` to `components/turn-runtime/src/psi/turn_runtime/accumulator.clj`
+- [x] Rename moved namespace `psi.agent-session.turn-accumulator` to `psi.turn-runtime.accumulator`
+- [x] Split `components/agent-session/src/psi/agent_session/prompt_runtime.clj`
+  - [x] move extracted execution runtime forms into `components/turn-runtime/src/psi/turn_runtime/core.clj`
+  - [x] move `execute-prepared-request-and-journal!` into `psi.turn` as the canonical post-extraction journal-appending wrapper
+  - [x] keep session-journal append behavior above the extracted boundary
+- [x] Rename extracted execution namespace to `psi.turn-runtime.core`
+- [x] Update all direct production consumers to require the extracted namespaces
+  - [x] `components/agent-session/src/psi/turn.clj`
+  - [x] `components/agent-session/src/psi/agent_session/context.clj` while preserving `psi.turn` as the public callback boundary and not binding context directly to `psi.turn-runtime.*`
+  - [x] any remaining direct production consumers found by repo search
+- [x] Update all direct test consumers/test helpers to require the extracted namespaces
+- [x] Move clearly component-owned focused tests into `components/turn-runtime/test/psi/turn_runtime/` where that improves ownership clarity without widening scope
+  - [x] rename moved tests to `psi.turn-runtime.*-test` namespaces
+  - [x] move tests whose primary subject is stream waiting/cancel/abort behavior
+  - [x] move tests whose primary subject is accumulator behavior or `make-turn-actions`
+  - [x] move tests whose primary subject is live turn execution or `execute-prepared-request!`
+  - [x] keep tests whose primary subject is lifecycle orchestration, dispatch handlers, context wiring, journaling, scheduling, or session mutation behavior under `components/agent-session/test`
+- [x] Record in `implementation.md` which focused tests moved into `components/turn-runtime/test/psi/turn_runtime/` and which intentionally remained under `components/agent-session/test`, with a brief reason
+- [x] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
+- [x] Remove any temporary compatibility shims before completion
+- [x] If no shim is used for the old `prompt-runtime` / `prompt-stream` / `turn-accumulator` namespaces, remove the old source files in this slice rather than leaving inert duplicates
+- [x] Run focused tests from the new component boundary
+  - [x] at least one moved stream-focused or stream-runtime-focused test namespace under `components/turn-runtime/test/psi/turn_runtime/`
+  - [x] at least one moved accumulator/runtime execution test namespace under `components/turn-runtime/test/psi/turn_runtime/`
+- [x] Run focused higher-level consuming-path verification
+  - [x] `psi.agent-session.prompt-execution-test`
+  - [x] `psi.agent-session.prompt-lifecycle-test`
+  - [x] record exact commands in `implementation.md`
+- [x] Confirm no remaining authoritative `psi.agent-session.prompt-runtime` / `prompt-stream` / `turn-accumulator` requires/usages remain in the repo
+- [x] Record final ownership, journaling split, and migration notes in `implementation.md`

@@ -18,7 +18,7 @@
    [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.turn-accumulator :as accum]))
+   [psi.turn-runtime.accumulator :as accum]))
 
 ;; ============================================================
 ;; Content helpers

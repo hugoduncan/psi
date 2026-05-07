@@ -1,4 +1,4 @@
-(ns psi.agent-session.turn-accumulator
+(ns psi.turn-runtime.accumulator
   "Streaming turn accumulation — content blocks, text merging, tool-call assembly,
    and the make-turn-actions factory that drives the per-turn statechart.
 
@@ -9,10 +9,6 @@
    [psi.agent-session.state-accessors :as sa]
    [psi.turn-statechart.core :as turn-sc]))
 
-;; ============================================================
-;; Progress emission
-;; ============================================================
-
 (defn emit-progress!
   "Emit a progress event to the progress queue (if provided).
    Events are maps with :type :agent-event and :event-kind."
@@ -20,10 +16,6 @@
   (when progress-queue
     (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
             (assoc event :type :agent-event))))
-
-;; ============================================================
-;; Content block tracking
-;; ============================================================
 
 (defn- note-last-provider-event! [turn-data event-type data]
   (swap! turn-data assoc
@@ -70,10 +62,6 @@
      (fn [current]
        (assoc current :content-index idx :status :closed :ended-at ts)))))
 
-;; ============================================================
-;; Text merging
-;; ============================================================
-
 (defn- common-prefix-length [a b]
   (let [a*    (or a "")
         b*    (or b "")
@@ -100,10 +88,6 @@
             cp         (common-prefix-length current* incoming*)
             tail-close (and (> in-len cur-len) (>= cp (max 1 (dec cur-len))))]
         (if tail-close incoming* (str current* incoming*))))))
-
-;; ============================================================
-;; Tool-call assembly helpers
-;; ============================================================
 
 (defn- canonical-tool-call-id [turn-id content-index provider-tool-call-id]
   (or provider-tool-call-id (str turn-id "/toolcall/" content-index)))
@@ -164,10 +148,6 @@
                      :detail     (:reason invalid)
                      :error-code "tool-call/assembly-failed"})))
 
-;; ============================================================
-;; Provider identity
-;; ============================================================
-
 (defn- provider-id [provider]
   (cond
     (keyword? provider) (name provider)
@@ -185,10 +165,6 @@
   (if (anthropic-provider? ai-model)
     (swap! thinking-buffers dissoc content-index)
     (reset! thinking-buffers {})))
-
-;; ============================================================
-;; Turn actions factory
-;; ============================================================
 
 (defn- content-index [data]
   (or (:content-index data) 0))
