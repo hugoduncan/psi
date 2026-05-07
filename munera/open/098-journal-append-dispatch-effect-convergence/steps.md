@@ -17,3 +17,4 @@
 - [x] Run focused verification
 - [x] Run full unit verification
 - [x] Record final ownership and any remaining compatibility in `implementation.md`
+- [x] Add one explicit focused proof around a concrete migrated production helper so the representative production-path evidence matches the task acceptance text more directly

@@ -53,3 +53,16 @@ Final ownership boundary:
 - `agent-session.persistence/append-entry-in!` owns explicit higher-level append orchestration and optional persistence reachability
 - typed journal append effects remain only as thin shapers over the authoritative generic append effect executor path
 - no `ctx :journal-append-fn` compatibility ownership remains in production context wiring
+
+2026-05-06 implementation review:
+- review judgment: approved
+- implementation matches the task design and architectural intent: canonical ownership now flows through dispatch/effects, pure/effect separation is explicit, and required production callers were migrated without introducing a component cycle
+- review noted one optional follow-up only: the new focused convergence proof for a representative production path currently asserts the dispatch-owned append event directly; it would align even more tightly with the task acceptance text to add one explicit focused proof around a concrete migrated production helper such as `journal-user-message-in!`, `execute-prepared-request-and-journal!`, or session lifecycle initialization
+- this is non-blocking and does not change the approval judgment
+
+2026-05-06 follow-up proof tightening:
+- implemented the optional review feedback by tightening the representative production-path proof around the real migrated helper `psi.agent-session.runtime/journal-user-message-in!`
+- the focused convergence test now proves that the helper produces the canonical user message, emits dispatch event `:session/append-journal-entry`, declares effect `:persist/journal-append-entry`, and appends the corresponding canonical journal entry into session state
+- focused follow-up verification green:
+  - `bb clojure:test:unit --focus psi.agent-session.journal-append-convergence-test --focus psi.session-state.state-test --focus psi.agent-session.runtime-test`
+  - `1521 tests, 11726 assertions, 0 failures`
