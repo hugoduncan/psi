@@ -22,6 +22,7 @@
         psi/system-bootstrap                          {:local/root "components/system-bootstrap"}
         psi/state-kernel                              {:local/root "components/state-kernel"}
         psi/session-state                             {:local/root "components/session-state"}
+        psi/session-journal                           {:local/root "components/session-journal"}
         psi/main                                      {:local/root "bases/main"}}
  :aliases
  {:dev   {:extra-paths ["dev"]}
@@ -32,6 +33,7 @@
                         "components/state-kernel/src"
                         "components/session-state/src"
                         "components/session-state/src"
+                        "components/session-journal/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -58,6 +60,7 @@
                         "components/app-runtime/src"
                         "components/agent-session/src"
                         "components/state-kernel/src"
+                        "components/session-journal/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -152,6 +155,7 @@
                              "components/agent-core/test"
                              "components/agent-session/test"
                              "components/session-state/test"
+                             "components/session-journal/test"
                              "extensions/auto-session-name/test"
                              "extensions/commit-checks/test"
                              "extensions/hello-ext/test"
@@ -183,6 +187,7 @@
                         "components/agent-core/test"
                         "components/agent-session/test"
                         "components/session-state/test"
+                        "components/session-journal/test"
                         "components/state-kernel/test"
                         "extensions/auto-session-name/test"
                         "extensions/commit-checks/test"
@@ -207,6 +212,7 @@
                         "components/agent-session/src"
                         "components/state-kernel/src"
                         "components/session-state/src"
+                        "components/session-journal/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
                         "components/system-bootstrap/test"

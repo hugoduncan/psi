@@ -15,3 +15,28 @@ Execution notes to capture during implementation
 - exact helpers intentionally retained in `psi.agent-session.persistence`
 - whether any in-memory journal helpers moved after all, and why
 - focused verification commands and results
+
+2026-05-06 step 1
+
+- Used `clj-surgeon :op :ls` and `:op :deps` on `components/agent-session/src/psi/agent_session/persistence.clj` to inventory the namespace structurally before editing.
+- Scaffolded the new lower component at `components/session-journal/`.
+- Added initial authoritative namespaces:
+  - `psi.session-journal.codec`
+  - `psi.session-journal.store`
+- Seeded focused component-local test namespaces:
+  - `psi.session-journal.codec-test`
+  - `psi.session-journal.store-test`
+- This step started as scaffolding only.
+- Follow-up in the same implementation slice thinned `psi.agent-session.persistence` into a session-facing adapter over `psi.session-journal.store` for store/load/list/write entry points while retaining ctx-oriented orchestration and domain entry constructors above the boundary.
+- Moved low-level focused proof to the new component tests and reduced `agent-session`-local persistence tests to session-facing orchestration coverage.
+- `psi.session-journal.store` now owns default sessions-root and directory-layout policy, with explicit root overrides on `session-dir-for` and `list-all-sessions` for tests and controlled callers.
+- Preserved return-shape contracts for `load-session-file`, `find-most-recent-session`, `list-sessions`, and `list-all-sessions`.
+- Preserved `:message-count` semantics as count of `:message` entries only; the new store-local tests were corrected to match the existing contract instead of changing behavior.
+- Fixed v3→v4 header migration parent-id derivation in the extracted store using filename-based extraction from the parent-session path basename.
+
+Verification
+
+- `clojure -M:test --focus psi.session-journal.codec-test --focus psi.session-journal.store-test --focus psi.agent-session.persistence-test`
+  - green: `10 tests, 78 assertions, 0 failures`
+- `clojure -M:test --focus psi.agent-session.session-lifecycle-test/fork-session-persists-child-file-with-parent-lineage-test --focus psi.agent-session.session-lifecycle-test/ensure-session-loaded-in!-resumes-by-context-session-id`
+  - green: `1 tests, 7 assertions, 0 failures`
