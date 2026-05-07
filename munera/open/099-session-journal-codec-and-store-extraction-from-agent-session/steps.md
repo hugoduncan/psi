@@ -1,0 +1,10 @@
+- [ ] Inventory `psi.agent-session.persistence` and annotate each function as move-vs-keep according to the settled first-cut split
+- [ ] Create `components/session-journal/` with `psi.session-journal.codec` and `psi.session-journal.store`
+- [ ] Establish `session-journal.store` ownership of default root/layout policy, with explicit root override support on filesystem-touching public APIs where needed for tests and controlled callers
+- [ ] Extract `instant->date`, `entry->line`, and `parse-line` with focused codec tests under `components/session-journal/test/`
+- [ ] Extract header/file-path/lock/write/flush helpers with focused store tests under `components/session-journal/test/`
+- [ ] Extract load/list/discovery/migration helpers with focused store tests under `components/session-journal/test/`, preserving current observable return shapes unless an intentional contract change is recorded
+- [ ] Update `agent-session.persistence` to use thin adapters over the extracted component while keeping session-facing orchestration and entry constructors local
+- [ ] Verify at least one representative `agent-session` orchestration path that reaches write/flush/load through `agent-session.persistence` and the extracted store boundary
+  - preferred proof: a real session lifecycle or resume/list path that causes journal write/flush and then re-loads or re-discovers the persisted session through `agent-session.persistence`
+- [ ] Record the final keep/move split, public API surface, preserved-or-changed return contracts, test ownership rationale, and confirmation of the settled first-cut keep/internal decisions in `implementation.md`

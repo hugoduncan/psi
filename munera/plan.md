@@ -16,6 +16,7 @@ Backlog:
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
+`munera/open/099-session-journal-codec-and-store-extraction-from-agent-session/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.
