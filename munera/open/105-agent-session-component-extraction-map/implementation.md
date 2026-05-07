@@ -24,3 +24,8 @@ Initial map captured in `design.md`:
 Supersession decision recorded:
 - `102-turn-preparation-component-extraction` is superseded by this umbrella
 - reason: its narrow extraction target proved structurally premature without the broader component map, especially around prompt composition and turn ownership
+
+Follow-on architectural note after child task `107-project-nrepl-component-extraction`:
+- the project-nrepl extraction landed successfully as a component move, but it exposed a cross-cutting config ownership question
+- `psi.project-nrepl.config` now carries copied project-config reading logic to avoid an upward dependency on `agent-session`
+- that may be acceptable temporarily, but the umbrella should remember this as a signal that config resolution/loading may deserve its own lower shared component rather than repeated local copies in extracted subsystems

@@ -217,6 +217,12 @@ Reason it is coherent:
 - already strongly bounded as a technical subsystem
 - likely a relatively low-ambiguity extraction
 
+Follow-on note from child task `107-project-nrepl-component-extraction`:
+
+- the extraction landed structurally, but `psi.project-nrepl.config` currently carries copied project-config reading logic instead of depending on a lower shared config owner
+- this preserved behavior in the child task, but it is a signal that config-reading concerns may themselves want a dedicated lower component or otherwise explicitly shared ownership
+- revisit later whether project/user/shared/local config resolution should be extracted as a complete component rather than recopied across subsystem boundaries
+
 #### 7. Extensions runtime
 
 Responsibility:
