@@ -59,3 +59,9 @@
   - [x] remove wrappers with no legitimate production use
   - [x] if any wrapper remains intentionally, record the reason in `implementation.md`
   - [x] run focused verification for any changed adapter/test seams
+- [x] Shape exception-path duplication in `psi.tool-runtime.core/execute-tool-call-prepared!`
+  - [x] inspect the current exception branch and identify the smallest helper seam that removes duplication without hiding the local failure contract
+  - [x] factor duplicated exception shaping (`err-text`, `details`, tool-error event payload, result-message payload) into a small local helper only if the result remains locally comprehensible
+  - [x] keep canonical `:tool-error` emission and final shaped error result behavior unchanged
+  - [x] update/add focused `psi.tool-runtime.core-test` only if the refactor changes the test surface materially
+  - [x] record the shaping decision in `implementation.md`

@@ -166,6 +166,34 @@
       (record-result! result-message))
     result-message))
 
+(defn- exception-tool-result
+  [tool-call err-text details]
+  (let [call-id    (:id tool-call)
+        tool-name  (:name tool-call)
+        content    [{:type :text :text err-text}]
+        result-msg {:role         "toolResult"
+                    :tool-call-id call-id
+                    :tool-name    tool-name
+                    :content      content
+                    :is-error     true
+                    :details      details
+                    :result-text  err-text
+                    :timestamp    (java.time.Instant/now)}]
+    {:tool-call      tool-call
+     :tool-result    {:content err-text :is-error true :details details}
+     :result-message result-msg}))
+
+(defn- emit-tool-error!
+  [on-event tool-call err-text details]
+  (emit-tool-event! on-event
+                    (tool-lifecycle-event :tool-error
+                                          (:id tool-call)
+                                          (:name tool-call)
+                                          :content [{:type :text :text err-text}]
+                                          :result-text err-text
+                                          :details details
+                                          :is-error true)))
+
 (defn execute-tool-call-prepared!
   "Generic execute phase for one tool call.
 
@@ -181,30 +209,11 @@
     (try
       (execute-tool-call! services prepared-tool-call (:parsed-args prepared-tool-call))
       (catch Exception e
-        (let [call-id    (:id prepared-tool-call)
-              tool-name  (:name prepared-tool-call)
-              err-text   (str "Error: " (ex-message e))
-              details    {:exception true}
-              _          (emit-tool-event! on-event
-                                           (tool-lifecycle-event :tool-error
-                                                                 call-id
-                                                                 tool-name
-                                                                 :content [{:type :text :text err-text}]
-                                                                 :result-text err-text
-                                                                 :details details
-                                                                 :is-error true))
-              result-msg {:role         "toolResult"
-                          :tool-call-id call-id
-                          :tool-name    tool-name
-                          :content      [{:type :text :text err-text}]
-                          :is-error     true
-                          :details      details
-                          :result-text  err-text
-                          :timestamp    (java.time.Instant/now)}]
-          {:tool-call        prepared-tool-call
-           :tool-result      {:content err-text :is-error true :details details}
-           :result-message   result-msg
-           :effective-policy nil})))))
+        (let [err-text (str "Error: " (ex-message e))
+              details  {:exception true}]
+          (emit-tool-error! on-event prepared-tool-call err-text details)
+          (assoc (exception-tool-result prepared-tool-call err-text details)
+                 :effective-policy nil))))))
 
 (defn record-tool-call-prepared-result!
   "Generic record phase for one previously prepared tool result."
