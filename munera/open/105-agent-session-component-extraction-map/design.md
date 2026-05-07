@@ -67,17 +67,36 @@ The probable remaining `agent-session` core is:
 - dispatch coordination
 - statechart coordination
 - canonical session orchestration
+- cross-domain command / resolver / mutation entrypoints that are still aggregating multiple lower components rather than owning a single subsystem
 
 Representative namespaces:
 
+- `bootstrap.clj`
 - `context.clj`
+- `context_index.clj`
+- `core.clj`
+- `runtime.clj`
 - `session_lifecycle.clj`
 - `session_runtime.clj`
 - `session_close.clj`
 - `session_settings.clj`
 - `child_session_state.clj`
-- `bootstrap.clj`
-- dispatch/statechart coordination namespaces that remain central rather than domain-specific
+- `commands.clj`
+- `resolvers.clj`
+- `mutations.clj`
+- dispatch/statechart coordination namespaces that remain central rather than domain-specific:
+  - `dispatch.clj`
+  - `dispatch_effects.clj`
+  - `dispatch_handlers.clj`
+  - `dispatch_schema.clj`
+  - `statechart.clj`
+  - `state_accessors.clj`
+
+Boundary note after reviewing the current namespace surface:
+
+- `commands.clj`, `resolvers.clj`, and `mutations.clj` should currently be treated as orchestration/aggregation surfaces, not as evidence that `agent-session` should continue owning every subsystem they route into
+- domain-specific sub-entrypoints already indicate future downward ownership shifts, for example `mutations/canonical_workflows.clj`, `mutations/extensions.clj`, `mutations/prompts.clj`, `mutations/tools.clj`, `resolvers/extensions.clj`, `resolvers/scheduler.clj`, and `resolvers/workflows.clj`
+- the residual `agent-session` core should get smaller as more domain components become authoritative owners, but it should remain the session-oriented composition layer rather than disappearing entirely
 
 ### Extractable component candidates
 
@@ -98,13 +117,21 @@ Representative namespaces:
 - `skills.clj`
 - `system_prompt.clj`
 - `conversation.clj`
-- potentially prompt-facing parts of `tool_defs.clj`
+- prompt-definition/projection parts of `tool_defs.clj`
 - possibly `message_text.clj` if it proves more prompt-text than session-owned
+- likely prompt-facing config inputs currently reached through `project_preferences.clj`, `user_config.clj`, and `config_resolution.clj`, though those config owners should not be assumed to belong wholly to the prompt component
 
 Reason it is coherent:
 
 - these namespaces form one conceptual pipeline: assets -> selection -> expansion -> assembly -> provider-facing conversation projection
 - this is a stronger first-cut component boundary than splitting skills/templates/prompt into several smaller components immediately
+
+Boundary note after reviewing the current namespace surface:
+
+- prompt composition and turn orchestration should stay distinct: prompt assets decide what to send, while turn owns when/how a single agent turn is prepared, executed, recorded, and continued
+- `tool_defs.clj` appears split-brain: prompt-facing tool schema projection likely belongs with prompt composition, while runtime execution ownership belongs with the tool runtime component
+- `message_text.clj` remains ambiguous and should be treated as a review point during a concrete extraction rather than forced into prompt ownership prematurely
+- config resolution is a cross-cutting concern exposed again here: prompt composition consumes config, but that does not imply config loading itself belongs inside the prompt component
 
 #### 2. OAuth / provider auth
 
@@ -148,17 +175,26 @@ Responsibility:
 
 Representative namespaces:
 
-- `tool_execution.clj`
-- `tool_batch.clj`
+- `tools.clj`
+- `tool_runtime_adapter.clj`
 - `tool_plan.clj`
 - `tool_path.clj`
-- possibly execution-owned parts of `tool_output.clj`
-- parser seam currently in `turn_runtime/tool_args.clj`
+- execution-owned parts of `tool_output.clj`
+- post-execution shaping in `post_tool.clj`
+- runtime-facing parts of `tool_defs.clj`
 
 Reason it is coherent:
 
 - tool execution is a real domain with runtime semantics distinct from session orchestration
-- extraction candidate `104-tool-runtime-component-extraction` is a concrete child of this umbrella
+- tool ownership is now more clearly a runtime-and-shaping cluster than the earlier narrower `tool_execution.clj` naming implied
+- extracted turn code under `components/agent-session/src/psi/turn/` makes the seam clearer: turn should depend downward on tool runtime capability, not own tool runtime itself
+
+Boundary note after reviewing the current namespace surface:
+
+- the previously envisioned `104-tool-runtime-component-extraction` child is now closed, but the underlying domain boundary still appears real in the current source tree
+- `post_tool.clj` looks like tool-domain behavior rather than generic turn orchestration and should be considered with the tool component first
+- `tool_output.clj` and `tool_defs.clj` are likely split-ownership files whose prompt-facing and runtime-facing concerns may need extraction-time decomposition rather than whole-file moves
+- `tool_path.clj` may prove lower-level and reusable across prompt, turn, and workflow flows, but its semantics still align more closely with tool ownership than with session orchestration
 
 #### 4. Turn
 
@@ -171,18 +207,30 @@ Responsibility:
 
 Representative namespaces:
 
-- `psi/turn.clj`
 - `prompt_control.clj`
 - `prompt_loop.clj`
 - `prompt_turn.clj`
 - `prompt_request.clj`
 - `prompt_recording.clj`
+- prompt-lifecycle dispatch handlers:
+  - `dispatch_handlers/prompt_handlers.clj`
+  - `dispatch_handlers/prompt_lifecycle.clj`
+- extracted lower turn surface already present under `components/agent-session/src/psi/turn/`:
+  - `psi.turn.handlers`
 
 Reason it is coherent:
 
 - already one conceptual unit
 - becomes cleaner after prompt composition / auth / tool seams are made explicit
+- the current tree now shows an important intermediate state: some turn ownership has already moved out of `psi.agent-session.*`, but higher-level prompt/turn orchestration still remains mixed into `agent-session`
 - prior task `102` attempted too narrow a first cut without this wider map
+
+Boundary note after reviewing the current namespace surface:
+
+- turn is not the same thing as prompt composition: prompt composition should be a lower dependency that turn consumes
+- turn is also not the same thing as session orchestration: `agent-session` should remain the owner of multi-session/session-lifecycle concerns even after a broader turn extraction
+- the live presence of `psi.turn.handlers` indicates that turn extraction is already partially underway; follow-on task design should account for this current split state instead of pretending turn is wholly unextracted
+- landed task `100-turn-statechart-component-extraction` should now be understood as a narrower low-level turn child under this umbrella, not as a substitute for the broader turn boundary
 
 #### 5. Workflow
 
@@ -197,7 +245,12 @@ Responsibility:
 
 Representative namespaces:
 
-- the `workflow_*` namespace family
+- the `workflow_*` namespace family, including model / IR / authoring / compiler / runtime / progression / statechart namespaces
+- `workflows.clj`
+- `workflow_mutations.clj`
+- `psi_tool_workflow.clj`
+- `mutations/canonical_workflows.clj`
+- `resolvers/workflows.clj`
 - `deterministic_operations.clj`
 - `deterministic_operation_registry.clj`
 
@@ -205,6 +258,13 @@ Reason it is coherent:
 
 - already a subsystem rather than a helper cluster
 - likely one of the strongest extraction candidates in the codebase
+- the current source tree shows the workflow family is already broad enough to justify component extraction even before every entrypoint and adapter seam is perfectly isolated
+
+Boundary note after reviewing the current namespace surface:
+
+- this is the clearest remaining extraction candidate by namespace mass and conceptual cohesion
+- the workflow domain already spans authoring, loading, compilation, execution, judging, routing, progression, and deterministic-operation bridging; keeping all of that under `agent-session` increasingly looks like historical placement rather than present ownership
+- `psi_tool_workflow.clj`, `workflow_mutations.clj`, `mutations/canonical_workflows.clj`, and `resolvers/workflows.clj` are likely adapter/entrypoint seams that may remain briefly in `agent-session` during migration, but their owned logic should flow downward toward an extracted workflow component
 
 #### 6. Project nREPL
 
@@ -256,10 +316,19 @@ Representative namespaces:
 - `extensions/runtime_eql.clj`
 - `extensions/runtime_fns.clj`
 - `extensions/runtime_ui.clj`
+- likely extension-facing entrypoint seams:
+  - `mutations/extensions.clj`
+  - `resolvers/extensions.clj`
 
 Reason it is coherent:
 
 - clearly a subsystem with its own runtime concerns
+- the namespace tree already looks component-shaped: loader, runtime, API, delivery, EQL, callable fns, and UI are all explicit sub-concerns inside one domain
+
+Boundary note after reviewing the current namespace surface:
+
+- extension runtime is broad enough to be its own component, but it may be lower in extraction order than workflow/prompt/tool because it is also a dependency surface for many other domains
+- this domain likely benefits from preserving `agent-session` as a temporary higher-level composition host for entrypoints while moving the underlying runtime/loader/API ownership downward first
 
 #### 8. Scheduler
 
@@ -274,11 +343,18 @@ Representative namespaces:
 - `scheduler.clj`
 - `scheduler_runtime.clj`
 - `psi_tool_scheduler.clj`
-- scheduler-specific handlers / resolvers where ownership proves local
+- scheduler-specific entrypoint seams:
+  - `dispatch_handlers/scheduler.clj`
+  - `resolvers/scheduler.clj`
 
 Reason it is coherent:
 
 - small but distinct domain with clear runtime semantics
+
+Boundary note after reviewing the current namespace surface:
+
+- scheduler still looks like a valid extracted component, but the namespace count suggests it is a mid-to-late extraction rather than one of the first three moves
+- the explicit existence of scheduler-specific dispatch handler and resolver seams is a good sign: the runtime logic can likely move downward while `agent-session` keeps temporary orchestration entrypoints
 
 #### 9. Persistence / journal
 
@@ -293,10 +369,16 @@ Representative namespaces:
 - `persistence.clj`
 - `compaction.clj`
 - `compaction_runtime.clj`
+- journal-touching entrypoint seams are also visible in dispatch/prompt/session code, but those call sites should not be mistaken for persistence ownership
 
 Reason it is coherent:
 
 - storage/history concerns form a strong boundary from session orchestration
+
+Boundary note after reviewing the current namespace surface:
+
+- persistence/journal ownership still looks real, but it is tightly coupled to session identity and lifecycle, so extraction order should remain later than workflow/prompt/tool
+- this domain may eventually want an extracted storage/history component while still leaving session-lifecycle policy in `agent-session`
 
 #### 10. Background jobs
 
@@ -314,9 +396,14 @@ Reason it is coherent:
 
 - smaller than the major subsystems, but already a real local domain
 
+Boundary note after reviewing the current namespace surface:
+
+- background jobs still looks extractable, but the current tree suggests it is better treated as a supporting runtime substrate than as a near-term extraction priority
+- unless background-job logic starts growing independently, it may reasonably wait behind workflow, prompt, tool, and extension moves
+
 ## Extraction ordering guidance
 
-Recommended first-cut extraction order:
+Recommended first-cut extraction order after reviewing the live namespace surface:
 
 1. OAuth / provider auth — landed via child task `106`
 2. Project nREPL — landed via child task `107`
@@ -324,21 +411,35 @@ Recommended first-cut extraction order:
 4. Prompt composition / prompt assets
 5. Tool runtime
 6. Turn
-7. Scheduler
-8. Persistence / journal
-9. Extensions runtime
+7. Extensions runtime
+8. Scheduler
+9. Persistence / journal
 10. Background jobs
 
 Ordering rationale:
 
 - start with bounded subsystems that already look component-shaped
+- the current source tree makes workflow the strongest remaining extraction candidate by both size and cohesion
 - extract prompt composition before forcing a cleaner turn extraction
 - treat tool runtime and turn as adjacent but distinct follow-on decompositions
+- move extensions runtime ahead of scheduler/persistence/background jobs because its current namespace family is already explicitly substructured and component-like
 - preserve `agent-session` as the orchestration/core layer rather than the home of every domain subsystem
+
+## Current namespace-surface review summary
+
+Reviewing the current `components/agent-session/src/psi/agent_session/` tree sharpened several points:
+
+- the workflow family is now the clearest remaining extraction candidate
+- turn extraction is already partial because `components/agent-session/src/psi/turn/handlers.clj` exists, so future work should assume an in-progress split rather than a wholly internal domain
+- prompt composition, tool runtime, and turn are three adjacent but distinct boundaries and should not be collapsed into a single vague "prompt runtime" move
+- config reading/resolution has emerged as a repeated cross-cutting concern; child task `107` already exposed this, and the current prompt/config surfaces suggest that future extractions may need an explicit shared config owner instead of repeated copied logic
+- top-level `commands.clj`, `mutations.clj`, and `resolvers.clj` should be treated as aggregator seams in the residual `agent-session` core, not as proof that underlying subsystem ownership belongs there permanently
 
 ## Relationship to existing tasks
 
-- `104-tool-runtime-component-extraction` is a concrete child aligned with this umbrella
+- landed child tasks `106-provider-auth-component-extraction` and `107-project-nrepl-component-extraction` validate the umbrella's early bounded-subsystem ordering
+- landed child task `104-tool-runtime-component-extraction` confirmed the domain boundary was useful, even though tool-related ownership still remains distributed enough that the umbrella continues to track the broader tool-runtime shape
+- landed task `100-turn-statechart-component-extraction` should be treated as a narrow low-level turn child aligned with this umbrella, not as a replacement for a broader turn-component decision
 - `102-turn-preparation-component-extraction` is superseded by this umbrella because its narrow extraction target proved structurally premature without the broader component map
 - follow-on extraction tasks should reference this umbrella when they carve out one of the named component candidates
 

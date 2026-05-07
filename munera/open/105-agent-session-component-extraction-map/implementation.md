@@ -43,3 +43,16 @@ Follow-on architectural notes after child tasks `106` and `107`:
 - `psi.project-nrepl.config` now carries copied project-config reading logic to avoid an upward dependency on `agent-session`
 - that may be acceptable temporarily, but the umbrella should remember this as a signal that config resolution/loading may deserve its own lower shared component rather than repeated local copies in extracted subsystems
 - `107` also accepted one non-blocking behavior drift at the higher-level tool boundary: `project-repl/start` missing-config handling now returns a structured component result, so the `psi-tool` path may want a later follow-on if stricter tool-facing error semantics matter
+
+Live namespace-surface review completed:
+- reviewed the current `components/agent-session/src/psi/agent_session/` tree against the umbrella map
+- confirmed the residual `agent-session` core should include orchestration/aggregation namespaces like `bootstrap`, `context`, `runtime`, `commands`, `mutations`, `resolvers`, dispatch coordination, and session lifecycle/statechart wiring
+- confirmed that top-level commands/resolvers/mutations should be treated as composition seams, not as permanent ownership claims over workflow/tool/prompt/extension/scheduler domains
+- sharpened prompt vs tool vs turn boundaries:
+  - prompt composition owns assets/assembly/provider-facing conversation projection
+  - tool runtime owns execution/shaping/schema/runtime adapters
+  - turn owns single-turn lifecycle orchestration and consumes prompt/tool capabilities rather than owning them
+- observed that turn extraction is already in an intermediate state because `components/agent-session/src/psi/turn/handlers.clj` exists while high-level prompt-turn orchestration still resides under `psi.agent-session.*`
+- confirmed workflow is now the clearest remaining extraction candidate by both namespace mass and conceptual cohesion
+- updated extraction ordering to move extensions runtime ahead of scheduler/persistence/background jobs, based on the live namespace tree already being explicitly substructured and component-like
+- recorded landed task `100-turn-statechart-component-extraction` as a narrow low-level turn child under this umbrella rather than as a substitute for the broader turn boundary

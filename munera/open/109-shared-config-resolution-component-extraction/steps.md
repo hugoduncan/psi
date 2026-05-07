@@ -1,0 +1,14 @@
+- [ ] Create `components/shared-config/` with src/test structure and local component dep wiring
+- [ ] Move user-global config ownership into `psi.shared-config.user`
+- [ ] Move project shared/local config ownership into `psi.shared-config.project`
+- [ ] Move layered shared agent-session config resolution into `psi.shared-config.resolution`
+- [ ] Preserve current config precedence and malformed-file handling behavior
+- [ ] Update `components/app-runtime/src/psi/app_runtime.clj` to depend on `psi.shared-config.resolution`
+- [ ] Update `components/agent-session/src/psi/agent_session/dispatch_effects.clj` to depend on shared-config write helpers
+- [ ] Update `components/project-nrepl/src/psi/project_nrepl/config.clj` to consume shared-config lower-level readers/mergers instead of duplicated logic
+- [ ] Remove old authoritative ownership from `psi.agent-session.config-resolution`, `psi.agent-session.project-preferences`, and `psi.agent-session.user-config`
+- [ ] Remove any temporary compatibility shims before completion
+- [ ] Move or add focused tests for shared-config user/project/resolution behavior
+- [ ] Rerun focused app-runtime config-driven defaulting verification
+- [ ] Rerun focused project-nREPL config verification
+- [ ] Record final ownership and migration notes in `implementation.md`
