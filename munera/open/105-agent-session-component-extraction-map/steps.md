@@ -2,7 +2,8 @@
 - [ ] Refine candidate component membership where a namespace obviously belongs elsewhere
 - [ ] Confirm the probable residual `agent-session` core boundaries
 - [ ] Reconcile existing extraction tasks against the umbrella map
-  - [ ] keep aligned tasks open as child tasks
-  - [ ] close superseded narrow tasks
-  - [ ] identify any task that should be rewritten rather than continued as-is
+  - [x] keep aligned tasks open as child tasks
+  - [x] close superseded narrow tasks
+  - [x] identify any task that should be rewritten rather than continued as-is
+  - [x] record landed child-task outcomes for `106-provider-auth-component-extraction` and `107-project-nrepl-component-extraction`
 - [ ] Use this map as the framing reference for the next extraction-task design/refinement pass

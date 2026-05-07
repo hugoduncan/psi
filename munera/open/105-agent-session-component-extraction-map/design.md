@@ -130,6 +130,13 @@ Reason it is coherent:
 - conceptually independent from session orchestration
 - likely one of the cleanest extractions available now
 
+Follow-on result from child task `106-provider-auth-component-extraction`:
+
+- this extraction is now landed as `components/provider-auth/`
+- authoritative namespaces now live under `psi.provider-auth.*`
+- higher-level `app-runtime`, `rpc`, and `agent-session` consumers now depend downward on the extracted auth component
+- the extraction confirmed this candidate was correctly identified as a low-ambiguity first move
+
 #### 3. Tool runtime
 
 Responsibility:
@@ -217,10 +224,15 @@ Reason it is coherent:
 - already strongly bounded as a technical subsystem
 - likely a relatively low-ambiguity extraction
 
-Follow-on note from child task `107-project-nrepl-component-extraction`:
+Follow-on result from child task `107-project-nrepl-component-extraction`:
 
-- the extraction landed structurally, but `psi.project-nrepl.config` currently carries copied project-config reading logic instead of depending on a lower shared config owner
+- this extraction is now landed as `components/project-nrepl/`
+- authoritative namespaces now live under `psi.project-nrepl.*`
+- higher-level `agent-session` command/context/psi-tool/resolver consumers now depend downward on the extracted project-nREPL component
+- the extraction confirmed this candidate was correctly identified as a low-ambiguity early move
+- follow-on architectural note: `psi.project-nrepl.config` currently carries copied project-config reading logic instead of depending on a lower shared config owner
 - this preserved behavior in the child task, but it is a signal that config-reading concerns may themselves want a dedicated lower component or otherwise explicitly shared ownership
+- accepted drift from the child task review: `project-repl/start` missing-config handling now returns a structured component result, so the `psi-tool` error contract may want a later follow-on if stricter tool-facing error semantics matter
 - revisit later whether project/user/shared/local config resolution should be extracted as a complete component rather than recopied across subsystem boundaries
 
 #### 7. Extensions runtime
@@ -306,8 +318,8 @@ Reason it is coherent:
 
 Recommended first-cut extraction order:
 
-1. OAuth / provider auth
-2. Project nREPL
+1. OAuth / provider auth — landed via child task `106`
+2. Project nREPL — landed via child task `107`
 3. Workflow
 4. Prompt composition / prompt assets
 5. Tool runtime
