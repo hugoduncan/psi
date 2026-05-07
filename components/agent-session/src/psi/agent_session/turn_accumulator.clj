@@ -7,7 +7,7 @@
    [clojure.string :as str]
    [psi.agent-session.conversation :as conv-translate]
    [psi.agent-session.state-accessors :as sa]
-   [psi.turn_statechart.core :as turn-sc]))
+   [psi.turn-statechart.core :as turn-sc]))
 
 ;; ============================================================
 ;; Progress emission

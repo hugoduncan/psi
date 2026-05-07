@@ -15,7 +15,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-execution :as tool-exec]
    [psi.agent-session.tool-plan :as tool-plan]
-   [psi.turn_statechart.core :as turn-sc])
+   [psi.turn-statechart.core :as turn-sc])
   (:import
    (java.util.concurrent ExecutorService Executors)))
 

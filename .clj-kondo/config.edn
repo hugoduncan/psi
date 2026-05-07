@@ -65,7 +65,5 @@
  :linters
  {;; Malli
   :unresolved-symbol {:exclude [(malli.core/=>)]}
-  :namespace-name-mismatch {:exclude [psi.turn_statechart.core psi.turn_statechart.core-test]}
-  :underscore-in-namespace {:level :off}
   ;; Guardrails
   :clj-kondo.fulcro.>defn/invalid-gspec {:level :error}}}

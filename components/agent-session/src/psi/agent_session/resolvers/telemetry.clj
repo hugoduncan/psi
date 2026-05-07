@@ -6,7 +6,7 @@
    [psi.agent-session.resolvers.telemetry-basics :as basics]
    [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as accessors]
-   [psi.turn_statechart.core :as turn-sc]))
+   [psi.turn-statechart.core :as turn-sc]))
 (declare tool-lifecycle-summaries)
 (defn- stats-snapshot
   "Build canonical session telemetry stats from current session/journal state."

@@ -2,17 +2,18 @@ Completed.
 
 Settled target:
 - component path: `components/turn-statechart/`
-- namespace family: `psi.turn_statechart.*`
-- authoritative namespace: `psi.turn_statechart.core`
+- namespace family: `psi.turn-statechart.*`
+- authoritative namespace: `psi.turn-statechart.core`
 - authoritative source file: `components/turn-statechart/src/psi/turn_statechart/core.clj`
 
 Implementation notes:
 - created new component `components/turn-statechart/` with its own `deps.edn`
 - moved the authoritative turn statechart implementation from `components/agent-session/src/psi/agent_session/turn_statechart.clj` to `components/turn-statechart/src/psi/turn_statechart/core.clj`
+- authoritative namespace now uses kebab-case: `psi.turn-statechart.core`
 - moved the focused statechart test to `components/turn-statechart/test/psi/turn_statechart/core_test.clj`
 - renamed the focused test namespace to `psi.turn-statechart.core-test`
-- updated all known direct production consumers to require `psi.turn_statechart.core`
-- updated direct test consumers to require `psi.turn_statechart.core`
+- updated all known direct production consumers to require `psi.turn-statechart.core`
+- updated direct test consumers to require `psi.turn-statechart.core`
 - added the new component as a local dep in the repo root `deps.edn`
 - added new source/test paths in root `deps.edn` aliases and `tests.edn`
 - added `psi/turn-statechart` as a component dep of `components/agent-session/deps.edn`

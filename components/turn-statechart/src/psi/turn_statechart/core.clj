@@ -1,4 +1,4 @@
-(ns psi.turn_statechart.core
+(ns psi.turn-statechart.core
   "Per-turn stream-assembly statechart — formalises the implicit provider
    streaming accumulation in `stream-turn!` as an explicit, queryable statechart.
 
@@ -277,5 +277,3 @@
   "Return the current turn data map (deref of :turn-data atom)."
   [turn-ctx]
   @(:turn-data turn-ctx))
-
-

@@ -4,16 +4,16 @@
   - [x] add source/test paths in `tests.edn`
   - [x] update `tests-component-isolated.edn` only if needed in this slice
 - [x] Move `components/agent-session/src/psi/agent_session/turn_statechart.clj` to `components/turn-statechart/src/psi/turn_statechart/core.clj`
-- [x] Rename namespace `psi.agent-session.turn-statechart` to `psi.turn_statechart.core`
+- [x] Rename namespace `psi.agent-session.turn-statechart` to `psi.turn-statechart.core`
 - [x] Move focused statechart test `components/agent-session/test/psi/agent_session/turn_statechart_test.clj` into `components/turn-statechart/test/psi/turn_statechart/`
 - [x] Rename moved focused test namespace(s) to match the new component/namespace shape
-- [x] Update all direct production consumers to require `psi.turn_statechart.core`
+- [x] Update all direct production consumers to require `psi.turn-statechart.core`
   - [x] `components/agent-session/src/psi/agent_session/turn_accumulator.clj`
   - [x] `components/agent-session/src/psi/agent_session/prompt_stream.clj`
   - [x] `components/agent-session/src/psi/agent_session/prompt_runtime.clj`
   - [x] `components/agent-session/src/psi/agent_session/dispatch_effects.clj`
   - [x] `components/agent-session/src/psi/agent_session/resolvers/telemetry.clj`
-- [x] Update all direct test consumers/test helpers to require `psi.turn_statechart.core`
+- [x] Update all direct test consumers/test helpers to require `psi.turn-statechart.core`
 - [x] Use a temporary compatibility shim only if needed during migration
 - [x] Remove any temporary compatibility shim before completion
 - [x] Run focused statechart tests from the new component location

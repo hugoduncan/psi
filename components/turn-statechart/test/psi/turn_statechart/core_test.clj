@@ -5,7 +5,7 @@
   no shared state, no ordering dependencies."
   (:require
    [clojure.test :refer [deftest testing is]]
-   [psi.turn_statechart.core :as turn-sc]))
+   [psi.turn-statechart.core :as turn-sc]))
 
 ;; ── Helper ──────────────────────────────────────────────────
 
