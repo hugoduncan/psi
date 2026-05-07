@@ -16,7 +16,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn-accumulator :as accum]
-   [psi.agent-session.turn-statechart :as turn-sc])
+   [psi.turn_statechart.core :as turn-sc])
   (:import
    [java.util.concurrent LinkedBlockingQueue TimeUnit]))
 

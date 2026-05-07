@@ -6,7 +6,7 @@
    [psi.agent-session.resolvers.telemetry-basics :as basics]
    [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as accessors]
-   [psi.agent-session.turn-statechart :as turn-sc]))
+   [psi.turn_statechart.core :as turn-sc]))
 (declare tool-lifecycle-summaries)
 (defn- stats-snapshot
   "Build canonical session telemetry stats from current session/journal state."
@@ -206,7 +206,7 @@
                               (update :psi.tool-lifecycle.summary/started-at
                                       #(or % (when (= :tool-start event-kind) timestamp) timestamp))
                               (assoc :psi.tool-lifecycle.summary/completed?
-                                     (boolean (contains? #{:tool-result} event-kind)))
+                                     (contains? #{:tool-result} event-kind))
                               (assoc :psi.tool-lifecycle.summary/is-error (boolean is-error))
                               (assoc :psi.tool-lifecycle.summary/result-text
                                      (or result-text (:psi.tool-lifecycle.summary/result-text cur)))

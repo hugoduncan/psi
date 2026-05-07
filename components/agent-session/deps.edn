@@ -12,4 +12,5 @@
         psi/ui-state               {:local/root "../ui-state"}
         psi/state-kernel           {:local/root "../state-kernel"}
         psi/session-state          {:local/root "../session-state"}
-        psi/session-journal        {:local/root "../session-journal"}}}
+        psi/session-journal        {:local/root "../session-journal"}
+        psi/turn-statechart        {:local/root "../turn-statechart"}}}

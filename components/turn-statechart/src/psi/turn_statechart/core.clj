@@ -1,4 +1,4 @@
-(ns psi.agent-session.turn-statechart
+(ns psi.turn_statechart.core
   "Per-turn stream-assembly statechart — formalises the implicit provider
    streaming accumulation in `stream-turn!` as an explicit, queryable statechart.
 

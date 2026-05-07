@@ -19,7 +19,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.turn-statechart :as turn-sc]))
+   [psi.turn_statechart.core :as turn-sc]))
 
 (defonce ^:private scheduler-timer-handles* (atom {}))
 

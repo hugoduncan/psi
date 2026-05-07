@@ -2,7 +2,7 @@
   "Shared prompt streaming helpers used by the executor and prepared-request runtime."
   (:require
    [psi.ai.core :as ai]
-   [psi.agent-session.turn-statechart :as turn-sc])
+   [psi.turn_statechart.core :as turn-sc])
   (:import
    (java.util.concurrent Future)))
 

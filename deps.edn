@@ -23,6 +23,7 @@
         psi/state-kernel                              {:local/root "components/state-kernel"}
         psi/session-state                             {:local/root "components/session-state"}
         psi/session-journal                           {:local/root "components/session-journal"}
+        psi/turn-statechart                           {:local/root "components/turn-statechart"}
         psi/main                                      {:local/root "bases/main"}}
  :aliases
  {:dev   {:extra-paths ["dev"]}
@@ -30,10 +31,12 @@
                         "bases/main/resources"
                         "components/app-runtime/src"
                         "components/agent-session/src"
+                        "components/turn-statechart/src"
                         "components/state-kernel/src"
                         "components/session-state/src"
                         "components/session-state/src"
                         "components/session-journal/src"
+                        "components/turn-statechart/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -61,6 +64,7 @@
                         "components/agent-session/src"
                         "components/state-kernel/src"
                         "components/session-journal/src"
+                        "components/turn-statechart/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
@@ -86,6 +90,7 @@
                            "components/tui/test"
                            "components/app-runtime/src"
                            "components/agent-session/src"
+                           "components/turn-statechart/src"
                            "components/agent-core/src"
                            "components/ai/src"
                            "components/engine/src"
@@ -154,6 +159,7 @@
                              "components/rpc/test"
                              "components/agent-core/test"
                              "components/agent-session/test"
+                             "components/turn-statechart/test"
                              "components/session-state/test"
                              "components/session-journal/test"
                              "extensions/auto-session-name/test"
@@ -186,6 +192,7 @@
                         "components/rpc/test"
                         "components/agent-core/test"
                         "components/agent-session/test"
+                        "components/turn-statechart/test"
                         "components/session-state/test"
                         "components/session-journal/test"
                         "components/state-kernel/test"

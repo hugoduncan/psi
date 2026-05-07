@@ -12,7 +12,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.turn-accumulator :as accum]
-   [psi.agent-session.turn-statechart :as turn-sc]))
+   [psi.turn_statechart.core :as turn-sc]))
 
 (def ^:dynamic llm-stream-idle-timeout-ms prompt-stream/llm-stream-idle-timeout-ms)
 (def ^:dynamic llm-stream-wait-poll-ms prompt-stream/llm-stream-wait-poll-ms)

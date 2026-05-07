@@ -1,11 +1,11 @@
-(ns psi.agent-session.turn-statechart-test
+(ns psi.turn-statechart.core-test
   "Tests for the per-turn streaming statechart.
 
   Every test creates its own turn context via the Nullable pattern —
   no shared state, no ordering dependencies."
   (:require
    [clojure.test :refer [deftest testing is]]
-   [psi.agent-session.turn-statechart :as turn-sc]))
+   [psi.turn_statechart.core :as turn-sc]))
 
 ;; ── Helper ──────────────────────────────────────────────────
 
