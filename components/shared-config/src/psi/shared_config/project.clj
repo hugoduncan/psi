@@ -1,4 +1,4 @@
-(ns psi.agent-session.project-preferences
+(ns psi.shared-config.project
   "Layered project AgentSession preferences.
 
    Stored at:
@@ -105,30 +105,3 @@
         prefs      (deep-merge default-prefs
                                (or (read-local-preferences cwd) {}))]
     (write-preferences! local-file (update prefs :agent-session merge m))))
-
-(defn project-model
-  [prefs]
-  (let [provider (get-in prefs [:agent-session :model-provider])
-        model-id (get-in prefs [:agent-session :model-id])]
-    (when (and (string? provider) (string? model-id))
-      {:provider provider :id model-id})))
-
-(defn project-thinking-level
-  [prefs]
-  (let [v (get-in prefs [:agent-session :thinking-level])]
-    (when (keyword? v)
-      v)))
-
-(defn project-prompt-mode
-  "Return the project-configured prompt mode, or nil if unset."
-  [prefs]
-  (let [v (get-in prefs [:agent-session :prompt-mode])]
-    (when (#{:lambda :prose} v)
-      v)))
-
-(defn project-nucleus-prelude-override
-  "Return the project-configured nucleus prelude override, or nil."
-  [prefs]
-  (let [v (get-in prefs [:agent-session :nucleus-prelude-override])]
-    (when (string? v)
-      v)))

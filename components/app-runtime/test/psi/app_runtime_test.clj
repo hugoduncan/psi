@@ -16,7 +16,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.prompt-templates :as pt]
-   [psi.agent-session.project-preferences :as project-prefs]
+   [psi.shared-config.project :as project-prefs]
    [psi.agent-session.skills :as skills]
    [psi.agent-session.system-prompt :as sys-prompt]
    [psi.introspection.core :as introspection]

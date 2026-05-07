@@ -1,4 +1,4 @@
-(ns psi.agent-session.config-resolution
+(ns psi.shared-config.resolution
   "Unified config resolution: system < user < project-shared < project-local.
 
    Precedence (highest wins):
@@ -11,21 +11,17 @@
    Callers should use `resolve-config` to obtain a merged view, then
    use the typed accessor functions to extract individual values."
   (:require
-   [psi.agent-session.project-preferences :as project-prefs]
-   [psi.agent-session.user-config :as user-cfg]))
-
-;; ── System defaults ──────────────────────────────────────────────────────────
+   [psi.shared-config.project :as project-prefs]
+   [psi.shared-config.user :as user-cfg]))
 
 (def ^:private system-defaults
-  {:model-provider      nil
-   :model-id            nil
-   :thinking-level      :off
-   :prompt-mode         :lambda
+  {:model-provider nil
+   :model-id nil
+   :thinking-level :off
+   :prompt-mode :lambda
    :nucleus-prelude-override nil})
 
-;; ── Merge helpers ────────────────────────────────────────────────────────────
-
-(defn- agent-session-map
+(defn agent-session-map
   "Extract the :agent-session sub-map, nil-safe."
   [cfg]
   (or (:agent-session cfg) {}))
@@ -44,8 +40,6 @@
   (let [user    (agent-session-map (user-cfg/read-config))
         project (agent-session-map (project-prefs/read-preferences cwd))]
     (merge system-defaults user project)))
-
-;; ── Typed accessors ──────────────────────────────────────────────────────────
 
 (defn resolved-model
   "Return {:provider p :id id} when both fields are present, else nil."

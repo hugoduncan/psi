@@ -14,6 +14,14 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 109 shared-config extraction is now landed locally:
+  - new lower component `components/shared-config/` owns user config, project config, and shared `:agent-session` resolution
+  - `app-runtime` now depends on `psi.shared-config.resolution`
+  - `agent-session.dispatch-effects` now writes through shared-config user/project helpers
+  - `project-nrepl.config` now consumes shared-config reads/extraction instead of its copied file/merge substrate
+  - removed old authoritative `psi.agent-session.config-resolution`, `psi.agent-session.project-preferences`, and `psi.agent-session.user-config` namespaces rather than leaving shims
+  - focused verification green: `9 tests, 50 assertions, 0 failures`
+
 - Task 086 delegated-boundary runtime invocation plumbing is now landed:
   - canonical IR `:type :delegate` steps now execute through `workflow_statechart_runtime.clj`
   - delegate execution resolves target workflow definitions, renders delegated `:prompt-string`, materializes ordered delegated `:context`, creates a callee workflow run via the canonical runtime seam, and executes it through the same Phase A statechart runtime path

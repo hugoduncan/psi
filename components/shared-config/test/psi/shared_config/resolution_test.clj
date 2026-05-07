@@ -1,15 +1,14 @@
-(ns psi.agent-session.config-resolution-test
+(ns psi.shared-config.resolution-test
   (:require
    [clojure.test :refer [deftest testing is]]
-   [psi.agent-session.config-resolution :as config-resolution]
-   [psi.agent-session.project-preferences :as project-prefs]
-   [psi.agent-session.user-config :as user-config]))
+   [psi.shared-config.project :as project-prefs]
+   [psi.shared-config.resolution :as config-resolution]
+   [psi.shared-config.user :as user-config]))
 
 (deftest resolve-config-test
-  ;; Tests system/user/project precedence and nil-safe :agent-session extraction.
   (testing "returns system defaults when user and project config are empty"
-    (with-redefs [user-config/read-config              (fn [] {})
-                  project-prefs/read-preferences       (fn [_cwd] {})]
+    (with-redefs [user-config/read-config        (fn [] {})
+                  project-prefs/read-preferences (fn [_cwd] {})]
       (is (= {:model-provider nil
               :model-id nil
               :thinking-level :off
@@ -61,7 +60,6 @@
              (config-resolution/resolve-config "/tmp/project"))))))
 
 (deftest resolved-model-test
-  ;; Tests typed model extraction and provider keyword coercion.
   (testing "returns keywordized provider and id when both fields are valid strings"
     (is (= {:provider :anthropic :id "claude-sonnet-4"}
            (config-resolution/resolved-model {:model-provider "anthropic"
@@ -76,7 +74,6 @@
                                                  :model-id :claude-sonnet-4})))))
 
 (deftest resolved-thinking-level-test
-  ;; Tests thinking-level fallback to :off.
   (testing "returns configured keyword thinking level"
     (is (= :high
            (config-resolution/resolved-thinking-level {:thinking-level :high}))))
@@ -88,7 +85,6 @@
            (config-resolution/resolved-thinking-level {})))))
 
 (deftest resolved-prompt-mode-test
-  ;; Tests prompt-mode validation and fallback behavior.
   (testing "returns supported prompt modes"
     (is (= :lambda
            (config-resolution/resolved-prompt-mode {:prompt-mode :lambda})))
@@ -104,7 +100,6 @@
            (config-resolution/resolved-prompt-mode {})))))
 
 (deftest resolved-nucleus-prelude-override-test
-  ;; Tests string-only nucleus prelude override extraction.
   (testing "returns string override"
     (is (= "custom prelude"
            (config-resolution/resolved-nucleus-prelude-override

@@ -74,7 +74,7 @@
    [psi.app-runtime.tui-frontend-actions :as tui-frontend-actions]
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.agent-session.prompt-templates :as pt]
-   [psi.agent-session.config-resolution :as config-res]
+   [psi.shared-config.resolution :as config-res]
    [psi.agent-session.skills :as skills]
    [psi.session-state.model :as session-data]
    [psi.agent-session.system-prompt :as sys-prompt]

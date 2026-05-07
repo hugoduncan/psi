@@ -14,4 +14,5 @@
         psi/system-bootstrap        {:local/root "../system-bootstrap"}
         psi/state-kernel            {:local/root "../state-kernel"}
         psi/session-state           {:local/root "../session-state"}
+        psi/shared-config           {:local/root "../shared-config"}
         psi/agent-session           {:local/root "../agent-session"}}}

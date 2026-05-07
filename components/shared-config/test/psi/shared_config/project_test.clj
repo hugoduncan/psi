@@ -1,9 +1,9 @@
-(ns psi.agent-session.project-preferences-test
+(ns psi.shared-config.project-test
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.test :refer [deftest testing is]]
-   [psi.agent-session.project-preferences :as project-prefs])
+   [psi.shared-config.project :as project-prefs])
   (:import
    (java.nio.file Files)
    (java.nio.file.attribute FileAttribute)))

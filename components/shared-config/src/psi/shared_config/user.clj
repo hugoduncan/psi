@@ -1,4 +1,4 @@
-(ns psi.agent-session.user-config
+(ns psi.shared-config.user
   "User-global AgentSession configuration.
 
    Stored at: ~/.psi/agent/config.edn
@@ -53,25 +53,3 @@
   [m]
   (let [cfg (read-config)]
     (write-config! (update cfg :agent-session merge m))))
-
-(defn user-model
-  [cfg]
-  (let [provider (get-in cfg [:agent-session :model-provider])
-        model-id (get-in cfg [:agent-session :model-id])]
-    (when (and (string? provider) (string? model-id))
-      {:provider provider :id model-id})))
-
-(defn user-thinking-level
-  [cfg]
-  (let [v (get-in cfg [:agent-session :thinking-level])]
-    (when (keyword? v) v)))
-
-(defn user-prompt-mode
-  [cfg]
-  (let [v (get-in cfg [:agent-session :prompt-mode])]
-    (when (#{:lambda :prose} v) v)))
-
-(defn user-nucleus-prelude-override
-  [cfg]
-  (let [v (get-in cfg [:agent-session :nucleus-prelude-override])]
-    (when (string? v) v)))

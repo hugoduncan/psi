@@ -8,7 +8,7 @@
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.project-preferences :as project-prefs]
+   [psi.shared-config.project :as project-prefs]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.state-accessors :as sa]

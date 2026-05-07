@@ -3,81 +3,21 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [psi.shared-config.project :as project-config]
+   [psi.shared-config.resolution :as shared-resolution]
+   [psi.shared-config.user :as user-config]))
 
 (def ^:private system-defaults
   {:project-nrepl {}})
 
-(def ^:private current-version 1)
-
-(defn- agent-session-map
-  [cfg]
-  (or (:agent-session cfg) {}))
-
-(defn- deep-merge
-  [& maps]
-  (apply merge-with (fn [a b]
-                      (if (and (map? a) (map? b))
-                        (deep-merge a b)
-                        b))
-         maps))
-
-(defn- read-edn-map-best-effort
-  [file default]
-  (try
-    (if (and (.exists file) (.isFile file))
-      (let [v (edn/read-string (slurp file))]
-        (if (map? v) v default))
-      default)
-    (catch Exception _
-      default)))
-
-(defn- user-config-file
-  []
-  (io/file (System/getProperty "user.home") ".psi" "agent" "config.edn"))
-
 (defn read-user-config
   []
-  (merge {:version current-version :agent-session {}}
-         (read-edn-map-best-effort (user-config-file)
-                                   {:version current-version :agent-session {}})))
-
-(defn- project-preferences-file
-  [cwd]
-  (io/file (str cwd) ".psi" "project.edn"))
-
-(defn- project-local-preferences-file
-  [cwd]
-  (io/file (str cwd) ".psi" "project.local.edn"))
-
-(defn- warn-malformed-file!
-  [file e]
-  (binding [*out* *err*]
-    (println (str "WARNING: ignoring malformed project preferences file "
-                  (.getAbsolutePath file)
-                  ": "
-                  (.getMessage e)))))
-
-(defn- read-project-preferences-file*
-  [file]
-  (try
-    (if (and (.exists file) (.isFile file))
-      (let [v (edn/read-string (slurp file))]
-        (if (map? v)
-          v
-          (do
-            (warn-malformed-file! file (ex-info "expected EDN map" {:value-type (type v)}))
-            nil)))
-      nil)
-    (catch Exception e
-      (warn-malformed-file! file e)
-      nil)))
+  (user-config/read-config))
 
 (defn read-project-preferences
   [cwd]
-  (deep-merge {:version current-version :agent-session {}}
-              (or (read-project-preferences-file* (project-preferences-file cwd)) {})
-              (or (read-project-preferences-file* (project-local-preferences-file cwd)) {})))
+  (project-config/read-preferences cwd))
 
 (defn resolve-config
   "Return merged project nREPL config for `cwd`.
@@ -86,9 +26,9 @@
    Config lives under [:agent-session :project-nrepl] in the existing user and
    project config files."
   [cwd]
-  (let [user    (or (:project-nrepl (agent-session-map (read-user-config))) {})
-        project (or (:project-nrepl (agent-session-map (read-project-preferences cwd))) {})]
-    (deep-merge system-defaults {:project-nrepl user} {:project-nrepl project})))
+  (let [user    (or (:project-nrepl (shared-resolution/agent-session-map (read-user-config))) {})
+        project (or (:project-nrepl (shared-resolution/agent-session-map (read-project-preferences cwd))) {})]
+    (project-config/deep-merge system-defaults {:project-nrepl user} {:project-nrepl project})))
 
 (defn resolve-target-worktree
   "Resolve the effective project nREPL target worktree.
