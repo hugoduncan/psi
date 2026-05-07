@@ -257,6 +257,7 @@
                         "components/session-journal/src"
                         "components/shared-config/src"
                         "components/project-nrepl/src"
+                        "components/prompt-assets/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
                         "components/system-bootstrap/test"
