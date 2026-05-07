@@ -2,8 +2,8 @@
   "Pathom3 resolvers for managed project nREPL projection state."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]))
+   [psi.project-nrepl.config :as project-nrepl-config]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]))
 
 (def ^:private project-nrepl-output
   [:psi.project-nrepl/id

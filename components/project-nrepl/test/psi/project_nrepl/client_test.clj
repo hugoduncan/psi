@@ -1,9 +1,9 @@
-(ns psi.agent-session.project-nrepl-client-test
+(ns psi.project-nrepl.client-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [nrepl.core]
-   [psi.agent-session.project-nrepl-client :as project-nrepl-client]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.client :as project-nrepl-client]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- make-ctx []

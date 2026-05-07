@@ -14,6 +14,7 @@
         psi/state-kernel           {:local/root "../state-kernel"}
         psi/session-state          {:local/root "../session-state"}
         psi/session-journal        {:local/root "../session-journal"}
+        psi/project-nrepl          {:local/root "../project-nrepl"}
         psi/turn-statechart        {:local/root "../turn-statechart"}
         psi/turn-runtime           {:local/root "../turn-runtime"}
         psi/tool-runtime           {:local/root "../tool-runtime"}}}

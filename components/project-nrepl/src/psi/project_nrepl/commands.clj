@@ -1,10 +1,10 @@
-(ns psi.agent-session.project-nrepl-commands
+(ns psi.project-nrepl.commands
   "Formatting + command dispatch helpers for managed project nREPL operations."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config]
-   [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.config :as project-nrepl-config]
+   [psi.project-nrepl.ops :as project-nrepl-ops]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.session-state.state :as ss]))
 
 (defn format-project-nrepl-status

@@ -1,14 +1,14 @@
-(ns psi.agent-session.project-nrepl-config
+(ns psi.project-nrepl.config
   "Config, targeting, and file-based discovery helpers for managed project nREPL support."
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [clojure.string :as str]
-   [psi.agent-session.project-preferences :as project-prefs]
-   [psi.agent-session.user-config :as user-cfg]))
+   [clojure.string :as str]))
 
 (def ^:private system-defaults
   {:project-nrepl {}})
+
+(def ^:private current-version 1)
 
 (defn- agent-session-map
   [cfg]
@@ -22,6 +22,40 @@
                         b))
          maps))
 
+(defn- read-edn-map-best-effort
+  [file default]
+  (try
+    (if (and (.exists file) (.isFile file))
+      (let [v (edn/read-string (slurp file))]
+        (if (map? v) v default))
+      default)
+    (catch Exception _
+      default)))
+
+(defn- user-config-file
+  []
+  (io/file (System/getProperty "user.home") ".psi" "agent" "config.edn"))
+
+(defn read-user-config
+  []
+  (merge {:version current-version :agent-session {}}
+         (read-edn-map-best-effort (user-config-file)
+                                   {:version current-version :agent-session {}})))
+
+(defn- project-preferences-file
+  [cwd]
+  (io/file (str cwd) ".psi" "project.edn"))
+
+(defn- project-local-preferences-file
+  [cwd]
+  (io/file (str cwd) ".psi" "project.local.edn"))
+
+(defn read-project-preferences
+  [cwd]
+  (deep-merge {:version current-version :agent-session {}}
+              (read-edn-map-best-effort (project-preferences-file cwd) {})
+              (read-edn-map-best-effort (project-local-preferences-file cwd) {})))
+
 (defn resolve-config
   "Return merged project nREPL config for `cwd`.
 
@@ -29,8 +63,8 @@
    Config lives under [:agent-session :project-nrepl] in the existing user and
    project config files."
   [cwd]
-  (let [user    (or (:project-nrepl (agent-session-map (user-cfg/read-config))) {})
-        project (or (:project-nrepl (agent-session-map (project-prefs/read-preferences cwd))) {})]
+  (let [user    (or (:project-nrepl (agent-session-map (read-user-config))) {})
+        project (or (:project-nrepl (agent-session-map (read-project-preferences cwd))) {})]
     (deep-merge system-defaults {:project-nrepl user} {:project-nrepl project})))
 
 (defn resolve-target-worktree

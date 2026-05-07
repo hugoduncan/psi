@@ -56,3 +56,64 @@ Resolved open questions:
 - session-state dependencies:
   - allowed in this slice
   - the required ownership shift is removal of `psi.agent-session.*` implementation ownership, not elimination of `psi.session-state.state` usage
+
+Implementation result:
+- created authoritative component `components/project-nrepl/`
+- moved the managed project nREPL namespace family to `psi.project-nrepl.*`
+- updated direct higher-level consumers in `agent-session` to require the extracted namespaces
+- removed the old `psi.agent-session.project-nrepl-*` source owners instead of leaving compatibility shims
+- kept the `commands` namespace inside the extracted component for this first cut because its implementation remained subsystem-owned command parsing/dispatch rather than broader command-router integration
+
+Authoritative moved namespaces:
+- `psi.project-nrepl.config`
+- `psi.project-nrepl.runtime`
+- `psi.project-nrepl.client`
+- `psi.project-nrepl.attach`
+- `psi.project-nrepl.started`
+- `psi.project-nrepl.eval`
+- `psi.project-nrepl.ops`
+- `psi.project-nrepl.commands`
+
+Component/test wiring changes:
+- added `components/project-nrepl/deps.edn`
+- added root `deps.edn` component dep and source/test paths for `project-nrepl`
+- added `psi/project-nrepl` as a dep in `components/agent-session/deps.edn`
+- added `components/project-nrepl` source/test paths in `tests.edn`
+
+Moved focused tests into `components/project-nrepl/test/psi/project_nrepl/`:
+- `config_test.clj`
+- `runtime_test.clj`
+- `client_test.clj`
+- `attach_test.clj`
+- `started_test.clj`
+- `eval_test.clj`
+- `commands_test.clj`
+
+Tests intentionally kept under higher-level owning component:
+- `components/agent-session/test/psi/agent_session/project_nrepl_resolvers_test.clj`
+  - remains above the boundary because it proves resolver projection from agent-session graph surfaces
+- `components/agent-session/test/psi/agent_session/project_nrepl_observability_test.clj`
+  - remains above the boundary because it proves graph/introspection surfaces rather than raw subsystem behavior
+- `components/agent-session/test/psi/agent_session/project_nrepl_extension_install_test.clj`
+  - remains above the boundary because it proves integration with extension install and session runtime paths
+- `components/agent-session/test/psi/agent_session/tools_test.clj`
+  - remains above the boundary because it proves higher-level tool routing into project-nREPL ops
+
+Boundary outcome notes:
+- `psi.project-nrepl.*` no longer depends on `psi.agent-session.*` implementation namespaces directly
+- the only retained lower dependency from the extracted component is `psi.session-state.state`, which was explicitly allowed by the design
+- config loading was localized into `psi.project-nrepl.config` so extracted code no longer depends on `psi.agent-session.project-preferences` or `psi.agent-session.user-config`
+
+Verification:
+- focused extracted-component verification green:
+  - `bb clojure:test:unit --focus psi.project-nrepl.config-test --focus psi.project-nrepl.runtime-test --focus psi.project-nrepl.client-test --focus psi.project-nrepl.attach-test --focus psi.project-nrepl.started-test --focus psi.project-nrepl.eval-test --focus psi.project-nrepl.commands-test`
+  - result: `1514 tests, 11723 assertions, 0 failures`
+- focused higher-level consuming-path verification green:
+  - `bb clojure:test:unit --focus psi.agent-session.project-nrepl-resolvers-test --focus psi.agent-session.project-nrepl-observability-test --focus psi.agent-session.project-nrepl-extension-install-test --focus psi.agent-session.tools-test`
+  - result: `1514 tests, 11051 assertions, 0 failures`
+
+Completion checks:
+- no compatibility shim introduced
+- old authoritative `components/agent-session/src/psi/agent_session/project_nrepl_*.clj` files removed
+- old focused agent-session-owned subsystem tests removed after move into the new component
+- repo search after migration showed no remaining production/test requires of `psi.agent-session.project-nrepl-*`; remaining mentions are task design prose and higher-level test namespaces that intentionally keep their `agent-session` test ownership labels

@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-session-context

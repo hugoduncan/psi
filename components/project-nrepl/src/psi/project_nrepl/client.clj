@@ -1,8 +1,8 @@
-(ns psi.agent-session.project-nrepl-client
+(ns psi.project-nrepl.client
   "nREPL socket + managed client-session connection for project nREPL instances."
   (:require
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]))
+   [psi.project-nrepl.config :as project-nrepl-config]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]))
 
 (defn connect-instance-in!
   "Connect to the discovered nREPL endpoint for a managed project instance and

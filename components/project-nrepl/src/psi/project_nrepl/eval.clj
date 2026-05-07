@@ -1,8 +1,8 @@
-(ns psi.agent-session.project-nrepl-eval
+(ns psi.project-nrepl.eval
   "Eval and interrupt operations for managed project nREPL instances."
   (:require
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime])
+   [psi.project-nrepl.config :as project-nrepl-config]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime])
   (:import
    (java.util UUID)))
 

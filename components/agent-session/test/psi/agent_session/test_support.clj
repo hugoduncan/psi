@@ -10,7 +10,7 @@
    [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.services :as services]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as ss]

@@ -1,25 +1,23 @@
-(ns psi.agent-session.project-nrepl-config-test
+(ns psi.project-nrepl.config-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config]
-   [psi.agent-session.project-preferences :as project-prefs]
-   [psi.agent-session.user-config :as user-config]))
+   [psi.project-nrepl.config :as project-nrepl-config]))
 
 (deftest resolve-config-test
   (testing "merges project nREPL config from user and project scopes"
-    (with-redefs [user-config/read-config (fn [] {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                                                                  :attach {:host "localhost" :port 7888}}}})
-                  project-prefs/read-preferences (fn [cwd]
-                                                   (is (= "/tmp/project" cwd))
-                                                   {:agent-session {:project-nrepl {:attach {:port 9999}}}})]
+    (with-redefs [project-nrepl-config/read-user-config (fn [] {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                                                                                :attach {:host "localhost" :port 7888}}}})
+                  project-nrepl-config/read-project-preferences (fn [cwd]
+                                                                  (is (= "/tmp/project" cwd))
+                                                                  {:agent-session {:project-nrepl {:attach {:port 9999}}}})]
       (is (= {:project-nrepl {:start-command ["bb" "nrepl-server"]
                               :attach {:host "localhost" :port 9999}}}
              (project-nrepl-config/resolve-config "/tmp/project")))))
 
   (testing "returns empty project-nrepl config when user and project config are empty"
-    (with-redefs [user-config/read-config (fn [] {})
-                  project-prefs/read-preferences (fn [_] {})]
+    (with-redefs [project-nrepl-config/read-user-config (fn [] {})
+                  project-nrepl-config/read-project-preferences (fn [_] {})]
       (is (= {:project-nrepl {}}
              (project-nrepl-config/resolve-config "/tmp/project"))))))
 

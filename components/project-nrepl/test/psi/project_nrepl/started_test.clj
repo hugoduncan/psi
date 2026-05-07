@@ -1,10 +1,10 @@
-(ns psi.agent-session.project-nrepl-started-test
+(ns psi.project-nrepl.started-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.project-nrepl-client]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
-   [psi.agent-session.project-nrepl-started :as project-nrepl-started]
+   [psi.project-nrepl.client]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.started :as project-nrepl-started]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- make-ctx []
@@ -77,15 +77,15 @@
                                                                (Thread/sleep 50)
                                                                (spit (io/file worktree ".nrepl-port") "7777\n"))
                                                              fake-process)
-                      psi.agent-session.project-nrepl-client/connect-instance-in! (fn [ctx worktree-path]
-                                                                                    (project-nrepl-runtime/update-instance-in!
-                                                                                     ctx worktree-path
-                                                                                     #(assoc %
-                                                                                             :lifecycle-state :ready
-                                                                                             :readiness true
-                                                                                             :active-session-id "nrepl-session-1"
-                                                                                             :can-eval? true
-                                                                                             :can-interrupt? true)))]
+                      psi.project-nrepl.client/connect-instance-in! (fn [ctx worktree-path]
+                                                                      (project-nrepl-runtime/update-instance-in!
+                                                                       ctx worktree-path
+                                                                       #(assoc %
+                                                                               :lifecycle-state :ready
+                                                                               :readiness true
+                                                                               :active-session-id "nrepl-session-1"
+                                                                               :can-eval? true
+                                                                               :can-interrupt? true)))]
           (let [instance (project-nrepl-started/start-instance-in!
                           ctx worktree ["bb" "nrepl-server"] {:timeout-ms 1000 :poll-interval-ms 10})]
             (is (= :ready (:lifecycle-state instance)))

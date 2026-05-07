@@ -1,14 +1,14 @@
-(ns psi.agent-session.project-nrepl-ops
+(ns psi.project-nrepl.ops
   "Canonical managed project nREPL operations and structured result shaping.
 
    Shared by psi-tool and /project-repl command handling. Contains no
    slash-command parsing and no command-formatted response text."
   (:require
-   [psi.agent-session.project-nrepl-attach :as project-nrepl-attach]
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config]
-   [psi.agent-session.project-nrepl-eval :as project-nrepl-eval]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
-   [psi.agent-session.project-nrepl-started :as project-nrepl-started]
+   [psi.project-nrepl.attach :as project-nrepl-attach]
+   [psi.project-nrepl.config :as project-nrepl-config]
+   [psi.project-nrepl.eval :as project-nrepl-eval]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.started :as project-nrepl-started]
    [psi.session-state.state :as ss]))
 
 (defn resolved-worktree-path!

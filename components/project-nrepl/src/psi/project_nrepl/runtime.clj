@@ -1,7 +1,7 @@
-(ns psi.agent-session.project-nrepl-runtime
+(ns psi.project-nrepl.runtime
   "Runtime-owned managed project nREPL registry keyed by canonical worktree path."
   (:require
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config])
+   [psi.project-nrepl.config :as project-nrepl-config])
   (:import
    (java.util UUID)))
 

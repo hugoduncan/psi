@@ -73,6 +73,14 @@ Bootstrapped on 2026-04-02.
   - removed `/tree` action payload compatibility forms; canonical action payloads are now used
   - removed targeted-event "missing session-id is ok" compatibility; session-targeted events now require canonical `:session-id` once session identity is known
   - removed remaining RPC payload camelCase/alternate key-shape fallbacks across Emacs event/projection/session-command handling
+- Task 107 project-nrepl component extraction is now landed:
+  - created new component `components/project-nrepl/` with authoritative namespace family `psi.project-nrepl.*`
+  - moved config/runtime/client/attach/started/eval/ops/commands out of `agent-session`
+  - updated agent-session commands/context/psi-tool/resolvers and higher-level tests to depend on the extracted component
+  - moved focused subsystem tests into `components/project-nrepl/test/psi/project_nrepl/`
+  - kept higher-level observability/resolvers/extension-install/tools proofs in `agent-session` tests because they verify owning integration surfaces above the extraction boundary
+  - extracted component no longer depends on `psi.agent-session.*` implementation namespaces directly
+  - focused extraction verification green and focused higher-level consuming-path verification green
 - Prompt-path compatibility cleanup now landed:
   - removed prompt-runtime timeout/abort sentinel compatibility handling; canonical internal sentinels only
   - removed prompt request runtime-model fallback scan of built-in `ai-models/all-models`; shared-session resolution now uses `model-registry` only

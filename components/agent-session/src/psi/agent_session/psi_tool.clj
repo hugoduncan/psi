@@ -9,7 +9,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.agent-session.extensions :as extensions]
-   [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
+   [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.psi-tool-workflow :as psi-tool-workflow]
    [psi.session-state.state :as session-state]

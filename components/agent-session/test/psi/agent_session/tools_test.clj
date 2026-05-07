@@ -7,7 +7,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.workflow-runtime]
    [psi.agent-session.extension-runtime :as extension-runtime]
-   [psi.agent-session.project-nrepl-ops]
+   [psi.project-nrepl.ops]
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.tools :as tools]
    [psi.ai.model-registry :as model-registry]))
@@ -491,13 +491,13 @@
     (let [[ctx session-id] (create-session-context {:persist? false
                                                     :session-defaults {:worktree-path (System/getProperty "user.dir")}})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
-      (with-redefs [psi.agent-session.project-nrepl-ops/start (fn [_ctx worktree-path]
-                                                                {:status :started
-                                                                 :instance {:worktree-path worktree-path
-                                                                            :acquisition-mode :started
-                                                                            :lifecycle-state :ready
-                                                                            :readiness true
-                                                                            :endpoint {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}}})]
+      (with-redefs [psi.project-nrepl.ops/start (fn [_ctx worktree-path]
+                                                  {:status :started
+                                                   :instance {:worktree-path worktree-path
+                                                              :acquisition-mode :started
+                                                              :lifecycle-state :ready
+                                                              :readiness true
+                                                              :endpoint {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}}})]
         (let [result ((:execute tool) {"action" "project-repl" "op" "start"})
               parsed (read-string (:content result))]
           (is (false? (:is-error result)))
@@ -508,15 +508,15 @@
     (let [[ctx session-id] (create-session-context {:persist? false
                                                     :session-defaults {:worktree-path (System/getProperty "user.dir")}})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
-      (with-redefs [psi.agent-session.project-nrepl-ops/attach (fn [_ctx worktree-path attach-input]
-                                                                 {:status :attached
-                                                                  :instance {:worktree-path worktree-path
-                                                                             :acquisition-mode :attached
-                                                                             :lifecycle-state :ready
-                                                                             :readiness true
-                                                                             :endpoint {:host (or (:host attach-input) "127.0.0.1")
-                                                                                        :port (:port attach-input)
-                                                                                        :port-source :explicit}}})]
+      (with-redefs [psi.project-nrepl.ops/attach (fn [_ctx worktree-path attach-input]
+                                                   {:status :attached
+                                                    :instance {:worktree-path worktree-path
+                                                               :acquisition-mode :attached
+                                                               :lifecycle-state :ready
+                                                               :readiness true
+                                                               :endpoint {:host (or (:host attach-input) "127.0.0.1")
+                                                                          :port (:port attach-input)
+                                                                          :port-source :explicit}}})]
         (let [result ((:execute tool) {"action" "project-repl" "op" "attach" "host" "127.0.0.1" "port" 7888})
               parsed (read-string (:content result))]
           (is (false? (:is-error result)))
@@ -527,10 +527,10 @@
     (let [[ctx session-id] (create-session-context {:persist? false
                                                     :session-defaults {:worktree-path (System/getProperty "user.dir")}})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
-      (with-redefs [psi.agent-session.project-nrepl-ops/stop (fn [_ctx _worktree-path]
-                                                               {:status :stopped
-                                                                :had-instance? true
-                                                                :prior-acquisition-mode :started})]
+      (with-redefs [psi.project-nrepl.ops/stop (fn [_ctx _worktree-path]
+                                                 {:status :stopped
+                                                  :had-instance? true
+                                                  :prior-acquisition-mode :started})]
         (let [result ((:execute tool) {"action" "project-repl" "op" "stop"})
               parsed (read-string (:content result))]
           (is (false? (:is-error result)))
@@ -541,8 +541,8 @@
     (let [[ctx session-id] (create-session-context {:persist? false
                                                     :session-defaults {:worktree-path (System/getProperty "user.dir")}})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
-      (with-redefs [psi.agent-session.project-nrepl-ops/eval-op (fn [_ctx _worktree-path _code]
-                                                                  {:status :ok :value "3" :out "" :err "" :ns "user"})]
+      (with-redefs [psi.project-nrepl.ops/eval-op (fn [_ctx _worktree-path _code]
+                                                    {:status :ok :value "3" :out "" :err "" :ns "user"})]
         (let [result ((:execute tool) {"action" "project-repl" "op" "eval" "code" "(+ 1 2)"})
               parsed (read-string (:content result))]
           (is (false? (:is-error result)))
@@ -553,8 +553,8 @@
     (let [[ctx session-id] (create-session-context {:persist? false
                                                     :session-defaults {:worktree-path (System/getProperty "user.dir")}})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
-      (with-redefs [psi.agent-session.project-nrepl-ops/interrupt (fn [_ctx _worktree-path]
-                                                                    {:status :ok :reason :interrupted})]
+      (with-redefs [psi.project-nrepl.ops/interrupt (fn [_ctx _worktree-path]
+                                                      {:status :ok :reason :interrupted})]
         (let [result ((:execute tool) {"action" "project-repl" "op" "interrupt"})
               parsed (read-string (:content result))]
           (is (false? (:is-error result)))
@@ -565,10 +565,10 @@
     (let [[ctx session-id] (create-session-context {:persist? false
                                                     :session-defaults {:worktree-path (System/getProperty "user.dir")}})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
-      (with-redefs [psi.agent-session.project-nrepl-ops/start (fn [_ctx worktree-path]
-                                                                (throw (ex-info "Project nREPL start requires a configured start-command"
-                                                                                {:phase :config
-                                                                                 :worktree-path worktree-path})))]
+      (with-redefs [psi.project-nrepl.ops/start (fn [_ctx worktree-path]
+                                                  (throw (ex-info "Project nREPL start requires a configured start-command"
+                                                                  {:phase :config
+                                                                   :worktree-path worktree-path})))]
         (let [result ((:execute tool) {"action" "project-repl" "op" "start"})
               parsed (read-string (:content result))]
           (is (true? (:is-error result)))

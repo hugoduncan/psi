@@ -1,10 +1,10 @@
-(ns psi.agent-session.project-nrepl-attach-test
+(ns psi.project-nrepl.attach-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.project-nrepl-client]
-   [psi.agent-session.project-nrepl-attach :as project-nrepl-attach]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.client]
+   [psi.project-nrepl.attach :as project-nrepl-attach]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- make-ctx []
@@ -46,15 +46,15 @@
   (testing "attach establishes attached instance and managed client session"
     (let [ctx      (make-ctx)
           worktree (System/getProperty "user.dir")]
-      (with-redefs [psi.agent-session.project-nrepl-client/connect-instance-in! (fn [ctx worktree-path]
-                                                                                  (project-nrepl-runtime/update-instance-in!
-                                                                                   ctx worktree-path
-                                                                                   #(assoc %
-                                                                                           :lifecycle-state :ready
-                                                                                           :readiness true
-                                                                                           :active-session-id "nrepl-session-1"
-                                                                                           :can-eval? true
-                                                                                           :can-interrupt? true)))]
+      (with-redefs [psi.project-nrepl.client/connect-instance-in! (fn [ctx worktree-path]
+                                                                    (project-nrepl-runtime/update-instance-in!
+                                                                     ctx worktree-path
+                                                                     #(assoc %
+                                                                             :lifecycle-state :ready
+                                                                             :readiness true
+                                                                             :active-session-id "nrepl-session-1"
+                                                                             :can-eval? true
+                                                                             :can-interrupt? true)))]
         (let [instance (project-nrepl-attach/attach-instance-in! ctx worktree {:port 7888})]
           (is (= :attached (:acquisition-mode instance)))
           (is (= :ready (:lifecycle-state instance)))
@@ -65,8 +65,8 @@
   (testing "attach failure is projected as failed state"
     (let [ctx      (make-ctx)
           worktree (System/getProperty "user.dir")]
-      (with-redefs [psi.agent-session.project-nrepl-client/connect-instance-in! (fn [_ _]
-                                                                                  (throw (ex-info "attach-boom" {:phase :connect})))]
+      (with-redefs [psi.project-nrepl.client/connect-instance-in! (fn [_ _]
+                                                                    (throw (ex-info "attach-boom" {:phase :connect})))]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"attach-boom"

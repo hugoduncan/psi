@@ -1,10 +1,10 @@
-(ns psi.agent-session.project-nrepl-started
+(ns psi.project-nrepl.started
   "Started-mode acquisition for managed project nREPL instances."
   (:require
    [clojure.java.io :as io]
-   [psi.agent-session.project-nrepl-client :as project-nrepl-client]
-   [psi.agent-session.project-nrepl-config :as project-nrepl-config]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime])
+   [psi.project-nrepl.client :as project-nrepl-client]
+   [psi.project-nrepl.config :as project-nrepl-config]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime])
   (:import
    (java.io File)
    (java.util UUID)))

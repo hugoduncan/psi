@@ -13,7 +13,7 @@
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.prompt-chain :as prompt-chain]
    [psi.turn :as turn]
    [psi.agent-session.resolvers :as resolvers]

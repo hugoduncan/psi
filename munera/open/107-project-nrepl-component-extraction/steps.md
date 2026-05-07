@@ -1,38 +1,38 @@
-- [ ] Create `components/project-nrepl/src/psi/project_nrepl/` and `components/project-nrepl/test/psi/project_nrepl/`
-- [ ] Update project/test configuration for the new component paths
-  - [ ] add local component dep and source/test paths in `deps.edn`
-  - [ ] add source/test paths in `tests.edn`
-  - [ ] add `psi/project-nrepl` dep in consuming component deps for at least `components/agent-session`
-  - [ ] update any explicit test alias path lists only where needed
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_config.clj` to `components/project-nrepl/src/psi/project_nrepl/config.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-config` to `psi.project-nrepl.config`
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_runtime.clj` to `components/project-nrepl/src/psi/project_nrepl/runtime.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-runtime` to `psi.project-nrepl.runtime`
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_client.clj` to `components/project-nrepl/src/psi/project_nrepl/client.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-client` to `psi.project-nrepl.client`
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_attach.clj` to `components/project-nrepl/src/psi/project_nrepl/attach.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-attach` to `psi.project-nrepl.attach`
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_started.clj` to `components/project-nrepl/src/psi/project_nrepl/started.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-started` to `psi.project-nrepl.started`
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_eval.clj` to `components/project-nrepl/src/psi/project_nrepl/eval.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-eval` to `psi.project-nrepl.eval`
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_ops.clj` to `components/project-nrepl/src/psi/project_nrepl/ops.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-ops` to `psi.project-nrepl.ops`
-- [ ] Move `components/agent-session/src/psi/agent_session/project_nrepl_commands.clj` to `components/project-nrepl/src/psi/project_nrepl/commands.clj`
-- [ ] Rename moved namespace `psi.agent-session.project-nrepl-commands` to `psi.project-nrepl.commands`
-- [ ] Update all direct production consumers to require the extracted namespaces where appropriate
-- [ ] Update all direct test consumers/test helpers to require the extracted namespaces where appropriate
-- [ ] Move clearly component-owned focused tests into `components/project-nrepl/test/psi/project_nrepl/` where that improves ownership clarity without widening scope
-  - [ ] rename moved tests to `psi.project-nrepl.*-test` namespaces
-  - [ ] move focused config/runtime/client/attach/started/eval tests
-  - [ ] move `commands` tests only if they primarily exercise project-nREPL-specific op parsing/dispatch independent of broader agent-session command registry/session command integration
-  - [ ] keep higher-level observability/resolvers/context/extension-install/tools integration tests in place and update requires/usages only
-- [ ] Record in `implementation.md` which focused tests moved into `components/project-nrepl/test/psi/project_nrepl/` and which intentionally remained under higher-level component tests, with a brief reason
-- [ ] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
-- [ ] Remove any temporary compatibility shims before completion
-- [ ] If no shim is used for the old project-nrepl namespaces, remove the old source files in this slice rather than leaving inert duplicates
-- [ ] Run focused tests from the new component boundary
-- [ ] Run focused higher-level consuming-path verification
-- [ ] Confirm no remaining authoritative old project-nrepl requires/usages remain in the repo
-- [ ] Confirm extracted authoritative `psi.project-nrepl.*` namespaces do not require `psi.agent-session.*` implementation namespaces directly
-- [ ] Record final ownership and migration notes in `implementation.md`
+- [x] Create `components/project-nrepl/src/psi/project_nrepl/` and `components/project-nrepl/test/psi/project_nrepl/`
+- [x] Update project/test configuration for the new component paths
+  - [x] add local component dep and source/test paths in `deps.edn`
+  - [x] add source/test paths in `tests.edn`
+  - [x] add `psi/project-nrepl` dep in consuming component deps for at least `components/agent-session`
+  - [x] update any explicit test alias path lists only where needed
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_config.clj` to `components/project-nrepl/src/psi/project_nrepl/config.clj`
+- [x] Rename moved namespace `psi.project-nrepl.config` to `psi.project-nrepl.config`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_runtime.clj` to `components/project-nrepl/src/psi/project_nrepl/runtime.clj`
+- [x] Rename moved namespace `psi.project-nrepl.runtime` to `psi.project-nrepl.runtime`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_client.clj` to `components/project-nrepl/src/psi/project_nrepl/client.clj`
+- [x] Rename moved namespace `psi.project-nrepl.client` to `psi.project-nrepl.client`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_attach.clj` to `components/project-nrepl/src/psi/project_nrepl/attach.clj`
+- [x] Rename moved namespace `psi.project-nrepl.attach` to `psi.project-nrepl.attach`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_started.clj` to `components/project-nrepl/src/psi/project_nrepl/started.clj`
+- [x] Rename moved namespace `psi.project-nrepl.started` to `psi.project-nrepl.started`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_eval.clj` to `components/project-nrepl/src/psi/project_nrepl/eval.clj`
+- [x] Rename moved namespace `psi.project-nrepl.eval` to `psi.project-nrepl.eval`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_ops.clj` to `components/project-nrepl/src/psi/project_nrepl/ops.clj`
+- [x] Rename moved namespace `psi.project-nrepl.ops` to `psi.project-nrepl.ops`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_commands.clj` to `components/project-nrepl/src/psi/project_nrepl/commands.clj`
+- [x] Rename moved namespace `psi.project-nrepl.commands` to `psi.project-nrepl.commands`
+- [x] Update all direct production consumers to require the extracted namespaces where appropriate
+- [x] Update all direct test consumers/test helpers to require the extracted namespaces where appropriate
+- [x] Move clearly component-owned focused tests into `components/project-nrepl/test/psi/project_nrepl/` where that improves ownership clarity without widening scope
+  - [x] rename moved tests to `psi.project-nrepl.*-test` namespaces
+  - [x] move focused config/runtime/client/attach/started/eval tests
+  - [x] move `commands` tests only if they primarily exercise project-nREPL-specific op parsing/dispatch independent of broader agent-session command registry/session command integration
+  - [x] keep higher-level observability/resolvers/context/extension-install/tools integration tests in place and update requires/usages only
+- [x] Record in `implementation.md` which focused tests moved into `components/project-nrepl/test/psi/project_nrepl/` and which intentionally remained under higher-level component tests, with a brief reason
+- [x] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
+- [x] Remove any temporary compatibility shims before completion
+- [x] If no shim is used for the old project-nrepl namespaces, remove the old source files in this slice rather than leaving inert duplicates
+- [x] Run focused tests from the new component boundary
+- [x] Run focused higher-level consuming-path verification
+- [x] Confirm no remaining authoritative old project-nrepl requires/usages remain in the repo
+- [x] Confirm extracted authoritative `psi.project-nrepl.*` namespaces do not require `psi.agent-session.*` implementation namespaces directly
+- [x] Record final ownership and migration notes in `implementation.md`
