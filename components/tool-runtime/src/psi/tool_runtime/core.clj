@@ -170,8 +170,9 @@
   "Generic execute phase for one tool call.
 
    Emits start/executing/update lifecycle and returns a shaped result without
-   recording the final tool result. On exception returns a shaped error result."
-  [services tool-call parsed-args]
+   recording the final tool result. On exception emits `:tool-error` and returns
+   a shaped error result."
+  [{:keys [on-event] :as services} tool-call parsed-args]
   (let [prepared-tool-call (assoc tool-call :parsed-args
                                   (or parsed-args
                                       (:parsed-args tool-call)
@@ -180,17 +181,28 @@
     (try
       (execute-tool-call! services prepared-tool-call (:parsed-args prepared-tool-call))
       (catch Exception e
-        (let [err-text   (str "Error: " (ex-message e))
+        (let [call-id    (:id prepared-tool-call)
+              tool-name  (:name prepared-tool-call)
+              err-text   (str "Error: " (ex-message e))
+              details    {:exception true}
+              _          (emit-tool-event! on-event
+                                           (tool-lifecycle-event :tool-error
+                                                                 call-id
+                                                                 tool-name
+                                                                 :content [{:type :text :text err-text}]
+                                                                 :result-text err-text
+                                                                 :details details
+                                                                 :is-error true))
               result-msg {:role         "toolResult"
-                          :tool-call-id (:id prepared-tool-call)
-                          :tool-name    (:name prepared-tool-call)
+                          :tool-call-id call-id
+                          :tool-name    tool-name
                           :content      [{:type :text :text err-text}]
                           :is-error     true
-                          :details      {:exception true}
+                          :details      details
                           :result-text  err-text
                           :timestamp    (java.time.Instant/now)}]
           {:tool-call        prepared-tool-call
-           :tool-result      {:content err-text :is-error true}
+           :tool-result      {:content err-text :is-error true :details details}
            :result-message   result-msg
            :effective-policy nil})))))
 

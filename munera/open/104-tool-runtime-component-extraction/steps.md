@@ -49,3 +49,13 @@
 - [x] Confirm no remaining authoritative `psi.agent-session.tool-execution` / `tool-batch` / `psi.turn-runtime.tool-args` requires/usages remain in the repo
 - [x] Confirm extracted authoritative `psi.tool-runtime.*` namespaces do not require `psi.agent-session.*` or `psi.turn-runtime.*` implementation namespaces directly
 - [x] Record final ownership and migration notes in `implementation.md`
+- [x] Resolve the canonical event-contract mismatch for tool failures
+  - [x] either emit canonical `:tool-error` events from `psi.tool-runtime.core` on execution failure
+  - [x] or explicitly narrow the documented first-cut event vocabulary so `:tool-result` + `:is-error true` is the authoritative failure contract
+  - [x] add/update a focused `psi.tool-runtime.core-test` proving the chosen failure-event contract
+  - [x] update `implementation.md` to record the chosen contract
+- [x] Remove or justify residual wrapper surface in `psi.agent-session.tool-runtime-adapter`
+  - [x] repo-search each wrapper surface: `tool-content->text`, `normalize-tool-content`, `tool-lifecycle-event`, `start-tool-call!`, `run-tool-call-through-runtime-effect!`
+  - [x] remove wrappers with no legitimate production use
+  - [x] if any wrapper remains intentionally, record the reason in `implementation.md`
+  - [x] run focused verification for any changed adapter/test seams

@@ -121,11 +121,26 @@ Final verification run:
 - `clojure -M:test --focus psi.turn-runtime.core-test`
   - `13 tests, 37 assertions, 0 failures`
 
+Follow-up verification run:
+- `clojure -M:test --focus psi.tool-runtime.core-test`
+  - `5 tests, 20 assertions, 0 failures`
+- `clojure -M:test --focus psi.agent-session.tool-execution-test`
+  - `9 tests, 49 assertions, 0 failures`
+- `clojure -M:test --focus psi.turn-runtime.core-test`
+  - `13 tests, 37 assertions, 0 failures`
+
 Final repo-search result:
 - no remaining production/test requires of `psi.turn-runtime.tool-args`
 - no remaining production requires of `psi.agent-session.tool-execution`
 - no remaining production requires of `psi.agent-session.tool-batch`
 - the remaining repo hit for `psi.agent-session.tool-execution` is only the higher-level test namespace name `psi.agent-session.tool-execution-test`, which intentionally remains as an `agent-session` integration test name rather than an authoritative code owner
 
+Follow-up completion note:
+- chose the design-promised failure contract rather than narrowing it: execution exceptions now emit canonical `:tool-error` before final `:tool-result` recording
+- repo search confirmed no legitimate production use for adapter wrapper surfaces `tool-content->text`, `normalize-tool-content`, `tool-lifecycle-event`, `start-tool-call!`, and `run-tool-call-through-runtime-effect!`, so they were removed rather than justified
+
 Open note:
 - this task remains intentionally narrower than a general “tool component” extraction; it extracts runtime/execution mechanics only, not tool definitions, tool UI, or every tool-adjacent namespace
+
+Review note:
+- follow-up review items are now addressed: `psi.tool-runtime.core/execute-tool-call-prepared!` emits canonical `:tool-error` on execution exceptions with focused proof in `psi.tool-runtime.core-test`, and the apparently-unused adapter wrapper functions (`tool-content->text`, `normalize-tool-content`, `tool-lifecycle-event`, `start-tool-call!`, `run-tool-call-through-runtime-effect!`) were removed from `psi.agent-session.tool-runtime-adapter` after repo search confirmed no legitimate production use

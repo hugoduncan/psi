@@ -13,18 +13,6 @@
    [psi.tool-runtime.core :as tool-runtime]
    [psi.turn-runtime.accumulator :as accum]))
 
-(defn tool-content->text
-  [content]
-  (tool-runtime/tool-content->text content))
-
-(defn normalize-tool-content
-  [content]
-  (tool-runtime/normalize-tool-content content))
-
-(defn tool-lifecycle-event
-  [event-kind tool-id tool-name & {:as extra}]
-  (apply tool-runtime/tool-lifecycle-event event-kind tool-id tool-name (mapcat identity extra)))
-
 (defn- emit-tool-lifecycle!
   [ctx session-id lifecycle-event]
   (dispatch/dispatch! ctx
@@ -76,14 +64,6 @@
                          :overrides    overrides}
      :on-event          (partial on-tool-event ctx session-id progress-queue)}))
 
-(defn start-tool-call!
-  [ctx session-id tool-call progress-queue]
-  (let [services (execution-services ctx session-id progress-queue)]
-    (tool-runtime/start-tool-call! services tool-call)
-    (dispatch/dispatch! ctx :session/tool-agent-start
-                        {:session-id session-id :tool-call tool-call}
-                        {:origin :core})))
-
 (defn execute-tool-call!
   [ctx session-id tool-call progress-queue]
   (tool-runtime/execute-tool-call!
@@ -128,13 +108,6 @@
 (defn record-tool-call-prepared-result!
   [ctx session-id shaped-result progress-queue]
   (record-tool-call-result! ctx session-id shaped-result progress-queue))
-
-(defn run-tool-call-through-runtime-effect!
-  [ctx session-id tool-call parsed-args progress-queue]
-  (record-tool-call-prepared-result!
-   ctx session-id
-   (execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue)
-   progress-queue))
 
 (defn run-tool-call!
   [ctx session-id tool-call progress-queue]
