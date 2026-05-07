@@ -1,0 +1,34 @@
+- [ ] Create `components/provider-auth/src/psi/provider_auth/` and `components/provider-auth/test/psi/provider_auth/`
+- [ ] Update project/test configuration for the new component paths
+  - [ ] add local component dep and source/test paths in `deps.edn`
+  - [ ] add source/test paths in `tests.edn`
+  - [ ] add `psi/provider-auth` dep in consuming component deps for at least `components/agent-session`, `components/app-runtime`, and `components/rpc`
+  - [ ] update any explicit test alias path lists only where needed
+- [ ] Move `components/agent-session/src/psi/agent_session/provider_auth.clj` to `components/provider-auth/src/psi/provider_auth/core.clj`
+- [ ] Rename moved namespace `psi.agent-session.provider-auth` to `psi.provider-auth.core`
+- [ ] Move `components/agent-session/src/psi/agent_session/oauth/store.clj` to `components/provider-auth/src/psi/provider_auth/oauth/store.clj`
+- [ ] Rename moved namespace `psi.agent-session.oauth.store` to `psi.provider-auth.oauth.store`
+- [ ] Move `components/agent-session/src/psi/agent_session/oauth/pkce.clj` to `components/provider-auth/src/psi/provider_auth/oauth/pkce.clj`
+- [ ] Rename moved namespace `psi.agent-session.oauth.pkce` to `psi.provider-auth.oauth.pkce`
+- [ ] Move `components/agent-session/src/psi/agent_session/oauth/callback_server.clj` to `components/provider-auth/src/psi/provider_auth/oauth/callback_server.clj`
+- [ ] Rename moved namespace `psi.agent-session.oauth.callback-server` to `psi.provider-auth.oauth.callback-server`
+- [ ] Move `components/agent-session/src/psi/agent_session/oauth/providers.clj` to `components/provider-auth/src/psi/provider_auth/oauth/providers.clj`
+- [ ] Rename moved namespace `psi.agent-session.oauth.providers` to `psi.provider-auth.oauth.providers`
+- [ ] Move `components/agent-session/src/psi/agent_session/oauth/core.clj` to `components/provider-auth/src/psi/provider_auth/oauth/core.clj`
+- [ ] Rename moved namespace `psi.agent-session.oauth.core` to `psi.provider-auth.oauth.core`
+- [ ] Update all direct production consumers to require the extracted namespaces where appropriate
+- [ ] Update all direct test consumers/test helpers to require the extracted namespaces where appropriate
+- [ ] Move clearly component-owned focused tests into `components/provider-auth/test/psi/provider_auth/` where that improves ownership clarity without widening scope
+  - [ ] rename moved tests to `psi.provider-auth.*-test` namespaces
+  - [ ] keep provider-auth helper tests under `components/provider-auth/test/psi/provider_auth/core_test.clj`
+  - [ ] move oauth/core, oauth/store, oauth/providers, oauth/pkce, and oauth/callback-server focused tests under `components/provider-auth/test/psi/provider_auth/oauth/`
+  - [ ] keep mixed higher-level app-runtime/rpc/agent-session integration tests in place and update requires/usages only
+- [ ] Record in `implementation.md` which focused tests moved into `components/provider-auth/test/psi/provider_auth/` and which intentionally remained under higher-level component tests, with a brief reason
+- [ ] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
+- [ ] Remove any temporary compatibility shims before completion
+- [ ] If no shim is used for the old provider-auth / oauth namespaces, remove the old source files in this slice rather than leaving inert duplicates
+- [ ] Run focused tests from the new component boundary
+- [ ] Run focused higher-level consuming-path verification
+- [ ] Confirm no remaining authoritative old provider-auth/oauth requires/usages remain in the repo
+- [ ] Confirm extracted authoritative `psi.provider-auth.*` namespaces do not require `psi.agent-session.*` implementation namespaces directly
+- [ ] Record final ownership and migration notes in `implementation.md`

@@ -9,6 +9,8 @@ Queue:
 
 Backlog:
 
+`munera/open/107-project-nrepl-component-extraction/`
+`munera/open/106-provider-auth-component-extraction/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/104-tool-runtime-component-extraction/`
 `munera/open/100-turn-statechart-component-extraction/`
