@@ -1,0 +1,24 @@
+- [ ] Re-read `105-agent-session-component-extraction-map` guidance for the tool-domain child boundary
+- [ ] Confirm `components/tool-registry/` and `psi.tool-registry.*` as the extracted component directory and namespace family
+- [ ] Inspect `components/agent-session/src/psi/agent_session/tool_defs.clj` for hidden dependency or split pressure
+- [ ] Inspect the tool-specific parts of `components/agent-session/src/psi/agent_session/extensions.clj` for hidden dependency or split pressure
+- [ ] Confirm the direct-registry-shape approach for tool-specific operations so the extracted component does not depend on `psi.agent-session.extensions` helper internals
+- [ ] Create the new tool-registry component directory and authoritative namespace locations
+- [ ] Move or split canonical tool-definition normalization/projection into the extracted component
+- [ ] Move tool-name validation with extension tool-registration ownership into the extracted component
+- [ ] Move or split extension tool-registration and tool-listing/query helpers into the extracted component
+- [ ] Update all direct production consumers of canonical tool defs to depend on the extracted component, including `bootstrap.clj`, `psi_tool.clj`, `tool_plan.clj`, `resolvers/extensions.clj`, and `components/ai/src/psi/ai/conversation.clj`
+- [ ] Update `mutations/extensions.clj` tool registration to call downward into the extracted component
+- [ ] Update `extensions/api.clj` tool registration to call downward into the extracted component
+- [ ] Move or add focused extracted-component tests under `components/tool-registry/test/`
+- [ ] Add `components/tool-registry/test` explicitly to the top-level `tests.edn` component test-path lists used by the standard root test runner
+- [ ] Preserve registered-tool query semantics explicitly: `tool-names-in` as cross-extension name set and `all-tools-in` as first-registration-wins by tool name
+- [ ] Preserve rich canonical tool-def maps, including runtime-only internal fields, while keeping projection helpers as the external boundary
+- [ ] Keep canonical tool-name validation scoped to extension registration in this slice unless implementation proves an existing broader invariant
+- [ ] Keep `tool-runtime` execution ownership separate; do not pull execution helpers into this component
+- [ ] Keep session tool-selection policy outside this extraction
+- [ ] Use compatibility forwarding shims only if strictly needed during migration
+- [ ] Remove any temporary compatibility shims before task completion
+- [ ] Run focused extracted-component verification
+- [ ] Run at least one focused higher-level registration/consumer verification path
+- [ ] Record the final ownership split, migrated consumers, and verification commands/results in `implementation.md`
