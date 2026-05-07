@@ -1,0 +1,24 @@
+- [ ] Create `components/turn-statechart/src/psi/turn_statechart/` and `components/turn-statechart/test/psi/turn_statechart/`
+- [ ] Update project/test configuration for the new component paths
+  - [ ] add local component dep and source/test paths in `deps.edn`
+  - [ ] add source/test paths in `tests.edn`
+  - [ ] update `tests-component-isolated.edn` only if needed in this slice
+- [ ] Move `components/agent-session/src/psi/agent_session/turn_statechart.clj` to `components/turn-statechart/src/psi/turn_statechart/core.clj`
+- [ ] Rename namespace `psi.agent-session.turn-statechart` to `psi.turn_statechart.core`
+- [ ] Move focused statechart test `components/agent-session/test/psi/agent_session/turn_statechart_test.clj` into `components/turn-statechart/test/psi/turn_statechart/`
+- [ ] Rename moved focused test namespace(s) to match the new component/namespace shape
+- [ ] Update all direct production consumers to require `psi.turn_statechart.core`
+  - [ ] `components/agent-session/src/psi/agent_session/turn_accumulator.clj`
+  - [ ] `components/agent-session/src/psi/agent_session/prompt_stream.clj`
+  - [ ] `components/agent-session/src/psi/agent_session/prompt_runtime.clj`
+  - [ ] `components/agent-session/src/psi/agent_session/dispatch_effects.clj`
+  - [ ] `components/agent-session/src/psi/agent_session/resolvers/telemetry.clj`
+- [ ] Update all direct test consumers/test helpers to require `psi.turn_statechart.core`
+- [ ] Use a temporary compatibility shim only if needed during migration
+- [ ] Remove any temporary compatibility shim before completion
+- [ ] Run focused statechart tests from the new component location
+  - [ ] `clojure -M:test --focus psi.turn-statechart.core-test`
+- [ ] Run at least one focused higher-level consuming-path verification
+  - [ ] `clojure -M:test --focus psi.turn-statechart.core-test --focus psi.agent-session.turn-accumulator-test --focus psi.agent-session.prompt-execution-test`
+- [ ] Confirm no remaining `psi.agent-session.turn-statechart` requires/usages remain in the repo
+- [ ] Record final ownership and migration notes in `implementation.md`
