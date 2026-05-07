@@ -41,3 +41,21 @@
   - [x] record exact commands in `implementation.md`
 - [x] Confirm no remaining authoritative `psi.agent-session.prompt-runtime` / `prompt-stream` / `turn-accumulator` requires/usages remain in the repo
 - [x] Record final ownership, journaling split, and migration notes in `implementation.md`
+- [x] Remove the direct `agent-session <-> turn-runtime` component cycle
+- [x] Re-home turn-execution mutation ownership out of `agent-session`
+  - [x] move turn-context mutation ownership to `turn-runtime`
+  - [x] move tool-call-attempt telemetry mutation ownership to `turn-runtime`
+  - [x] move provider request/reply capture mutation ownership to `turn-runtime`
+  - [x] keep journal append ownership above the boundary in `psi.turn` / `agent-session`
+- [x] Keep tool-output accounting out of `turn-runtime` ownership for this extraction
+  - [x] leave `record-tool-output-stat` above the boundary as explicit deferred tool-domain follow-on
+  - [x] keep turn-runtime focused on turn execution, not tool accounting policy
+- [x] Remove remaining `agent-session` namespace requires from `psi.turn-runtime.core` and `psi.turn-runtime.accumulator`
+- [x] Converge lower shared helpers downward without callback seams
+  - [x] keep assistant-message classification in one lower authoritative runtime home for this extraction slice
+  - [x] move or extract generic tool-argument parsing currently borrowed from `psi.agent-session.conversation`
+  - [x] move or extract any generic bounded telemetry/update helpers needed by `turn-runtime`
+- [x] Replace `psi.agent-session.state-accessors` usage from `turn-runtime` with lower-owned state/mutation surfaces
+  - [x] preserve explicit data-oriented boundaries
+  - [x] do not introduce callback-based indirection for this follow-up
+- [x] Re-run focused verification after breaking the cycle and record the updated command/result in `implementation.md`

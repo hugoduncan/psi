@@ -67,6 +67,14 @@
     - `psi.turn` -> `psi.turn-runtime.core`
     - `psi.turn-runtime.core` -> `psi.turn-runtime.stream`
     - `psi.turn-runtime.core` -> `psi.turn-runtime.accumulator`
+- Follow-up status:
+  - the ownership/cycle defect found in post-extraction review was resolved by closed task `103-turn-runtime-ownership-boundary-repair`
+  - follow-on cleanup `3628a9f0` then removed the now-obsolete migrated turn-runtime state accessors from `psi.agent-session.state-accessors`
+  - `turn-runtime` no longer depends on `psi.agent-session.*`, and the direct `agent-session <-> turn-runtime` component cycle is gone
+- Deferred note:
+  - `record-tool-output-stat` remains above the boundary as explicit tool-domain follow-on work; this was intentionally not required to complete the extraction itself
+- Closure note:
+  - the extraction work for task `101` is complete; the only remaining related work is the explicitly deferred tool-accounting ownership follow-on tracked outside this task's closure
 - Notes:
   - no compatibility shim was introduced
   - old source files were removed in the same slice
