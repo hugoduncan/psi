@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.commands :as project-nrepl-commands]
-   [psi.project-nrepl.config]
    [psi.project-nrepl.ops]
    [psi.agent-session.test-support :as test-support]))
 
@@ -23,11 +22,15 @@
       (is (re-find #"Project nREPL" (:message result)))))
 
   (testing "/project-repl start reports missing command configuration clearly"
-    (let [worktree-path      (System/getProperty "user.dir")
+    (let [worktree-path    (System/getProperty "user.dir")
           [ctx session-id] (test-support/create-test-session {:persist? false
                                                               :session-defaults {:worktree-path worktree-path}})]
-      (with-redefs [psi.project-nrepl.config/resolve-config (fn [_]
-                                                              {:project-nrepl {}})]
+      (with-redefs [psi.project-nrepl.ops/start (fn [_ctx _worktree-path]
+                                                  {:status :missing-start-command
+                                                   :worktree-path worktree-path
+                                                   :config-paths ["~/.psi/agent/config.edn"
+                                                                  (str worktree-path "/.psi/project.edn")
+                                                                  (str worktree-path "/.psi/project.local.edn")]})]
         (let [result (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id "/project-repl start")]
           (is (= :text (:type result)))
           (is (re-find #"requires a configured start-command" (:message result)))

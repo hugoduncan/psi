@@ -62,19 +62,15 @@
       {:type :text :message (format-project-nrepl-status ctx session-id)}
 
       (= trimmed "/project-repl start")
-      (let [cfg            (project-nrepl-config/resolve-config worktree-path)
-            command-vector (project-nrepl-config/resolved-start-command cfg)]
-        (if-not command-vector
-          {:type :text
-           :message (missing-start-command-message worktree-path)}
-          (let [{:keys [status instance]} (project-nrepl-ops/start ctx worktree-path)]
-            {:type :text
-             :message (case status
-                        :present (str "Project nREPL already ready for " (:worktree-path instance)
-                                      " at " (get-in instance [:endpoint :host]) ":" (get-in instance [:endpoint :port]))
-                        :started (str "Started project nREPL for " (:worktree-path instance)
-                                      " at " (get-in instance [:endpoint :host]) ":" (get-in instance [:endpoint :port]))
-                        (str "Project nREPL start: " (name status)))})))
+      (let [{:keys [status instance] :as result} (project-nrepl-ops/start ctx worktree-path)]
+        {:type :text
+         :message (case status
+                    :missing-start-command (missing-start-command-message (:worktree-path result))
+                    :present (str "Project nREPL already ready for " (:worktree-path instance)
+                                  " at " (get-in instance [:endpoint :host]) ":" (get-in instance [:endpoint :port]))
+                    :started (str "Started project nREPL for " (:worktree-path instance)
+                                  " at " (get-in instance [:endpoint :host]) ":" (get-in instance [:endpoint :port]))
+                    (str "Project nREPL start: " (name status)))})
 
       (= trimmed "/project-repl attach")
       (let [cfg      (project-nrepl-config/resolve-config worktree-path)

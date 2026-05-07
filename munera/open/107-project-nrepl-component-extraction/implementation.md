@@ -126,3 +126,16 @@ Review note:
   - narrowed `components/project-nrepl/test/psi/project_nrepl/commands_test.clj` so it now proves `psi.project-nrepl.commands` directly
   - added explicit higher-level `/project-repl` routing proof in `components/agent-session/test/psi/agent_session/commands_test.clj`
   - re-ran focused extracted-component plus higher-level consuming-path verification green (`1517 tests, 11734 assertions, 0 failures`)
+
+Code-shaper review note:
+- extraction shape is strong and non-blocking follow-up shaping remains
+- tighten the commands↔ops boundary by moving missing-start-command policy fully into `psi.project-nrepl.ops/start` and letting `psi.project-nrepl.commands` shape only structured op results
+- dedupe repeated public eval result shaping in `psi.project-nrepl.ops/eval-op`
+- either remove the unused `client-session` binding in `psi.project-nrepl.eval/interrupt-instance-in!` or validate it explicitly so interrupt availability assumptions stay local and explicit
+- follow-up implemented:
+  - `psi.project-nrepl.ops/start` now returns structured `:missing-start-command` instead of throwing for unset start config
+  - `psi.project-nrepl.commands` no longer re-resolves start config locally and now formats the structured start result
+  - `psi.project-nrepl.ops/eval-op` now uses one shared helper for the public eval payload while preserving the existing output contract
+  - `psi.project-nrepl.eval/interrupt-instance-in!` now makes missing client-session explicit as `{:status :unavailable :reason :no-client-session}` when an active op exists without a usable session
+  - added focused `psi.project-nrepl.ops-test` plus expanded command/eval coverage for the shaping follow-up
+  - focused verification green: `bb clojure:test:unit --focus psi.project-nrepl.ops-test --focus psi.project-nrepl.commands-test --focus psi.project-nrepl.eval-test --focus psi.agent-session.commands-test --focus psi.agent-session.tools-test` → `1519 tests, 11740 assertions, 0 failures`

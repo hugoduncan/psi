@@ -131,10 +131,18 @@
                        :worktree-path effective-worktree})))
     (let [client-session (get-in instance [:runtime-handle :client-session])
           active-op      (get-in instance [:runtime-handle :active-op])]
-      (if-not active-op
+      (cond
+        (not active-op)
         {:status :unavailable
          :reason :no-active-eval
          :worktree-path effective-worktree}
+
+        (not client-session)
+        {:status :unavailable
+         :reason :no-client-session
+         :worktree-path effective-worktree}
+
+        :else
         (let [responses (doall (client-session {:op "interrupt"
                                                 :interrupt-id (:op-id active-op)
                                                 :id (new-operation-id)}))

@@ -102,4 +102,18 @@
         (is (= "eval-123" (:interrupted-op-id result)))
         (is (= "interrupt" (:op (first @calls*))))
         (is (= "eval-123" (:interrupt-id (first @calls*))))
-        (is (= result (:last-interrupt instance)))))))
+        (is (= result (:last-interrupt instance))))))
+
+  (testing "interrupt reports unavailable when active eval exists but client session is missing"
+    (let [ctx      (make-ctx)
+          worktree (System/getProperty "user.dir")]
+      (install-instance! ctx worktree (fn [_] []))
+      (project-nrepl-runtime/update-instance-in!
+       ctx worktree
+       #(-> %
+            (assoc-in [:runtime-handle :active-op] {:op-id "eval-123" :started-at (java.time.Instant/now)})
+            (update :runtime-handle dissoc :client-session)))
+      (is (= {:status :unavailable
+              :reason :no-client-session
+              :worktree-path worktree}
+             (project-nrepl-eval/interrupt-instance-in! ctx worktree))))))

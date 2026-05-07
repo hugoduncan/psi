@@ -39,24 +39,27 @@
     {:status :absent
      :worktree-path worktree-path}))
 
+(defn- missing-start-command-result
+  [worktree-path]
+  {:status :missing-start-command
+   :worktree-path worktree-path
+   :config-paths ["~/.psi/agent/config.edn"
+                  (str worktree-path "/.psi/project.edn")
+                  (str worktree-path "/.psi/project.local.edn")]})
+
 (defn start
   [ctx worktree-path]
   (let [cfg            (project-nrepl-config/resolve-config worktree-path)
         command-vector (project-nrepl-config/resolved-start-command cfg)]
-    (when-not command-vector
-      (throw (ex-info "Project nREPL start requires a configured start-command"
-                      {:phase :config
-                       :worktree-path worktree-path
-                       :config-paths ["~/.psi/agent/config.edn"
-                                      (str worktree-path "/.psi/project.edn")
-                                      (str worktree-path "/.psi/project.local.edn")]})))
-    (let [existing (project-nrepl-runtime/instance-in ctx worktree-path)]
-      (if (and existing (:readiness existing))
-        {:status :present
-         :instance (instance-payload existing)}
-        (let [instance (project-nrepl-started/start-instance-in! ctx worktree-path command-vector)]
-          {:status :started
-           :instance (instance-payload instance)})))))
+    (if-not command-vector
+      (missing-start-command-result worktree-path)
+      (let [existing (project-nrepl-runtime/instance-in ctx worktree-path)]
+        (if (and existing (:readiness existing))
+          {:status :present
+           :instance (instance-payload existing)}
+          (let [instance (project-nrepl-started/start-instance-in! ctx worktree-path command-vector)]
+            {:status :started
+             :instance (instance-payload instance)}))))))
 
 (defn attach
   [ctx worktree-path attach-input]
@@ -76,31 +79,25 @@
      :had-instance? (boolean instance)
      :prior-acquisition-mode prior-mode}))
 
+(defn- public-eval-payload
+  ([result]
+   (public-eval-payload result (:status result)))
+  ([result public-status]
+   {:status public-status
+    :value (:value result)
+    :out (:out result)
+    :err (:err result)
+    :ns (:ns result)
+    :timing {:started-at (:started-at result)
+             :finished-at (:finished-at result)}}))
+
 (defn eval-op
   [ctx worktree-path code]
   (let [result (project-nrepl-eval/eval-instance-in! ctx worktree-path code)]
     (case (:status result)
-      :success {:status :ok
-                :value (:value result)
-                :out (:out result)
-                :err (:err result)
-                :ns (:ns result)
-                :timing {:started-at (:started-at result)
-                         :finished-at (:finished-at result)}}
-      :error {:status :eval-error
-              :value (:value result)
-              :out (:out result)
-              :err (:err result)
-              :ns (:ns result)
-              :timing {:started-at (:started-at result)
-                       :finished-at (:finished-at result)}}
-      :interrupted {:status :interrupted
-                    :value (:value result)
-                    :out (:out result)
-                    :err (:err result)
-                    :ns (:ns result)
-                    :timing {:started-at (:started-at result)
-                             :finished-at (:finished-at result)}}
+      :success (public-eval-payload result :ok)
+      :error (public-eval-payload result :eval-error)
+      :interrupted (public-eval-payload result :interrupted)
       :unavailable {:status :unavailable
                     :error (:error result)}
       {:status (:status result)

@@ -44,3 +44,17 @@
   - [x] make `components/project-nrepl/test/psi/project_nrepl/commands_test.clj` prove `psi.project-nrepl.commands` directly without routing through `psi.agent-session.commands`, or move the routing proof back under `agent-session`
   - [x] keep one explicit higher-level `/project-repl` routing proof under `agent-session` if the component-local test is narrowed
 - [x] Re-run focused extracted-component and higher-level consuming-path verification after the follow-up fixes
+- [x] Move missing-start-command decision fully into `psi.project-nrepl.ops/start`
+  - [x] return a structured non-exceptional result for missing start-command config that preserves existing user-facing messaging needs
+  - [x] make `psi.project-nrepl.commands` shape that structured result instead of re-resolving start config locally
+  - [x] keep higher-level `/project-repl start` behavior unchanged at the user-visible boundary
+- [x] Dedupe repeated public eval result shaping in `psi.project-nrepl.ops/eval-op`
+  - [x] extract one helper for the shared public eval payload fields
+  - [x] preserve current status mapping and output shape exactly
+- [x] Tighten interrupt availability handling in `psi.project-nrepl.eval/interrupt-instance-in!`
+  - [x] either remove the unused `client-session` binding or validate client-session presence explicitly before interrupt
+  - [x] keep the unavailable/active-op behavior locally comprehensible and explicit
+- [x] Add or update focused tests for the shaping follow-up
+  - [x] prove missing-start-command handling through `psi.project-nrepl.ops` and `psi.project-nrepl.commands`
+  - [x] preserve existing eval-op and interrupt result contracts
+- [x] Re-run focused extracted-component and higher-level consuming-path verification after the code-shaper follow-up
