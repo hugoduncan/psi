@@ -295,3 +295,14 @@
     (let [ctx (create-test-ctx)]
       (is (set? (turn-sc/turn-configuration ctx)))
       (is (contains? (turn-sc/turn-configuration ctx) :idle)))))
+
+(deftest send-event-return-contract-test
+  (testing "send-event! returns a narrowed component-level snapshot"
+    (let [ctx     (create-test-ctx)
+          started (turn-sc/send-event! ctx :turn/start)]
+      (is (= :text-accumulating (:turn-phase started)))
+      (is (= (turn-sc/get-turn-data ctx) (:turn-data started)))
+      (let [updated (turn-sc/send-event! ctx :turn/text-delta {:delta "hi"})]
+        (is (= :text-accumulating (:turn-phase updated)))
+        (is (= (turn-sc/get-turn-data ctx) (:turn-data updated)))
+        (is (= "hi" (get-in updated [:turn-data :text-buffer])))))))

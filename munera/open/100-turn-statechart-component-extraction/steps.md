@@ -26,3 +26,8 @@
 - [x] Update `design.md` to use corrected authoritative namespace `psi.turn-statechart.core`
 - [x] Update `plan.md` to use corrected authoritative namespace `psi.turn-statechart.core`
 - [x] Rerun focused verification after the review follow-up
+- [x] If `components/turn-statechart/src/psi/turn_statechart/core.clj` grows, split chart definition vs accumulation actions vs runtime helpers
+- [x] Clarify in code or docs whether `:thinking-blocks` and `:stop-reason` are intentionally shared turn-data shape in this component
+- [x] Decide whether `send-event!` should continue returning raw working memory or a narrower component-level result
+- [x] Consider replacing `components/turn-statechart/src/psi/turn_statechart/core.clj` facade `def` re-exports with explicit API vars/functions for richer doc/arglist introspection
+- [x] Add a focused test that locks in the narrowed `send-event!` return contract

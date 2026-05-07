@@ -33,3 +33,5 @@ Final ownership:
 
 Review note:
 - follow-up review findings addressed: removed duplicate `components/turn-statechart/src` in root `deps.edn :run`, aligned `design.md` + `plan.md` with the corrected kebab-case authoritative namespace `psi.turn-statechart.core`, and reran focused verification green (`57 tests, 193 assertions, 0 failures`)
+- code-shaper follow-up completed: split the component into `data`, `chart`, and `runtime` namespaces behind the stable `core` facade; documented that `:thinking-blocks` and `:stop-reason` are intentionally shared turn-data shape; narrowed `send-event!` to return a component-level snapshot instead of raw working memory; and reran focused verification green (`57 tests, 193 assertions, 0 failures`)
+- review follow-up completed: replaced `core` facade `def` re-exports with explicit API functions/docstrings for richer public-surface introspection, added a focused test that locks in the narrowed `send-event!` return contract, and reran focused verification green (`58 tests, 197 assertions, 0 failures`)
