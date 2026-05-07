@@ -42,7 +42,40 @@ Verification
 
 - `clojure -M:test --focus psi.session-journal.codec-test --focus psi.session-journal.store-test --focus psi.agent-session.persistence-test`
   - green: `10 tests, 78 assertions, 0 failures`
+  - re-run green on 2026-05-06/07 after review: `10 tests, 80 assertions, 0 failures`
 - `clojure -M:test --focus psi.agent-session.session-lifecycle-test/fork-session-persists-child-file-with-parent-lineage-test --focus psi.agent-session.session-lifecycle-test/ensure-session-loaded-in!-resumes-by-context-session-id`
   - green: `1 tests, 7 assertions, 0 failures`
 - `clojure -M:test --focus psi.tui.app-session-selector-test --focus psi.agent-session.resolvers-test --focus psi.session-journal.store-test`
   - green: `43 tests, 244 assertions, 0 failures`
+  - re-run green on 2026-05-06/07 after review: `43 tests, 246 assertions, 0 failures`
+
+Review note
+
+- Task-implementation review result: acceptable and aligned with the task design.
+- Boundary/ownership split is clear and matches the intended first cut:
+  - `psi.session-journal.codec` owns line encode/decode
+  - `psi.session-journal.store` owns root/layout, locking, write/flush, load/list/discovery, and migration
+  - `psi.agent-session.persistence` remains session-facing and owns in-memory journal helpers plus domain entry constructors
+- Focused proof now primarily lives with the new component, with representative `agent-session` integration proof retained above the boundary.
+- Non-blocking follow-up found during review: `psi.agent-session.persistence` still re-exported `*session-file-lock-retry-ms*` and `*session-file-lock-max-attempts*` as copied dynamic values rather than aliases to the store vars, so binding the persistence vars would not affect store locking behavior.
+- Follow-up implemented: removed those misleading re-exports from `psi.agent-session.persistence` so lock retry tuning is now unambiguously owned by `psi.session-journal.store`.
+- Added focused proof for the follow-up shape:
+  - `psi.session-journal.store-test` now asserts the bound retry/max-attempt values appear in lock acquisition failure `ex-data`
+  - `psi.agent-session.persistence-test` now asserts the misleading lock-tuning vars are no longer present on the persistence public surface
+
+Session-journal test review note
+
+- Session-journal component tests are in good shape and align well with the extracted boundary:
+  - `codec_test.clj` is focused and sufficient for current line encode/decode ownership
+  - `store_test.clj` covers root/layout, write/append, locking, load/migration, and listing/discovery responsibilities with real temp-file exercise
+- No blocking test-quality issues found.
+- Non-blocking follow-up suggestions from review:
+  - tighten `store_test.clj` by removing redundant `Thread/sleep` calls where explicit `.setLastModified` already establishes ordering
+  - optionally add one more small codec round-trip shape beyond nested-instants coverage if the codec surface grows later
+  - consider splitting `store_test.clj` by concern only if the component test surface grows materially beyond the current size
+- Follow-up implemented:
+  - removed the redundant `Thread/sleep` calls from `store_test.clj`; ordering proof now relies on the explicit `.setLastModified` shaping already present in the tests
+  - added one additional small codec round-trip case covering plain scalar/header-shaped values alongside the existing nested-instants coverage because it improved signal with minimal extra test complexity
+- Focused verification after the test-shaping follow-up:
+  - `clojure -M:test --focus psi.session-journal.codec-test --focus psi.session-journal.store-test`
+    - green: `7 tests, 58 assertions, 0 failures`

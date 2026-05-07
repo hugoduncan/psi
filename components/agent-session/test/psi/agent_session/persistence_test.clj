@@ -65,6 +65,11 @@
       (is (= [msg] (p/messages-from-entries j)))
       (is (= [msg] (vec (p/messages-up-to j nil)))))))
 
+(deftest persistence-public-surface-test
+  (testing "lock retry tuning is owned by session-journal.store, not re-exported here"
+    (is (nil? (ns-resolve 'psi.agent-session.persistence '*session-file-lock-retry-ms*)))
+    (is (nil? (ns-resolve 'psi.agent-session.persistence '*session-file-lock-max-attempts*)))))
+
 (deftest persist-entry-lazy-flush-test
   (testing "no write before first assistant message"
     (let [dir (tmp-dir)

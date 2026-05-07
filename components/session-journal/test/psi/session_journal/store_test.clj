@@ -100,7 +100,9 @@
                          (catch clojure.lang.ExceptionInfo e
                            e))]
                 (is (some? ex))
-                (is (re-find #"Failed to acquire session file lock" (ex-message ex)))))
+                (is (re-find #"Failed to acquire session file lock" (ex-message ex)))
+                (is (= 2 (:max-attempts (ex-data ex))))
+                (is (= 1 (:retry-ms (ex-data ex))))))
             (finally
               (.release ^FileLock held))))
         (finally
@@ -168,7 +170,6 @@
       (store/flush-journal! f1 "sess-a" "/proj" nil
                             [(message-entry (user-msg "first message"))
                              (message-entry (assistant-msg "reply"))])
-      (Thread/sleep 10)
       (store/flush-journal! f2 "sess-b" "/proj" "sess-parent" "/tmp/parent.ndedn"
                             [(message-entry (user-msg "second message"))
                              {:id (str (java.util.UUID/randomUUID))
@@ -199,7 +200,6 @@
             f1   (io/file dir1 "a.ndedn")
             f2   (io/file dir2 "b.ndedn")]
         (store/flush-journal! f1 "sess-a" "/proj-a" nil [(message-entry (assistant-msg "a"))])
-        (Thread/sleep 10)
         (store/flush-journal! f2 "sess-b" "/proj-b" nil [(message-entry (assistant-msg "b"))])
         (.setLastModified f2 (+ (.lastModified f1) 1000))
         (let [sessions (store/list-all-sessions root)]

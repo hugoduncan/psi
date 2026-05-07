@@ -71,11 +71,6 @@
 ;;; Session-facing state helpers
 ;;; ============================================================
 
-(def ^:dynamic *session-file-lock-retry-ms*
-  journal-store/*session-file-lock-retry-ms*)
-(def ^:dynamic *session-file-lock-max-attempts*
-  journal-store/*session-file-lock-max-attempts*)
-
 (defn session-dir-for
   [& args]
   (apply journal-store/session-dir-for args))

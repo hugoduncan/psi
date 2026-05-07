@@ -8,3 +8,7 @@
 - [x] Verify at least one representative `agent-session` orchestration path that reaches write/flush/load through `agent-session.persistence` and the extracted store boundary
   - preferred proof: a real session lifecycle or resume/list path that causes journal write/flush and then re-loads or re-discovers the persisted session through `agent-session.persistence`
 - [x] Record the final keep/move split, public API surface, preserved-or-changed return contracts, test ownership rationale, and confirmation of the settled first-cut keep/internal decisions in `implementation.md`
+- [x] Remove or reshape the misleading `psi.agent-session.persistence` lock retry/max-attempt dynamic var re-exports so bindings cannot imply control they do not actually have
+- [x] Add/update focused proof for the chosen follow-up shape so the effective lock-configuration surface is explicit and non-misleading
+- [x] Tighten `components/session-journal/test/psi/session_journal/store_test.clj` by removing redundant `Thread/sleep` ordering scaffolding where explicit `.setLastModified` already establishes ordering
+- [x] Re-evaluate whether `codec_test.clj` needs one additional small round-trip shape after the current task lands; only add it if it materially improves signal over the existing nested-instants coverage
