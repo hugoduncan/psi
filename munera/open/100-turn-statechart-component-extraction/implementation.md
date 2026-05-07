@@ -30,3 +30,6 @@ Verification:
 Final ownership:
 - lower-level per-turn stream statechart ownership now lives below `agent-session` in `components/turn-statechart/`
 - higher-level prompt/session orchestration remains in `agent-session`
+
+Review note:
+- follow-up review findings addressed: removed duplicate `components/turn-statechart/src` in root `deps.edn :run`, aligned `design.md` + `plan.md` with the corrected kebab-case authoritative namespace `psi.turn-statechart.core`, and reran focused verification green (`57 tests, 193 assertions, 0 failures`)

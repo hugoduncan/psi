@@ -22,3 +22,7 @@
   - [x] `clojure -M:test --focus psi.turn-statechart.core-test --focus psi.agent-session.turn-accumulator-test --focus psi.agent-session.prompt-execution-test`
 - [x] Confirm no remaining `psi.agent-session.turn-statechart` requires/usages remain in the repo
 - [x] Record final ownership and migration notes in `implementation.md`
+- [x] Remove duplicate `components/turn-statechart/src` entry from root `deps.edn :run`
+- [x] Update `design.md` to use corrected authoritative namespace `psi.turn-statechart.core`
+- [x] Update `plan.md` to use corrected authoritative namespace `psi.turn-statechart.core`
+- [x] Rerun focused verification after the review follow-up

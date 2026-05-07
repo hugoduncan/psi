@@ -58,8 +58,8 @@ The extracted component should become the authoritative home of the current turn
 
 Chosen target for this task:
 - component path: `components/turn-statechart/`
-- namespace family: `psi.turn_statechart.*`
-- first-cut authoritative namespace: `psi.turn_statechart.core`
+- namespace family: `psi.turn-statechart.*`
+- first-cut authoritative namespace: `psi.turn-statechart.core`
 - first-cut source file: `components/turn-statechart/src/psi/turn_statechart/core.clj`
 
 First-cut expectations:
@@ -82,7 +82,7 @@ First-cut expectations:
 ## Concrete done criteria
 
 - the task records the chosen component path explicitly as `components/turn-statechart/`
-- the extracted authoritative namespace is renamed explicitly to `psi.turn_statechart.core`
+- the extracted authoritative namespace is renamed explicitly to `psi.turn-statechart.core`
 - `psi.agent-session.turn-statechart` is removed, or exists only temporarily as a migration shim during the work and is removed before completion
 - the canonical statechart implementation has one obvious owner after the move
 - all existing direct consumers are updated to require the extracted namespace in this slice

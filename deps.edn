@@ -36,7 +36,6 @@
                         "components/session-state/src"
                         "components/session-state/src"
                         "components/session-journal/src"
-                        "components/turn-statechart/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"

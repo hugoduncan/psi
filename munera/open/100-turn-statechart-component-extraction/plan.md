@@ -2,7 +2,7 @@
 
 Approach:
 - extract the namespace as a narrow structural move, not a semantic redesign
-- create `components/turn-statechart/` with authoritative namespace `psi.turn_statechart.core`
+- create `components/turn-statechart/` with authoritative namespace `psi.turn-statechart.core`
 - move the current implementation and focused tests into the new component first
 - update all direct consumers in the same slice so the new namespace becomes authoritative immediately
 - allow a temporary `psi.agent-session.turn-statechart` shim only if needed to keep the migration incremental, but remove it before task completion
@@ -21,9 +21,9 @@ Consumer migration set:
 Implementation sequence:
 1. create the new component directories and destination namespace/file
 2. update project/test configuration so `components/turn-statechart/` participates in normal source and test paths
-3. move `turn_statechart.clj` implementation to `psi.turn_statechart.core`
+3. move `turn_statechart.clj` implementation to `psi.turn-statechart.core`
 4. move focused statechart tests to the new component test tree and update requires
-5. update all direct production/test consumers to require `psi.turn_statechart.core`
+5. update all direct production/test consumers to require `psi.turn-statechart.core`
 6. if an intermediate shim is needed during editing, keep it temporary and remove it before verification/finish
 7. run focused verification for the extracted component and at least one higher-level consuming path
 8. record final ownership and any migration notes in `implementation.md`
