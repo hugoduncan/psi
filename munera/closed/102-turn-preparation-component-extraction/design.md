@@ -2,7 +2,7 @@
 
 ## Goal
 
-Extract the prepared-turn projection and response-recording layer into a separate component so the lower-level pure machinery for shaping one turn no longer lives under `agent-session`.
+Extract the lower pure prepared-request assembly layer and the response-recording layer into a separate component so the pure machinery for shaping one turn no longer lives under `agent-session`, while leaving session-specific projection and resolution above that boundary.
 
 ## Why
 
@@ -42,28 +42,35 @@ This task is meant to remove that ownership blur without redesigning prepared-re
 
 ## Intent
 
-Create one explicit lower-level component for pure turn preparation mechanics.
+Create one explicit lower-level component for the pure assembly and recording mechanics of one turn, while keeping session-specific projection and policy above that boundary.
 
 That component should own:
 
-- provider-message projection from canonical journal/session state
-- request/runtime option projection for one turn
-- effective system-prompt assembly and prompt-layer projection
-- user-message expansion through skills/templates during request preparation
-- construction of the canonical prepared-request map
+- construction of the canonical prepared-request map from normalized prepared-request inputs
+- prompt-layer packaging and prepared-request cache projection when those are pure functions of supplied inputs
 - assistant-message classification into stop / tool-use / error outcomes
 - construction of the canonical record-response pure-result map
 
 That component should not own:
 
-- session dispatch orchestration
+- session state lookup
+- journal lookup from canonical session storage
+- request/runtime option resolution from session/provider auth state
+- effective system-prompt assembly when it depends on session-owned prompt assets/policies
+- user-message expansion through skills/templates when it depends on session-owned assets
 - prompt submission/start/prepare/record/continue/finish control flow
+- session dispatch orchestration
 - live provider execution
 - stream accumulation / waiting / abort
 - journal append execution semantics
 - extension dispatch
 - workflow orchestration
 - adapter or UI behavior
+
+Session-owned projection clarification:
+
+- this task now explicitly treats auth resolution, skill/template expansion, prompt-asset selection, and other session-owned projection/policy as staying above the extracted lower layer unless they are already available through lower pure helpers
+- the extraction target for request preparation is therefore not “move the entire current `prompt_request` namespace as-is”, but “split request preparation into a session-owned projection step plus a lower pure prepared-request assembly step”, then extract only the lower pure assembly step
 
 ## Refactoring findings
 
@@ -166,12 +173,24 @@ First-cut authoritative namespaces:
 - `psi.turn-preparation.recording`
   - source file: `components/turn-preparation/src/psi/turn_preparation/recording.clj`
 
+Required supporting split above the new lower request namespace:
+
+- `psi.agent-session.turn-preparation-inputs`
+  - source file: `components/agent-session/src/psi/agent_session/turn_preparation_inputs.clj`
+  - authoritative home for session-owned projection/resolution needed before pure request assembly
+  - owns canonical session/journal reads, auth/provider-option resolution, skill/template expansion, prompt-asset selection/filtering, and construction of the normalized prepared-request input map passed down to `psi.turn-preparation.request`
+
 Expected ownership split:
 
+- `psi.agent-session.turn-preparation-inputs`
+  - authoritative `session->prepared-request-inputs`
+  - authoritative home for session-owned projection and policy required before lower pure request assembly
+  - may continue to depend on existing `psi.agent-session.*` prompt/auth/conversation helpers in this slice
+
 - `psi.turn-preparation.request`
-  - current `prompt_request.clj` implementation
+  - authoritative lower pure request assembly from normalized prepared-request inputs
   - authoritative `build-prepared-request`
-  - authoritative request shaping / system-prompt assembly / provider-conversation projection helpers
+  - does not own session-state lookup, auth resolution, skill/template expansion, or other session-owned prompt-asset policy
 
 - `psi.turn-preparation.recording`
   - current `prompt_recording.clj` implementation
@@ -186,11 +205,14 @@ API-surface clarifications:
 
 Ownership clarifications:
 
-- preferred steady-state production dependency slope should be:
+- preferred steady-state production dependency slope for this slice should be:
   - `components/agent-session/src/psi/agent_session/context.clj` -> `psi.turn`
+  - `psi.turn` -> `psi.agent-session.turn-preparation-inputs`
   - `psi.turn` -> `psi.turn-preparation.request`
   - `psi.turn` -> `psi.turn-preparation.recording`
   - `psi.turn` -> `psi.turn-runtime.core`
+- this is intentionally an intermediate boundary improvement rather than the final removal of all request-preparation-related `agent-session` involvement
+- success for this task is that the lower pure prepared-request assembly owner moves below `agent-session`, while session-owned projection and policy remain explicit and above that boundary
 - some existing lower-level production namespaces may still need to require `psi.turn-preparation.request` or `psi.turn-preparation.recording` directly because they depend on helper-level APIs rather than on the public `psi.turn` facade; those cases are allowed only when they are concrete existing consumers, kept minimal, and recorded explicitly in `implementation.md`
 - this task should reduce direct lower-level consumers where doing so is trivial and clarifying, but it does not require forcing every helper-level consumer through `psi.turn` if that would introduce wrapper duplication or a worse dependency shape
 - completion requires one obvious owner per function surface; duplicate long-term wrappers across `psi.turn-preparation.*`, `psi.turn`, and legacy `agent-session` namespaces are not allowed
@@ -250,14 +272,16 @@ Completion requires a final repo search confirming that authoritative usage has 
 ## Acceptance
 
 - a separate `turn-preparation` component exists
-- the authoritative prepared-turn projection and response-recording implementation no longer resides under `components/agent-session/`
+- the authoritative response-recording implementation no longer resides under `components/agent-session/`
+- the authoritative lower pure prepared-request assembly implementation no longer resides under `components/agent-session/`
 - the authoritative namespace names match the new component ownership
 - no new component cycle is introduced
-- `psi.turn` depends on the extracted turn-preparation component rather than on `psi.agent-session.prompt-request` / `psi.agent-session.prompt-recording`
-- all direct consumers compile against the extracted namespaces
+- `psi.turn` depends on `psi.agent-session.turn-preparation-inputs` for session-owned projection and on the extracted `turn-preparation` component for lower pure request assembly and response recording
+- all direct consumers compile against the migrated namespaces/functions
 - focused turn-preparation verification is green from the new component boundary
 - at least one higher-level consuming path still works unchanged in behavior
 - no live runtime or journal-execution semantics are pulled down into the extracted component
+- no session-owned auth/skill/template/prompt-asset policy is silently dragged into the lower request assembly namespace in the name of extraction
 - any compatibility shim is used only temporarily during migration and removed before completion
 
 ## Concrete done criteria
@@ -287,13 +311,16 @@ Completion requires a final repo search confirming that authoritative usage has 
 ## Suggested migration sequence
 
 1. create `components/turn-preparation/` and add repo/component deps
-2. move `prompt_request` into `psi.turn-preparation.request`
-3. move `prompt_recording` into `psi.turn-preparation.recording`
-4. update `psi.turn` to require the new preparation namespaces
-5. update direct production consumers that still require the old preparation namespaces
-6. update focused tests and move any clearly component-owned tests
-7. remove any temporary compatibility shims
-8. run focused verification and record final ownership in task notes
+2. add `psi.agent-session.turn-preparation-inputs` as the session-owned projection/resolution namespace above the extracted lower layer
+3. split current request preparation into:
+   - `session->prepared-request-inputs` under `agent-session`
+   - `build-prepared-request` under `psi.turn-preparation.request` consuming normalized inputs
+4. move `prompt_recording` into `psi.turn-preparation.recording`
+5. update `psi.turn` to require the new projector + extracted preparation namespaces
+6. update direct production consumers that still require the old preparation namespaces
+7. update focused tests and move any clearly component-owned tests
+8. remove any temporary compatibility shims
+9. run focused verification and record final ownership in task notes
 
 ## Verification intent
 

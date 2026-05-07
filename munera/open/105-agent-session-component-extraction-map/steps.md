@@ -1,0 +1,8 @@
+- [ ] Review the current `agent-session` namespace surface against the proposed component map
+- [ ] Refine candidate component membership where a namespace obviously belongs elsewhere
+- [ ] Confirm the probable residual `agent-session` core boundaries
+- [ ] Reconcile existing extraction tasks against the umbrella map
+  - [ ] keep aligned tasks open as child tasks
+  - [ ] close superseded narrow tasks
+  - [ ] identify any task that should be rewritten rather than continued as-is
+- [ ] Use this map as the framing reference for the next extraction-task design/refinement pass
