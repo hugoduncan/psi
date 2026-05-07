@@ -31,6 +31,7 @@ Execution notes to capture during implementation
 - Moved low-level focused proof to the new component tests and reduced `agent-session`-local persistence tests to session-facing orchestration coverage.
 - `psi.session-journal.store` now owns default sessions-root and directory-layout policy, with explicit root overrides on `session-dir-for` and `list-all-sessions` for tests and controlled callers.
 - Follow-up consumer cleanup started: non-session listing/discovery consumers in TUI selector surfaces and agent-session discovery resolvers now depend directly on `psi.session-journal.store` instead of reaching those store-owned operations through `psi.agent-session.persistence`.
+- Continued cleanup: `psi.agent-session.session-lifecycle` now depends directly on `psi.session-journal.store` for file allocation/load/flush operations, and remaining direct store-only test fixtures were updated to use `psi.session-journal.store` as well.
 - Preserved return-shape contracts for `load-session-file`, `find-most-recent-session`, `list-sessions`, and `list-all-sessions`.
 - Preserved `:message-count` semantics as count of `:message` entries only; the new store-local tests were corrected to match the existing contract instead of changing behavior.
 - Fixed v3→v4 header migration parent-id derivation in the extracted store using filename-based extraction from the parent-session path basename.

@@ -8,6 +8,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.session-close :as session-close]
+   [psi.session-journal.store :as journal-store]
    [psi.agent-session.session-runtime :as runtime]
    [psi.session-state.state :as session]
    [psi.agent-session.workflows :as wf]))
@@ -21,8 +22,8 @@
                            (:worktree-path (:session-defaults ctx))
                            (:cwd ctx))
         session-file   (when (:persist? ctx)
-                         (let [session-dir (persist/session-dir-for worktree-path)
-                               file        (persist/new-session-file-path session-dir new-session-id)]
+                         (let [session-dir (journal-store/session-dir-for worktree-path)
+                               file        (journal-store/new-session-file-path session-dir new-session-id)]
                            (str file)))]
     (dispatch/dispatch! ctx
                         dispatch-event
@@ -102,7 +103,7 @@
         {:keys [cancelled?]} (ext/dispatch-in reg "session_before_switch" {:reason :resume})]
     (when-not cancelled?
       (wf/clear-all-in! (:workflow-registry ctx))
-      (let [loaded (persist/load-session-file session-path)]
+      (let [loaded (journal-store/load-session-file session-path)]
         (if-not loaded
           (do
             (dispatch/dispatch! ctx
@@ -210,8 +211,8 @@
           branch-entries      (fork-branch-entries ctx parent-session-id entry-id)
           messages            (compaction/rebuild-messages-from-journal-entries branch-entries)
           session-file        (when (:persist? ctx)
-                                (let [session-dir (persist/session-dir-for (session/session-worktree-path-in ctx parent-session-id))
-                                      file        (persist/new-session-file-path session-dir new-session-id)]
+                                (let [session-dir (journal-store/session-dir-for (session/session-worktree-path-in ctx parent-session-id))
+                                      file        (journal-store/new-session-file-path session-dir new-session-id)]
                                   (str file)))]
       (dispatch/dispatch! ctx
                           :session/fork-initialize
@@ -240,12 +241,12 @@
       ;; Fork persistence: create/write child file immediately with lineage header.
       (when session-file
         (let [file (io/file session-file)]
-          (persist/flush-journal! file
-                                  new-session-id
-                                  (session/session-worktree-path-in ctx new-session-id)
-                                  parent-session-id
-                                  parent-session-file
-                                  branch-entries)))
+          (journal-store/flush-journal! file
+                                        new-session-id
+                                        (session/session-worktree-path-in ctx new-session-id)
+                                        parent-session-id
+                                        parent-session-file
+                                        branch-entries)))
 
       (ext/dispatch-in reg "session_fork" {})
       (session/get-session-data-in ctx new-session-id))))

@@ -20,6 +20,7 @@
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.oauth.core :as oauth]
    [psi.agent-session.persistence :as persist]
+   [psi.session-journal.store :as journal-store]
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]
    [psi.query.core :as query]))
@@ -195,13 +196,13 @@
                                                           (persist/message-entry {:role "user"
                                                                                   :content [{:type :text :text "alpha"}]
                                                                                   :timestamp (java.time.Instant/parse "2026-03-16T10:47:00Z")}))
-          _                  (persist/flush-journal! (java.io.File. path-1)
-                                                     sid-1
-                                                     cwd
-                                                     nil
-                                                     nil
-                                                     [(persist/thinking-level-entry :off)
-                                                      (persist/session-info-entry "alpha")])
+          _                  (journal-store/flush-journal! (java.io.File. path-1)
+                                                           sid-1
+                                                           cwd
+                                                           nil
+                                                           nil
+                                                           [(persist/thinking-level-entry :off)
+                                                            (persist/session-info-entry "alpha")])
           sd-2               (session/new-session-in! ctx sid-1 {})
           sid-2              (:session-id sd-2)
           path-2             (:session-file sd-2)
@@ -209,13 +210,13 @@
                                                           (persist/message-entry {:role "user"
                                                                                   :content [{:type :text :text "beta"}]
                                                                                   :timestamp (java.time.Instant/parse "2026-03-16T10:48:00Z")}))
-          _                  (persist/flush-journal! (java.io.File. path-2)
-                                                     sid-2
-                                                     cwd
-                                                     nil
-                                                     nil
-                                                     [(persist/thinking-level-entry :off)
-                                                      (persist/session-info-entry "beta")])
+          _                  (journal-store/flush-journal! (java.io.File. path-2)
+                                                           sid-2
+                                                           cwd
+                                                           nil
+                                                           nil
+                                                           [(persist/thinking-level-entry :off)
+                                                            (persist/session-info-entry "beta")])
           process-result     (q-in ctx [:psi.agent-session/context-session-count
                                         {:psi.agent-session/context-sessions
                                          [:psi.session-info/id

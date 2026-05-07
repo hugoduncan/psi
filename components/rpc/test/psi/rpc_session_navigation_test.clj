@@ -7,6 +7,7 @@
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.persistence :as persist]
+   [psi.session-journal.store :as journal-store]
    [psi.session-state.state :as ss]
    [psi.rpc-test-support :as support]))
 
@@ -97,13 +98,13 @@
           sd1                 (session/new-session-in! ctx nil {})
           session-id          (:session-id sd1)
           path1               (:session-file sd1)
-          _                   (persist/flush-journal! (java.io.File. path1)
-                                                      session-id
-                                                      cwd
-                                                      nil
-                                                      nil
-                                                      [(persist/message-entry {:role "user" :content "hi"})
-                                                       (persist/message-entry {:role "assistant" :content [{:type :text :text "there"}]})])
+          _                   (journal-store/flush-journal! (java.io.File. path1)
+                                                            session-id
+                                                            cwd
+                                                            nil
+                                                            nil
+                                                            [(persist/message-entry {:role "user" :content "hi"})
+                                                             (persist/message-entry {:role "assistant" :content [{:type :text :text "there"}]})])
           state               (atom {:transport {:ready? true :pending {}}
                                      :connection {:subscribed-topics #{"session/resumed" "session/rehydrated" "command-result"}}})
           handler             (support/make-handler ctx state)
@@ -129,12 +130,12 @@
           sd1                 (session/new-session-in! ctx nil {})
           sid1                (:session-id sd1)
           path1               (:session-file sd1)
-          _                   (persist/flush-journal! (java.io.File. path1)
-                                                      sid1
-                                                      cwd
-                                                      nil
-                                                      nil
-                                                      [(persist/message-entry {:role "assistant" :content [{:type :text :text "root"}]})])
+          _                   (journal-store/flush-journal! (java.io.File. path1)
+                                                            sid1
+                                                            cwd
+                                                            nil
+                                                            nil
+                                                            [(persist/message-entry {:role "assistant" :content [{:type :text :text "root"}]})])
           _                   (session/new-session-in! ctx sid1 {})
           state               (atom {:transport {:ready? true :pending {}}
                                      :connection {:subscribed-topics #{"session/resumed" "session/rehydrated" "command-result" "context/updated"}}})

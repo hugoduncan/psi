@@ -9,6 +9,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.persistence :as persist]
    [psi.agent-session.prompt-runtime]
+   [psi.session-journal.store :as journal-store]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support])
   (:import
@@ -113,12 +114,12 @@
           sd1                (session/new-session-in! ctx nil {})
           sid1               (:session-id sd1)
           path1              (:session-file sd1)
-          _                  (persist/flush-journal! (java.io.File. path1)
-                                                     sid1
-                                                     cwd
-                                                     nil
-                                                     nil
-                                                     [(persist/thinking-level-entry :off)])
+          _                  (journal-store/flush-journal! (java.io.File. path1)
+                                                           sid1
+                                                           cwd
+                                                           nil
+                                                           nil
+                                                           [(persist/thinking-level-entry :off)])
           sd2                (session/new-session-in! (retarget ctx sd1) sid1 {})
           sid2               (:session-id sd2)
           sd1*               (session/ensure-session-loaded-in! (retarget ctx sd2) sid2 sid1)
@@ -289,7 +290,7 @@
         ctx                (retarget ctx child-sd)
         child-sd           (ss/get-session-data-in ctx child-id)
         child-file         (:session-file child-sd)
-        loaded-child       (persist/load-session-file child-file)]
+        loaded-child       (journal-store/load-session-file child-file)]
     (is (string? child-file))
     (is (.exists (java.io.File. child-file)))
     (is (= parent-file (get-in loaded-child [:header :parent-session])))
@@ -348,7 +349,7 @@
                                                  :content [{:type :text :text "hello"}]
                                                  :timestamp (java.time.Instant/now)})]]
       (.deleteOnExit f)
-      (persist/flush-journal! f "sess-no-model" "/tmp/project" nil entries)
+      (journal-store/flush-journal! f "sess-no-model" "/tmp/project" nil entries)
       (let [sd                 (session/resume-session-in! ctx session-id (.getAbsolutePath f))
             resumed-id         (:session-id sd)
             ctx                (retarget ctx sd)
@@ -368,7 +369,7 @@
           _                (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 22000 :window 200000} {:origin :core})
           f                (File/createTempFile "psi-resume-context" ".ndedn")]
       (.deleteOnExit f)
-      (persist/flush-journal! f "sess-resume-context" "/tmp/project" nil [])
+      (journal-store/flush-journal! f "sess-resume-context" "/tmp/project" nil [])
       (let [sd         (session/resume-session-in! ctx session-id (.getAbsolutePath f))
             resumed-id (:session-id sd)
             ctx        (retarget ctx sd)

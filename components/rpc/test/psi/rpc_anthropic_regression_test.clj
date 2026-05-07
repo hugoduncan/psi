@@ -4,6 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.persistence :as persist]
    [psi.rpc :as rpc]
+   [psi.session-journal.store :as journal-store]
    [psi.rpc-test-support :as support]))
 
 (deftest rpc-new-session-rehydrates-agent-messages-not-tui-projection-test
@@ -40,15 +41,15 @@
           sd1                (session/new-session-in! ctx nil {})
           session-id         (:session-id sd1)
           path1              (:session-file sd1)
-          _                  (persist/flush-journal! (java.io.File. path1)
-                                                     session-id
-                                                     cwd
-                                                     nil
-                                                     nil
-                                                     [(persist/message-entry {:role "assistant"
-                                                                              :content [{:type :text :text "[New session started]"}]})
-                                                      (persist/message-entry {:role "user"
-                                                                              :content [{:type :text :text "who are you?"}]})])
+          _                  (journal-store/flush-journal! (java.io.File. path1)
+                                                           session-id
+                                                           cwd
+                                                           nil
+                                                           nil
+                                                           [(persist/message-entry {:role "assistant"
+                                                                                    :content [{:type :text :text "[New session started]"}]})
+                                                            (persist/message-entry {:role "user"
+                                                                                    :content [{:type :text :text "who are you?"}]})])
           state              (atom {:transport {:ready? true :pending {}}
                                     :connection {:subscribed-topics #{"session/rehydrated"}}})
           handler (support/make-handler ctx state)
