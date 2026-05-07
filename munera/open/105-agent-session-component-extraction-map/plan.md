@@ -18,6 +18,6 @@ Scope boundaries:
 - this task exists to improve structural decision-making for subsequent extraction tasks
 
 Follow-on guidance:
-- existing task `104-tool-runtime-component-extraction` can proceed as a child aligned to this umbrella
+- landed tasks `106-provider-auth-component-extraction`, `107-project-nrepl-component-extraction`, and `109-shared-config-resolution-component-extraction` now serve as concrete child examples of this umbrella's ownership-mapping approach
 - future extraction tasks should cite this umbrella and state which candidate component they are instantiating
 - narrow tasks that depend on broader subsystem boundaries should be closed, replaced, or rewritten against this map rather than continued in isolation

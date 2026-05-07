@@ -37,12 +37,13 @@ Supersession decision recorded:
 - `102-turn-preparation-component-extraction` is superseded by this umbrella
 - reason: its narrow extraction target proved structurally premature without the broader component map, especially around prompt composition and turn ownership
 
-Follow-on architectural notes after child tasks `106` and `107`:
+Follow-on architectural notes after child tasks `106`, `107`, and `109`:
 - `106` did not expose a comparable ownership surprise; it behaved like the clean bounded extraction the umbrella predicted
-- `107` did expose a cross-cutting config ownership question
-- `psi.project-nrepl.config` now carries copied project-config reading logic to avoid an upward dependency on `agent-session`
-- that may be acceptable temporarily, but the umbrella should remember this as a signal that config resolution/loading may deserve its own lower shared component rather than repeated local copies in extracted subsystems
-- `107` also accepted one non-blocking behavior drift at the higher-level tool boundary: `project-repl/start` missing-config handling now returns a structured component result, so the `psi-tool` path may want a later follow-on if stricter tool-facing error semantics matter
+- `107` exposed a cross-cutting config ownership question
+- landed task `109-shared-config-resolution-component-extraction` has now resolved that question by extracting `components/shared-config/` as the lower owner for shared user/project config loading and layered `:agent-session` resolution
+- `psi.project-nrepl.config` now depends downward on `psi.shared-config.*` instead of carrying copied project/user config reading logic
+- this validates the umbrella's broader ownership-mapping approach: extracted subsystems can reveal lower shared seams that should become explicit components rather than being recopied locally
+- `107` still accepted one non-blocking behavior drift at the higher-level tool boundary: `project-repl/start` missing-config handling now returns a structured component result, so the `psi-tool` path may want a later follow-on if stricter tool-facing error semantics matter
 
 Live namespace-surface review completed:
 - reviewed the current `components/agent-session/src/psi/agent_session/` tree against the umbrella map
@@ -54,5 +55,6 @@ Live namespace-surface review completed:
   - turn owns single-turn lifecycle orchestration and consumes prompt/tool capabilities rather than owning them
 - observed that turn extraction is already in an intermediate state because `components/agent-session/src/psi/turn/handlers.clj` exists while high-level prompt-turn orchestration still resides under `psi.agent-session.*`
 - confirmed workflow is now the clearest remaining extraction candidate by both namespace mass and conceptual cohesion
+- recorded that the lower shared-config seam exposed by `107` is no longer speculative: it is now landed concretely via task `109`
 - updated extraction ordering to move extensions runtime ahead of scheduler/persistence/background jobs, based on the live namespace tree already being explicitly substructured and component-like
 - recorded landed task `100-turn-statechart-component-extraction` as a narrow low-level turn child under this umbrella rather than as a substitute for the broader turn boundary

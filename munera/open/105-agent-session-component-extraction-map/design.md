@@ -119,7 +119,7 @@ Representative namespaces:
 - `conversation.clj`
 - prompt-definition/projection parts of `tool_defs.clj`
 - possibly `message_text.clj` if it proves more prompt-text than session-owned
-- likely prompt-facing config inputs currently reached through `project_preferences.clj`, `user_config.clj`, and `config_resolution.clj`, though those config owners should not be assumed to belong wholly to the prompt component
+- likely prompt-facing config inputs were previously reached through `project_preferences.clj`, `user_config.clj`, and `config_resolution.clj`; those config owners have now been extracted into `components/shared-config/` and should continue to be treated as a lower shared substrate rather than prompt-owned logic
 
 Reason it is coherent:
 
@@ -131,7 +131,7 @@ Boundary note after reviewing the current namespace surface:
 - prompt composition and turn orchestration should stay distinct: prompt assets decide what to send, while turn owns when/how a single agent turn is prepared, executed, recorded, and continued
 - `tool_defs.clj` appears split-brain: prompt-facing tool schema projection likely belongs with prompt composition, while runtime execution ownership belongs with the tool runtime component
 - `message_text.clj` remains ambiguous and should be treated as a review point during a concrete extraction rather than forced into prompt ownership prematurely
-- config resolution is a cross-cutting concern exposed again here: prompt composition consumes config, but that does not imply config loading itself belongs inside the prompt component
+- config resolution remains a cross-cutting concern: prompt composition consumes config, but config loading itself now has an explicit lower owner in `components/shared-config/` rather than belonging inside the prompt component
 
 #### 2. OAuth / provider auth
 
@@ -290,10 +290,10 @@ Follow-on result from child task `107-project-nrepl-component-extraction`:
 - authoritative namespaces now live under `psi.project-nrepl.*`
 - higher-level `agent-session` command/context/psi-tool/resolver consumers now depend downward on the extracted project-nREPL component
 - the extraction confirmed this candidate was correctly identified as a low-ambiguity early move
-- follow-on architectural note: `psi.project-nrepl.config` currently carries copied project-config reading logic instead of depending on a lower shared config owner
-- this preserved behavior in the child task, but it is a signal that config-reading concerns may themselves want a dedicated lower component or otherwise explicitly shared ownership
-- accepted drift from the child task review: `project-repl/start` missing-config handling now returns a structured component result, so the `psi-tool` error contract may want a later follow-on if stricter tool-facing error semantics matter
-- revisit later whether project/user/shared/local config resolution should be extracted as a complete component rather than recopied across subsystem boundaries
+- follow-on architectural note from the original extraction has now been resolved by landed task `109-shared-config-resolution-component-extraction`
+- shared file-backed config ownership now lives in `components/shared-config/` under `psi.shared-config.*`
+- `psi.project-nrepl.config` now depends downward on that shared substrate instead of carrying copied project/user config reading logic
+- accepted drift from the child task review still stands: `project-repl/start` missing-config handling now returns a structured component result, so the `psi-tool` error contract may want a later follow-on if stricter tool-facing error semantics matter
 
 #### 7. Extensions runtime
 
@@ -432,7 +432,7 @@ Reviewing the current `components/agent-session/src/psi/agent_session/` tree sha
 - the workflow family is now the clearest remaining extraction candidate
 - turn extraction is already partial because `components/agent-session/src/psi/turn/handlers.clj` exists, so future work should assume an in-progress split rather than a wholly internal domain
 - prompt composition, tool runtime, and turn are three adjacent but distinct boundaries and should not be collapsed into a single vague "prompt runtime" move
-- config reading/resolution has emerged as a repeated cross-cutting concern; child task `107` already exposed this, and the current prompt/config surfaces suggest that future extractions may need an explicit shared config owner instead of repeated copied logic
+- config reading/resolution had emerged as a repeated cross-cutting concern from child task `107`; landed task `109` has now resolved that pressure by extracting an explicit lower shared-config owner instead of tolerating repeated copied logic
 - top-level `commands.clj`, `mutations.clj`, and `resolvers.clj` should be treated as aggregator seams in the residual `agent-session` core, not as proof that underlying subsystem ownership belongs there permanently
 
 ## Relationship to existing tasks
