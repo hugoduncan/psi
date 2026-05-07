@@ -28,8 +28,8 @@ Implementation sequence:
    - `components/agent-session/deps.edn`
    - `components/turn-runtime/deps.edn` only if needed during the move sequence
 3. move `turn_runtime/tool_args.clj` implementation to `psi.tool-runtime.args`
-4. move `tool_execution.clj` implementation to `psi.tool-runtime.core`
-5. move `tool_batch.clj` implementation to `psi.tool-runtime.batch`
+4. split `tool_execution.clj` and extract the lower-level subset into `psi.tool-runtime.core`
+5. split `tool_batch.clj` and extract the lower-level subset into `psi.tool-runtime.batch`
 6. update direct production consumers according to the API they actually use
    - helper-level parser callers -> `psi.tool-runtime.args`
    - helper-level execution callers -> `psi.tool-runtime.core`
@@ -43,11 +43,12 @@ Consumer migration expectations:
 - current production consumers should depend on the extracted namespace that matches the helper-level API they actually use
 - preferred steady-state production dependency slope should be:
   - `psi.turn-runtime.*` -> `psi.tool-runtime.*`
-  - `psi.agent-session.prompt-turn` and/or `psi.agent-session.dispatch_handlers.session-mutations` may depend on `psi.tool-runtime.*` only where higher-level session orchestration still owns the surrounding concerns
-  - `psi.agent-session.conversation` -> `psi.tool-runtime.args`
+  - current known helper-level consumer: `psi.agent-session.conversation` -> `psi.tool-runtime.args`
+  - `psi.agent-session.prompt-turn` is the preferred primary adapter from generic tool-runtime events into turn-specific progress/accumulation semantics
+  - `psi.agent-session.dispatch_handlers.session-mutations` may depend on `psi.tool-runtime.*` only for lower-level tool runtime helpers where session-owned mutation orchestration still legitimately surrounds the call
 - the extracted authoritative `psi.tool-runtime.*` namespaces must sit below `agent-session`, so they must not require `psi.agent-session.*` implementation namespaces directly at completion
 - the extracted authoritative `psi.tool-runtime.*` namespaces must not require `psi.turn-runtime.*` implementation namespaces directly at completion
-- tool-runtime should deliver progress/lifecycle updates through a generic event/callback sink or equivalent generic returned event data, with turn-runtime adapting those generic events upward
+- first-cut API decision: tool-runtime delivers intermediate progress/lifecycle updates through an `:on-event` callback receiving generic tool event maps, while the final tool result remains a separate return value
 - some higher-level production namespaces may still depend directly on `psi.tool-runtime.*` because this task is extracting helper/runtime ownership rather than introducing a new single public facade; each such case should be minimized and recorded in `implementation.md`
 - completion requires a final repo search confirming no remaining authoritative uses of:
   - `psi.agent-session.tool-execution`

@@ -27,7 +27,8 @@ Observed consumer surfaces from repo search at task creation time:
 - production consumers include `prompt_turn.clj`, `conversation.clj`, and dispatch handlers in `session_mutations.clj`
 - current ownership already crosses `agent-session` and `turn-runtime`, which strengthens the case for a dedicated `tool-runtime` component
 - current `tool_execution.clj` also depends on `agent-session`-owned services such as dispatch/state/post-tool/tool-output, so the task must split mixed ownership rather than move the entire namespace wholesale if the result is to sit below `agent-session`
-- revised seam decision: `psi.tool-runtime.*` must not depend on `psi.turn-runtime.*`; tool-runtime should instead deliver generic tool events/data upward, with turn-runtime adapting those generic events into turn accumulation/progress semantics above the boundary
+- revised seam decision: `psi.tool-runtime.*` must not depend on `psi.turn-runtime.*`; tool-runtime should instead deliver generic tool events upward through a first-cut `:on-event` callback seam, with turn-runtime adapting those generic events into turn accumulation/progress semantics above the boundary
+- preferred upper-layer adapter decision: `prompt_turn.clj` is the primary adapter for turn-specific progress/accumulation concerns, while `session_mutations.clj` may still wrap lower-level helpers where session-owned mutation orchestration remains the surrounding concern
 - first-cut task explicitly leaves `post_tool.clj` and `tool_output.clj` outside the extraction boundary to avoid widening into all tool-adjacent ownership at once
 
 Open note:

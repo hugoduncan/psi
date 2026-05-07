@@ -15,6 +15,7 @@
 - [ ] Rename moved namespace `psi.turn-runtime.tool-args` to `psi.tool-runtime.args`
 - [ ] Extract the lower-level subset of `components/agent-session/src/psi/agent_session/tool_execution.clj` into `components/tool-runtime/src/psi/tool_runtime/core.clj`
 - [ ] Rename extracted authoritative namespace to `psi.tool-runtime.core`
+- [ ] Shape the first-cut lower-level API around generic inputs/outputs plus `:on-event` callback delivery for intermediate tool events
 - [ ] Leave or reshape any residual `agent-session`-owned orchestration in place above the boundary until it can delegate to `psi.tool-runtime.core`
 - [ ] Extract the lower-level subset of `components/agent-session/src/psi/agent_session/tool_batch.clj` into `components/tool-runtime/src/psi/tool_runtime/batch.clj`
 - [ ] Rename extracted authoritative namespace to `psi.tool-runtime.batch`
@@ -30,7 +31,7 @@
 - [ ] Move clearly component-owned focused tests into `components/tool-runtime/test/psi/tool_runtime/` where that improves ownership clarity without widening scope
   - [ ] rename moved tests to `psi.tool-runtime.*-test` namespaces
   - [ ] prefer moving whole focused test files rather than splitting mixed-purpose higher-level files
-  - [ ] move tests whose primary subject is parser behavior, lower-level execution shaping, or batch ordering/locking behavior
+  - [ ] move tests whose primary subject is parser behavior, lower-level execution shaping, generic tool event delivery, or batch ordering/locking behavior
   - [ ] when an existing file is mixed-purpose, leave it in place and update requires/usages only, or add a small new component-owned focused test file instead
   - [ ] keep `tool_execution_test.clj` under `agent-session` when it is proving session-owned dispatch, telemetry, post-tool, or tool-output integration concerns
   - [ ] keep tests whose primary subject is prompt lifecycle, transcript semantics, tool-output telemetry integration, post-tool registry behavior, or service wiring under the higher-level component that owns those concerns
@@ -41,6 +42,7 @@
 - [ ] Run focused tests from the new component boundary
   - [ ] at least one moved args-focused or single-tool-runtime-focused test namespace under `components/tool-runtime/test/psi/tool_runtime/`
   - [ ] at least one moved batch-focused test namespace under `components/tool-runtime/test/psi/tool_runtime/`
+  - [ ] add or move a focused test proving the canonical `:on-event` tool event envelope and ordering
 - [ ] Run focused higher-level consuming-path verification
   - [ ] `psi.agent-session.tool-output-integration-test`
   - [ ] record exact commands in `implementation.md`

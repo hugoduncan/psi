@@ -189,8 +189,30 @@ Boundary clarifications:
 - `tool_output.clj` and `post_tool.clj` remain outside the first-cut extracted component; this task is about execution/runtime mechanics, not every tool-related namespace
 - because the new component must sit below `agent-session`, lower-level tool-runtime code must receive any needed higher-level services via data/callback/protocol inputs or remain above the boundary; it must not require `psi.agent-session.*` implementation namespaces directly at completion
 - explicit decision for this slice: `psi.tool-runtime.*` must not depend on `psi.turn-runtime.*`
-- lower-level tool-runtime code must deliver progress and lifecycle updates through a generic event/callback sink or equivalent generic returned event data, rather than calling turn-runtime accumulation helpers directly
-- `turn-runtime` and/or higher-level session orchestration may adapt those generic tool-runtime events into turn-specific accumulation, progress queues, or transcript updates above the boundary
+- first-cut delivery seam decision: lower-level tool-runtime code delivers intermediate progress and lifecycle updates through an `:on-event` callback input that receives generic tool event maps; the final tool result remains a separate return value
+- preferred first-cut adapter decision: `psi.agent-session.prompt-turn` is the primary adapter from generic tool-runtime events into turn-specific accumulation, progress queues, and transcript updates
+- other higher-level session orchestration may adapt those same generic tool-runtime events only where it legitimately owns surrounding session concerns, but the task should not spread turn-specific adaptation logic across multiple layers without necessity
+
+Canonical first-cut generic tool event envelope:
+
+- every emitted event must be a map containing at least:
+  - `:event-kind`
+  - `:tool-call-id`
+  - `:tool-name`
+- first-cut canonical event kinds are:
+  - `:tool-start`
+  - `:tool-executing`
+  - `:tool-execution-update`
+  - `:tool-result`
+  - `:tool-error`
+- optional fields may include, when relevant:
+  - `:content`
+  - `:result-text`
+  - `:details`
+  - `:is-error`
+  - `:arguments`
+  - `:parsed-args`
+- tool-runtime owns this generic event vocabulary; turn-runtime and agent-session may project it into higher-level semantics but must not redefine the lower event contract ad hoc
 
 ## Target shape
 
@@ -227,10 +249,36 @@ Expected ownership split:
   - authoritative batch execution helpers
   - authoritative per-file serialization helpers
 
+First-cut expected split from `tool_execution.clj`:
+
+- likely move into `psi.tool-runtime.core`:
+  - `tool-content->text`
+  - `normalize-tool-content`
+  - `tool-lifecycle-event`
+  - the lower-level single-tool execution shaping path, provided it can be expressed in terms of generic inputs/outputs and generic `:on-event` delivery
+- likely remain above the boundary in `agent-session` unless further refactored into generic dependencies:
+  - dispatch-owned orchestration
+  - session telemetry/stat recording
+  - post-tool integration
+  - tool-output policy/storage integration
+  - direct state mutation / session-agent lifecycle integration
+
+First-cut expected split from `tool_batch.clj`:
+
+- likely move into `psi.tool-runtime.batch`:
+  - file-key extraction
+  - per-file locking
+  - batch ordering / concurrency helpers
+  - generic batch execution over lower-level tool-runtime operations
+- likely remain above the boundary in `agent-session` unless further refactored into generic dependencies:
+  - dispatch-owned submit/record orchestration tied to session mutation handlers
+  - any session-specific executor/config wiring that cannot be passed in generically
+
 API-surface clarifications:
 
-- `execute-tool-call-prepared!` and `record-tool-call-prepared-result!` remain valid lower-level phases only if they no longer depend on `agent-session` implementation namespaces and deliver intermediate progress through a generic event/callback sink rather than turn-runtime-specific helpers
-- `run-tool-call-through-runtime-effect!` may remain as a compatibility/public composition helper within the extracted component only if it preserves the below-`agent-session`, non-`turn-runtime` boundary; otherwise that composition should remain above the boundary
+- `execute-tool-call-prepared!` and `record-tool-call-prepared-result!` remain valid lower-level phases only if they no longer depend on `agent-session` implementation namespaces and deliver intermediate progress through the generic `:on-event` callback seam rather than turn-runtime-specific helpers
+- preferred outcome: composition such as `run-tool-call-through-runtime-effect!` remains above the boundary unless it can be expressed entirely in lower-level, non-`agent-session`, non-`turn-runtime` terms
+- if `run-tool-call-through-runtime-effect!` remains within the extracted component, it must preserve the below-`agent-session`, non-`turn-runtime` boundary completely; otherwise it should remain an upper-layer composition helper
 - `psi.tool-runtime.args` is the one authoritative home for generic tool-argument parsing; `turn-runtime` must not remain the owner of that surface at completion
 
 Ownership clarifications:
@@ -238,8 +286,9 @@ Ownership clarifications:
 - preferred steady-state production dependency slope should be:
   - `psi.turn` -> `psi.turn-runtime.*`
   - `psi.turn-runtime.*` -> `psi.tool-runtime.*`
-  - `psi.agent-session.prompt-turn` and/or `psi.agent-session.dispatch_handlers.session-mutations` may depend on `psi.tool-runtime.*` only where higher-level session orchestration still owns the surrounding concerns
-  - `psi.agent-session.conversation` -> `psi.tool-runtime.args`
+  - current known helper-level consumer: `psi.agent-session.conversation` -> `psi.tool-runtime.args`
+  - `psi.agent-session.prompt-turn` is the preferred primary adapter from generic tool-runtime events into turn-specific progress/accumulation semantics
+  - `psi.agent-session.dispatch_handlers.session-mutations` may depend on `psi.tool-runtime.*` only for lower-level tool runtime helpers where session-owned mutation orchestration still legitimately surrounds the call
 - `psi.tool-runtime.*` must be structurally below `agent-session`; completion therefore requires that the extracted authoritative namespaces do not require `psi.agent-session.*` implementation namespaces directly
 - `psi.tool-runtime.*` must not depend on `psi.turn-runtime.*`; tool-runtime emits generic tool events/data, and turn-runtime consumes/adapts them
 - some existing higher-level agent-session production namespaces may depend directly on `psi.tool-runtime.*` because they use helper-level APIs rather than a single public facade; those cases are expected and should be kept minimal and recorded explicitly in `implementation.md`
