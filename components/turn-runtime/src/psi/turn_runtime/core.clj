@@ -6,9 +6,9 @@
    shaping for one prepared turn."
   (:require
    [psi.ai.models :as models]
-   [psi.agent-session.state-accessors :as sa]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.accumulator :as accum]
+   [psi.turn-runtime.state :as trs]
    [psi.turn-runtime.stream :as stream]
    [psi.turn-statechart.core :as turn-sc]))
 
@@ -56,7 +56,7 @@
   "Abort the currently active prepared-request turn for `session-id`, if any.
    Cancels the stream handle and forces an aborted terminal turn result."
   [ctx session-id]
-  (when-let [turn-ctx (sa/turn-context-in ctx session-id)]
+  (when-let [turn-ctx (trs/turn-context-in ctx session-id)]
     (stream/abort-turn! turn-ctx)
     true))
 
@@ -70,13 +70,13 @@
                (stream/chain-callbacks
                 (:on-provider-request opts)
                 (fn [capture]
-                  (sa/append-provider-request-capture-in!
+                  (trs/append-provider-request-capture-in!
                    ctx session-id (assoc capture :turn-id turn-id)))))
         (assoc :on-provider-response
                (stream/chain-callbacks
                 (:on-provider-response opts)
                 (fn [capture]
-                  (sa/append-provider-reply-capture-in!
+                  (trs/append-provider-reply-capture-in!
                    ctx session-id (assoc capture :turn-id turn-id))))))))
 
 (defn create-live-turn-context
@@ -92,7 +92,7 @@
         _                (swap! (:turn-data turn-ctx) assoc :turn-id turn-id)
         last-progress-ms (atom (stream/now-ms))
         timed-out?       (atom false)]
-    (sa/set-turn-context-in! ctx session-id turn-ctx)
+    (trs/set-turn-context-in! ctx session-id turn-ctx)
     (turn-sc/send-event! turn-ctx :turn/start)
     {:done-p done-p
      :actions-fn actions-fn

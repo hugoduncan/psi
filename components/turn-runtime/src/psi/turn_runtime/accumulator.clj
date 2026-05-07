@@ -5,8 +5,8 @@
    Owns all mutable state updates to the turn-data atom during a streaming turn."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.conversation :as conv-translate]
-   [psi.agent-session.state-accessors :as sa]
+   [psi.turn-runtime.state :as trs]
+   [psi.turn-runtime.tool-args :as tool-args]
    [psi.turn-statechart.core :as turn-sc]))
 
 (defn emit-progress!
@@ -102,7 +102,7 @@
                      (update :id #(canonical-tool-call-id turn-id content-index %))))))))
 
 (defn invalid-tool-call [tc]
-  (let [{:keys [ok?]} (conv-translate/parse-args-strict (:arguments tc))]
+  (let [{:keys [ok?]} (tool-args/parse-args-strict (:arguments tc))]
     (cond
       (or (nil? (:id tc)) (str/blank? (str (:id tc))))
       {:reason :missing-call-id
@@ -269,12 +269,12 @@
     (note-last-provider-event! td :toolcall-start data)
     (begin-content-block! td idx)
     (update-content-block! td idx #(assoc % :kind :tool-call))
-    (sa/append-tool-call-attempt-in! ctx session-id
-                                     {:turn-id       (:turn-id @td)
-                                      :event-kind    :toolcall-start
-                                      :content-index idx
-                                      :id            tc-id
-                                      :name          tc-name})
+    (trs/append-tool-call-attempt-in! ctx session-id
+                                      {:turn-id       (:turn-id @td)
+                                       :event-kind    :toolcall-start
+                                       :content-index idx
+                                       :id            tc-id
+                                       :name          tc-name})
     (emit-tool-assembly-progress! progress-queue td :start idx updated
                                   (when (= tc-id (:id updated)) tc-id))))
 
@@ -284,11 +284,11 @@
         updated (update-tool-call-delta td idx delta)]
     (note-last-provider-event! td :toolcall-delta data)
     (note-content-delta! td idx :tool-call)
-    (sa/append-tool-call-attempt-in! ctx session-id
-                                     {:turn-id       (:turn-id @td)
-                                      :event-kind    :toolcall-delta
-                                      :content-index idx
-                                      :delta         delta})
+    (trs/append-tool-call-attempt-in! ctx session-id
+                                      {:turn-id       (:turn-id @td)
+                                       :event-kind    :toolcall-delta
+                                       :content-index idx
+                                       :delta         delta})
     (emit-tool-assembly-progress! progress-queue td :delta idx updated
                                   (canonical-provider-tool-call-id (:turn-id @td) (:id updated)))))
 
@@ -297,10 +297,10 @@
         updated (get-in @td [:tool-calls idx])]
     (note-last-provider-event! td :toolcall-end data)
     (end-content-block! td idx)
-    (sa/append-tool-call-attempt-in! ctx session-id
-                                     {:turn-id       (:turn-id @td)
-                                      :event-kind    :toolcall-end
-                                      :content-index idx})
+    (trs/append-tool-call-attempt-in! ctx session-id
+                                      {:turn-id       (:turn-id @td)
+                                       :event-kind    :toolcall-end
+                                       :content-index idx})
     (emit-tool-assembly-progress! progress-queue td :end idx updated
                                   (canonical-provider-tool-call-id (:turn-id @td) (:id updated)))))
 

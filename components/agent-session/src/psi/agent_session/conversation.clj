@@ -7,34 +7,10 @@
    Entry point: agent-messages->ai-conversation"
   (:require
    [clojure.string :as str]
-   [cheshire.core :as json]
    [psi.ai.conversation :as conv]
    [psi.agent-session.system-prompt :as system-prompt]
-   [psi.agent-session.tool-defs :as tool-defs]))
-
-;; ============================================================
-;; JSON argument parsing
-;; ============================================================
-
-(defn parse-args-strict
-  "Parse tool args strictly, preserving parse validity.
-   Returns {:ok? true :value <map>} when JSON parses to a map,
-   otherwise {:ok? false :value nil}."
-  [arguments]
-  (try
-    (let [parsed (json/parse-string arguments)]
-      (if (map? parsed)
-        {:ok? true :value parsed}
-        {:ok? false :value nil}))
-    (catch Exception _
-      {:ok? false :value nil})))
-
-(defn parse-args
-  "Parse JSON tool arguments string into a map.
-   Always returns a map — returns {} on non-map or parse failure."
-  [arguments]
-  (let [{:keys [ok? value]} (parse-args-strict arguments)]
-    (if ok? value {})))
+   [psi.agent-session.tool-defs :as tool-defs]
+   [psi.turn-runtime.tool-args :as tool-args]))
 
 ;; ============================================================
 ;; Cache-control helpers
@@ -121,7 +97,7 @@
                                    {:kind  :tool-call
                                     :id    (:id tc)
                                     :name  (:name tc)
-                                    :input (parse-args (:arguments tc))})
+                                    :input (tool-args/parse-args (:arguments tc))})
                                  tool-calls)))]
     (if (seq structured-blocks)
       (conv/add-assistant-message conv {:content {:kind :structured :blocks structured-blocks}})

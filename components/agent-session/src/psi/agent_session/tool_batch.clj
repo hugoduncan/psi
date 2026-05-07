@@ -4,7 +4,7 @@
    Canonical home for shared-session tool batch execution ordering,
    parallelism, and result recording."
   (:require
-   [psi.agent-session.conversation :as conv-translate]
+   [psi.turn-runtime.tool-args :as tool-args]
    [psi.agent-session.dispatch :as dispatch])
   (:import
    (java.util.concurrent Callable ConcurrentHashMap ExecutorService Future)
@@ -17,7 +17,7 @@
                       {:session-id     session-id
                        :tool-call      tool-call
                        :parsed-args    (or (:parsed-args tool-call)
-                                           (conv-translate/parse-args (:arguments tool-call)))
+                                           (tool-args/parse-args (:arguments tool-call)))
                        :progress-queue progress-queue}
                       {:origin :core}))
 
@@ -32,7 +32,7 @@
    tools (path, file, file_path) in both string and keyword forms."
   [tool-call]
   (let [args (or (:parsed-args tool-call)
-                 (conv-translate/parse-args (:arguments tool-call)))]
+                 (tool-args/parse-args (:arguments tool-call)))]
     (some (fn [k] (when-let [v (get args k)]
                     (when (string? v) (not-empty v))))
           ["path" "file" "file_path" :path :file :file_path])))
@@ -54,7 +54,7 @@
   ^Callable
   (fn []
     (let [parsed-args (or (:parsed-args tool-call)
-                          (conv-translate/parse-args (:arguments tool-call)))]
+                          (tool-args/parse-args (:arguments tool-call)))]
       (if file-key
         (let [^ReentrantLock lk (acquire-file-lock! lock-map file-key)]
           (try

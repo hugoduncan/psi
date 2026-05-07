@@ -11,7 +11,7 @@
    - run-tool-call-through-runtime-effect!  — full start→execute→record transaction"
   (:require
    [clojure.string :as str]
-   [psi.agent-session.conversation :as conv-translate]
+   [psi.turn-runtime.tool-args :as tool-args]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.psi-tool :as psi-tool]
@@ -134,7 +134,7 @@
   (let [call-id (:id tool-call)
         name    (:name tool-call)
         args    (or (:parsed-args tool-call)
-                    (conv-translate/parse-args (:arguments tool-call)))]
+                    (tool-args/parse-args (:arguments tool-call)))]
     (accum/emit-progress!
      progress-queue
      (emit-tool-lifecycle!
@@ -228,7 +228,7 @@
   (let [prepared-tool-call (assoc tool-call :parsed-args
                                   (or parsed-args
                                       (:parsed-args tool-call)
-                                      (conv-translate/parse-args (:arguments tool-call))))]
+                                      (tool-args/parse-args (:arguments tool-call))))]
     (start-tool-call! ctx session-id prepared-tool-call progress-queue)
     (try
       (execute-tool-call! ctx session-id prepared-tool-call progress-queue)
