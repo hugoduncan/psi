@@ -6,6 +6,7 @@
    [psi.agent-session.resolvers.telemetry-basics :as basics]
    [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as accessors]
+   [psi.turn-runtime.state :as turn-state]
    [psi.turn-statechart.core :as turn-sc]))
 (declare tool-lifecycle-summaries)
 (defn- stats-snapshot
@@ -729,7 +730,7 @@
                  :psi.turn/is-tool-accumulating
                  :psi.turn/is-done
                  :psi.turn/is-error]}
-  (if-let [turn-ctx (accessors/turn-context-in agent-session-ctx session-id)]
+  (if-let [turn-ctx (turn-state/turn-context-in agent-session-ctx session-id)]
     (let [phase (turn-sc/turn-phase turn-ctx)
           td    (turn-sc/get-turn-data turn-ctx)]
       {:psi.turn/phase                phase

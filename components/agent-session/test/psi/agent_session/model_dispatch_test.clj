@@ -12,7 +12,8 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.state-accessors :as sa]
-   [psi.agent-session.test-support :as test-support])
+   [psi.agent-session.test-support :as test-support]
+   [psi.turn-runtime.state :as turn-state])
   (:import
    (java.io File)))
 
@@ -299,10 +300,10 @@
     (let [[ctx session-id] (create-session-context)
           _                  (kernel/clear-event-log!)
           stat       {:tool-name "bash" :context-bytes-added 12}
-          _          (sa/set-turn-context-in! ctx session-id {:turn-id "t-1"})
-          _          (sa/append-tool-call-attempt-in! ctx session-id {:id "tc-1" :name "read"})
-          _          (sa/append-provider-request-capture-in! ctx session-id {:provider "anthropic" :turn-id "t-1"})
-          _          (sa/append-provider-reply-capture-in! ctx session-id {:provider "anthropic" :turn-id "t-1" :event {:type :done}})
+          _          (turn-state/set-turn-context-in! ctx session-id {:turn-id "t-1"})
+          _          (turn-state/append-tool-call-attempt-in! ctx session-id {:id "tc-1" :name "read"})
+          _          (turn-state/append-provider-request-capture-in! ctx session-id {:provider "anthropic" :turn-id "t-1"})
+          _          (turn-state/append-provider-reply-capture-in! ctx session-id {:provider "anthropic" :turn-id "t-1" :event {:type :done}})
           _          (sa/record-tool-output-stat-in! ctx session-id stat 12 false)
           state      @(:state* ctx)
           events     (mapv :event-type (kernel/event-log-entries))]
@@ -312,11 +313,7 @@
         (is (= "anthropic" (get-in state [:agent-session :sessions sid :telemetry :provider-requests 0 :provider])))
         (is (= "anthropic" (get-in state [:agent-session :sessions sid :telemetry :provider-replies 0 :provider])))
         (is (= [stat] (get-in state [:agent-session :sessions sid :telemetry :tool-output-stats :calls]))))
-      (is (= [:session/set-turn-context
-              :session/append-tool-call-attempt
-              :session/append-provider-request-capture
-              :session/append-provider-reply-capture
-              :session/record-tool-output-stat]
+      (is (= [:session/record-tool-output-stat]
              events)))))
 
 (deftest interrupt-and-bootstrap-prompt-dispatch-test
