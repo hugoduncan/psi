@@ -5,6 +5,7 @@ description: Build a lambda expression
 {:steps [{:name "compile-1"
           :type :delegate
           :target "lambda-compiler"
+		  :skills ["lambda-compiler"]
           :prompt-string {:type :template
                           :text "compile a lambda for: {{input}}"
                           :vars {"input" {:from :workflow-input
@@ -14,6 +15,7 @@ description: Build a lambda expression
          {:name "decompile"
           :type :delegate
           :target "lambda-decompiler"
+		  :skills ["lambda-compiler"]
           :prompt-string {:type :template
                           :text "decompile the lambda expression: {{input}}"
                           :vars {"input" {:from {:step "compile-1" :yield :text}}}}
@@ -24,6 +26,7 @@ description: Build a lambda expression
          {:name "compile-2"
           :type :delegate
           :target "lambda-compiler"
+		  :skills ["lambda-compiler"]
           :prompt-string {:type :template
                           :text "compile a lambda for: {{input}}"
                           :vars {"input" {:from {:step "decompile" :yield :text}}}}
