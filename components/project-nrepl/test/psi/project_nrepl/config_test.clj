@@ -4,6 +4,12 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config :as project-nrepl-config]))
 
+(defn- capture-stderr [f]
+  (let [w (java.io.StringWriter.)]
+    (binding [*err* w]
+      (f))
+    (str w)))
+
 (deftest resolve-config-test
   (testing "merges project nREPL config from user and project scopes"
     (with-redefs [project-nrepl-config/read-user-config (fn [] {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
@@ -20,6 +26,60 @@
                   project-nrepl-config/read-project-preferences (fn [_] {})]
       (is (= {:project-nrepl {}}
              (project-nrepl-config/resolve-config "/tmp/project"))))))
+
+(deftest read-project-preferences-test
+  (testing "deep-merges shared then local with local precedence"
+    (let [dir      (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-pref-" (java.util.UUID/randomUUID)))
+          shared-f (io/file dir ".psi" "project.edn")
+          local-f  (io/file dir ".psi" "project.local.edn")]
+      (.mkdirs (.getParentFile shared-f))
+      (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                                              :attach {:host "localhost" :port 7888}}}}))
+      (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 9999}}}}))
+      (try
+        (is (= {:version 1
+                :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                                :attach {:host "localhost" :port 9999}}}}
+               (project-nrepl-config/read-project-preferences (.getAbsolutePath dir))))
+        (finally
+          (doseq [f (reverse (file-seq dir))]
+            (.delete f))))))
+
+  (testing "malformed local warns and falls back to shared"
+    (let [dir      (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-pref-" (java.util.UUID/randomUUID)))
+          shared-f (io/file dir ".psi" "project.edn")
+          local-f  (io/file dir ".psi" "project.local.edn")]
+      (.mkdirs (.getParentFile shared-f))
+      (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}))
+      (spit local-f "not valid edn")
+      (try
+        (let [err (capture-stderr
+                   #(is (= {:version 1
+                            :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
+                           (project-nrepl-config/read-project-preferences (.getAbsolutePath dir)))))]
+          (is (.contains err "WARNING: ignoring malformed project preferences file"))
+          (is (.contains err "project.local.edn")))
+        (finally
+          (doseq [f (reverse (file-seq dir))]
+            (.delete f))))))
+
+  (testing "malformed shared warns and falls back to local"
+    (let [dir      (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-pref-" (java.util.UUID/randomUUID)))
+          shared-f (io/file dir ".psi" "project.edn")
+          local-f  (io/file dir ".psi" "project.local.edn")]
+      (.mkdirs (.getParentFile shared-f))
+      (spit shared-f "not valid edn")
+      (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 7888}}}}))
+      (try
+        (let [err (capture-stderr
+                   #(is (= {:version 1
+                            :agent-session {:project-nrepl {:attach {:port 7888}}}}
+                           (project-nrepl-config/read-project-preferences (.getAbsolutePath dir)))))]
+          (is (.contains err "WARNING: ignoring malformed project preferences file"))
+          (is (.contains err "project.edn")))
+        (finally
+          (doseq [f (reverse (file-seq dir))]
+            (.delete f)))))))
 
 (deftest resolve-target-worktree-test
   (testing "explicit target wins over session worktree"

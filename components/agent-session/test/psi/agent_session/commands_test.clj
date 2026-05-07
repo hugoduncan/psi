@@ -142,6 +142,13 @@
     (is (= :text (:type result)))
     (is (= "Usage: /tree name <session-id|prefix> <name>" (:message result)))))
 
+(deftest dispatch-project-repl-routing-test
+  (testing "/project-repl routes through the higher-level command dispatcher"
+    (let [[ctx session-id] (make-test-ctx)
+          result           (commands/dispatch-in ctx session-id "/project-repl" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (str/includes? (:message result) "Project nREPL")))))
+
 (deftest dispatch-status-test
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/status" cmd-opts)]

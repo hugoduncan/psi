@@ -50,11 +50,34 @@
   [cwd]
   (io/file (str cwd) ".psi" "project.local.edn"))
 
+(defn- warn-malformed-file!
+  [file e]
+  (binding [*out* *err*]
+    (println (str "WARNING: ignoring malformed project preferences file "
+                  (.getAbsolutePath file)
+                  ": "
+                  (.getMessage e)))))
+
+(defn- read-project-preferences-file*
+  [file]
+  (try
+    (if (and (.exists file) (.isFile file))
+      (let [v (edn/read-string (slurp file))]
+        (if (map? v)
+          v
+          (do
+            (warn-malformed-file! file (ex-info "expected EDN map" {:value-type (type v)}))
+            nil)))
+      nil)
+    (catch Exception e
+      (warn-malformed-file! file e)
+      nil)))
+
 (defn read-project-preferences
   [cwd]
   (deep-merge {:version current-version :agent-session {}}
-              (read-edn-map-best-effort (project-preferences-file cwd) {})
-              (read-edn-map-best-effort (project-local-preferences-file cwd) {})))
+              (or (read-project-preferences-file* (project-preferences-file cwd)) {})
+              (or (read-project-preferences-file* (project-local-preferences-file cwd)) {})))
 
 (defn resolve-config
   "Return merged project nREPL config for `cwd`.

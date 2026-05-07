@@ -80,6 +80,7 @@ Bootstrapped on 2026-04-02.
   - moved focused subsystem tests into `components/project-nrepl/test/psi/project_nrepl/`
   - kept higher-level observability/resolvers/extension-install/tools proofs in `agent-session` tests because they verify owning integration surfaces above the extraction boundary
   - extracted component no longer depends on `psi.agent-session.*` implementation namespaces directly
+  - follow-up review fixes landed too: malformed project-config warning/fallback parity restored for extracted config loading, and project-nrepl command tests now prove the component directly while agent-session owns the explicit routing proof
   - focused extraction verification green and focused higher-level consuming-path verification green
 - Prompt-path compatibility cleanup now landed:
   - removed prompt-runtime timeout/abort sentinel compatibility handling; canonical internal sentinels only

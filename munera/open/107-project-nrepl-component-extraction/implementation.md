@@ -117,3 +117,12 @@ Completion checks:
 - old authoritative `components/agent-session/src/psi/agent_session/project_nrepl_*.clj` files removed
 - old focused agent-session-owned subsystem tests removed after move into the new component
 - repo search after migration showed no remaining production/test requires of `psi.agent-session.project-nrepl-*`; remaining mentions are task design prose and higher-level test namespaces that intentionally keep their `agent-session` test ownership labels
+
+Review note:
+- follow-up required before closure: extraction-local config loading drifted from existing malformed-file semantics, and moved `commands_test.clj` still proves higher-level agent-session routing instead of a purely component-local command surface
+- follow-up implemented:
+  - restored malformed project config warning/fallback behavior in `psi.project-nrepl.config` for shared/local project files
+  - expanded `psi.project-nrepl.config-test` to prove malformed shared/local project config parity
+  - narrowed `components/project-nrepl/test/psi/project_nrepl/commands_test.clj` so it now proves `psi.project-nrepl.commands` directly
+  - added explicit higher-level `/project-repl` routing proof in `components/agent-session/test/psi/agent_session/commands_test.clj`
+  - re-ran focused extracted-component plus higher-level consuming-path verification green (`1517 tests, 11734 assertions, 0 failures`)

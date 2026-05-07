@@ -36,3 +36,11 @@
 - [x] Confirm no remaining authoritative old project-nrepl requires/usages remain in the repo
 - [x] Confirm extracted authoritative `psi.project-nrepl.*` namespaces do not require `psi.agent-session.*` implementation namespaces directly
 - [x] Record final ownership and migration notes in `implementation.md`
+- [x] Restore config behavior parity for malformed user/project config files
+  - [x] remove extraction-local divergence in `psi.project-nrepl.config` best-effort readers
+  - [x] reuse or extract the existing warning/fallback config-reading semantics so malformed config behavior matches pre-extraction behavior
+  - [x] add/restore tests that prove malformed shared/local config handling parity
+- [x] Tighten moved command-test ownership to match the intended boundary
+  - [x] make `components/project-nrepl/test/psi/project_nrepl/commands_test.clj` prove `psi.project-nrepl.commands` directly without routing through `psi.agent-session.commands`, or move the routing proof back under `agent-session`
+  - [x] keep one explicit higher-level `/project-repl` routing proof under `agent-session` if the component-local test is narrowed
+- [x] Re-run focused extracted-component and higher-level consuming-path verification after the follow-up fixes
