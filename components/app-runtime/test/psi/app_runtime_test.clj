@@ -15,10 +15,10 @@
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.provider-auth.oauth.core :as oauth]
-   [psi.agent-session.prompt-templates :as pt]
+   [psi.prompt-assets.prompt-templates :as pt]
    [psi.shared-config.project :as project-prefs]
-   [psi.agent-session.skills :as skills]
-   [psi.agent-session.system-prompt :as sys-prompt]
+   [psi.prompt-assets.skills :as skills]
+   [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.introspection.core :as introspection]
    [psi.memory.runtime :as memory-runtime]
    #_[psi.tui.app :as tui-app]))

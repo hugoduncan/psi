@@ -5,7 +5,7 @@
    prompt/config semantics stay aligned across workflow paths."
   (:require
    [psi.session-state.state :as session-state]
-   [psi.agent-session.skills :as skills]
+   [psi.prompt-assets.skills :as skills]
    [psi.agent-session.tool-defs :as tool-defs]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]

@@ -1,4 +1,4 @@
-(ns psi.agent-session.system-prompt
+(ns psi.prompt-assets.system-prompt
   "System prompt assembly for the agent session.
 
    The system prompt is built from:
@@ -16,7 +16,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.skills :as skills]))
+   [psi.prompt-assets.skills :as skills]))
 
 ;;; Tool descriptions (built-in)
 

@@ -15,4 +15,5 @@
         psi/state-kernel            {:local/root "../state-kernel"}
         psi/session-state           {:local/root "../session-state"}
         psi/shared-config           {:local/root "../shared-config"}
+        psi/prompt-assets           {:local/root "../prompt-assets"}
         psi/agent-session           {:local/root "../agent-session"}}}

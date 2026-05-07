@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.child-session-state :as child-session-state]
-   [psi.agent-session.system-prompt :as system-prompt]
+   [psi.prompt-assets.system-prompt :as system-prompt]
    [psi.session-state.init :as init]
    [psi.session-state.model :as session-model]
    [psi.session-state.state :as state]))

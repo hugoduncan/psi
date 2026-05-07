@@ -1,4 +1,4 @@
-(ns psi.agent-session.prompt-templates
+(ns psi.prompt-assets.prompt-templates
   "Prompt template discovery, parsing, argument expansion, and invocation.
 
    Architecture

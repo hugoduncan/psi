@@ -14,6 +14,14 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 110 prompt-assets component extraction is now landed locally:
+  - created new lower component `components/prompt-assets/` with authoritative namespaces `psi.prompt-assets.prompt-templates`, `psi.prompt-assets.skills`, and `psi.prompt-assets.system-prompt`
+  - moved the three authoritative source namespaces and their focused tests out of `components/agent-session/` into the new component without introducing compatibility forwarding shims
+  - updated `agent-session` and `app-runtime` consumers to depend downward on `psi.prompt-assets.*`
+  - wired `psi/prompt-assets` into the root deps plus `components/agent-session/deps.edn` and `components/app-runtime/deps.edn`
+  - kept `conversation`, `tool-defs`, and `message-text` outside the extracted component boundary as intended
+  - focused verification green: `12 tests, 57 assertions, 0 failures`; lint green: `0 errors, 0 warnings`
+
 - Task 109 shared-config extraction is now landed locally:
   - new lower component `components/shared-config/` owns user config, project config, and shared `:agent-session` resolution
   - `app-runtime` now depends on `psi.shared-config.resolution`

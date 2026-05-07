@@ -7,7 +7,7 @@
   (:require
    [psi.session-state.state :as session]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.agent-session.system-prompt :as sys-prompt]))
+   [psi.prompt-assets.system-prompt :as sys-prompt]))
 
 ;;; Prompt contribution pure helpers
 

@@ -11,7 +11,7 @@
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
-   [psi.agent-session.prompt-templates :as pt]))
+   [psi.prompt-assets.prompt-templates :as pt]))
 
 (defn- parse-edn-prefix
   "When `text` starts with `{` (after trimming leading whitespace),

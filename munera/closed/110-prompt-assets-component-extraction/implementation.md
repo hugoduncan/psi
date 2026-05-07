@@ -68,3 +68,28 @@ Tightening pass applied using the refactoring skill:
 - clarified that the consumer inventory in `design.md` is the minimum known set at task creation time and not a scope limit
 - clarified that task completion requires both relocation of focused tests into `components/prompt-assets/test/` and final authoritative test namespaces under `psi.prompt-assets.*-test`
 - clarified that indirect app-runtime coverage through shared prompt-building paths is acceptable unless extraction reveals a distinct app-runtime-only regression surface
+
+Implementation notes
+- created new component `components/prompt-assets/` with authoritative namespaces:
+  - `psi.prompt-assets.prompt-templates`
+  - `psi.prompt-assets.skills`
+  - `psi.prompt-assets.system-prompt`
+- moved the three source namespaces whole, without decomposition
+- moved the focused tests into `components/prompt-assets/test/psi/prompt_assets/` and renamed their namespaces to the authoritative final-state `psi.prompt-assets.*-test` names
+- updated direct consumer requires across `agent-session` and `app-runtime` to depend on `psi.prompt-assets.*`
+- updated component dependencies so `agent-session` and `app-runtime` now depend on the new lower component, and added `psi/prompt-assets` to the root `deps.edn`
+- removed the old authoritative source/test files from `components/agent-session/`; no compatibility forwarding shims were introduced or retained
+- used `clj-surgeon :op :ls` to inspect the moved namespaces before extraction and `clj-surgeon :op :fix-declares!` after the move to confirm no declare repair was needed
+
+Verification
+- focused prompt-assets + consuming-path verification:
+  - `clojure -M:test --focus psi.prompt-assets.prompt-templates-test --focus psi.prompt-assets.skills-test --focus psi.prompt-assets.system-prompt-test --focus psi.agent-session.child-session-state-test --focus psi.agent-session.child-session-mutation-test`
+  - result: `12 tests, 57 assertions, 0 failures`
+- lint:
+  - `clojure -M:lint --lint components/prompt-assets components/agent-session components/app-runtime deps.edn`
+  - result: `0 errors, 0 warnings`
+
+Residual boundary notes
+- no hidden lower split pressure emerged during this move
+- `discover-context-files` moved cleanly with `system-prompt`, so the first-cut ownership decision held
+- `conversation`, `tool-defs`, and `message-text` remained outside the extracted component as intended

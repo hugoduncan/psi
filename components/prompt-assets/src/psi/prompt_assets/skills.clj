@@ -1,4 +1,4 @@
-(ns psi.agent-session.skills
+(ns psi.prompt-assets.skills
   "Skill discovery, parsing, validation, progressive disclosure, and invocation.
 
    Skills are self-contained capability packages the agent loads on-demand.
@@ -31,7 +31,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.prompt-templates :as pt]))
+   [psi.prompt-assets.prompt-templates :as pt]))
 
 ;; ============================================================
 ;; Config

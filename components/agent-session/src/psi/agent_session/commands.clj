@@ -30,7 +30,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as ext-runtime-fns]
    [psi.session-state.state :as ss]
-   [psi.agent-session.prompt-templates :as pt]
+   [psi.prompt-assets.prompt-templates :as pt]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.project-nrepl.commands :as project-nrepl-commands]
    [psi.ai.models :as ai-models]

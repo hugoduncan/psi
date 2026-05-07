@@ -1,0 +1,23 @@
+- [x] Confirm `components/prompt-assets/` and `psi.prompt-assets.*` as the extracted component directory and namespace family
+- [x] Re-read `105-agent-session-component-extraction-map` guidance for the prompt-assets child boundary
+- [x] Inspect `components/agent-session/src/psi/agent_session/prompt_templates.clj` for hidden dependencies or helper split pressure
+- [x] Inspect `components/agent-session/src/psi/agent_session/skills.clj` for hidden dependencies or helper split pressure
+- [x] Inspect `components/agent-session/src/psi/agent_session/system_prompt.clj` for hidden dependencies or helper split pressure
+- [x] Create the new prompt-assets component directory and authoritative namespace locations
+- [x] Move `psi.agent-session.prompt-templates` into the extracted component
+- [x] Move `psi.agent-session.skills` into the extracted component
+- [x] Move `psi.agent-session.system-prompt` into the extracted component
+- [x] Move associated focused tests into `components/prompt-assets/test/` and rename them to their final authoritative `psi.prompt-assets.*-test` namespaces
+- [x] Update all live consumers of prompt-templates to depend on the extracted component
+- [x] Update all live consumers of skills to depend on the extracted component
+- [x] Update all live consumers of system-prompt to depend on the extracted component
+- [x] Use compatibility forwarding shims only if strictly needed during migration
+- [x] Remove any temporary compatibility forwarding shims before task completion
+- [x] Run focused prompt-assets component verification using the required final-state authoritative suites:
+  - [x] `clojure -M:test --focus psi.prompt-assets.prompt-templates-test`
+  - [x] `clojure -M:test --focus psi.prompt-assets.skills-test`
+  - [x] `clojure -M:test --focus psi.prompt-assets.system-prompt-test`
+- [x] Run focused consuming-path verification for all relevant prompt-building and child-session prompt-shaping consumers, with the required minimum proofs:
+  - [x] `clojure -M:test --focus psi.agent-session.child-session-state-test`
+  - [x] `clojure -M:test --focus psi.agent-session.child-session-mutation-test`
+- [x] Record any residual follow-on boundary issues in `implementation.md`, especially if a lower split was required beyond the default first-cut move

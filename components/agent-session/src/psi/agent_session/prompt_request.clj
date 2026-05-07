@@ -7,11 +7,11 @@
    [clojure.string :as str]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.conversation :as conv]
-   [psi.agent-session.prompt-templates :as prompt-templates]
+   [psi.prompt-assets.prompt-templates :as prompt-templates]
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
-   [psi.agent-session.skills :as skills]
-   [psi.agent-session.system-prompt :as system-prompt]))
+   [psi.prompt-assets.skills :as skills]
+   [psi.prompt-assets.system-prompt :as system-prompt]))
 
 (defn journal->provider-messages
   "Project persisted journal entries into agent/provider message maps."

@@ -8,7 +8,7 @@
   (:require
    [clojure.string :as str]
    [psi.ai.conversation :as conv]
-   [psi.agent-session.system-prompt :as system-prompt]
+   [psi.prompt-assets.system-prompt :as system-prompt]
    [psi.agent-session.tool-defs :as tool-defs]
    [psi.tool-runtime.args :as tool-args]))
 

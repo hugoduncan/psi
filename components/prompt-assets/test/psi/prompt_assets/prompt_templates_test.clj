@@ -1,11 +1,11 @@
-(ns psi.agent-session.prompt-templates-test
+(ns psi.prompt-assets.prompt-templates-test
   "Tests for prompt template discovery, parsing, argument expansion,
    invocation, and EQL introspection."
   (:require
    [clojure.test :refer [deftest testing is]]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.prompt-templates :as pt]
+   [psi.prompt-assets.prompt-templates :as pt]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.core :as session-core]
    [com.wsscode.pathom3.connect.indexes :as pci]

@@ -4,7 +4,7 @@
    through agent-session prompt assembly semantics."
   (:require
    [psi.agent-session.persistence :as persist]
-   [psi.agent-session.system-prompt]
+   [psi.prompt-assets.system-prompt]
    [psi.session-state.init :as init]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as state]))
@@ -14,7 +14,7 @@
   (let [cwd (:worktree-path parent-sd)
         base-opts (merge {:cwd                       cwd
                           :context-files             (when cwd
-                                                       (psi.agent-session.system-prompt/discover-context-files cwd))
+                                                       (psi.prompt-assets.system-prompt/discover-context-files cwd))
                           :selected-tools            (mapv :name resolved-tool-defs)
                           :skills                    resolved-skills
                           :prompt-mode               (:prompt-mode parent-sd :lambda)
@@ -28,23 +28,23 @@
 
 (defn- derive-child-prompt-state
   [parent-sd {:keys [system-prompt tool-defs prompt-component-selection skills]}]
-  (let [normalized-selection (psi.agent-session.system-prompt/normalize-prompt-component-selection prompt-component-selection)
+  (let [normalized-selection (psi.prompt-assets.system-prompt/normalize-prompt-component-selection prompt-component-selection)
         parent-tool-defs     (or tool-defs (:tool-defs parent-sd))
         parent-skills        (or skills (:skills parent-sd))
         resolved-tool-defs   (if normalized-selection
-                               (psi.agent-session.system-prompt/filter-tool-defs
+                               (psi.prompt-assets.system-prompt/filter-tool-defs
                                 parent-tool-defs
                                 normalized-selection)
                                (vec (or parent-tool-defs [])))
         resolved-skills      (if normalized-selection
-                               (psi.agent-session.system-prompt/filter-skills
+                               (psi.prompt-assets.system-prompt/filter-skills
                                 parent-skills
                                 normalized-selection)
                                (vec (or parent-skills [])))
         build-opts           (default-child-system-prompt-build-opts
                               parent-sd resolved-tool-defs resolved-skills normalized-selection)
         resolved-base-prompt (or system-prompt
-                                 (psi.agent-session.system-prompt/build-system-prompt build-opts)
+                                 (psi.prompt-assets.system-prompt/build-system-prompt build-opts)
                                  (:base-system-prompt parent-sd))]
     {:prompt-component-selection normalized-selection
      :tool-defs                  resolved-tool-defs

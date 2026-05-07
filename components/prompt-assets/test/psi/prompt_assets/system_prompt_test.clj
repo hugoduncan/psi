@@ -1,10 +1,10 @@
-(ns psi.agent-session.system-prompt-test
+(ns psi.prompt-assets.system-prompt-test
   "Tests for system prompt assembly and context file discovery."
   (:require
    [clojure.test :refer [deftest testing is]]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.system-prompt :as sys-prompt]))
+   [psi.prompt-assets.system-prompt :as sys-prompt]))
 
 ;; ============================================================
 ;; Test helpers

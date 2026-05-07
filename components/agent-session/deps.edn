@@ -16,6 +16,7 @@
         psi/session-journal        {:local/root "../session-journal"}
         psi/shared-config          {:local/root "../shared-config"}
         psi/project-nrepl          {:local/root "../project-nrepl"}
+        psi/prompt-assets          {:local/root "../prompt-assets"}
         psi/turn-statechart        {:local/root "../turn-statechart"}
         psi/turn-runtime           {:local/root "../turn-runtime"}
         psi/tool-runtime           {:local/root "../tool-runtime"}}}

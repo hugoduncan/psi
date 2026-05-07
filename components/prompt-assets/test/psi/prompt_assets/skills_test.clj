@@ -1,11 +1,11 @@
-(ns psi.agent-session.skills-test
+(ns psi.prompt-assets.skills-test
   "Tests for skill discovery, parsing, validation, progressive disclosure,
    invocation, and EQL introspection."
   (:require
    [clojure.test :refer [deftest testing is]]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.agent-session.skills :as skills]
+   [psi.prompt-assets.skills :as skills]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.core :as session-core]
    [com.wsscode.pathom3.connect.indexes :as pci]

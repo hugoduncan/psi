@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.skills :as skills]
+   [psi.prompt-assets.skills :as skills]
    [psi.agent-session.tools :as tools]))
 
 (defn print-banner [model templates loaded-skills ctx]

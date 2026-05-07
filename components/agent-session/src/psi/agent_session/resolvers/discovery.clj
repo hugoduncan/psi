@@ -2,10 +2,10 @@
   "Pathom3 resolvers for prompt template, skill, tool, and session introspection."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.prompt-templates :as pt]
+   [psi.prompt-assets.prompt-templates :as pt]
    [psi.session-journal.store :as journal-store]
    [psi.agent-session.resolvers.support :as support]
-   [psi.agent-session.skills :as skills]))
+   [psi.prompt-assets.skills :as skills]))
 
 ;; ── Prompt template introspection ────────────────────────
 
