@@ -88,6 +88,7 @@ Moved focused tests into `components/project-nrepl/test/psi/project_nrepl/`:
 - `started_test.clj`
 - `eval_test.clj`
 - `commands_test.clj`
+- `ops_test.clj`
 
 Tests intentionally kept under higher-level owning component:
 - `components/agent-session/test/psi/agent_session/project_nrepl_resolvers_test.clj`
@@ -139,3 +140,7 @@ Code-shaper review note:
   - `psi.project-nrepl.eval/interrupt-instance-in!` now makes missing client-session explicit as `{:status :unavailable :reason :no-client-session}` when an active op exists without a usable session
   - added focused `psi.project-nrepl.ops-test` plus expanded command/eval coverage for the shaping follow-up
   - focused verification green: `bb clojure:test:unit --focus psi.project-nrepl.ops-test --focus psi.project-nrepl.commands-test --focus psi.project-nrepl.eval-test --focus psi.agent-session.commands-test --focus psi.agent-session.tools-test` → `1519 tests, 11740 assertions, 0 failures`
+
+Task-implementation-review note:
+- review found one remaining behavior drift: `psi.project-nrepl.ops/start` now returns structured `:missing-start-command`, so the `psi-tool` `project-repl/start` path may no longer surface the same explicit error contract it had when `start` threw
+- accepted as follow-on drift rather than reopening 107 because the extraction boundary, ownership, and focused verification goals of this task are satisfied; if needed, a later follow-on can restore stricter `psi-tool` error semantics without changing the component extraction outcome
