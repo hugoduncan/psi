@@ -20,7 +20,10 @@
 
 (defn- sessions-root-dir
   ([] @sessions-root)
-  ([root] (io/file root)))
+  ([root]
+   (if (some? root)
+     (io/file root)
+     @sessions-root)))
 
 (defn session-dir-for
   "Return the session directory (java.io.File) for `worktree-path`.

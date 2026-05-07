@@ -47,7 +47,14 @@
           dir  (store/session-dir-for root "/tmp/my:repo/worktree")]
       (is (.isDirectory dir))
       (is (= (.getAbsolutePath (io/file root "--tmp-my-repo-worktree--"))
-             (.getAbsolutePath dir))))))
+             (.getAbsolutePath dir)))))
+
+  (testing "nil explicit root falls back to the default sessions root instead of cwd"
+    (let [dir (store/session-dir-for nil "/tmp/my:repo/worktree")
+          path (.getAbsolutePath dir)
+          cwd  (.getAbsolutePath (io/file "."))]
+      (is (str/includes? path ".psi/agent/sessions"))
+      (is (not (str/starts-with? path cwd))))))
 
 (deftest write-and-append-test
   (testing "write-header! produces valid first line"

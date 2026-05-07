@@ -36,6 +36,7 @@ Execution notes to capture during implementation
 - Preserved return-shape contracts for `load-session-file`, `find-most-recent-session`, `list-sessions`, and `list-all-sessions`.
 - Preserved `:message-count` semantics as count of `:message` entries only; the new store-local tests were corrected to match the existing contract instead of changing behavior.
 - Fixed v3→v4 header migration parent-id derivation in the extracted store using filename-based extraction from the parent-session path basename.
+- Fixed a root-selection bug in `psi.session-journal.store/session-dir-for`: the two-arity form treated `nil` root as a relative path and created `--...--` directories in the project cwd. `nil` root now correctly falls back to the default `~/.psi/agent/sessions` root.
 
 Verification
 
