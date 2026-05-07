@@ -1,0 +1,36 @@
+2026-05-07
+- Created task `101-turn-runtime-component-extraction`.
+- Chosen target:
+  - component path: `components/turn-runtime/`
+  - namespace family: `psi.turn-runtime.*`
+  - first-cut authoritative namespaces:
+    - `psi.turn-runtime.stream`
+    - `psi.turn-runtime.accumulator`
+    - `psi.turn-runtime.core`
+- Refactoring-oriented inspection summary:
+  - `prompt_stream.clj` is already a coherent leaf namespace and should move nearly as-is.
+  - `turn_accumulator.clj` is already a coherent leaf namespace and should move nearly as-is.
+  - `prompt_runtime.clj` is nearly the extracted core already.
+  - the one explicit mixed-ownership seam is `execute-prepared-request-and-journal!`; it combines extracted turn execution with session-owned journal append semantics and therefore should not become part of the extracted component.
+- Structural inspection used `clj-surgeon` where available for outline/dependency inspection.
+  - working invocation shape in this environment is flag-based, e.g. `clj-surgeon -op :ls -file <path>` and `clj-surgeon -op :deps -file <path>`.
+- Design direction:
+  - lower-level turn execution machinery moves below `agent-session`
+  - public turn lifecycle orchestration remains above it
+  - session journaling remains above it
+  - no semantic redesign is intended in this slice
+- Review for ambiguities:
+  - Found one primary actionable ambiguity in `design.md`: the final home of `execute-prepared-request-and-journal!` was left open as either `psi.turn` or an `agent-session`/session-owned wrapper namespace.
+  - This was design-significant rather than editorial because it determined the post-extraction dependency slope, the surviving session-owned wrapper surface, and where higher-level callers/tests should bind or stub journal-appending execution.
+  - Resolved in the design: `psi.turn` is now the canonical post-extraction home for `execute-prepared-request-and-journal!` as a thin session-owned wrapper over `psi.turn-runtime.core/execute-prepared-request!` plus journal append.
+  - Secondary ambiguity: verification language said focused proof should cover the extracted component but the representative command `clojure -M:test --focus psi.turn-runtime` was not a concrete test namespace pattern in the current test runner surface.
+  - Resolved in the design: the task now requires concrete moved test namespaces and exact commands to be recorded in `implementation.md` during execution, while keeping `psi.agent-session.prompt-execution-test` and `psi.agent-session.prompt-lifecycle-test` as named higher-level verification surfaces.
+- Second-pass review for ambiguities:
+  - No new major design ambiguity remains around the extraction boundary, ownership split, or journaling placement.
+  - One minor implementation-facing ambiguity remained: the phrase "any context callback wiring currently bound through `prompt-runtime`" was still generic. The actual binding surface should be treated as `components/agent-session/src/psi/agent_session/context.clj`, and the extraction should preserve the existing public callback boundary by keeping context bound to `psi.turn` functions rather than rebinding context directly to low-level `psi.turn-runtime.*` internals.
+  - One additional minor ambiguity remained in test movement language: "move clearly component-owned focused tests" still left judgment to the implementation pass. This was acceptable, but implementation should explicitly record which tests moved versus which stayed under `agent-session`, and why, so ownership stays inspectable after completion.
+- Final tightening pass:
+  - Made the steady-state production dependency slope explicit in `design.md` and `plan.md`.
+  - Clarified that no other production namespace should require `psi.turn-runtime.stream` or `psi.turn-runtime.accumulator` directly unless recorded as an explicit exception in `implementation.md`.
+  - Required moved component-owned tests to adopt `psi.turn-runtime.*-test` namespaces so namespace ownership matches component ownership.
+  - Made old-source-file removal explicit when no temporary compatibility shim is used, so the slice does not leave inert duplicate source files behind.
