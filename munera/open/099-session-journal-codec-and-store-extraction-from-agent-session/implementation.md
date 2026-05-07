@@ -30,6 +30,7 @@ Execution notes to capture during implementation
 - Follow-up in the same implementation slice thinned `psi.agent-session.persistence` into a session-facing adapter over `psi.session-journal.store` for store/load/list/write entry points while retaining ctx-oriented orchestration and domain entry constructors above the boundary.
 - Moved low-level focused proof to the new component tests and reduced `agent-session`-local persistence tests to session-facing orchestration coverage.
 - `psi.session-journal.store` now owns default sessions-root and directory-layout policy, with explicit root overrides on `session-dir-for` and `list-all-sessions` for tests and controlled callers.
+- Follow-up consumer cleanup started: non-session listing/discovery consumers in TUI selector surfaces and agent-session discovery resolvers now depend directly on `psi.session-journal.store` instead of reaching those store-owned operations through `psi.agent-session.persistence`.
 - Preserved return-shape contracts for `load-session-file`, `find-most-recent-session`, `list-sessions`, and `list-all-sessions`.
 - Preserved `:message-count` semantics as count of `:message` entries only; the new store-local tests were corrected to match the existing contract instead of changing behavior.
 - Fixed v3→v4 header migration parent-id derivation in the extracted store using filename-based extraction from the parent-session path basename.
@@ -40,3 +41,5 @@ Verification
   - green: `10 tests, 78 assertions, 0 failures`
 - `clojure -M:test --focus psi.agent-session.session-lifecycle-test/fork-session-persists-child-file-with-parent-lineage-test --focus psi.agent-session.session-lifecycle-test/ensure-session-loaded-in!-resumes-by-context-session-id`
   - green: `1 tests, 7 assertions, 0 failures`
+- `clojure -M:test --focus psi.tui.app-session-selector-test --focus psi.agent-session.resolvers-test --focus psi.session-journal.store-test`
+  - green: `43 tests, 244 assertions, 0 failures`

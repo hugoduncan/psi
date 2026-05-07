@@ -6,7 +6,7 @@
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
    [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-journal.store :as journal-store]
    [psi.tui.app.frontend-actions :as frontend-actions]
    [psi.tui.app.shared :as shared]
    [psi.tui.app.support :as support]
@@ -244,7 +244,7 @@
   (let [new-scope (if (= :current (:scope sel)) :all :current)]
     (if (and (= :all new-scope) (nil? (:all-sessions sel)))
       (-> sel
-          (assoc :scope :all :all-sessions (persist/list-all-sessions))
+          (assoc :scope :all :all-sessions (journal-store/list-all-sessions))
           session-selector/selector-clamp)
       (-> sel
           (assoc :scope new-scope)

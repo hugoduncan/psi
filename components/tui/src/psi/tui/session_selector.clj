@@ -1,7 +1,7 @@
 (ns psi.tui.session-selector
   (:require
    [clojure.string :as str]
-   [psi.agent-session.persistence :as persist])
+   [psi.session-journal.store :as journal-store])
   (:import
    [java.time Instant]))
 
@@ -43,8 +43,8 @@
 
 (defn session-selector-init
   [cwd current-session-file]
-  (let [dir      (persist/session-dir-for cwd)
-        sessions (persist/list-sessions dir)]
+  (let [dir      (journal-store/session-dir-for cwd)
+        sessions (journal-store/list-sessions dir)]
     {:sessions             sessions
      :all-sessions         nil
      :scope                :current
