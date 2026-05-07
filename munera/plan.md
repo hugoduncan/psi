@@ -9,7 +9,6 @@ Queue:
 
 Backlog:
 
-`munera/open/098-journal-append-dispatch-effect-convergence/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
