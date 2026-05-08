@@ -11,7 +11,6 @@ Backlog:
 
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
-`munera/open/114-prompt-contribution-registration-component-extraction/`
 `munera/open/115-workflow-registration-component-extraction/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
