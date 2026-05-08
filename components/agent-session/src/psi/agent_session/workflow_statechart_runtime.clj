@@ -22,7 +22,6 @@
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.agent-session.deterministic-operations :as deterministic-ops]
    [psi.agent-session.prompt-control :as prompt-control]
-   [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-judge :as workflow-judge]
@@ -32,7 +31,8 @@
    [psi.workflow-registry.registry :as registry]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
    [psi.agent-session.workflow-step-prep :as workflow-step-prep]
-   [psi.agent-session.workflow-terminal-contract :as workflow-terminal-contract]))
+   [psi.agent-session.workflow-terminal-contract :as workflow-terminal-contract]
+   [psi.turn-runtime.recording :as turn-recording]))
 
 (declare create-workflow-context send-and-drain!)
 
@@ -197,7 +197,7 @@
 
 (defn- assistant-turn-classification
   [assistant-message]
-  (prompt-recording/classify-assistant-message assistant-message))
+  (turn-recording/classify-assistant-message assistant-message))
 
 (defn- execution-failure-payload
   [execution-session-id assistant-message]

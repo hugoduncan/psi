@@ -277,6 +277,10 @@ Compatibility / remaining wrappers
 - `psi.agent-session.prompt-request` and `psi.agent-session.prompt-recording` still exist as compatibility/session-normalization wrappers for current callers
 - `psi.turn` still calls those wrappers for its higher facade API, but the lower authoritative implementation now lives in `psi.turn-runtime.*`
 - repo search confirms the lower authoritative helper implementations (`build-provider-conversation`, `build-prompt-layers`, `extract-tool-calls`, `classify-assistant-message`) now live in `turn-runtime`; remaining `agent-session` definitions are delegating wrappers rather than authoritative lower owners
+- follow-on direct-consumer cleanup landed too:
+  - `psi.agent-session.prompt-turn` now depends directly on `psi.turn-runtime.recording` for lower assistant-message classification
+  - `psi.agent-session.workflow-statechart-runtime` now depends directly on `psi.turn-runtime.recording` for lower assistant-message classification
+  - this reduces residual lower-helper dependence on the compatibility `prompt-recording` wrapper while keeping session-owned request normalization wrappers intact
 
 Verification
 - lint green for touched namespaces

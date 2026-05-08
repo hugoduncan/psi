@@ -5,10 +5,10 @@
    preparation, live turn execution, and assistant-message journaling to the
    prompt runtime path."
   (:require
-   [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
-   [psi.turn :as turn]))
+   [psi.turn :as turn]
+   [psi.turn-runtime.recording :as turn-recording]))
 
 (defn stream-turn!
   "Stream one LLM response into agent-core via the per-turn statechart.
@@ -30,7 +30,7 @@
   [ai-ctx ctx session-id ai-model extra-ai-options progress-queue]
   (let [assistant-message (stream-turn! ai-ctx ctx session-id ai-model
                                         extra-ai-options progress-queue)
-        outcome           (prompt-recording/classify-assistant-message assistant-message)]
+        outcome           (turn-recording/classify-assistant-message assistant-message)]
     (case (:turn/outcome outcome)
       :turn.outcome/tool-use
       (do (tool-runtime-adapter/run-tool-calls! ctx session-id (:tool-calls outcome) progress-queue)
