@@ -1,0 +1,78 @@
+- [ ] Refine `session-persistence` into explicit lower pure helpers
+  - make `append-journal-entry-root-update` available as the canonical production root-state update helper for journal appends
+  - add `mark-flushed-root-update` as the canonical post-success flush-state root-state update helper
+  - add a pure helper such as `persistence-io-request` that takes:
+    - `entries` (the would-be post-append entries vector)
+    - `flush-state`
+    - `session-id`
+    - `worktree-path`
+    - `parent-session-id`
+    - `parent-session-path`
+    - and returns either `nil` or a fully materialized append/flush IO request map
+  - keep persistence policy lower-owned and pure; do not add upward dependencies on `session-state.state` or dispatch namespaces
+
+- [ ] Retire combined memory+IO helpers from the production path
+  - stop using these as the authoritative production seam:
+    - `append-entry-in!`
+    - `persist-journal-in!`
+    - `persist-entry-in!`
+    - `persist-entry!`
+    - `persist-state-entry!`
+  - compatibility/test surfaces may remain temporarily, but production append/fork flows must no longer depend on them for file IO
+  - retained helpers, if any, should be documented explicitly as compatibility-only or test-only
+
+- [ ] Move journal append memory mutation into the append handler result
+  - update `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`
+  - refine `:session/append-journal-entry` so it:
+    - derives `next-entries` locally rather than depending on post-apply state reads
+    - applies `:root-state-update` via the lower `append-journal-entry-root-update`
+    - materializes session persistence metadata from `ctx` / session state
+    - asks lower persistence semantics for append/flush/no-op via `persistence-io-request`
+    - returns explicit `:persist/session-journal-io` effect data only when needed
+  - preserve current caller-facing append ergonomics: callers should still be able to dispatch `:session/append-journal-entry`
+
+- [ ] Introduce the explicit persistence IO executor boundary
+  - add `:persist/session-journal-io` to dispatch schema/effect execution
+  - implement executor support in `components/agent-session/src/psi/agent_session/dispatch_effects.clj`
+  - support:
+    - `:op :append-entry`
+    - `:op :flush-journal`
+  - executor responsibilities:
+    - perform file-backed persistence only
+    - avoid recomputing lazy-flush policy
+    - on successful `:op :flush-journal`, apply `mark-flushed-root-update` directly
+    - on failed append/flush, do not advance flush-state
+  - treat executor-side direct state update after successful flush as the accepted first-cut mechanism
+
+- [ ] Rework existing append effect surfaces to bottom out in the new IO boundary
+  - current append executors in `dispatch_effects.clj` (`:persist/journal-append-entry` and the specialized model/message/thinking/session-info variants) should no longer call `persist/append-entry-in!`
+  - keep these surfaces only as compatibility/convenience shims if needed, but ensure the real file-write seam is `:persist/session-journal-io`
+  - preserve append-first semantics and current higher-level behavior during the transition
+
+- [ ] Route fork/session-file creation persistence through the same explicit IO boundary
+  - replace direct `journal-store/flush-journal!` usage in `components/agent-session/src/psi/agent_session/session_lifecycle.clj`
+  - preserve child-session lineage/header invariants and current branch-entry persistence semantics
+  - keep lifecycle orchestration in `session_lifecycle.clj`, but move actual file writes to a dispatch-owned event/effect path that declares `:persist/session-journal-io`
+  - do not call `dispatch-effects/execute-effect!` directly from lifecycle code
+
+- [ ] Update focused tests to match the refined boundary
+  - add pure persistence decision logic tests around append/flush/no-op selection
+  - add tests for `mark-flushed-root-update`
+  - update append-path tests so they prove memory append occurs through handler-owned `:root-state-update` rather than via executor-side combined helper behavior
+  - add a focused proof that the canonical `:persist/session-journal-io` executor does not append to in-memory journal state
+  - update boundary tests away from stubbing `persist-journal-in!` as the production append seam
+  - add dispatch/effect tests for `:persist/session-journal-io` append-vs-flush execution
+  - keep regression proof for no write before first assistant message
+  - keep regression proof for first-assistant bulk flush
+  - keep regression proof for append-after-flush
+  - keep focused proof aligned with the clarified meaning of `:flushed?` as an initial-full-flush mode flag rather than a complete ongoing disk-sync guarantee
+  - add focused proof that failed flush does not set `:flushed? true`
+  - add focused proof that effect-layer suppression/replacement preserves in-memory append behavior
+  - keep regression proof for fork/resume persisted-session invariants
+
+- [ ] Re-review final code shape for boundary clarity and cycle avoidance
+  - confirm `session-persistence` did not regain an upward dependency on `session-state.state`
+  - confirm production persistence writes now cross explicit effect execution seams only
+  - confirm handler owns append state mutation and executor owns file IO
+  - confirm retained `:persist/journal-append-*` effects, if any, are no longer the authoritative production file-write seam
+  - confirm compatibility helpers, if retained, are no longer the authoritative production write path
