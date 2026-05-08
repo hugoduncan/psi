@@ -16,8 +16,8 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.workflow-ir :as workflow-ir]
-   [psi.agent-session.workflow-judge :as workflow-judge]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]))
+   [psi.agent-session.workflow-statechart :as workflow-statechart]
+   [psi.workflow-judge :as workflow-judge]))
 
 (defn- effective-step-def
   [workflow-run step-id]

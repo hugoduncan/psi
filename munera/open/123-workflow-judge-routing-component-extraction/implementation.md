@@ -1,16 +1,44 @@
-2026-05-07
+2026-05-08
 
-Task created from workflow component-extraction review.
+Implemented the extraction as a narrow below-dispatch component split.
 
-Creation rationale:
-- workflow judge/routing is one of the cleanest remaining below-dispatch workflow seams
-- it is primarily domain logic rather than session orchestration
-- extracting it should reduce the size and ambiguity of a later workflow runtime-core extraction
-- it provides a focused proof that workflow behavior can move downward cleanly when the ownership line is drawn at projection/normalization/routing rather than at public entrypoints
+Final namespace/boundary split:
+- new lower component: `components/workflow-judge/`
+- authoritative pure namespace: `psi.workflow-judge`
+- remaining higher impure namespace: `psi.agent-session.workflow-judge`
 
-Initial boundary notes:
-- authoritative extracted namespace family is expected to live under `psi.workflow-judge.*`
-- canonical judge projection, verdict normalization, and routing evaluation should move downward
-- judge-session creation and prompt submission should remain outside the extracted component
-- mutations, resolvers, and `psi-tool` stay above the boundary
-- do not leave compatibility shims unless implementation proves a very small temporary seam is necessary
+What moved downward:
+- message projection helpers and `project-messages`
+- `match-signal`
+- `resolve-goto-target`
+- `check-iteration-limit`
+- `evaluate-routing`
+
+What remained above:
+- persistence reads for actor messages
+- judge child-session creation
+- prompt submission
+- retry feedback injection / retry loop
+- `execute-judge!`
+
+Consumer rewiring:
+- `psi.agent-session.workflow-source-resolution` now depends directly on `psi.workflow-judge` for projection semantics
+- `psi.agent-session.workflow-judge` now depends downward on `psi.workflow-judge` for pure projection/routing logic while retaining execution ownership
+- root + agent-session deps now include `psi/workflow-judge`
+
+Test split:
+- pure projection/routing tests moved to `components/workflow-judge/test/psi/workflow_judge_test.clj`
+- impure execution tests remained in `components/agent-session/test/psi/agent_session/workflow_judge_test.clj`
+- higher statechart/workflow integration proofs remain above the boundary unchanged
+
+Contract notes:
+- projection semantics preserved exactly from the prior owner
+- routing result shapes preserved exactly
+- step-id contract preserved as existing string step ids in `step-order` / routing-table targets; no ambiguity forced a redesign during extraction, so no contract change was made
+
+Non-shim note:
+- the remaining `psi.agent-session.workflow-judge` namespace is not a compatibility facade; it is now the authoritative owner only of impure judge-session execution/orchestration
+
+Verification:
+- focused tests: `22 tests, 98 assertions, 0 failures`
+- lint: `0 errors, 0 warnings`
