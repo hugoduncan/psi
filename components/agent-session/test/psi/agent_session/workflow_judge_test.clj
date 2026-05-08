@@ -1,7 +1,7 @@
 (ns psi.agent-session.workflow-judge-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.turn]
+   [psi.agent-session.turn-execution-contract]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.session-persistence.core]))
 
@@ -27,11 +27,15 @@
                     (fn [_ctx _sid]
                       [{:role "user" :content "Build it"}
                        {:role "assistant" :content [{:type :text :text "Done building."}]}])
-                    psi.agent-session.turn/prompt-execution-result-in!
+                    psi.agent-session.turn-execution-contract/execute-judge-turn!
                     (fn [_ctx sid text]
                       (swap! prompts* conj {:session-id sid :text text})
-                      {:execution-result/assistant-message
-                       {:role "assistant" :content [{:type :text :text "APPROVED"}]}})]
+                      {:status :ok
+                       :session-id sid
+                       :turn-outcome :turn.outcome/stop
+                       :assistant-message {:role "assistant" :content [{:type :text :text "APPROVED"}]}
+                       :assistant-text "APPROVED"
+                       :execution-result {:execution-result/session-id sid}})]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
                       {:current-step-id "step-3-review"
@@ -58,13 +62,22 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.turn/prompt-execution-result-in!
-                    (fn [_ctx _sid _text]
+                    psi.agent-session.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid _text]
                       (swap! prompt-count* inc)
-                      {:execution-result/assistant-message
-                       (if (<= @prompt-count* 1)
-                         {:role "assistant" :content [{:type :text :text "I think it looks good"}]}
-                         {:role "assistant" :content [{:type :text :text "APPROVED"}]})})]
+                      (if (<= @prompt-count* 1)
+                        {:status :ok
+                         :session-id sid
+                         :turn-outcome :turn.outcome/stop
+                         :assistant-message {:role "assistant" :content [{:type :text :text "I think it looks good"}]}
+                         :assistant-text "I think it looks good"
+                         :execution-result {:execution-result/session-id sid}}
+                        {:status :ok
+                         :session-id sid
+                         :turn-outcome :turn.outcome/stop
+                         :assistant-message {:role "assistant" :content [{:type :text :text "APPROVED"}]}
+                         :assistant-text "APPROVED"
+                         :execution-result {:execution-result/session-id sid}}))]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
                       {:current-step-id "step-3-review"
@@ -87,11 +100,15 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.turn/prompt-execution-result-in!
-                    (fn [_ctx _sid _text]
+                    psi.agent-session.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid _text]
                       (swap! prompt-count* inc)
-                      {:execution-result/assistant-message
-                       {:role "assistant" :content [{:type :text :text "hmm not sure"}]}})]
+                      {:status :ok
+                       :session-id sid
+                       :turn-outcome :turn.outcome/stop
+                       :assistant-message {:role "assistant" :content [{:type :text :text "hmm not sure"}]}
+                       :assistant-text "hmm not sure"
+                       :execution-result {:execution-result/session-id sid}})]
         (let [result (workflow-judge/execute-judge!
                       ctx "parent-1" "actor-1" judge-spec routing-table
                       {:current-step-id "step-3-review"

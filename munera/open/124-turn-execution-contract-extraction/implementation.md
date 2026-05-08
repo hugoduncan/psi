@@ -104,3 +104,9 @@ Code-shaper review note
 - follow-up completed:
   - documented `execute-actor-turn!` and `execute-judge-turn!` as intentional semantic aliases over `execute-session-turn!`
   - extracted `prompt-execution-result` so turn invocation selection is separate from bounded result normalization while keeping the boundary minimal
+
+Test review note
+- test coverage is good overall: the task is proved at the right workflow judge/runtime surfaces and includes a focused invariant test for the pending-state cleanup
+- follow-up completed:
+  - `workflow_judge_test.clj` now stubs `psi.agent-session.turn-execution-contract/execute-judge-turn!` at the extracted seam rather than stubbing below it
+  - the pending-state invariant test intentionally remains watch-based for now and is recorded as the minimal internal proof surface until more such invariant tests accumulate

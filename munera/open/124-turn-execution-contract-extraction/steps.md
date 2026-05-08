@@ -17,3 +17,5 @@
 - [x] Add or update focused proof for the chosen `:execution-result` retention decision if the implementation keeps it
 - [x] Decide whether `execute-actor-turn!` and `execute-judge-turn!` should remain intentional semantic aliases over `execute-session-turn!`; either document the intent or consolidate if no caller-specific behavior is expected
 - [x] If `execute-session-turn!` grows further, extract a tiny helper for turn invocation selection so result normalization and prompt-execution dispatch stay separate; otherwise record that current branching remains intentionally minimal
+- [x] Update `workflow_judge_test.clj` to stub `psi.agent-session.turn-execution-contract/execute-judge-turn!` instead of stubbing below the extracted seam at `psi.agent-session.turn/prompt-execution-result-in!`
+- [x] If more pending-state invariant tests accumulate, extract a narrower capture helper or cleaner seam than the current working-memory watch pattern; otherwise explicitly keep the current test as the minimal internal invariant proof
