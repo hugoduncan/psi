@@ -58,12 +58,12 @@
   - removed obsolete compatibility helpers once production/path references were gone
   - migrated remaining lower-component tests onto canonical lower helpers and explicit IO-request execution instead of wrapper APIs
 
-- [ ] Refresh `psi.session-persistence.core` namespace docstring after the extraction
-  - describe the current post-task ownership more precisely
-  - remove outdated wording that implies broader ctx-based append/persist execution ownership
+- [x] Refresh `psi.session-persistence.core` namespace docstring after the extraction
+  - described the current post-task ownership more precisely
+  - removed outdated wording that implied broader ctx-based append/persist execution ownership
 
-- [ ] Remove the empty `;;; Flush + persist semantics` section stub from `psi.session-persistence.core`
-  - keep file sections aligned with the remaining code shape after wrapper removal
+- [x] Remove the empty `;;; Flush + persist semantics` section stub from `psi.session-persistence.core`
+  - kept file sections aligned with the remaining code shape after wrapper removal
 
 - [x] Remove the `:persist/journal-append-*` shim effects in a follow-on cleanup
   - audited remaining callers of `:persist/journal-append-entry`

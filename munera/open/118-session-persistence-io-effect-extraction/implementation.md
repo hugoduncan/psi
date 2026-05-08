@@ -58,7 +58,10 @@
   - obsolete compatibility wrappers have now been removed entirely
   - lower-level proofs exist in addition to higher-level integration/convergence tests
 - Review follow-up items identified:
-  1. `psi.session-persistence.core` namespace docstring is slightly stale; it still describes broader ctx-based append/persist semantics than the post-task surface now owns.
-  2. `psi.session-persistence.core` contains an empty `;;; Flush + persist semantics` section stub after wrapper removal.
-  3. Compatibility effect surfaces `:persist/journal-append-*` still exist as shims above the canonical IO seam; this is acceptable, but a later cleanup could migrate callers onto the canonical seam directly and remove the shims.
-- These follow-up items are non-blocking review cleanups, not correctness defects.
+  1. `psi.session-persistence.core` namespace docstring was slightly stale; it described broader ctx-based append/persist semantics than the post-task surface now owns.
+  2. `psi.session-persistence.core` contained an empty `;;; Flush + persist semantics` section stub after wrapper removal.
+  3. Compatibility effect surfaces `:persist/journal-append-*` still existed as shims above the canonical IO seam; this was acceptable, but a later cleanup could migrate callers onto the canonical seam directly and remove the shims.
+- These follow-up items were non-blocking review cleanups, not correctness defects.
+- Final polish slice completed the remaining non-shim review follow-ups:
+  - refreshed the `psi.session-persistence.core` namespace docstring to match the current post-task ownership
+  - removed the empty section stub left behind after wrapper removal

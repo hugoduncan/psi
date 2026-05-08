@@ -2,8 +2,9 @@
   "Canonical session-facing journal and persistence ownership.
 
    Owns the persistence subtree shape, persistence-specific session paths,
-   ctx-based append/persist semantics, semantic journal-entry constructors,
-   and session-file store wrappers over `psi.session-journal.store`."
+   pure persistence decision helpers, in-memory journal helpers, semantic
+   journal-entry constructors, and session-file store wrappers over
+   `psi.session-journal.store`."
   (:require
    [psi.session-journal.store :as journal-store]
    [psi.session-state.model :as session-model]))
@@ -239,10 +240,6 @@
          :parent-session-id parent-session-id
          :parent-session-path parent-session-path
          :entries entries}))))
-
-;;; ============================================================
-;;; Flush + persist semantics
-;;; ============================================================
 
 ;;; ============================================================
 ;;; Convenience entry constructors
