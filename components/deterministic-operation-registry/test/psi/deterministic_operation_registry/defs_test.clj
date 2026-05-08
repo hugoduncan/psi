@@ -54,3 +54,26 @@
                                             :handler handler
                                             :description nil
                                             :summary nil}))))))
+
+(deftest operation-result-validation-test
+  (testing "accepts canonical success results"
+    (is (true? (defs/valid-operation-result?
+                {:status :ok
+                 :data {:issues []}
+                 :summary "ok"
+                 :details {:count 0}}))))
+
+  (testing "accepts canonical error results"
+    (is (true? (defs/valid-operation-result?
+                {:status :error
+                 :reason :not-found
+                 :message "repo missing"
+                 :details {:repo "psi"}}))))
+
+  (testing "rejects malformed results"
+    (is (false? (defs/valid-operation-result?
+                 {:status :ok
+                  :summary "missing data"})))
+    (is (some? (defs/explain-operation-result
+                {:status :ok
+                 :summary "missing data"})))))

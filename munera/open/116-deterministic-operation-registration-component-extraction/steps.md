@@ -20,3 +20,8 @@
 - [x] Apply the small local cleanup in `psi.deterministic-operation-registry.registry/unregister-operations-by-extension-in!` by pre-binding the removal-id set instead of rebuilding it inline during registration-order filtering
 - [x] Run focused verification for the follow-up shaping pass across deterministic-operation component tests plus affected workflow/extension tests
 - [x] Update `implementation.md` with the outcome of the code-shaper follow-up pass once completed
+- [x] Reduce or replace `components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj` so it proves only agent-session-owned behavior instead of re-proving lower registry semantics already covered by the extracted component tests
+- [x] Preserve explicit proof for agent-session-owned invoke-step result wrapping after trimming the overlapping registry test coverage
+- [x] Add direct extracted-component tests for deterministic-operation result validation in `components/deterministic-operation-registry/test/psi/deterministic_operation_registry/defs_test.clj`, covering one valid `:ok` result, one valid `:error` result, and one malformed result case
+- [x] Run focused verification for the test-shaping follow-up across the extracted component tests plus affected agent-session tests
+- [x] Update `implementation.md` with the outcome of the test-shaping follow-up pass once completed

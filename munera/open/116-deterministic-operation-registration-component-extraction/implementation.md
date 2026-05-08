@@ -152,3 +152,51 @@ Verification for the follow-up shaping pass:
   - `psi.agent-session.workflow-execution-test`
 - combined result: `47 tests, 213 assertions, 0 failures`
 - focused lint across touched source and test files: `0 errors, 0 warnings`
+
+2026-05-08 — test review
+
+Review outcome:
+- test coverage is broadly strong and aligned with the extracted boundary
+- lower-component tests correctly prove the extracted registry contracts directly
+- higher-level tests correctly prove workflow invoke and extension cleanup integration paths
+
+Actionable follow-up findings:
+- `components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj` now substantially overlaps the lower-component proofs in:
+  - `components/deterministic-operation-registry/test/psi/deterministic_operation_registry/registry_test.clj`
+- the overlap includes lower-owner semantics such as:
+  - registration/lookup
+  - duplicate rejection
+  - invoke success/error behavior
+  - unregister-by-extension
+  - thrown-operation canonicalization
+- after the extraction, those semantics should be owned primarily by the extracted component tests rather than re-proved in agent-session
+- the remaining agent-session-owned part in that file is `invoke-step-wrapping-test`, which still belongs above the lower registry because it proves workflow-facing result wrapping
+- `defs_test.clj` currently proves definition validation well, but it does not directly prove the extracted result-schema validation helpers with one explicit valid `:ok`, one explicit valid `:error`, and one malformed result case
+
+Recommended direction from review:
+- trim or replace `psi.agent-session.deterministic-operation-registry-test` so it covers only agent-session-owned behavior, likely the invoke-step result wrapping surface
+- keep lower registry semantics proven in the extracted component tests
+- consider adding direct result-schema validation checks to `psi.deterministic-operation-registry.defs-test` to strengthen local proof of the extracted result contract
+
+2026-05-08 — test-shaping follow-up execution
+
+Implemented the test-shaping follow-up from the test review.
+
+What changed:
+- reduced `components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj` to the agent-session-owned `invoke-step-wrapping-test` only
+- removed re-proof of lower registry semantics from that agent-session test namespace so the extracted component remains the primary owner of registry-semantic proofs
+- added direct extracted-component result-validation checks to `components/deterministic-operation-registry/test/psi/deterministic_operation_registry/defs_test.clj`
+  - one explicit valid `:ok` result
+  - one explicit valid `:error` result
+  - one malformed result case checked through both `valid-operation-result?` and `explain-operation-result`
+
+Verification for the test-shaping follow-up:
+- focused verification green across:
+  - `psi.deterministic-operation-registry.defs-test`
+  - `psi.deterministic-operation-registry.registry-test`
+  - `psi.agent-session.deterministic-operation-registry-test`
+  - `psi.agent-session.workflow-invoke-runtime-test`
+  - `psi.agent-session.extensions-test`
+  - `psi.agent-session.workflow-execution-test`
+- combined result: `41 tests, 201 assertions, 0 failures`
+- focused lint across touched test files: `0 errors, 0 warnings`
