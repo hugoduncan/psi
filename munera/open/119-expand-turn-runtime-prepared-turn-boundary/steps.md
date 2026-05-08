@@ -16,3 +16,10 @@
   - [x] whether any small new component-owned focused tests should be added instead of moving mixed files
 - [x] Confirm the task stays aligned with umbrella task `105`
 - [x] Use this task as the framing reference for implementation once queued
+- [x] Add lower authoritative namespaces under `components/turn-runtime/` for conversation, request assembly, and recording
+- [x] Refactor `prompt_request` into session-owned normalization over lower `turn-runtime.request`
+- [x] Refactor `prompt_recording` into higher orchestration over lower `turn-runtime.recording`
+- [x] Move prepared-turn helper usage in `psi.turn.handlers` down to `turn-runtime` where appropriate
+- [x] Add focused lower component tests for request assembly and recording classification/decision shaping
+- [x] Verify higher consuming path remains green (`prompt_lifecycle_test`)
+- [x] Record compatibility-wrapper status and boundary notes in `implementation.md`
