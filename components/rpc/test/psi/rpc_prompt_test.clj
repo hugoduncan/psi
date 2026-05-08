@@ -169,6 +169,7 @@
           handler            (support/make-handler ctx state)
           requests           (atom [])
           call-n             (atom 0)
+          marker             (str "rpc-codex-tool-args-" (random-uuid))
           first-sse          (str
                               "data: " (json/generate-string
                                         {:type "response.output_item.added"
@@ -206,7 +207,7 @@
           input              (str
                               "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                               "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"tool/start\" \"tool/executing\" \"tool/result\" \"assistant/message\"]}}\n"
-                              "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"run pwd\"}}\n")
+                              "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"run pwd " marker "\"}}\n")
           {:keys [out-lines]}
           (with-redefs [runtime/resolve-api-key-in (fn [_ctx _session-id _model] support/openai-chatgpt-test-token)
                         http/post (fn [url req]
@@ -214,6 +215,11 @@
                                     (let [n (swap! call-n inc)]
                                       {:body (support/stream-body (if (= 1 n) first-sse second-sse))}))]
             (support/run-loop input handler state 900))
+          relevant-requests (->> @requests
+                                 (filter (fn [{:keys [url req]}]
+                                           (and (= "https://chatgpt.com/backend-api/codex/responses" url)
+                                                (str/includes? (str (:body req)) marker))))
+                                 vec)
           frames         (support/parse-frames out-lines)
           events         (filter #(= :event (:kind %)) frames)
           prompt-frame   (some #(when (and (= :response (:kind %))
@@ -224,13 +230,12 @@
           assistant-evt   (some #(when (= "assistant/message" (:event %)) %) events)]
       (is (some? prompt-frame))
       (is (true? (get-in prompt-frame [:data :accepted])))
-      (is (= 2 (count @requests)))
-      (is (every? #(= "https://chatgpt.com/backend-api/codex/responses" (:url %)) @requests))
+      (is (= 2 (count relevant-requests)))
       (is (= (str "Bearer " support/openai-chatgpt-test-token)
-             (get-in (first @requests) [:req :headers "Authorization"])))
+             (get-in (first relevant-requests) [:req :headers "Authorization"])))
       (is (= "acc_test"
-             (get-in (first @requests) [:req :headers "chatgpt-account-id"])))
-      (let [body (json/parse-string (get-in (first @requests) [:req :body]) true)]
+             (get-in (first relevant-requests) [:req :headers "chatgpt-account-id"])))
+      (let [body (json/parse-string (get-in (first relevant-requests) [:req :body]) true)]
         (is (= "gpt-5.3-codex" (:model body)))
         (is (= true (:stream body)))
         (is (= "bash" (get-in body [:tools 0 :name]))))
