@@ -7,4 +7,4 @@
 - [x] Rewire any incidental non-test consumers discovered during implementation to the extracted runtime component
 - [x] Update focused tests, moving deterministic-operation runtime unit proofs into the new component while keeping workflow invoke execution/wrapping proofs with workflow code
 - [x] Remove the old authoritative `psi.agent-session.deterministic-operations` namespace rather than leaving a compatibility shim
-- [ ] Record final boundary decisions and residual follow-ons in `implementation.md`
+- [x] Record final boundary decisions and residual follow-ons in `implementation.md`

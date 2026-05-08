@@ -35,3 +35,10 @@ Implementation notes:
 Residual boundary decision:
 - the workflow-owned wrapper currently lives in `workflow_statechart_runtime.clj` because this task intentionally extracts only the lower deterministic-operation runtime seam
 - if later workflow shaping wants a smaller helper ns for invoke-step adapter logic, that should be a workflow-local cleanup task rather than a reason to broaden this extraction
+
+Review 2026-05-08:
+- Reviewed implementation against task `121` design/plan and changed code paths.
+- No new actionable code-quality or architecture issues found.
+- The extraction matches the intended boundary: generic invoke execution now lives in `psi.deterministic-operation-runtime.core`, while workflow-specific invoke-step result wrapping stays explicit in `psi.agent-session.workflow-statechart-runtime`.
+- Focused verification already recorded for the implementation remains the relevant proof surface for this slice.
+- Minor task-artifact drift found during review: `steps.md` still showed the final implementation-note step unchecked even though `implementation.md` had already recorded the final boundary decisions; corrected that checklist item.
