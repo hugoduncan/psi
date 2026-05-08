@@ -55,5 +55,5 @@
   - direct `mark-flushed-root-update` unit test in lower component
 
 - [x] Re-review final code shape for compatibility helper retention and possible follow-on cleanup
-  - confirmed retained compatibility helpers still have test coverage and are no longer authoritative production write seams
-  - documented `persist-state-entry!`, `persist-entry!`, `persist-journal-in!`, and `persist-entry-in!` more explicitly as compatibility/testing helpers and non-authoritative production seams
+  - removed obsolete compatibility helpers once production/path references were gone
+  - migrated remaining lower-component tests onto canonical lower helpers and explicit IO-request execution instead of wrapper APIs

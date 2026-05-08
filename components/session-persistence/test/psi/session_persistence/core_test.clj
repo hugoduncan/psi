@@ -26,6 +26,21 @@
   {:role "assistant" :content [{:type :text :text text}]
    :timestamp (java.time.Instant/now)})
 
+(defn- execute-io-request!
+  [request on-flushed!]
+  (let [{:keys [op session-file session-id worktree-path parent-session-id parent-session-path entry entries]} request]
+    (case op
+      :append-entry
+      (p/append-entry-to-disk! session-file entry)
+
+      :flush-journal
+      (do
+        (p/flush-journal! session-file session-id worktree-path parent-session-id parent-session-path entries)
+        (when on-flushed!
+          (on-flushed!)))
+
+      nil)))
+
 (deftest path-and-subtree-ownership-test
   (is (= [:agent-session :sessions "sid" :persistence :journal]
          (p/session-journal-path "sid")))
@@ -114,42 +129,55 @@
     (is (= (conj before entry)
            (vec (ss/get-state-value-in ctx (ss/state-path :journal sid)))))))
 
-(deftest persist-journal-in-lazy-flush-test
-  (testing "ctx append-first semantics preserve memory even before flush"
+(deftest persistence-io-request-lazy-flush-test
+  (testing "in-memory append semantics preserve memory before explicit IO"
     (let [ctx (core/create-context {:persist? false})
           sd  (core/new-session-in! ctx nil {:worktree-path "/tmp/ws"})
           sid (:session-id sd)
           entry (p/message-entry (user-msg "hi"))]
-      (is (= entry (p/append-entry-in! ctx sid entry)))
+      (is (= entry (p/append-journal-entry-in! ctx sid entry)))
       (is (= [entry] (p/all-entries-in ctx sid)))))
 
   (testing "no write before first assistant message"
     (let [dir (tmp-dir)
-          f   (io/file dir "lazy.ndedn")
-          j   (p/create-journal)
-          fs  (p/create-flush-state)]
-      (swap! fs assoc :session-file f)
-      (p/append-entry! j (p/message-entry (user-msg "hi")))
-      (p/persist-entry! j fs "sess-4" "/proj" nil)
-      (is (not (.exists f)))))
+          file (io/file dir "lazy.ndedn")
+          entries [(p/message-entry (user-msg "hi"))]
+          request (p/persistence-io-request {:entries entries
+                                             :flush-state {:flushed? false :session-file file}
+                                             :session-id "sess-4"
+                                             :worktree-path "/proj"
+                                             :parent-session-id nil
+                                             :parent-session-path nil})]
+      (is (nil? request))
+      (is (not (.exists file)))))
 
   (testing "bulk flush on first assistant message and later append"
-    (let [dir (tmp-dir)
-          f   (io/file dir "lazy.ndedn")
-          j   (p/create-journal)
-          fs  (p/create-flush-state)]
-      (swap! fs assoc :session-file f)
-      (p/append-entry! j (p/thinking-level-entry :off))
-      (p/append-entry! j (p/message-entry (user-msg "hello")))
-      (p/append-entry! j (p/message-entry (assistant-msg "world")))
-      (p/persist-entry! j fs "sess-5" "/proj" nil)
-      (is (.exists f))
-      (is (:flushed? @fs))
-      (is (= 4 (count (slurp-lines f))))
-      (let [lines-before (count (slurp-lines f))]
-        (p/append-entry! j (p/thinking-level-entry :medium))
-        (p/persist-entry! j fs "sess-5" "/proj" nil)
-        (is (= (inc lines-before) (count (slurp-lines f))))))))
+    (let [dir          (tmp-dir)
+          file         (io/file dir "lazy.ndedn")
+          flush-state* (atom {:flushed? false :session-file file})
+          entries*     (atom [(p/thinking-level-entry :off)
+                              (p/message-entry (user-msg "hello"))
+                              (p/message-entry (assistant-msg "world"))])]
+      (execute-io-request! (p/persistence-io-request {:entries @entries*
+                                                      :flush-state @flush-state*
+                                                      :session-id "sess-5"
+                                                      :worktree-path "/proj"
+                                                      :parent-session-id nil
+                                                      :parent-session-path nil})
+                           #(swap! flush-state* assoc :flushed? true))
+      (is (.exists file))
+      (is (:flushed? @flush-state*))
+      (is (= 4 (count (slurp-lines file))))
+      (let [lines-before (count (slurp-lines file))]
+        (swap! entries* conj (p/thinking-level-entry :medium))
+        (execute-io-request! (p/persistence-io-request {:entries @entries*
+                                                        :flush-state @flush-state*
+                                                        :session-id "sess-5"
+                                                        :worktree-path "/proj"
+                                                        :parent-session-id nil
+                                                        :parent-session-path nil})
+                             #(swap! flush-state* assoc :flushed? true))
+        (is (= (inc lines-before) (count (slurp-lines file))))))))
 
 (deftest persisted-session-store-wrapper-test
   (let [dir (tmp-dir)
