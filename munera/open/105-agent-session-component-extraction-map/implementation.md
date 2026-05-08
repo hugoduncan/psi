@@ -66,6 +66,9 @@ Live namespace-surface review completed:
 - recorded open child task `116-deterministic-operation-registration-component-extraction`
   - this sharpens the separate workflow-adjacent invoke-operation registry seam further: canonical deterministic-operation registration/removal/query semantics used by workflow `:invoke` can move into a lower component while invoke-step execution sequencing and broader workflow runtime ownership remain above the boundary
 - observed that turn extraction is already in an intermediate state because `components/agent-session/src/psi/turn/handlers.clj` exists while high-level prompt-turn orchestration still resides under `psi.agent-session.*`
+- recorded open child task `119-expand-turn-runtime-prepared-turn-boundary`
+  - this sharpens the current turn follow-on further: the right next move is to expand the existing `turn-runtime` component so it owns more of the lower prepared-turn boundary, while leaving dispatch invocation and higher session-owned orchestration in `agent-session`
+  - this replaces any temptation to revive the old sibling `turn-preparation` framing from superseded task `102`
 - confirmed workflow is now the clearest remaining extraction candidate by both namespace mass and conceptual cohesion
 - clarified that the workflow area now contains at least two distinct lower registry seams rather than one: workflow-definition registration and deterministic-operation registration for workflow `:invoke`
 - recorded that the lower shared-config seam exposed by `107` is no longer speculative: it is now landed concretely via task `109`

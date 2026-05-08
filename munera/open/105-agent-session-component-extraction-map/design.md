@@ -234,6 +234,7 @@ Boundary note after reviewing the current namespace surface:
 - turn is also not the same thing as session orchestration: `agent-session` should remain the owner of multi-session/session-lifecycle concerns even after a broader turn extraction
 - the live presence of `psi.turn.handlers` indicates that turn extraction is already partially underway; follow-on task design should account for this current split state instead of pretending turn is wholly unextracted
 - landed task `100-turn-statechart-component-extraction` should now be understood as a narrower low-level turn child under this umbrella, not as a substitute for the broader turn boundary
+- open child task `119-expand-turn-runtime-prepared-turn-boundary` now sharpens the turn story further: the existing `turn-runtime` component is the seed of the correct lower prepared-turn boundary, and the next move is to expand that component to absorb lower request-preparation and response-recording ownership rather than revive a sibling `turn-preparation` component
 
 #### 5. Workflow
 
@@ -454,6 +455,7 @@ Reviewing the current `components/agent-session/src/psi/agent_session/` tree sha
 - open child task `115-workflow-registration-component-extraction` sharpens the workflow-definition registry seam by extracting canonical workflow-definition registration/removal/query semantics into a lower `workflow-registry` component while leaving workflow-file loading, workflow-run execution/progression, and higher mutation/resolver/`psi-tool` adapter seams above the boundary
 - open child task `116-deterministic-operation-registration-component-extraction` sharpens the separate workflow-adjacent invoke-operation registry seam by extracting canonical deterministic-operation registration/removal/query semantics used by workflow `:invoke` into a lower component while leaving invoke-step execution/runtime sequencing above the boundary
 - landed task `100-turn-statechart-component-extraction` should be treated as a narrow low-level turn child aligned with this umbrella, not as a replacement for a broader turn-component decision
+- open child task `119-expand-turn-runtime-prepared-turn-boundary` sharpens the turn follow-on further by treating the existing `turn-runtime` component as the seed of the correct lower prepared-turn boundary and expanding it to absorb lower request-preparation and response-recording ownership rather than reviving a sibling `turn-preparation` component
 - `102-turn-preparation-component-extraction` is superseded by this umbrella because its narrow extraction target proved structurally premature without the broader component map
 - follow-on extraction tasks should reference this umbrella when they carve out one of the named component candidates
 

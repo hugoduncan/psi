@@ -1,0 +1,9 @@
+- [ ] Review landed `101`, `103`, and the current `turn-runtime` namespace surface against the broader prepared-turn boundary
+- [ ] Classify current lower turn code into:
+  - [ ] lower prepared-turn assembly/runtime/recording ownership
+  - [ ] higher dispatch/session-owned orchestration ownership
+  - [ ] ambiguous helpers needing extraction-time review
+- [ ] Design the expanded `turn-runtime` namespace map
+- [ ] Record the keep/move/split map for `psi.turn`, `psi.turn.handlers`, `prompt_request`, and `prompt_recording`
+- [ ] Confirm the task stays aligned with umbrella task `105`
+- [ ] Use this task as the framing reference for implementation once queued
