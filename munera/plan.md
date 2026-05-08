@@ -9,6 +9,7 @@ Queue:
 
 Backlog:
 
+`munera/open/121-deterministic-operation-runtime-component-extraction/`
 `munera/open/119-expand-turn-runtime-prepared-turn-boundary/`
 `munera/open/120-rename-psi-turn-to-agent-session-turn/`
 `munera/open/118-session-persistence-io-effect-extraction/`
