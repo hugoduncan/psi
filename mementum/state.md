@@ -14,10 +14,21 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 125 workflow-runtime core component extraction is now landed locally:
+  - added new lower component `components/workflow-runtime/` with authoritative namespaces under `psi.workflow-runtime.*`
+  - moved canonical workflow runtime owners out of `components/agent-session/src/psi/agent_session/`: model, IR, target IR compiler, statechart, source resolution, runtime core, progression recording, attempts, step prep, terminal contract, and statechart runtime
+  - rewired higher `agent-session` owners (`context`, `workflow-execution`, workflow mutations/resolvers, `psi_tool_workflow`) to depend downward on `psi.workflow-runtime.*`
+  - recorded final boundary decision that `workflow_runtime`, `workflow_step_prep`, and `workflow_terminal_contract` all belong in the extracted lower component, with `step_prep` and `terminal_contract` treated as sibling lower helpers rather than public/session orchestration owners
+  - kept `workflow_statechart_runtime` mostly intact during the move instead of forcing extra decomposition in the same slice
+  - preserved lower seam consumption: pure judge/routing remains in `psi.workflow-judge`, workflow runtime still uses the impure session-owned judge execution seam, and bounded actor execution still goes through `psi.agent-session.turn-execution-contract`
+  - introduced explicit ctx callback keys (`:execute-workflow-judge-fn`, step-prep callbacks, session-state/skill lookups) so the extracted runtime component does not depend back upward on session-owned workflow namespaces
+  - copied focused lower runtime tests into `components/workflow-runtime/test/psi/workflow_runtime/` and wired root test paths/deps for the new component
+  - focused verification green: `57 tests, 275 assertions, 0 failures`; lint green: `0 errors, 0 warnings`
+
 - Task 124 turn-execution contract extraction is now complete and closed:
   - added new workflow-facing bounded execution namespace `components/agent-session/src/psi/agent_session/turn_execution_contract.clj`
   - moved canonical assistant-text extraction and execution-failure normalization into that boundary
-  - rewired `psi.agent-session.workflow-statechart-runtime` to execute session-backed actor steps through `psi.agent-session.turn-execution-contract` instead of directly through `psi.agent-session.turn`
+  - rewired `psi.workflow-runtime.statechart-runtime` to execute session-backed actor steps through `psi.agent-session.turn-execution-contract` instead of directly through `psi.agent-session.turn`
   - rewired `psi.agent-session.workflow-judge` to execute judge turns through the same contract instead of directly through `psi.agent-session.turn`
   - preserved workflow-specific session shaping, attempt child-session creation, judge child-session creation, routing interpretation, and judge retry orchestration above the new boundary
   - chose caller-supplied execution session ids as the boundary mode; the contract starts once workflow code has a session id and final prompt text
@@ -43,30 +54,6 @@ Bootstrapped on 2026-04-02.
   - updated active task text that still described `prompt-control` as a live compatibility seam
   - focused verification green: lint `0 errors, 0 warnings`; focused tests `1572 tests, 12038 assertions, 0 failures`
 
-- Task 110 prompt-assets component extraction is now landed locally:
-  - created new lower component `components/prompt-assets/` with authoritative namespaces `psi.prompt-assets.prompt-templates`, `psi.prompt-assets.skills`, and `psi.prompt-assets.system-prompt`
-  - moved the three authoritative source namespaces and their focused tests out of `components/agent-session/` into the new component without introducing compatibility forwarding shims
-  - updated `agent-session` and `app-runtime` consumers to depend downward on `psi.prompt-assets.*`
-  - wired `psi/prompt-assets` into the root deps plus `components/agent-session/deps.edn` and `components/app-runtime/deps.edn`
-  - kept `conversation`, `tool-defs`, and `message-text` outside the extracted component boundary as intended
-  - focused verification green: `12 tests, 57 assertions, 0 failures`; lint green: `0 errors, 0 warnings`
-
-- Task 109 shared-config extraction is now landed locally:
-  - new lower component `components/shared-config/` owns user config, project config, and shared `:agent-session` resolution
-  - `app-runtime` now depends on `psi.shared-config.resolution`
-  - `agent-session.dispatch-effects` now writes through shared-config user/project helpers
-  - `project-nrepl.config` now consumes shared-config reads/extraction instead of its copied file/merge substrate
-  - removed old authoritative `psi.agent-session.config-resolution`, `psi.agent-session.project-preferences`, and `psi.agent-session.user-config` namespaces rather than leaving shims
-  - focused verification green: `9 tests, 50 assertions, 0 failures`
-
-- Task 086 delegated-boundary runtime invocation plumbing is now landed:
-  - canonical IR `:type :delegate` steps now execute through `workflow_statechart_runtime.clj`
-  - delegate execution resolves target workflow definitions, renders delegated `:prompt-string`, materializes ordered delegated `:context`, creates a callee workflow run via the canonical runtime seam, and executes it through the same Phase A statechart runtime path
-  - workflow runs now support explicit top-level `:workflow-original` in addition to `:workflow-input`; source resolution now prefers that explicit field when present so delegated callees see the exact boundary payload promised by task 077/086
-  - delegating step accepted results default to the callee workflow terminal accepted-result envelope, with delegate boundary diagnostics recorded under `[:diagnostics :delegate]`
-  - focused delegate execution proofs landed in `workflow_execution_test.clj` (delegate-only and mixed session→delegate)
-  - focused verification green: `35 tests, 178 assertions, 0 failures`
-
 ## Suggested next step
-- Task `125-workflow-runtime-core-component-extraction` is now the direct follow-on.
-- It can target `turn-execution-contract` instead of direct `turn` usage for session-backed actor/judge execution.
+- Review `105-agent-session-component-extraction-map` against the new `workflow-runtime` landing and update the remaining extraction map/follow-ons.
+- Likely next focused cleanup candidates from task 125 are session-owned child-session/judge callback surfaces if a later slice wants those lowered further.

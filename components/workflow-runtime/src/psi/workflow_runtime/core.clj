@@ -1,13 +1,13 @@
-(ns psi.agent-session.workflow-runtime
+(ns psi.workflow-runtime.core
   "Pure canonical-root workflow state operations for deterministic workflow runs.
 
    Scope of this slice:
    - create workflow runs with immutable effective-definition snapshots
    - expose small pure run lookup/update helpers for later dispatch/mutation/query layers"
   (:require
-   [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]
-   [psi.agent-session.workflow-target-ir-compiler :as workflow-target-ir-compiler]
+   [psi.workflow-runtime.model :as workflow-model]
+   [psi.workflow-runtime.statechart :as workflow-statechart]
+   [psi.workflow-runtime.target-ir-compiler :as workflow-target-ir-compiler]
    [psi.workflow-registry.registry :as registry]))
 
 (defn- now []

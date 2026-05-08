@@ -5,7 +5,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
-   [psi.agent-session.workflow-runtime]
+   [psi.workflow-runtime.core]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- complete-run-step
@@ -35,7 +35,7 @@
   [state*]
   (fn [_ctx _session-id run-id]
     (loop [steps-executed []]
-      (let [run (psi.agent-session.workflow-runtime/workflow-run-in @state* run-id)
+      (let [run (psi.workflow-runtime.core/workflow-run-in @state* run-id)
             status (:status run)]
         (cond
           (contains? #{:completed :failed :cancelled} status)
@@ -66,7 +66,7 @@
 (defn- resume-and-execute-run-nullable
   [state*]
   (fn [ctx session-id run-id]
-    (let [[new-state _run] (psi.agent-session.workflow-runtime/resume-run @state* run-id)]
+    (let [[new-state _run] (psi.workflow-runtime.core/resume-run @state* run-id)]
       (reset! state* new-state)
       ((execute-run-nullable state*) ctx session-id run-id))))
 
@@ -168,7 +168,7 @@
           _ (swap! (:state* ctx)
                    (fn [state]
                      (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                           [state2 _ _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        state2)))
           tool        (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           list-result ((:execute tool) {"action" "workflow" "op" "list-runs"})
@@ -189,7 +189,7 @@
           _ (swap! (:state* ctx)
                    (fn [state]
                      (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
-                           [state2 run-id _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                           [state2 run-id _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        (-> state2
                            (assoc-in [:workflows :runs run-id :status] :blocked)
                            (assoc-in [:workflows :runs run-id :blocked] {:reason "needs resume"})))))
@@ -208,7 +208,7 @@
           _ (swap! (:state* ctx)
                    (fn [state]
                      (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                           [state2 _ _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        state2)))
           tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow" "op" "execute-run" "run-id" "run-1"})
@@ -225,7 +225,7 @@
           _ (swap! (:state* ctx)
                    (fn [state]
                      (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                           [state2 _ _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        state2)))
           tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow" "op" "cancel-run" "run-id" "run-1" "reason" "operator request"})

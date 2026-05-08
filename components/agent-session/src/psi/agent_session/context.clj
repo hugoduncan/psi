@@ -27,7 +27,9 @@
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.session-runtime :as session-runtime]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-model :as workflow-model]
+   [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.workflow-runtime.model :as workflow-model]
+   [psi.skill-registry.registry :as skill-registry]
    [psi.agent-session.workflows :as wf]
    [psi.history.resolvers :as history-resolvers]
    [psi.query.core :as query]
@@ -156,9 +158,16 @@
    :notify-extension-fn #'ext-rt/notify-extension-in!
    :register-resolvers-fn (fn [qctx rebuild?] (register-resolvers-in! qctx rebuild?))
    :register-mutations-fn (fn [qctx mutations rebuild?] (register-mutations-in! qctx mutations rebuild?))
-   :create-workflow-child-session-fn create-workflow-child-session!
-   :execute-workflow-run-fn workflow-execution/execute-run!
-   :resume-and-execute-workflow-run-fn workflow-execution/resume-and-execute-run!
+   :create-workflow-child-session-fn #'create-workflow-child-session!
+   :execute-workflow-run-fn #'workflow-execution/execute-run!
+   :resume-and-execute-workflow-run-fn #'workflow-execution/resume-and-execute-run!
+   :get-session-data-fn #'ss/get-session-data-in
+   :list-context-sessions-fn #'ss/list-context-sessions-in
+   :find-skill-fn #'skill-registry/find-skill
+   :resolve-workflow-step-session-config-fn #'workflow-execution/resolve-step-session-config
+   :materialize-workflow-step-session-conversation-fn #'workflow-execution/materialize-step-session-conversation
+   :split-workflow-step-session-conversation-fn #'workflow-execution/split-step-session-conversation
+   :execute-workflow-judge-fn #'workflow-judge/execute-judge!
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
    :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
    :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
@@ -184,7 +193,10 @@
    :all-mutations mutations})
 
 (defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
-                                create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn]
+                                create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn
+                                get-session-data-fn list-context-sessions-fn find-skill-fn
+                                resolve-workflow-step-session-config-fn materialize-workflow-step-session-conversation-fn
+                                split-workflow-step-session-conversation-fn execute-workflow-judge-fn]
                          :or {persist? true mutations []}
                          :as opts}]
   (let [resolved-cwd (or cwd (System/getProperty "user.dir"))
@@ -226,7 +238,28 @@
                       (assoc :execute-workflow-run-fn execute-workflow-run-fn)
 
                       (contains? opts :resume-and-execute-workflow-run-fn)
-                      (assoc :resume-and-execute-workflow-run-fn resume-and-execute-workflow-run-fn)))
+                      (assoc :resume-and-execute-workflow-run-fn resume-and-execute-workflow-run-fn)
+
+                      (contains? opts :get-session-data-fn)
+                      (assoc :get-session-data-fn get-session-data-fn)
+
+                      (contains? opts :list-context-sessions-fn)
+                      (assoc :list-context-sessions-fn list-context-sessions-fn)
+
+                      (contains? opts :find-skill-fn)
+                      (assoc :find-skill-fn find-skill-fn)
+
+                      (contains? opts :resolve-workflow-step-session-config-fn)
+                      (assoc :resolve-workflow-step-session-config-fn resolve-workflow-step-session-config-fn)
+
+                      (contains? opts :materialize-workflow-step-session-conversation-fn)
+                      (assoc :materialize-workflow-step-session-conversation-fn materialize-workflow-step-session-conversation-fn)
+
+                      (contains? opts :split-workflow-step-session-conversation-fn)
+                      (assoc :split-workflow-step-session-conversation-fn split-workflow-step-session-conversation-fn)
+
+                      (contains? opts :execute-workflow-judge-fn)
+                      (assoc :execute-workflow-judge-fn execute-workflow-judge-fn)))
         _ (dispatch-handlers/register-all! ctx0)
         actions-fn (dispatch-handlers/make-actions-fn ctx0)
         ctx (assoc ctx0 :session-actions-fn actions-fn)]

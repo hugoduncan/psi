@@ -1,15 +1,13 @@
-(ns psi.agent-session.workflow-step-prep
+(ns psi.workflow-runtime.step-prep
   "Shared pure-ish workflow step preparation helpers used by both the execution
    wrapper namespace and the Phase A statechart runtime. Centralizes step input
    materialization, prompt rendering, and child-session configuration shaping so
    prompt/config semantics stay aligned across workflow paths."
   (:require
-   [psi.session-state.state :as session-state]
-   [psi.skill-registry.registry :as skill-registry]
    [psi.tool-registry.defs :as tool-defs]
    [psi.workflow-registry.registry :as registry]
-   [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]))
+   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]
+   [psi.workflow-runtime.statechart :as workflow-statechart]))
 
 (defn- effective-step-def
   [workflow-run step-id]
@@ -142,13 +140,13 @@
 
 (defn- resolve-step-skills
   [ctx parent-session-id skill-config]
-  (let [session-skills (vec (or (:skills (session-state/get-session-data-in ctx parent-session-id)) []))]
+  (let [session-skills (vec (or (:skills ((:get-session-data-fn ctx) ctx parent-session-id)) []))]
     (when (some? skill-config)
       (mapv (fn [skill]
               (cond
                 (map? skill) skill
                 (string? skill)
-                (or (skill-registry/find-skill session-skills skill)
+                (or ((:find-skill-fn ctx) session-skills skill)
                     {:name skill
                      :description ""
                      :file-path ""
@@ -160,7 +158,7 @@
 
 (defn- resolve-step-tool-defs
   [ctx parent-session-id tool-config]
-  (let [session-tool-defs (vec (or (:tool-defs (session-state/get-session-data-in ctx parent-session-id)) []))]
+  (let [session-tool-defs (vec (or (:tool-defs ((:get-session-data-fn ctx) ctx parent-session-id)) []))]
     (when (some? tool-config)
       (mapv (fn [tool]
               (cond
@@ -204,8 +202,8 @@
   [ctx parent-session-id workflow-run step-id]
   (let [{:keys [step-def base-meta framing-prompt]} (step-meta-for ctx workflow-run step-id)
         parent-session-id (or parent-session-id
-                              (some->> (session-state/list-context-sessions-in ctx) first :session-id))
-        parent-session (session-state/get-session-data-in ctx parent-session-id)
+                              (some->> ((:list-context-sessions-fn ctx) ctx) first :session-id))
+        parent-session ((:get-session-data-fn ctx) ctx parent-session-id)
         parent-session-model (:model parent-session)
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)

@@ -2,7 +2,7 @@
   "Pathom3 resolvers for deterministic workflow definitions, runs, and workflow↔session relationships."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 ;; NOTE: resolver ::pco/output declarations use flat key lists only.

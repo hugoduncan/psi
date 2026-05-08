@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-target-ir-compiler-test
+(ns psi.workflow-runtime.target-ir-compiler-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.ir :as workflow-ir]

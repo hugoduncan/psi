@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-terminal-contract
+(ns psi.workflow-runtime.terminal-contract
   "Workflow-level terminal export contract helpers.
 
    First cut scope:
@@ -8,8 +8,8 @@
    - yielded text remains separate and continues to flow through `:yield :text`"
   (:require
    [clojure.string :as str]
-   [psi.agent-session.workflow-ir :as workflow-ir]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]))
+   [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.statechart :as workflow-statechart]))
 
 (defn- effective-steps
   [workflow-run]

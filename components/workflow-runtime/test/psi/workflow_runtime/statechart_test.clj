@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-statechart-test
+(ns psi.workflow-runtime.statechart-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [com.fulcrologic.statecharts :as sc]

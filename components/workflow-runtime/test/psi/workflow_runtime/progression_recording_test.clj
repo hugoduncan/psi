@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-progression-test
+(ns psi.workflow-runtime.progression-recording-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.attempts :as workflow-attempts]

@@ -6,9 +6,9 @@
    [psi.session-persistence.core]
    [psi.agent-session.turn]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow-attempts]
+   [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.workflow-runtime.core :as workflow-runtime]))
 
 (defn- create-session-context
   []
@@ -153,7 +153,7 @@
                                                                        :workflow-input {:repo "psi"
                                                                                         :labels ["bug"]}})]
                        s)))]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]
                         {:attempt {:attempt-id (str sid "-attempt")

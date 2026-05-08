@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-attempts-test
+(ns psi.workflow-runtime.attempts-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session-core]
@@ -19,7 +19,7 @@
     (let [[ctx parent-session-id] (create-session-context {:persist? false})
           {:keys [attempt execution-session]}
           (workflow-attempts/create-step-attempt-session!
-           (assoc ctx :get-session-data-fn session-state/get-session-data-in)
+           ctx
            parent-session-id
            {:workflow-run-id "run-1"
             :workflow-step-id "plan"

@@ -14,9 +14,9 @@
    Canonical execution note:
    - Phase A statechart execution is the sole canonical workflow-run execution path"
   (:require
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
-   [psi.agent-session.workflow-statechart-runtime :as workflow-statechart-runtime]
-   [psi.agent-session.workflow-step-prep :as workflow-step-prep]))
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.statechart-runtime :as workflow-statechart-runtime]
+   [psi.workflow-runtime.step-prep :as workflow-step-prep]))
 
 (def binding-source-value workflow-step-prep/binding-source-value)
 (def materialize-step-inputs workflow-step-prep/materialize-step-inputs)

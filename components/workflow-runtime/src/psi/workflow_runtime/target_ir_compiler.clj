@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-target-ir-compiler
+(ns psi.workflow-runtime.target-ir-compiler
   "Compile target-authored workflow definitions into normalized workflow IR.
 
    This compiler owns the forward compilation path from the converged authored
@@ -6,7 +6,7 @@
    runtime workflow IR. Unlike the current-grammar compatibility compiler, this
    compiler emits no migration `:compat` metadata."
   (:require
-   [psi.agent-session.workflow-ir :as workflow-ir]
+   [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-registry.definition :as workflow-definition]))
 
 (def ^:private default-invoke-outputs

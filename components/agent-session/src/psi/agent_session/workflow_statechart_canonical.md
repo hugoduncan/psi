@@ -4,17 +4,17 @@ This note documents the authoritative workflow execution/compiler/runtime surfac
 
 ## Canonical Phase A surfaces
 
-- `psi.agent-session.workflow-statechart/compile-hierarchical-chart`
+- `psi.workflow-runtime.statechart/compile-hierarchical-chart`
   - Canonical execution chart compiler for deterministic workflow runs.
-- `psi.agent-session.workflow-statechart`
+- `psi.workflow-runtime.statechart`
   - Canonical run lifecycle chart plus workflow definition-order helpers such as `initial-step-id` and `next-step-id`.
-- `psi.agent-session.workflow-statechart-runtime`
+- `psi.workflow-runtime.statechart-runtime`
   - Canonical statechart-driven runtime boundary.
-- `psi.agent-session.workflow-step-prep`
+- `psi.workflow-runtime.step-prep`
   - Canonical shared step input/prompt/session-config preparation helpers.
-- `psi.agent-session.workflow-progression-recording`
+- `psi.workflow-runtime.progression-recording`
   - Canonical record/update substrate used by the Phase A runtime.
-- `psi.agent-session.workflow-runtime`
+- `psi.workflow-runtime.core`
   - Canonical pure root-state lifecycle operations for definitions and runs, including run creation, resume, cancellation, input updates, and removal.
 
 ## Remaining compatibility / legacy surface

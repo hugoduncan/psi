@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-attempts
+(ns psi.workflow-runtime.attempts
   "Workflow step-attempt session orchestration for deterministic workflows.
 
    This slice owns creation of one canonical execution session per workflow step attempt,
@@ -8,8 +8,7 @@
    to avoid a load cycle through mutations/session → core → context."
   (:require
    [clojure.string :as str]
-   [psi.session-state.model :as session]
-   [psi.session-state.state :as session-state]))
+   [psi.session-state.model :as session]))
 
 (defn- now []
   (java.time.Instant/now))
@@ -73,7 +72,7 @@
                            :workflow-attempt-id        attempt-id'
                            :workflow-owned?            true})
         _                result
-        child-sd         (session-state/get-session-data-in ctx child-session-id)
+        child-sd         ((:get-session-data-fn ctx) ctx child-session-id)
         attempt          (new-attempt {:attempt-id attempt-id'
                                        :status :pending
                                        :execution-session-id child-session-id})]

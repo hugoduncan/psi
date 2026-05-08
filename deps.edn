@@ -36,6 +36,7 @@
         psi/deterministic-operation-runtime           {:local/root "components/deterministic-operation-runtime"}
         psi/workflow-registry                         {:local/root "components/workflow-registry"}
         psi/workflow-judge                            {:local/root "components/workflow-judge"}
+        psi/workflow-runtime                          {:local/root "components/workflow-runtime"}
         psi/turn-statechart                           {:local/root "components/turn-statechart"}
         psi/turn-runtime                              {:local/root "components/turn-runtime"}
         psi/tool-runtime                              {:local/root "components/tool-runtime"}
@@ -195,6 +196,7 @@
                              "components/tool-registry/test"
                              "components/workflow-registry/test"
                              "components/workflow-judge/test"
+                             "components/workflow-runtime/test"
                              "components/turn-statechart/test"
                              "components/turn-runtime/test"
                              "components/tool-runtime/test"
@@ -243,6 +245,7 @@
                         "components/tool-registry/test"
                         "components/workflow-registry/test"
                         "components/workflow-judge/test"
+                        "components/workflow-runtime/test"
                         "components/turn-statechart/test"
                         "components/turn-runtime/test"
                         "components/tool-runtime/test"
@@ -283,6 +286,7 @@
                         "components/tool-registry/src"
                         "components/workflow-registry/src"
                         "components/workflow-judge/src"
+                        "components/workflow-runtime/src"
                         "components/tool-runtime/src"
                         "components/state-kernel/src"
                         "components/session-state/src"

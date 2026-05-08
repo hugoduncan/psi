@@ -7,8 +7,8 @@
   (:require
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.workflow-ir :as workflow-ir]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (pco/defmutation register-workflow-definition

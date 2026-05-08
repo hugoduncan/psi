@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-statechart-runtime-test
+(ns psi.workflow-runtime.statechart-runtime-test
   (:require
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]

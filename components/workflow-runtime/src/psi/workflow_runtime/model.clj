@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-model
+(ns psi.workflow-runtime.model
   "Pure workflow domain model for deterministic workflow runtime state.
 
    Owns canonical workflow entity schemas, status enums, linkage conventions,

@@ -1,4 +1,4 @@
-(ns psi.agent-session.deterministic-operation-registry-test
+(ns psi.workflow-runtime.deterministic-operation-registry-bridge-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.statechart-runtime :as workflow-statechart-runtime]))

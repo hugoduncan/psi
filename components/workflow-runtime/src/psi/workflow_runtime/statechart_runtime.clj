@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-statechart-runtime
+(ns psi.workflow-runtime.statechart-runtime
   "Phase A workflow statechart runtime scaffolding.
 
    This namespace owns the execution context around the hierarchical workflow
@@ -23,16 +23,14 @@
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.agent-session.turn-execution-contract :as turn-execution]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]
-   [psi.agent-session.workflow-ir :as workflow-ir]
-   [psi.agent-session.workflow-judge :as workflow-judge]
-   [psi.agent-session.workflow-progression-recording :as workflow-progression-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
-   [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
+   [psi.workflow-runtime.attempts :as workflow-attempts]
+   [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.progression-recording :as workflow-progression-recording]
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]
    [psi.workflow-registry.registry :as registry]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]
-   [psi.agent-session.workflow-step-prep :as workflow-step-prep]
-   [psi.agent-session.workflow-terminal-contract :as workflow-terminal-contract]))
+   [psi.workflow-runtime.statechart :as workflow-statechart]
+   [psi.workflow-runtime.terminal-contract :as workflow-terminal-contract]))
 
 (declare create-workflow-context send-and-drain!)
 
@@ -346,12 +344,14 @@
               delegate-step? (= :delegate (:type step-def))
               session-step? (= :session (:type step-def))
               step-config (when session-step?
-                            (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id))
+                            ((:resolve-workflow-step-session-config-fn ctx)
+                             ctx parent-session-id workflow-run step-id))
               session-conversation (when session-step?
-                                     (workflow-step-prep/materialize-step-session-conversation workflow-run step-id))
+                                     ((:materialize-workflow-step-session-conversation-fn ctx)
+                                      workflow-run step-id))
               {:keys [preloaded-messages prompt]}
               (if session-step?
-                (workflow-step-prep/split-step-session-conversation session-conversation)
+                ((:split-workflow-step-session-conversation-fn ctx) session-conversation)
                 {})
               {:keys [attempt execution-session]}
               (if session-step?
@@ -510,7 +510,7 @@
               judge-spec (:judge step-def)
               routing-table (or (:on step-def) {})
               actor-session-id (get-in @working-memory* [:sessions step-id])
-              judge-result (workflow-judge/execute-judge!
+              judge-result ((:execute-workflow-judge-fn ctx)
                             ctx
                             parent-session-id
                             actor-session-id

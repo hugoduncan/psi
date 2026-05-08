@@ -3,7 +3,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
-   [psi.agent-session.workflow-model :as workflow-model]
+   [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- make-test-ctx

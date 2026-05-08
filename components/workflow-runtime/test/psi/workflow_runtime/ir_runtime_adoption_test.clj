@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-ir-runtime-adoption-test
+(ns psi.workflow-runtime.ir-runtime-adoption-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]

@@ -3,8 +3,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.context :as context]
    [psi.session-state.state :as session-state]
-   [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-runtime.model :as workflow-model]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (def definition

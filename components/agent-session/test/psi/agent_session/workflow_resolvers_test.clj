@@ -3,9 +3,9 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]
-   [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-runtime.attempts :as workflow-attempts]
+   [psi.workflow-runtime.progression-recording :as workflow-recording]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context

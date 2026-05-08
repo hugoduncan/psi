@@ -8,11 +8,11 @@
    [psi.agent-session.turn]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow-attempts]
+   [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
-   [psi.agent-session.workflow-statechart-runtime]
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.statechart-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
@@ -294,7 +294,7 @@
           prompts* (atom [])
           created* (atom [])
           responses* (atom ["planner output" "builder output"])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]
                         (swap! created* conj {:step-id (:workflow-step-id opts)
@@ -353,7 +353,7 @@
                        s)))
           created* (atom [])
           prompts* (atom [])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]
                         (swap! created* conj {:step-id (:workflow-step-id opts)
@@ -473,7 +473,7 @@
                          :summary "2 issues found"}
                         (throw (ex-info "unexpected operation" {:operation-id operation-id
                                                                 :invocation invocation}))))
-                    psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]
                         (swap! created* conj {:step-id (:workflow-step-id opts)
@@ -554,7 +554,7 @@
                                                                                     :original {:request-id 7}}})]
                        s)))
           prompts* (atom [])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]
                         {:attempt {:attempt-id (str sid "-attempt")
@@ -718,7 +718,7 @@
                        s)))
           step-executions* (atom [])
           judge-call-count* (atom 0)]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]
                         (swap! step-executions* conj (:workflow-step-id opts))

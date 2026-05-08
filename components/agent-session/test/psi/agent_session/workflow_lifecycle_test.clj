@@ -4,10 +4,10 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.turn]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]
+   [psi.workflow-runtime.attempts :as workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-runtime.progression-recording :as workflow-recording]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
@@ -78,7 +78,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           run-id          (install-definition-and-run! ctx)
           child-sessions* (atom [])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-" (:attempt-id opts) "-session")
                             attempt {:attempt-id (:attempt-id opts)
@@ -155,7 +155,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           run-id            (install-definition-and-run! ctx)
           created-sessions* (atom [])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-" (:attempt-id opts) "-session")
                             attempt {:attempt-id (:attempt-id opts)

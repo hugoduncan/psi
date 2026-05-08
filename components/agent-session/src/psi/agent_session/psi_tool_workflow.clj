@@ -2,7 +2,7 @@
   "Workflow action handler for psi-tool: parse, summarise, and execute workflow ops."
   (:require
    [clojure.edn :as edn]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 ;; ── Helpers (local copies of private psi_tool utilities) ────────────────────
@@ -116,7 +116,35 @@
 
     (not (contains? ctx :resume-and-execute-workflow-run-fn))
     (assoc :resume-and-execute-workflow-run-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "resume-and-execute-run!"))))
+           (find-required-fn "psi.agent-session.workflow-execution" "resume-and-execute-run!"))
+
+    (not (contains? ctx :get-session-data-fn))
+    (assoc :get-session-data-fn
+           (find-required-fn "psi.session-state.state" "get-session-data-in"))
+
+    (not (contains? ctx :list-context-sessions-fn))
+    (assoc :list-context-sessions-fn
+           (find-required-fn "psi.session-state.state" "list-context-sessions-in"))
+
+    (not (contains? ctx :find-skill-fn))
+    (assoc :find-skill-fn
+           (find-required-fn "psi.skill-registry.registry" "find-skill"))
+
+    (not (contains? ctx :resolve-workflow-step-session-config-fn))
+    (assoc :resolve-workflow-step-session-config-fn
+           (find-required-fn "psi.agent-session.workflow-execution" "resolve-step-session-config"))
+
+    (not (contains? ctx :materialize-workflow-step-session-conversation-fn))
+    (assoc :materialize-workflow-step-session-conversation-fn
+           (find-required-fn "psi.agent-session.workflow-execution" "materialize-step-session-conversation"))
+
+    (not (contains? ctx :split-workflow-step-session-conversation-fn))
+    (assoc :split-workflow-step-session-conversation-fn
+           (find-required-fn "psi.agent-session.workflow-execution" "split-step-session-conversation"))
+
+    (not (contains? ctx :execute-workflow-judge-fn))
+    (assoc :execute-workflow-judge-fn
+           (find-required-fn "psi.agent-session.workflow-judge" "execute-judge!"))))
 
 ;; ── Workflow op handler ──────────────────────────────────────────────────────
 

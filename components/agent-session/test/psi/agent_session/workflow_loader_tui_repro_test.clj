@@ -12,7 +12,7 @@
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-file-loader :as workflow-file-loader]
    [psi.agent-session.workflow-file-compiler :as workflow-file-compiler]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.workflow-runtime.core :as workflow-runtime]))
 
 (defn- create-context+session []
   (let [ctx (session/create-context {:persist? false

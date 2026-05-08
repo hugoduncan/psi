@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-execution-terminal-contract-test
+(ns psi.workflow-runtime.terminal-contract-execution-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]

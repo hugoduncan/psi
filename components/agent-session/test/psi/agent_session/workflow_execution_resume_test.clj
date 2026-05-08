@@ -5,9 +5,9 @@
    [psi.session-persistence.core]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]
-   [psi.agent-session.workflow-statechart-runtime]))
+   [psi.workflow-runtime.statechart-runtime]))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -48,11 +48,11 @@
                                        :status :succeeded
                                        :execution-session-id "child-1"}])))))
           seen* (atom [])]
-      (with-redefs [psi.agent-session.workflow-statechart-runtime/create-workflow-context
+      (with-redefs [psi.workflow-runtime.statechart-runtime/create-workflow-context
                     (fn [_ctx _parent-session-id run-id]
                       (swap! seen* conj [:create run-id])
                       {:wm :stub-wm})
-                    psi.agent-session.workflow-statechart-runtime/send-and-drain!
+                    psi.workflow-runtime.statechart-runtime/send-and-drain!
                     (fn [_wf-ctx _wm event _data]
                       (swap! seen* conj [:event event])
                       :stubbed)]

@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-ir
+(ns psi.workflow-runtime.ir
   "Canonical normalized workflow IR schema and minimal semantic validation.
 
    This namespace defines the runtime-owned validation boundary for compiled

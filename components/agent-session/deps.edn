@@ -26,6 +26,7 @@
         psi/deterministic-operation-runtime {:local/root "../deterministic-operation-runtime"}
         psi/workflow-registry      {:local/root "../workflow-registry"}
         psi/workflow-judge         {:local/root "../workflow-judge"}
+        psi/workflow-runtime       {:local/root "../workflow-runtime"}
         psi/turn-statechart        {:local/root "../turn-statechart"}
         psi/turn-runtime           {:local/root "../turn-runtime"}
         psi/tool-runtime           {:local/root "../tool-runtime"}}}

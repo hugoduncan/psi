@@ -14,7 +14,10 @@
    [psi.agent-session.prompt-recording]
    [psi.agent-session.prompt-request]
    [psi.agent-session.services :as services]
+   [psi.agent-session.workflow-execution :as workflow-execution]
+   [psi.agent-session.workflow-judge]
    [psi.session-state.model :as session-data]
+   [psi.skill-registry.registry]
    [psi.session-state.state :as ss]
    [psi.agent-session.turn]
    [psi.agent-session.statechart :as session-sc]
@@ -175,6 +178,13 @@
                                                                                     {:session-id session-id :message msg}
                                                                                     {:origin :core})
                                                          msg)))
+                       :get-session-data-fn          ss/get-session-data-in
+                       :list-context-sessions-fn     ss/list-context-sessions-in
+                       :find-skill-fn                psi.skill-registry.registry/find-skill
+                       :resolve-workflow-step-session-config-fn workflow-execution/resolve-step-session-config
+                       :materialize-workflow-step-session-conversation-fn workflow-execution/materialize-step-session-conversation
+                       :split-workflow-step-session-conversation-fn workflow-execution/split-step-session-conversation
+                       :execute-workflow-judge-fn    psi.agent-session.workflow-judge/execute-judge!
                        :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
                        :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
                        :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!

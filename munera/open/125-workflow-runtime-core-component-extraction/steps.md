@@ -1,12 +1,12 @@
-- [ ] Review the current workflow-adjacent namespace cluster and confirm the exact below-public-entrypoint runtime-core ownership surface to preserve
-- [ ] Decide and record which adjacent namespaces are true runtime-core owners versus sibling lower workflow helpers or above-boundary shaping owners
-- [ ] Create a lower workflow runtime-core component with authoritative `psi.workflow-runtime.*` namespace(s)
-- [ ] Move workflow execution/progression/statechart runtime ownership out of `psi.agent-session.*`
-- [ ] Decide and record whether `workflow_runtime.clj`, `workflow_step_prep.clj`, and `workflow_terminal_contract.clj` belong inside runtime core, in sibling lower workflow ownership, or above the boundary for justified reasons
-- [ ] Rewire the extracted runtime core to depend downward on lower seams for judge/routing, bounded step execution, and deterministic operation runtime where available
-- [ ] If the lower seams from tasks `123` and `124` are not yet landed, record any temporary direct dependency on higher mixed judge or turn/session orchestration surfaces as residual debt in `implementation.md`
-- [ ] Decompose `workflow_statechart_runtime.clj` if needed so the extracted runtime core reflects ownership cleanly rather than forcing a whole-file move
-- [ ] Keep mutations/resolvers/`psi-tool` and other public entrypoints above the extracted runtime-core boundary
-- [ ] Update focused tests, moving lower runtime-core proofs with the new component while keeping higher integration proofs with the remaining adapter/orchestration owners
-- [ ] Remove misplaced authoritative runtime-core ownership from `psi.agent-session.*`
-- [ ] Record final runtime-core membership, lower-seam consumption status, statechart-runtime decomposition decisions, residual above-boundary workflow logic, and follow-on cleanup candidates in `implementation.md`
+- [x] Review the current workflow-adjacent namespace cluster and confirm the exact below-public-entrypoint runtime-core ownership surface to preserve
+- [x] Decide and record which adjacent namespaces are true runtime-core owners versus sibling lower workflow helpers or above-boundary shaping owners
+- [x] Create a lower workflow runtime-core component with authoritative `psi.workflow-runtime.*` namespace(s)
+- [x] Move workflow execution/progression/statechart runtime ownership out of `psi.agent-session.*`
+- [x] Decide and record whether `workflow_runtime.clj`, `workflow_step_prep.clj`, and `workflow_terminal_contract.clj` belong inside runtime core, in sibling lower workflow ownership, or above the boundary for justified reasons
+- [x] Rewire the extracted runtime core to depend downward on lower seams for judge/routing, bounded step execution, and deterministic operation runtime where available
+- [x] If the lower seams from tasks `123` and `124` are not yet landed, record any temporary direct dependency on higher mixed judge or turn/session orchestration surfaces as residual debt in `implementation.md`
+- [x] Decompose `workflow_statechart_runtime.clj` if needed so the extracted runtime core reflects ownership cleanly rather than forcing a whole-file move
+- [x] Keep mutations/resolvers/`psi-tool` and other public entrypoints above the extracted runtime-core boundary
+- [x] Update focused tests, moving lower runtime-core proofs with the new component while keeping higher integration proofs with the remaining adapter/orchestration owners
+- [x] Remove misplaced authoritative runtime-core ownership from `psi.agent-session.*`
+- [x] Record final runtime-core membership, lower-seam consumption status, statechart-runtime decomposition decisions, residual above-boundary workflow logic, and follow-on cleanup candidates in `implementation.md`

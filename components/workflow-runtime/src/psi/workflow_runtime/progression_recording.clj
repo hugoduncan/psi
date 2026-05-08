@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-progression-recording
+(ns psi.workflow-runtime.progression-recording
   "Phase A record/update substrate for workflow runs.
 
    These helpers record attempt, step, and judge outcomes without owning workflow

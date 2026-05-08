@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-model-test
+(ns psi.workflow-runtime.model-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [malli.core :as m]

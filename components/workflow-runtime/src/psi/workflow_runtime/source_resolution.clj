@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-source-resolution
+(ns psi.workflow-runtime.source-resolution
   "Canonical shared workflow-runtime source reference and source-spec resolution.
 
    Owns normalized IR-shaped runtime semantics for:
@@ -15,8 +15,8 @@
    delegate runtime value resolution semantics here rather than re-encode them."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.workflow-ir :as workflow-ir]
-   [psi.agent-session.workflow-statechart :as workflow-statechart]
+   [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.statechart :as workflow-statechart]
    [psi.workflow-judge :as workflow-judge]))
 
 (defn- effective-step-def

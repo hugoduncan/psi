@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-statechart
+(ns psi.workflow-runtime.statechart
   "Canonical Phase A workflow execution chart compiler for deterministic workflows.
 
    Public canonical surfaces:

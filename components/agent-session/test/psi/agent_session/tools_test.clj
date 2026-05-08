@@ -5,7 +5,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.workflow-runtime]
+   [psi.workflow-runtime.core]
    [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.project-nrepl.ops]
    [psi.agent-session.psi-tool :as psi-tool]
@@ -141,7 +141,7 @@
       (let [[ctx session-id] (create-session-context {:persist? false})
             _ (swap! (:state* ctx)
                      (fn [state]
-                       (let [[s _ _] (psi.agent-session.workflow-runtime/create-run
+                       (let [[s _ _] (psi.workflow-runtime.core/create-run
                                       state
                                       {:definition {:definition-id "invoke-proof"
                                                     :name "invoke-proof"
