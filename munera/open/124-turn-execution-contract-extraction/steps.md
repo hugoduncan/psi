@@ -1,15 +1,15 @@
-- [ ] Trace the current workflow session-backed actor/judge execution path across workflow runtime and turn orchestration
-- [ ] Separate workflow-specific session shaping from generic bounded turn-execution mechanics
-- [ ] Confirm the exact scope to preserve: session-backed actor-step execution and judge-step execution only, excluding deterministic `:invoke` and delegated `:delegate` execution
-- [ ] Identify the minimal workflow-facing bounded execution contract or lower bounded execution substrate that can serve those turn-backed workflow forms
-- [ ] Decide whether to expand an existing lower turn-runtime component or create a new lower execution-boundary component, and record the reason in `implementation.md`
-- [ ] Define and record the canonical bounded step execution result contract for workflow callers, including the minimum success/failure shape and any required execution metadata
-- [ ] Decide and record the execution-session creation mode: internal creation/binding, caller-supplied session id, or explicitly documented support for both
-- [ ] Decide and record the exact actor-step boundary start for the lower contract while keeping workflow-specific session-config derivation and conversation shaping outside it
-- [ ] Decide and record whether the final shape is one shared contract used directly by both actor/judge callers or one lower substrate with thin actor/judge adapters above it
-- [ ] Route workflow runtime through the new execution contract
-- [ ] Keep workflow-specific session-config derivation, conversation shaping, routing interpretation, and retry orchestration outside the extracted contract
-- [ ] Preserve persistence/audit behavior without using journal/transcript reread as the semantic result contract
-- [ ] Support and record how judge-session reuse across no-match retries works without re-exposing high-level orchestration internals
-- [ ] Update focused tests to prove canonical execution-result return for both session-backed actor and judge paths
-- [ ] Record final boundary decisions, chosen contract shape, and follow-on implications in `implementation.md`
+- [x] Trace the current workflow session-backed actor/judge execution path across workflow runtime and turn orchestration
+- [x] Separate workflow-specific session shaping from generic bounded turn-execution mechanics
+- [x] Confirm the exact scope to preserve: session-backed actor-step execution and judge-step execution only, excluding deterministic `:invoke` and delegated `:delegate` execution
+- [x] Identify the minimal workflow-facing bounded execution contract or lower bounded execution substrate that can serve those turn-backed workflow forms
+- [x] Decide whether to expand an existing lower turn-runtime component or create a new lower execution-boundary component, and record the reason in `implementation.md`
+- [x] Define and record the canonical bounded step execution result contract for workflow callers, including the minimum success/failure shape and any required execution metadata
+- [x] Decide and record the execution-session creation mode: internal creation/binding, caller-supplied session id, or explicitly documented support for both
+- [x] Decide and record the exact actor-step boundary start for the lower contract while keeping workflow-specific session-config derivation and conversation shaping outside it
+- [x] Decide and record whether the final shape is one shared contract used directly by both actor/judge callers or one lower substrate with thin actor/judge adapters above it
+- [x] Route workflow runtime through the new execution contract
+- [x] Keep workflow-specific session-config derivation, conversation shaping, routing interpretation, and retry orchestration outside the extracted contract
+- [x] Preserve persistence/audit behavior without using journal/transcript reread as the semantic result contract
+- [x] Support and record how judge-session reuse across no-match retries works without re-exposing high-level orchestration internals
+- [x] Update focused tests to prove canonical execution-result return for both session-backed actor and judge paths
+- [x] Record final boundary decisions, chosen contract shape, and follow-on implications in `implementation.md`

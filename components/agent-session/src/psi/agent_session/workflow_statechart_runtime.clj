@@ -22,7 +22,7 @@
    [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
-   [psi.agent-session.turn :as turn]
+   [psi.agent-session.turn-execution-contract :as turn-execution]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-judge :as workflow-judge]
@@ -32,8 +32,7 @@
    [psi.workflow-registry.registry :as registry]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
    [psi.agent-session.workflow-step-prep :as workflow-step-prep]
-   [psi.agent-session.workflow-terminal-contract :as workflow-terminal-contract]
-   [psi.turn-runtime.recording :as turn-recording]))
+   [psi.agent-session.workflow-terminal-contract :as workflow-terminal-contract]))
 
 (declare create-workflow-context send-and-drain!)
 
@@ -171,47 +170,8 @@
                (contains? #{:completed :failed :cancelled} status)
                (assoc :finished-at (or (:finished-at workflow-run) (now))))))))
 
-(defn assistant-message-text
-  [assistant-message]
-  (or (some->> (:content assistant-message)
-               (filter map?)
-               (keep (fn [block]
-                       (when (= :text (:type block))
-                         (:text block))))
-               seq
-               (str/join "\n"))
-      (when (string? (:content assistant-message))
-        (:content assistant-message))
-      ""))
-
-(defn- assistant-error-message
-  [assistant-message]
-  (or (:error-message assistant-message)
-      (some->> (:content assistant-message)
-               (filter map?)
-               (keep (fn [block]
-                       (when (= :error (:type block))
-                         (:text block))))
-               seq
-               (str/join "\n"))
-      "Assistant turn ended in error"))
-
-(defn- assistant-turn-classification
-  [assistant-message]
-  (turn-recording/classify-assistant-message assistant-message))
-
-(defn- execution-failure-payload
-  [execution-session-id assistant-message]
-  (let [{:keys [turn/outcome]} (assistant-turn-classification assistant-message)]
-    (cond-> {:message (assistant-error-message assistant-message)}
-      (:stop-reason assistant-message)
-      (assoc :stop-reason (:stop-reason assistant-message))
-
-      (= :turn.outcome/error outcome)
-      (assoc :turn-outcome outcome)
-
-      execution-session-id
-      (assoc :session-id execution-session-id))))
+(def assistant-message-text
+  turn-execution/assistant-message-text)
 
 (defn operation-result->invoke-step-result
   "Wrap a canonical deterministic operation result into workflow invoke-step semantics."
@@ -481,21 +441,17 @@
                                 {}))
 
               :else
-              (let [execution-result (turn/prompt-execution-result-in! ctx (:session-id execution-session) prompt)
-                    assistant-message (:execution-result/assistant-message execution-result)
-                    {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
-                    failure-payload (when (= :turn.outcome/error outcome)
-                                      (execution-failure-payload (:session-id execution-session) assistant-message))]
-                (if failure-payload
+              (let [{:keys [status assistant-text failure] :as actor-result}
+                    (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)]
+                (if (= :error status)
                   (do
                     (swap! working-memory* assoc :pending-actor-result {:kind :failure
-                                                                        :payload failure-payload
+                                                                        :payload failure
                                                                         :step-id step-id
                                                                         :attempt-id attempt-id
                                                                         :updated-at (now)})
                     (enqueue-event! event-queue* working-memory* :actor/failed {}))
-                  (let [assistant-text (assistant-message-text assistant-message)
-                        normalized-outputs (workflow-ir/step-output-surfaces
+                  (let [normalized-outputs (workflow-ir/step-output-surfaces
                                             step-def
                                             {:outcome :ok
                                              :outputs {:final-llm-reply assistant-text
@@ -507,6 +463,7 @@
                                                                         :payload envelope
                                                                         :step-id step-id
                                                                         :attempt-id attempt-id
+                                                                        :execution-result (:execution-result actor-result)
                                                                         :updated-at (now)})
                     (enqueue-event! event-queue* working-memory*
                                     (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done)

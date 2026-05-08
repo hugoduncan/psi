@@ -5,29 +5,13 @@
    This namespace owns only judge-session execution/orchestration above that boundary."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.turn :as turn]
+   [psi.agent-session.turn-execution-contract :as turn-execution]
    [psi.session-persistence.core :as persist]
    [psi.workflow-judge :as workflow-judge]))
 
 ;;; Judge session execution — impure
 
 (def ^:private max-judge-retries 2)
-
-(defn- assistant-message-text
-  "Extract text content from an assistant message.
-   Handles both string content and structured content blocks.
-   Mirrors workflow-execution/assistant-message-text (cannot share due to dep direction)."
-  [assistant-message]
-  (or (some->> (:content assistant-message)
-               (filter map?)
-               (keep (fn [block]
-                       (when (= :text (:type block))
-                         (:text block))))
-               seq
-               (str/join "\n"))
-      (when (string? (:content assistant-message))
-        (:content assistant-message))
-      ""))
 
 (defn- judge-retry-feedback
   "Build a feedback message for a judge retry when no signal matched."
@@ -64,18 +48,18 @@
       :preloaded-messages projected
       :workflow-owned?    true})
     ;; First attempt
-    (let [initial-result (turn/prompt-execution-result-in! ctx judge-sid (:prompt judge-spec))]
+    (let [initial-result (turn-execution/execute-judge-turn! ctx judge-sid (:prompt judge-spec))]
       (loop [attempt 0
-             last-output (str/trim (assistant-message-text (:execution-result/assistant-message initial-result)))]
+             last-output (str/trim (:assistant-text initial-result))]
         (let [routing-result (workflow-judge/evaluate-routing last-output routing-table
                                                               current-step-id step-order step-runs)]
           (if (and (= :no-match (:action routing-result))
                    (< attempt max-judge-retries))
             ;; Retry: inject feedback into the same judge session
-            (let [retry-result (turn/prompt-execution-result-in! ctx judge-sid
-                                                                 (judge-retry-feedback last-output expected-sigs))]
+            (let [retry-result (turn-execution/execute-judge-turn! ctx judge-sid
+                                                                   (judge-retry-feedback last-output expected-sigs))]
               (recur (inc attempt)
-                     (str/trim (assistant-message-text (:execution-result/assistant-message retry-result)))))
+                     (str/trim (:assistant-text retry-result))))
             ;; Matched, or retries exhausted
             {:judge-session-id judge-sid
              :judge-output     last-output

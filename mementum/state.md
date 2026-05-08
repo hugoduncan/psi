@@ -14,6 +14,15 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 124 turn-execution contract extraction is now landed locally:
+  - added new workflow-facing bounded execution namespace `components/agent-session/src/psi/agent_session/turn_execution_contract.clj`
+  - moved canonical assistant-text extraction and execution-failure normalization into that boundary
+  - rewired `psi.agent-session.workflow-statechart-runtime` to execute session-backed actor steps through `psi.agent-session.turn-execution-contract` instead of directly through `psi.agent-session.turn`
+  - rewired `psi.agent-session.workflow-judge` to execute judge turns through the same contract instead of directly through `psi.agent-session.turn`
+  - preserved workflow-specific session shaping, attempt child-session creation, judge child-session creation, routing interpretation, and judge retry orchestration above the new boundary
+  - chose caller-supplied execution session ids as the boundary mode; the contract starts once workflow code has a session id and final prompt text
+  - focused verification green across workflow surfaces: workflow judge/statechart runtime plus broader workflow execution/lifecycle/invoke/delegate terminal-contract tests
+
 - Task 123 workflow judge/routing component extraction is now landed locally:
   - created new lower component `components/workflow-judge/` with authoritative pure namespace `psi.workflow-judge`
   - moved canonical pure message projection and routing functions out of `psi.agent-session.workflow-judge`: `project-messages`, `match-signal`, `resolve-goto-target`, `check-iteration-limit`, and `evaluate-routing`, plus adjacent private helpers
@@ -56,5 +65,5 @@ Bootstrapped on 2026-04-02.
   - focused verification green: `35 tests, 178 assertions, 0 failures`
 
 ## Suggested next step
-- Commit the landed task-123 extraction slice.
-- After that, the likely follow-on is task `125-workflow-runtime-core-component-extraction`, which is currently present as an untracked task directory and should remain untouched by the 123 commit.
+- Commit the landed task-124 extraction slice.
+- After that, the likely follow-on is task `125-workflow-runtime-core-component-extraction`, now able to target `turn-execution-contract` instead of direct `turn` usage for session-backed actor/judge execution.
