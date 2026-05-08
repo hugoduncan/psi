@@ -312,6 +312,14 @@ Review conclusion
   - remaining tests were repointed to `psi.turn-runtime.request` using normalized lower-input data instead of session-state wrapper helpers
 - the final ownership story is now crisp enough to close `119`
 
+2026-05-08 test review note
+- test shape is good overall: lower `turn-runtime` ownership is directly tested and higher consuming-path coverage remains intact
+- focused test follow-ups were then executed:
+  - added lower `turn-runtime.request` coverage for no developer prompt / no contributions
+  - added lower `turn-runtime.request` coverage for tools/cache variants with normalized lower inputs
+  - added explicit `turn-runtime.recording` assertions for stop/error -> `:session/prompt-finish`
+  - reran focused verification successfully after the lower-boundary test additions
+
 2026-05-08 code-shaper review note
 - shape is good overall: lower ownership is clear and the true shims are gone
 - optional polish was identified and then executed:

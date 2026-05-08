@@ -36,3 +36,8 @@
   - [x] consider splitting prepared-turn message shaping from normalized map assembly in `build-prepared-request`
   - [x] tighten `psi.turn-runtime.request` docstrings to state the normalized `:turn/*` input invariant explicitly
   - [x] rerun focused verification if any code-shaping changes are made
+- [x] Focused test follow-ups from review
+  - [x] add `psi.turn-runtime.request` cases covering no developer prompt / no contributions
+  - [x] add `psi.turn-runtime.request` cases covering tools/cache variants with already-normalized lower inputs
+  - [x] add `psi.turn-runtime.recording` assertions proving stop/error outcomes route to `:session/prompt-finish`
+  - [x] rerun focused verification after the added lower-boundary tests

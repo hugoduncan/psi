@@ -46,3 +46,22 @@
     (is (= :turn.outcome/tool-use (:turn-outcome decision)))
     (is (= :session/prompt-continue (:next-event decision)))
     (is (= 35 (recording/execution-usage-tokens execution-result)))))
+
+(deftest build-recording-decision-stop-and-error-finish-test
+  (testing "stop outcome routes to prompt-finish"
+    (let [decision (recording/build-recording-decision
+                    {:execution-result/turn-id "turn-stop"
+                     :execution-result/assistant-message {:role "assistant"
+                                                          :content [{:type :text :text "done"}]
+                                                          :stop-reason :stop}})]
+      (is (= :turn.outcome/stop (:turn-outcome decision)))
+      (is (= :session/prompt-finish (:next-event decision)))))
+
+  (testing "error outcome routes to prompt-finish"
+    (let [decision (recording/build-recording-decision
+                    {:execution-result/turn-id "turn-error"
+                     :execution-result/assistant-message {:role "assistant"
+                                                          :content [{:type :error :text "boom"}]
+                                                          :stop-reason :error}})]
+      (is (= :turn.outcome/error (:turn-outcome decision)))
+      (is (= :session/prompt-finish (:next-event decision))))))
