@@ -50,11 +50,11 @@ Boundary after extraction
 Review note — code-shaper
 - implementation quality is acceptable and matches the intended extraction boundary
 - no blocking design/code issues were found in review
-- follow-up shaping items were identified:
-  - remove the local `atom` from `update-contribution` and return updated contribution detail through a purely functional reduction/result shape
-  - remove unnecessary `sort-contributions` calls when only computing counts in `update-contribution`; use direct vector count or `contribution-count`
-  - extract the repeated prompt-contribution identity match predicate into one small helper to reduce drift risk across `find`, `register`, `update`, and `unregister`
-  - tighten the `normalize-identity` docstring so it states the actual first-cut contract directly: string coercion with nil accepted and normalized to `""`
+- follow-up shaping items were identified and are now implemented:
+  - removed the local `atom` from `update-contribution` and now return updated contribution detail through a purely functional reduction/result shape
+  - removed unnecessary `sort-contributions` calls when only computing counts in `update-contribution`; count-only paths now use `contribution-count`
+  - extracted a shared prompt-contribution identity match helper to reduce drift risk across `find`, `register`, `update`, and `unregister`
+  - tightened the `normalize-identity` docstring so it states the actual first-cut contract directly: string coercion with nil accepted and normalized to `""`
 - focused review verification after implementation also stayed green:
   - `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test` → green (`17 tests, 82 assertions, 0 failures`)
   - `clojure -M:test --focus psi.agent-session.query-graph-tools-test` → green (`4 tests, 23 assertions, 0 failures`)

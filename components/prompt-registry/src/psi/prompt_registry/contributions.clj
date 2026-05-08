@@ -5,10 +5,10 @@
 (def ^:private canonical-priority 1000)
 
 (defn normalize-identity
-  "Return the canonical first-cut contribution identity map.
+  "Return the first-cut canonical contribution identity.
 
-   Current preserved behavior intentionally coerces both identity parts with
-   `str`, so nil becomes the empty string and blank strings remain allowed."
+   Identity parts are string-coerced. Nil and blank inputs remain accepted and
+   normalize to the empty string."
   [ext-path id]
   {:ext-path (str ext-path)
    :id (str id)})
@@ -72,13 +72,16 @@
   [contributions]
   (count (all-contributions contributions)))
 
+(defn- same-identity?
+  [{expected-ext-path :ext-path expected-id :id} contribution]
+  (and (= expected-ext-path (:ext-path contribution))
+       (= expected-id (:id contribution))))
+
 (defn find-contribution
   "Return the contribution identified by `ext-path` + `id`, or nil."
   [contributions ext-path id]
-  (let [{ext-path* :ext-path id* :id} (normalize-identity ext-path id)]
-    (some #(when (and (= ext-path* (:ext-path %))
-                      (= id* (:id %)))
-             %)
+  (let [identity (normalize-identity ext-path id)]
+    (some #(when (same-identity? identity %) %)
           (all-contributions contributions))))
 
 (defn register-contribution
@@ -87,21 +90,20 @@
    Returns {:contributions [...] :contribution m :registered? true
             :replaced? boolean :changed? true :count n}."
   [contributions ext-path id contribution]
-  (let [{ext-path* :ext-path id* :id} (normalize-identity ext-path id)
-        contribution* (normalize-contribution ext-path* id* contribution)
+  (let [identity      (normalize-identity ext-path id)
+        contribution* (normalize-contribution (:ext-path identity) (:id identity) contribution)
         xs            (all-contributions contributions)
-        replaced?     (boolean (find-contribution xs ext-path* id*))
-        next*         (let [without-match (->> xs
-                                               (remove #(and (= ext-path* (:ext-path %))
-                                                             (= id* (:id %))))
-                                               vec)]
-                        (conj without-match contribution*))]
+        replaced?     (boolean (find-contribution xs (:ext-path identity) (:id identity)))
+        without-match (->> xs
+                           (remove #(same-identity? identity %))
+                           vec)
+        next*         (conj without-match contribution*)]
     {:contributions next*
      :contribution contribution*
      :registered? true
      :replaced? replaced?
      :changed? true
-     :count (count next*)}))
+     :count (contribution-count next*)}))
 
 (defn update-contribution
   "Patch an existing contribution by canonical identity.
@@ -109,29 +111,30 @@
    Returns {:contributions [...] :contribution m|nil :updated? boolean
             :changed? boolean :count n}."
   [contributions ext-path id patch]
-  (let [{ext-path* :ext-path id* :id} (normalize-identity ext-path id)
+  (let [identity (normalize-identity ext-path id)
         xs       (all-contributions contributions)
-        found    (find-contribution xs ext-path* id*)]
+        found    (find-contribution xs (:ext-path identity) (:id identity))]
     (if-not found
       {:contributions xs
        :contribution nil
        :updated? false
        :changed? false
-       :count (count (sort-contributions xs))}
-      (let [updated (atom nil)
-            next*   (mapv (fn [c]
-                            (if (and (= ext-path* (:ext-path c))
-                                     (= id* (:id c)))
-                              (let [n (merge-contribution-patch c patch)]
-                                (reset! updated n)
-                                n)
-                              c))
-                          xs)]
-        {:contributions next*
-         :contribution @updated
+       :count (contribution-count xs)}
+      (let [{:keys [contributions updated]}
+            (reduce (fn [{:keys [contributions] :as acc} contribution]
+                      (if (same-identity? identity contribution)
+                        (let [next-contribution (merge-contribution-patch contribution patch)]
+                          {:contributions (conj contributions next-contribution)
+                           :updated next-contribution})
+                        (update acc :contributions conj contribution)))
+                    {:contributions []
+                     :updated nil}
+                    xs)]
+        {:contributions contributions
+         :contribution updated
          :updated? true
          :changed? true
-         :count (count (sort-contributions next*))}))))
+         :count (contribution-count contributions)}))))
 
 (defn unregister-contribution
   "Remove a contribution by canonical identity.
@@ -139,12 +142,11 @@
    Returns {:contributions [...] :contribution removed|nil :removed? boolean
             :changed? boolean :count n}."
   [contributions ext-path id]
-  (let [{ext-path* :ext-path id* :id} (normalize-identity ext-path id)
+  (let [identity (normalize-identity ext-path id)
         xs       (all-contributions contributions)
-        removed  (find-contribution xs ext-path* id*)
+        removed  (find-contribution xs (:ext-path identity) (:id identity))
         next*    (->> xs
-                      (remove #(and (= ext-path* (:ext-path %))
-                                    (= id* (:id %))))
+                      (remove #(same-identity? identity %))
                       vec)
         removed? (some? removed)]
     {:contributions next*
@@ -152,5 +154,5 @@
      :removed? removed?
      :changed? removed?
      :count (if removed?
-              (count next*)
-              (count xs))}))
+              (contribution-count next*)
+              (contribution-count xs))}))
