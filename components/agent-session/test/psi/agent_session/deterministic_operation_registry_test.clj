@@ -1,7 +1,7 @@
 (ns psi.agent-session.deterministic-operation-registry-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.deterministic-operation-registry :as reg]
+   [psi.deterministic-operation-registry.registry :as reg]
    [psi.agent-session.deterministic-operations :as ops]))
 
 (deftest registry-registration-and-lookup-test
@@ -43,12 +43,13 @@
     (is (= {:status :ok :data {:repo "psi"} :summary "1 issue"}
            (reg/invoke-operation-in registry
                                     "github/search-issues-by-label"
-                                    {:args {:repo "psi"}})))
+                                    {:args {:repo "psi"}}
+                                    ops/invoke-operation)))
     (is (= {:status :error
             :reason :not-found
             :message "repo missing"
             :details {:repo "x"}}
-           (reg/invoke-operation-in registry "github/fail" {:args {}})))))
+           (reg/invoke-operation-in registry "github/fail" {:args {}} ops/invoke-operation)))))
 
 (deftest malformed-result-rejected-test
   (let [registry (reg/create-registry)]
@@ -58,7 +59,7 @@
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"malformed result"
-         (reg/invoke-operation-in registry "github/bad" {:args {}})))))
+         (reg/invoke-operation-in registry "github/bad" {:args {}} ops/invoke-operation)))))
 
 (deftest unregister-operations-by-extension-test
   (let [registry (reg/create-registry)]
@@ -89,7 +90,7 @@
             :reason :operation-threw
             :message "boom"
             :details {:operation-id "github/throws"}}
-           (reg/invoke-operation-in registry "github/throws" {:args {}})))))
+           (reg/invoke-operation-in registry "github/throws" {:args {}} ops/invoke-operation)))))
 
 (deftest invoke-step-wrapping-test
   (testing "successful operation result wraps into canonical invoke outputs"

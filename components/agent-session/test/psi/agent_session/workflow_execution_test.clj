@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.deterministic-operation-registry]
+   [psi.deterministic-operation-registry.registry]
    [psi.agent-session.deterministic-operations]
    [psi.agent-session.persistence]
    [psi.agent-session.prompt-control]
@@ -362,8 +362,8 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.deterministic-operation-registry/invoke-operation-in
-                    (fn [_registry operation-id invocation]
+                    psi.deterministic-operation-registry.registry/invoke-operation-in
+                    (fn [_registry operation-id invocation _invoke-operation]
                       (if (= operation-id "demo/discover")
                         {:status :succeeded
                          :data {:issues ["i-1" "i-2"]
@@ -470,8 +470,8 @@
                        s)))
           created* (atom [])
           prompts* (atom [])]
-      (with-redefs [psi.agent-session.deterministic-operation-registry/invoke-operation-in
-                    (fn [_registry operation-id invocation]
+      (with-redefs [psi.deterministic-operation-registry.registry/invoke-operation-in
+                    (fn [_registry operation-id invocation _invoke-operation]
                       (if (= operation-id "demo/discover")
                         {:status :succeeded
                          :data {:issues ["i-1" "i-2"]
