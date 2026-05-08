@@ -365,18 +365,12 @@
                     psi.deterministic-operation-registry.registry/invoke-operation-in
                     (fn [_registry operation-id invocation _invoke-operation]
                       (if (= operation-id "demo/discover")
-                        {:status :succeeded
+                        {:status :ok
                          :data {:issues ["i-1" "i-2"]
                                 :summary "2 issues found"}
                          :summary "2 issues found"}
                         (throw (ex-info "unexpected operation" {:operation-id operation-id
                                                                 :invocation invocation}))))
-                    psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result
-                    (fn [operation-result]
-                      {:kind :accepted-result
-                       :accepted-result {:outcome :ok
-                                         :outputs {:data (:data operation-result)
-                                                   :summary (:summary operation-result)}}})
                     psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
@@ -473,18 +467,12 @@
       (with-redefs [psi.deterministic-operation-registry.registry/invoke-operation-in
                     (fn [_registry operation-id invocation _invoke-operation]
                       (if (= operation-id "demo/discover")
-                        {:status :succeeded
+                        {:status :ok
                          :data {:issues ["i-1" "i-2"]
                                 :summary "2 issues found"}
                          :summary "2 issues found"}
                         (throw (ex-info "unexpected operation" {:operation-id operation-id
                                                                 :invocation invocation}))))
-                    psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result
-                    (fn [operation-result]
-                      {:kind :accepted-result
-                       :accepted-result {:outcome :ok
-                                         :outputs {:data (:data operation-result)
-                                                   :summary (:summary operation-result)}}})
                     psi.agent-session.workflow-attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-child")]

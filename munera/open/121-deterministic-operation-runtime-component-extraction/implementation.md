@@ -42,3 +42,11 @@ Review 2026-05-08:
 - The extraction matches the intended boundary: generic invoke execution now lives in `psi.deterministic-operation-runtime.core`, while workflow-specific invoke-step result wrapping stays explicit in `psi.agent-session.workflow-statechart-runtime`.
 - Focused verification already recorded for the implementation remains the relevant proof surface for this slice.
 - Minor task-artifact drift found during review: `steps.md` still showed the final implementation-note step unchecked even though `implementation.md` had already recorded the final boundary decisions; corrected that checklist item.
+
+Code-shaper review 2026-05-08:
+- One actionable follow-up: workflow invoke-path tests still stub non-canonical operation success results with `:status :succeeded` and stub the wrapper, which weakens proof of the extracted runtime/result contract.
+- Follow-up should tighten those tests to use canonical `{:status :ok ...}` results and keep at least one focused workflow proof on the real wrapper path.
+
+Follow-up execution 2026-05-08:
+- Updated workflow invoke-path test stubs in `workflow_execution_test.clj` from `:status :succeeded` to canonical `:status :ok`.
+- Removed wrapper stubbing from the focused session-contribution and delegate invoke-path workflow tests so those proofs now exercise the real `psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result` path.
