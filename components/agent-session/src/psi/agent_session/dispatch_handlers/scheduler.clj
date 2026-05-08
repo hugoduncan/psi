@@ -7,7 +7,7 @@
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
    [psi.agent-session.session-lifecycle :as session-lifecycle]
    [psi.session-state.state :as ss]
-   [psi.agent-session.tool-defs :as tool-defs]))
+   [psi.tool-registry.defs :as tool-defs]))
 
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))

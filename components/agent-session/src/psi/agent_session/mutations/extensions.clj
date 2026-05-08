@@ -4,7 +4,8 @@
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]
-   [psi.agent-session.extensions :as ext]))
+   [psi.agent-session.extensions :as ext]
+   [psi.tool-registry.registry :as tool-registry]))
 
 (pco/defmutation register-tool
   "Register an extension-owned tool into the extension registry."
@@ -14,9 +15,9 @@
    ::pco/output  [:psi.extension/path
                   :psi.extension/tool-names]}
   (let [reg (:extension-registry agent-session-ctx)]
-    (ext/register-tool-in! reg ext-path tool)
+    (tool-registry/register-tool-in! reg ext-path tool)
     {:psi.extension/path       ext-path
-     :psi.extension/tool-names (vec (ext/tool-names-in reg))}))
+     :psi.extension/tool-names (vec (tool-registry/tool-names-in reg))}))
 
 (pco/defmutation register-command
   "Register an extension-owned command into the extension registry."

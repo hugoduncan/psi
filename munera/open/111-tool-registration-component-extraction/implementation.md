@@ -56,3 +56,79 @@ Collaborative resolution recorded:
 - accepted canonical-map rule: keep rich canonical normalized tool-def maps, including runtime-only internal fields such as `:execute`, `:source`, and `:ext-path`; projection helpers remain responsible for external boundary shaping
 - accepted validation scope: canonical kebab-case tool-name validation remains scoped to extension registration in this slice rather than becoming a new global rule across every tool-def normalization path
 - accepted test-ownership split: move lower-level tool-def normalization/projection and tool-registration/query behavior tests into the extracted component; keep mutation/API/resolver/integration proofs above the boundary
+
+2026-05-08 implementation
+
+Implemented extraction to new lower component:
+- added `components/tool-registry/deps.edn`
+- added authoritative namespaces:
+  - `components/tool-registry/src/psi/tool_registry/defs.clj`
+  - `components/tool-registry/src/psi/tool_registry/registry.clj`
+
+Authoritative ownership now lives in `psi.tool-registry.*` for:
+- canonical tool-definition normalization and projection helpers
+- canonical tool-name validation for extension registration
+- extension tool registration into the extension registry state shape
+- registered-tool queries:
+  - `tool-names-in`
+  - `all-tools-in`
+  - `get-tool-in`
+
+Consumer migration completed:
+- canonical tool-def consumers now require `psi.tool-registry.defs` directly:
+  - `components/agent-session/src/psi/agent_session/session_runtime.clj`
+  - `components/agent-session/src/psi/agent_session/conversation.clj`
+  - `components/agent-session/src/psi/agent_session/dispatch_effects.clj`
+  - `components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj`
+  - `components/agent-session/src/psi/agent_session/dispatch_handlers/scheduler.clj`
+  - `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
+  - `components/ai/src/psi/ai/conversation.clj`
+- tool-registration/query consumers now depend on `psi.tool-registry.registry` where they specifically consume registered extension tools:
+  - `components/agent-session/src/psi/agent_session/bootstrap.clj`
+  - `components/agent-session/src/psi/agent_session/tool_plan.clj`
+  - `components/agent-session/src/psi/agent_session/psi_tool.clj`
+  - `components/agent-session/src/psi/agent_session/resolvers/extensions.clj`
+  - `components/agent-session/src/psi/agent_session/mutations/extensions.clj`
+  - several focused tests and helper test seams
+
+Higher-level seam shaping:
+- kept `psi.agent-session.mutations.extensions/register-tool` above the boundary as a thin adapter calling `psi.tool-registry.registry/register-tool-in!`
+- kept `psi.agent-session.extensions` as the broader extension-registry owner, but removed authoritative tool-specific logic from it
+- reintroduced thin compatibility seam functions in `psi.agent-session.extensions`:
+  - `register-tool-in!`
+  - `tool-names-in`
+  - `all-tools-in`
+  - `get-tool-in`
+  each now delegates downward to `psi.tool-registry.registry`
+- kept `create-extension-api` above the boundary while its tool registration callback now routes through the thin seam to the extracted owner
+
+Compatibility status:
+- `components/agent-session/src/psi/agent_session/tool_defs.clj` is no longer authoritative; it is now a thin compatibility wrapper re-exporting the extracted `psi.tool-registry.defs` vars
+- no authoritative tool-definition implementation remains under `psi.agent-session.*`
+- no authoritative tool-name validation or tool-registration implementation remains under `psi.agent-session.*`
+
+Tests moved/added:
+- added extracted-component tests under:
+  - `components/tool-registry/test/psi/tool_registry/defs_test.clj`
+  - `components/tool-registry/test/psi/tool_registry/registry_test.clj`
+- reshaped `components/agent-session/test/psi/agent_session/tool_defs_test.clj` into a thin compatibility-wrapper proof so lower-level behavior ownership now lives under `tool-registry`
+- removed lower-level duplicated tool-registration behavior proofs from `extensions_test.clj` while preserving higher-level extension registry / API / integration proofs
+
+Test configuration updates:
+- added `components/tool-registry/test` and `components/tool-registry/src` to root `tests.edn`
+- added `components/tool-registry/test` and `components/tool-registry/src` to root `deps.edn` test aliases
+- added `psi/tool-registry` as a root/component dependency where needed (`deps.edn`, `components/agent-session/deps.edn`, `components/ai/deps.edn`)
+
+Behavior preserved explicitly:
+- `tool-names-in` remains the cross-extension registered-name set
+- `all-tools-in` remains first-registration-wins by tool name
+- canonical normalized tool-def maps continue preserving runtime-oriented fields such as `:execute`, `:source`, and `:ext-path`
+- tool-name validation remains scoped to extension registration
+
+Focused verification run:
+- `clj -M:test --focus psi.tool-registry.defs-test --focus psi.tool-registry.registry-test --focus psi.agent-session.tool-defs-test --focus psi.agent-session.extensions-io-test --focus psi.agent-session.query-graph-tools-test --focus psi.bootstrap-extension-invariant-test`
+- result: `19 tests, 92 assertions, 0 failures`
+
+Lint verification:
+- `clj -M:lint`
+- result: `0 errors, 0 warnings`

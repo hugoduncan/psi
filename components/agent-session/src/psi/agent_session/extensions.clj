@@ -5,7 +5,7 @@
    [psi.agent-session.deterministic-operations :as deterministic-ops]
    [psi.agent-session.extensions.api :as api]
    [psi.agent-session.extensions.loader :as loader]
-   [psi.agent-session.tool-defs :as tool-defs]
+   [psi.tool-registry.registry :as tool-registry]
    [taoensso.timbre :as timbre]))
 
 (defrecord ExtensionRegistry [state])
@@ -84,35 +84,25 @@
          {:extension-path ext-path :handler handler-fn})
   reg)
 
-(def ^:private tool-name-pattern
-  "Canonical tool names are kebab-case ASCII.
-   This keeps names portable across model providers and transports."
-  #"^[a-z0-9][a-z0-9-]*$")
-
-(defn valid-tool-name?
-  "Return true when `tool-name` is canonical kebab-case ASCII.
-   Examples: read, psi-tool, delegate."
-  [tool-name]
-  (and (string? tool-name)
-       (boolean (re-matches tool-name-pattern tool-name))))
-
 (defn register-tool-in!
-  "Register `tool` (a map with :name key) for the extension at `ext-path`.
-   Tool maps may include :lambda-description for lambda-mode prompt rendering.
-   Stores canonical normalized tool defs in the registry.
-   Throws when tool name is missing or not canonical kebab-case."
+  "Thin upper seam delegating tool registration to the extracted tool-registry owner."
   [reg ext-path tool]
-  (let [tool-name (:name tool)]
-    (when-not (valid-tool-name? tool-name)
-      (throw (ex-info (str "Invalid tool name: " (pr-str tool-name)
-                           ". Expected kebab-case matching " tool-name-pattern)
-                      {:ext-path  ext-path
-                       :tool-name tool-name
-                       :pattern   (str tool-name-pattern)})))
-    (let [tool* (tool-defs/normalize-tool-def (assoc tool :source :extension :ext-path ext-path))]
-      (swap! (:state reg)
-             assoc-in [:extensions ext-path :tools tool-name] tool*)
-      reg)))
+  (tool-registry/register-tool-in! reg ext-path tool))
+
+(defn tool-names-in
+  "Thin upper seam delegating tool-name queries to the extracted tool-registry owner."
+  [reg]
+  (tool-registry/tool-names-in reg))
+
+(defn all-tools-in
+  "Thin upper seam delegating registered-tool listing to the extracted tool-registry owner."
+  [reg]
+  (tool-registry/all-tools-in reg))
+
+(defn get-tool-in
+  "Thin upper seam delegating tool lookup to the extracted tool-registry owner."
+  [reg tool-name]
+  (tool-registry/get-tool-in reg tool-name))
 
 (defn register-command-in!
   "Register `cmd` (a map with :name key) for the extension at `ext-path`."
@@ -392,11 +382,6 @@
   [reg]
   (into (sorted-set) (extension-item-names-in reg :handlers)))
 
-(defn tool-names-in
-  "Return set of all registered tool names across all extensions in `reg`."
-  [reg]
-  (extension-item-names-in reg :tools))
-
 (defn operation-ids-in
   "Return set of all deterministic operation ids registered across all extensions in `reg`."
   [reg]
@@ -411,12 +396,6 @@
   "Return set of all registered flag names across all extensions in `reg`."
   [reg]
   (extension-item-names-in reg :flags))
-
-(defn all-tools-in
-  "Return vector of all registered tool definition maps across all extensions.
-   First registration per name wins."
-  [reg]
-  (all-first-registered-items-in reg :tools))
 
 (defn all-commands-in
   "Return vector of all registered command maps across all extensions.
@@ -444,11 +423,6 @@
   "Return the command map for `cmd-name`, or nil."
   [reg cmd-name]
   (get-extension-item-in reg :commands cmd-name))
-
-(defn get-tool-in
-  "Return the tool map for `tool-name`, or nil."
-  [reg tool-name]
-  (get-extension-item-in reg :tools tool-name))
 
 (defn extension-detail-in
   "Return detail map for a single extension at `ext-path`, or nil."
@@ -482,7 +456,7 @@
    :extensions      (extensions-in reg)
    :handler-count   (handler-count-in reg)
    :handler-events  (handler-event-names-in reg)
-   :tool-names      (tool-names-in reg)
+   :tool-names      (tool-registry/tool-names-in reg)
    :operation-ids   (operation-ids-in reg)
    :command-names   (command-names-in reg)
    :flag-names      (flag-names-in reg)})

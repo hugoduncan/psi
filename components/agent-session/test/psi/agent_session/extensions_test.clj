@@ -6,6 +6,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.test-support :as test-support]))
 
@@ -70,26 +71,6 @@
 ;; ── Tool and command registration ──────────────────────────────────────────
 
 (deftest tool-command-registration-test
-  (testing "tool names tracked"
-    (let [reg (ext/create-registry)]
-      (ext/register-extension-in! reg "/ext/a")
-      (ext/register-tool-in! reg "/ext/a" {:name "my-tool" :label "My Tool"})
-      (is (contains? (ext/tool-names-in reg) "my-tool"))))
-
-  (testing "rejects non-canonical tool names"
-    (let [reg (ext/create-registry)]
-      (ext/register-extension-in! reg "/ext/a")
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Invalid tool name"
-           (ext/register-tool-in! reg "/ext/a" {:name "my_tool" :label "My Tool"}))))
-    (let [reg (ext/create-registry)]
-      (ext/register-extension-in! reg "/ext/a")
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Invalid tool name"
-           (ext/register-tool-in! reg "/ext/a" {:name "MyTool" :label "My Tool"})))))
-
   (testing "command names tracked"
     (let [reg (ext/create-registry)]
       (ext/register-extension-in! reg "/ext/a")
@@ -294,7 +275,7 @@
     (let [reg (ext/create-registry)]
       (ext/register-extension-in! reg "/ext/a")
       (ext/register-handler-in! reg "/ext/a" "e" (fn [_] nil))
-      (ext/register-tool-in! reg "/ext/a" {:name "t1"})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "t1"})
       (let [s (ext/summary-in reg)]
         (is (= 1 (:extension-count s)))
         (is (= 1 (:handler-count s)))
@@ -440,28 +421,6 @@
 
 ;; ── Introspection: all tools/commands/flags ─────────────────────────────────
 
-(deftest all-tools-in-test
-  (testing "all-tools-in returns tools with extension-path"
-    (let [reg (ext/create-registry)]
-      (ext/register-extension-in! reg "/ext/a")
-      (ext/register-tool-in! reg "/ext/a" {:name "my-tool" :label "T" :description "d" :parameters {:type "object"}})
-      (let [tools (ext/all-tools-in reg)]
-        (is (= 1 (count tools)))
-        (is (= "my-tool" (:name (first tools))))
-        (is (= "/ext/a" (:extension-path (first tools))))
-        (is (= :extension (:source (first tools))))
-        (is (= {:type "object" :properties {}} (:parameters (first tools)))))))
-
-  (testing "first registration per name wins"
-    (let [reg (ext/create-registry)]
-      (ext/register-extension-in! reg "/ext/a")
-      (ext/register-extension-in! reg "/ext/b")
-      (ext/register-tool-in! reg "/ext/a" {:name "t" :label "A"})
-      (ext/register-tool-in! reg "/ext/b" {:name "t" :label "B"})
-      (let [tools (ext/all-tools-in reg)]
-        (is (= 1 (count tools)))
-        (is (= "A" (:label (first tools))))))))
-
 (deftest all-commands-in-test
   (testing "all-commands-in returns commands with extension-path"
     (let [reg (ext/create-registry)]
@@ -490,7 +449,7 @@
       (ext/register-extension-in! reg "/ext/a")
       (ext/register-handler-in! reg "/ext/a" "tool_call" (fn [_] nil))
       (ext/register-handler-in! reg "/ext/a" "tool_result" (fn [_] nil))
-      (ext/register-tool-in! reg "/ext/a" {:name "my-tool"})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool"})
       (ext/register-command-in! reg "/ext/a" {:name "cmd"})
       (ext/register-flag-in! reg "/ext/a" {:name "f1" :type :boolean})
       (let [d (ext/extension-detail-in reg "/ext/a")]
@@ -528,19 +487,6 @@
   (testing "returns nil for unknown command"
     (let [reg (ext/create-registry)]
       (is (nil? (ext/get-command-in reg "nope"))))))
-
-(deftest get-tool-in-test
-  (testing "returns tool by name"
-    (let [reg (ext/create-registry)]
-      (ext/register-extension-in! reg "/ext/a")
-      (ext/register-tool-in! reg "/ext/a" {:name "my-tool" :label "T"})
-      (let [tool (ext/get-tool-in reg "my-tool")]
-        (is (= "my-tool" (:name tool)))
-        (is (= {:type "object" :properties {}} (:parameters tool))))))
-
-  (testing "returns nil for unknown tool"
-    (let [reg (ext/create-registry)]
-      (is (nil? (ext/get-tool-in reg "nope"))))))
 
 ;; ── Extension API (factory invocation) ──────────────────────────────────────
 
@@ -601,7 +547,7 @@
           _   (ext/register-extension-in! reg "/ext/test")
           api (ext/create-extension-api reg "/ext/test" {})]
       ((:register-tool api) {:name "ext-tool" :label "ET" :description "test"})
-      (is (contains? (ext/tool-names-in reg) "ext-tool"))))
+      (is (contains? (tool-registry/tool-names-in reg) "ext-tool"))))
 
   (testing "API :register-command registers commands"
     (let [reg (ext/create-registry)

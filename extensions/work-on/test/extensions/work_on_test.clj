@@ -6,6 +6,7 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
    [psi.extension-test-helpers.nullable-api :as nullable]
@@ -818,7 +819,7 @@
 
                                 (= op 'psi.extension/register-tool)
                                 (do
-                                  (ext/register-tool-in! reg ext-path (:tool params))
+                                  (tool-registry/register-tool-in! reg ext-path (:tool params))
                                   {:psi.extension/registered-tool? true})
 
                                 (= op 'git.worktree/add!)
@@ -865,7 +866,7 @@
           mutate-calls (atom [])
           {:keys [api reg]} (make-runtime-work-on-api ctx s1 s2 ext-path mutate-calls)
           _            (sut/init api)
-          tool         (ext/get-tool-in reg "work-on")]
+          tool         (tool-registry/get-tool-in reg "work-on")]
       (binding [runtime-fns/*active-extension-session-id* s2]
         ((:execute tool) {"description" "active session target"}))
       (let [set-worktree-call (some #(when (= 'psi.extension/set-worktree-path (first %)) %) @mutate-calls)]

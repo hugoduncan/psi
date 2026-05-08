@@ -18,7 +18,7 @@
    [psi.shared-config.user :as user-cfg]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
-   [psi.agent-session.tool-defs :as tool-defs]
+   [psi.tool-registry.defs :as tool-defs]
    [psi.turn-statechart.core :as turn-sc]))
 
 (defonce ^:private scheduler-timer-handles* (atom {}))

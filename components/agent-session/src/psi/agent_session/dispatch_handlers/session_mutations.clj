@@ -12,7 +12,7 @@
    [psi.agent-session.post-tool :as post-tool]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as session]
-   [psi.agent-session.tool-defs :as tool-defs]
+   [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
 
 (defn- register-core-handler! [event handler]

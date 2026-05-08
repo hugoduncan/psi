@@ -27,6 +27,7 @@
         psi/shared-config                             {:local/root "components/shared-config"}
         psi/project-nrepl                             {:local/root "components/project-nrepl"}
         psi/prompt-assets                             {:local/root "components/prompt-assets"}
+        psi/tool-registry                             {:local/root "components/tool-registry"}
         psi/turn-statechart                           {:local/root "components/turn-statechart"}
         psi/turn-runtime                              {:local/root "components/turn-runtime"}
         psi/tool-runtime                              {:local/root "components/tool-runtime"}
@@ -181,6 +182,7 @@
                              "components/agent-core/test"
                              "components/agent-session/test"
                              "components/provider-auth/test"
+                             "components/tool-registry/test"
                              "components/turn-statechart/test"
                              "components/turn-runtime/test"
                              "components/tool-runtime/test"
@@ -220,6 +222,7 @@
                         "components/agent-core/test"
                         "components/agent-session/test"
                         "components/provider-auth/test"
+                        "components/tool-registry/test"
                         "components/turn-statechart/test"
                         "components/turn-runtime/test"
                         "components/tool-runtime/test"
@@ -251,6 +254,7 @@
                         "components/agent-core/src"
                         "components/agent-session/src"
                         "components/provider-auth/src"
+                        "components/tool-registry/src"
                         "components/tool-runtime/src"
                         "components/state-kernel/src"
                         "components/session-state/src"

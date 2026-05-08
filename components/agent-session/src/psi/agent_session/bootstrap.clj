@@ -7,6 +7,7 @@
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
    [psi.agent-session.extensions :as ext]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
    [psi.agent-session.mutations :as mutations]
    [psi.query.core :as query]))
@@ -134,7 +135,7 @@
                              {:path  (:psi.extension/path r)
                               :error e}))
                          extension-results)
-        ext-tools (ext/all-tools-in (:extension-registry ctx))
+        ext-tools (tool-registry/all-tools-in (:extension-registry ctx))
         active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
         _         (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps (into (vec active-tools) ext-tools)} {:origin :core})
         summary   {:timestamp              (java.time.Instant/now)

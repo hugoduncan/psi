@@ -7,7 +7,7 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.statechart :as sc]
-   [psi.agent-session.tool-defs :as tool-defs]))
+   [psi.tool-registry.defs :as tool-defs]))
 
 (defn telemetry-state []
   {:tool-output-stats {:calls []
