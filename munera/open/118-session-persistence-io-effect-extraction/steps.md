@@ -78,3 +78,15 @@
   - centralized the canonical `:runtime/dispatch-event` -> `:session/append-journal-entry` effect-map construction
   - updated current call sites in prompt lifecycle, session mutations, and prompt recording to use the shared helper
   - kept the helper small and local to the owning agent-session boundary so it reduces repetition without introducing unnecessary abstraction
+
+- [ ] Reduce repeated exact append-effect envelope assertions in higher-level agent-session tests
+  - keep one or two focused tests that explicitly prove the canonical append-dispatch effect envelope shape
+  - relax other higher-level tests toward semantic outcomes (journal update, dispatch event type, recorded entry kind/data, flush-state effects) instead of exact nested effect maps
+
+- [ ] Decide whether replay-focused tests should use canonical entry constructors instead of reduced handcrafted entry shapes
+  - audit current replay-only tests that build minimal `:session-info` entry maps by hand
+  - either switch them to canonical constructors plus partial assertions, or document explicitly why reduced shapes are intentional in those tests
+
+- [ ] Preserve and prefer the lower pure persistence tests as the authoritative seam proofs
+  - keep direct `persistence-io-request` and `mark-flushed-root-update` tests strong and local
+  - avoid replacing those lower pure tests with only higher-level integration assertions

@@ -75,3 +75,10 @@
   - added `components/agent-session/src/psi/agent_session/journal_append_effect.clj` as the small owning helper for the canonical append-journal dispatch-effect envelope
   - migrated prompt lifecycle, session mutations, and prompt recording call sites to use the shared helper
   - kept the helper intentionally narrow: effect-envelope construction only, with small entry-specific convenience wrappers
+
+2026-05-08 — Test review
+- Verdict: test coverage is good and sufficient for closure.
+- Main non-blocking test follow-ups:
+  - some higher-level agent-session tests still assert exact append-effect envelope structure more often than necessary
+  - replay-focused tests use reduced handcrafted entry shapes instead of canonical constructors, which is acceptable but mildly inconsistent
+  - lower pure persistence tests are the strongest/highest-signal part of the suite and should remain authoritative
