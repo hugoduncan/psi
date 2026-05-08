@@ -8,7 +8,9 @@
    [clojure.string :as str]
    [psi.agent-core.core :as agent]
    [psi.command-registry.registry :as command-registry]
-   [psi.session-state.state :as session]))
+   [psi.session-state.state :as session]
+   [psi.turn-runtime.recording :as turn-recording]
+   [psi.turn-runtime.request :as turn-request]))
 
 (defn- now-inst []
   (java.time.Instant/now))
@@ -71,12 +73,7 @@
 
 (defn prepared-request-query-text
   [prepared-request]
-  (or (get-in prepared-request [:prepared-request/user-message :content 0 :text])
-      (some->> (:prepared-request/queued-steering-messages prepared-request)
-               first
-               :content
-               first
-               :text)))
+  (turn-request/prepared-request-query-text prepared-request))
 
 (defn prompt-prepare-request-effects
   [prepared-request progress-queue steering-consumed? return-execution-result?]
@@ -118,15 +115,7 @@
 
 (defn execution-usage-tokens
   [execution-result]
-  (let [usage (:execution-result/usage execution-result)]
-    (when (map? usage)
-      (let [total (or (:total-tokens usage)
-                      (+ (or (:input-tokens usage) 0)
-                         (or (:output-tokens usage) 0)
-                         (or (:cache-read-tokens usage) 0)
-                         (or (:cache-write-tokens usage) 0)))]
-        (when (and (number? total) (pos? total))
-          total)))))
+  (turn-recording/execution-usage-tokens execution-result))
 
 (defn prompt-record-next-payload
   [session-id execution-result progress-queue next-event]

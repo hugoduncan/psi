@@ -6,7 +6,7 @@
    [psi.agent-core.core :as agent]
    [psi.session-persistence.core :as persist]
    [psi.agent-session.prompt-loop :as prompt-loop]
-   [psi.agent-session.prompt-recording :as prompt-recording]
+   [psi.turn-runtime.recording :as prompt-recording]
    [psi.agent-session.prompt-turn :as prompt-turn]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]

@@ -250,3 +250,36 @@ Recommended implementation order from this review
 4. refactor `psi.agent-session.prompt-recording/build-record-response` into a higher orchestration wrapper over the lower recording helper
 5. move or copy focused lower tests into `components/turn-runtime/test/` before removing old lower owners
 6. update `psi.turn` imports/wrappers so it no longer depends authoritatively on `psi.agent-session.prompt-request` or `psi.agent-session.prompt-recording`
+
+2026-05-08 implementation pass
+
+What landed
+- added new lower namespaces under `components/turn-runtime/`:
+  - `psi.turn-runtime.conversation`
+  - `psi.turn-runtime.request`
+  - `psi.turn-runtime.recording`
+- moved authoritative lower provider-conversation translation into `turn-runtime.conversation`
+- moved authoritative lower prompt-layer assembly, effective system prompt assembly, prepared-request query-text extraction, and final prepared-request map assembly into `turn-runtime.request`
+- moved authoritative lower assistant-message classification, tool-call extraction, recording-decision shaping, and usage-token extraction into `turn-runtime.recording`
+- updated `psi.turn-runtime.core` to delegate assistant-message classification to `turn-runtime.recording`
+- refactored `psi.agent-session.prompt-request/build-prepared-request` into a session-owned normalization wrapper over `turn-runtime.request/build-prepared-request`
+- refactored `psi.agent-session.prompt-recording/build-record-response` into a higher orchestration wrapper over `turn-runtime.recording/build-recording-decision`
+- updated `psi.turn.handlers` to use lower helpers from `turn-runtime.request` and `turn-runtime.recording`
+- added focused lower tests in:
+  - `components/turn-runtime/test/psi/turn_runtime/request_test.clj`
+  - `components/turn-runtime/test/psi/turn_runtime/recording_test.clj`
+
+Important boundary note
+- extracting lower request assembly also required moving the pure message->provider conversation translator below the boundary because `turn-runtime` cannot depend upward on `agent-session` without recreating the component-cycle problem fixed in task `103`
+- `psi.agent-session.conversation` now remains only as a compatibility wrapper delegating to `psi.turn-runtime.conversation`
+
+Compatibility / remaining wrappers
+- `psi.agent-session.prompt-request` and `psi.agent-session.prompt-recording` still exist as compatibility/session-normalization wrappers for current callers
+- `psi.turn` still calls those wrappers for its higher facade API, but the lower authoritative implementation now lives in `psi.turn-runtime.*`
+- repo search confirms the lower authoritative helper implementations (`build-provider-conversation`, `build-prompt-layers`, `extract-tool-calls`, `classify-assistant-message`) now live in `turn-runtime`; remaining `agent-session` definitions are delegating wrappers rather than authoritative lower owners
+
+Verification
+- lint green for touched namespaces
+- focused unit verification green:
+  - `bb clojure:test:unit --focus psi.turn-runtime.core-test`
+  - `bb clojure:test:unit --focus psi.turn-runtime.request-test --focus psi.turn-runtime.recording-test --focus psi.agent-session.prompt-lifecycle-test`
