@@ -60,10 +60,10 @@ Production rewiring that landed:
 - `agent-session.extensions.runtime-fns` now registers runtime-owned deterministic operations through the extracted registry directly
 - `agent-session.extensions` now delegates deterministic-operation cleanup to the extracted registry directly and uses extracted definition normalization
 
-Compatibility decision:
-- retained `components/agent-session/src/psi/agent_session/deterministic_operation_registry.clj` as a thin compatibility wrapper delegating to the extracted component
-- this minimized churn in existing tests and higher-level callers while making the lower owner explicit
-- wrapper keeps the old 3-arity `invoke-operation-in` by supplying `psi.agent-session.deterministic-operations/invoke-operation`
+Final cleanup that also landed:
+- removed the temporary compatibility namespace `components/agent-session/src/psi/agent_session/deterministic_operation_registry.clj`
+- rewired remaining tests to target `psi.deterministic-operation-registry.registry` directly
+- updated direct test calls and stubs to the extracted lower 4-arity seam by supplying or accepting the explicit invoke fn argument
 
 Behavior preserved and now explicitly proven:
 - canonical id field remains `:id`
@@ -85,10 +85,16 @@ Focused verification run after extraction:
 - new lower-component tests green:
   - `psi.deterministic-operation-registry.registry-test`
   - `7 tests, 14 assertions, 0 failures`
-- higher-level compatibility and behavior proofs green:
+- higher-level compatibility and behavior proofs green after extraction:
   - `psi.agent-session.deterministic-operation-registry-test` → `7 tests, 14 assertions, 0 failures`
   - `psi.agent-session.workflow-invoke-runtime-test` → `3 tests, 15 assertions, 0 failures`
   - `psi.agent-session.extensions-test` → `23 tests, 117 assertions, 0 failures`
+- final focused verification after compat-wrapper removal green:
+  - `psi.agent-session.deterministic-operation-registry-test`
+  - `psi.agent-session.workflow-invoke-runtime-test`
+  - `psi.agent-session.extensions-test`
+  - `psi.agent-session.workflow-execution-test`
+  - combined result: `47 tests, 213 assertions, 0 failures`
 
 Non-obvious tradeoff recorded:
 - the extracted lower registry namespace intentionally does not depend on `agent-session` invoke semantics
