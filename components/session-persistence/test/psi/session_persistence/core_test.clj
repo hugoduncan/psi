@@ -5,11 +5,13 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as core]
    [psi.session-persistence.core :as p]
-   [psi.session-state.state :as ss])
+   [psi.session-state.state :as ss]
+   [psi.session-journal.codec :as codec])
   (:import
    (java.io File)
    (java.nio.file Files)
-   (java.nio.file.attribute FileAttribute)))
+   (java.nio.file.attribute FileAttribute)
+   (java.time Instant)))
 
 (defn- tmp-dir []
   (.toFile (Files/createTempDirectory "psi-session-persistence-test"
@@ -17,6 +19,25 @@
 
 (defn- slurp-lines [^File f]
   (str/split-lines (slurp f)))
+
+(defn- instant->millis-precision
+  [^Instant instant]
+  (Instant/ofEpochMilli (.toEpochMilli instant)))
+
+(defn- entry->canonical
+  [x]
+  (cond
+    (instance? Instant x) (instant->millis-precision x)
+    (instance? java.util.Date x) (Instant/ofEpochMilli (.getTime ^java.util.Date x))
+    (map? x) (reduce-kv (fn [m k v] (assoc m k (entry->canonical v))) {} x)
+    (sequential? x) (mapv entry->canonical x)
+    :else x))
+
+(defn- read-lines
+  [^File f]
+  (->> (slurp-lines f)
+       (keep codec/parse-line)
+       (mapv entry->canonical)))
 
 (defn- user-msg [text]
   {:role "user" :content [{:type :text :text text}]
@@ -53,11 +74,12 @@
   (is (= {:journal []
           :flush-state {:flushed? false :session-file nil}}
          (p/persistence-state)))
-  (is (= {:journal [(p/message-entry {:role "user" :content "hi"})]
-          :flush-state {:flushed? true :session-file ::file}}
-         (p/persistence-state {:journal [(p/message-entry {:role "user" :content "hi"})]
-                               :session-file ::file
-                               :flushed? true})))
+  (let [entry (p/message-entry {:role "user" :content "hi"})]
+    (is (= {:journal [entry]
+            :flush-state {:flushed? true :session-file ::file}}
+           (p/persistence-state {:journal [entry]
+                                 :session-file ::file
+                                 :flushed? true}))))
   (is (= {:agent-session {:sessions {"sid" {:persistence {:journal []
                                                           :flush-state {:flushed? false
                                                                         :session-file nil}}}}}}
@@ -134,9 +156,10 @@
     (let [ctx (core/create-context {:persist? false})
           sd  (core/new-session-in! ctx nil {:worktree-path "/tmp/ws"})
           sid (:session-id sd)
+          before (p/all-entries-in ctx sid)
           entry (p/message-entry (user-msg "hi"))]
       (is (= entry (p/append-journal-entry-in! ctx sid entry)))
-      (is (= [entry] (p/all-entries-in ctx sid)))))
+      (is (= (conj before entry) (p/all-entries-in ctx sid)))))
 
   (testing "no write before first assistant message"
     (let [dir (tmp-dir)
@@ -167,7 +190,16 @@
                            #(swap! flush-state* assoc :flushed? true))
       (is (.exists file))
       (is (:flushed? @flush-state*))
-      (is (= 4 (count (slurp-lines file))))
+      (let [lines (read-lines file)]
+        (is (= {:type :session
+                :version 4
+                :id "sess-5"
+                :worktree-path "/proj"
+                :parent-session-id nil
+                :parent-session nil}
+               (dissoc (first lines) :timestamp)))
+        (is (= (mapv entry->canonical @entries*)
+               (subvec lines 1))))
       (let [lines-before (count (slurp-lines file))]
         (swap! entries* conj (p/thinking-level-entry :medium))
         (execute-io-request! (p/persistence-io-request {:entries @entries*
@@ -187,7 +219,8 @@
     (let [loaded (p/load-session-file file)]
       (is (= "sid-1" (get-in loaded [:header :id])))
       (is (= "/tmp/ws" (get-in loaded [:header :worktree-path])))
-      (is (= [entry] (vec (:entries loaded)))))))
+      (is (= [(entry->canonical entry)]
+             (mapv entry->canonical (:entries loaded)))))))
 
 (deftest entry-constructors-test
   (let [msg (user-msg "hello")]

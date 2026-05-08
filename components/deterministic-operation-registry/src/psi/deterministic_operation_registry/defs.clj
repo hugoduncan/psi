@@ -19,7 +19,7 @@
        (boolean (re-matches operation-id-pattern operation-id))))
 
 (def operation-definition-schema
-  [:map
+  [:map {:closed true}
    [:id [:fn {:error/message (str "operation id must match " operation-id-pattern)}
          valid-operation-id?]]
    [:handler fn?]
