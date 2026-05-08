@@ -4,6 +4,7 @@
    boundary in agent-session for now."
   (:require
    [clojure.java.io :as io]
+   [psi.session-persistence.core :as persistence]
    [psi.session-state.model :as model]
    [psi.session-state.state :as state]))
 
@@ -26,7 +27,7 @@
 (defn initialize-session-slots
   [state* sid journal-entries]
   (-> state*
-      (assoc-in (state/session-journal-path sid) journal-entries)
+      (persistence/initialize-persistence-state sid {:journal journal-entries})
       (assoc-in [:agent-session :sessions sid :telemetry] initial-telemetry)
       (assoc-in [:agent-session :sessions sid :turn] {:ctx nil})))
 
@@ -53,8 +54,7 @@
         sid     (:session-id next-sd)]
     (-> state*
         (assoc-in (state/session-data-path sid) next-sd)
-        (assoc-in (state/session-flush-state-path sid) {:flushed?     false
-                                                        :session-file (io/file session-path)})
+        (persistence/initialize-persistence-state sid {:session-file (io/file session-path)})
         (initialize-session-slots sid []))))
 
 (defn carry-runtime-handles
@@ -114,8 +114,7 @@
                 (assoc-in (state/session-data-path new-session-id) next-sd)
                 (initialize-session-slots new-session-id []))
       session-file
-      (assoc-in (state/session-flush-state-path new-session-id) {:flushed?     false
-                                                                 :session-file (io/file session-file)}))))
+      (persistence/initialize-persistence-state new-session-id {:session-file (io/file session-file)}))))
 
 (defn initialize-resumed-session-state
   [state* current-sd {:keys [session-id _source-session-id session-path header entries model thinking-level]}]
@@ -156,10 +155,12 @@
                             :model model
                             :thinking-level thinking-level)]
     (-> state*
-        (assoc-in (state/session-flush-state-path session-id) {:flushed?     true
-                                                               :session-file (io/file session-path)})
         (assoc-in (state/session-data-path session-id) next-sd)
-        (initialize-session-slots session-id (vec entries)))))
+        (initialize-session-slots session-id (vec entries))
+        (persistence/initialize-persistence-state session-id
+                                                  {:journal (vec entries)
+                                                   :session-file (io/file session-path)
+                                                   :flushed? true}))))
 
 (defn initialize-forked-session-state
   [state* parent-sd {:keys [new-session-id branch-entries session-file]}]
@@ -197,5 +198,7 @@
                 (assoc-in (state/session-data-path new-session-id) next-sd)
                 (initialize-session-slots new-session-id branch-entries))
       session-file
-      (assoc-in (state/session-flush-state-path new-session-id) {:flushed?     true
-                                                                 :session-file (io/file session-file)}))))
+      (persistence/initialize-persistence-state new-session-id
+                                                {:journal branch-entries
+                                                 :session-file (io/file session-file)
+                                                 :flushed? true}))))

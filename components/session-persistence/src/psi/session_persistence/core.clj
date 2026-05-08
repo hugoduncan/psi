@@ -42,6 +42,14 @@
    {:journal (vec (or journal []))
     :flush-state (flush-state session-file flushed?)}))
 
+(defn assoc-persistence-state
+  [state session-id persistence]
+  (assoc-in state [:agent-session :sessions session-id :persistence] persistence))
+
+(defn initialize-persistence-state
+  [state session-id opts]
+  (assoc-persistence-state state session-id (persistence-state opts)))
+
 (defn- state*
   [ctx]
   (:state* ctx))

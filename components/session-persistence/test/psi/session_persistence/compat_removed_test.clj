@@ -1,4 +1,4 @@
-(ns psi.agent-session.persistence-test
+(ns psi.session-persistence.compat-removed-test
   "Session-facing persistence tests: in-memory journal helpers, lazy flush orchestration,
   and representative use of the extracted session-journal store boundary."
   (:require
@@ -6,7 +6,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as core]
-   [psi.agent-session.persistence :as p]
+   [psi.session-persistence.core :as p]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss])
   (:import
@@ -66,9 +66,9 @@
       (is (= [msg] (vec (p/messages-up-to j nil)))))))
 
 (deftest persistence-public-surface-test
-  (testing "lock retry tuning is owned by session-journal.store, not re-exported here"
-    (is (nil? (ns-resolve 'psi.agent-session.persistence '*session-file-lock-retry-ms*)))
-    (is (nil? (ns-resolve 'psi.agent-session.persistence '*session-file-lock-max-attempts*)))))
+  (testing "lock retry tuning is owned by session-journal.store, not the canonical persistence ns"
+    (is (nil? (ns-resolve 'psi.session-persistence.core '*session-file-lock-retry-ms*)))
+    (is (nil? (ns-resolve 'psi.session-persistence.core '*session-file-lock-max-attempts*)))))
 
 (deftest persist-entry-lazy-flush-test
   (testing "no write before first assistant message"

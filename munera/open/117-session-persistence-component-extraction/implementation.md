@@ -45,3 +45,44 @@ Verification
   - `psi.app-runtime.navigation-test`
 - result: `30 tests, 173 assertions, 0 failures`
 - an initial implementation attempt introduced a `session-persistence <-> session-state.state` load cycle; fixed by removing the `session-state.state` require from `psi.session-persistence.core` and having the new component own its ctx-level atom access directly
+
+2026-05-08 review note — task implementation review
+- verdict: implementation is mostly aligned and valuable, but the task is not fully complete against its own design
+- strong positives:
+  - authoritative lower component `psi.session-persistence.core` exists and owns the intended public persistence API surface
+  - `psi.turn` no longer depends on `psi.agent-session.persistence`
+  - production consumers were migrated downward to the new component
+  - compatibility wrappers were narrowed substantially rather than left as the main production path
+  - focused regression and lint verification were run and were green at implementation time
+- actionable gap 1: top-level persistence subtree initialization is not fully moved down yet
+  - `psi.session-state.init` still constructs flush-state maps directly in `initialize-resume-missing-state`, `initialize-new-session-state`, `initialize-resumed-session-state`, and `initialize-forked-session-state`
+  - `psi.session-state.init/initialize-session-slots` still writes journal state through `session-state` path helpers instead of delegating to canonical `psi.session-persistence.core` constructors/helpers
+  - this means the task only fully moved child-session runtime initialization and the `agent-session.session-runtime` shim; it did not fully land the broader design statement that top-level and child-session persistence slot initialization delegate to the extracted component
+- actionable gap 2: temporary compatibility wrappers remain and need explicit completion treatment
+  - `psi.agent-session.persistence` still exists as a broad re-export namespace
+  - `psi.session-state.state` still retains delegating seams for `session-journal-path`, `session-flush-state-path`, and `append-journal-entry-in!`
+  - these wrappers may be acceptable temporarily, but task closure should either remove them or explicitly justify each remaining seam as intentional with concrete remaining consumers
+- actionable gap 3: the implementation exposed a deeper architectural issue worth follow-up tracking
+  - the initial `session-persistence <-> session-state.state` load cycle was fixed locally
+  - but the cycle is evidence that persistence semantics and persistence IO execution still press against the current boundary shape
+  - a follow-on task now exists for that: `118-session-persistence-io-effect-extraction`
+- recommended follow-up direction for this task:
+  - finish moving the remaining pure persistence subtree initialization helpers in `session-state.init` to `psi.session-persistence.core`, or add canonical persistence-owned pure constructors/update helpers there and delegate from `session-state.init`
+  - audit remaining compatibility seams and either remove them or explicitly document why each one remains
+  - after those follow-ups, re-run focused persistence/session-lifecycle regressions before considering task closure
+
+2026-05-08 follow-up execution
+- moved top-level/session-state persistence subtree initialization onto persistence-owned helpers
+  - added `assoc-persistence-state` and `initialize-persistence-state` to `psi.session-persistence.core`
+  - `psi.session-state.init/initialize-session-slots` now seeds the journal via canonical persistence initialization instead of direct `assoc-in` on persistence-specific paths
+  - `initialize-resume-missing-state`, `initialize-new-session-state`, `initialize-resumed-session-state`, and `initialize-forked-session-state` now build persistence state via `psi.session-persistence.core` helpers rather than raw flush-state maps
+- removed the `psi.agent-session.persistence` compatibility namespace from production code
+- moved the old compatibility-oriented persistence test into the extracted component test tree as `components/session-persistence/test/psi/session_persistence/compat_removed_test.clj`
+- focused follow-up verification green via:
+  - `psi.session-persistence.core-test`
+  - `psi.session-persistence.compat-removed-test`
+  - `psi.session-state.init-test`
+  - `psi.session-state.state-test`
+  - `psi.agent-session.session-lifecycle-test`
+  - `psi.agent-session.journal-append-convergence-test`
+- result: `20 tests, 149 assertions, 0 failures`

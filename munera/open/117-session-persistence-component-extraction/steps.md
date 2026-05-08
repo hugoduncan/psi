@@ -24,6 +24,12 @@
 - [x] Move canonical persistence subtree initialization ownership into the new component
   - [x] replace `session-runtime/persistence-state` with `psi.session-persistence.core/persistence-state`
   - [x] replace manual child-session persistence map construction with `flush-state` / `persistence-state`
+  - [x] replace `psi.session-state.init/initialize-session-slots` journal initialization with a canonical persistence-owned helper or constructor
+  - [x] replace direct flush-state map construction in `initialize-resume-missing-state` with a canonical persistence-owned helper
+  - [x] replace direct flush-state map construction in `initialize-new-session-state` with a canonical persistence-owned helper
+  - [x] replace direct flush-state map construction in `initialize-resumed-session-state` with a canonical persistence-owned helper
+  - [x] replace direct flush-state map construction in `initialize-forked-session-state` with a canonical persistence-owned helper
+  - [x] add or refine persistence-owned pure subtree/update helpers as needed so `session-state.init` no longer rebuilds persistence shapes inline
 - [x] Update production consumers to depend downward on the new component
   - [x] `psi.turn`
   - [x] `agent-session` runtime/lifecycle/dispatch-effects/workflow consumers
@@ -37,5 +43,17 @@
   - [x] session lifecycle / fork-resume tests
   - [x] app-runtime projection tests that consume journal helpers
 - [x] Verify `psi.turn` no longer requires `psi.agent-session.persistence` and instead uses `psi.session-persistence.core`
-- [ ] Record final path-ownership and initialization-ownership decisions in `implementation.md`
-- [ ] Remove temporary compatibility wrappers unless a remaining wrapper is explicitly justified in `implementation.md`
+- [x] Record final path-ownership and initialization-ownership decisions in `implementation.md`
+- [x] Execute review follow-up: finish moving top-level/session-state persistence subtree initialization ownership out of `psi.session-state.init`
+  - [x] complete the `session-state.init` follow-ups above
+  - [x] rerun focused `psi.session-persistence.core-test`
+  - [x] rerun focused `psi.session-state.init-test`
+  - [x] rerun focused `psi.agent-session.session-lifecycle-test`
+  - [x] rerun focused `psi.agent-session.journal-append-convergence-test`
+  - [x] append outcome/decisions to `implementation.md`
+- [x] Remove temporary compatibility wrappers unless a remaining wrapper is explicitly justified in `implementation.md`
+  - [x] audit remaining production/test consumers of `psi.agent-session.persistence`
+  - [x] remove the `psi.agent-session.persistence` re-export namespace if no justified consumers remain
+  - [x] audit remaining delegating seams in `psi.session-state.state`
+  - [x] explicitly justify retaining `session-journal-path`, `session-flush-state-path`, and `append-journal-entry-in!` in `psi.session-state.state` as generic compatibility/session-state query surfaces for now
+  - [x] rerun focused regressions after wrapper removal or seam-retention decision
