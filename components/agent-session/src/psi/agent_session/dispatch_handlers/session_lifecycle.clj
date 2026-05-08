@@ -81,18 +81,34 @@
 
   (kernel/register-handler!
    :session/fork-initialize
-   (fn [ctx {:keys [session-id new-session-id branch-entries session-file messages]}]
-     (let [parent-sd (session/get-session-data-in ctx session-id)
-           payload   {:new-session-id new-session-id
-                      :branch-entries branch-entries
-                      :session-file   session-file}]
-       {:root-state-update #(ss/initialize-forked-session-state % parent-sd payload)
-        :return-key        (session/session-data-path new-session-id)
-        :effects (cond-> [{:effect/type :projection/context-changed
-                           :session-id new-session-id
-                           :active-session-id new-session-id
-                           :reason :session/fork-initialize}]
-                   messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))})))
+   (fn [ctx {:keys [session-id new-session-id branch-entries session-file messages parent-session-id parent-session-path]}]
+     (let [parent-sd   (session/get-session-data-in ctx session-id)
+           payload     {:new-session-id new-session-id
+                        :branch-entries branch-entries
+                        :session-file   session-file}
+           child-sd    (merge parent-sd {:session-id new-session-id
+                                         :session-file session-file
+                                         :parent-session-id parent-session-id
+                                         :parent-session-path parent-session-path})
+           io-request  (when session-file
+                         {:op :flush-journal
+                          :session-id new-session-id
+                          :session-file session-file
+                          :worktree-path (:worktree-path child-sd)
+                          :parent-session-id parent-session-id
+                          :parent-session-path parent-session-path
+                          :entries (vec branch-entries)})]
+       (cond-> {:root-state-update #(ss/initialize-forked-session-state % parent-sd payload)
+                :return-key        (session/session-data-path new-session-id)
+                :effects (cond-> [{:effect/type :projection/context-changed
+                                   :session-id new-session-id
+                                   :active-session-id new-session-id
+                                   :reason :session/fork-initialize}]
+                           messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))}
+         io-request
+         (update :effects conj {:effect/type :persist/session-journal-io
+                                :session-id new-session-id
+                                :request io-request})))))
 
   (kernel/register-handler!
    :session/create-child

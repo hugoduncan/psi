@@ -247,7 +247,7 @@
       (is (= :medium (get-in entry [:event-data :thinking-level]))))))
 
 (testing "fork-session-in! initialization is logged through dispatch"
-  (let [[ctx _session-id] (create-session-context {:persist? false})
+  (let [[ctx _session-id] (create-session-context)
         _                 (kernel/clear-event-log!)
         parent-sd          (session/new-session-in! ctx nil {})
         parent-id          (:session-id parent-sd)

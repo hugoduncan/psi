@@ -1,7 +1,6 @@
 (ns psi.agent-session.session-lifecycle
   "Session lifecycle operations — create, resume, fork, switch, close."
   (:require
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [psi.agent-session.compaction :as compaction]
    [psi.agent-session.dispatch :as dispatch]
@@ -238,16 +237,6 @@
                  (-> state
                      (assoc-in [:agent-session :sessions new-session-id :agent-ctx] (:agent-ctx fresh))
                      (assoc-in [:agent-session :sessions new-session-id :sc-session-id] (:sc-session-id fresh))))))
-      ;; Fork persistence: create/write child file immediately with lineage header.
-      (when session-file
-        (let [file (io/file session-file)]
-          (journal-store/flush-journal! file
-                                        new-session-id
-                                        (session/session-worktree-path-in ctx new-session-id)
-                                        parent-session-id
-                                        parent-session-file
-                                        branch-entries)))
-
       (ext/dispatch-in reg "session_fork" {})
       (session/get-session-data-in ctx new-session-id))))
 

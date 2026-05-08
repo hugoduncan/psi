@@ -219,9 +219,34 @@
 (defmethod execute-effect! :statechart/send-event [ctx effect]
   (sc/send-event! (:sc-env ctx) (effect-sc-session-id ctx effect) (:event effect)))
 
+(defn- execute-session-journal-io!
+  [_ctx {:keys [request]}]
+  (let [{:keys [op session-file session-id worktree-path parent-session-id parent-session-path entry entries]} request
+        session-file (if (instance? java.io.File session-file)
+                       session-file
+                       (java.io.File. (str session-file)))]
+    (case op
+      :append-entry
+      (persist/append-entry-to-disk! session-file entry)
+
+      :flush-journal
+      (persist/flush-journal! session-file session-id worktree-path parent-session-id parent-session-path entries)
+
+      nil)))
+
+(defmethod execute-effect! :persist/session-journal-io [ctx effect]
+  (let [request (:request effect)
+        result  (execute-session-journal-io! ctx effect)]
+    (when (= :flush-journal (:op request))
+      (ss/apply-root-state-update-in! ctx (persist/mark-flushed-root-update (effect-session-id ctx effect))))
+    result))
+
 (defn- execute-journal-append-effect!
   [ctx effect entry]
-  (persist/append-entry-in! ctx (effect-session-id ctx effect) entry))
+  (dispatch/dispatch! ctx :session/append-journal-entry
+                      {:session-id (effect-session-id ctx effect)
+                       :entry entry}
+                      {:origin :core}))
 
 (defmethod execute-effect! :persist/journal-append-entry [ctx effect]
   (execute-journal-append-effect! ctx effect (:entry effect)))

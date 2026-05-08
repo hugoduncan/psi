@@ -93,6 +93,17 @@
      [:schedule-id :string]]]
    [:scheduler/drain-queue
     [:map [:effect/type [:= :scheduler/drain-queue]]]]
+   [:persist/session-journal-io
+    [:map [:effect/type [:= :persist/session-journal-io]]
+     [:request [:map
+                [:op [:enum :append-entry :flush-journal]]
+                [:session-id :string]
+                [:session-file :any]
+                [:worktree-path [:maybe :string]]
+                [:parent-session-id {:optional true} [:maybe :string]]
+                [:parent-session-path {:optional true} [:maybe :string]]
+                [:entry {:optional true} :map]
+                [:entries {:optional true} [:vector :map]]]]]]
    [:persist/journal-append-entry
     [:map [:effect/type [:= :persist/journal-append-entry]] [:entry :map]]]
    [:persist/journal-append-model-entry

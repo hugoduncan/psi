@@ -62,10 +62,15 @@
   [ctx path value]
   (swap! (state* ctx) assoc-in path value))
 
-(defn- append-journal-entry-root-update
+(defn append-journal-entry-root-update
   [session-id entry]
   (fn [state]
     (update-in state (session-journal-path session-id) (fnil conj []) entry)))
+
+(defn mark-flushed-root-update
+  [session-id]
+  (fn [state]
+    (assoc-in state (conj (session-flush-state-path session-id) :flushed?) true)))
 
 (defn append-journal-entry-in!
   [ctx session-id entry]
@@ -166,7 +171,7 @@
 (declare persist-journal-in!)
 
 (defn append-entry-in!
-  "Compatibility alias. Prefer `append-journal-entry-in!`."
+  "Compatibility alias. Prefer handler-owned append + explicit persistence IO effects."
   [ctx session-id entry]
   (append-journal-entry-in! ctx session-id entry)
   (let [sd (get-state-in ctx [:agent-session :sessions session-id :data])]
@@ -231,6 +236,28 @@
   [entries]
   (some assistant-message-entry? entries))
 
+(defn persistence-io-request
+  [{:keys [entries flush-state session-id worktree-path parent-session-id parent-session-path]
+    :as _request}]
+  (let [{:keys [flushed? session-file]} flush-state
+        entries (vec (or entries []))]
+    (when (and session-file (has-assistant-message? entries))
+      (if flushed?
+        {:op :append-entry
+         :session-id session-id
+         :session-file session-file
+         :worktree-path worktree-path
+         :parent-session-id parent-session-id
+         :parent-session-path parent-session-path
+         :entry (last entries)}
+        {:op :flush-journal
+         :session-id session-id
+         :session-file session-file
+         :worktree-path worktree-path
+         :parent-session-id parent-session-id
+         :parent-session-path parent-session-path
+         :entries entries}))))
+
 ;;; ============================================================
 ;;; Flush + persist semantics
 ;;; ============================================================
@@ -239,27 +266,34 @@
   ([entries flush-state session-id cwd parent-session-path save-flush-state!]
    (persist-state-entry! entries flush-state session-id cwd nil parent-session-path save-flush-state!))
   ([entries flush-state session-id cwd parent-session-id parent-session-path save-flush-state!]
-   (let [{:keys [flushed? session-file]} flush-state]
-     (when (and session-file (has-assistant-message? entries))
-       (if flushed?
-         (append-entry-to-disk! session-file (last entries))
-         (do
-           (flush-journal! session-file session-id cwd parent-session-id parent-session-path entries)
-           (when save-flush-state!
-             (save-flush-state! (assoc flush-state :flushed? true)))))))))
+   (when-let [{:keys [op session-file entry entries]}
+              (persistence-io-request {:entries entries
+                                       :flush-state flush-state
+                                       :session-id session-id
+                                       :worktree-path cwd
+                                       :parent-session-id parent-session-id
+                                       :parent-session-path parent-session-path})]
+     (case op
+       :append-entry
+       (append-entry-to-disk! session-file entry)
+
+       :flush-journal
+       (do
+         (flush-journal! session-file session-id cwd parent-session-id parent-session-path entries)
+         (when save-flush-state!
+           (save-flush-state! (assoc flush-state :flushed? true))))))))
 
 (defn persist-entry!
   ([journal-atom flush-state-atom session-id cwd parent-session-path]
    (persist-entry! journal-atom flush-state-atom session-id cwd nil parent-session-path))
   ([journal-atom flush-state-atom session-id cwd parent-session-id parent-session-path]
-   (let [{:keys [flushed? session-file]} @flush-state-atom
-         entries @journal-atom]
-     (when (and session-file (has-assistant-message? entries))
-       (if flushed?
-         (append-entry-to-disk! session-file (last entries))
-         (do
-           (flush-journal! session-file session-id cwd parent-session-id parent-session-path entries)
-           (swap! flush-state-atom assoc :flushed? true)))))))
+   (persist-state-entry! @journal-atom
+                         @flush-state-atom
+                         session-id
+                         cwd
+                         parent-session-id
+                         parent-session-path
+                         #(reset! flush-state-atom %))))
 
 (defn persist-journal-in!
   ([ctx session-id cwd parent-session-path]
@@ -267,14 +301,14 @@
   ([ctx session-id cwd parent-session-id parent-session-path]
    (let [fp (session-flush-state-path session-id)
          flush-state (get-state-in ctx fp)
-         session-file (:session-file flush-state)
          entries (all-entries-in ctx session-id)]
-     (when (and session-file (has-assistant-message? entries))
-       (if (:flushed? flush-state)
-         (append-entry-to-disk! session-file (last entries))
-         (do
-           (flush-journal! session-file session-id cwd parent-session-id parent-session-path entries)
-           (assoc-state-in! ctx fp (assoc flush-state :flushed? true))))))))
+     (persist-state-entry! entries
+                           flush-state
+                           session-id
+                           cwd
+                           parent-session-id
+                           parent-session-path
+                           #(assoc-state-in! ctx fp %)))))
 
 (defn persist-entry-in!
   "Compatibility alias. Prefer `persist-journal-in!`."
