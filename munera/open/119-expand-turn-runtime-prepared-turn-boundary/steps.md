@@ -31,3 +31,8 @@
   - [x] if intentional, document that explicitly in `implementation.md` so the final ownership story is unambiguous
 - [x] Re-run focused verification after the follow-up cleanup/documentation pass
   - [x] `bb clojure:test:unit --focus psi.turn-runtime.request-test --focus psi.turn-runtime.recording-test --focus psi.agent-session.prompt-lifecycle-test`
+- [x] Optional code-shaping polish from review
+  - [x] extract a private helper in `psi.agent-session.prompt-request` for normalized turn input assembly
+  - [x] consider splitting prepared-turn message shaping from normalized map assembly in `build-prepared-request`
+  - [x] tighten `psi.turn-runtime.request` docstrings to state the normalized `:turn/*` input invariant explicitly
+  - [x] rerun focused verification if any code-shaping changes are made

@@ -6,6 +6,12 @@
    [psi.turn-runtime.conversation :as conv]))
 
 (defn effective-system-prompt
+  "Assemble the provider-visible effective system prompt from a fully
+   normalized lower-boundary `normalized-turn` map.
+
+   This function must consume only normalized `:turn/*` data and must not do
+   session lookup, journal lookup, auth resolution, template/skill expansion,
+   or prompt-selection policy."
   [normalized-turn]
   (let [base     (:turn/base-system-prompt normalized-turn)
         dev      (:turn/developer-prompt normalized-turn)
@@ -16,6 +22,8 @@
      (:turn/sorted-prompt-contributions normalized-turn))))
 
 (defn build-prompt-layers
+  "Return introspectable prompt layers from a fully normalized lower-boundary
+   `normalized-turn` map. Consumes normalized `:turn/*` values only."
   [normalized-turn]
   (let [base    (:turn/base-system-prompt normalized-turn)
         dev     (:turn/developer-prompt normalized-turn)
@@ -44,6 +52,8 @@
              :content contrib}))))
 
 (defn build-provider-conversation
+  "Build the provider-facing conversation from a fully normalized lower-boundary
+   `normalized-turn` map. Consumes normalized `:turn/*` values only."
   [normalized-turn]
   (let [cache-bps (set (or (:turn/cache-breakpoints normalized-turn) #{}))
         tool-defs (:turn/filtered-tool-defs normalized-turn)]
@@ -63,6 +73,8 @@
                :text)))
 
 (defn build-prepared-request
+  "Assemble the final prepared-request map from a fully normalized lower-boundary
+   `normalized-turn` map. Consumes normalized `:turn/*` values only."
   [normalized-turn]
   (let [cache-bps     (set (or (:turn/cache-breakpoints normalized-turn) #{}))
         prompt-layers (build-prompt-layers normalized-turn)

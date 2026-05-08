@@ -311,3 +311,11 @@ Review conclusion
   - the remaining `prompt-request` helper wrappers (`effective-system-prompt`, `build-provider-conversation`, `build-prompt-layers`) were removed
   - remaining tests were repointed to `psi.turn-runtime.request` using normalized lower-input data instead of session-state wrapper helpers
 - the final ownership story is now crisp enough to close `119`
+
+2026-05-08 code-shaper review note
+- shape is good overall: lower ownership is clear and the true shims are gone
+- optional polish was identified and then executed:
+  - extracted private helpers in `psi.agent-session.prompt-request` for expanded turn input, prepared-turn message shaping, and normalized turn input assembly
+  - split prepared-turn message shaping from normalized map assembly in `build-prepared-request`
+  - tightened `psi.turn-runtime.request` docstrings around the normalized `:turn/*` input invariant
+  - reran focused verification successfully after the shaping pass
