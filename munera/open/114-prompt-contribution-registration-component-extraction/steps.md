@@ -15,3 +15,7 @@
 - [x] Run focused component-local verification for `prompt-registry`
 - [x] Run affected higher-level verification for prompt contribution and prompt-refresh behavior
 - [x] Record final boundary decisions, count/reporting behavior, and any non-obvious tradeoffs in `implementation.md`
+- [ ] Shape `update-contribution` to remove the local `atom` and keep result derivation purely functional
+- [ ] Remove unnecessary `sort-contributions` calls from count-only paths in `update-contribution`
+- [ ] Extract a shared prompt-contribution identity match helper to reduce repeated `ext-path` + `id` comparison logic
+- [ ] Tighten `normalize-identity` doc wording so the contract is stated directly and minimally
