@@ -6,6 +6,7 @@
   - [x] close superseded narrow tasks
   - [x] identify any task that should be rewritten rather than continued as-is
   - [x] record landed child-task outcomes for `106-provider-auth-component-extraction` and `107-project-nrepl-component-extraction`
+  - [x] record open child-task relationships for `112-skill-registration-component-extraction`, `113-command-registration-component-extraction`, and `114-prompt-contribution-registration-component-extraction`
   - [x] note current relationship of landed task `100-turn-statechart-component-extraction` to the umbrella as a narrow low-level turn child
   - [x] record that previously aligned child tasks `104`, `106`, and `107` are now landed/closed rather than still open
 - [x] Use this map as the framing reference for the next extraction-task design/refinement pass

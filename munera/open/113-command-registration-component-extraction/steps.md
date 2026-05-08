@@ -1,0 +1,16 @@
+- [ ] Verify the documented command registration and query semantics against live code/tests
+- [ ] Define the first-cut `command-registry` API for registration, lookup, names, and listing operations
+- [ ] Decide and prove the registration result contract
+- [ ] Decide and document the first-cut command validation/normalization rule to preserve current behavior: exact-name identity, no slash-prefix normalization, and `:name` as the only registry-required field
+- [ ] Preserve the first-cut registry boundary by not introducing broader command-completeness validation for fields such as `:handler`
+- [ ] Decide and prove explicit invalid-registration behavior at the registry boundary
+- [ ] Create `components/command-registry/` with focused registry tests
+- [ ] Implement canonical command register/get/list/name helpers below `agent-session`
+- [ ] Make same-extension replacement and cross-extension first-registration-wins semantics explicit and preserve them
+- [ ] Preserve and prove missing-command lookup behavior
+- [ ] Delegate `agent-session` command registration/query ownership to the extracted component
+- [ ] Keep command execution/routing behavior above the boundary
+- [ ] Keep `register-command` mutation/API seams as thin higher-level adapters
+- [ ] Run focused component-local verification for `command-registry`
+- [ ] Run affected higher-level verification for command registration/consuming behavior
+- [ ] Record final boundary decisions and any non-obvious tradeoffs in `implementation.md`
