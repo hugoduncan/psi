@@ -8,6 +8,7 @@
    [psi.ai.models :as models]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.accumulator :as accum]
+   [psi.turn-runtime.recording :as recording]
    [psi.turn-runtime.state :as trs]
    [psi.turn-runtime.stream :as stream]
    [psi.turn-statechart.core :as turn-sc]))
@@ -17,22 +18,7 @@
 
 (defn classify-assistant-message
   [assistant-msg]
-  (let [tool-calls (vec (filter #(= :tool-call (:type %)) (:content assistant-msg)))]
-    (cond
-      (= :error (:stop-reason assistant-msg))
-      {:turn/outcome :turn.outcome/error
-       :assistant-message assistant-msg
-       :tool-calls tool-calls}
-
-      (seq tool-calls)
-      {:turn/outcome :turn.outcome/tool-use
-       :assistant-message assistant-msg
-       :tool-calls tool-calls}
-
-      :else
-      {:turn/outcome :turn.outcome/stop
-       :assistant-message assistant-msg
-       :tool-calls tool-calls})))
+  (recording/classify-assistant-message assistant-msg))
 
 (defn do-stream!
   [ai-ctx ai-conv ai-model ai-options consume-fn]
