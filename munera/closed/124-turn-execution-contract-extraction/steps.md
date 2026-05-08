@@ -1,0 +1,21 @@
+- [x] Trace the current workflow session-backed actor/judge execution path across workflow runtime and turn orchestration
+- [x] Separate workflow-specific session shaping from generic bounded turn-execution mechanics
+- [x] Confirm the exact scope to preserve: session-backed actor-step execution and judge-step execution only, excluding deterministic `:invoke` and delegated `:delegate` execution
+- [x] Identify the minimal workflow-facing bounded execution contract or lower bounded execution substrate that can serve those turn-backed workflow forms
+- [x] Decide whether to expand an existing lower turn-runtime component or create a new lower execution-boundary component, and record the reason in `implementation.md`
+- [x] Define and record the canonical bounded step execution result contract for workflow callers, including the minimum success/failure shape and any required execution metadata
+- [x] Decide and record the execution-session creation mode: internal creation/binding, caller-supplied session id, or explicitly documented support for both
+- [x] Decide and record the exact actor-step boundary start for the lower contract while keeping workflow-specific session-config derivation and conversation shaping outside it
+- [x] Decide and record whether the final shape is one shared contract used directly by both actor/judge callers or one lower substrate with thin actor/judge adapters above it
+- [x] Route workflow runtime through the new execution contract
+- [x] Keep workflow-specific session-config derivation, conversation shaping, routing interpretation, and retry orchestration outside the extracted contract
+- [x] Preserve persistence/audit behavior without using journal/transcript reread as the semantic result contract
+- [x] Support and record how judge-session reuse across no-match retries works without re-exposing high-level orchestration internals
+- [x] Update focused tests to prove canonical execution-result return for both session-backed actor and judge paths
+- [x] Record final boundary decisions, chosen contract shape, and follow-on implications in `implementation.md`
+- [x] Review `:execution-result` retained in workflow pending actor state; remove it if unused or document the intentional retention boundary in code/task notes
+- [x] Add or update focused proof for the chosen `:execution-result` retention decision if the implementation keeps it
+- [x] Decide whether `execute-actor-turn!` and `execute-judge-turn!` should remain intentional semantic aliases over `execute-session-turn!`; either document the intent or consolidate if no caller-specific behavior is expected
+- [x] If `execute-session-turn!` grows further, extract a tiny helper for turn invocation selection so result normalization and prompt-execution dispatch stay separate; otherwise record that current branching remains intentionally minimal
+- [x] Update `workflow_judge_test.clj` to stub `psi.agent-session.turn-execution-contract/execute-judge-turn!` instead of stubbing below the extracted seam at `psi.agent-session.turn/prompt-execution-result-in!`
+- [x] If more pending-state invariant tests accumulate, extract a narrower capture helper or cleaner seam than the current working-memory watch pattern; otherwise explicitly keep the current test as the minimal internal invariant proof

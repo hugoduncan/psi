@@ -14,14 +14,17 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
-- Task 124 turn-execution contract extraction is now landed locally:
+- Task 124 turn-execution contract extraction is now complete and closed:
   - added new workflow-facing bounded execution namespace `components/agent-session/src/psi/agent_session/turn_execution_contract.clj`
   - moved canonical assistant-text extraction and execution-failure normalization into that boundary
   - rewired `psi.agent-session.workflow-statechart-runtime` to execute session-backed actor steps through `psi.agent-session.turn-execution-contract` instead of directly through `psi.agent-session.turn`
   - rewired `psi.agent-session.workflow-judge` to execute judge turns through the same contract instead of directly through `psi.agent-session.turn`
   - preserved workflow-specific session shaping, attempt child-session creation, judge child-session creation, routing interpretation, and judge retry orchestration above the new boundary
   - chose caller-supplied execution session ids as the boundary mode; the contract starts once workflow code has a session id and final prompt text
-  - focused verification green across workflow surfaces: workflow judge/statechart runtime plus broader workflow execution/lifecycle/invoke/delegate terminal-contract tests
+  - removed unused `:execution-result` retention from workflow pending actor state and added focused invariant proof for that boundary decision
+  - shaped the contract so invocation selection and result normalization are separated, while keeping actor/judge entrypoints as intentional semantic aliases
+  - aligned workflow judge tests to stub the extracted contract seam directly
+  - verified through focused workflow surfaces and confirmed the component tests are runnable via top-level Kaocha `tests.edn` using `clojure -M:test`
 
 - Task 123 workflow judge/routing component extraction is now landed locally:
   - created new lower component `components/workflow-judge/` with authoritative pure namespace `psi.workflow-judge`
@@ -65,5 +68,5 @@ Bootstrapped on 2026-04-02.
   - focused verification green: `35 tests, 178 assertions, 0 failures`
 
 ## Suggested next step
-- Commit the landed task-124 extraction slice.
-- After that, the likely follow-on is task `125-workflow-runtime-core-component-extraction`, now able to target `turn-execution-contract` instead of direct `turn` usage for session-backed actor/judge execution.
+- Task `125-workflow-runtime-core-component-extraction` is now the direct follow-on.
+- It can target `turn-execution-contract` instead of direct `turn` usage for session-backed actor/judge execution.
