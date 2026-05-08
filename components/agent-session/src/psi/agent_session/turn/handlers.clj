@@ -1,4 +1,4 @@
-(ns psi.turn.handlers
+(ns psi.agent-session.turn.handlers
   "Thin turn-lifecycle handler helpers.
 
    This namespace owns the turn lifecycle dispatch orchestration used by

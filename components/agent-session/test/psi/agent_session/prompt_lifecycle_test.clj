@@ -10,7 +10,7 @@
    [psi.turn-runtime.core]
    [psi.agent-session.runtime :as runtime]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.turn]
+   [psi.agent-session.turn]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [clojure.java.io :as io]
@@ -47,15 +47,15 @@
 
 (deftest prompt-control-delegates-to-psi-turn-test
   (let [calls (atom [])]
-    (with-redefs [psi.turn/prompt-in! (fn [& args] (swap! calls conj [:prompt-in args]) :prompted)
-                  psi.turn/prompt-execution-result-in! (fn [& args] (swap! calls conj [:prompt-execution-result-in args]) :execution-result)
-                  psi.turn/last-assistant-message-in (fn [& args] (swap! calls conj [:last-assistant-message-in args]) :assistant)
-                  psi.turn/steer-in! (fn [& args] (swap! calls conj [:steer-in args]) :steered)
-                  psi.turn/follow-up-in! (fn [& args] (swap! calls conj [:follow-up-in args]) :followed)
-                  psi.turn/queue-while-streaming-in! (fn [& args] (swap! calls conj [:queue-while-streaming-in args]) :queued)
-                  psi.turn/request-interrupt-in! (fn [& args] (swap! calls conj [:request-interrupt-in args]) :interrupted)
-                  psi.turn/abort-in! (fn [& args] (swap! calls conj [:abort-in args]) :aborted)
-                  psi.turn/consume-queued-input-text-in! (fn [& args] (swap! calls conj [:consume-queued-input-text-in args]) :consumed)]
+    (with-redefs [psi.agent-session.turn/prompt-in! (fn [& args] (swap! calls conj [:prompt-in args]) :prompted)
+                  psi.agent-session.turn/prompt-execution-result-in! (fn [& args] (swap! calls conj [:prompt-execution-result-in args]) :execution-result)
+                  psi.agent-session.turn/last-assistant-message-in (fn [& args] (swap! calls conj [:last-assistant-message-in args]) :assistant)
+                  psi.agent-session.turn/steer-in! (fn [& args] (swap! calls conj [:steer-in args]) :steered)
+                  psi.agent-session.turn/follow-up-in! (fn [& args] (swap! calls conj [:follow-up-in args]) :followed)
+                  psi.agent-session.turn/queue-while-streaming-in! (fn [& args] (swap! calls conj [:queue-while-streaming-in args]) :queued)
+                  psi.agent-session.turn/request-interrupt-in! (fn [& args] (swap! calls conj [:request-interrupt-in args]) :interrupted)
+                  psi.agent-session.turn/abort-in! (fn [& args] (swap! calls conj [:abort-in args]) :aborted)
+                  psi.agent-session.turn/consume-queued-input-text-in! (fn [& args] (swap! calls conj [:consume-queued-input-text-in args]) :consumed)]
       (is (= :prompted (psi.agent-session.prompt-control/prompt-in! :ctx :sid "hi")))
       (is (= :execution-result (psi.agent-session.prompt-control/prompt-execution-result-in! :ctx :sid "hi")))
       (is (= :assistant (psi.agent-session.prompt-control/last-assistant-message-in :ctx :sid)))

@@ -17,7 +17,7 @@
    [psi.agent-session.prompt-chain :as prompt-chain]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.turn :as turn]
+   [psi.agent-session.turn :as turn]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
    [psi.session-state.model :as session]

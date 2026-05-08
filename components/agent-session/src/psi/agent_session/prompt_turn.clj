@@ -7,7 +7,7 @@
   (:require
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
-   [psi.turn :as turn]
+   [psi.agent-session.turn :as turn]
    [psi.turn-runtime.recording :as turn-recording]))
 
 (defn stream-turn!

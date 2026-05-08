@@ -1,7 +1,7 @@
 2026-05-07
 
 - Oriented on task `120` and confirmed prerequisite task `119-expand-turn-runtime-prepared-turn-boundary` is closed under `munera/closed/119-expand-turn-runtime-prepared-turn-boundary/`.
-- Confirmed the surviving higher authoritative namespace family is currently:
+- Confirmed the surviving higher authoritative namespace family before the rename was:
   - `components/agent-session/src/psi/turn.clj` -> `psi.turn`
   - `components/agent-session/src/psi/turn/handlers.clj` -> `psi.turn.handlers`
 - Confirmed lower prepared-turn ownership already remains under `psi.turn-runtime.*`, so the rename can stay narrow and ownership-signaling.
@@ -14,3 +14,9 @@
   - `psi.agent-session.test-support`
   - `psi.agent-session.prompt-lifecycle-test`
 - Started implementation with the explicit intent to use `clj-surgeon` for the namespace rename and keep the change behavior-preserving.
+- Ran `clj-surgeon :op :rename-ns` for both namespace targets. The tool surfaced non-`.clj` references for review but did not rewrite the authoritative source files, so the authoritative file-path + `ns` rename was completed manually in the same narrow task branch.
+- Renamed the authoritative higher orchestration files to:
+  - `components/agent-session/src/psi/agent_session/turn.clj` -> `psi.agent-session.turn`
+  - `components/agent-session/src/psi/agent_session/turn/handlers.clj` -> `psi.agent-session.turn.handlers`
+- Updated direct production and test consumers to require the renamed namespaces.
+- Updated `with-redefs` callsites in `psi.agent-session.prompt-lifecycle-test` so the focused prompt-control delegation proof targets `psi.agent-session.turn/*` vars directly rather than the retired `psi.turn/*` vars.

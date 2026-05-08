@@ -16,7 +16,7 @@
    [psi.agent-session.services :as services]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as ss]
-   [psi.turn]
+   [psi.agent-session.turn]
    [psi.agent-session.statechart :as session-sc]
    [psi.agent-session.tool-plan :as tool-plan]
    [psi.agent-session.workflows :as wf]

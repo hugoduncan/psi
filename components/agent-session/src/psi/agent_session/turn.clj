@@ -1,4 +1,4 @@
-(ns psi.turn
+(ns psi.agent-session.turn
   "Authoritative turn lifecycle API.
 
    Owns the canonical submit/start -> prepare -> execute -> record ->

@@ -1,14 +1,14 @@
 (ns psi.agent-session.dispatch-handlers.prompt-lifecycle
   "Registration/adaptation layer for the canonical turn lifecycle.
 
-   Turn lifecycle orchestration lives under `psi.turn` and
-   `psi.turn.handlers`; this namespace only registers dispatch handlers."
+   Turn lifecycle orchestration lives under `psi.agent-session.turn` and
+   `psi.agent-session.turn.handlers`; this namespace only registers dispatch handlers."
   (:require
    [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.turn.handlers :as turn.handlers]))
+   [psi.agent-session.turn.handlers :as turn.handlers]))
 
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))

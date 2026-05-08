@@ -1,9 +1,9 @@
 (ns psi.agent-session.prompt-control
   (:require
-   [psi.turn :as turn]))
+   [psi.agent-session.turn :as turn]))
 
 (defn prompt-in!
-  "Compatibility facade over `psi.turn/prompt-in!`."
+  "Compatibility facade over `psi.agent-session.turn/prompt-in!`."
   ([ctx session-id text]
    (turn/prompt-in! ctx session-id text))
   ([ctx session-id text images]
@@ -12,7 +12,7 @@
    (turn/prompt-in! ctx session-id text images opts)))
 
 (defn prompt-execution-result-in!
-  "Compatibility facade over `psi.turn/prompt-execution-result-in!`."
+  "Compatibility facade over `psi.agent-session.turn/prompt-execution-result-in!`."
   ([ctx session-id text]
    (turn/prompt-execution-result-in! ctx session-id text))
   ([ctx session-id text images]

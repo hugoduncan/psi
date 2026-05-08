@@ -1,18 +1,24 @@
-- [ ] Confirm `119` has landed the lower prepared-turn ownership split that leaves the surviving `psi.turn.*` family in `agent-session` and no longer leaves those namespaces as the authoritative owners of lower request/recording logic
-- [ ] Inventory the surviving higher `psi.turn.*` namespaces and confirm they belong above the boundary rather than in `turn-runtime`
-- [ ] Rename the authoritative higher namespace family from `psi.turn.*` to `psi.agent-session.turn.*`
-  - [ ] prefer nested family naming, e.g. `psi.turn` -> `psi.agent-session.turn`
-  - [ ] rename higher helper namespaces consistently, e.g. `psi.turn.handlers` -> `psi.agent-session.turn.handlers`
-- [ ] Update direct production consumers to require/use the renamed namespaces
-- [ ] Update tests to require/use the renamed namespaces
-- [ ] Update any production string/data references to the old namespaces if they exist
-- [ ] Update active architecture/task text where the old authoritative namespaces would now misstate current ownership
-- [ ] Verify no authoritative higher production `psi.turn` / `psi.turn.*` namespaces remain
-  - [ ] repo search for `ns psi.turn`
-  - [ ] repo search for higher-family namespace definitions under `psi.turn.*`
-  - [ ] repo search for production `:require [psi.turn ...]`
-  - [ ] repo search for production requires targeting higher `psi.turn.*` namespaces
-  - [ ] repo search for any production string/data references to `psi.turn` / `psi.turn.*`, if present
-- [ ] Run focused verification for the renamed family and at least one higher-level consuming path
-  - [ ] include prompt lifecycle or equivalent higher orchestration coverage
-- [ ] Remove any temporary compatibility aliases before completion
+- [x] Confirm `119` has landed the lower prepared-turn ownership split that leaves the surviving `psi.turn.*` family in `agent-session` and no longer leaves those namespaces as the authoritative owners of lower request/recording logic
+- [x] Inventory the surviving higher `psi.turn.*` namespaces and confirm they belong above the boundary rather than in `turn-runtime`
+- [x] Rename the authoritative higher namespace family from `psi.turn.*` to `psi.agent-session.turn.*`
+  - [x] prefer nested family naming, e.g. `psi.turn` -> `psi.agent-session.turn`
+  - [x] rename higher helper namespaces consistently, e.g. `psi.turn.handlers` -> `psi.agent-session.turn.handlers`
+- [x] Update direct production consumers to require/use the renamed namespaces
+- [x] Update tests to require/use the renamed namespaces
+- [x] Update any production string/data references to the old namespaces if they exist
+  - [x] updated nearby production docstrings/comments that named the retired higher namespaces
+- [x] Update active architecture/task text where the old authoritative namespaces would now misstate current ownership
+  - [x] updated this task's `implementation.md` to reflect the completed authoritative rename
+- [x] Verify no authoritative higher production `psi.turn` / `psi.turn.*` namespaces remain
+  - [x] repo search for `ns psi.turn`
+  - [x] repo search for higher-family namespace definitions under `psi.turn.*`
+  - [x] repo search for production `:require [psi.turn ...]`
+  - [x] repo search for production requires targeting higher `psi.turn.*` namespaces
+  - [x] repo search for any production string/data references to `psi.turn` / `psi.turn.*`, if present
+    - [x] remaining `:psi.turn/*` resolver/query attributes are intentionally retained telemetry attrs, not namespace references
+- [x] Run focused verification for the renamed family and at least one higher-level consuming path
+  - [x] include prompt lifecycle or equivalent higher orchestration coverage
+  - [x] `clj-kondo --lint` on touched production/test namespaces
+  - [x] `bb clojure:test:unit --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.session-lifecycle-test`
+- [x] Remove any temporary compatibility aliases before completion
+  - [x] no compatibility alias namespaces were introduced
