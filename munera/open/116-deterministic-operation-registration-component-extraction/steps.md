@@ -1,17 +1,17 @@
-- [ ] Inspect current deterministic-operation registry behavior and record the exact live semantics to preserve: registry-object shape, canonical id field `:id`, invalid-definition behavior, duplicate-registration rejection, lookup miss behavior, bulk unregister by `ext-path`, and registration-order behavior
-- [ ] Decide and document the canonical deterministic-operation identity rule and current namespaced kebab-case operation-id validation behavior
-- [ ] Decide and document the canonical stored deterministic-operation definition shape: required keys, optional keys, normalization behavior, and whether extra keys are permitted by the current schema
-- [ ] Decide and prove invalid registration behavior at the registry boundary
-- [ ] Decide and prove duplicate-registration behavior for existing operation ids, preserving current rejection rather than replacement
-- [ ] Decide and prove `get-operation-in` miss behavior and `invoke-operation-in` missing-operation behavior
-- [ ] Decide and prove registration-order behavior for `operation-ids-in` and `all-operations-in`
-- [ ] Create `components/deterministic-operation-registry/` with focused component-local tests
-- [ ] Implement the canonical first-cut registry-object API below `agent-session`: `register-operation-in!`, `unregister-operations-by-extension-in!`, `get-operation-in`, `all-operations-in`, `operation-ids-in`, `operation-count-in`, and the thin lower `invoke-operation-in` seam
-- [ ] Move or re-express deterministic-operation definition validation and registration/query helpers into the extracted component while keeping workflow-facing invoke-result wrapping outside the registry boundary
-- [ ] Delegate extension deterministic-operation registration/removal ownership to the extracted component while preserving extension-registry bookkeeping above the boundary
-- [ ] Preserve extension unregister-all cleanup behavior while delegating deterministic-operation registry ownership downward
-- [ ] Delegate workflow invoke-time registered-operation lookup ownership to the extracted component without widening into workflow-run execution ownership
-- [ ] Keep broader invoke execution sequencing and `operation-result->invoke-step-result` ownership outside this task
-- [ ] Run focused component-local verification for `deterministic-operation-registry`, including duplicate-registration rejection, bulk unregister, and registration-order preservation
-- [ ] Run affected higher-level verification for extension API, extension cleanup, and workflow invoke runtime behavior
-- [ ] Record final boundary decisions, result contracts, and any non-obvious tradeoffs in `implementation.md`
+- [x] Inspect current deterministic-operation registry behavior and record the exact live semantics to preserve: registry-object shape, canonical id field `:id`, invalid-definition behavior, duplicate-registration rejection, lookup miss behavior, bulk unregister by `ext-path`, and registration-order behavior
+- [x] Decide and document the canonical deterministic-operation identity rule and current namespaced kebab-case operation-id validation behavior
+- [x] Decide and document the canonical stored deterministic-operation definition shape: required keys, optional keys, normalization behavior, and whether extra keys are permitted by the current schema
+- [x] Decide and prove invalid registration behavior at the registry boundary
+- [x] Decide and prove duplicate-registration behavior for existing operation ids, preserving current rejection rather than replacement
+- [x] Decide and prove `get-operation-in` miss behavior and `invoke-operation-in` missing-operation behavior
+- [x] Decide and prove registration-order behavior for `operation-ids-in` and `all-operations-in`
+- [x] Create `components/deterministic-operation-registry/` with focused component-local tests
+- [x] Implement the canonical first-cut registry-object API below `agent-session`: `register-operation-in!`, `unregister-operations-by-extension-in!`, `get-operation-in`, `all-operations-in`, `operation-ids-in`, `operation-count-in`, and the thin lower `invoke-operation-in` seam
+- [x] Move or re-express deterministic-operation definition validation and registration/query helpers into the extracted component while keeping workflow-facing invoke-result wrapping outside the registry boundary
+- [x] Delegate extension deterministic-operation registration/removal ownership to the extracted component while preserving extension-registry bookkeeping above the boundary
+- [x] Preserve extension unregister-all cleanup behavior while delegating deterministic-operation registry ownership downward
+- [x] Delegate workflow invoke-time registered-operation lookup ownership to the extracted component without widening into workflow-run execution ownership
+- [x] Keep broader invoke execution sequencing and `operation-result->invoke-step-result` ownership outside this task
+- [x] Run focused component-local verification for `deterministic-operation-registry`, including duplicate-registration rejection, bulk unregister, and registration-order preservation
+- [x] Run affected higher-level verification for extension API, extension cleanup, and workflow invoke runtime behavior
+- [x] Record final boundary decisions, result contracts, and any non-obvious tradeoffs in `implementation.md`

@@ -1,8 +1,8 @@
 (ns psi.agent-session.extensions
   "Extension registry, loading, dispatch, tool wrapping, and introspection."
   (:require
-   [psi.agent-session.deterministic-operation-registry :as deterministic-op-reg]
-   [psi.agent-session.deterministic-operations :as deterministic-ops]
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
+   [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.agent-session.extensions.api :as api]
    [psi.agent-session.extensions.loader :as loader]
    [psi.command-registry.registry :as command-registry]
@@ -119,7 +119,7 @@
    deterministic operation registry remains authoritative for invoke-time
    resolution and duplicate detection."
   [reg ext-path operation]
-  (let [operation* (deterministic-ops/normalize-operation-def
+  (let [operation* (deterministic-op-defs/normalize-operation-def
                     (assoc operation :ext-path ext-path :source :extension))]
     (swap! (:state reg)
            assoc-in [:extensions ext-path :operations (:id operation*)] operation*)
@@ -156,7 +156,7 @@
    (unregister-extension-in! reg path nil))
   ([reg path deterministic-operation-registry]
    (when deterministic-operation-registry
-     (deterministic-op-reg/unregister-operations-by-extension-in!
+     (deterministic-op-registry/unregister-operations-by-extension-in!
       deterministic-operation-registry
       path))
    (swap! (:state reg)
@@ -179,7 +179,7 @@
   ([reg deterministic-operation-registry]
    (when deterministic-operation-registry
      (doseq [path (:registration-order @(:state reg))]
-       (deterministic-op-reg/unregister-operations-by-extension-in!
+       (deterministic-op-registry/unregister-operations-by-extension-in!
         deterministic-operation-registry
         path)))
    (swap! (:state reg) assoc :extensions {} :registration-order [])

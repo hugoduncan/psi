@@ -1,70 +1,17 @@
 (ns psi.agent-session.deterministic-operation-registry
-  "Runtime-owned deterministic operation registry.
-
-   The registry is authoritative for stable operation ids used by workflow IR
-   invoke steps. Extensions may contribute implementations, but workflow authors
-   target ids, not vars/functions."
+  "Compatibility wrapper over the extracted deterministic-operation-registry component."
   (:require
-   [psi.agent-session.deterministic-operations :as ops]))
+   [psi.agent-session.deterministic-operations :as ops]
+   [psi.deterministic-operation-registry.registry :as registry]))
 
-(defrecord DeterministicOperationRegistry [state])
-
-(defn create-registry
-  []
-  (->DeterministicOperationRegistry
-   (atom {:operations {}
-          :registration-order []})))
-
-(defn register-operation-in!
-  [reg operation]
-  (let [operation* (ops/normalize-operation-def operation)
-        operation-id (:id operation*)]
-    (swap! (:state reg)
-           (fn [s]
-             (when-let [existing (get-in s [:operations operation-id])]
-               (throw (ex-info "Deterministic operation id already registered"
-                               {:operation-id operation-id
-                                :existing existing
-                                :new operation*})))
-             (-> s
-                 (assoc-in [:operations operation-id] operation*)
-                 (update :registration-order conj operation-id))))
-    reg))
-
-(defn unregister-operations-by-extension-in!
-  [reg ext-path]
-  (swap! (:state reg)
-         (fn [s]
-           (let [remove-ids (->> (:registration-order s)
-                                 (filter #(= ext-path (get-in s [:operations % :ext-path])))
-                                 vec)]
-             (-> s
-                 (update :operations #(apply dissoc % remove-ids))
-                 (update :registration-order (fn [order]
-                                               (vec (remove (set remove-ids) order))))))))
-  reg)
-
-(defn operation-ids-in
-  [reg]
-  (:registration-order @(:state reg)))
-
-(defn operation-count-in
-  [reg]
-  (count (operation-ids-in reg)))
-
-(defn get-operation-in
-  [reg operation-id]
-  (get-in @(:state reg) [:operations operation-id]))
-
-(defn all-operations-in
-  [reg]
-  (mapv #(get-operation-in reg %) (operation-ids-in reg)))
+(def create-registry registry/create-registry)
+(def register-operation-in! registry/register-operation-in!)
+(def unregister-operations-by-extension-in! registry/unregister-operations-by-extension-in!)
+(def operation-ids-in registry/operation-ids-in)
+(def operation-count-in registry/operation-count-in)
+(def get-operation-in registry/get-operation-in)
+(def all-operations-in registry/all-operations-in)
 
 (defn invoke-operation-in
   [reg operation-id invocation]
-  (let [operation (get-operation-in reg operation-id)]
-    (when-not operation
-      (throw (ex-info "Deterministic operation not found"
-                      {:type :missing-deterministic-operation
-                       :operation-id operation-id})))
-    (ops/invoke-operation operation invocation)))
+  (registry/invoke-operation-in reg operation-id invocation ops/invoke-operation))

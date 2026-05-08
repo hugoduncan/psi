@@ -7,28 +7,8 @@
    - tagged success/failure operation-result contract
    - runtime-owned invocation/result normalization helpers for invoke steps"
   (:require
-   [clojure.string :as str]
-   [malli.core :as m]))
-
-(def operation-id-pattern
-  "Canonical deterministic operation ids are namespaced kebab-case strings.
-   Example: github/search-issues-by-label"
-  #"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$")
-
-(defn valid-operation-id?
-  [operation-id]
-  (and (string? operation-id)
-       (boolean (re-matches operation-id-pattern operation-id))))
-
-(def operation-definition-schema
-  [:map
-   [:id [:fn {:error/message (str "operation id must match " operation-id-pattern)}
-         valid-operation-id?]]
-   [:handler fn?]
-   [:description {:optional true} [:maybe :string]]
-   [:summary {:optional true} [:maybe :string]]
-   [:ext-path {:optional true} [:maybe :string]]
-   [:source {:optional true} [:maybe [:enum :extension :runtime]]]])
+   [malli.core :as m]
+   [psi.deterministic-operation-registry.defs :as defs]))
 
 (def operation-success-result-schema
   [:map
@@ -49,9 +29,11 @@
    [:ok operation-success-result-schema]
    [:error operation-error-result-schema]])
 
-(defn valid-operation-definition?
-  [x]
-  (m/validate operation-definition-schema x))
+(def valid-operation-id? defs/valid-operation-id?)
+(def operation-id-pattern defs/operation-id-pattern)
+(def operation-definition-schema defs/operation-definition-schema)
+(def valid-operation-definition? defs/valid-operation-definition?)
+(def normalize-operation-def defs/normalize-operation-def)
 
 (defn valid-operation-result?
   [x]
@@ -60,16 +42,6 @@
 (defn explain-operation-result
   [x]
   (m/explain operation-result-schema x))
-
-(defn normalize-operation-def
-  [operation]
-  (when-not (valid-operation-definition? operation)
-    (throw (ex-info "Invalid deterministic operation definition"
-                    {:operation operation
-                     :explanation (m/explain operation-definition-schema operation)})))
-  (cond-> operation
-    (contains? operation :description) (update :description #(some-> % str/trim))
-    (contains? operation :summary) (update :summary #(some-> % str/trim))))
 
 (defn malformed-operation-result-ex
   [operation invocation result]

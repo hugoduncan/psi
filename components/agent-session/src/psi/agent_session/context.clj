@@ -5,7 +5,7 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.compaction :as compaction]
    [psi.agent-session.compaction-runtime :as compaction-runtime]
-   [psi.agent-session.deterministic-operation-registry :as deterministic-ops-reg]
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-schema :as schema]
@@ -197,7 +197,7 @@
                      :agent-initial agent-initial
                      :nrepl-runtime-atom nrepl-runtime-atom
                      :extension-registry (ext/create-registry)
-                     :deterministic-operation-registry (deterministic-ops-reg/create-registry)
+                     :deterministic-operation-registry (deterministic-op-registry/create-registry)
                      :workflow-registry (wf/create-registry)
                      :service-registry (services/create-registry)
                      :project-nrepl-registry (project-nrepl-runtime/create-registry)

@@ -31,6 +31,7 @@
         psi/skill-registry                            {:local/root "components/skill-registry"}
         psi/command-registry                          {:local/root "components/command-registry"}
         psi/tool-registry                             {:local/root "components/tool-registry"}
+        psi/deterministic-operation-registry          {:local/root "components/deterministic-operation-registry"}
         psi/workflow-registry                         {:local/root "components/workflow-registry"}
         psi/turn-statechart                           {:local/root "components/turn-statechart"}
         psi/turn-runtime                              {:local/root "components/turn-runtime"}
@@ -199,6 +200,7 @@
                              "components/prompt-registry/test"
                              "components/skill-registry/test"
                              "components/command-registry/test"
+                             "components/deterministic-operation-registry/test"
                              "extensions/auto-session-name/test"
                              "extensions/commit-checks/test"
                              "extensions/hello-ext/test"
@@ -243,6 +245,7 @@
                         "components/prompt-registry/test"
                         "components/skill-registry/test"
                         "components/command-registry/test"
+                        "components/deterministic-operation-registry/test"
                         "components/state-kernel/test"
                         "extensions/auto-session-name/test"
                         "extensions/commit-checks/test"
@@ -278,6 +281,7 @@
                         "components/prompt-registry/src"
                         "components/skill-registry/src"
                         "components/command-registry/src"
+                        "components/deterministic-operation-registry/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
                         "components/system-bootstrap/test"

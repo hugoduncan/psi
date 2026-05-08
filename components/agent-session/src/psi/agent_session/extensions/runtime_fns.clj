@@ -1,6 +1,6 @@
 (ns psi.agent-session.extensions.runtime-fns
   (:require
-   [psi.agent-session.deterministic-operation-registry :as deterministic-op-reg]
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.agent-session.extensions :as extensions]
    [psi.agent-session.extensions.runtime-eql :as runtime-eql]
    [psi.agent-session.extensions.runtime-ui :as runtime-ui]
@@ -62,8 +62,8 @@
      (fn [ext-path* operation]
        (let [op-reg (:deterministic-operation-registry ctx)]
          (extensions/register-operation-in! (:extension-registry ctx) ext-path* operation)
-         (deterministic-op-reg/register-operation-in! op-reg
-                                                      (assoc operation :ext-path ext-path* :source :extension))
+         (deterministic-op-registry/register-operation-in! op-reg
+                                                           (assoc operation :ext-path ext-path* :source :extension))
          {:id (:id operation)}))
 
      :deterministic-operation-registry
