@@ -46,6 +46,8 @@ Implementation notes — 2026-05-07
 - `register-skill` preserves the design contract exactly: first registration per name wins, duplicates are ignored, ordering is preserved, and the return shape includes `:added?`, `:changed?`, and `:count`
 - `agent-session` `:session/register-skill` now delegates registry semantics to `psi.skill-registry.registry/register-skill` and keeps prompt-refresh orchestration local by only emitting `:runtime/refresh-system-prompt` when `:changed?` is true
 - `prompt-assets.skills` remains the owner of discovery/parsing/validation/invocation semantics, but trivial registered-skill read helpers `find-skill` and `skill-names` now delegate downward to the new registry owner
+- follow-on ownership cleanup kept going one small step further: `agent-session` registry-shaped consumers in `resolvers.discovery` and `workflow-step-prep` now depend directly on `psi.skill-registry.registry` instead of reaching that collection behavior through the prompt-assets wrapper
+- focused follow-on verification after that cleanup stayed green: `psi.prompt-assets.skills-test`, `psi.agent-session.config-compaction-test`, and `psi.agent-session.workflow-step-prep-test` (`32 tests, 204 assertions, 0 failures`)
 - added focused `skill-registry` tests for validation, registration, duplicate-ignore behavior, ordering, lookup, and count
 - extended `agent-session` config-compaction coverage to assert the new return contract for first registration and to prove duplicate registration leaves prompt/session skill state unchanged and does not trigger follow-on refresh events
 - repository test/deps surfaces were updated to include the new component in root/test resolution

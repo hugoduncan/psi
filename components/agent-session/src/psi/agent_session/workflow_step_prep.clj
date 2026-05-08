@@ -5,7 +5,7 @@
    prompt/config semantics stay aligned across workflow paths."
   (:require
    [psi.session-state.state :as session-state]
-   [psi.prompt-assets.skills :as skills]
+   [psi.skill-registry.registry :as skill-registry]
    [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
@@ -148,7 +148,7 @@
               (cond
                 (map? skill) skill
                 (string? skill)
-                (or (skills/find-skill session-skills skill)
+                (or (skill-registry/find-skill session-skills skill)
                     {:name skill
                      :description ""
                      :file-path ""

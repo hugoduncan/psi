@@ -3,9 +3,10 @@
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.prompt-assets.prompt-templates :as pt]
+   [psi.prompt-assets.skills :as skills]
    [psi.session-journal.store :as journal-store]
    [psi.agent-session.resolvers.support :as support]
-   [psi.prompt-assets.skills :as skills]))
+   [psi.skill-registry.registry :as skill-registry]))
 
 ;; ── Prompt template introspection ────────────────────────
 
@@ -49,7 +50,7 @@
   (let [all-skills (:skills (support/session-data agent-session-ctx session-id))
         summary    (skills/skill-summary all-skills)]
     {:psi.skill/summary       summary
-     :psi.skill/names         (skills/skill-names all-skills)
+     :psi.skill/names         (skill-registry/skill-names all-skills)
      :psi.skill/count         (:skill-count summary)
      :psi.skill/visible-count (:visible-count summary)
      :psi.skill/hidden-count  (:hidden-count summary)
@@ -62,7 +63,7 @@
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id :psi.skill/name]
    ::pco/output [:psi.skill/detail]}
   (let [all-skills (:skills (support/session-data agent-session-ctx session-id))
-        skill      (skills/find-skill all-skills name)]
+        skill      (skill-registry/find-skill all-skills name)]
     {:psi.skill/detail
      (when skill (skills/enrich-skill skill))}))
 
