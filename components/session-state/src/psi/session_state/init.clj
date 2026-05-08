@@ -26,10 +26,15 @@
 
 (defn initialize-session-slots
   [state* sid journal-entries]
-  (-> state*
-      (persistence/initialize-persistence-state sid {:journal journal-entries})
-      (assoc-in [:agent-session :sessions sid :telemetry] initial-telemetry)
-      (assoc-in [:agent-session :sessions sid :turn] {:ctx nil})))
+  (let [existing-persistence (get-in state* [:agent-session :sessions sid :persistence])
+        session-file         (get-in existing-persistence [:flush-state :session-file])
+        flushed?             (boolean (get-in existing-persistence [:flush-state :flushed?]))]
+    (-> state*
+        (persistence/initialize-persistence-state sid {:journal journal-entries
+                                                       :session-file session-file
+                                                       :flushed? flushed?})
+        (assoc-in [:agent-session :sessions sid :telemetry] initial-telemetry)
+        (assoc-in [:agent-session :sessions sid :turn] {:ctx nil}))))
 
 (defn update-runtime-rpc-trace-state [state* enabled? file]
   (assoc-in state* [:runtime :rpc-trace] {:enabled? enabled? :file file}))

@@ -125,3 +125,34 @@ Verification
   - `psi.session-state.init-test`
   - `psi.agent-session.journal-append-convergence-test`
 - result: `7 tests, 39 assertions, 0 failures`
+
+2026-05-08 test review note
+- verdict: the focused test coverage for task `117` is solid and protects the main behavior/ownership moves, but there is one worthwhile non-blocking test cleanup area
+- strengths from the test review:
+  - `components/session-persistence/test/psi/session_persistence/core_test.clj` covers the canonical component behavior well: paths, subtree constructors, append-first behavior, lazy flush, append-after-flush, store wrappers, and entry constructors
+  - `components/session-state/test/psi/session_state/init_test.clj` provides good coverage for new, resumed, missing, and forked session-state initialization after the follow-up ownership move
+  - `components/agent-session/test/psi/agent_session/journal_append_convergence_test.clj` provides a strong integration seam test for dispatch-owned append and persistence-boundary reachability
+- main test follow-up item: duplicate/overlapping coverage between `core_test.clj` and `compat_removed_test.clj`
+  - both now test a substantial amount of journal helper, lazy flush, append-after-flush, and constructor behavior
+  - this is not incorrect, but it adds maintenance noise and weakens the distinct signal of each test namespace
+- recommended test-shaping direction:
+  - keep `core_test.clj` as the authoritative component behavior suite
+  - narrow `compat_removed_test.clj` to only the unique migration/compatibility-removal assertions, or fold those unique assertions into `core_test.clj` and remove the extra file entirely
+- secondary test-shaping note:
+  - some `session-state.init` tests assert journal contents and `:flushed?`, but could be made slightly more direct by asserting the full persistence subtree shape when that increases clarity
+  - this is optional and not a blocker
+
+2026-05-08 test-shaping follow-up execution
+- consolidated overlapping persistence tests
+  - kept `components/session-persistence/test/psi/session_persistence/core_test.clj` as the authoritative component behavior suite
+  - narrowed `components/session-persistence/test/psi/session_persistence/compat_removed_test.clj` to migration/compatibility-removal assertions only
+  - folded a small amount of unique signal back into `core_test.clj` where it belonged naturally
+- made `components/session-state/test/psi/session_state/init_test.clj` more explicit about persistence subtree shape in selected initialization scenarios while keeping assertions idiomatic and not over-coupled to object identity details
+- important discovery from the test-shaping pass: stronger `initialize-resume-missing-state` assertions exposed a real production bug
+  - `psi.session-state.init/initialize-session-slots` was reinitializing persistence state with only `:journal`, unintentionally dropping previously established `:session-file` and `:flushed?` values
+  - fixed by preserving existing persistence `:session-file` and `:flushed?` when seeding journal state in `initialize-session-slots`
+- focused test-shaping verification green via:
+  - `psi.session-persistence.core-test`
+  - `psi.session-persistence.compat-removed-test`
+  - `psi.session-state.init-test`
+- result: `4 tests, 35 assertions, 0 failures`

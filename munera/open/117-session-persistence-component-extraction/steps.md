@@ -30,6 +30,7 @@
   - [x] replace direct flush-state map construction in `initialize-resumed-session-state` with a canonical persistence-owned helper
   - [x] replace direct flush-state map construction in `initialize-forked-session-state` with a canonical persistence-owned helper
   - [x] add or refine persistence-owned pure subtree/update helpers as needed so `session-state.init` no longer rebuilds persistence shapes inline
+  - [x] preserve existing `:session-file` and `:flushed?` values when `initialize-session-slots` seeds journal state
 - [x] Update production consumers to depend downward on the new component
   - [x] `psi.turn`
   - [x] `agent-session` runtime/lifecycle/dispatch-effects/workflow consumers
@@ -66,3 +67,11 @@
   - [x] decide that broader local reorganization should be deferred rather than folded into task `117` closure cleanup
   - [x] rerun focused `psi.session-persistence.core-test`, `psi.session-state.init-test`, and `psi.agent-session.journal-append-convergence-test`
   - [x] append shaping outcome/decision to `implementation.md`
+- [x] Execute test-shaping follow-up cleanup
+  - [x] review overlap between `components/session-persistence/test/psi/session_persistence/core_test.clj` and `components/session-persistence/test/psi/session_persistence/compat_removed_test.clj`
+  - [x] keep `core_test.clj` as the authoritative component behavior suite
+  - [x] narrow `compat_removed_test.clj` to unique migration/compatibility-removal assertions only
+  - [x] decide that explicit full-subtree persistence assertions in `session-state.init` tests are useful where they clarify ownership and state preservation
+  - [x] preserve the production persistence subtree state that the stronger tests now prove, specifically `:session-file` and `:flushed?` during `initialize-session-slots`
+  - [x] rerun focused `psi.session-persistence.core-test`, `psi.session-persistence.compat-removed-test`, and `psi.session-state.init-test`
+  - [x] append test-shaping outcome/decision to `implementation.md`

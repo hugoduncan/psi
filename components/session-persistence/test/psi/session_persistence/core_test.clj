@@ -42,7 +42,11 @@
           :flush-state {:flushed? true :session-file ::file}}
          (p/persistence-state {:journal [(p/message-entry {:role "user" :content "hi"})]
                                :session-file ::file
-                               :flushed? true}))))
+                               :flushed? true})))
+  (is (= {:agent-session {:sessions {"sid" {:persistence {:journal []
+                                                          :flush-state {:flushed? false
+                                                                        :session-file nil}}}}}}
+         (p/initialize-persistence-state {} "sid" {}))))
 
 (deftest append-journal-entry-in-test
   (let [ctx (core/create-context)
@@ -104,6 +108,7 @@
 (deftest entry-constructors-test
   (let [msg (user-msg "hello")]
     (is (= :message (:kind (p/message-entry msg))))
+    (is (= msg (get-in (p/message-entry msg) [:data :message])))
     (is (= :thinking-level (:kind (p/thinking-level-entry :medium))))
     (is (= :model (:kind (p/model-entry "anthropic" "claude-3"))))
     (is (= :label (:kind (p/label-entry "target" "label"))))
@@ -115,3 +120,8 @@
                                                    :details nil}
                                                   false))))
     (is (= :branch-summary (:kind (p/branch-summary-entry "e1" "summary" nil "label" false))))))
+
+(deftest persistence-public-surface-test
+  (testing "lock retry tuning is owned by session-journal.store, not the canonical persistence ns"
+    (is (nil? (ns-resolve 'psi.session-persistence.core '*session-file-lock-retry-ms*)))
+    (is (nil? (ns-resolve 'psi.session-persistence.core '*session-file-lock-max-attempts*)))))

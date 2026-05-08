@@ -31,16 +31,22 @@
       (is (= [{:name "s"}] (:skills sd1)))
       (is (= [{:name "bash"}] (:tool-defs sd1))))
     (testing "journal, telemetry, and flush slots are initialized"
-      (is (= [] (get-in state1 (state/session-journal-path "child-1"))))
-      (is (= {:ctx nil} (get-in state1 [:agent-session :sessions "child-1" :turn])))
-      (is (= false (get-in state1 (conj (state/session-flush-state-path "child-1") :flushed?)))))))
+      (let [persistence (get-in state1 [:agent-session :sessions "child-1" :persistence])]
+        (is (= [] (:journal persistence)))
+        (is (false? (get-in persistence [:flush-state :flushed?])))
+        (is (= "/tmp/session.ndedn"
+               (some-> persistence :flush-state :session-file str))))
+      (is (= {:ctx nil} (get-in state1 [:agent-session :sessions "child-1" :turn]))))))
 
 (deftest initialize-resume-missing-state-test
   (let [current-sd {:session-id "sid-1" :worktree-path "/tmp/ws"}
-        state1     (init/initialize-resume-missing-state {} current-sd "/tmp/missing.ndedn")]
+        state1     (init/initialize-resume-missing-state {} current-sd "/tmp/missing.ndedn")
+        persistence (get-in state1 [:agent-session :sessions "sid-1" :persistence])]
     (is (= "/tmp/missing.ndedn" (get-in state1 (conj (state/session-data-path "sid-1") :session-file))))
-    (is (= [] (get-in state1 (state/session-journal-path "sid-1"))))
-    (is (= false (get-in state1 (conj (state/session-flush-state-path "sid-1") :flushed?))))))
+    (is (= [] (:journal persistence)))
+    (is (false? (get-in persistence [:flush-state :flushed?])))
+    (is (= "/tmp/missing.ndedn"
+           (some-> persistence :flush-state :session-file str)))))
 
 (deftest initialize-resumed-session-state-test
   (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/source"})
@@ -63,7 +69,11 @@
     (is (= "/tmp/parent.ndedn" (:parent-session-path sd1)))
     (is (= {:provider "prov" :id "m"} (:model sd1)))
     (is (= :medium (:thinking-level sd1)))
-    (is (= entries (get-in state1 (state/session-journal-path "sid-r"))))))
+    (is (= entries (get-in state1 (state/session-journal-path "sid-r"))))
+    (let [persistence (get-in state1 [:agent-session :sessions "sid-r" :persistence])]
+      (is (true? (get-in persistence [:flush-state :flushed?])))
+      (is (= "/tmp/resume.ndedn"
+             (some-> persistence :flush-state :session-file str))))))
 
 (deftest initialize-forked-session-state-test
   (let [parent-sd {:session-id "parent"
@@ -85,5 +95,9 @@
     (is (= "/tmp/parent.ndedn" (:parent-session-path sd1)))
     (is (= :fork-head (:spawn-mode sd1)))
     (is (= branch-entries (get-in state1 (state/session-journal-path "fork-1"))))
+    (let [persistence (get-in state1 [:agent-session :sessions "fork-1" :persistence])]
+      (is (true? (get-in persistence [:flush-state :flushed?])))
+      (is (= "/tmp/fork.ndedn"
+             (some-> persistence :flush-state :session-file str))))
     (is (= ::agent (get-in state1 [:agent-session :sessions "fork-1" :agent-ctx])))
     (is (= ::sc (get-in state1 [:agent-session :sessions "fork-1" :sc-session-id])))))
