@@ -24,6 +24,7 @@
         psi/state-kernel                              {:local/root "components/state-kernel"}
         psi/session-state                             {:local/root "components/session-state"}
         psi/session-journal                           {:local/root "components/session-journal"}
+        psi/session-persistence                       {:local/root "components/session-persistence"}
         psi/shared-config                             {:local/root "components/shared-config"}
         psi/project-nrepl                             {:local/root "components/project-nrepl"}
         psi/prompt-assets                             {:local/root "components/prompt-assets"}
@@ -51,6 +52,7 @@
                         "components/session-state/src"
                         "components/session-state/src"
                         "components/session-journal/src"
+                        "components/session-persistence/src"
                         "components/shared-config/src"
                         "components/project-nrepl/src"
                         "components/agent-core/src"
@@ -83,6 +85,7 @@
                         "components/tool-runtime/src"
                         "components/state-kernel/src"
                         "components/session-journal/src"
+                        "components/session-persistence/src"
                         "components/shared-config/src"
                         "components/project-nrepl/src"
                         "components/turn-statechart/src"
@@ -194,6 +197,7 @@
                              "components/tool-runtime/test"
                              "components/session-state/test"
                              "components/session-journal/test"
+                             "components/session-persistence/test"
                              "components/shared-config/test"
                              "components/project-nrepl/test"
                              "components/prompt-assets/test"
@@ -239,6 +243,7 @@
                         "components/tool-runtime/test"
                         "components/session-state/test"
                         "components/session-journal/test"
+                        "components/session-persistence/test"
                         "components/shared-config/test"
                         "components/project-nrepl/test"
                         "components/prompt-assets/test"
@@ -275,6 +280,7 @@
                         "components/state-kernel/src"
                         "components/session-state/src"
                         "components/session-journal/src"
+                        "components/session-persistence/src"
                         "components/shared-config/src"
                         "components/project-nrepl/src"
                         "components/prompt-assets/src"

@@ -1,41 +1,41 @@
-- [ ] Implement the settled target component name, namespace family, and public API shape around `psi.session-persistence.core`
-  - [ ] expose `session-journal-path` and `session-flush-state-path`
-  - [ ] expose `flush-state` and `persistence-state`
-  - [ ] expose `append-journal-entry-in!` and `persist-journal-in!`
-- [ ] Create `components/session-persistence/`
-- [ ] Add focused component-local tests for the extracted persistence owner
-  - [ ] `session-journal-path` / `session-flush-state-path` ownership
-  - [ ] `append-journal-entry-in!` append-first ctx semantics
-  - [ ] lazy flush on first assistant message
-  - [ ] append-after-flush semantics
-  - [ ] persisted session file load/list wrappers
-  - [ ] `flush-state` / `persistence-state` canonical persistence subtree initialization helpers
-- [ ] Move persistence-specific path builders out of `psi.session-state.state`
-  - [ ] move authoritative `session-journal-path` ownership
-  - [ ] move authoritative `session-flush-state-path` ownership
-  - [ ] move canonical `append-journal-entry-in!` ownership out of `psi.session-state.state`
-  - [ ] decide whether any temporary delegating compatibility helpers are needed
-- [ ] Move `psi.agent-session.persistence` implementation into the new component
-  - [ ] journal entry constructors
-  - [ ] in-memory journal helpers
-  - [ ] ctx-based journal helpers, ending on `append-journal-entry-in!` and the existing `*-in` read helper names
-  - [ ] flush-state helpers, ending on `flush-state`, `persistence-state`, and `persist-journal-in!`
-  - [ ] persisted session file wrappers over `session-journal.store`
-- [ ] Move canonical persistence subtree initialization ownership into the new component
-  - [ ] replace `session-runtime/persistence-state` with `psi.session-persistence.core/persistence-state`
-  - [ ] replace manual child-session persistence map construction with `flush-state` / `persistence-state`
-- [ ] Update production consumers to depend downward on the new component
-  - [ ] `psi.turn`
-  - [ ] `agent-session` runtime/lifecycle/dispatch-effects/workflow consumers
-  - [ ] app-runtime projections
-- [ ] Remove broad production requires on `psi.agent-session.persistence`
-- [ ] Remove direct production use of `psi.session-state.state/state-path` for `:journal` and `:flush-state` in favor of `session-journal-path` and `session-flush-state-path`
-- [ ] Run focused regression coverage
-  - [ ] extracted component tests
-  - [ ] persistence/journal convergence tests
-  - [ ] turn-focused regression tests
-  - [ ] session lifecycle / fork-resume tests
-  - [ ] app-runtime projection tests that consume journal helpers
-- [ ] Verify `psi.turn` no longer requires `psi.agent-session.persistence` and instead uses `psi.session-persistence.core`
+- [x] Implement the settled target component name, namespace family, and public API shape around `psi.session-persistence.core`
+  - [x] expose `session-journal-path` and `session-flush-state-path`
+  - [x] expose `flush-state` and `persistence-state`
+  - [x] expose `append-journal-entry-in!` and `persist-journal-in!`
+- [x] Create `components/session-persistence/`
+- [x] Add focused component-local tests for the extracted persistence owner
+  - [x] `session-journal-path` / `session-flush-state-path` ownership
+  - [x] `append-journal-entry-in!` append-first ctx semantics
+  - [x] lazy flush on first assistant message
+  - [x] append-after-flush semantics
+  - [x] persisted session file load/list wrappers
+  - [x] `flush-state` / `persistence-state` canonical persistence subtree initialization helpers
+- [x] Move persistence-specific path builders out of `psi.session-state.state`
+  - [x] move authoritative `session-journal-path` ownership
+  - [x] move authoritative `session-flush-state-path` ownership
+  - [x] move canonical `append-journal-entry-in!` ownership out of `psi.session-state.state`
+  - [x] leave only narrow delegating compatibility helpers in `session-state.state`
+- [x] Move `psi.agent-session.persistence` implementation into the new component
+  - [x] journal entry constructors
+  - [x] in-memory journal helpers
+  - [x] ctx-based journal helpers, ending on `append-journal-entry-in!` and the existing `*-in` read helper names
+  - [x] flush-state helpers, ending on `flush-state`, `persistence-state`, and `persist-journal-in!`
+  - [x] persisted session file wrappers over `session-journal.store`
+- [x] Move canonical persistence subtree initialization ownership into the new component
+  - [x] replace `session-runtime/persistence-state` with `psi.session-persistence.core/persistence-state`
+  - [x] replace manual child-session persistence map construction with `flush-state` / `persistence-state`
+- [x] Update production consumers to depend downward on the new component
+  - [x] `psi.turn`
+  - [x] `agent-session` runtime/lifecycle/dispatch-effects/workflow consumers
+  - [x] app-runtime projections
+- [x] Remove broad production requires on `psi.agent-session.persistence`
+- [x] Remove direct production use of `psi.session-state.state/state-path` for `:journal` and `:flush-state` in favor of `session-journal-path` and `session-flush-state-path`
+- [x] Run focused regression coverage
+  - [x] extracted component tests
+  - [x] persistence/journal convergence tests
+  - [x] turn-focused regression tests
+  - [x] session lifecycle / fork-resume tests
+  - [x] app-runtime projection tests that consume journal helpers
+- [x] Verify `psi.turn` no longer requires `psi.agent-session.persistence` and instead uses `psi.session-persistence.core`
 - [ ] Record final path-ownership and initialization-ownership decisions in `implementation.md`
 - [ ] Remove temporary compatibility wrappers unless a remaining wrapper is explicitly justified in `implementation.md`

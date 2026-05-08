@@ -3,8 +3,8 @@
    lower `psi.session-state` boundary because it derives prompt/tool/skill state
    through agent-session prompt assembly semantics."
   (:require
-   [psi.agent-session.persistence :as persist]
    [psi.prompt-assets.system-prompt]
+   [psi.session-persistence.core :as persistence]
    [psi.session-state.init :as init]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as state]))
@@ -95,6 +95,6 @@
     (-> state*
         (assoc-in (state/session-data-path child-session-id) child-sd)
         (assoc-in [:agent-session :sessions child-session-id :persistence]
-                  {:journal     (vec (map persist/message-entry (or preloaded-messages [])))
-                   :flush-state {:flushed? false :session-file nil}})
+                  (persistence/persistence-state
+                   {:journal (mapv persistence/message-entry (or preloaded-messages []))}))
         (init/initialize-session-slots child-session-id []))))

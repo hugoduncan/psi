@@ -6,7 +6,7 @@
    Impure execution functions create and prompt judge sessions."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.prompt-control :as prompt-control]))
 
 ;;; Projection — pure functions

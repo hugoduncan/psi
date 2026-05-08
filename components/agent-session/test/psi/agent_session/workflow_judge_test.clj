@@ -1,7 +1,7 @@
 (ns psi.agent-session.workflow-judge-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.persistence]
+   [psi.session-persistence.core]
    [psi.agent-session.prompt-control]
    [psi.agent-session.workflow-judge :as workflow-judge]))
 
@@ -239,7 +239,7 @@
                (fn [_ctx _parent opts]
                  (swap! created-sessions* conj opts)
                  nil)}]
-      (with-redefs [psi.agent-session.persistence/messages-from-entries-in
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid]
                       [{:role "user" :content "Build it"}
                        {:role "assistant" :content [{:type :text :text "Done building."}]}])
@@ -275,7 +275,7 @@
                          "REVISE"   {:goto "step-2-build" :max-iterations 3}}
           step-runs {"step-2-build"  {:step-id "step-2-build" :attempts [] :iteration-count 1}
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
-      (with-redefs [psi.agent-session.persistence/messages-from-entries-in
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
                     psi.agent-session.prompt-control/prompt-execution-result-in!
                     (fn [_ctx _sid _text]
@@ -305,7 +305,7 @@
                          "REVISE"   {:goto "step-2-build" :max-iterations 3}}
           step-runs {"step-2-build"  {:step-id "step-2-build" :attempts [] :iteration-count 1}
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
-      (with-redefs [psi.agent-session.persistence/messages-from-entries-in
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
                     psi.agent-session.prompt-control/prompt-execution-result-in!
                     (fn [_ctx _sid _text]

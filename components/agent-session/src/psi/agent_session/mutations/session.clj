@@ -8,7 +8,7 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as core]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.session-runtime :as runtime]
    [psi.session-state.state :as ss]))
 

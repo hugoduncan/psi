@@ -6,7 +6,7 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.provider-auth.oauth.core :as oauth]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.state-accessors :as sa]

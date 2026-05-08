@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.deterministic-operation-registry.registry :as op-reg]
-   [psi.agent-session.persistence]
+   [psi.session-persistence.core]
    [psi.agent-session.prompt-control]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]

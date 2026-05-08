@@ -9,7 +9,7 @@
    [psi.agent-session.dispatch-handlers.session-lifecycle :as session-lifecycle-handlers]
    [psi.agent-session.dispatch-handlers.session-mutations :as session-mutations]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 

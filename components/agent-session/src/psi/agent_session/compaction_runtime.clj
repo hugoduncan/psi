@@ -3,7 +3,7 @@
    [psi.agent-session.compaction :as compaction]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.prompt-control :as prompt-control]
    [psi.session-state.state :as ss]))
 

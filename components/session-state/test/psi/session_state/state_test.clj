@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.session-state.state :as ss]
    [psi.agent-session.core :as session]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-ctx []

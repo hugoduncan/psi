@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.mutations :as mutations]
    [psi.rpc :as rpc]
    [psi.rpc.session.projections :as rpc.projections]

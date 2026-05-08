@@ -11,7 +11,7 @@
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.transcript]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.provider-auth.oauth.core :as oauth]

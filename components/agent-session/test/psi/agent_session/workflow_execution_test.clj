@@ -5,7 +5,7 @@
    [psi.agent-session.core :as session]
    [psi.deterministic-operation-registry.registry]
    [psi.agent-session.deterministic-operations]
-   [psi.agent-session.persistence]
+   [psi.session-persistence.core]
    [psi.agent-session.prompt-control]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]

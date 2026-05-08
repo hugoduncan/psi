@@ -1,4 +1,5 @@
 {:deps {org.clojure/clojure {:mvn/version "1.12.0"}
         metosin/malli {:mvn/version "0.16.4"}
         psi/prompt-registry {:local/root "../prompt-registry"}
+        psi/session-persistence {:local/root "../session-persistence"}
         psi/workflow-registry {:local/root "../workflow-registry"}}}

@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.rpc :as rpc]
    [psi.session-journal.store :as journal-store]
    [psi.rpc-test-support :as support]))

@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.turn-runtime.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))

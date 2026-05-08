@@ -7,6 +7,7 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [psi.prompt-registry.contributions :as prompt-contributions]
+   [psi.session-persistence.core :as session-persistence]
    [psi.session-state.display-name :as display-name]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -20,8 +21,8 @@
 
 (defn session-data-path [sid] [:agent-session :sessions sid :data])
 (defn session-telemetry-path [sid k] [:agent-session :sessions sid :telemetry k])
-(defn session-journal-path [sid] [:agent-session :sessions sid :persistence :journal])
-(defn session-flush-state-path [sid] [:agent-session :sessions sid :persistence :flush-state])
+(defn session-journal-path [sid] (session-persistence/session-journal-path sid))
+(defn session-flush-state-path [sid] (session-persistence/session-flush-state-path sid))
 (defn session-turn-ctx-path [sid] [:agent-session :sessions sid :turn :ctx])
 (defn session-scheduler-path [sid] [:agent-session :sessions sid :data :scheduler])
 (defn session-scheduler-schedules-path [sid] [:agent-session :sessions sid :data :scheduler :schedules])
@@ -100,8 +101,7 @@
 
 (defn append-journal-entry-in!
   [ctx session-id entry]
-  (apply-root-state-update-in! ctx (append-journal-entry-root-update session-id entry))
-  entry)
+  (session-persistence/append-journal-entry-in! ctx session-id entry))
 
 (defn get-sessions-map-in [ctx] (get-state-in* ctx [:agent-session :sessions]))
 

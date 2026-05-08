@@ -7,7 +7,7 @@
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.shared-config.project :as project-prefs]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]

@@ -8,7 +8,7 @@
    [clojure.string :as str]
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.runtime :as runtime]

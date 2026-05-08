@@ -7,7 +7,7 @@
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.turn-runtime.core]
    [psi.session-journal.store :as journal-store]
    [psi.session-state.state :as ss]

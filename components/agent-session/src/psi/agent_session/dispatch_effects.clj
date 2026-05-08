@@ -12,7 +12,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.memory.core :as memory]
    [psi.memory.runtime :as memory-runtime]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.shared-config.project :as project-prefs]
    [psi.session-state.model :as session-data]
    [psi.shared-config.user :as user-cfg]

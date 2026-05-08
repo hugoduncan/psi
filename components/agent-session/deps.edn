@@ -14,6 +14,7 @@
         psi/state-kernel           {:local/root "../state-kernel"}
         psi/session-state          {:local/root "../session-state"}
         psi/session-journal        {:local/root "../session-journal"}
+        psi/session-persistence    {:local/root "../session-persistence"}
         psi/shared-config          {:local/root "../shared-config"}
         psi/project-nrepl          {:local/root "../project-nrepl"}
         psi/prompt-assets          {:local/root "../prompt-assets"}

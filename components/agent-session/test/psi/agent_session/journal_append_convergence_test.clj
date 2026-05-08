@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is]]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
@@ -26,12 +26,12 @@
   (let [[ctx sid] (create-ctx {:persist? false})
         entry     (persist/message-entry {:role "assistant" :content [{:type :text :text "done"}]})
         seen      (atom [])]
-    (with-redefs [persist/persist-entry-in! (fn [ctx* session-id cwd parent-session-id parent-session-path]
-                                              (swap! seen conj {:ctx ctx*
-                                                                :session-id session-id
-                                                                :cwd cwd
-                                                                :parent-session-id parent-session-id
-                                                                :parent-session-path parent-session-path}))]
+    (with-redefs [persist/persist-journal-in! (fn [ctx* session-id cwd parent-session-id parent-session-path]
+                                                (swap! seen conj {:ctx ctx*
+                                                                  :session-id session-id
+                                                                  :cwd cwd
+                                                                  :parent-session-id parent-session-id
+                                                                  :parent-session-path parent-session-path}))]
       (dispatch-effects/execute-effect! ctx {:effect/type :persist/journal-append-entry
                                              :session-id sid
                                              :entry entry}))

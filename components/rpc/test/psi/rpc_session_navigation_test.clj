@@ -6,7 +6,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.session-journal.store :as journal-store]
    [psi.session-state.state :as ss]
    [psi.rpc-test-support :as support]))

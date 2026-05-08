@@ -9,4 +9,5 @@
         psi/app-runtime       {:local/root "../app-runtime"}
         psi/memory            {:local/root "../memory"}
         psi/session-state     {:local/root "../session-state"}
+        psi/session-persistence {:local/root "../session-persistence"}
         psi/ui-state          {:local/root "../ui-state"}}}

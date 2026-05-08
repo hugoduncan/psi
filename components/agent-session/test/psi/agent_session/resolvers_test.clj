@@ -19,7 +19,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.mutations :as mutations]
    [psi.provider-auth.oauth.core :as oauth]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.session-journal.store :as journal-store]
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]

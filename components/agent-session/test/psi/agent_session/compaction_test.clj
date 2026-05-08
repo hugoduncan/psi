@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.compaction :as compaction]
    [psi.session-state.model :as session]
-   [psi.agent-session.persistence :as persist]))
+   [psi.session-persistence.core :as persist]))
 
 (defn- user-message [text]
   {:role "user"

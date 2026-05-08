@@ -8,7 +8,7 @@
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))

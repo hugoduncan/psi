@@ -7,7 +7,7 @@
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
    [psi.agent-session.conversation]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.prompt-loop :as prompt-loop]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]

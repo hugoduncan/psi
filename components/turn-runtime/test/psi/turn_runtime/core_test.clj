@@ -4,7 +4,7 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.prompt-loop :as prompt-loop]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-turn :as prompt-turn]

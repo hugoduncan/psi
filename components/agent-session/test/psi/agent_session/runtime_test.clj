@@ -7,7 +7,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.provider-auth.oauth.core :as oauth]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.turn-runtime.core]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.test-support :as test-support]

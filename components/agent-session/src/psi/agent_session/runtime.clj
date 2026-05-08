@@ -11,7 +11,7 @@
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.session-state.state :as ss]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.provider-auth.core :as provider-auth]
    [psi.recursion.core :as recursion]
    [taoensso.timbre :as timbre]))
