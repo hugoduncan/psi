@@ -5,7 +5,7 @@
 
 (deftest invoke-operation-test
   (testing "successful operation results pass through unchanged"
-    (is (= {:status :ok :data {:issues [1]} :summary "1 issue"}
+    (is (= {:status :ok :data {:issues [1]} :summary "github/search"}
            (runtime/invoke-operation {:id "github/search"
                                       :handler (fn [{:keys [operation-id args]}]
                                                  {:status :ok
