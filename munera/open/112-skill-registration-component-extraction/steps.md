@@ -1,0 +1,14 @@
+- [ ] Inspect current `:session/register-skill` behavior and confirm the exact canonical semantics to preserve
+- [ ] Define the first-cut `skill-registry` API as pure registered-skill collection operations
+- [ ] Decide and document the minimal registration validation rule (`:name` present and non-blank string only, without importing prompt-assets discovery validation)
+- [ ] Create `components/skill-registry/` with focused registry tests
+- [ ] Implement canonical register/get/list/skill-names/count helpers for registered skill maps
+- [ ] Implement explicit duplicate-handling semantics: ignore duplicates and preserve first-registration order
+- [ ] Implement result reporting that includes `:added?` and `:changed?`
+- [ ] Delegate `agent-session` skill registration to the extracted component
+- [ ] Keep prompt-refresh behavior in `agent-session` and prove it still triggers only on changed skill sets
+- [ ] Verify `prompt-assets.skills` remains the owner of discovery/parsing/validation/invocation concerns
+- [ ] If helpful and low-risk, delegate trivial read-path helpers to the new component
+- [ ] Run focused component-local verification for `skill-registry`
+- [ ] Run affected `agent-session` verification for skill registration/orchestration behavior
+- [ ] Record final boundary decisions and any non-obvious tradeoffs in `implementation.md`

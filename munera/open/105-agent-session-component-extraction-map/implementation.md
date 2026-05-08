@@ -53,6 +53,8 @@ Live namespace-surface review completed:
   - prompt composition owns assets/assembly/provider-facing conversation projection
   - tool runtime owns execution/shaping/schema/runtime adapters
   - turn owns single-turn lifecycle orchestration and consumes prompt/tool capabilities rather than owning them
+- identified an additional prompt/skills sub-boundary now captured as open child task `112-skill-registration-component-extraction`
+  - this sharpens the prompt/skills area further: `prompt-assets.skills` remains the owner of discovery/parsing/invocation helpers, while pure registered-skill collection semantics can move into a lower `skill-registry` component
 - observed that turn extraction is already in an intermediate state because `components/agent-session/src/psi/turn/handlers.clj` exists while high-level prompt-turn orchestration still resides under `psi.agent-session.*`
 - confirmed workflow is now the clearest remaining extraction candidate by both namespace mass and conceptual cohesion
 - recorded that the lower shared-config seam exposed by `107` is no longer speculative: it is now landed concretely via task `109`

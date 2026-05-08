@@ -130,6 +130,7 @@ Boundary note after reviewing the current namespace surface:
 
 - prompt composition and turn orchestration should stay distinct: prompt assets decide what to send, while turn owns when/how a single agent turn is prepared, executed, recorded, and continued
 - `tool_defs.clj` appears split-brain: prompt-facing tool schema projection likely belongs with prompt composition, while runtime execution ownership belongs with the tool runtime component
+- skill registration now also appears split from broader prompt ownership: discovery/parsing/invocation belongs with prompt assets, while pure registered-skill collection semantics can sit in a narrower lower `skill-registry` child component
 - `message_text.clj` remains ambiguous and should be treated as a review point during a concrete extraction rather than forced into prompt ownership prematurely
 - config resolution remains a cross-cutting concern: prompt composition consumes config, but config loading itself now has an explicit lower owner in `components/shared-config/` rather than belonging inside the prompt component
 
@@ -439,6 +440,7 @@ Reviewing the current `components/agent-session/src/psi/agent_session/` tree sha
 
 - landed child tasks `106-provider-auth-component-extraction` and `107-project-nrepl-component-extraction` validate the umbrella's early bounded-subsystem ordering
 - landed child task `104-tool-runtime-component-extraction` confirmed the domain boundary was useful, even though tool-related ownership still remains distributed enough that the umbrella continues to track the broader tool-runtime shape
+- open child task `112-skill-registration-component-extraction` sharpens the prompt/skills boundary by extracting pure registered-skill collection semantics into a lower `skill-registry` component while leaving discovery/parsing/invocation in `prompt-assets.skills`
 - landed task `100-turn-statechart-component-extraction` should be treated as a narrow low-level turn child aligned with this umbrella, not as a replacement for a broader turn-component decision
 - `102-turn-preparation-component-extraction` is superseded by this umbrella because its narrow extraction target proved structurally premature without the broader component map
 - follow-on extraction tasks should reference this umbrella when they carve out one of the named component candidates
