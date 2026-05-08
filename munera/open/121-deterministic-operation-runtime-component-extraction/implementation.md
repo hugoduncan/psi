@@ -50,3 +50,12 @@ Code-shaper review 2026-05-08:
 Follow-up execution 2026-05-08:
 - Updated workflow invoke-path test stubs in `workflow_execution_test.clj` from `:status :succeeded` to canonical `:status :ok`.
 - Removed wrapper stubbing from the focused session-contribution and delegate invoke-path workflow tests so those proofs now exercise the real `psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result` path.
+
+Test review 2026-05-08:
+- Tests now align with the extracted boundary and the tightened invoke-path proofs are good.
+- One minor non-blocking follow-up remains: `core_test.clj` asserts malformed-result `:explanation` presence but not its shape; add one targeted assertion only if that explanation structure is intended to stay stable.
+
+Follow-up execution 2026-05-08:
+- Checked the live malformed-result explanation from `psi.deterministic-operation-registry.defs/explain-operation-result` for invalid `:status` dispatch.
+- Treated the narrow `:errors` projection as stable enough for a targeted proof.
+- Updated `core_test.clj` to assert the key explanation shape for this case: one error at `[:status]` / `[:status]` with type `:malli.core/invalid-dispatch-value`.

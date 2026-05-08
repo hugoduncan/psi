@@ -41,4 +41,8 @@
               :result {:status :succeeded :data {}}}
              (select-keys (ex-data ex)
                           [:type :operation-id :invocation :result])))
-      (is (some? (:explanation (ex-data ex)))))))
+      (is (= [{:path [:status]
+               :in [:status]
+               :type :malli.core/invalid-dispatch-value}]
+             (mapv #(select-keys % [:path :in :type])
+                   (:errors (:explanation (ex-data ex)))))))))

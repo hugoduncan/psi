@@ -10,3 +10,5 @@
 - [x] Record final boundary decisions and residual follow-ons in `implementation.md`
 - [x] Update workflow invoke-path test stubs in `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` to use canonical deterministic operation success results (`:status :ok`)
 - [x] Keep at least one focused workflow invoke-path proof on the real `psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result` path instead of stubbing the wrapper everywhere
+- [x] Decide whether malformed-result `:explanation` shape in `components/deterministic-operation-runtime/test/psi/deterministic_operation_runtime/core_test.clj` is intended to be stable
+- [x] If the malformed-result `:explanation` shape is intended to be stable, add one targeted assertion for that structure in `components/deterministic-operation-runtime/test/psi/deterministic_operation_runtime/core_test.clj`
