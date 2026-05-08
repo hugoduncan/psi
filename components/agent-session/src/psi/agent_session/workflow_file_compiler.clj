@@ -9,7 +9,7 @@
    - checked-in `.psi/workflows/*.md` files are now target-authored only
    - current-authored single-step and multi-step file compilation paths are removed"
   (:require
-   [psi.agent-session.workflow-target-ir-compiler :as workflow-target-ir-compiler]))
+   [psi.workflow-registry.definition :as workflow-definition]))
 
 ;;; Top-level compilation
 
@@ -29,7 +29,7 @@
                                                  :description description)
                               (contains? config :terminal-contract) (assoc :terminal-contract (:terminal-contract config))
                               body (assoc :workflow-file-meta {:framing-prompt body}))]
-    (when-not (workflow-target-ir-compiler/target-authored-workflow-definition? workflow-definition)
+    (when-not (workflow-definition/target-authored-workflow-definition? workflow-definition)
       (throw (ex-info "Target-authored workflow file must define `{:steps [...]}`"
                       {:workflow-definition workflow-definition})))
     workflow-definition))

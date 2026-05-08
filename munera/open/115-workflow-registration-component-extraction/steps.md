@@ -1,20 +1,23 @@
-- [ ] Inspect current workflow definition register/remove/list/get behavior and verify the documented canonical semantics to preserve
-- [ ] Define the first-cut `workflow-registry` API explicitly as `register-definition`, `remove-definition`, `workflow-definition`, `list-definitions`, and `definition-ids`, with `register-definition` and `remove-definition` as tuple-returning authoritative component helpers
-- [ ] Decide and document the canonical definition identity rule (`:definition-id`) and current `normalize-id` behavior, including blank-id UUID generation
-- [ ] Decide and prove invalid registration behavior at the registry boundary, preserving target-authored definition validation
-- [ ] Decide and prove registration replacement behavior
-- [ ] Decide and prove removal miss behavior and missing-definition lookup behavior
-- [ ] Decide and prove listing and definition-id query ordering behavior
-- [ ] Create `components/workflow-registry/` with focused registry tests
-- [ ] Implement canonical workflow definition `register-definition`, `remove-definition`, `workflow-definition`, `list-definitions`, and `definition-ids` helpers below `agent-session`
-- [ ] Move workflow-definition-specific path helpers such as `definitions-path` and `definition-path` into the extracted component
-- [ ] Implement only the workflow-definition-specific path/query/update helpers needed for canonical definition storage and registry operations
-- [ ] Delegate workflow mutation entrypoints to the extracted component, including workflow definition listing mutations as well as register/remove mutations
-- [ ] Delegate workflow resolvers to the extracted component, including normalized detail lookup
-- [ ] Delegate `psi-tool` workflow definition listing/lookup ownership to the extracted component or a thin upper seam over it
-- [ ] Keep workflow-loader reload/retirement orchestration above the boundary while delegating canonical registration/removal downward
-- [ ] Rewire registered-definition lookup used by workflow run creation to the extracted registry without widening into run-execution ownership
-- [ ] Keep workflow-run creation/execution/resume/cancel/progression ownership outside this task
-- [ ] Run focused component-local verification for `workflow-registry`
-- [ ] Run affected higher-level verification for workflow mutation, resolver, `psi-tool`, loader, and run-creation lookup behavior
-- [ ] Record final boundary decisions, ordering behavior, lower-vs-higher result-contract distinctions, and any non-obvious tradeoffs in `implementation.md`
+- [x] Inspect current workflow definition register/remove/list/get behavior and verify the documented canonical semantics to preserve
+- [x] Define the first-cut `workflow-registry` API explicitly as `register-definition`, `remove-definition`, `workflow-definition`, `list-definitions`, and `definition-ids`, with `register-definition` and `remove-definition` as tuple-returning authoritative component helpers
+- [x] Decide and document the canonical definition identity rule (`:definition-id`) and current `normalize-id` behavior, including blank-id UUID generation
+- [x] Decide and prove invalid registration behavior at the registry boundary, preserving target-authored definition validation
+- [x] Decide and prove registration replacement behavior
+- [x] Decide and prove removal miss behavior and missing-definition lookup behavior
+- [x] Decide and prove listing and definition-id query ordering behavior
+- [x] Create `components/workflow-registry/` with focused registry tests
+- [x] Implement canonical workflow definition `register-definition`, `remove-definition`, `workflow-definition`, `list-definitions`, and `definition-ids` helpers below `agent-session`
+- [x] Move workflow-definition-specific path helpers such as `definitions-path` and `definition-path` into the extracted component
+- [x] Implement only the workflow-definition-specific path/query/update helpers needed for canonical definition storage and registry operations
+- [x] Delegate workflow mutation entrypoints to the extracted component, including workflow definition listing mutations as well as register/remove mutations
+- [x] Delegate workflow resolvers to the extracted component, including normalized detail lookup
+- [x] Delegate `psi-tool` workflow definition listing/lookup ownership to the extracted component or a thin upper seam over it
+- [x] Keep workflow-loader reload/retirement orchestration above the boundary while delegating canonical registration/removal downward
+- [x] Rewire registered-definition lookup used by workflow run creation to the extracted registry without widening into run-execution ownership
+- [x] Keep workflow-run creation/execution/resume/cancel/progression ownership outside this task
+- [x] Run focused component-local verification for `workflow-registry`
+- [x] Run affected higher-level verification for workflow mutation, resolver, `psi-tool`, loader, and run-creation lookup behavior
+- [x] Record final boundary decisions, ordering behavior, lower-vs-higher result-contract distinctions, and any non-obvious tradeoffs in `implementation.md`
+- [x] Optional follow-up: add a brief compatibility comment near `psi.agent-session.workflow-target-ir-compiler/target-authored-workflow-definition?` explaining that it intentionally aliases the lower shared predicate during migration
+- [x] Optional follow-up: if `psi.workflow-registry.registry` grows, consider introducing a tiny internal `ensure-valid-definition!` helper to keep validation/error shaping flat without broadening the public API
+- [x] Optional follow-up: add direct loader-focused proof for the workflow-loader consumer seam so loader acceptance evidence is explicit rather than indirect through mutation-path coverage

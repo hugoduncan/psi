@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-file-compiler :as compiler]
-   [psi.agent-session.workflow-target-ir-compiler :as target-compiler]))
+   [psi.workflow-registry.definition :as workflow-definition]))
 
 (def target-session-parsed
   {:name "planner"
@@ -57,7 +57,7 @@
       (is (= "planner" (:name definition)))
       (is (= "Plans tasks" (:summary definition)))
       (is (= "You are a planner." (get-in definition [:workflow-file-meta :framing-prompt])))
-      (is (target-compiler/target-authored-workflow-definition? definition))
+      (is (workflow-definition/target-authored-workflow-definition? definition))
       (is (= [:session] (mapv :type (:steps definition))))))
 
   (testing "target-authored multi-step workflow files compile unchanged as authored definitions"

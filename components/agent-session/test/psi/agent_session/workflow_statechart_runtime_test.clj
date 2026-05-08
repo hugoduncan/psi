@@ -7,6 +7,7 @@
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-judge]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]
    [psi.agent-session.workflow-statechart-runtime :as runtime]))
 
 (defn- create-session-context
@@ -56,7 +57,7 @@
   [ctx definition run-id]
   (swap! (:state* ctx)
          (fn [state]
-           (let [[s _ _] (workflow-runtime/register-definition state definition)
+           (let [[s _ _] (workflow-registry/register-definition state definition)
                  [s _ _] (workflow-runtime/create-run s {:definition-id (:definition-id definition)
                                                          :run-id run-id
                                                          :workflow-input {:input "ship it"

@@ -201,6 +201,42 @@
                         (= "planner" (get-in % [:params :definition-id])))
                   @mutate-calls))))))
 
+(deftest reload-definitions-registers-and-retires-through-workflow-mutations-test
+  (testing "reload computes file-backed adds/removals while delegating registry semantics through canonical workflow mutations"
+    (let [{:keys [api commands mutate-calls]} (make-loader-api
+                                               {'psi.workflow/register-definition (fn [_] {:psi.workflow/registered? true})
+                                                'psi.workflow/remove-definition (fn [_] {:psi.workflow/removed? true})})
+          load-call* (atom 0)]
+      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+                    (fn [_]
+                      (case (swap! load-call* inc)
+                        1 {:definitions {"planner" {:definition-id "planner"
+                                                    :name "planner"
+                                                    :summary "Plans"
+                                                    :step-order ["step-1"]
+                                                    :steps {"step-1" {:label "planner"}}}}
+                           :errors []
+                           :warnings []}
+                        2 {:definitions {"builder" {:definition-id "builder"
+                                                    :name "builder"
+                                                    :summary "Builds"
+                                                    :step-order ["step-1"]
+                                                    :steps {"step-1" {:label "builder"}}}}
+                           :errors []
+                           :warnings []}))]
+        (wl/init api)
+        (reset! mutate-calls [])
+        ((:handler (get @commands "delegate-reload")) nil)
+        (is (= [{:sym 'psi.workflow/remove-definition
+                 :params {:definition-id "planner"}}
+                {:sym 'psi.workflow/register-definition
+                 :params {:definition {:definition-id "builder"
+                                       :name "builder"
+                                       :summary "Builds"
+                                       :step-order ["step-1"]
+                                       :steps {"step-1" {:label "builder"}}}}}]
+               @mutate-calls))))))
+
 (deftest init-registers-notifications-via-map-opts-test
   (testing "init sends startup load notices through extension ui notifications when available"
     (let [notifications (atom [])

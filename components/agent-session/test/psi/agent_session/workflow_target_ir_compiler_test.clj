@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]
    [psi.agent-session.workflow-target-ir-compiler :as target-compiler]))
 
 (def target-invoke-session-delegate-definition
@@ -132,6 +133,12 @@
               {:outcome :ok
                :outputs {:handoff {:issue_number "12"}}}))))))
 
+(deftest target-authored-workflow-definition?-alias-test
+  (testing "agent-session compiler alias matches lower shared authored-shape predicate"
+    (is (true? (target-compiler/target-authored-workflow-definition?
+                {:steps [{:name "plan" :type :session}]})))
+    (is (false? (target-compiler/target-authored-workflow-definition? {:steps {}})))))
+
 (deftest compile-target-judge-routing-and-loop-bounds-test
   (testing "target authored judges, routing, and loop bounds compile into canonical IR"
     (let [ir (target-compiler/compile-workflow-definition target-judged-definition)
@@ -202,9 +209,9 @@
 (deftest create-run-preserves-registered-target-definition-provenance-without-inline-definition-id-test
   (testing "registered target-authored runs keep source provenance while inline snapshots remain source-id free"
     (let [state {:workflows {:definitions {} :runs {} :run-order []}}
-          [state definition-id _] (workflow-runtime/register-definition state
-                                                                        (assoc target-invoke-session-delegate-definition
-                                                                               :definition-id "target-authored"))
+          [state definition-id _] (workflow-registry/register-definition state
+                                                                         (assoc target-invoke-session-delegate-definition
+                                                                                :definition-id "target-authored"))
           [_ _ run] (workflow-runtime/create-run state {:definition-id definition-id
                                                         :run-id "registered-target-run"
                                                         :workflow-input {:repo "org/repo"

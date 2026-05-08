@@ -12,7 +12,8 @@
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -125,7 +126,7 @@
                                            {:provider :anthropic :id "claude-test"})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state single-step-with-model)
+                     (let [[s _ _] (workflow-registry/register-definition state single-step-with-model)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                    :run-id "run-1"
                                                                    :workflow-input {:input "plan it"}})]
@@ -143,9 +144,9 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
-                           [s _ _] (workflow-runtime/register-definition s builder-definition-with-meta)
-                           [s _ _] (workflow-runtime/register-definition s multi-step-definition-with-meta)
+                     (let [[s _ _] (workflow-registry/register-definition state single-step-definition-with-meta)
+                           [s _ _] (workflow-registry/register-definition s builder-definition-with-meta)
+                           [s _ _] (workflow-registry/register-definition s multi-step-definition-with-meta)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build"
                                                                    :run-id "run-2"
                                                                    :workflow-input {:input "build it"
@@ -186,9 +187,9 @@
                                :workflow-file-meta {:framing-prompt "Coordinate a plan-build cycle."}}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
-                           [s _ _] (workflow-runtime/register-definition s builder-definition-with-meta)
-                           [s _ _] (workflow-runtime/register-definition s override-definition)
+                     (let [[s _ _] (workflow-registry/register-definition state single-step-definition-with-meta)
+                           [s _ _] (workflow-registry/register-definition s builder-definition-with-meta)
+                           [s _ _] (workflow-registry/register-definition s override-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build-overrides"
                                                                    :run-id "run-overrides"
                                                                    :workflow-input {:input "build it"}})]
@@ -209,8 +210,8 @@
       (is (= :high (:thinking-level builder-config))))))
 
 (deftest materialize-step-inputs-and-prompt-test
-  (let [[state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
-                                                           multi-step-definition-with-meta)
+  (let [[state1 _ _] (workflow-registry/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
+                                                            multi-step-definition-with-meta)
         [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "plan-build"
                                                                :run-id "run-prompt"
                                                                :workflow-input {:input "ship it"
@@ -244,8 +245,8 @@
                                                      "original" {:from :workflow-input
                                                                  :path [:original :issue :title]}}}]}]
                     :workflow-file-meta {:framing-prompt "Projection proof."}}
-        [state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
-                                                           definition)
+        [state1 _ _] (workflow-registry/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
+                                                            definition)
         [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "projection-proof"
                                                                :run-id "run-projection-proof"
                                                                :workflow-input {:ticket {:body "repro details"}
@@ -284,7 +285,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state multi-step-definition-with-meta)
+                     (let [[s _ _] (workflow-registry/register-definition state multi-step-definition-with-meta)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build"
                                                                    :run-id "run-linear"
                                                                    :workflow-input {:input "ship it"
@@ -410,8 +411,8 @@
                                                {:type :template
                                                 :text "Review {{reply}}"
                                                 :vars {"reply" {:from {:step "plan" :yield :text}}}}]}]}
-          [state1 _ _] (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
-                                                             definition)
+          [state1 _ _] (workflow-registry/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
+                                                              definition)
           [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "mixed-session-inputs"
                                                                  :run-id "run-mixed-session-inputs"
                                                                  :workflow-input {:input "Ship it"
@@ -461,7 +462,7 @@
                                                  :path [:issues]}]}]}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state (assoc callee-definition :definition-id "builder"))
+                     (let [[s _ _] (workflow-registry/register-definition state (assoc callee-definition :definition-id "builder"))
                            [s _ _] (workflow-runtime/create-run s {:definition caller-definition
                                                                    :run-id "run-delegate"
                                                                    :workflow-input {:original {:ticket 123
@@ -558,7 +559,7 @@
                                                        :vars {"build-result" {:from {:step "build" :yield :text}}}}]}]}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state (assoc callee-definition :definition-id "builder"))
+                     (let [[s _ _] (workflow-registry/register-definition state (assoc callee-definition :definition-id "builder"))
                            [s _ _] (workflow-runtime/create-run s {:definition caller-definition
                                                                    :run-id "run-mixed-delegate"
                                                                    :workflow-input {:task "ship it"
@@ -600,7 +601,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
+                     (let [[s _ _] (workflow-registry/register-definition state single-step-definition-with-meta)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                    :run-id "run-mode-1"
                                                                    :workflow-input {:input "plan it"}})]
@@ -625,7 +626,7 @@
                         :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state planner-def)
+                     (let [[s _ _] (workflow-registry/register-definition state planner-def)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                    :run-id "run-ext-1"
                                                                    :workflow-input {:input "plan it"}})
@@ -664,7 +665,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state workflow-selection-definition)
+                     (let [[s _ _] (workflow-registry/register-definition state workflow-selection-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner-selection"
                                                                    :run-id "run-selection-1"
                                                                    :workflow-input {:input "plan it"}})]
@@ -721,7 +722,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state judged-definition)
+                     (let [[s _ _] (workflow-registry/register-definition state judged-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build-review-judged"
                                                                    :run-id "run-loop"
                                                                    :workflow-input {:input "ship it"

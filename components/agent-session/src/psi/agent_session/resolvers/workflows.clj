@@ -2,7 +2,8 @@
   "Pathom3 resolvers for deterministic workflow definitions, runs, and workflow↔session relationships."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 ;; NOTE: resolver ::pco/output declarations use flat key lists only.
 ;; Nested join shapes are pre-projected by the ->eql helpers and returned
@@ -14,15 +15,9 @@
   [agent-session-ctx]
   (or (:workflows @(:state* agent-session-ctx)) {}))
 
-(defn- definition-map
-  [agent-session-ctx]
-  (or (:definitions (root-workflow-state agent-session-ctx)) {}))
-
 (defn- ordered-definitions
   [agent-session-ctx]
-  (->> (vals (definition-map agent-session-ctx))
-       (sort-by :definition-id)
-       vec))
+  (workflow-registry/list-definitions @(:state* agent-session-ctx)))
 
 (defn- run-map
   [agent-session-ctx]
@@ -137,7 +132,7 @@
   {::pco/input  [:psi/agent-session-ctx :psi.workflow.definition/id]
    ::pco/output [:psi.workflow.definition/detail]}
   {:psi.workflow.definition/detail
-   (some-> (get (definition-map agent-session-ctx) id)
+   (some-> (workflow-registry/workflow-definition @(:state* agent-session-ctx) id)
            definition->eql)})
 
 (pco/defresolver workflow-runs-root

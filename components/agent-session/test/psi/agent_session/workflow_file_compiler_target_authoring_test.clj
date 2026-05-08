@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-file-compiler :as compiler]
-   [psi.agent-session.workflow-target-ir-compiler :as target-compiler]))
+   [psi.workflow-registry.definition :as workflow-definition]))
 
 (deftest compile-target-authored-workflow-file-test
   (testing "workflow file compiler preserves target-authored examples as target definitions"
@@ -30,7 +30,7 @@
       (is (= "plan-build" (:name definition)))
       (is (= "Plan and build without review" (:summary definition)))
       (is (= "Frame it." (get-in definition [:workflow-file-meta :framing-prompt])))
-      (is (target-compiler/target-authored-workflow-definition? definition))
+      (is (workflow-definition/target-authored-workflow-definition? definition))
       (is (= [:session :session]
              (mapv :type (:steps definition))))))
 

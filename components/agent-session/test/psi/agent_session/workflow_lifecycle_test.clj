@@ -7,7 +7,8 @@
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
   ([]
@@ -43,7 +44,7 @@
 (defn- install-definition-and-run!
   [ctx]
   (let [[state1 definition-id _]
-        (workflow-runtime/register-definition @(:state* ctx) plan-build-review-definition)
+        (workflow-registry/register-definition @(:state* ctx) plan-build-review-definition)
         [state2 run-id _]
         (workflow-runtime/create-run state1 {:definition-id definition-id
                                              :run-id "run-1"

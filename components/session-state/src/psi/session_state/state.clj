@@ -7,7 +7,8 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [psi.prompt-registry.contributions :as prompt-contributions]
-   [psi.session-state.display-name :as display-name]))
+   [psi.session-state.display-name :as display-name]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn agent-ctx-in
   [ctx session-id]
@@ -28,7 +29,7 @@
 
 (def ^:private static-state-paths
   {:workflow-state        [:workflows]
-   :workflow-definitions  [:workflows :definitions]
+   :workflow-definitions  (workflow-registry/definitions-path)
    :workflow-runs         [:workflows :runs]
    :workflow-run-order    [:workflows :run-order]
    :nrepl-runtime         [:runtime :nrepl]

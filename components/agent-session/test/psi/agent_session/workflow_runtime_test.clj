@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (def registered-definition
   {:definition-id "plan-build-review"
@@ -31,30 +32,11 @@
                              :text "{{task}}"
                              :vars {"task" {:from :workflow-input :path [:task]}}}]}]})
 
-(deftest register-definition-test
-  (testing "register-definition stores validated definitions under canonical workflow root state"
-    (let [[state definition-id stored]
-          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                registered-definition)]
-      (is (= "plan-build-review" definition-id))
-      (is (= stored (workflow-runtime/workflow-definition-in state definition-id)))
-      (is (= [stored] (vals (get-in state [:workflows :definitions])))))))
-
-(deftest remove-definition-test
-  (testing "remove-definition removes a registered definition from canonical state"
-    (let [[state1 definition-id stored]
-          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                registered-definition)
-          [state2 removed]
-          (workflow-runtime/remove-definition state1 definition-id)]
-      (is (= stored removed))
-      (is (nil? (workflow-runtime/workflow-definition-in state2 definition-id))))))
-
 (deftest create-run-from-registered-definition-test
   (testing "create-run captures immutable effective definition snapshot and initializes per-step runs"
     (let [[state1 definition-id _]
-          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                registered-definition)
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
           [state2 run-id run]
           (workflow-runtime/create-run state1 {:definition-id definition-id
                                                :run-id "run-1"
@@ -91,8 +73,8 @@
 (deftest update-run-workflow-input-test
   (testing "update-run-workflow-input replaces workflow input and records history"
     (let [[state1 definition-id _]
-          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                registered-definition)
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
           [state2 run-id _]
           (workflow-runtime/create-run state1 {:definition-id definition-id
                                                :run-id "run-1"
@@ -106,8 +88,8 @@
 (deftest resume-run-test
   (testing "resume-run clears blocked payload and returns the run to :running"
     (let [[state1 definition-id _]
-          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                registered-definition)
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
           [state2 run-id _]
           (workflow-runtime/create-run state1 {:definition-id definition-id
                                                :run-id "run-1"
@@ -125,8 +107,8 @@
 (deftest cancel-run-test
   (testing "cancel-run marks a run cancelled and records terminal outcome/history"
     (let [[state1 definition-id _]
-          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                registered-definition)
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
           [state2 run-id _]
           (workflow-runtime/create-run state1 {:definition-id definition-id
                                                :run-id "run-1"
@@ -141,8 +123,8 @@
 (deftest remove-run-test
   (testing "remove-run removes the run from runs and run-order"
     (let [[state1 definition-id _]
-          (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                registered-definition)
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
           [state2 run-id run]
           (workflow-runtime/create-run state1 {:definition-id definition-id
                                                :run-id "run-1"

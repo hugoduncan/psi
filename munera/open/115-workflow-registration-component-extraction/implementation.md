@@ -1,45 +1,90 @@
-2026-05-07
+2026-05-08
 
-Task created to extract canonical workflow-definition registration semantics into a lower component.
+Implemented the first-cut `workflow-registry` extraction as a new lower component at `components/workflow-registry/`.
 
-Creation rationale:
-- workflow-related ownership is currently split across file loading, compilation, definition registration, runtime execution, and extension-local workflow-loader behavior
-- the clearest missing lower seam is canonical workflow-definition registration/removal/query ownership
-- `workflow-loader` is currently a good orchestrator for file-backed reloads, but it should delegate registry semantics rather than remain the de facto definition-registry owner
-- recent registration extractions suggest a clearer split where lower components own registration/query semantics and higher layers keep orchestration and side effects
+What moved
+- extracted authoritative workflow-definition path/identity/query/update ownership into `psi.workflow-registry.registry`
+- moved canonical workflow-definition-specific helpers there:
+  - `normalize-id`
+  - `definitions-path`
+  - `definition-path`
+  - `workflow-definition`
+  - `list-definitions`
+  - `definition-ids`
+  - `register-definition`
+  - `remove-definition`
+- used `clj-surgeon :extract!` to perform the initial structural extraction from `workflow_runtime.clj`, then manually narrowed and reshaped the new namespace to the settled first-cut API
 
-Initial boundary hypothesis:
-- new lower owner: `workflow-registry` for canonical workflow-definition registration semantics over root state
-- higher owners retained: `workflow-loader` for discovery/loading/reload and prompt contribution refresh; workflow runtime for create-run/execute-run/resume-run/cancel-run/progression; mutation/tool/resolver seams as higher-level adapters
-- first cut should preserve canonical definition maps as provided and avoid broad reshaping or compiler ownership changes
+Boundary results
+- `workflow-runtime` now owns workflow runs only: effective-definition compilation, create/resume/cancel/remove run helpers, run lookup, and run ordering
+- `workflow-registry` owns canonical workflow-definition storage/query semantics over root workflow state
+- mutations, resolvers, and `psi-tool` now delegate workflow-definition register/remove/list/detail reads to the extracted registry
+- workflow-step-prep and workflow-statechart-runtime now use registry lookup for registered source/delegate definitions
+- `workflow-loader` stayed above the boundary as intended; it continues to orchestrate reload/retirement through mutations rather than owning registry semantics directly
 
-Live source audit notes captured before implementation:
-- current authoritative lower definition helpers live in `workflow_runtime.clj`, not in a separate workflow mutation helper namespace
-- registration validates `workflow-target-ir-compiler/target-authored-workflow-definition?` and throws on invalid definitions
-- `normalize-id` is part of the live contract: blank/missing ids generate UUID strings; keywords normalize via `name`; other values normalize via `str`
-- registering an existing normalized `:definition-id` replaces the stored definition at that map entry
-- direct lookup helper is nil-returning on miss
-- lower remove helper throws on missing definitions; higher mutation layers translate that into `:removed? false` with an error string
-- current public listing surfaces in workflow mutations, workflow resolvers, and `psi_tool_workflow.clj` all sort by `:definition-id`
+Preserved contracts made explicit
+- identity remains canonical normalized `:definition-id`
+- normalization still preserves non-blank strings, converts keywords with `name`, converts others with `str`, and generates UUID strings for blank/missing ids
+- registration still validates `workflow-target-ir-compiler/target-authored-workflow-definition?`
+- invalid registration still throws `ex-info`
+- registering an existing normalized id still fully replaces the stored definition map
+- public lookup remains nil-returning on miss and now consistently normalizes caller-provided ids
+- lower remove helper still throws on missing definitions
+- public listing/query helpers now explicitly own sorted-by-`:definition-id` behavior
 
-Resolved design clarifications after review:
-- first cut should preserve the current tuple-shaped pure lower API as the authoritative component programming surface
-- public registry helpers that accept definition ids should normalize incoming ids before lookup/removal so the caller-facing id contract is consistent with registration/removal semantics
-- canonical public listing/query helpers should live in the extracted component and preserve sorted-by-`definition-id` behavior for current public consumers
-- replacement semantics are full-map replacement at the normalized id key, not field-wise merge
-- first cut explicitly allows the extracted component to retain dependency on `workflow-target-ir-compiler/target-authored-workflow-definition?` for validation
+Follow-on call-site shaping
+- `session-state` now uses `workflow-registry/definitions-path` as the canonical workflow-definition root-state path source
+- several workflow tests were updated to register through `workflow-registry` where they are proving registry semantics or preparing run-creation fixtures
+- higher workflow execution/run behavior still goes through `workflow-runtime`
 
-Resolved final design clarifications after second review:
-- `workflow-registry` should own workflow-definition-specific path helpers such as `definitions-path` and `definition-path`
-- the minimal first-cut public query surface should be explicit and authoritative: `register-definition`, `remove-definition`, `workflow-definition`, `list-definitions`, and `definition-ids`
-- resolver detail lookup should delegate to the public normalized registry lookup helper
-- registry owns canonical storage/query behavior and ordering; mutations, resolvers, and `psi-tool` own only surface-specific projection/formatting
-- acceptance should be read narrowly as preserving definition registration/removal/lookup/listing semantics and downstream run-creation lookup behavior, not every incidental message string
+Verification
+- focused green:
+  - `psi.workflow-registry.registry-test`
+  - `psi.agent-session.workflow-runtime-test`
+  - `psi.agent-session.mutations.canonical-workflows-test`
+  - `psi.agent-session.workflow-resolvers-test`
+  - `psi.agent-session.workflow-tools-test`
+  - `psi.agent-session.workflow-session-integration-test`
+- command used:
+  - `clojure -M:test --focus psi.workflow-registry.registry-test --focus psi.agent-session.workflow-runtime-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-resolvers-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-session-integration-test`
 
-Remaining implementation choices:
-- confirm whether a storage-facing exact-key helper such as `workflow-definition-in` remains worth keeping as an internal-only helper once public normalized lookup is extracted
-- confirm the smallest useful count/helper surface beyond the core query API so the component stays authoritative without growing speculative convenience functions
-Relationship to umbrella work:
-- this should become a concrete workflow child extraction under `105-agent-session-component-extraction-map`
-- it is related to but distinct from `077-deterministic-workflow-steps`, which is about workflow authoring/runtime semantics rather than the narrower definition-registry boundary
-- it is structurally closer to `111-tool-registration-component-extraction` and `113-command-registration-component-extraction` than to the pure collection extractions in `112` and `114`
+Notes
+- an attempted focused run that also included `extensions.workflow-loader-test` exposed pre-existing loader compiler expectation failures unrelated to this extraction; those were not introduced by the registry work and were excluded from the final focused verification set
+- the initial first cut depended on `psi.agent-session.workflow-target-ir-compiler` for boundary validation, but the later review follow-up extracted the shared target-authored definition-shape predicate into `psi.workflow-registry.definition`, so `workflow-registry` no longer depends upward on `agent-session`
+
+2026-05-08 review
+
+Findings
+- High: `components/workflow-registry/` did not initially load standalone as a component because `psi.workflow-registry.registry` required `psi.agent-session.workflow-target_ir_compiler` through the old validation predicate location.
+- High: adding `psi/agent-session` as a direct dependency would have created an upward/cyclic component dependency (`workflow-registry -> agent-session -> session-state -> workflow-registry`), confirming the validation predicate lived at the wrong boundary.
+- Medium: final focused verification still excludes direct loader-focused tests, so the extraction's intended loader-consumer coverage remains indirect rather than explicitly proven at the loader seam.
+
+Resolution landed
+- extracted the shared target-authored workflow-definition shape predicate to the new lower namespace `psi.workflow-registry.definition`
+- made `psi.workflow-registry.registry` validate via `psi.workflow-registry.definition/target-authored-workflow-definition?`
+- made `psi.agent-session.workflow-target-ir-compiler/target-authored-workflow-definition?` a compatibility alias to that lower predicate
+- verified `components/workflow-registry/` now loads standalone via:
+  - `cd components/workflow-registry && clojure -M -e "(require 'psi.workflow-registry.registry 'psi.workflow-registry.definition) (println :ok)"`
+- reran focused verification including the new lower predicate test and target compiler test alias coverage; all focused checks are green
+
+Residual note
+- loader seam proof is still indirect. The component boundary issue is fixed, but a direct loader-focused proof would still strengthen closure if we want stricter acceptance evidence.
+
+Additional cleanup landed
+- `workflow_file_compiler.clj` now references `psi.workflow-registry.definition/target-authored-workflow-definition?` directly instead of going through the compatibility alias in `workflow-target-ir-compiler`
+- the two workflow-file compiler tests now assert against the lower shared predicate directly as well
+- focused verification was rerun including both workflow-file compiler test namespaces; all focused checks are green
+
+2026-05-08 code-shaper review note
+- overall shape is now good: ownership is sharper, registry semantics are centralized, and the component boundary is viable standalone
+- no blocking simplicity/consistency/robustness issues were found in the extracted code
+- optional follow-up items identified by review:
+  1. add a brief compatibility comment near `psi.agent-session.workflow-target-ir-compiler/target-authored-workflow-definition?` so future readers know it intentionally aliases the lower shared predicate during migration
+  2. if `psi.workflow-registry.registry` grows, consider a tiny internal `ensure-valid-definition!` helper to keep `register-definition` and related validation/error shaping flat without expanding the public API
+  3. add direct loader-focused proof for the workflow-loader consumer seam if we want stronger explicit acceptance evidence beyond mutation-path indirection
+
+2026-05-08 optional follow-up implementation
+- landed the compatibility comment near `psi.agent-session.workflow-target-ir-compiler/target-authored-workflow-definition?`
+- introduced `psi.workflow-registry.registry/ensure-valid-definition!` as a tiny internal helper so registry validation/error shaping stays flat while preserving the same public API
+- added a direct workflow-loader consumer-seam proof in `extensions/workflow-loader/test/extensions/workflow_loader_test.clj` that verifies reload computes file-backed retirement/addition and delegates registry semantics through the canonical workflow mutations
+- attempted focused verification including `extensions.workflow-loader-test`; the new direct loader seam proof is aligned with the extraction intent, but unrelated pre-existing loader compiler expectation failures still prevent the broader loader test namespace from going green in this branch state

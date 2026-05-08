@@ -6,7 +6,8 @@
    runtime workflow IR. Unlike the current-grammar compatibility compiler, this
    compiler emits no migration `:compat` metadata."
   (:require
-   [psi.agent-session.workflow-ir :as workflow-ir]))
+   [psi.agent-session.workflow-ir :as workflow-ir]
+   [psi.workflow-registry.definition :as workflow-definition]))
 
 (def ^:private default-invoke-outputs
   {:data {:source :invoke/data}
@@ -32,11 +33,11 @@
 (def ^:private default-delegate-yields
   {:type :delegated})
 
-(defn target-authored-workflow-definition?
-  [workflow-definition]
-  (and (map? workflow-definition)
-       (vector? (:steps workflow-definition))
-       (every? map? (:steps workflow-definition))))
+;; Compatibility alias during workflow-registration extraction follow-on.
+;; New lower ownership lives in `psi.workflow-registry.definition`; keep this
+;; public name stable for existing higher workflow compiler/runtime callers.
+(def target-authored-workflow-definition?
+  workflow-definition/target-authored-workflow-definition?)
 
 (defn- compile-source-spec
   [{:keys [from path projection] :as source-spec}]

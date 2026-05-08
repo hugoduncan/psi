@@ -8,7 +8,8 @@
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.workflow-ir :as workflow-ir]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (pco/defmutation register-workflow-definition
   "Register a canonical workflow definition into root state."
@@ -20,7 +21,7 @@
                   :psi.workflow/error]}
   (try
     (let [[new-state definition-id _stored]
-          (workflow-runtime/register-definition @(:state* agent-session-ctx) definition)]
+          (workflow-registry/register-definition @(:state* agent-session-ctx) definition)]
       (reset! (:state* agent-session-ctx) new-state)
       {:psi.workflow/definition-id definition-id
        :psi.workflow/registered? true
@@ -40,7 +41,7 @@
                   :psi.workflow/error]}
   (try
     (let [[new-state _removed-definition]
-          (workflow-runtime/remove-definition @(:state* agent-session-ctx) definition-id)]
+          (workflow-registry/remove-definition @(:state* agent-session-ctx) definition-id)]
       (reset! (:state* agent-session-ctx) new-state)
       {:psi.workflow/definition-id definition-id
        :psi.workflow/removed? true
@@ -213,10 +214,7 @@
    ::pco/params  [:psi/agent-session-ctx]
    ::pco/output  [:psi.workflow/definitions
                   :psi.workflow/definition-count]}
-  (let [definitions (->> (get-in @(:state* agent-session-ctx) [:workflows :definitions])
-                         vals
-                         (sort-by :definition-id)
-                         vec)]
+  (let [definitions (workflow-registry/list-definitions @(:state* agent-session-ctx))]
     {:psi.workflow/definitions (mapv (fn [d]
                                        {:definition-id (:definition-id d)
                                         :name (:name d)

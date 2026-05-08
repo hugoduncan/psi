@@ -2,7 +2,8 @@
   "Workflow action handler for psi-tool: parse, summarise, and execute workflow ops."
   (:require
    [clojure.edn :as edn]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 ;; ── Helpers (local copies of private psi_tool utilities) ────────────────────
 
@@ -131,10 +132,7 @@
             result
             (case op
               "list-definitions"
-              (let [definitions (->> (get-in @(:state* ctx) [:workflows :definitions])
-                                     vals
-                                     (sort-by :definition-id)
-                                     vec)]
+              (let [definitions (workflow-registry/list-definitions @(:state* ctx))]
                 {:psi-tool/action         :workflow
                  :psi-tool/workflow-op    :list-definitions
                  :psi-tool/overall-status :ok

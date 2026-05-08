@@ -2,38 +2,20 @@
   "Pure canonical-root workflow state operations for deterministic workflow runs.
 
    Scope of this slice:
-   - register workflow definitions in canonical root state
    - create workflow runs with immutable effective-definition snapshots
-   - expose small pure lookup helpers for later dispatch/mutation/query layers"
+   - expose small pure run lookup/update helpers for later dispatch/mutation/query layers"
   (:require
-   [clojure.string :as str]
    [psi.agent-session.workflow-model :as workflow-model]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
-   [psi.agent-session.workflow-target-ir-compiler :as workflow-target-ir-compiler]))
+   [psi.agent-session.workflow-target-ir-compiler :as workflow-target-ir-compiler]
+   [psi.workflow-registry.registry :as registry]))
 
 (defn- now []
   (java.time.Instant/now))
 
-(defn- blankish? [x]
-  (or (nil? x)
-      (and (string? x) (str/blank? x))))
-
-(defn normalize-id
-  [id]
-  (cond
-    (blankish? id) (str (java.util.UUID/randomUUID))
-    (keyword? id)  (name id)
-    :else          (str id)))
-
-(defn definitions-path [] [:workflows :definitions])
-(defn runs-path [] [:workflows :runs])
 (defn run-order-path [] [:workflows :run-order])
-(defn definition-path [definition-id] [:workflows :definitions definition-id])
+(defn runs-path [] [:workflows :runs])
 (defn run-path [run-id] [:workflows :runs run-id])
-
-(defn workflow-definition-in
-  [state definition-id]
-  (get-in state (definition-path definition-id)))
 
 (defn workflow-run-in
   [state run-id]
@@ -44,28 +26,6 @@
   (let [runs (get-in state (runs-path))
         order (get-in state (run-order-path))]
     (mapv #(get runs %) order)))
-
-(defn register-definition
-  "Return [state definition-id stored-definition] after validating and storing a target-authored definition."
-  [state definition]
-  (when-not (workflow-target-ir-compiler/target-authored-workflow-definition? definition)
-    (throw (ex-info "Invalid target-authored workflow definition"
-                    {:definition definition})))
-  (let [definition-id (normalize-id (:definition-id definition))
-        stored-definition (assoc definition :definition-id definition-id)]
-    [(assoc-in state (definition-path definition-id) stored-definition)
-     definition-id
-     stored-definition]))
-
-(defn remove-definition
-  "Return [state removed-definition] after removing a registered workflow definition."
-  [state definition-id]
-  (let [definition-id' (normalize-id definition-id)
-        definition (workflow-definition-in state definition-id')]
-    (when-not definition
-      (throw (ex-info "Workflow definition not found" {:definition-id definition-id'})))
-    [(update-in state (definitions-path) dissoc definition-id')
-     definition]))
 
 (defn- workflow-definition-source
   [definition-id]
@@ -102,7 +62,7 @@
   [definition source]
   (let [canonical-ir (compile-definition-to-ir! definition source)
         definition-id (when (some? (:definition-id definition))
-                        (normalize-id (:definition-id definition)))]
+                        (registry/normalize-id (:definition-id definition)))]
     (cond-> (assoc definition :canonical-ir canonical-ir)
       definition-id
       (assoc :definition-id definition-id)
@@ -126,7 +86,7 @@
        :source-definition-id nil})
 
     (some? definition-id)
-    (let [resolved (workflow-definition-in state (normalize-id definition-id))]
+    (let [resolved (registry/workflow-definition state definition-id)]
       (when-not resolved
         (throw (ex-info "Workflow definition not found"
                         {:definition-id definition-id})))
@@ -151,7 +111,7 @@
   (let [{:keys [effective-definition source-definition-id]}
         (resolve-effective-definition state opts)
         initial-step-id (workflow-statechart/initial-step-id effective-definition)
-        run-id'         (normalize-id run-id)
+        run-id'         (registry/normalize-id run-id)
         ts              (now)
         run             (cond-> {:run-id run-id'
                                  :status :pending

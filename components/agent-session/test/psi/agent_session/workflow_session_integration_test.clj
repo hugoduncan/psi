@@ -4,7 +4,8 @@
    [psi.agent-session.context :as context]
    [psi.session-state.state :as session-state]
    [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (def definition
   {:definition-id "plan-build-review"
@@ -38,13 +39,13 @@
     (let [ctx (context/create-context {:persist? false})]
       (try
         (let [state0 @(:state* ctx)
-              [state1 definition-id _] (workflow-runtime/register-definition state0 definition)
+              [state1 definition-id _] (workflow-registry/register-definition state0 definition)
               [state2 run-id run]      (workflow-runtime/create-run state1 {:definition-id definition-id
                                                                             :run-id "run-1"
                                                                             :workflow-input {:task "ship it"}})]
           (reset! (:state* ctx) state2)
           (is (= "plan-build-review" definition-id))
-          (is (= definition (get-in @(:state* ctx) [:workflows :definitions definition-id])))
+          (is (= definition (workflow-registry/workflow-definition @(:state* ctx) definition-id)))
           (is (= run (get-in @(:state* ctx) [:workflows :runs run-id])))
           (is (workflow-model/valid-workflow-run? run))
           (is (= ["plan" "build"] (get-in run [:effective-definition :step-order])))

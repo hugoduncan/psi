@@ -29,6 +29,7 @@
    [psi.agent-session.workflow-progression-recording :as workflow-progression-recording]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
    [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
+   [psi.workflow-registry.registry :as registry]
    [psi.agent-session.workflow-statechart :as workflow-statechart]
    [psi.agent-session.workflow-step-prep :as workflow-step-prep]
    [psi.agent-session.workflow-terminal-contract :as workflow-terminal-contract]))
@@ -240,7 +241,7 @@
 
 (defn- resolve-delegate-target-definition
   [ctx target]
-  (let [definition (workflow-runtime/workflow-definition-in @(:state* ctx) target)]
+  (let [definition (registry/workflow-definition @(:state* ctx) target)]
     (when-not definition
       (throw (ex-info "Delegated workflow definition not found"
                       {:target target})))

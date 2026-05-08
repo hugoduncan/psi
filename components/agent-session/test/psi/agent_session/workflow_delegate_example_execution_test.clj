@@ -6,7 +6,8 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -87,8 +88,8 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state planner-definition)
-                           [s _ _] (workflow-runtime/register-definition s builder-definition)
+                     (let [[s _ _] (workflow-registry/register-definition state planner-definition)
+                           [s _ _] (workflow-registry/register-definition s builder-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition delegate-build-review-definition
                                                                    :run-id "run-delegate-build-review"
                                                                    :workflow-input {:input "add workflow docs"

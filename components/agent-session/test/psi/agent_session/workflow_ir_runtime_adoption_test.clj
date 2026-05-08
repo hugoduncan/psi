@@ -6,7 +6,8 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -68,8 +69,8 @@
 
   (testing "registered definitions with workflow-runtime refs also fail at run creation seam"
     (let [[state1 definition-id _]
-          (workflow-runtime/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
-                                                runtime-ref-definition)]
+          (workflow-registry/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
+                                                 runtime-ref-definition)]
       (is (= "runtime-ref" definition-id))
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
@@ -82,7 +83,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state plan-build-definition)
+                     (let [[s _ _] (workflow-registry/register-definition state plan-build-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build"
                                                                    :run-id "run-ir"
                                                                    :workflow-input {:input "ship it"}})]

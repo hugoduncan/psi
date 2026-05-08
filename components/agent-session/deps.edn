@@ -21,6 +21,7 @@
         psi/skill-registry         {:local/root "../skill-registry"}
         psi/command-registry       {:local/root "../command-registry"}
         psi/tool-registry          {:local/root "../tool-registry"}
+        psi/workflow-registry      {:local/root "../workflow-registry"}
         psi/turn-statechart        {:local/root "../turn-statechart"}
         psi/turn-runtime           {:local/root "../turn-runtime"}
         psi/tool-runtime           {:local/root "../tool-runtime"}}}

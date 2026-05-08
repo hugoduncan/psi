@@ -6,6 +6,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]
    [psi.agent-session.workflow-statechart-runtime]))
 
 (defn- create-session-context
@@ -35,7 +36,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state single-step-definition-with-meta)
+                     (let [[s _ _] (workflow-registry/register-definition state single-step-definition-with-meta)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                    :run-id "run-resume"
                                                                    :workflow-input {:input "plan it"}})]

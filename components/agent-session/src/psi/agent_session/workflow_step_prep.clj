@@ -7,7 +7,7 @@
    [psi.session-state.state :as session-state]
    [psi.skill-registry.registry :as skill-registry]
    [psi.tool-registry.defs :as tool-defs]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as registry]
    [psi.agent-session.workflow-source-resolution :as workflow-source-resolution]
    [psi.agent-session.workflow-statechart :as workflow-statechart]))
 
@@ -180,7 +180,7 @@
         run-meta (or (get-in workflow-run [:effective-definition :workflow-file-meta]) {})
         source-definition-id (:source-definition-id workflow-run)
         source-definition (when source-definition-id
-                            (workflow-runtime/workflow-definition-in @(:state* ctx) source-definition-id))
+                            (registry/workflow-definition @(:state* ctx) source-definition-id))
         source-meta (or (get-in source-definition [:workflow-file-meta]) {})
         base-meta (merge source-meta run-meta)
         framing-prompt (:framing-prompt run-meta)]

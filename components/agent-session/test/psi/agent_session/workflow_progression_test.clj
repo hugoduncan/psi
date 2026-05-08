@@ -4,7 +4,8 @@
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-model :as workflow-model]
    [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (def definition
   {:definition-id "plan-build-review"
@@ -22,8 +23,8 @@
 
 (defn- base-state-with-run
   []
-  (let [[state1 _ _] (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                           definition)
+  (let [[state1 _ _] (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                            definition)
         [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "plan-build-review"
                                                                :run-id "run-1"
                                                                :workflow-input {:task "ship it"}})
@@ -125,8 +126,8 @@
 (defn- judged-state-at-review
   "Set up a workflow run that has reached the review step with accepted results for plan and build."
   []
-  (let [[state1 _ _] (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                           judged-definition)
+  (let [[state1 _ _] (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                            judged-definition)
         [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "plan-build-review"
                                                                :run-id "run-j1"
                                                                :workflow-input {:task "ship it"}})

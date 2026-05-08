@@ -3,7 +3,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
-   [psi.agent-session.workflow-model :as workflow-model]))
+   [psi.agent-session.workflow-model :as workflow-model]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- make-test-ctx
   "Create a minimal ctx with a state atom for testing pure mutations."
@@ -34,7 +35,7 @@
       (is (true? (:psi.workflow/registered? result)))
       (is (= "test-workflow" (:psi.workflow/definition-id result)))
       (is (nil? (:psi.workflow/error result)))
-      (is (some? (get-in @(:state* ctx) [:workflows :definitions "test-workflow"])))))
+      (is (some? (workflow-registry/workflow-definition @(:state* ctx) "test-workflow")))))
 
   (testing "returns error for invalid definition"
     (let [ctx (make-test-ctx)

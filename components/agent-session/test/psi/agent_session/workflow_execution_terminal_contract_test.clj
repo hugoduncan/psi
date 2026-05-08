@@ -6,7 +6,8 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -58,7 +59,7 @@
                                                               "text" {:from {:step "discover" :yield :text}}}}]}]}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[s _ _] (workflow-runtime/register-definition state callee-definition)
+                     (let [[s _ _] (workflow-registry/register-definition state callee-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition caller-definition
                                                                    :run-id "run-delegate-contract"
                                                                    :workflow-input {}})]
