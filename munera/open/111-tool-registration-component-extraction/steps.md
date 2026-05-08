@@ -22,3 +22,6 @@
 - [x] Run focused extracted-component verification
 - [x] Run at least one focused higher-level registration/consumer verification path
 - [x] Record the final ownership split, migrated consumers, and verification commands/results in `implementation.md`
+- [x] Add a lower-level registry test fixture or neutral helper so `components/tool-registry/test/psi/tool_registry/registry_test.clj` no longer depends on `psi.agent-session.extensions`
+- [x] Re-run focused `tool-registry` tests after the test-fixture decoupling cleanup
+- [x] Append the cleanup outcome to `implementation.md`

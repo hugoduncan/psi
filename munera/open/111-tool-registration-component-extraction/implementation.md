@@ -132,3 +132,30 @@ Focused verification run:
 Lint verification:
 - `clj -M:lint`
 - result: `0 errors, 0 warnings`
+
+2026-05-08 review note
+
+Review verdict:
+- implementation matches the task design and intended architecture overall
+- extraction boundary is correct in production code
+- one non-blocking follow-up was identified before task closure
+
+Follow-up note:
+- `components/tool-registry/test/psi/tool_registry/registry_test.clj` still depends on upper-layer `psi.agent-session.extensions` for registry construction and setup
+- this weakens the lower-component boundary slightly because component-owned tests still reach upward into the former owner layer
+- preferred cleanup: introduce a minimal lower-level registry test fixture or tiny neutral helper so `tool-registry` tests can avoid requiring `psi.agent-session.extensions`
+
+2026-05-08 follow-up implementation
+
+Implemented the review follow-up:
+- rewrote `components/tool-registry/test/psi/tool_registry/registry_test.clj` so it no longer requires `psi.agent-session.extensions`
+- added a tiny local lower-level registry fixture in the test namespace:
+  - `create-test-registry`
+  - `register-extension-in!`
+- the extracted component’s own tests now exercise `psi.tool-registry.registry` directly against the minimal registry-state shape it owns by contract, without reaching upward into `agent-session`
+
+Follow-up verification:
+- `clj -M:test --focus psi.tool-registry.defs-test --focus psi.tool-registry.registry-test`
+- result: `6 tests, 26 assertions, 0 failures`
+- `clj -M:lint`
+- result: `0 errors, 0 warnings`
