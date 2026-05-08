@@ -2,14 +2,14 @@ Approach:
 - treat this as a small lower-boundary component extraction, not a workflow redesign
 - preserve deterministic operation invoke/result behavior first
 - reduce workflow runtime dependence on `psi.agent-session.*` by moving invoke execution into an extracted lower component
-- make the one real boundary decision explicit: whether workflow-facing invoke-step result wrapping stays with deterministic-operation runtime in the first cut or moves to workflow-owned code
+- keep deterministic-operation runtime generic: invoke-step result wrapping should move into explicit workflow-owned code in `psi.agent-session.workflow-statechart-runtime` in the first cut
 
 Planned outcomes:
 1. create a new deterministic-operation runtime component
 2. move canonical invoke execution out of `psi.agent-session.*`
 3. preserve current operation result validation/error behavior
-4. update workflow runtime consumers to depend downward on the extracted component
-5. record the final ownership decision for invoke-step result wrapping
+4. update `psi.agent-session.workflow-statechart-runtime` to depend downward on the extracted component, plus any incidental consumers discovered during implementation
+5. move invoke-step result wrapping into `psi.agent-session.workflow-statechart-runtime` and record that first-cut ownership boundary
 
 Scope boundaries:
 - no redesign of deterministic-operation registration/query semantics
@@ -19,4 +19,5 @@ Scope boundaries:
 
 Follow-on guidance:
 - reference task `105` as the umbrella workflow-adjacent extraction map
-- if invoke-step result wrapping remains in the extracted runtime for the first cut, record any cleaner workflow-owned split as a later shaping follow-on rather than expanding this task
+- do not leave compatibility shims behind the extraction; move authoritative ownership cleanly
+- callers that need defs-level validation/result helpers should depend on `psi.deterministic-operation-registry.defs` directly rather than through the extracted runtime component

@@ -1,8 +1,9 @@
 - [ ] Review current `psi.agent-session.deterministic-operations` consumers and confirm the exact runtime surface to preserve
-- [ ] Choose and record the first-cut ownership of `operation-result->invoke-step-result`
-- [ ] Create the extracted deterministic-operation runtime component and authoritative namespace
+- [ ] Create `components/deterministic-operation-runtime/` with authoritative namespace `psi.deterministic-operation-runtime.core`
 - [ ] Move canonical invoke execution and malformed-result validation/error shaping into the new component
-- [ ] Update workflow runtime consumers to depend downward on the extracted component
-- [ ] Update focused tests for deterministic operation runtime and workflow invoke execution
-- [ ] Remove temporary compatibility wrappers if any are introduced
+- [ ] Verify whether any production or test consumers still rely on defs-level helper re-exports and rewire them to `psi.deterministic-operation-registry.defs` directly if needed
+- [ ] Move `operation-result->invoke-step-result` into `psi.agent-session.workflow-statechart-runtime`
+- [ ] Update `workflow_statechart_runtime.clj` to depend downward on the extracted runtime component and use its own workflow-owned invoke-step wrapper
+- [ ] Update focused tests, moving deterministic-operation runtime unit proofs into the new component while keeping workflow invoke execution/wrapping proofs with workflow code
+- [ ] Remove the old authoritative `psi.agent-session.deterministic-operations` namespace rather than leaving a compatibility shim
 - [ ] Record final boundary decisions and residual follow-ons in `implementation.md`

@@ -54,8 +54,8 @@ This task should:
 
 - move canonical operation invocation out of `psi.agent-session.*`
 - move canonical deterministic-operation result validation/error shaping out of `psi.agent-session.*`
-- decide explicitly whether workflow-facing invoke-step result wrapping belongs in the same extracted runtime namespace or in a workflow-owned adapter namespace
-- update workflow runtime consumers to depend downward on the extracted component
+- move workflow-facing invoke-step result wrapping into explicit workflow-owned code under `psi.agent-session.workflow-statechart-runtime`
+- update `psi.agent-session.workflow-statechart-runtime` to depend downward on the extracted component, plus any incidental consumers discovered during implementation
 - keep user-facing workflow behavior unchanged
 
 This task should not:
@@ -78,10 +78,15 @@ Current responsibilities:
 - `invoke-operation`
 - `operation-result->invoke-step-result`
 
-Current known consumers:
+Current production consumer:
 
 - `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj`
-- tests under `components/agent-session/test/psi/agent_session/`
+
+Current test consumers include:
+
+- `components/agent-session/test/psi/agent_session/extensions_test.clj`
+- `components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj`
+- `components/agent-session/test/psi/agent_session/workflow_execution_test.clj`
 
 ## Proposed boundary
 
@@ -92,7 +97,7 @@ Extract a small lower runtime component rather than leaving invoke execution und
 Representative target shape:
 
 - `components/deterministic-operation-runtime/`
-- authoritative namespace such as `psi.deterministic-operation-runtime.core`
+- authoritative namespace `psi.deterministic-operation-runtime.core`
 
 The extracted component should own:
 
@@ -100,40 +105,21 @@ The extracted component should own:
 - malformed-result detection and structured `ex-info`
 - canonical operation-result validation at the runtime boundary
 
-### Result-wrapping decision to settle
+### Result-wrapping ownership decision
 
-The main open boundary decision is `operation-result->invoke-step-result`.
+`operation-result->invoke-step-result` should move into explicit workflow-owned code rather than the extracted deterministic-operation runtime component.
 
-There are two plausible homes:
+Reasoning:
 
-#### Option A — keep it in the extracted runtime component
+- invoke-step accepted-result/execution-error shaping is workflow-facing adapter logic rather than generic deterministic-operation runtime behavior
+- the extracted deterministic-operation runtime component should stay focused on canonical operation invocation plus malformed-result validation/error shaping
+- this keeps the lower runtime component generic while making workflow-specific result projection explicit at the workflow boundary
 
-Pros:
+First-cut rule:
 
-- simplest migration
-- smallest call-site churn
-- keeps all deterministic-operation execution/result logic together initially
-
-Cons:
-
-- leaves one workflow-facing adapter concern in the generic runtime namespace
-
-#### Option B — move it into workflow-owned code
-
-Pros:
-
-- cleaner ownership split
-- deterministic-operation runtime stays generic
-- workflow remains the owner of invoke-step accepted-result/execution-error wrapping semantics
-
-Cons:
-
-- slightly larger refactor for a small immediate gain
-
-Preferred first-cut decision:
-
-- allow either option, but require the implementation to make the ownership decision explicit in `implementation.md`
-- if ambiguity remains during implementation, prefer Option A for the first cut and record Option B as a later shaping follow-on rather than blocking the extraction
+- `psi.deterministic-operation-runtime.core` owns canonical invoke execution and malformed-result validation/error shaping
+- `psi.agent-session.workflow-statechart-runtime` owns invoke-step result wrapping semantics in the first cut
+- this task should remove `operation-result->invoke-step-result` from `psi.agent-session.deterministic-operations` rather than relocating it into the extracted runtime component unchanged
 
 ## Responsibilities that should remain outside the new component
 
@@ -146,6 +132,12 @@ This remains in the already extracted component:
 - `psi.deterministic-operation-registry.defs`
 
 This task should consume those contracts, not re-own them.
+
+Re-export policy:
+
+- the extracted runtime component should not become a compatibility re-export surface for definition/result helpers already owned by `psi.deterministic-operation-registry.defs`
+- callers that need definition/result contract helpers should depend on `psi.deterministic-operation-registry.defs` directly
+- the extracted runtime component should own only invoke execution plus malformed-result validation/error shaping
 
 ### Workflow runtime sequencing
 
@@ -173,12 +165,12 @@ These remain above the boundary:
 ## Suggested implementation shape
 
 1. create `components/deterministic-operation-runtime/`
-2. move or re-express the canonical runtime namespace from `psi.agent-session.deterministic-operations` to the new component namespace
+2. move invoke runtime ownership from `psi.agent-session.deterministic-operations` into `psi.deterministic-operation-runtime.core`
 3. preserve the current operation invocation and result-validation behavior exactly
-4. decide and document the ownership of `operation-result->invoke-step-result`
-5. update `workflow_statechart_runtime.clj` and any other lower runtime consumers to depend on the extracted namespace
-6. update focused tests
-7. remove temporary compatibility wrappers if used during migration
+4. move `operation-result->invoke-step-result` into `psi.agent-session.workflow-statechart-runtime` and document that first-cut ownership explicitly
+5. update `workflow_statechart_runtime.clj` to depend downward on the extracted runtime namespace and use its own workflow-owned invoke-step result wrapper
+6. update focused tests, moving deterministic-operation runtime unit proofs into the new component while keeping workflow-owned invoke-step wrapping/integration proofs with workflow code
+7. remove the old authoritative `psi.agent-session.deterministic-operations` namespace rather than leaving a compatibility shim
 8. record any residual workflow-specific adapter logic that still remains outside the new component
 
 ## Acceptance
@@ -186,10 +178,12 @@ These remain above the boundary:
 - a new lower component exists for deterministic operation runtime behavior
 - canonical invoke execution no longer lives under `psi.agent-session.*`
 - malformed operation-result validation/error shaping no longer lives under `psi.agent-session.*`
-- workflow runtime consumers depend downward on the extracted component
+- `workflow_statechart_runtime.clj` depends downward on the extracted component
+- `psi.agent-session.workflow-statechart-runtime` explicitly owns invoke-step result wrapping semantics in the first cut
 - operation definition/result contracts remain unchanged
 - workflow `:invoke` behavior remains unchanged
-- the ownership decision for `operation-result->invoke-step-result` is explicit and recorded
+- the extracted runtime component does not become a compatibility re-export surface for defs-level contracts
+- the old authoritative `psi.agent-session.deterministic-operations` namespace is removed rather than left as a shim
 - task `105-agent-session-component-extraction-map` can reference this as a concrete workflow-adjacent runtime extraction that reduces lower workflow dependence on `agent-session`
 
 ## Related work

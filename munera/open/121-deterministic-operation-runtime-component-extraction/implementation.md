@@ -11,4 +11,7 @@ Creation rationale:
 Initial boundary notes:
 - operation registration/query ownership is already handled separately by the extracted deterministic-operation registry component
 - this task is specifically about invoke execution and result validation/wrapping
-- the only meaningful ownership choice to settle during implementation is whether `operation-result->invoke-step-result` remains with deterministic-operation runtime in the first cut or moves into workflow-owned adapter code
+- authoritative extracted namespace is `psi.deterministic-operation-runtime.core` under `components/deterministic-operation-runtime/`
+- `operation-result->invoke-step-result` should move into `psi.agent-session.workflow-statechart-runtime` because invoke-step accepted-result/execution-error shaping is workflow-facing adapter logic, not generic deterministic-operation runtime behavior
+- do not leave compatibility shims: remove the old authoritative `psi.agent-session.deterministic-operations` namespace after consumers are rewired
+- callers that need defs-level validation/result helpers should use `psi.deterministic-operation-registry.defs` directly rather than through the extracted runtime component
