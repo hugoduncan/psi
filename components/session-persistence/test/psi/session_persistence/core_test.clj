@@ -48,6 +48,62 @@
                                                                         :session-file nil}}}}}}
          (p/initialize-persistence-state {} "sid" {}))))
 
+(deftest pure-persistence-request-shaping-test
+  (testing "returns nil before first assistant message"
+    (let [entry (p/message-entry (user-msg "hi"))]
+      (is (nil? (p/persistence-io-request {:entries [entry]
+                                           :flush-state {:flushed? false :session-file (io/file (tmp-dir) "lazy.ndedn")}
+                                           :session-id "sid"
+                                           :worktree-path "/proj"
+                                           :parent-session-id nil
+                                           :parent-session-path nil})))))
+
+  (testing "returns flush request on first assistant-visible flush"
+    (let [entries [(p/message-entry (user-msg "hello"))
+                   (p/message-entry (assistant-msg "world"))]
+          file    (io/file (tmp-dir) "flush.ndedn")]
+      (is (= {:op :flush-journal
+              :session-id "sid"
+              :session-file file
+              :worktree-path "/proj"
+              :parent-session-id "parent"
+              :parent-session-path "/tmp/parent.ndedn"
+              :entries entries}
+             (p/persistence-io-request {:entries entries
+                                        :flush-state {:flushed? false :session-file file}
+                                        :session-id "sid"
+                                        :worktree-path "/proj"
+                                        :parent-session-id "parent"
+                                        :parent-session-path "/tmp/parent.ndedn"})))))
+
+  (testing "returns append request after initial flush"
+    (let [entries [(p/message-entry (user-msg "hello"))
+                   (p/message-entry (assistant-msg "world"))
+                   (p/thinking-level-entry :medium)]
+          file    (io/file (tmp-dir) "append.ndedn")]
+      (is (= {:op :append-entry
+              :session-id "sid"
+              :session-file file
+              :worktree-path "/proj"
+              :parent-session-id nil
+              :parent-session-path nil
+              :entry (last entries)}
+             (p/persistence-io-request {:entries entries
+                                        :flush-state {:flushed? true :session-file file}
+                                        :session-id "sid"
+                                        :worktree-path "/proj"
+                                        :parent-session-id nil
+                                        :parent-session-path nil}))))))
+
+(deftest mark-flushed-root-update-test
+  (let [state {:agent-session {:sessions {"sid" {:persistence {:journal []
+                                                               :flush-state {:flushed? false
+                                                                             :session-file ::file}}}}}}
+        updated ((p/mark-flushed-root-update "sid") state)]
+    (is (false? (get-in state [:agent-session :sessions "sid" :persistence :flush-state :flushed?])))
+    (is (true? (get-in updated [:agent-session :sessions "sid" :persistence :flush-state :flushed?])))
+    (is (= ::file (get-in updated [:agent-session :sessions "sid" :persistence :flush-state :session-file])))))
+
 (deftest append-journal-entry-in-test
   (let [ctx (core/create-context)
         sd  (core/new-session-in! ctx nil {})

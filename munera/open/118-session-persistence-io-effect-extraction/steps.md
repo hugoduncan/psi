@@ -50,7 +50,7 @@
   - kept regression proof for fork/resume persisted-session invariants green through focused verification
   - verified replay behavior after nested dispatch compatibility shims via focused replay tests
 
-- [ ] Add direct lower-component unit proofs for pure persistence decision logic
+- [x] Add direct lower-component unit proofs for pure persistence decision logic
   - append/no-op/flush request shaping in isolation
   - direct `mark-flushed-root-update` unit test in lower component
 

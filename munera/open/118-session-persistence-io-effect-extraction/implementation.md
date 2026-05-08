@@ -30,6 +30,12 @@
   - `clj-kondo --lint` on touched source/test files: green
   - `bb clojure:test:unit --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-pure-result-test`: green
   - `bb clojure:test:unit --focus psi.session-persistence.core-test --focus psi.agent-session.journal-append-convergence-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.session-lifecycle-test`: green
+- Follow-on proof slice landed after the first implementation commit:
+  - added direct lower-component unit proofs in `components/session-persistence/test/psi/session_persistence/core_test.clj` for:
+    - `persistence-io-request` no-op before first assistant message
+    - `persistence-io-request` flush shaping for first assistant-visible persistence
+    - `persistence-io-request` append shaping after initial flush
+    - `mark-flushed-root-update` root-state transition semantics
+  - kept compatibility helper presence unchanged; this slice focused on proving lower-owned semantics directly rather than changing surface area
 - Remaining follow-on for task completion:
-  - pure persistence decision logic still lacks direct lower-component unit proofs separate from higher-level convergence tests
   - legacy compatibility helpers remain present, though no longer authoritative for production file writes
