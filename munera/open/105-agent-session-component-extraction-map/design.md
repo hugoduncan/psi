@@ -244,7 +244,9 @@ Responsibility:
 - file authoring / parsing / loading / compilation
 - runtime execution
 - attempts / judging / routing / progression
+- workflow-definition registration
 - deterministic operation bridging
+- deterministic-operation registration for workflow `:invoke`
 
 Representative namespaces:
 
@@ -266,9 +268,10 @@ Reason it is coherent:
 Boundary note after reviewing the current namespace surface:
 
 - this is the clearest remaining extraction candidate by namespace mass and conceptual cohesion
-- the workflow domain already spans authoring, loading, compilation, execution, judging, routing, progression, and deterministic-operation bridging; keeping all of that under `agent-session` increasingly looks like historical placement rather than present ownership
-- landed child task `115-workflow-registration-component-extraction` has now sharpened the lower registry seam: canonical workflow-definition registration/removal/query semantics belong in a lower `workflow-registry` component, while workflow-file loading, workflow-run execution/progression, and higher mutation/resolver/`psi-tool` adapter seams remain the broader extraction surface
-- `psi_tool_workflow.clj`, `workflow_mutations.clj`, `mutations/canonical_workflows.clj`, and `resolvers/workflows.clj` are likely adapter/entrypoint seams that may remain briefly in `agent-session` during migration, but their owned logic should flow downward toward an extracted workflow component
+- the workflow domain already spans authoring, loading, compilation, execution, judging, routing, progression, workflow-definition registration, and deterministic-operation bridging; keeping all of that under `agent-session` increasingly looks like historical placement rather than present ownership
+- open child task `115-workflow-registration-component-extraction` sharpens one lower registry seam: canonical workflow-definition registration/removal/query semantics belong in a lower `workflow-registry` component, while workflow-file loading, workflow-run execution/progression, and higher mutation/resolver/`psi-tool` adapter seams remain the broader extraction surface
+- new child task `116-deterministic-operation-registration-component-extraction` sharpens the second workflow-adjacent registry seam: canonical deterministic-operation registration/removal/query semantics for workflow `:invoke` belong in a lower deterministic-operation registry component, while invoke-step execution sequencing and workflow runtime ownership remain above the boundary
+- `psi_tool_workflow.clj`, `workflow_mutations.clj`, `mutations/canonical_workflows.clj`, `resolvers/workflows.clj`, `deterministic_operations.clj`, and `deterministic_operation_registry.clj` are likely adapter/entrypoint or lower-seam surfaces whose owned logic should continue flowing downward toward extracted workflow-adjacent components
 
 #### 6. Project nREPL
 
@@ -448,7 +451,8 @@ Reviewing the current `components/agent-session/src/psi/agent_session/` tree sha
 - landed child task `112-skill-registration-component-extraction` sharpened the prompt/skills boundary by extracting pure registered-skill collection semantics into a lower `skill-registry` component while leaving discovery/parsing/invocation in `prompt-assets.skills`
 - landed child task `113-command-registration-component-extraction` sharpened the extension/command boundary by extracting extension-owned command registration/query semantics into a lower `command-registry` component while leaving command dispatch/routing and higher-level mutation/API seams above the boundary
 - landed child task `114-prompt-contribution-registration-component-extraction` sharpened the remaining prompt boundary by extracting pure extension-owned prompt contribution registration semantics into a lower `prompt-registry` component while leaving prompt-refresh orchestration in `agent-session` and prompt assembly in `prompt-assets.system-prompt`
-- open child task `115-workflow-registration-component-extraction` sharpens the workflow boundary by extracting canonical workflow-definition registration/removal/query semantics into a lower `workflow-registry` component while leaving workflow-file loading, workflow-run execution/progression, and higher mutation/resolver/`psi-tool` adapter seams above the boundary
+- open child task `115-workflow-registration-component-extraction` sharpens the workflow-definition registry seam by extracting canonical workflow-definition registration/removal/query semantics into a lower `workflow-registry` component while leaving workflow-file loading, workflow-run execution/progression, and higher mutation/resolver/`psi-tool` adapter seams above the boundary
+- open child task `116-deterministic-operation-registration-component-extraction` sharpens the separate workflow-adjacent invoke-operation registry seam by extracting canonical deterministic-operation registration/removal/query semantics used by workflow `:invoke` into a lower component while leaving invoke-step execution/runtime sequencing above the boundary
 - landed task `100-turn-statechart-component-extraction` should be treated as a narrow low-level turn child aligned with this umbrella, not as a replacement for a broader turn-component decision
 - `102-turn-preparation-component-extraction` is superseded by this umbrella because its narrow extraction target proved structurally premature without the broader component map
 - follow-on extraction tasks should reference this umbrella when they carve out one of the named component candidates

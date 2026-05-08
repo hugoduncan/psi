@@ -62,10 +62,13 @@ Live namespace-surface review completed:
 - recorded landed child task `114-prompt-contribution-registration-component-extraction`
   - this sharpens the remaining prompt area further: pure extension-owned contribution normalization and register/update/unregister semantics now live in a lower `prompt-registry` component while `agent-session` keeps prompt-refresh orchestration and `prompt-assets.system-prompt` keeps composition semantics
 - recorded open child task `115-workflow-registration-component-extraction`
-  - this sharpens the workflow boundary further: canonical workflow-definition registration/removal/query semantics can move into a lower `workflow-registry` component while workflow-file loading, workflow-run execution/progression, and higher adapter seams remain above the boundary
+  - this sharpens the workflow-definition registry seam further: canonical workflow-definition registration/removal/query semantics can move into a lower `workflow-registry` component while workflow-file loading, workflow-run execution/progression, and higher adapter seams remain above the boundary
+- recorded open child task `116-deterministic-operation-registration-component-extraction`
+  - this sharpens the separate workflow-adjacent invoke-operation registry seam further: canonical deterministic-operation registration/removal/query semantics used by workflow `:invoke` can move into a lower component while invoke-step execution sequencing and broader workflow runtime ownership remain above the boundary
 - observed that turn extraction is already in an intermediate state because `components/agent-session/src/psi/turn/handlers.clj` exists while high-level prompt-turn orchestration still resides under `psi.agent-session.*`
 - confirmed workflow is now the clearest remaining extraction candidate by both namespace mass and conceptual cohesion
+- clarified that the workflow area now contains at least two distinct lower registry seams rather than one: workflow-definition registration and deterministic-operation registration for workflow `:invoke`
 - recorded that the lower shared-config seam exposed by `107` is no longer speculative: it is now landed concretely via task `109`
 - updated extraction ordering to move extensions runtime ahead of scheduler/persistence/background jobs
-- recorded that narrower registry refinements inside the broader tool/prompt/extension/workflow areas have now started landing concretely through tasks `111`–`114`, with `115` still open in the current munera state
+- recorded that narrower registry refinements inside the broader tool/prompt/extension/workflow areas have now started landing concretely through tasks `111`–`114`, with workflow-adjacent follow-on registry tasks `115` and `116` open in the current munera state
 - recorded landed task `100-turn-statechart-component-extraction` as a narrow low-level turn child under this umbrella rather than as a substitute for the broader turn boundary
