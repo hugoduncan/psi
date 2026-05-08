@@ -51,3 +51,8 @@ Implementation notes — 2026-05-07
 - added focused `skill-registry` tests for validation, registration, duplicate-ignore behavior, ordering, lookup, and count
 - extended `agent-session` config-compaction coverage to assert the new return contract for first registration and to prove duplicate registration leaves prompt/session skill state unchanged and does not trigger follow-on refresh events
 - repository test/deps surfaces were updated to include the new component in root/test resolution
+
+Review notes — 2026-05-08
+- task-implementation-review outcome: no actionable implementation issues found; the extraction matches the design, keeps the intended architecture split, and appears ready from a task-quality perspective
+- code-shaper outcome: implementation is well-shaped overall for simplicity, consistency, and robustness
+- one optional follow-up polish item was identified and then completed: `psi.skill-registry.registry/find-skill` now uses `some` instead of `first` + `filter`, preserving behavior while expressing the intent more directly

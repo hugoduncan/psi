@@ -28,7 +28,7 @@
 (defn find-skill
   "Return the registered skill named `skill-name`, or nil when absent."
   [skills skill-name]
-  (first (filter #(= (:name %) skill-name) (all-skills skills))))
+  (some #(when (= (:name %) skill-name) %) (all-skills skills)))
 
 (defn skill-names
   "Return the registered skill names in registration order."

@@ -12,3 +12,4 @@
 - [x] Run focused component-local verification for `skill-registry`
 - [x] Run affected `agent-session` verification for skill registration/orchestration behavior
 - [x] Record final boundary decisions and any non-obvious tradeoffs in `implementation.md`
+- [x] Polish `psi.skill-registry.registry/find-skill` by replacing `first` + `filter` with `some` while preserving behavior and test coverage
