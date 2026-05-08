@@ -59,3 +59,13 @@ Follow-up execution 2026-05-08:
 - Checked the live malformed-result explanation from `psi.deterministic-operation-registry.defs/explain-operation-result` for invalid `:status` dispatch.
 - Treated the narrow `:errors` projection as stable enough for a targeted proof.
 - Updated `core_test.clj` to assert the key explanation shape for this case: one error at `[:status]` / `[:status]` with type `:malli.core/invalid-dispatch-value`.
+
+Test-shaper review 2026-05-08:
+- Tests are in good shape overall and the component is now present in the top-level Kaocha plan.
+- One follow-up remains in `core_test.clj`: split the success-path proof so `:operation-id` injection and success-result passthrough are asserted as separate behaviors for clearer failures.
+
+Follow-up execution 2026-05-08:
+- Split the combined success-path proof in `core_test.clj` into two focused behaviors:
+  - handler receives injected `:operation-id`
+  - canonical success result passes through unchanged
+- This improves failure signal without broadening the runtime test surface.

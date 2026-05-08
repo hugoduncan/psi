@@ -4,14 +4,27 @@
    [psi.deterministic-operation-runtime.core :as runtime]))
 
 (deftest invoke-operation-test
+  (testing "handler receives injected operation-id"
+    (let [received* (atom nil)]
+      (is (= {:status :ok :data {:ok true}}
+             (runtime/invoke-operation {:id "github/search"
+                                        :handler (fn [invocation]
+                                                   (reset! received* invocation)
+                                                   {:status :ok :data {:ok true}})}
+                                       {:args {:repo 1}})))
+      (is (= {:operation-id "github/search"
+              :args {:repo 1}}
+             (select-keys @received* [:operation-id :args])))))
+
   (testing "successful operation results pass through unchanged"
-    (is (= {:status :ok :data {:issues [1]} :summary "github/search"}
-           (runtime/invoke-operation {:id "github/search"
-                                      :handler (fn [{:keys [operation-id args]}]
-                                                 {:status :ok
-                                                  :data {:issues [(:repo args)]}
-                                                  :summary operation-id})}
-                                     {:args {:repo 1}}))))
+    (let [result {:status :ok
+                  :data {:issues [1]}
+                  :summary "1 issue"}]
+      (is (= result
+             (runtime/invoke-operation {:id "github/search"
+                                        :handler (fn [_]
+                                                   result)}
+                                       {:args {:repo 1}})))))
 
   (testing "thrown exceptions are canonicalized into tagged error results"
     (is (= {:status :error

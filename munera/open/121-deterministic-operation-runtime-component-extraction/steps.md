@@ -12,3 +12,4 @@
 - [x] Keep at least one focused workflow invoke-path proof on the real `psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result` path instead of stubbing the wrapper everywhere
 - [x] Decide whether malformed-result `:explanation` shape in `components/deterministic-operation-runtime/test/psi/deterministic_operation_runtime/core_test.clj` is intended to be stable
 - [x] If the malformed-result `:explanation` shape is intended to be stable, add one targeted assertion for that structure in `components/deterministic-operation-runtime/test/psi/deterministic_operation_runtime/core_test.clj`
+- [x] Split the success-path proof in `components/deterministic-operation-runtime/test/psi/deterministic_operation_runtime/core_test.clj` so handler `:operation-id` injection and success-result passthrough are asserted as separate behaviors
