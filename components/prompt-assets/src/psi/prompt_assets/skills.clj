@@ -31,7 +31,8 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.prompt-assets.prompt-templates :as pt]))
+   [psi.prompt-assets.prompt-templates :as pt]
+   [psi.skill-registry.registry :as skill-registry]))
 
 ;; ============================================================
 ;; Config
@@ -377,7 +378,7 @@
 (defn find-skill
   "Find a skill by name in `skills` vector. Returns nil if not found."
   [skills name]
-  (first (filter #(= (:name %) name) skills)))
+  (skill-registry/find-skill skills name))
 
 (defn invoke-skill
   "Expand a /skill:name command.
@@ -416,7 +417,7 @@
 (defn skill-names
   "Return a vector of skill name strings."
   [skills]
-  (mapv :name skills))
+  (skill-registry/skill-names skills))
 
 (defn skills-by-source
   "Group skills by their source."

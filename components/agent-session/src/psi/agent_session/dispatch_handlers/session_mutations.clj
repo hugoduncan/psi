@@ -12,6 +12,7 @@
    [psi.agent-session.post-tool :as post-tool]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as session]
+   [psi.skill-registry.registry :as skill-registry]
    [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
 
@@ -440,12 +441,12 @@
   (register-core-handler!
    :session/register-skill
    (fn [ctx {:keys [session-id skill]}]
-     (let [skills     (vec (:skills (session/get-session-data-in ctx session-id)))
-           existing?  (some #(= (:name %) (:name skill)) skills)
-           next-count (if existing? (count skills) (inc (count skills)))]
-       (cond-> {:return {:added? (not existing?) :count next-count}}
-         (not existing?)
-         (assoc :root-state-update (session/session-update session-id #(update % :skills (fnil conj []) skill))
+     (let [skills  (:skills (session/get-session-data-in ctx session-id))
+           result  (skill-registry/register-skill skills skill)
+           changed? (:changed? result)]
+       (cond-> {:return (select-keys result [:added? :changed? :count])}
+         changed?
+         (assoc :root-state-update (session/session-update session-id #(assoc % :skills (:skills result)))
                 :effects [{:effect/type :runtime/refresh-system-prompt
                            :session-id session-id}])))))
 

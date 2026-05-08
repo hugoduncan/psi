@@ -38,3 +38,14 @@ Read-path note after review:
 Relationship to umbrella work:
 - this should become a concrete child/refinement under `105-agent-session-component-extraction-map`
 - it sharpens the prompt/skills boundary in the same way `tool-registry` sharpened the tool boundary, while intentionally remaining a pure collection-oriented component rather than a stateful runtime registry
+
+Implementation notes — 2026-05-07
+- created new lower component `components/skill-registry/` with authoritative namespace `psi.skill-registry.registry`
+- registry API is intentionally pure over vectors of already-constructed skill maps: `valid-skill-name?`, `all-skills`, `find-skill`, `skill-names`, `skill-count`, and `register-skill`
+- first-cut validation is minimal and local to registration: `:name` must be a non-blank string; discovery-time prompt-assets validation remains unchanged and lower-owned there
+- `register-skill` preserves the design contract exactly: first registration per name wins, duplicates are ignored, ordering is preserved, and the return shape includes `:added?`, `:changed?`, and `:count`
+- `agent-session` `:session/register-skill` now delegates registry semantics to `psi.skill-registry.registry/register-skill` and keeps prompt-refresh orchestration local by only emitting `:runtime/refresh-system-prompt` when `:changed?` is true
+- `prompt-assets.skills` remains the owner of discovery/parsing/validation/invocation semantics, but trivial registered-skill read helpers `find-skill` and `skill-names` now delegate downward to the new registry owner
+- added focused `skill-registry` tests for validation, registration, duplicate-ignore behavior, ordering, lookup, and count
+- extended `agent-session` config-compaction coverage to assert the new return contract for first registration and to prove duplicate registration leaves prompt/session skill state unchanged and does not trigger follow-on refresh events
+- repository test/deps surfaces were updated to include the new component in root/test resolution
