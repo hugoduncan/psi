@@ -11,4 +11,7 @@
 (deftest canonical-compatibility-helper-names-still-exist-test
   (is (fn? p/append-entry-in!))
   (is (fn? p/persist-entry-in!))
+  (is (fn? p/persist-journal-in!))
+  (is (fn? p/persist-entry!))
+  (is (fn? p/persist-state-entry!))
   (is (fn? p/create-flush-state)))

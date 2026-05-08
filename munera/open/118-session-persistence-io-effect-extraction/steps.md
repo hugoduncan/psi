@@ -54,6 +54,6 @@
   - append/no-op/flush request shaping in isolation
   - direct `mark-flushed-root-update` unit test in lower component
 
-- [ ] Re-review final code shape for compatibility helper retention and possible follow-on cleanup
-  - confirm which retained compatibility helpers should remain public vs compatibility-only
-  - consider whether retained `persist-state-entry!` / `persist-entry!` should be documented more explicitly as non-authoritative seams
+- [x] Re-review final code shape for compatibility helper retention and possible follow-on cleanup
+  - confirmed retained compatibility helpers still have test coverage and are no longer authoritative production write seams
+  - documented `persist-state-entry!`, `persist-entry!`, `persist-journal-in!`, and `persist-entry-in!` more explicitly as compatibility/testing helpers and non-authoritative production seams

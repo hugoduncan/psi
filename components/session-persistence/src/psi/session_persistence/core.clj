@@ -263,6 +263,9 @@
 ;;; ============================================================
 
 (defn persist-state-entry!
+  "Compatibility/testing helper for atom/value-oriented persistence callers.
+   Not the authoritative production file-write seam; production append/fork
+   flows should cross the explicit `:persist/session-journal-io` effect boundary."
   ([entries flush-state session-id cwd parent-session-path save-flush-state!]
    (persist-state-entry! entries flush-state session-id cwd nil parent-session-path save-flush-state!))
   ([entries flush-state session-id cwd parent-session-id parent-session-path save-flush-state!]
@@ -284,6 +287,8 @@
            (save-flush-state! (assoc flush-state :flushed? true))))))))
 
 (defn persist-entry!
+  "Compatibility/testing helper for atom-backed journal persistence.
+   Prefer explicit dispatch-owned IO effects in production flows."
   ([journal-atom flush-state-atom session-id cwd parent-session-path]
    (persist-entry! journal-atom flush-state-atom session-id cwd nil parent-session-path))
   ([journal-atom flush-state-atom session-id cwd parent-session-id parent-session-path]
@@ -296,6 +301,9 @@
                          #(reset! flush-state-atom %))))
 
 (defn persist-journal-in!
+  "Compatibility helper for ctx-backed persistence callers.
+   Production append/fork paths should prefer handler-owned root updates plus
+   explicit `:persist/session-journal-io` effects."
   ([ctx session-id cwd parent-session-path]
    (persist-journal-in! ctx session-id cwd nil parent-session-path))
   ([ctx session-id cwd parent-session-id parent-session-path]
@@ -311,7 +319,8 @@
                            #(assoc-state-in! ctx fp %)))))
 
 (defn persist-entry-in!
-  "Compatibility alias. Prefer `persist-journal-in!`."
+  "Compatibility alias. Prefer `persist-journal-in!`, and prefer explicit
+   dispatch-owned IO effects in new production call paths."
   ([ctx session-id cwd parent-session-path]
    (persist-journal-in! ctx session-id cwd parent-session-path))
   ([ctx session-id cwd parent-session-id parent-session-path]

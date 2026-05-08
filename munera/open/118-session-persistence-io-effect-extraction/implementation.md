@@ -37,5 +37,8 @@
     - `persistence-io-request` append shaping after initial flush
     - `mark-flushed-root-update` root-state transition semantics
   - kept compatibility helper presence unchanged; this slice focused on proving lower-owned semantics directly rather than changing surface area
-- Remaining follow-on for task completion:
-  - legacy compatibility helpers remain present, though no longer authoritative for production file writes
+- Final compatibility-surface review slice landed too:
+  - kept the retained helper names in place for compatibility/testing coverage
+  - clarified in `components/session-persistence/src/psi/session_persistence/core.clj` docstrings that `persist-state-entry!`, `persist-entry!`, `persist-journal-in!`, and `persist-entry-in!` are not the authoritative production file-write seam
+  - extended compatibility-surface tests to assert those retained helper names still exist intentionally
+- Task 118 now has its intended architectural boundary and lower-level proof coverage; any future follow-on would be optional compatibility surface removal rather than required extraction work
