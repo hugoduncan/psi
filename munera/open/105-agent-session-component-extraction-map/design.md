@@ -130,9 +130,9 @@ Boundary note after reviewing the current namespace surface:
 
 - prompt composition and turn orchestration should stay distinct: prompt assets decide what to send, while turn owns when/how a single agent turn is prepared, executed, recorded, and continued
 - `tool_defs.clj` appears split-brain: prompt-facing tool schema projection likely belongs with prompt composition, while runtime execution ownership belongs with the tool runtime component
-- skill registration now also appears split from broader prompt ownership: discovery/parsing/invocation belongs with prompt assets, while pure registered-skill collection semantics can sit in a narrower lower `skill-registry` child component
-- command registration now also appears to have a clean lower seam: extension-owned command registration/query semantics should be separable from higher-level command dispatch/routing and broader extension-runtime ownership via a `command-registry` child component
-- prompt contribution registration also appears separable from broader prompt composition: extension-owned contribution normalization and register/update/unregister semantics can sit in a lower pure `prompt-registry` child component while `agent-session` retains prompt-refresh orchestration and `prompt-assets.system-prompt` retains composition semantics
+- landed child task `112-skill-registration-component-extraction` confirmed this split: discovery/parsing/invocation remains with prompt assets, while pure registered-skill collection semantics now sit in a lower `skill-registry` component
+- landed child task `113-command-registration-component-extraction` confirmed a clean lower seam here: extension-owned command registration/query semantics now sit in a lower `command-registry` component while higher-level command dispatch/routing remains above the boundary
+- landed child task `114-prompt-contribution-registration-component-extraction` confirmed the prompt-contribution seam: extension-owned contribution normalization and register/update/unregister semantics now sit in a lower pure `prompt-registry` component while `agent-session` retains prompt-refresh orchestration and `prompt-assets.system-prompt` retains composition semantics
 - `message_text.clj` remains ambiguous and should be treated as a review point during a concrete extraction rather than forced into prompt ownership prematurely
 - config resolution remains a cross-cutting concern: prompt composition consumes config, but config loading itself now has an explicit lower owner in `components/shared-config/` rather than belonging inside the prompt component
 
@@ -267,6 +267,7 @@ Boundary note after reviewing the current namespace surface:
 
 - this is the clearest remaining extraction candidate by namespace mass and conceptual cohesion
 - the workflow domain already spans authoring, loading, compilation, execution, judging, routing, progression, and deterministic-operation bridging; keeping all of that under `agent-session` increasingly looks like historical placement rather than present ownership
+- landed child task `115-workflow-registration-component-extraction` has now sharpened the lower registry seam: canonical workflow-definition registration/removal/query semantics belong in a lower `workflow-registry` component, while workflow-file loading, workflow-run execution/progression, and higher mutation/resolver/`psi-tool` adapter seams remain the broader extraction surface
 - `psi_tool_workflow.clj`, `workflow_mutations.clj`, `mutations/canonical_workflows.clj`, and `resolvers/workflows.clj` are likely adapter/entrypoint seams that may remain briefly in `agent-session` during migration, but their owned logic should flow downward toward an extracted workflow component
 
 #### 6. Project nREPL
@@ -415,11 +416,9 @@ Recommended first-cut extraction order after reviewing the live namespace surfac
 5. Tool runtime
 6. Turn
 7. Extensions runtime
-8. Command registration
-9. Prompt contribution registration
-10. Scheduler
-11. Persistence / journal
-12. Background jobs
+8. Scheduler
+9. Persistence / journal
+10. Background jobs
 
 Ordering rationale:
 
@@ -428,7 +427,7 @@ Ordering rationale:
 - extract prompt composition before forcing a cleaner turn extraction
 - treat tool runtime and turn as adjacent but distinct follow-on decompositions
 - move extensions runtime ahead of scheduler/persistence/background jobs because its current namespace family is already explicitly substructured and component-like
-- place command registration and prompt contribution registration after the larger domain splits because they are narrower registry refinements inside the broader extension/prompt area, but keep them explicit so those lower seams are not lost inside larger extractions
+- landed child tasks `111` through `114` validate that several narrower registry refinements could be extracted cleanly below the larger tool/prompt/extension surfaces without forcing the broader runtime/component moves to happen first
 - preserve `agent-session` as the orchestration/core layer rather than the home of every domain subsystem
 
 ## Current namespace-surface review summary
@@ -445,9 +444,10 @@ Reviewing the current `components/agent-session/src/psi/agent_session/` tree sha
 
 - landed child tasks `106-provider-auth-component-extraction` and `107-project-nrepl-component-extraction` validate the umbrella's early bounded-subsystem ordering
 - landed child task `104-tool-runtime-component-extraction` confirmed the domain boundary was useful, even though tool-related ownership still remains distributed enough that the umbrella continues to track the broader tool-runtime shape
-- open child task `112-skill-registration-component-extraction` sharpens the prompt/skills boundary by extracting pure registered-skill collection semantics into a lower `skill-registry` component while leaving discovery/parsing/invocation in `prompt-assets.skills`
-- open child task `113-command-registration-component-extraction` sharpens the extension/command boundary by extracting extension-owned command registration/query semantics into a lower `command-registry` component while leaving command dispatch/routing and higher-level mutation/API seams above the boundary
-- open child task `114-prompt-contribution-registration-component-extraction` sharpens the remaining prompt boundary by extracting pure extension-owned prompt contribution registration semantics into a lower `prompt-registry` component while leaving prompt-refresh orchestration in `agent-session` and prompt assembly in `prompt-assets.system-prompt`
+- landed child task `111-tool-registration-component-extraction` sharpened the tool boundary by extracting pure tool-definition registration/query semantics into a lower registration component while leaving broader tool runtime/execution ownership above the boundary
+- landed child task `112-skill-registration-component-extraction` sharpened the prompt/skills boundary by extracting pure registered-skill collection semantics into a lower `skill-registry` component while leaving discovery/parsing/invocation in `prompt-assets.skills`
+- landed child task `113-command-registration-component-extraction` sharpened the extension/command boundary by extracting extension-owned command registration/query semantics into a lower `command-registry` component while leaving command dispatch/routing and higher-level mutation/API seams above the boundary
+- landed child task `114-prompt-contribution-registration-component-extraction` sharpened the remaining prompt boundary by extracting pure extension-owned prompt contribution registration semantics into a lower `prompt-registry` component while leaving prompt-refresh orchestration in `agent-session` and prompt assembly in `prompt-assets.system-prompt`
 - open child task `115-workflow-registration-component-extraction` sharpens the workflow boundary by extracting canonical workflow-definition registration/removal/query semantics into a lower `workflow-registry` component while leaving workflow-file loading, workflow-run execution/progression, and higher mutation/resolver/`psi-tool` adapter seams above the boundary
 - landed task `100-turn-statechart-component-extraction` should be treated as a narrow low-level turn child aligned with this umbrella, not as a replacement for a broader turn-component decision
 - `102-turn-preparation-component-extraction` is superseded by this umbrella because its narrow extraction target proved structurally premature without the broader component map

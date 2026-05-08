@@ -53,14 +53,19 @@ Live namespace-surface review completed:
   - prompt composition owns assets/assembly/provider-facing conversation projection
   - tool runtime owns execution/shaping/schema/runtime adapters
   - turn owns single-turn lifecycle orchestration and consumes prompt/tool capabilities rather than owning them
-- identified an additional prompt/skills sub-boundary now captured as open child task `112-skill-registration-component-extraction`
-  - this sharpens the prompt/skills area further: `prompt-assets.skills` remains the owner of discovery/parsing/invocation helpers, while pure registered-skill collection semantics can move into a lower `skill-registry` component
-- identified an additional extension/command sub-boundary now captured as open child task `113-command-registration-component-extraction`
-  - this sharpens command ownership further: extension-owned command registration/query semantics can move into a lower `command-registry` component while command dispatch/routing and higher-level API seams remain above the boundary
-- identified an additional prompt-contribution sub-boundary now captured as open child task `114-prompt-contribution-registration-component-extraction`
-  - this sharpens the remaining prompt area further: pure extension-owned contribution normalization and register/update/unregister semantics can move into a lower `prompt-registry` component while `agent-session` keeps prompt-refresh orchestration and `prompt-assets.system-prompt` keeps composition semantics
+- recorded landed child task `111-tool-registration-component-extraction`
+  - this sharpened the tool area further: pure tool-definition registration/query semantics now live below the broader tool runtime/execution boundary
+- recorded landed child task `112-skill-registration-component-extraction`
+  - this sharpens the prompt/skills area further: `prompt-assets.skills` remains the owner of discovery/parsing/invocation helpers, while pure registered-skill collection semantics now live in a lower `skill-registry` component
+- recorded landed child task `113-command-registration-component-extraction`
+  - this sharpens command ownership further: extension-owned command registration/query semantics now live in a lower `command-registry` component while command dispatch/routing and higher-level API seams remain above the boundary
+- recorded landed child task `114-prompt-contribution-registration-component-extraction`
+  - this sharpens the remaining prompt area further: pure extension-owned contribution normalization and register/update/unregister semantics now live in a lower `prompt-registry` component while `agent-session` keeps prompt-refresh orchestration and `prompt-assets.system-prompt` keeps composition semantics
+- recorded open child task `115-workflow-registration-component-extraction`
+  - this sharpens the workflow boundary further: canonical workflow-definition registration/removal/query semantics can move into a lower `workflow-registry` component while workflow-file loading, workflow-run execution/progression, and higher adapter seams remain above the boundary
 - observed that turn extraction is already in an intermediate state because `components/agent-session/src/psi/turn/handlers.clj` exists while high-level prompt-turn orchestration still resides under `psi.agent-session.*`
 - confirmed workflow is now the clearest remaining extraction candidate by both namespace mass and conceptual cohesion
 - recorded that the lower shared-config seam exposed by `107` is no longer speculative: it is now landed concretely via task `109`
-- updated extraction ordering to move extensions runtime ahead of scheduler/persistence/background jobs and to make command-registration and prompt-contribution registration explicit later registry refinements inside the broader extension/prompt area
+- updated extraction ordering to move extensions runtime ahead of scheduler/persistence/background jobs
+- recorded that narrower registry refinements inside the broader tool/prompt/extension/workflow areas have now started landing concretely through tasks `111`–`114`, with `115` still open in the current munera state
 - recorded landed task `100-turn-statechart-component-extraction` as a narrow low-level turn child under this umbrella rather than as a substitute for the broader turn boundary
