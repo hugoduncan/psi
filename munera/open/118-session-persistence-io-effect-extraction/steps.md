@@ -57,3 +57,19 @@
 - [x] Re-review final code shape for compatibility helper retention and possible follow-on cleanup
   - removed obsolete compatibility helpers once production/path references were gone
   - migrated remaining lower-component tests onto canonical lower helpers and explicit IO-request execution instead of wrapper APIs
+
+- [ ] Refresh `psi.session-persistence.core` namespace docstring after the extraction
+  - describe the current post-task ownership more precisely
+  - remove outdated wording that implies broader ctx-based append/persist execution ownership
+
+- [ ] Remove the empty `;;; Flush + persist semantics` section stub from `psi.session-persistence.core`
+  - keep file sections aligned with the remaining code shape after wrapper removal
+
+- [ ] Decide whether to remove the `:persist/journal-append-*` shim effects in a follow-on cleanup
+  - audit remaining callers of `:persist/journal-append-entry`
+  - audit remaining callers of `:persist/journal-append-message-entry`
+  - audit remaining callers of `:persist/journal-append-model-entry`
+  - audit remaining callers of `:persist/journal-append-thinking-level-entry`
+  - audit remaining callers of `:persist/journal-append-session-info-entry`
+  - if migration is straightforward, route callers directly through canonical handler/effect seams and remove the shim effect variants
+  - if migration is not straightforward, document explicitly why the shim surfaces remain intentional

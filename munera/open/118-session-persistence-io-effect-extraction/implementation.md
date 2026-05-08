@@ -42,3 +42,18 @@
   - rewrote remaining lower-component tests to use canonical lower helpers plus direct execution of shaped IO requests instead of wrapper APIs
   - updated compatibility-surface tests to assert those obsolete names are now absent from the canonical namespace
 - Task 118 now has its intended architectural boundary, lower-level proof coverage, and a simplified canonical persistence surface
+
+2026-05-08 — Task implementation review
+- Review verdict: implementation matches the task design and is acceptable for closure from a behavior/architecture standpoint.
+- Confirmed strengths:
+  - canonical file-write seam is now `:persist/session-journal-io`
+  - lower component owns pure persistence policy through `persistence-io-request`
+  - handler owns in-memory append while executor owns file IO
+  - fork persistence crosses the same explicit effect boundary as append flows
+  - obsolete compatibility wrappers have now been removed entirely
+  - lower-level proofs exist in addition to higher-level integration/convergence tests
+- Review follow-up items identified:
+  1. `psi.session-persistence.core` namespace docstring is slightly stale; it still describes broader ctx-based append/persist semantics than the post-task surface now owns.
+  2. `psi.session-persistence.core` contains an empty `;;; Flush + persist semantics` section stub after wrapper removal.
+  3. Compatibility effect surfaces `:persist/journal-append-*` still exist as shims above the canonical IO seam; this is acceptable, but a later cleanup could migrate callers onto the canonical seam directly and remove the shims.
+- These follow-up items are non-blocking review cleanups, not correctness defects.
