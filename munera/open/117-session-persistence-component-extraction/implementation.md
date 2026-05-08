@@ -86,3 +86,42 @@ Verification
   - `psi.agent-session.session-lifecycle-test`
   - `psi.agent-session.journal-append-convergence-test`
 - result: `20 tests, 149 assertions, 0 failures`
+
+2026-05-08 final review pass
+- reviewed the post-follow-up implementation against the task design and architecture constraints
+- conclusion: task `117` now satisfies its stated implementation goals
+- accepted retained seam: `psi.session-state.state` still exposes `session-journal-path`, `session-flush-state-path`, and `append-journal-entry-in!`, but these now act as thin session-state compatibility/query surfaces delegating to the persistence owner rather than competing implementations
+- no new actionable task-local follow-up items were found in this review pass
+- separate architectural follow-up remains correctly tracked as task `118-session-persistence-io-effect-extraction`; that is a boundary refinement beyond the closure criteria of task `117`, not a blocker on `117` itself
+
+2026-05-08 code-shaper review note
+- verdict: the implementation is shaped well enough to keep and is acceptable to close for task `117`, but a few non-blocking shaping follow-ups remain worth making explicit
+- strengths from the shaping review:
+  - persistence ownership is now centralized in `psi.session-persistence.core`
+  - consumer dependency direction is simpler and more coherent
+  - persistence subtree initialization is now delegated instead of repeatedly rebuilt inline in `session-state.init`
+  - compatibility cleanup materially reduced indirection by removing the old production `psi.agent-session.persistence` namespace
+- shaping follow-up 1: `psi.session-persistence.core` is still somewhat broad
+  - it currently mixes subtree/path construction, ctx mutation helpers, atom journal helpers, disk/store wrappers, and lazy flush orchestration in one namespace
+  - this is acceptable for the extraction task, but it is a sign that later reshaping may improve local comprehensibility
+- shaping follow-up 2: assistant-message detection logic is duplicated
+  - the same assistant-presence check appears in `persist-state-entry!`, `persist-entry!`, and `persist-journal-in!`
+  - extracting one local helper would improve consistency and reduce duplication
+- shaping follow-up 3: persistence helper layering could be more explicit
+  - the new helpers `assoc-persistence-state`, `initialize-persistence-state`, and `append-journal-entry-root-update` are a good start
+  - a later local reshaping pass could make the file easier to mutate by grouping subtree/update helpers separately from journal read helpers and persistence execution helpers
+- shaping follow-up 4: the deeper semantic-vs-IO separation remains a separate architectural refinement
+  - this is already tracked correctly as task `118-session-persistence-io-effect-extraction`
+  - it should be treated as a boundary follow-up, not a defect in `117`
+
+2026-05-08 code-shaper follow-up execution
+- extracted local helpers `assistant-message-entry?` and `has-assistant-message?` in `psi.session-persistence.core`
+- updated `persist-state-entry!`, `persist-entry!`, and `persist-journal-in!` to use the shared helper instead of repeating inline assistant-message detection logic
+- result: reduced duplication and more consistent persistence-guard logic across atom/state/ctx persistence paths
+- broader local namespace reorganization was explicitly deferred
+  - rationale: task `117` is already closure-ready after the helper extraction, and larger persistence-namespace restructuring would overlap substantially with the architecture-oriented boundary work already tracked in `118-session-persistence-io-effect-extraction`
+- focused shaping verification green via:
+  - `psi.session-persistence.core-test`
+  - `psi.session-state.init-test`
+  - `psi.agent-session.journal-append-convergence-test`
+- result: `7 tests, 39 assertions, 0 failures`

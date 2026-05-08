@@ -57,3 +57,12 @@
   - [x] audit remaining delegating seams in `psi.session-state.state`
   - [x] explicitly justify retaining `session-journal-path`, `session-flush-state-path`, and `append-journal-entry-in!` in `psi.session-state.state` as generic compatibility/session-state query surfaces for now
   - [x] rerun focused regressions after wrapper removal or seam-retention decision
+- [x] Review final implementation against task design and architecture after follow-up fixes
+  - [x] confirm no remaining task-local follow-up items block closure
+  - [x] distinguish non-blocking architectural follow-up `118-session-persistence-io-effect-extraction` from task-117 closure criteria
+- [x] Execute code-shaper follow-up cleanup
+  - [x] extract a local helper in `psi.session-persistence.core` for assistant-message detection used by `persist-state-entry!`, `persist-entry!`, and `persist-journal-in!`
+  - [x] review whether `psi.session-persistence.core` should be locally reorganized so subtree/update helpers, journal read helpers, and persistence execution helpers are easier to scan and mutate
+  - [x] decide that broader local reorganization should be deferred rather than folded into task `117` closure cleanup
+  - [x] rerun focused `psi.session-persistence.core-test`, `psi.session-state.init-test`, and `psi.agent-session.journal-append-convergence-test`
+  - [x] append shaping outcome/decision to `implementation.md`
