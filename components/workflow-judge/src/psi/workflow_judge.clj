@@ -3,52 +3,7 @@
   (:require
    [clojure.string :as str]))
 
-(defn check-iteration-limit
-  "Check a target step-run's iteration count against a directive's max-iterations.
-   Returns :within-limit or :exhausted."
-  [iteration-count max-iterations]
-  (if (and max-iterations (>= (or iteration-count 0) max-iterations))
-    :exhausted
-    :within-limit))
-
-(defn match-signal
-  "Match a signal string against a routing table.
-   Returns the matched directive map or nil. Exact match after trim."
-  [signal routing-table]
-  (when (and signal routing-table)
-    (get routing-table (str/trim signal))))
-
-(defn resolve-goto-target
-  "Resolve a :goto value to a concrete action.
-
-   Returns one of:
-   - {:action :goto :target step-id}
-   - {:action :complete}
-   - {:action :fail :reason ...}"
-  [goto current-step-id step-order]
-  (let [idx (.indexOf ^java.util.List step-order current-step-id)
-        last-idx (dec (count step-order))]
-    (cond
-      (= :done goto)
-      {:action :complete}
-
-      (= :next goto)
-      (if (>= idx last-idx)
-        {:action :complete}
-        {:action :goto :target (nth step-order (inc idx))})
-
-      (= :previous goto)
-      (if (<= idx 0)
-        {:action :fail :reason :no-previous-step}
-        {:action :goto :target (nth step-order (dec idx))})
-
-      (string? goto)
-      (if (contains? (set step-order) goto)
-        {:action :goto :target goto}
-        {:action :fail :reason :unknown-step :step-id goto})
-
-      :else
-      {:action :fail :reason :invalid-goto :goto goto})))
+;;; Projection
 
 (defn- text-block?
   "True if a content block is a text block (not tool_use or tool_result)."
@@ -59,31 +14,6 @@
 (defn- user-message?
   [msg]
   (= "user" (:role msg)))
-
-(defn evaluate-routing
-  "Evaluate a judge signal against a routing table with iteration checks.
-
-   Returns one of:
-   - {:action :goto :target step-id}
-   - {:action :complete}
-   - {:action :fail :reason ...}
-   - {:action :no-match}"
-  [signal routing-table current-step-id step-order step-runs]
-  (if-let [directive (match-signal signal routing-table)]
-    (let [resolved (resolve-goto-target (:goto directive) current-step-id step-order)]
-      (case (:action resolved)
-        :goto
-        (let [target (:target resolved)
-              target-run (get step-runs target)
-              iter-count (get target-run :iteration-count 0)
-              limit-check (check-iteration-limit iter-count (:max-iterations directive))]
-          (if (= :exhausted limit-check)
-            {:action :fail :reason :iteration-exhausted :step-id target :iteration-count iter-count}
-            resolved))
-
-        ;; :complete or :fail — pass through
-        resolved))
-    {:action :no-match}))
 
 (defn- strip-tool-blocks
   "Remove tool_use and tool_result content blocks from a message.
@@ -144,3 +74,76 @@
     :else
     (vec messages)))
 
+;;; Routing
+
+(defn check-iteration-limit
+  "Check a target step-run's iteration count against a directive's max-iterations.
+   Returns :within-limit or :exhausted."
+  [iteration-count max-iterations]
+  (if (and max-iterations (>= (or iteration-count 0) max-iterations))
+    :exhausted
+    :within-limit))
+
+(defn match-signal
+  "Match a signal string against a routing table.
+   Returns the matched directive map or nil. Exact match after trim."
+  [signal routing-table]
+  (when (and signal routing-table)
+    (get routing-table (str/trim signal))))
+
+(defn resolve-goto-target
+  "Resolve a :goto value to a concrete action.
+
+   Returns one of:
+   - {:action :goto :target step-id}
+   - {:action :complete}
+   - {:action :fail :reason ...}"
+  [goto current-step-id step-order]
+  (let [idx (.indexOf ^java.util.List step-order current-step-id)
+        last-idx (dec (count step-order))]
+    (cond
+      (= :done goto)
+      {:action :complete}
+
+      (= :next goto)
+      (if (>= idx last-idx)
+        {:action :complete}
+        {:action :goto :target (nth step-order (inc idx))})
+
+      (= :previous goto)
+      (if (<= idx 0)
+        {:action :fail :reason :no-previous-step}
+        {:action :goto :target (nth step-order (dec idx))})
+
+      (string? goto)
+      (if (contains? (set step-order) goto)
+        {:action :goto :target goto}
+        {:action :fail :reason :unknown-step :step-id goto})
+
+      :else
+      {:action :fail :reason :invalid-goto :goto goto})))
+
+(defn evaluate-routing
+  "Evaluate a judge signal against a routing table with iteration checks.
+
+   Returns one of:
+   - {:action :goto :target step-id}
+   - {:action :complete}
+   - {:action :fail :reason ...}
+   - {:action :no-match}"
+  [signal routing-table current-step-id step-order step-runs]
+  (if-let [directive (match-signal signal routing-table)]
+    (let [resolved (resolve-goto-target (:goto directive) current-step-id step-order)]
+      (case (:action resolved)
+        :goto
+        (let [target (:target resolved)
+              target-run (get step-runs target)
+              iter-count (get target-run :iteration-count 0)
+              limit-check (check-iteration-limit iter-count (:max-iterations directive))]
+          (if (= :exhausted limit-check)
+            {:action :fail :reason :iteration-exhausted :step-id target :iteration-count iter-count}
+            resolved))
+
+        ;; :complete or :fail — pass through
+        resolved))
+    {:action :no-match}))

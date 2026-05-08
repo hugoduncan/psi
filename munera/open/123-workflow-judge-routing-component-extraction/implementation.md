@@ -42,3 +42,12 @@ Non-shim note:
 Verification:
 - focused tests: `22 tests, 98 assertions, 0 failures`
 - lint: `0 errors, 0 warnings`
+
+Code-shaper review:
+- review passed; extraction shape is simple, consistent, and robust
+- one minor follow-up noted: reorder forms in `components/workflow-judge/src/psi/workflow_judge.clj` so projection helpers/functions and routing helpers/functions are grouped contiguously for stronger local comprehensibility
+
+Namespace-order cleanup:
+- reordered `psi.workflow-judge` so projection helpers/functions are contiguous and routing helpers/functions are contiguous
+- focused verification after cleanup: `3 tests, 16 assertions, 0 failures`
+- lint after cleanup: `0 errors, 0 warnings`

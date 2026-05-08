@@ -9,3 +9,7 @@
 - [x] Update focused tests, moving pure judge/routing proofs with the new component while keeping impure judge-execution and higher workflow integration proofs above the boundary
 - [x] Remove mixed authoritative ownership of the pure judge/routing logic from `psi.agent-session.*`
 - [x] Record final boundary decisions, the final namespace split, and any residual follow-ons in `implementation.md`
+- [x] Reorder forms in `components/workflow-judge/src/psi/workflow_judge.clj` so projection helpers/functions and routing helpers/functions are grouped contiguously
+- [x] Re-run focused workflow-judge tests after the namespace-order cleanup
+- [x] Re-run lint after the namespace-order cleanup
+- [x] Append the namespace-order cleanup result to `implementation.md`
