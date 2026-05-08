@@ -9,15 +9,9 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
    [psi.session-persistence.core :as persist]
-   [psi.agent-session.prompt-recording :as prompt-recording]
-   [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.runtime :as runtime]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.core :as turn-runtime]))
-
-(defn build-prepared-request
-  [ctx session-id opts]
-  (prompt-request/build-prepared-request ctx session-id opts))
 
 (defn execute-prepared-request!
   [ai-ctx ctx session-id prepared-request progress-queue]
@@ -34,10 +28,6 @@
                          :entry (persist/message-entry assistant-msg)}
                         {:origin :core})
     execution-result))
-
-(defn build-record-response
-  [session-id execution-result progress-queue]
-  (prompt-recording/build-record-response session-id execution-result progress-queue))
 
 (defn- extract-text-from-content-blocks
   "Extract :text values from agent-core message content blocks."

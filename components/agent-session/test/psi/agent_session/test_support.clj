@@ -11,6 +11,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
+   [psi.agent-session.prompt-recording]
+   [psi.agent-session.prompt-request]
    [psi.agent-session.services :as services]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as ss]
@@ -129,8 +131,8 @@
                        :dispatch-statechart-event-fn dispatch-statechart-event-fn
                        :runtime-tool-executor-fn     tool-plan/default-execute-runtime-tool-in!
                        :execute-tool-runtime-fn      #'tool-plan/execute-tool-runtime-in!
-                       :build-prepared-request-fn    #'psi.turn/build-prepared-request
-                       :build-record-response-fn     #'psi.turn/build-record-response
+                       :build-prepared-request-fn    #'psi.agent-session.prompt-request/build-prepared-request
+                       :build-record-response-fn     #'psi.agent-session.prompt-recording/build-record-response
                        :continue-prompt-chain-fn     (fn [_ctx _session-id _execution-result _progress-queue]
                                                        {:continued? true})
                        :refresh-system-prompt-fn     (fn

@@ -15,6 +15,8 @@
    [psi.agent-session.post-tool :as post-tool]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.prompt-chain :as prompt-chain]
+   [psi.agent-session.prompt-recording :as prompt-recording]
+   [psi.agent-session.prompt-request :as prompt-request]
    [psi.turn :as turn]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
@@ -142,9 +144,9 @@
    :dispatch-statechart-event-fn dispatch-handlers/dispatch-statechart-event-in!
    :runtime-tool-executor-fn tool-plan/default-execute-runtime-tool-in!
    :execute-tool-runtime-fn #'tool-plan/execute-tool-runtime-in!
-   :build-prepared-request-fn #'turn/build-prepared-request
+   :build-prepared-request-fn #'prompt-request/build-prepared-request
    :execute-prepared-request-fn #'turn/execute-prepared-request!
-   :build-record-response-fn #'turn/build-record-response
+   :build-record-response-fn #'prompt-recording/build-record-response
    :continue-prompt-chain-fn #'prompt-chain/run-prompt-tools!
    :refresh-system-prompt-fn (fn
                                ([_ctx] (throw (ex-info "refresh-system-prompt-fn requires explicit session-id" {:callback :refresh-system-prompt-fn})))

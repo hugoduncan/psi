@@ -6,8 +6,8 @@
    [psi.agent-core.core :as agent]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
-   [psi.agent-session.conversation]
    [psi.session-persistence.core :as persist]
+   [psi.turn-runtime.conversation :as turn-conversation]
    [psi.agent-session.prompt-loop :as prompt-loop]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
@@ -146,7 +146,7 @@
                                    (mapv #(get-in % [:data :message]))))
             assistant       (last messages)
             anthropic-model (models/get-model :sonnet-4.6)
-            conv            (#'psi.agent-session.conversation/agent-messages->ai-conversation
+            conv            (#'turn-conversation/agent-messages->ai-conversation
                              "sys" messages [] {:cache-breakpoints #{:system}})
             body            (json/parse-string
                              (:body (#'anthropic/build-request conv anthropic-model {:api-key "test-key"

@@ -2,7 +2,7 @@
   "Tests for agent-messages->ai-conversation — pure translation, no session needed."
   (:require
    [clojure.test :refer [deftest testing is]]
-   [psi.agent-session.conversation :as conv-translate]))
+   [psi.turn-runtime.conversation :as conv-translate]))
 
 (deftest custom-type-messages-excluded-from-llm-conversation-test
   (testing "messages with :custom-type are filtered out before LLM call"
