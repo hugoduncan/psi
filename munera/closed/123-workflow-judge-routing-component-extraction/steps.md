@@ -13,3 +13,9 @@
 - [x] Re-run focused workflow-judge tests after the namespace-order cleanup
 - [x] Re-run lint after the namespace-order cleanup
 - [x] Append the namespace-order cleanup result to `implementation.md`
+- [x] Add a pure-component regression test proving that `:tool-output false` drops messages whose content becomes empty after tool-block stripping
+- [x] Re-run focused workflow-judge tests after adding the empty-content drop regression
+- [x] Re-run lint after adding the empty-content drop regression
+- [x] Add an optional consumer-level proof for `workflow-source-resolution` applying `:projection` through the new lower owner
+- [x] Re-run focused consuming-path tests if the optional consumer-level proof is added
+- [x] Append the test-follow-up result to `implementation.md`

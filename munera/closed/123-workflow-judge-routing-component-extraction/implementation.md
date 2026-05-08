@@ -51,3 +51,14 @@ Namespace-order cleanup:
 - reordered `psi.workflow-judge` so projection helpers/functions are contiguous and routing helpers/functions are contiguous
 - focused verification after cleanup: `3 tests, 16 assertions, 0 failures`
 - lint after cleanup: `0 errors, 0 warnings`
+
+Test review:
+- test review passed overall; pure/impure boundary ownership is proved in the right places
+- one actionable follow-up noted: add an explicit pure-component regression proving that `:tool-output false` drops messages whose content becomes empty after tool-block stripping
+- one optional follow-up noted: add a consumer-level proof for `workflow-source-resolution` applying `:projection` through the new lower owner
+
+Test-follow-up execution:
+- added a pure `psi.workflow-judge-test` regression proving `:tool-output false` drops assistant/tool messages emptied by tool-block stripping
+- extended `psi.agent-session.workflow-source-resolution-test` to prove both `:projection :full` passthrough and the lower-owner projection path that drops emptied messages
+- focused verification after the test follow-up: `8 tests, 15 assertions, 0 failures`
+- lint after the test follow-up: `0 errors, 0 warnings`

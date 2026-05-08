@@ -162,6 +162,36 @@
            (workflow-source-resolution/apply-source-spec
             run
             {:from {:step "report" :output :transcript}
+             :projection {:type :tail :turns 1 :tool-output false}})))
+    (is (= transcript
+           (workflow-source-resolution/apply-source-spec
+            run
+            {:from {:step "report" :output :transcript}
+             :projection :full})))))
+
+(deftest apply-source-spec-projects-through-lower-owner-dropping-emptied-messages-test
+  (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                       {:definition {:steps [{:name "report"
+                                                                              :type :session
+                                                                              :contributions [{:type :template
+                                                                                               :text "x"
+                                                                                               :vars {}}]}]}
+                                                        :run-id "run-transcript-tool-only"
+                                                        :workflow-input {}})
+        transcript [{:role "user" :content "Request"}
+                    {:role "assistant" :content [{:type :tool_use :id "t1" :name "read" :input {:path "x"}}]}
+                    {:role "tool" :content [{:type :tool_result :tool-use-id "t1" :content "ok"}]}
+                    {:role "assistant" :content [{:type :text :text "Done"}]}]
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "report" :accepted-result]
+                         {:outcome :ok
+                          :outputs {:transcript transcript
+                                    :final-llm-reply "Done"}})
+        run (workflow-runtime/workflow-run-in state3 run-id)]
+    (is (= [{:role "user" :content "Request"}
+            {:role "assistant" :content [{:type :text :text "Done"}]}]
+           (workflow-source-resolution/apply-source-spec
+            run
+            {:from {:step "report" :output :transcript}
              :projection {:type :tail :turns 1 :tool-output false}})))))
 
 (deftest resolve-binding-ref-normalizes-session-output-paths-through-canonical-ir-test

@@ -29,6 +29,12 @@
    {:role "user" :content "Turn 3 user"}
    {:role "assistant" :content [{:type :text :text "Turn 3 assistant"}]}])
 
+(def messages-with-tool-only-turn
+  [{:role "user" :content "Build the feature"}
+   {:role "assistant" :content [{:type :tool_use :id "t1" :name "read" :input {:path "src/core.clj"}}]}
+   {:role "tool" :content [{:type :tool_result :tool-use-id "t1" :content "file contents"}]}
+   {:role "assistant" :content [{:type :text :text "Build complete."}]}])
+
 (def step-order ["step-1-plan" "step-2-build" "step-3-review"])
 
 (deftest project-messages-none-test
@@ -88,6 +94,13 @@
         (when (= "assistant" (:role msg))
           (doseq [block (:content msg)]
             (is (= :text (:type block)) "No tool blocks should remain"))))))
+
+  (testing "tool-output false drops messages emptied by tool-block stripping"
+    (let [result (workflow-judge/project-messages messages-with-tool-only-turn
+                                                  {:type :tail :turns 1 :tool-output false})]
+      (is (= [{:role "user" :content "Build the feature"}
+              {:role "assistant" :content [{:type :text :text "Build complete."}]}]
+             result))))
 
   (testing "tool-output true preserves tool blocks"
     (let [result (workflow-judge/project-messages messages-with-tools
