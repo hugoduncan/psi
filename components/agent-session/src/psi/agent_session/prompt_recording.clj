@@ -1,7 +1,7 @@
 (ns psi.agent-session.prompt-recording
   "Deterministic prompt response classification/recording scaffold."
   (:require
-   [psi.session-persistence.core :as persist]
+   [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.session-state.state :as session]))
 
 (defn extract-tool-calls
@@ -48,11 +48,7 @@
                :stop-reason     (:execution-result/stop-reason execution-result)
                :tool-call-count (count tool-calls)
                :recorded-at     (java.time.Instant/now)}))
-     :effects [{:effect/type :runtime/dispatch-event
-                :event-type :session/append-journal-entry
-                :event-data {:session-id session-id
-                             :entry (persist/message-entry assistant-message)}
-                :origin :core}]
+     :effects [(journal-append-effect/append-message-effect session-id assistant-message)]
      :return {:recorded? true
               :turn-id   turn-id
               :outcome   outcome

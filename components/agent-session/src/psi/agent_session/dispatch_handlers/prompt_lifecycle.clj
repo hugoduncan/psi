@@ -4,6 +4,7 @@
    Turn lifecycle orchestration lives under `psi.turn` and
    `psi.turn.handlers`; this namespace only registers dispatch handlers."
   (:require
+   [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -28,11 +29,7 @@
   (register-core-handler!
    :session/prompt-submit
    (fn [_ctx {:keys [session-id user-msg]}]
-     {:effects [{:effect/type :runtime/dispatch-event
-                 :event-type :session/append-journal-entry
-                 :event-data {:session-id session-id
-                              :entry (persist/message-entry user-msg)}
-                 :origin :core}]
+     {:effects [(journal-append-effect/append-message-effect session-id user-msg)]
       :return {:submitted? true
                :turn-id (str (java.util.UUID/randomUUID))
                :user-msg user-msg}}))

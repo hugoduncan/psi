@@ -71,3 +71,7 @@
 - Main non-blocking shaping follow-up:
   - repeated `:runtime/dispatch-event` -> `:session/append-journal-entry` effect construction now appears in multiple handlers (`prompt_lifecycle`, `session_mutations`, `prompt_recording`)
   - recommend extracting one small helper for this canonical effect envelope to reduce repetition and future drift risk
+- Follow-up executed:
+  - added `components/agent-session/src/psi/agent_session/journal_append_effect.clj` as the small owning helper for the canonical append-journal dispatch-effect envelope
+  - migrated prompt lifecycle, session mutations, and prompt recording call sites to use the shared helper
+  - kept the helper intentionally narrow: effect-envelope construction only, with small entry-specific convenience wrappers
