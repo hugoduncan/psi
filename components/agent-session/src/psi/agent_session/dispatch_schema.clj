@@ -104,18 +104,6 @@
                 [:parent-session-path {:optional true} [:maybe :string]]
                 [:entry {:optional true} :map]
                 [:entries {:optional true} [:vector :map]]]]]]
-   [:persist/journal-append-entry
-    [:map [:effect/type [:= :persist/journal-append-entry]] [:entry :map]]]
-   [:persist/journal-append-model-entry
-    [:map [:effect/type [:= :persist/journal-append-model-entry]]
-     [:provider :string] [:model-id :string]]]
-   [:persist/journal-append-message-entry
-    [:map [:effect/type [:= :persist/journal-append-message-entry]] [:message :map]]]
-   [:persist/journal-append-thinking-level-entry
-    [:map [:effect/type [:= :persist/journal-append-thinking-level-entry]]
-     [:level :keyword]]]
-   [:persist/journal-append-session-info-entry
-    [:map [:effect/type [:= :persist/journal-append-session-info-entry]] [:name :string]]]
    [:persist/project-prefs-update
     [:map [:effect/type [:= :persist/project-prefs-update]] [:prefs :map]]]
    [:persist/user-config-update

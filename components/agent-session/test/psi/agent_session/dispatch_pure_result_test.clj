@@ -149,8 +149,10 @@
        :session/set-session-name
        (fn [_ctx {:keys [name]}]
          {:root-state-update #(assoc % :session-name name)
-          :effects [{:effect/type :persist/journal-append-session-info-entry
-                     :name name}]
+          :effects [{:effect/type :runtime/dispatch-event
+                     :event-type :session/append-journal-entry
+                     :event-data {:entry {:kind :session-info :data {:name name}}}
+                     :origin :core}]
           :return :ok}))
       (dispatch/dispatch! ctx :session/set-session-name {:name "after"})
       (let [entry (last (kernel/event-log-entries))]
@@ -173,8 +175,10 @@
        :session/set-session-name
        (fn [_ctx {:keys [name]}]
          {:root-state-update #(assoc % :session-name name)
-          :effects [{:effect/type :persist/journal-append-session-info-entry
-                     :name name}]
+          :effects [{:effect/type :runtime/dispatch-event
+                     :event-type :session/append-journal-entry
+                     :event-data {:entry {:kind :session-info :data {:name name}}}
+                     :origin :core}]
           :return :name-updated}))
       (kernel/register-handler!
        :session/set-worktree-path

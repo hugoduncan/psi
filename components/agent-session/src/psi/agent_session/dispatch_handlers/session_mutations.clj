@@ -7,6 +7,7 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.session-persistence.core :as persist]
    [psi.session-state.init :as ss]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.post-tool :as post-tool]
@@ -63,9 +64,11 @@
         :return {:model model :thinking-level clamped-level}
         :effects (cond-> [{:effect/type :runtime/agent-set-model
                            :model model}
-                          {:effect/type :persist/journal-append-model-entry
-                           :provider (:provider model)
-                           :model-id (:id model)}
+                          {:effect/type :runtime/dispatch-event
+                           :event-type :session/append-journal-entry
+                           :event-data {:session-id session-id
+                                        :entry (persist/model-entry (:provider model) (:id model))}
+                           :origin :core}
                           {:effect/type :notify/extension-dispatch
                            :event-name "model_select"
                            :payload {:model model :source :set}}]
@@ -87,8 +90,11 @@
         :return {:thinking-level clamped}
         :effects (cond-> [{:effect/type :runtime/agent-set-thinking-level
                            :level clamped}
-                          {:effect/type :persist/journal-append-thinking-level-entry
-                           :level clamped}]
+                          {:effect/type :runtime/dispatch-event
+                           :event-type :session/append-journal-entry
+                           :event-data {:session-id session-id
+                                        :entry (persist/thinking-level-entry clamped)}
+                           :origin :core}]
                    persist-effect (conj persist-effect))})))
 
   (register-core-handler!
@@ -120,8 +126,11 @@
    :session/set-session-name
    (fn [_ctx {:keys [session-id name]}]
      {:root-state-update (session/session-update session-id #(assoc % :session-name name))
-      :effects [{:effect/type :persist/journal-append-session-info-entry
-                 :name name}
+      :effects [{:effect/type :runtime/dispatch-event
+                 :event-type :session/append-journal-entry
+                 :event-data {:session-id session-id
+                              :entry (persist/session-info-entry name)}
+                 :origin :core}
                 {:effect/type :projection/context-changed
                  :session-id session-id
                  :reason :session/set-session-name}]
@@ -349,11 +358,14 @@
 
   (register-core-handler!
    :session/tool-agent-record-result
-   (fn [_ctx {:keys [tool-result-msg]}]
+   (fn [_ctx {:keys [session-id tool-result-msg]}]
      {:effects [{:effect/type :runtime/agent-record-tool-result
                  :tool-result-msg tool-result-msg}
-                {:effect/type :persist/journal-append-message-entry
-                 :message tool-result-msg}]}))
+                {:effect/type :runtime/dispatch-event
+                 :event-type :session/append-journal-entry
+                 :event-data {:session-id session-id
+                              :entry (persist/message-entry tool-result-msg)}
+                 :origin :core}]}))
 
   (register-core-handler!
    :session/tool-execute
@@ -469,8 +481,11 @@
    (fn [_ctx {:keys [session-id message]}]
      {:effects [{:effect/type :runtime/agent-append-message
                  :message message}
-                {:effect/type :persist/journal-append-message-entry
-                 :message message}
+                {:effect/type :runtime/dispatch-event
+                 :event-type :session/append-journal-entry
+                 :event-data {:session-id session-id
+                              :entry (persist/message-entry message)}
+                 :origin :core}
                 {:effect/type :runtime/agent-emit
                  :event {:type :message-start :message message}}
                 {:effect/type :runtime/agent-emit
@@ -485,8 +500,11 @@
    (fn [_ctx {:keys [session-id message]}]
      {:effects [{:effect/type :runtime/agent-append-message
                  :message message}
-                {:effect/type :persist/journal-append-message-entry
-                 :message message}
+                {:effect/type :runtime/dispatch-event
+                 :event-type :session/append-journal-entry
+                 :event-data {:session-id session-id
+                              :entry (persist/message-entry message)}
+                 :origin :core}
                 {:effect/type :runtime/agent-emit
                  :event {:type :message-start :message message}}
                 {:effect/type :runtime/agent-emit

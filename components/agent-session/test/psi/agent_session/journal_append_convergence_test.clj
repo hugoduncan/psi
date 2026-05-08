@@ -14,13 +14,11 @@
   ([opts]
    (test-support/create-test-session (test-support/safe-context-opts opts))))
 
-(deftest generic-journal-append-effect-updates-memory-test
+(deftest append-journal-entry-handler-updates-memory-test
   (let [[ctx sid] (create-ctx {:persist? false})
         before    (vec (ss/get-state-value-in ctx (ss/state-path :journal sid)))
         entry     (persist/message-entry {:role "user" :content [{:type :text :text "hi"}]})]
-    (dispatch-effects/execute-effect! ctx {:effect/type :persist/journal-append-entry
-                                           :session-id sid
-                                           :entry entry})
+    (dispatch/dispatch! ctx :session/append-journal-entry {:session-id sid :entry entry} {:origin :core})
     (is (= (conj before entry) (ss/get-state-value-in ctx (ss/state-path :journal sid))))))
 
 (deftest session-append-handler-declares-canonical-io-effect-test

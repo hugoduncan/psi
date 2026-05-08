@@ -42,6 +42,11 @@
   - rewrote remaining lower-component tests to use canonical lower helpers plus direct execution of shaped IO requests instead of wrapper APIs
   - updated compatibility-surface tests to assert those obsolete names are now absent from the canonical namespace
 - Task 118 now has its intended architectural boundary, lower-level proof coverage, and a simplified canonical persistence surface
+- Final follow-on cleanup removed the retained `:persist/journal-append-*` shim effects too:
+  - migrated remaining production callers onto the canonical `:session/append-journal-entry` seam via `:runtime/dispatch-event`
+  - removed shim effect methods from `components/agent-session/src/psi/agent_session/dispatch_effects.clj`
+  - removed shim effect schema entries from `components/agent-session/src/psi/agent_session/dispatch_schema.clj`
+  - updated focused tests to assert the canonical dispatch-event-to-append path instead of the removed shim names
 
 2026-05-08 — Task implementation review
 - Review verdict: implementation matches the task design and is acceptable for closure from a behavior/architecture standpoint.

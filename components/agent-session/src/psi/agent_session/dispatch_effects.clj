@@ -241,24 +241,6 @@
       (ss/apply-root-state-update-in! ctx (persist/mark-flushed-root-update (effect-session-id ctx effect))))
     result))
 
-(defn- execute-journal-append-effect!
-  [ctx effect entry]
-  (dispatch/dispatch! ctx :session/append-journal-entry
-                      {:session-id (effect-session-id ctx effect)
-                       :entry entry}
-                      {:origin :core}))
-
-(defmethod execute-effect! :persist/journal-append-entry [ctx effect]
-  (execute-journal-append-effect! ctx effect (:entry effect)))
-(defmethod execute-effect! :persist/journal-append-model-entry [ctx effect]
-  (execute-journal-append-effect! ctx effect (persist/model-entry (:provider effect) (:model-id effect))))
-(defmethod execute-effect! :persist/journal-append-message-entry [ctx effect]
-  (execute-journal-append-effect! ctx effect (persist/message-entry (:message effect))))
-(defmethod execute-effect! :persist/journal-append-thinking-level-entry [ctx effect]
-  (execute-journal-append-effect! ctx effect (persist/thinking-level-entry (:level effect))))
-(defmethod execute-effect! :persist/journal-append-session-info-entry [ctx effect]
-  (execute-journal-append-effect! ctx effect (persist/session-info-entry (:name effect))))
-
 (defmethod execute-effect! :persist/project-prefs-update [ctx effect]
   (try
     (let [session-id (effect-session-id ctx effect)]

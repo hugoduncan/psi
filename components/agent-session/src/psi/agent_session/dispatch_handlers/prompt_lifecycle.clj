@@ -27,9 +27,12 @@
 
   (register-core-handler!
    :session/prompt-submit
-   (fn [_ctx {:keys [user-msg]}]
-     {:effects [{:effect/type :persist/journal-append-message-entry
-                 :message user-msg}]
+   (fn [_ctx {:keys [session-id user-msg]}]
+     {:effects [{:effect/type :runtime/dispatch-event
+                 :event-type :session/append-journal-entry
+                 :event-data {:session-id session-id
+                              :entry (persist/message-entry user-msg)}
+                 :origin :core}]
       :return {:submitted? true
                :turn-id (str (java.util.UUID/randomUUID))
                :user-msg user-msg}}))

@@ -65,11 +65,11 @@
 - [ ] Remove the empty `;;; Flush + persist semantics` section stub from `psi.session-persistence.core`
   - keep file sections aligned with the remaining code shape after wrapper removal
 
-- [ ] Decide whether to remove the `:persist/journal-append-*` shim effects in a follow-on cleanup
-  - audit remaining callers of `:persist/journal-append-entry`
-  - audit remaining callers of `:persist/journal-append-message-entry`
-  - audit remaining callers of `:persist/journal-append-model-entry`
-  - audit remaining callers of `:persist/journal-append-thinking-level-entry`
-  - audit remaining callers of `:persist/journal-append-session-info-entry`
-  - if migration is straightforward, route callers directly through canonical handler/effect seams and remove the shim effect variants
-  - if migration is not straightforward, document explicitly why the shim surfaces remain intentional
+- [x] Remove the `:persist/journal-append-*` shim effects in a follow-on cleanup
+  - audited remaining callers of `:persist/journal-append-entry`
+  - audited remaining callers of `:persist/journal-append-message-entry`
+  - audited remaining callers of `:persist/journal-append-model-entry`
+  - audited remaining callers of `:persist/journal-append-thinking-level-entry`
+  - audited remaining callers of `:persist/journal-append-session-info-entry`
+  - routed remaining production callers directly through canonical handler/effect seams
+  - removed the shim effect variants from execution + schema surfaces

@@ -166,18 +166,30 @@
           (is (= {:name "dispatch-visible"} (dissoc (:psi.dispatch-event/event-data entry) :session-id)))
           (is (false? (:psi.dispatch-event/replaying? entry)))
           (is (= :root-state-update (:psi.dispatch-event/pure-result-kind entry)))
-          (is (= [{:effect/type :persist/journal-append-session-info-entry
-                   :name "dispatch-visible"}
-                  {:effect/type :projection/context-changed
-                   :session-id session-id
-                   :reason :session/set-session-name}]
-                 (:psi.dispatch-event/declared-effects entry)))
-          (is (= [{:effect/type :persist/journal-append-session-info-entry
-                   :name "dispatch-visible"}
-                  {:effect/type :projection/context-changed
-                   :session-id session-id
-                   :reason :session/set-session-name}]
-                 (:psi.dispatch-event/applied-effects entry)))
+          (let [persist-effect (first (:psi.dispatch-event/declared-effects entry))
+                projection-effect (second (:psi.dispatch-event/declared-effects entry))
+                applied-persist-effect (first (:psi.dispatch-event/applied-effects entry))
+                applied-projection-effect (second (:psi.dispatch-event/applied-effects entry))]
+            (is (= :runtime/dispatch-event (:effect/type persist-effect)))
+            (is (= :session/append-journal-entry (:event-type persist-effect)))
+            (is (= session-id (get-in persist-effect [:event-data :session-id])))
+            (is (= :session-info (get-in persist-effect [:event-data :entry :kind])))
+            (is (= "dispatch-visible" (get-in persist-effect [:event-data :entry :data :name])))
+            (is (= :core (:origin persist-effect)))
+            (is (= {:effect/type :projection/context-changed
+                    :session-id session-id
+                    :reason :session/set-session-name}
+                   projection-effect))
+            (is (= :runtime/dispatch-event (:effect/type applied-persist-effect)))
+            (is (= :session/append-journal-entry (:event-type applied-persist-effect)))
+            (is (= session-id (get-in applied-persist-effect [:event-data :session-id])))
+            (is (= :session-info (get-in applied-persist-effect [:event-data :entry :kind])))
+            (is (= "dispatch-visible" (get-in applied-persist-effect [:event-data :entry :data :name])))
+            (is (= :core (:origin applied-persist-effect)))
+            (is (= {:effect/type :projection/context-changed
+                    :session-id session-id
+                    :reason :session/set-session-name}
+                   applied-projection-effect)))
           (is (= {:root-keys [:agent-session :background-jobs :oauth :recursion :runtime :ui :workflows]
                   :root-key-count 7}
                  (:psi.dispatch-event/db-summary-before entry)))
