@@ -38,6 +38,15 @@
       (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :label "My Tool"})
       (is (contains? (tool-registry/tool-names-in reg) "my-tool"))))
 
+  (testing "rejects unregistered extension paths"
+    (let [reg (create-test-registry)]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"unregistered extension path"
+           (tool-registry/register-tool-in! reg "/ext/missing" {:name "my-tool" :label "My Tool"})))
+      (is (= [] (:registration-order @(:state reg))))
+      (is (= {} (:extensions @(:state reg))))))
+
   (testing "rejects non-canonical tool names"
     (let [reg (create-test-registry)]
       (register-extension-in! reg "/ext/a")

@@ -15,13 +15,26 @@
   (and (string? tool-name)
        (boolean (re-matches tool-name-pattern tool-name))))
 
+(defn- state-in
+  [reg]
+  @(:state reg))
+
+(defn- ensure-registered-extension-path!
+  [reg ext-path]
+  (when-not (contains? (:extensions (state-in reg)) ext-path)
+    (throw (ex-info (str "Cannot register tool for unregistered extension path: " (pr-str ext-path))
+                    {:ext-path ext-path
+                     :reason :unregistered-extension-path}))))
+
 (defn register-tool-in!
   "Register `tool` (a map with :name key) for the extension at `ext-path`.
    Tool maps may include :lambda-description for lambda-mode prompt rendering.
    Stores canonical normalized tool defs in the registry.
-   Throws when tool name is missing or not canonical kebab-case."
+   Throws when `ext-path` is not already registered, or when tool name is
+   missing or not canonical kebab-case."
   [reg ext-path tool]
   (let [tool-name (:name tool)]
+    (ensure-registered-extension-path! reg ext-path)
     (when-not (valid-tool-name? tool-name)
       (throw (ex-info (str "Invalid tool name: " (pr-str tool-name)
                            ". Expected kebab-case matching " tool-name-pattern)
@@ -32,10 +45,6 @@
       (swap! (:state reg)
              assoc-in [:extensions ext-path :tools tool-name] tool*)
       reg)))
-
-(defn- state-in
-  [reg]
-  @(:state reg))
 
 (defn- extension-item-maps
   [state item-key]

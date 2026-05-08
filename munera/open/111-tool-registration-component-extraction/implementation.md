@@ -159,3 +159,34 @@ Follow-up verification:
 - result: `6 tests, 26 assertions, 0 failures`
 - `clj -M:lint`
 - result: `0 errors, 0 warnings`
+
+2026-05-08 code-shaper review note
+
+Code-shaper verdict:
+- the extraction shape is simple and coherent overall
+- component boundaries improved materially
+- one small robustness follow-up was identified
+
+Follow-up note:
+- `components/tool-registry/src/psi/tool_registry/registry.clj` `register-tool-in!` currently writes through `assoc-in` without enforcing that `ext-path` is already a registered extension path
+- this can create partial `:extensions` entries that do not participate in canonical `:registration-order` tracking or carry the full expected extension-record shape
+- preferred cleanup: make the registration precondition explicit by failing fast on unregistered `ext-path`, unless there is a deliberate supported use case for implicit pre-registration tool insertion
+
+2026-05-08 robustness follow-up implementation
+
+Implemented the robustness shaping follow-up:
+- added `ensure-registered-extension-path!` to `components/tool-registry/src/psi/tool_registry/registry.clj`
+- `register-tool-in!` now fails fast before writing tool data when `ext-path` is not already present in the registry `:extensions` map
+- this makes the lower-level registry precondition explicit and prevents partial extension entries from being created outside canonical extension registration flow
+
+Added focused regression coverage:
+- `components/tool-registry/test/psi/tool_registry/registry_test.clj` now proves unregistered `ext-path` tool registration is rejected
+- the regression also proves no partial registry drift occurs:
+  - `:registration-order` remains empty
+  - `:extensions` remains empty
+
+Robustness follow-up verification:
+- `clj -M:test --focus psi.tool-registry.defs-test --focus psi.tool-registry.registry-test`
+- result: `6 tests, 29 assertions, 0 failures`
+- `clj -M:lint`
+- result: `0 errors, 0 warnings`

@@ -25,3 +25,7 @@
 - [x] Add a lower-level registry test fixture or neutral helper so `components/tool-registry/test/psi/tool_registry/registry_test.clj` no longer depends on `psi.agent-session.extensions`
 - [x] Re-run focused `tool-registry` tests after the test-fixture decoupling cleanup
 - [x] Append the cleanup outcome to `implementation.md`
+- [x] Make `psi.tool-registry.registry/register-tool-in!` fail fast or otherwise explicitly enforce the precondition that `ext-path` is already registered before writing tool data
+- [x] Add a focused regression proving unregistered `ext-path` tool registration is rejected or otherwise handled canonically
+- [x] Re-run focused `tool-registry` verification after the robustness fix
+- [x] Append the robustness-fix outcome to `implementation.md`
