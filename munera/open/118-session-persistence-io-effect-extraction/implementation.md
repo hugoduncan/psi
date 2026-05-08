@@ -65,3 +65,9 @@
 - Final polish slice completed the remaining non-shim review follow-ups:
   - refreshed the `psi.session-persistence.core` namespace docstring to match the current post-task ownership
   - removed the empty section stub left behind after wrapper removal
+
+2026-05-08 — Code-shaper review
+- Verdict: implementation is in good shape for simplicity, consistency, and robustness.
+- Main non-blocking shaping follow-up:
+  - repeated `:runtime/dispatch-event` -> `:session/append-journal-entry` effect construction now appears in multiple handlers (`prompt_lifecycle`, `session_mutations`, `prompt_recording`)
+  - recommend extracting one small helper for this canonical effect envelope to reduce repetition and future drift risk

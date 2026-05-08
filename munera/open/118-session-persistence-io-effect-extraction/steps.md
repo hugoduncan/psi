@@ -73,3 +73,8 @@
   - audited remaining callers of `:persist/journal-append-session-info-entry`
   - routed remaining production callers directly through canonical handler/effect seams
   - removed the shim effect variants from execution + schema surfaces
+
+- [ ] Extract a small helper for the repeated append-journal dispatch effect envelope
+  - centralize the canonical `:runtime/dispatch-event` -> `:session/append-journal-entry` effect-map construction
+  - update current call sites in prompt lifecycle, session mutations, and prompt recording to use the shared helper
+  - keep the helper small and local to the owning agent-session boundary so it reduces repetition without introducing unnecessary abstraction
