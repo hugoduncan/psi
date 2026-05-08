@@ -45,7 +45,7 @@
        (finally
          (delete-tree! ~sym)))))
 
-(deftest prompt-control-delegates-to-psi-turn-test
+(deftest prompt-control-delegates-to-agent-session-turn-test
   (let [calls (atom [])]
     (with-redefs [psi.agent-session.turn/prompt-in! (fn [& args] (swap! calls conj [:prompt-in args]) :prompted)
                   psi.agent-session.turn/prompt-execution-result-in! (fn [& args] (swap! calls conj [:prompt-execution-result-in args]) :execution-result)
