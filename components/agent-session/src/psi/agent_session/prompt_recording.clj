@@ -1,17 +1,10 @@
 (ns psi.agent-session.prompt-recording
-  "Deterministic prompt response classification/recording scaffold."
+  "Higher prompt response recording orchestration over lower turn-runtime
+   recording decisions."
   (:require
    [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.session-state.state :as session]
    [psi.turn-runtime.recording :as turn-recording]))
-
-(defn extract-tool-calls
-  [assistant-msg]
-  (turn-recording/extract-tool-calls assistant-msg))
-
-(defn classify-assistant-message
-  [assistant-msg]
-  (turn-recording/classify-assistant-message assistant-msg))
 
 (defn build-record-response
   "Build a pure-result for prompt response recording.

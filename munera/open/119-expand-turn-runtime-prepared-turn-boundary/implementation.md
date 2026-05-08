@@ -281,6 +281,7 @@ Compatibility / remaining wrappers
   - `psi.agent-session.prompt-turn` now depends directly on `psi.turn-runtime.recording` for lower assistant-message classification
   - `psi.agent-session.workflow-statechart-runtime` now depends directly on `psi.turn-runtime.recording` for lower assistant-message classification
   - this reduces residual lower-helper dependence on the compatibility `prompt-recording` wrapper while keeping session-owned request normalization wrappers intact
+- stale `prompt-recording` lower helper compatibility fns (`extract-tool-calls`, `classify-assistant-message`) were then removed because no production/test callers remained; `prompt-recording` now clearly owns only the higher record-response orchestration wrapper
 
 Verification
 - lint green for touched namespaces
