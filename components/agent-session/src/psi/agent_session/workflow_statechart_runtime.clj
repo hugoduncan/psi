@@ -19,8 +19,9 @@
    [com.fulcrologic.statecharts.events :as evts]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
+   [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
-   [psi.agent-session.deterministic-operations :as deterministic-ops]
+   [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.agent-session.turn :as turn]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-ir :as workflow-ir]
@@ -212,6 +213,34 @@
       execution-session-id
       (assoc :session-id execution-session-id))))
 
+(defn operation-result->invoke-step-result
+  "Wrap a canonical deterministic operation result into workflow invoke-step semantics."
+  [operation-result]
+  (when-not (deterministic-op-defs/valid-operation-result? operation-result)
+    (throw (ex-info "Cannot wrap malformed deterministic operation result"
+                    {:type :malformed-operation-result
+                     :result operation-result
+                     :explanation (deterministic-op-defs/explain-operation-result operation-result)})))
+  (case (:status operation-result)
+    :ok
+    {:kind :accepted-result
+     :accepted-result {:outcome :ok
+                       :outputs (cond-> {:data (:data operation-result)
+                                         :result operation-result}
+                                  (contains? operation-result :summary)
+                                  (assoc :summary (:summary operation-result)))}}
+
+    :error
+    {:kind :execution-error
+     :execution-error (cond-> {:reason (:reason operation-result)
+                               :message (:message operation-result)
+                               :operation-result operation-result}
+                        (:details operation-result)
+                        (assoc :operation-details (:details operation-result)))}
+
+    (throw (ex-info "Unknown deterministic operation result status"
+                    {:result operation-result}))))
+
 (defn- invoke-step-runtime-result
   [ctx parent-session-id run-id step-id step-def workflow-run]
   (let [invoke-spec (or (:invoke step-def)
@@ -225,13 +254,13 @@
                            :workflow-run-id run-id
                            :step-id step-id
                            :args args}
-                          deterministic-ops/invoke-operation)]
+                          deterministic-op-runtime/invoke-operation)]
     {:effective-args args
      :operation-result operation-result}))
 
 (defn- apply-invoke-step-result
   [{:keys [effective-args operation-result]}]
-  (let [{:keys [kind accepted-result execution-error]} (deterministic-ops/operation-result->invoke-step-result operation-result)]
+  (let [{:keys [kind accepted-result execution-error]} (operation-result->invoke-step-result operation-result)]
     (case kind
       :accepted-result {:attempt-data {:effective-args effective-args}
                         :pending-kind :success

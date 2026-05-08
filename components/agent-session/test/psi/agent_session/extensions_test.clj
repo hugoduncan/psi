@@ -2,7 +2,7 @@
   "Tests for the extension registry, tool wrapping, introspection, and extension API."
   (:require
    [clojure.test :refer [deftest testing is]]
-   [psi.agent-session.deterministic-operations :as deterministic-ops]
+   [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.deterministic-operation-registry.registry :as op-reg]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extension-runtime :as ext-rt]
@@ -512,7 +512,7 @@
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"not found"
-         (op-reg/invoke-operation-in op-reg "github/search" {:args {}} deterministic-ops/invoke-operation)))))
+         (op-reg/invoke-operation-in op-reg "github/search" {:args {}} deterministic-op-runtime/invoke-operation)))))
 
 (deftest reload-extensions-removes-stale-runtime-deterministic-operation-ids-test
   (let [[ctx session-id] (test-support/create-test-session {:persist? false})
@@ -533,7 +533,7 @@
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"not found"
-         (op-reg/invoke-operation-in op-registry "github/search-issues-by-label" {:args {}} deterministic-ops/invoke-operation)))))
+         (op-reg/invoke-operation-in op-registry "github/search-issues-by-label" {:args {}} deterministic-op-runtime/invoke-operation)))))
 
 (deftest extension-api-registration-test
   (testing "API :on registers handlers"

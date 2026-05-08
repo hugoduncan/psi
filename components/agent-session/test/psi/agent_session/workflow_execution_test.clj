@@ -4,7 +4,6 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.deterministic-operation-registry.registry]
-   [psi.agent-session.deterministic-operations]
    [psi.session-persistence.core]
    [psi.agent-session.turn]
    [psi.agent-session.prompt-request :as prompt-request]
@@ -13,6 +12,7 @@
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
    [psi.agent-session.workflow-runtime :as workflow-runtime]
+   [psi.agent-session.workflow-statechart-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
@@ -371,7 +371,7 @@
                          :summary "2 issues found"}
                         (throw (ex-info "unexpected operation" {:operation-id operation-id
                                                                 :invocation invocation}))))
-                    psi.agent-session.deterministic-operations/operation-result->invoke-step-result
+                    psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result
                     (fn [operation-result]
                       {:kind :accepted-result
                        :accepted-result {:outcome :ok
@@ -479,7 +479,7 @@
                          :summary "2 issues found"}
                         (throw (ex-info "unexpected operation" {:operation-id operation-id
                                                                 :invocation invocation}))))
-                    psi.agent-session.deterministic-operations/operation-result->invoke-step-result
+                    psi.agent-session.workflow-statechart-runtime/operation-result->invoke-step-result
                     (fn [operation-result]
                       {:kind :accepted-result
                        :accepted-result {:outcome :ok
