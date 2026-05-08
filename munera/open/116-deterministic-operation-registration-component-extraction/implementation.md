@@ -100,3 +100,55 @@ Non-obvious tradeoff recorded:
 - the extracted lower registry namespace intentionally does not depend on `agent-session` invoke semantics
 - instead of moving invoke execution down or keeping lookup up, the chosen seam is dependency injection of the invoke fn into `registry/invoke-operation-in`
 - this keeps the registry lower and reusable while preserving current invoke behavior exactly
+
+2026-05-08 — code-shaper review
+
+Review outcome:
+- overall extraction shape is good: lower ownership is clearer, production seams are simpler, and the compat wrapper removal improved honesty of the boundary
+- no correctness concerns were found in the landed implementation
+
+Actionable follow-up findings:
+- remaining contract duplication exists between `psi.deterministic-operation-registry.defs` and `psi.agent-session.deterministic-operations`
+  - `defs.clj` already owns `operation-result-schema`, `valid-operation-result?`, and `explain-operation-result`
+  - `deterministic_operations.clj` still redefines the operation success/error/result schemas plus the matching validation helpers
+  - this weakens single ownership and risks later drift if result-shape edits land in only one namespace
+- a minor local shaping improvement remains in `unregister-operations-by-extension-in!`
+  - `set` is rebuilt inline from `remove-ids` during registration-order filtering
+  - harmless at current scale, but a pre-bound `remove-id-set` would make the code slightly clearer and avoid recomputation
+
+Recommended direction from review:
+- make `psi.deterministic-operation-registry.defs` the sole formal owner of deterministic-operation result schemas and result validation helpers
+- reduce `psi.agent-session.deterministic-operations` to invoke execution and workflow-facing result wrapping only
+- apply the small local cleanup in `unregister-operations-by-extension-in!` if doing the follow-up shaping pass
+
+2026-05-08 — code-shaper follow-up execution
+
+Implemented the follow-up shaping pass from the code-shaper review.
+
+What changed:
+- removed remaining deterministic-operation result contract duplication from `psi.agent-session.deterministic-operations`
+  - `operation-success-result-schema`
+  - `operation-error-result-schema`
+  - `operation-result-schema`
+  - `valid-operation-result?`
+  - `explain-operation-result`
+  now delegate directly to `psi.deterministic-operation-registry.defs`
+- this makes `psi.deterministic-operation-registry.defs` the sole formal owner of deterministic-operation result schemas and result validation helpers
+- `psi.agent-session.deterministic-operations` is now thinner and more focused on:
+  - invoke execution
+  - malformed-result exception shaping
+  - workflow-facing `operation-result->invoke-step-result`
+- applied the small local cleanup in `psi.deterministic-operation-registry.registry/unregister-operations-by-extension-in!`
+  - pre-bound `remove-id-set`
+  - reused it during registration-order filtering instead of rebuilding `set` inline
+
+Verification for the follow-up shaping pass:
+- focused verification green across:
+  - `psi.deterministic-operation-registry.defs-test`
+  - `psi.deterministic-operation-registry.registry-test`
+  - `psi.agent-session.deterministic-operation-registry-test`
+  - `psi.agent-session.workflow-invoke-runtime-test`
+  - `psi.agent-session.extensions-test`
+  - `psi.agent-session.workflow-execution-test`
+- combined result: `47 tests, 213 assertions, 0 failures`
+- focused lint across touched source and test files: `0 errors, 0 warnings`

@@ -37,11 +37,12 @@
          (fn [s]
            (let [remove-ids (->> (:registration-order s)
                                  (filter #(= ext-path (get-in s [:operations % :ext-path])))
-                                 vec)]
+                                 vec)
+                 remove-id-set (set remove-ids)]
              (-> s
                  (update :operations #(apply dissoc % remove-ids))
                  (update :registration-order (fn [order]
-                                               (vec (remove (set remove-ids) order))))))))
+                                               (vec (remove remove-id-set order))))))))
   reg)
 
 (defn operation-ids-in

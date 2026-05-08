@@ -1,47 +1,22 @@
 (ns psi.agent-session.deterministic-operations
   "Canonical deterministic-operation boundary for workflow IR `:type :invoke`.
 
-   Owns:
-   - stable author-facing operation ids
-   - extension/runtime registration shape validation
-   - tagged success/failure operation-result contract
-   - runtime-owned invocation/result normalization helpers for invoke steps"
+   Owns runtime invoke execution and workflow-facing invoke-step result wrapping.
+   Formal deterministic-operation contracts live in
+   `psi.deterministic-operation-registry.defs`."
   (:require
-   [malli.core :as m]
    [psi.deterministic-operation-registry.defs :as defs]))
 
-(def operation-success-result-schema
-  [:map
-   [:status [:= :ok]]
-   [:data :any]
-   [:summary {:optional true} [:maybe :string]]
-   [:details {:optional true} [:maybe :map]]])
-
-(def operation-error-result-schema
-  [:map
-   [:status [:= :error]]
-   [:reason :keyword]
-   [:message :string]
-   [:details {:optional true} [:maybe :map]]])
-
-(def operation-result-schema
-  [:multi {:dispatch :status}
-   [:ok operation-success-result-schema]
-   [:error operation-error-result-schema]])
-
+(def operation-success-result-schema defs/operation-success-result-schema)
+(def operation-error-result-schema defs/operation-error-result-schema)
+(def operation-result-schema defs/operation-result-schema)
 (def valid-operation-id? defs/valid-operation-id?)
 (def operation-id-pattern defs/operation-id-pattern)
 (def operation-definition-schema defs/operation-definition-schema)
 (def valid-operation-definition? defs/valid-operation-definition?)
 (def normalize-operation-def defs/normalize-operation-def)
-
-(defn valid-operation-result?
-  [x]
-  (m/validate operation-result-schema x))
-
-(defn explain-operation-result
-  [x]
-  (m/explain operation-result-schema x))
+(def valid-operation-result? defs/valid-operation-result?)
+(def explain-operation-result defs/explain-operation-result)
 
 (defn malformed-operation-result-ex
   [operation invocation result]

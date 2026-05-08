@@ -15,3 +15,8 @@
 - [x] Run focused component-local verification for `deterministic-operation-registry`, including duplicate-registration rejection, bulk unregister, and registration-order preservation
 - [x] Run affected higher-level verification for extension API, extension cleanup, and workflow invoke runtime behavior
 - [x] Record final boundary decisions, result contracts, and any non-obvious tradeoffs in `implementation.md`
+- [x] Remove remaining deterministic-operation result-schema/result-validation duplication by making `psi.deterministic-operation-registry.defs` the sole owner of operation result schemas and helpers
+- [x] Simplify `psi.agent-session.deterministic-operations` so it owns only invoke execution and workflow-facing result wrapping after result-schema ownership moves down
+- [x] Apply the small local cleanup in `psi.deterministic-operation-registry.registry/unregister-operations-by-extension-in!` by pre-binding the removal-id set instead of rebuilding it inline during registration-order filtering
+- [x] Run focused verification for the follow-up shaping pass across deterministic-operation component tests plus affected workflow/extension tests
+- [x] Update `implementation.md` with the outcome of the code-shaper follow-up pass once completed
