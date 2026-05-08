@@ -1,0 +1,11 @@
+- [ ] Review current `psi.agent-session.workflow-judge` responsibilities and separate pure judge/routing logic from impure execution/orchestration logic
+- [ ] Confirm the exact pure extraction surface to preserve: `project-messages`, `match-signal`, `resolve-goto-target`, `check-iteration-limit`, and `evaluate-routing`, plus any adjacent pure helpers discovered during implementation
+- [ ] Create a lower workflow judge/routing component with authoritative `psi.workflow-judge.*` namespace(s)
+- [ ] Move canonical pure judge projection logic into the new component
+- [ ] Move verdict normalization and routing evaluation into the new component
+- [ ] Preserve the current projection semantics and record any explicitly chosen step-id contract decision in `implementation.md` if implementation reveals ambiguity
+- [ ] Keep `execute-judge!`, persistence reads, prompt submission, and retry orchestration outside the extracted component and rewire any consumers accordingly
+- [ ] Update workflow runtime consumers to depend downward on the extracted component
+- [ ] Update focused tests, moving pure judge/routing proofs with the new component while keeping impure judge-execution and higher workflow integration proofs above the boundary
+- [ ] Remove mixed authoritative ownership of the pure judge/routing logic from `psi.agent-session.*`
+- [ ] Record final boundary decisions, the final namespace split, and any residual follow-ons in `implementation.md`
