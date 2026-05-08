@@ -5,42 +5,56 @@
    [psi.agent-session.workflow-file-loader :as loader]
    [psi.agent-session.workflow-file-parser :as parser]
    [psi.agent-session.workflow-file-compiler :as compiler]
-   [psi.agent-session.workflow-model :as workflow-model]))
+   [psi.workflow-registry.definition :as workflow-definition]))
 
 ;;; End-to-end: raw file text → parsed → compiled → valid canonical definition
 
 (def planner-raw
   (str "---\nname: planner\ndescription: Plans tasks\n---\n"
-       "{:tools [\"read\" \"bash\"]}\n\n"
-       "You are a planner."))
+       "{:steps [{:name \"plan\"\n"
+       "          :type :session\n"
+       "          :tools [\"read\" \"bash\"]\n"
+       "          :contributions [{:type :template\n"
+       "                           :text \"You are a planner.\\n\\n{{input}}\"\n"
+       "                           :vars {\"input\" {:from :workflow-input}}}]}]}"))
 
 (def builder-raw
   (str "---\nname: builder\ndescription: Builds code\n---\n"
-       "{:tools [\"read\" \"bash\" \"edit\" \"write\"]\n"
-       " :skills [\"clojure-coding-standards\"]}\n\n"
-       "You are a builder agent."))
+       "{:steps [{:name \"build\"\n"
+       "          :type :session\n"
+       "          :tools [\"read\" \"bash\" \"edit\" \"write\"]\n"
+       "          :skills [\"clojure-coding-standards\"]\n"
+       "          :contributions [{:type :template\n"
+       "                           :text \"You are a builder agent.\\n\\n{{input}}\"\n"
+       "                           :vars {\"input\" {:from :workflow-input}}}]}]}"))
 
 (def reviewer-raw
   (str "---\nname: reviewer\ndescription: Reviews code\n---\n"
-       "You are a reviewer."))
+       "{:steps [{:name \"review\"\n"
+       "          :type :session\n"
+       "          :tools [\"read\" \"bash\"]\n"
+       "          :contributions [{:type :template\n"
+       "                           :text \"You are a reviewer.\\n\\n{{input}}\"\n"
+       "                           :vars {\"input\" {:from :workflow-input}}}]}]}"))
 
 (def chain-raw
   (str "---\nname: plan-build-review\ndescription: Plan, build, and review\n---\n"
        "{:steps [{:name \"plan\"\n"
-       "          :workflow \"planner\"\n"
-       "          :session {:input {:from :workflow-input}\n"
-       "                    :reference {:from :workflow-original}}\n"
-       "          :prompt \"$INPUT\"}\n"
+       "          :type :delegate\n"
+       "          :target \"planner\"\n"
+       "          :prompt-string {:type :template :text \"{{input}}\" :vars {\"input\" {:from :workflow-input}}}}\n"
        "         {:name \"build\"\n"
-       "          :workflow \"builder\"\n"
-       "          :session {:input {:from {:step \"plan\" :kind :accepted-result}}\n"
-       "                    :reference {:from :workflow-original}}\n"
-       "          :prompt \"Execute: $INPUT\\nOriginal: $ORIGINAL\"}\n"
+       "          :type :delegate\n"
+       "          :target \"builder\"\n"
+       "          :prompt-string {:type :template :text \"Execute: {{input}}\\nOriginal: {{original}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"plan\" :yield :text}}\n"
+       "                                 \"original\" {:from :workflow-original}}}}\n"
        "         {:name \"review\"\n"
-       "          :workflow \"reviewer\"\n"
-       "          :session {:input {:from {:step \"build\" :kind :accepted-result}}\n"
-       "                    :reference {:from :workflow-original}}\n"
-       "          :prompt \"Review: $INPUT\\nOriginal: $ORIGINAL\"}]}\n\n"
+       "          :type :delegate\n"
+       "          :target \"reviewer\"\n"
+       "          :prompt-string {:type :template :text \"Review: {{input}}\\nOriginal: {{original}}\"\n"
+       "                          :vars {\"input\" {:from {:step \"build\" :yield :text}}\n"
+       "                                 \"original\" {:from :workflow-original}}}}]}\n\n"
        "Coordinate a plan-build-review cycle."))
 
 (defn reset-extension-state [f]
@@ -95,12 +109,12 @@
           {:keys [definition error]} (compiler/compile-workflow-file parsed)]
       (is (nil? error))
       (is (= "planner" (:definition-id definition)))
-      (is (= ["step-1"] (:step-order definition)))
-      (is (workflow-model/valid-workflow-definition? definition))
-      ;; Tools carry through
-      (is (= #{"read" "bash"} (get-in definition [:steps "step-1" :capability-policy :tools])))
-      ;; System prompt in metadata
-      (is (= "You are a planner." (get-in definition [:workflow-file-meta :system-prompt]))))))
+      (is (= 1 (count (:steps definition))))
+      (is (workflow-definition/target-authored-workflow-definition? definition))
+      (is (= :session (get-in definition [:steps 0 :type])))
+      (is (= ["read" "bash"] (get-in definition [:steps 0 :tools])))
+      (is (= "You are a planner.\n\n{{input}}"
+             (get-in definition [:steps 0 :contributions 0 :text]))))))
 
 (deftest end-to-end-multi-step-test
   (testing "raw chain file → parse → compile → valid canonical multi-step definition"
@@ -108,9 +122,11 @@
           {:keys [definition error]} (compiler/compile-workflow-file parsed)]
       (is (nil? error))
       (is (= "plan-build-review" (:definition-id definition)))
-      (is (= 3 (count (:step-order definition))))
-      (is (workflow-model/valid-workflow-definition? definition))
-      ;; Framing prompt in metadata
+      (is (= 3 (count (:steps definition))))
+      (is (workflow-definition/target-authored-workflow-definition? definition))
+      (is (= :delegate (get-in definition [:steps 0 :type])))
+      (is (= :delegate (get-in definition [:steps 1 :type])))
+      (is (= :delegate (get-in definition [:steps 2 :type])))
       (is (= "Coordinate a plan-build-review cycle."
              (get-in definition [:workflow-file-meta :framing-prompt]))))))
 
@@ -121,15 +137,16 @@
           {:keys [definitions errors]} (compiler/compile-workflow-files parsed)]
       (is (= 4 (count definitions)))
       (is (empty? errors))
-      (is (every? workflow-model/valid-workflow-definition? definitions))
+      (is (every? workflow-definition/target-authored-workflow-definition? definitions))
       ;; Step references all resolve
       (is (true? (:valid? (compiler/validate-step-references definitions))))
       ;; No name collisions
       (is (true? (:valid? (compiler/validate-no-name-collisions definitions)))))))
 
 (deftest legacy-agent-profile-compatibility-test
-  (testing "existing .psi/agents/*.md files parse and compile cleanly"
-    ;; Current agent profiles have YAML frontmatter with tools: and lambda: keys
+  (testing "legacy agent-profile shaped files parse but no longer compile as workflows"
+    ;; Task 090 retired current-authored / agent-profile workflow compilation.
+    ;; Only target-authored `{:steps [...]}` workflow files compile now.
     (let [raw (str "---\n"
                    "name: planner\n"
                    "description: Analyzes tasks, creates implementation plans\n"
@@ -139,15 +156,11 @@
                    "You are a planning agent.")
           parsed (parser/parse-workflow-file raw)
           {:keys [definition error]} (compiler/compile-workflow-file parsed)]
-      (is (nil? error))
-      (is (= "planner" (:definition-id definition)))
-      (is (workflow-model/valid-workflow-definition? definition))
-      ;; Body becomes system prompt (no EDN config detected since body doesn't start with '{')
-      (is (= "You are a planning agent."
-             (get-in definition [:workflow-file-meta :system-prompt])))
-      ;; Note: tools: from YAML frontmatter is not auto-migrated to EDN config —
-      ;; migration step will handle that conversion
-      )))
+      (is (nil? (:error parsed)))
+      (is (= "planner" (:name parsed)))
+      (is (= "You are a planning agent." (:body parsed)))
+      (is (nil? definition))
+      (is (= "Workflow files must define target-authored `{:steps [...]}` config" error)))))
 
 (deftest reload-definitions-retires-removed-definition-test
   (testing "reload retires definitions removed from disk"
