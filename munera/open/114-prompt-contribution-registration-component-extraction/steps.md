@@ -1,17 +1,17 @@
-- [ ] Inspect current prompt contribution handler behavior and verify the documented canonical semantics to preserve
-- [ ] Define the first-cut `prompt-registry` API for normalization, patching, register/update/unregister, pure collection queries, and explicit result contracts
-- [ ] Decide and document the canonical contribution identity rule (`ext-path` + `id`) and canonical stored-shape normalization rules
-- [ ] Decide and prove invalid identity-field behavior at the registry boundary, including blank-field handling
-- [ ] Decide and prove register/update/unregister result contracts and missing-lookup behavior
-- [ ] Decide and prove patchable vs non-patchable field rules, including ignored-key behavior
-- [ ] Decide and prove timestamp semantics for register replacement and update
-- [ ] Make the registry-ordering vs prompt-composition-ordering boundary explicit
-- [ ] Create `components/prompt-registry/` with focused contribution-registry tests
-- [ ] Implement canonical normalize/register/update/unregister helpers below `agent-session`
-- [ ] Implement pure lookup/list/query helpers where they clearly sharpen ownership
-- [ ] Delegate `agent-session` prompt contribution collection ownership to the extracted component
-- [ ] Keep effective-prompt rebuilding and runtime prompt-update effects above the boundary
-- [ ] Keep prompt template registration outside this task
-- [ ] Run focused component-local verification for `prompt-registry`
-- [ ] Run affected higher-level verification for prompt contribution and prompt-refresh behavior
-- [ ] Record final boundary decisions, count/reporting behavior, and any non-obvious tradeoffs in `implementation.md`
+- [x] Inspect current prompt contribution handler behavior and verify the documented canonical semantics to preserve
+- [x] Define the first-cut `prompt-registry` API for normalization, patching, register/update/unregister, pure collection queries, and explicit result contracts
+- [x] Decide and document the canonical contribution identity rule (`ext-path` + `id`) and canonical stored-shape normalization rules
+- [x] Decide and prove invalid identity-field behavior at the registry boundary, including blank-field handling
+- [x] Decide and prove register/update/unregister result contracts and missing-lookup behavior
+- [x] Decide and prove patchable vs non-patchable field rules, including ignored-key behavior
+- [x] Decide and prove timestamp semantics for register replacement and update
+- [x] Make the registry-ordering vs prompt-composition-ordering boundary explicit
+- [x] Create `components/prompt-registry/` with focused contribution-registry tests
+- [x] Implement canonical normalize/register/update/unregister helpers below `agent-session`
+- [x] Implement pure lookup/list/query helpers where they clearly sharpen ownership
+- [x] Delegate `agent-session` prompt contribution collection ownership to the extracted component
+- [x] Keep effective-prompt rebuilding and runtime prompt-update effects above the boundary
+- [x] Keep prompt template registration outside this task
+- [x] Run focused component-local verification for `prompt-registry`
+- [x] Run affected higher-level verification for prompt contribution and prompt-refresh behavior
+- [x] Record final boundary decisions, count/reporting behavior, and any non-obvious tradeoffs in `implementation.md`

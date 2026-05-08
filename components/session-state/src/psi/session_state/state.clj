@@ -6,6 +6,7 @@
    [clojure.string :as str]
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
+   [psi.prompt-registry.contributions :as prompt-contributions]
    [psi.session-state.display-name :as display-name]))
 
 (defn agent-ctx-in
@@ -149,13 +150,7 @@
   (= :idle (sc-phase-in ctx session-id)))
 
 (defn sorted-prompt-contributions [coll]
-  (->> (or coll [])
-       (filter map?)
-       (sort-by (fn [{:keys [priority ext-path id]}]
-                  [(or priority 1000)
-                   (or ext-path "")
-                   (or id "")]))
-       vec))
+  (prompt-contributions/sort-contributions coll))
 
 (defn list-prompt-contributions-in [ctx session-id]
   (sorted-prompt-contributions (:prompt-contributions (get-session-data-in ctx session-id))))

@@ -5,9 +5,10 @@
    bootstrap-prompt-state, ensure-base-system-prompt,
    reset-prompt-contributions, register-prompt-template."
   (:require
+   [psi.prompt-assets.system-prompt :as sys-prompt]
+   [psi.prompt-registry.contributions :as contributions]
    [psi.session-state.state :as session]
-   [psi.state-kernel.dispatch :as kernel]
-   [psi.prompt-assets.system-prompt :as sys-prompt]))
+   [psi.state-kernel.dispatch :as kernel]))
 
 ;;; Prompt contribution pure helpers
 
@@ -18,27 +19,6 @@
    (-> contributions
        (sys-prompt/filter-prompt-contributions selection)
        session/sorted-prompt-contributions)))
-
-(defn- normalize-prompt-contribution [ext-path id contribution]
-  (let [now (java.time.Instant/now)
-        c   (or contribution {})]
-    {:id         (str id)
-     :ext-path   (str ext-path)
-     :section    (some-> (:section c) str)
-     :content    (str (or (:content c) ""))
-     :priority   (int (or (:priority c) 1000))
-     :enabled    (if (contains? c :enabled) (boolean (:enabled c)) true)
-     :created-at now
-     :updated-at now}))
-
-(defn- merge-prompt-contribution-patch [existing patch]
-  (let [p   (or patch {})
-        now (java.time.Instant/now)]
-    (cond-> (assoc existing :updated-at now)
-      (contains? p :section)  (assoc :section  (some-> (:section p) str))
-      (contains? p :content)  (assoc :content  (str (or (:content p) "")))
-      (contains? p :priority) (assoc :priority (int (or (:priority p) 1000)))
-      (contains? p :enabled)  (assoc :enabled  (boolean (:enabled p))))))
 
 ;;; System-prompt rebuild helpers — imported lazily to avoid circular deps.
 ;;; sys-prompt ns is referenced via require at call time; callers pass it in.
@@ -93,17 +73,12 @@
   (kernel/register-handler!
    :session/register-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id contribution]}]
-     (let [ext-path* (str ext-path)
-           id*       (str id)
-           norm      (normalize-prompt-contribution ext-path* id* contribution)
-           sd        (session/get-session-data-in ctx session-id)
-           xs        (or (:prompt-contributions sd) [])
-           xs*       (vec (remove #(and (= ext-path* (:ext-path %))
-                                        (= id* (:id %)))
-                                  xs))
-           next*     (conj xs* norm)
-           base      (or (:base-system-prompt sd) (:system-prompt sd) "")
-           prompt*   (effective-prompt base next* (:prompt-component-selection sd))]
+     (let [sd      (session/get-session-data-in ctx session-id)
+           xs      (:prompt-contributions sd)
+           result  (contributions/register-contribution xs ext-path id contribution)
+           next*   (:contributions result)
+           base    (or (:base-system-prompt sd) (:system-prompt sd) "")
+           prompt* (effective-prompt base next* (:prompt-component-selection sd))]
        {:root-state-update
         (session/session-update session-id
                                 #(assoc %
@@ -111,31 +86,21 @@
                                         :system-prompt prompt*))
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt*}]
-        :return {:registered?  true
-                 :contribution norm
-                 :count (count (session/list-prompt-contributions-in ctx session-id))}})))
+        :return {:registered?  (:registered? result)
+                 :contribution (:contribution result)
+                 :count (:count result)}})))
 
   (kernel/register-handler!
    :session/update-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id patch]}]
-     (let [ext-path* (str ext-path)
-           id*       (str id)
-           sd        (session/get-session-data-in ctx session-id)
-           xs        (vec (or (:prompt-contributions sd) []))
-           found     (some #(and (= ext-path* (:ext-path %)) (= id* (:id %))) xs)]
-       (if-not found
-         {:return {:updated?     false
+     (let [sd     (session/get-session-data-in ctx session-id)
+           xs     (:prompt-contributions sd)
+           result (contributions/update-contribution xs ext-path id patch)]
+       (if-not (:updated? result)
+         {:return {:updated? false
                    :contribution nil
-                   :count (count (session/sorted-prompt-contributions xs))}}
-         (let [updated (atom nil)
-               next*   (mapv (fn [c]
-                               (if (and (= ext-path* (:ext-path c))
-                                        (= id* (:id c)))
-                                 (let [n (merge-prompt-contribution-patch c patch)]
-                                   (reset! updated n)
-                                   n)
-                                 c))
-                             xs)
+                   :count (:count result)}}
+         (let [next*   (:contributions result)
                base    (or (:base-system-prompt sd) (:system-prompt sd) "")
                prompt* (effective-prompt base next* (:prompt-component-selection sd))]
            {:root-state-update (session/session-update session-id #(assoc %
@@ -143,31 +108,27 @@
                                                                           :system-prompt prompt*))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
-            :return {:updated?     true
-                     :contribution @updated
-                     :count (count (session/sorted-prompt-contributions next*))}})))))
+            :return {:updated?     (:updated? result)
+                     :contribution (:contribution result)
+                     :count (:count result)}})))))
 
   (kernel/register-handler!
    :session/unregister-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id]}]
-     (let [ext-path* (str ext-path)
-           id*       (str id)
-           sd        (session/get-session-data-in ctx session-id)
-           xs        (vec (or (:prompt-contributions sd) []))
-           next*     (vec (remove #(and (= ext-path* (:ext-path %))
-                                        (= id* (:id %)))
-                                  xs))
-           removed?  (< (count next*) (count xs))]
-       (if-not removed?
-         {:return {:removed? false :count (count xs)}}
-         (let [base    (or (:base-system-prompt sd) (:system-prompt sd) "")
+     (let [sd     (session/get-session-data-in ctx session-id)
+           xs     (:prompt-contributions sd)
+           result (contributions/unregister-contribution xs ext-path id)]
+       (if-not (:removed? result)
+         {:return {:removed? false :count (:count result)}}
+         (let [next*   (:contributions result)
+               base    (or (:base-system-prompt sd) (:system-prompt sd) "")
                prompt* (effective-prompt base next* (:prompt-component-selection sd))]
            {:root-state-update (session/session-update session-id #(assoc %
                                                                           :prompt-contributions next*
                                                                           :system-prompt prompt*))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
-            :return {:removed? true :count (count next*)}})))))
+            :return {:removed? true :count (:count result)}})))))
 
   (kernel/register-handler!
    :session/reset-prompt-contributions
