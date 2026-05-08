@@ -85,6 +85,13 @@ The expanded `turn-runtime` component should own the lower-level mechanics of on
 - deterministic response-record shaping
 - lower prepared-turn inspection helpers such as prepared-request summaries or query-text extraction when they are not session-policy-owned
 
+Normalized-input rule:
+
+- the lower request-construction API in `turn-runtime` must consume a fully normalized input map
+- that normalized input map is produced above the boundary by session-owned projection/policy code
+- lower request construction must not perform session-state lookup, journal reads, auth resolution, skill/template expansion, command-registry lookup, or prompt-contribution selection policy
+- lower request construction may assemble provider-facing conversation, prompt layers, cache projections, and final prepared-request maps only from the normalized values it is given
+
 ### `agent-session` should own
 
 `agent-session` should remain the authoritative owner of:
@@ -96,6 +103,9 @@ The expanded `turn-runtime` component should own the lower-level mechanics of on
 - journal append through dispatch
 - prompt lifecycle dispatch handlers
 - session-owned policy and projection required before lower prepared-turn assembly
+- prompt-asset selection and ordering policy
+- auth and provider-request option resolution
+- journal/session reads needed to produce normalized prepared-turn inputs
 
 ### `psi.turn` should become clearer as a higher facade
 
@@ -172,6 +182,14 @@ Current lower candidates:
 - pure helper functions currently in `psi.turn` that support prepared-turn shaping rather than dispatch orchestration
 - pure helper functions currently in `psi.turn.handlers` that summarize prepared requests or execution results without encoding dispatch effect choreography
 
+Current expected lower helper candidates:
+
+- `prepared-request-state-summary`
+- `prepared-request-query-text`
+- `execution-usage-tokens`
+
+These are expected to move only if implementation confirms they remain purely lower prepared-turn helpers after the normalized-input split.
+
 ### Likely remain above the boundary
 
 Current higher candidates:
@@ -187,6 +205,13 @@ Current higher candidates:
 - `psi.turn/consume-queued-input-text-in!`
 - dispatch/effect/event choreography in `psi.turn.handlers`
 - prompt lifecycle registration in `dispatch-handlers.prompt-lifecycle`
+
+Current expected higher helper candidates:
+
+- follow-up batching helpers
+- synthetic prompt effect choreography
+- prompt-record next-event payload/effect shaping
+- prompt-finish follow-up effect choreography
 
 ## Target shape
 
@@ -212,6 +237,12 @@ API-shape preference:
 - one obvious lower prepared-turn entrypoint for prepared-request execution
 - one obvious lower prepared-turn entrypoint for record shaping
 - `psi.turn` remains the public higher session-oriented facade above those lower APIs
+
+Direct-consumer rule:
+
+- `psi.turn` is the preferred higher-level production facade over lower prepared-turn APIs
+- other production namespaces may depend directly on `psi.turn-runtime.request` or `psi.turn-runtime.recording` only when they genuinely need helper-level lower prepared-turn APIs rather than dispatch-owning orchestration
+- any such direct consumer should be kept minimal and recorded explicitly in `implementation.md`
 
 ## Acceptance
 
@@ -240,13 +271,14 @@ API-shape preference:
 2. classify current `prompt_request` responsibilities into:
    - lower prepared-turn assembly
    - session-owned projection/policy that must stay above the boundary
-3. move the lower prepared-turn assembly into `components/turn-runtime/`
-4. move `prompt_recording` into `components/turn-runtime/`
-5. extract any small pure helpers from `psi.turn` or `psi.turn.handlers` when they clearly belong with the lower prepared-turn boundary
-6. update `psi.turn` to depend downward on the expanded `turn-runtime` component
-7. update direct consumers and focused tests
-8. remove any temporary migration shims
-9. run focused verification and record the final ownership result
+3. define the normalized prepared-turn input map consumed by the lower request builder
+4. move the lower prepared-turn assembly into `components/turn-runtime/`
+5. move `prompt_recording` into `components/turn-runtime/`
+6. extract any small pure helpers from `psi.turn` or `psi.turn.handlers` when they clearly belong with the lower prepared-turn boundary
+7. update `psi.turn` to depend downward on the expanded `turn-runtime` component
+8. update direct consumers and focused tests
+9. remove any temporary migration shims
+10. run focused verification and record the final ownership result
 
 ## Verification intent
 
@@ -257,6 +289,12 @@ Minimum intent:
 - focused `turn-runtime` tests for request/execution/recording behavior
 - focused higher-level tests proving `psi.turn` still orchestrates turns correctly through the expanded lower component
 - repo search proving lower prepared-turn code is no longer authoritatively owned by `agent-session`
+
+Test-movement rule:
+
+- move whole focused files when they are primarily about lower request/recording ownership
+- leave mixed higher-level lifecycle/orchestration tests under `agent-session` and update them in place
+- when ownership proof is needed but whole-file movement would create churn, prefer adding a small new `turn-runtime`-owned focused test over splitting a mixed higher-level test file
 
 Representative higher-level consuming surfaces:
 

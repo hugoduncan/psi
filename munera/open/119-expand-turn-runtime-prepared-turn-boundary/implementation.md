@@ -18,3 +18,11 @@ Relationship to prior tasks recorded:
 - `103` is treated as the ownership repair prerequisite that made the lower component real
 - `102` is treated as historical background only; the task explicitly avoids reviving a sibling `turn-preparation` component framing
 - `105` remains the umbrella architectural reference for this task
+
+Design review follow-up notes added after initial task creation:
+- the most important ambiguity was the missing normalized-input contract for lower request construction
+- the task now explicitly states that lower `turn-runtime` request assembly must consume a fully normalized input map and must not perform session-state lookup, journal reads, auth resolution, skill/template expansion, command-registry lookup, or prompt-contribution selection policy
+- the task now also clarifies that prompt-asset selection/ordering, auth/provider-request-option resolution, and journal/session reads needed to produce normalized inputs remain above the boundary in `agent-session`
+- the task now records expected lower helper candidates (`prepared-request-state-summary`, `prepared-request-query-text`, `execution-usage-tokens`) and expected higher helper candidates (follow-up batching and dispatch/effect choreography)
+- the task now adds a direct-consumer rule for any production namespace that needs helper-level access to `psi.turn-runtime.request` or `psi.turn-runtime.recording`
+- the task now adds a test-movement rule to reduce unnecessary churn when proving the expanded boundary

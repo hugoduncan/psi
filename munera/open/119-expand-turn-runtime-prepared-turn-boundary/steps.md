@@ -3,7 +3,16 @@
   - [ ] lower prepared-turn assembly/runtime/recording ownership
   - [ ] higher dispatch/session-owned orchestration ownership
   - [ ] ambiguous helpers needing extraction-time review
+- [ ] Define the normalized prepared-turn input map consumed by the lower request builder
 - [ ] Design the expanded `turn-runtime` namespace map
 - [ ] Record the keep/move/split map for `psi.turn`, `psi.turn.handlers`, `prompt_request`, and `prompt_recording`
+  - [ ] identify which current `prompt_request` responsibilities stay above the boundary as session-owned projection/policy
+  - [ ] identify which current `prompt_request` responsibilities move down as lower request assembly
+  - [ ] identify which current `psi.turn.handlers` helpers move down versus remain as dispatch/effect choreography
+- [ ] Record direct-consumer exceptions, if any, for namespaces that should use `psi.turn-runtime.request` or `psi.turn-runtime.recording` directly
+- [ ] Identify verification surfaces and test ownership decisions:
+  - [ ] which focused tests should move under `components/turn-runtime/test/`
+  - [ ] which mixed higher-level tests should remain under `agent-session`
+  - [ ] whether any small new component-owned focused tests should be added instead of moving mixed files
 - [ ] Confirm the task stays aligned with umbrella task `105`
 - [ ] Use this task as the framing reference for implementation once queued

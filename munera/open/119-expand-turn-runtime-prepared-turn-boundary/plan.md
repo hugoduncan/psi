@@ -7,9 +7,10 @@ Approach:
 Planned outcomes:
 1. establish `turn-runtime` as the single lower prepared-turn component identity
 2. identify which parts of current request preparation are truly lower assembly versus session-owned projection/policy
-3. move lower response-recording ownership into `turn-runtime`
+3. move lower request-assembly and response-recording ownership into `turn-runtime`
 4. update `psi.turn` to depend downward on the expanded lower component while retaining dispatch/session orchestration ownership
 5. leave a cleaner keep/move/split boundary for any later `psi.turn` refactoring
+6. record any direct-consumer exceptions and verification/test-ownership decisions needed to keep the expanded boundary explicit
 
 Scope boundaries:
 - no extraction of `psi.turn` as a component in this task
