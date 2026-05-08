@@ -9,7 +9,9 @@ Queue:
 
 Backlog:
 
-`munera/open/121-deterministic-operation-runtime-component-extraction/`
+`munera/open/123-workflow-judge-routing-component-extraction/`
+`munera/open/124-turn-execution-contract-extraction/`
+`munera/open/125-workflow-runtime-core-component-extraction/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
