@@ -5,6 +5,7 @@
    [extensions.workflow-loader :as wl]
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
+   [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
@@ -49,7 +50,7 @@
           _               (session/register-mutations-in! qctx mutations/all-mutations true)
           _               (load-extension-path! ctx session-id "extensions/work-on/src/extensions/work_on.clj")
           _               (load-extension-path! ctx session-id "extensions/workflow-loader/src/extensions/workflow_loader.clj")
-          before-cmds     (ext/command-names-in reg)
+          before-cmds     (command-registry/command-names-in reg)
           before-tools    (tool-registry/tool-names-in reg)
           before-defs     (keys (:loaded-definitions (workflow-loader-state)))
           result          ((:execute tool) {"action" "reload-code"
@@ -59,7 +60,7 @@
                                                           "extensions.workflow-loader"
                                                           "extensions.work-on"]})
           parsed          (read-string (:content result))
-          after-cmds      (ext/command-names-in reg)
+          after-cmds      (command-registry/command-names-in reg)
           after-tools     (tool-registry/tool-names-in reg)
           after-defs      (:loaded-definitions (workflow-loader-state))
           complexity-def  (get after-defs "complexity-reduction-pr")]

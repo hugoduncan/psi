@@ -5,6 +5,7 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
+   [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]))
 
 (pco/defmutation register-tool
@@ -27,9 +28,9 @@
    ::pco/output  [:psi.extension/path
                   :psi.extension/command-names]}
   (let [reg (:extension-registry agent-session-ctx)]
-    (ext/register-command-in! reg ext-path (assoc opts :name name))
+    (command-registry/register-command-in! reg ext-path (assoc opts :name name))
     {:psi.extension/path          ext-path
-     :psi.extension/command-names (vec (ext/command-names-in reg))}))
+     :psi.extension/command-names (vec (command-registry/command-names-in reg))}))
 
 (pco/defmutation register-handler
   "Register an extension-owned event handler into the extension registry."

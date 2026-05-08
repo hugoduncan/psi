@@ -5,6 +5,7 @@
    [psi.agent-session.deterministic-operations :as deterministic-ops]
    [psi.agent-session.extensions.api :as api]
    [psi.agent-session.extensions.loader :as loader]
+   [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
    [taoensso.timbre :as timbre]))
 
@@ -105,11 +106,9 @@
   (tool-registry/get-tool-in reg tool-name))
 
 (defn register-command-in!
-  "Register `cmd` (a map with :name key) for the extension at `ext-path`."
+  "Thin upper seam delegating command registration to the extracted command-registry owner."
   [reg ext-path cmd]
-  (swap! (:state reg)
-         assoc-in [:extensions ext-path :commands (:name cmd)] cmd)
-  reg)
+  (command-registry/register-command-in! reg ext-path cmd))
 
 (defn register-operation-in!
   "Register a deterministic operation for the extension at `ext-path`.
@@ -217,30 +216,6 @@
     (into #{}
           (mapcat keys)
           (extension-item-maps state item-key))))
-
-(defn- all-first-registered-items-in
-  [reg item-key]
-  (let [state (state-in reg)
-        seen  (volatile! #{})]
-    (reduce
-     (fn [items path]
-       (reduce-kv
-        (fn [items name item]
-          (if (contains? @seen name)
-            items
-            (do
-              (vswap! seen conj name)
-              (conj items (assoc item :extension-path path)))))
-        items
-        (or (get-in state [:extensions path item-key]) {})))
-     []
-     (:registration-order state))))
-
-(defn- get-extension-item-in
-  [reg item-key item-name]
-  (let [state (state-in reg)]
-    (some #(get-in state [:extensions % item-key item-name])
-          (:registration-order state))))
 
 (defn bus-emit-in!
   "Emit `data` on `channel` to all event bus subscribers in `reg`."
@@ -388,9 +363,9 @@
   (extension-item-names-in reg :operations))
 
 (defn command-names-in
-  "Return set of all registered command names across all extensions in `reg`."
+  "Thin upper seam delegating command-name queries to the extracted command-registry owner."
   [reg]
-  (extension-item-names-in reg :commands))
+  (command-registry/command-names-in reg))
 
 (defn flag-names-in
   "Return set of all registered flag names across all extensions in `reg`."
@@ -398,10 +373,9 @@
   (extension-item-names-in reg :flags))
 
 (defn all-commands-in
-  "Return vector of all registered command maps across all extensions.
-   First registration per name wins."
+  "Thin upper seam delegating registered-command listing to the extracted command-registry owner."
   [reg]
-  (all-first-registered-items-in reg :commands))
+  (command-registry/all-commands-in reg))
 
 (defn all-flags-in
   "Return vector of all registered flag maps across all extensions."
@@ -420,9 +394,9 @@
      []
      (:registration-order state))))
 (defn get-command-in
-  "Return the command map for `cmd-name`, or nil."
+  "Thin upper seam delegating command lookup to the extracted command-registry owner."
   [reg cmd-name]
-  (get-extension-item-in reg :commands cmd-name))
+  (command-registry/get-command-in reg cmd-name))
 
 (defn extension-detail-in
   "Return detail map for a single extension at `ext-path`, or nil."

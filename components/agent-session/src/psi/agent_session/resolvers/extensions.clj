@@ -4,6 +4,7 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extension-installs :as installs]
    [psi.agent-session.extensions :as ext]
+   [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.resolvers.support :as support]
    [psi.agent-session.workflows :as wf]
@@ -134,9 +135,9 @@
    ::pco/output [:psi.extension/commands
                  :psi.extension/command-names]}
   (let [reg  (:extension-registry agent-session-ctx)
-        cmds (ext/all-commands-in reg)]
+        cmds (command-registry/all-commands-in reg)]
     {:psi.extension/commands      (mapv #(dissoc % :handler) cmds)
-     :psi.extension/command-names (vec (ext/command-names-in reg))}))
+     :psi.extension/command-names (vec (command-registry/command-names-in reg))}))
 
 (pco/defresolver extension-flags-resolver
   [{:keys [psi/agent-session-ctx]}]

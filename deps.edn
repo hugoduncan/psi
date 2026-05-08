@@ -28,6 +28,7 @@
         psi/project-nrepl                             {:local/root "components/project-nrepl"}
         psi/prompt-assets                             {:local/root "components/prompt-assets"}
         psi/skill-registry                            {:local/root "components/skill-registry"}
+        psi/command-registry                          {:local/root "components/command-registry"}
         psi/tool-registry                             {:local/root "components/tool-registry"}
         psi/turn-statechart                           {:local/root "components/turn-statechart"}
         psi/turn-runtime                              {:local/root "components/turn-runtime"}
@@ -193,6 +194,7 @@
                              "components/project-nrepl/test"
                              "components/prompt-assets/test"
                              "components/skill-registry/test"
+                             "components/command-registry/test"
                              "extensions/auto-session-name/test"
                              "extensions/commit-checks/test"
                              "extensions/hello-ext/test"
@@ -234,6 +236,7 @@
                         "components/project-nrepl/test"
                         "components/prompt-assets/test"
                         "components/skill-registry/test"
+                        "components/command-registry/test"
                         "components/state-kernel/test"
                         "extensions/auto-session-name/test"
                         "extensions/commit-checks/test"
@@ -265,6 +268,7 @@
                         "components/shared-config/src"
                         "components/project-nrepl/src"
                         "components/prompt-assets/src"
+                        "components/command-registry/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
                         "components/system-bootstrap/test"

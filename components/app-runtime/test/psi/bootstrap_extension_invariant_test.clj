@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.extensions :as ext]
+   [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
@@ -37,7 +38,7 @@
                                                                           :label "Delegate"
                                                                           :description "Run workflows"
                                                                           :parameters {:type "object"}})
-          _                (ext/register-command-in! reg ext-path {:name "delegate" :description "Run a workflow"})
+          _                (command-registry/register-command-in! reg ext-path {:name "delegate" :description "Run a workflow"})
           _                (((ext/create-extension-api reg ext-path runtime-fns)
                              :register-prompt-contribution)
                             "workflow-loader-workflows"

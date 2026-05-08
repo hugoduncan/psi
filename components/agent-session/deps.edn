@@ -18,6 +18,7 @@
         psi/project-nrepl          {:local/root "../project-nrepl"}
         psi/prompt-assets          {:local/root "../prompt-assets"}
         psi/skill-registry         {:local/root "../skill-registry"}
+        psi/command-registry       {:local/root "../command-registry"}
         psi/tool-registry          {:local/root "../tool-registry"}
         psi/turn-statechart        {:local/root "../turn-statechart"}
         psi/turn-runtime           {:local/root "../turn-runtime"}

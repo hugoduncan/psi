@@ -7,7 +7,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-core.core :as agent]
-   [psi.agent-session.extensions :as ext]
+   [psi.command-registry.registry :as command-registry]
    [psi.session-state.state :as session]))
 
 (defn- now-inst []
@@ -101,7 +101,7 @@
                             ctx session-id {:turn-id turn-id
                                             :user-message user-msg
                                             :runtime-opts runtime-opts
-                                            :commands (ext/command-names-in (:extension-registry ctx))})
+                                            :commands (command-registry/command-names-in (:extension-registry ctx))})
         api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
         steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
     (cond-> {:root-state-update
