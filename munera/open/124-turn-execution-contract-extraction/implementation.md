@@ -98,3 +98,9 @@ Follow-on implication
 Review note
 - implementation review passed against task intent and architecture
 - follow-up completed: removed unused `:execution-result` retention from workflow pending actor state and added focused proof that successful actor pending state no longer carries that internal execution detail
+
+Code-shaper review note
+- code shape is good overall: the new contract is small, coherent, and improves ownership boundaries
+- follow-up completed:
+  - documented `execute-actor-turn!` and `execute-judge-turn!` as intentional semantic aliases over `execute-session-turn!`
+  - extracted `prompt-execution-result` so turn invocation selection is separate from bounded result normalization while keeping the boundary minimal

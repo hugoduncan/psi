@@ -15,3 +15,5 @@
 - [x] Record final boundary decisions, chosen contract shape, and follow-on implications in `implementation.md`
 - [x] Review `:execution-result` retained in workflow pending actor state; remove it if unused or document the intentional retention boundary in code/task notes
 - [x] Add or update focused proof for the chosen `:execution-result` retention decision if the implementation keeps it
+- [x] Decide whether `execute-actor-turn!` and `execute-judge-turn!` should remain intentional semantic aliases over `execute-session-turn!`; either document the intent or consolidate if no caller-specific behavior is expected
+- [x] If `execute-session-turn!` grows further, extract a tiny helper for turn invocation selection so result normalization and prompt-execution dispatch stay separate; otherwise record that current branching remains intentionally minimal

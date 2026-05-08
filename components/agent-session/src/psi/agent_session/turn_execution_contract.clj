@@ -48,6 +48,13 @@
       execution-session-id
       (assoc :session-id execution-session-id))))
 
+(defn- prompt-execution-result
+  [ctx session-id text images opts]
+  (cond
+    (some? opts) (turn/prompt-execution-result-in! ctx session-id text images opts)
+    (some? images) (turn/prompt-execution-result-in! ctx session-id text images)
+    :else (turn/prompt-execution-result-in! ctx session-id text)))
+
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt
    inputs.
@@ -60,10 +67,7 @@
   ([ctx session-id text images]
    (execute-session-turn! ctx session-id text images nil))
   ([ctx session-id text images opts]
-   (let [execution-result (cond
-                            (some? opts) (turn/prompt-execution-result-in! ctx session-id text images opts)
-                            (some? images) (turn/prompt-execution-result-in! ctx session-id text images)
-                            :else (turn/prompt-execution-result-in! ctx session-id text))
+   (let [execution-result (prompt-execution-result ctx session-id text images opts)
          assistant-message (:execution-result/assistant-message execution-result)
          assistant-text (assistant-message-text assistant-message)
          {:keys [turn/outcome]} (turn-recording/classify-assistant-message assistant-message)]
@@ -78,9 +82,17 @@
               :failure (execution-failure-payload session-id assistant-message))))))
 
 (defn execute-actor-turn!
+  "Intent-named semantic alias for workflow actor-step callers.
+   Kept distinct from `execute-judge-turn!` so actor/judge callers share one
+   bounded contract today while retaining a stable place for caller-specific
+   divergence later if needed."
   [ctx session-id prompt]
   (execute-session-turn! ctx session-id prompt))
 
 (defn execute-judge-turn!
+  "Intent-named semantic alias for workflow judge callers.
+   Kept distinct from `execute-actor-turn!` so actor/judge callers share one
+   bounded contract today while retaining a stable place for caller-specific
+   divergence later if needed."
   [ctx session-id prompt]
   (execute-session-turn! ctx session-id prompt))
