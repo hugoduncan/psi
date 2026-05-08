@@ -80,32 +80,31 @@
     (let [result (workflow-judge/project-messages messages-with-tools {:type :tail :turns 2})]
       (is (= (count messages-with-tools) (count result))))))
 
-(deftest project-messages-tail-tool-output-false-test
-  (testing "tool-output false strips tool blocks from messages"
-    (let [result (workflow-judge/project-messages messages-with-tools
-                                                  {:type :tail :turns 1 :tool-output false})]
-      (is (= 2 (count result)))
-      (is (= "Review it" (:content (first result))))))
+(deftest project-messages-tail-tool-output-false-preserves-non-tool-text-test
+  (let [result (workflow-judge/project-messages messages-with-tools
+                                                {:type :tail :turns 1 :tool-output false})]
+    (is (= 2 (count result)))
+    (is (= "Review it" (:content (first result))))))
 
-  (testing "tool-output false strips tool_use blocks from assistant messages"
-    (let [result (workflow-judge/project-messages messages-with-tools
-                                                  {:type :tail :turns 2 :tool-output false})]
-      (doseq [msg result]
-        (when (= "assistant" (:role msg))
-          (doseq [block (:content msg)]
-            (is (= :text (:type block)) "No tool blocks should remain"))))))
+(deftest project-messages-tail-tool-output-false-strips-tool-blocks-from-assistant-messages-test
+  (let [result (workflow-judge/project-messages messages-with-tools
+                                                {:type :tail :turns 2 :tool-output false})]
+    (doseq [msg result]
+      (when (= "assistant" (:role msg))
+        (doseq [block (:content msg)]
+          (is (= :text (:type block)) "No tool blocks should remain"))))))
 
-  (testing "tool-output false drops messages emptied by tool-block stripping"
-    (let [result (workflow-judge/project-messages messages-with-tool-only-turn
-                                                  {:type :tail :turns 1 :tool-output false})]
-      (is (= [{:role "user" :content "Build the feature"}
-              {:role "assistant" :content [{:type :text :text "Build complete."}]}]
-             result))))
+(deftest project-messages-tail-tool-output-false-drops-emptied-messages-test
+  (let [result (workflow-judge/project-messages messages-with-tool-only-turn
+                                                {:type :tail :turns 1 :tool-output false})]
+    (is (= [{:role "user" :content "Build the feature"}
+            {:role "assistant" :content [{:type :text :text "Build complete."}]}]
+           result))))
 
-  (testing "tool-output true preserves tool blocks"
-    (let [result (workflow-judge/project-messages messages-with-tools
-                                                  {:type :tail :turns 2 :tool-output true})]
-      (is (= (count messages-with-tools) (count result))))))
+(deftest project-messages-tail-tool-output-true-preserves-tool-blocks-test
+  (let [result (workflow-judge/project-messages messages-with-tools
+                                                {:type :tail :turns 2 :tool-output true})]
+    (is (= (count messages-with-tools) (count result)))))
 
 (deftest match-signal-test
   (let [table {"APPROVED" {:goto :next}

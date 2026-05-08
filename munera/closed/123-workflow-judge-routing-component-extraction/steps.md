@@ -19,3 +19,9 @@
 - [x] Add an optional consumer-level proof for `workflow-source-resolution` applying `:projection` through the new lower owner
 - [x] Re-run focused consuming-path tests if the optional consumer-level proof is added
 - [x] Append the test-follow-up result to `implementation.md`
+- [x] Split `project-messages-tail-tool-output-false-test` into narrower behavior-focused tests
+- [x] Re-run focused workflow-judge tests after splitting the dense projection test
+- [x] Re-run lint after splitting the dense projection test
+- [x] Optionally extract a tiny transcript-run helper in `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` if it reduces repeated setup without hiding intent
+- [x] Re-run focused consuming-path tests if the transcript helper is introduced
+- [x] Append the test-shaper follow-up result to `implementation.md`

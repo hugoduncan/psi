@@ -62,3 +62,13 @@ Test-follow-up execution:
 - extended `psi.agent-session.workflow-source-resolution-test` to prove both `:projection :full` passthrough and the lower-owner projection path that drops emptied messages
 - focused verification after the test follow-up: `8 tests, 15 assertions, 0 failures`
 - lint after the test follow-up: `0 errors, 0 warnings`
+
+Test-shaper review:
+- review passed; the tests now prove the intended extraction invariants with good boundary alignment
+- two minor follow-ups noted: split the dense `project-messages-tail-tool-output-false-test` into narrower behavior-focused tests, and optionally extract a tiny transcript-run helper in `workflow_source_resolution_test.clj` to reduce repeated setup
+
+Test-shaper follow-up execution:
+- split the dense pure projection test into four narrower behavior-focused tests covering preserved non-tool text, stripped tool blocks, dropped emptied messages, and `tool-output true` preservation
+- added a tiny `run-with-transcript` helper in `workflow_source_resolution_test.clj` to remove repeated transcript-run setup while keeping test intent explicit
+- focused verification after the test-shaper follow-up: `8 tests, 15 assertions, 0 failures`
+- lint after the test-shaper follow-up: `0 errors, 0 warnings`
