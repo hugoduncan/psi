@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-schema :as dispatch-schema]
+   [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.agent-session.service-protocol]
    [psi.agent-session.services]
    [psi.state-kernel.dispatch :as kernel]))
@@ -149,10 +150,7 @@
        :session/set-session-name
        (fn [_ctx {:keys [name]}]
          {:root-state-update #(assoc % :session-name name)
-          :effects [{:effect/type :runtime/dispatch-event
-                     :event-type :session/append-journal-entry
-                     :event-data {:entry {:kind :session-info :data {:name name}}}
-                     :origin :core}]
+          :effects [(journal-append-effect/append-session-info-effect nil name)]
           :return :ok}))
       (dispatch/dispatch! ctx :session/set-session-name {:name "after"})
       (let [entry (last (kernel/event-log-entries))]
@@ -175,10 +173,7 @@
        :session/set-session-name
        (fn [_ctx {:keys [name]}]
          {:root-state-update #(assoc % :session-name name)
-          :effects [{:effect/type :runtime/dispatch-event
-                     :event-type :session/append-journal-entry
-                     :event-data {:entry {:kind :session-info :data {:name name}}}
-                     :origin :core}]
+          :effects [(journal-append-effect/append-session-info-effect nil name)]
           :return :name-updated}))
       (kernel/register-handler!
        :session/set-worktree-path

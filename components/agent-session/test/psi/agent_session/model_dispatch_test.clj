@@ -170,22 +170,18 @@
                 projection-effect (second (:psi.dispatch-event/declared-effects entry))
                 applied-persist-effect (first (:psi.dispatch-event/applied-effects entry))
                 applied-projection-effect (second (:psi.dispatch-event/applied-effects entry))]
-            (is (= :runtime/dispatch-event (:effect/type persist-effect)))
             (is (= :session/append-journal-entry (:event-type persist-effect)))
             (is (= session-id (get-in persist-effect [:event-data :session-id])))
             (is (= :session-info (get-in persist-effect [:event-data :entry :kind])))
             (is (= "dispatch-visible" (get-in persist-effect [:event-data :entry :data :name])))
-            (is (= :core (:origin persist-effect)))
             (is (= {:effect/type :projection/context-changed
                     :session-id session-id
                     :reason :session/set-session-name}
                    projection-effect))
-            (is (= :runtime/dispatch-event (:effect/type applied-persist-effect)))
             (is (= :session/append-journal-entry (:event-type applied-persist-effect)))
             (is (= session-id (get-in applied-persist-effect [:event-data :session-id])))
             (is (= :session-info (get-in applied-persist-effect [:event-data :entry :kind])))
             (is (= "dispatch-visible" (get-in applied-persist-effect [:event-data :entry :data :name])))
-            (is (= :core (:origin applied-persist-effect)))
             (is (= {:effect/type :projection/context-changed
                     :session-id session-id
                     :reason :session/set-session-name}

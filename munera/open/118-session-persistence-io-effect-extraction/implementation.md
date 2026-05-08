@@ -82,3 +82,7 @@
   - some higher-level agent-session tests still assert exact append-effect envelope structure more often than necessary
   - replay-focused tests use reduced handcrafted entry shapes instead of canonical constructors, which is acceptable but mildly inconsistent
   - lower pure persistence tests are the strongest/highest-signal part of the suite and should remain authoritative
+- Follow-up executed:
+  - relaxed selected higher-level agent-session tests toward stable semantic checks instead of repeated full nested effect-envelope equality
+  - migrated reviewed replay-focused tests to the shared canonical append-effect helper instead of reduced handcrafted effect shapes
+  - preserved the lower pure persistence tests unchanged as the authoritative seam proofs
