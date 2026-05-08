@@ -14,6 +14,14 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Task 122 prompt-control compatibility namespace removal is now landed locally:
+  - removed `components/agent-session/src/psi/agent_session/prompt_control.clj` instead of leaving a forwarding shim
+  - rewired `core`, `workflow-statechart-runtime`, `workflow-judge`, and `compaction-runtime` to depend directly on `psi.agent-session.turn`
+  - rewired workflow-oriented tests and `with-redefs` callsites to target `psi.agent-session.turn/*`
+  - removed the facade-only delegation test from `prompt_lifecycle_test.clj`; higher-level prompt lifecycle and workflow consuming-path tests remain the proof surfaces
+  - updated active task text that still described `prompt-control` as a live compatibility seam
+  - focused verification green: lint `0 errors, 0 warnings`; focused tests `1572 tests, 12038 assertions, 0 failures`
+
 - Task 110 prompt-assets component extraction is now landed locally:
   - created new lower component `components/prompt-assets/` with authoritative namespaces `psi.prompt-assets.prompt-templates`, `psi.prompt-assets.skills`, and `psi.prompt-assets.system-prompt`
   - moved the three authoritative source namespaces and their focused tests out of `components/agent-session/` into the new component without introducing compatibility forwarding shims

@@ -7,7 +7,7 @@
   (:require
    [clojure.string :as str]
    [psi.session-persistence.core :as persist]
-   [psi.agent-session.prompt-control :as prompt-control]))
+   [psi.agent-session.turn :as turn]))
 
 ;;; Projection — pure functions
 
@@ -209,7 +209,7 @@
       :preloaded-messages projected
       :workflow-owned?    true})
     ;; First attempt
-    (let [initial-result (prompt-control/prompt-execution-result-in! ctx judge-sid (:prompt judge-spec))]
+    (let [initial-result (turn/prompt-execution-result-in! ctx judge-sid (:prompt judge-spec))]
       (loop [attempt 0
              last-output (str/trim (assistant-message-text (:execution-result/assistant-message initial-result)))]
         (let [routing-result (evaluate-routing last-output routing-table
@@ -217,8 +217,8 @@
           (if (and (= :no-match (:action routing-result))
                    (< attempt max-judge-retries))
             ;; Retry: inject feedback into the same judge session
-            (let [retry-result (prompt-control/prompt-execution-result-in! ctx judge-sid
-                                                                           (judge-retry-feedback last-output expected-sigs))]
+            (let [retry-result (turn/prompt-execution-result-in! ctx judge-sid
+                                                                 (judge-retry-feedback last-output expected-sigs))]
               (recur (inc attempt)
                      (str/trim (assistant-message-text (:execution-result/assistant-message retry-result)))))
             ;; Matched, or retries exhausted

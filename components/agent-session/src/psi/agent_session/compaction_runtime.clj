@@ -4,7 +4,7 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
    [psi.session-persistence.core :as persist]
-   [psi.agent-session.prompt-control :as prompt-control]
+   [psi.agent-session.turn :as turn]
    [psi.session-state.state :as ss]))
 
 (defn execute-compaction-in!
@@ -49,7 +49,7 @@
    caller can still receive the compaction result directly."
   [ctx session-id custom-instructions]
   (when-not (ss/idle-in? ctx session-id)
-    (prompt-control/abort-in! ctx session-id))
+    (turn/abort-in! ctx session-id))
   (dispatch/dispatch! ctx :session/compact-start {:session-id session-id} {:origin :core})
   (let [result (dispatch/dispatch! ctx
                                    :session/manual-compaction-execute

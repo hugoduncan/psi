@@ -4,7 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.deterministic-operation-registry.registry :as op-reg]
    [psi.session-persistence.core]
-   [psi.agent-session.prompt-control]
+   [psi.agent-session.turn]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
@@ -160,7 +160,7 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
                       {:execution-result/assistant-message

@@ -1,0 +1,10 @@
+- [x] Inventory all production references to `psi.agent-session.prompt-control`
+- [x] Inventory all test references to `psi.agent-session.prompt-control`
+- [x] Update production consumers to require/use `psi.agent-session.turn` directly
+- [x] Update tests to require/use `psi.agent-session.turn` directly
+- [x] Remove the facade-only test that proves delegation through `prompt-control`, replacing it with proof at the authoritative surface if needed
+- [x] Delete `components/agent-session/src/psi/agent_session/prompt_control.clj`
+- [x] Update active open-task text that would otherwise still describe `prompt-control` as a current compatibility facade
+- [x] Run repo search proving no production namespace definition or production require for `psi.agent-session.prompt-control` remains
+- [x] Run focused lint/tests covering direct turn behavior and at least one higher-level consuming path
+- [x] Record final boundary notes and any residual follow-ons in `implementation.md`

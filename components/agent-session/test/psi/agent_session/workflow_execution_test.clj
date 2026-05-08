@@ -6,7 +6,7 @@
    [psi.deterministic-operation-registry.registry]
    [psi.agent-session.deterministic-operations]
    [psi.session-persistence.core]
-   [psi.agent-session.prompt-control]
+   [psi.agent-session.turn]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]
@@ -303,12 +303,12 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in! (fn [_ctx child-session-id prompt]
-                                                                                   (swap! prompts* conj {:session-id child-session-id :prompt prompt})
-                                                                                   {:execution-result/assistant-message
-                                                                                    {:content (let [resp (first @responses*)]
-                                                                                                (swap! responses* subvec 1)
-                                                                                                resp)}})]
+                    psi.agent-session.turn/prompt-execution-result-in! (fn [_ctx child-session-id prompt]
+                                                                         (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                                                                         {:execution-result/assistant-message
+                                                                          {:content (let [resp (first @responses*)]
+                                                                                      (swap! responses* subvec 1)
+                                                                                      resp)}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-linear")
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-linear")]
           (is (= :completed (:status result)))
@@ -377,7 +377,7 @@
                        :accepted-result {:outcome :ok
                                          :outputs {:data (:data operation-result)
                                                    :summary (:summary operation-result)}}})
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
                       {:execution-result/assistant-message
@@ -495,7 +495,7 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
                       {:execution-result/assistant-message
@@ -573,7 +573,7 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
                       {:execution-result/assistant-message
@@ -637,9 +637,9 @@
                            s (assoc-in s [:agent-session :sessions session-id :data :prompt-contributions]
                                        [contribution])]
                        s)))]
-      (with-redefs [psi.agent-session.prompt-control/prompt-execution-result-in! (fn [_ctx _child-session-id _prompt]
-                                                                                   {:execution-result/assistant-message
-                                                                                    {:content "planner output"}})]
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in! (fn [_ctx _child-session-id _prompt]
+                                                                         {:execution-result/assistant-message
+                                                                          {:content "planner output"}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-ext-1")
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-ext-1")
               child-id (get-in run [:step-runs "step-1" :attempts 0 :execution-session-id])
@@ -686,7 +686,7 @@
                                        :enabled true
                                        :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
                                        :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}])))))]
-      (with-redefs [psi.agent-session.prompt-control/prompt-execution-result-in!
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx _child-session-id _prompt]
                       {:execution-result/assistant-message
                        {:content "planner output"}})]
@@ -738,7 +738,7 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session (valid-child-session sid)}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx sid _text]
                       {:execution-result/assistant-message
                        (cond

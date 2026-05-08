@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.session-persistence.core]
-   [psi.agent-session.prompt-control]
+   [psi.agent-session.turn]
    [psi.agent-session.workflow-judge :as workflow-judge]))
 
 ;;; Test message fixtures
@@ -243,7 +243,7 @@
                     (fn [_ctx _sid]
                       [{:role "user" :content "Build it"}
                        {:role "assistant" :content [{:type :text :text "Done building."}]}])
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx sid text]
                       (swap! prompts* conj {:session-id sid :text text})
                       {:execution-result/assistant-message
@@ -277,7 +277,7 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx _sid _text]
                       (swap! prompt-count* inc)
                       {:execution-result/assistant-message
@@ -307,7 +307,7 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx _sid _text]
                       (swap! prompt-count* inc)
                       {:execution-result/assistant-message

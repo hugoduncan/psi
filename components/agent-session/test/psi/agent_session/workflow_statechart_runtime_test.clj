@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.prompt-control]
+   [psi.agent-session.turn]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-judge]
@@ -73,7 +73,7 @@
                                :status :pending
                                :execution-session-id sid}
                      :execution-session {:session-id sid}}))
-                psi.agent-session.prompt-control/prompt-execution-result-in!
+                psi.agent-session.turn/prompt-execution-result-in!
                 (fn [_ctx _sid _prompt]
                   {:execution-result/assistant-message
                    {:role "assistant"
@@ -104,7 +104,7 @@
                                  :status :pending
                                  :execution-session-id sid}
                        :execution-session {:session-id sid}}))
-                  psi.agent-session.prompt-control/prompt-execution-result-in!
+                  psi.agent-session.turn/prompt-execution-result-in!
                   (fn [_ctx sid prompt]
                     (swap! prompts* conj {:session-id sid :prompt prompt})
                     {:execution-result/assistant-message
@@ -161,7 +161,7 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session {:session-id sid}}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx sid prompt]
                       (swap! prompts* conj {:session-id sid :prompt prompt})
                       {:execution-result/assistant-message

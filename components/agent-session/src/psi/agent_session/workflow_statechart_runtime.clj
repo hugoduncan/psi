@@ -21,7 +21,7 @@
    [com.fulcrologic.statecharts.simple :as simple]
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.agent-session.deterministic-operations :as deterministic-ops]
-   [psi.agent-session.prompt-control :as prompt-control]
+   [psi.agent-session.turn :as turn]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-ir :as workflow-ir]
    [psi.agent-session.workflow-judge :as workflow-judge]
@@ -452,7 +452,7 @@
                                 {}))
 
               :else
-              (let [execution-result (prompt-control/prompt-execution-result-in! ctx (:session-id execution-session) prompt)
+              (let [execution-result (turn/prompt-execution-result-in! ctx (:session-id execution-session) prompt)
                     assistant-message (:execution-result/assistant-message execution-result)
                     {:keys [turn/outcome]} (assistant-turn-classification assistant-message)
                     failure-payload (when (= :turn.outcome/error outcome)

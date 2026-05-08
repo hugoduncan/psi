@@ -18,6 +18,7 @@ That makes it a good follow-on extraction candidate:
 - low ambiguity
 - directly reduces workflow runtime dependence on `agent-session`
 - aligns with task `105-agent-session-component-extraction-map`, which identifies workflow as the clearest remaining extraction domain and notes `deterministic_operations.clj` as one of the workflow-adjacent lower seams
+- remains well-scoped after landed task `120-rename-psi-turn-to-agent-session-turn`, which resolved surrounding turn naming churn without changing this deterministic-operation runtime boundary
 
 ## Problem
 
@@ -82,6 +83,11 @@ Current production consumer:
 
 - `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj`
 
+Adjacent boundary note after landed task `120` and follow-on cleanup `122`:
+
+- `psi.agent-session.turn` is now the direct higher turn orchestration surface
+- this task does not need to resolve turn naming or turn-namespace migration questions before extracting deterministic-operation runtime ownership
+
 Current test consumers include:
 
 - `components/agent-session/test/psi/agent_session/extensions_test.clj`
@@ -118,7 +124,7 @@ Reasoning:
 First-cut rule:
 
 - `psi.deterministic-operation-runtime.core` owns canonical invoke execution and malformed-result validation/error shaping
-- `psi.agent-session.workflow-statechart-runtime` owns invoke-step result wrapping semantics in the first cut
+- `psi.agent-session.workflow-statechart-runtime` owns invoke-step result wrapping semantics in the first cut as a pragmatic workflow-local home for this extraction slice
 - this task should remove `operation-result->invoke-step-result` from `psi.agent-session.deterministic-operations` rather than relocating it into the extracted runtime component unchanged
 
 ## Responsibilities that should remain outside the new component

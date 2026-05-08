@@ -210,7 +210,7 @@ Responsibility:
 
 Representative namespaces:
 
-- `prompt_control.clj`
+- `turn.clj`
 - `prompt_loop.clj`
 - `prompt_turn.clj`
 - `prompt_request.clj`

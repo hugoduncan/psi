@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.prompt-control]
+   [psi.agent-session.turn]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts :as workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
@@ -101,7 +101,7 @@
                         (swap! child-sessions* conj sid)
                         {:attempt attempt
                          :execution-session execution-session}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (let [responses* (atom ["plan-output" "build-output" "review-output"])]
                       (fn [_ctx _sid _prompt]
                         {:execution-result/assistant-message
