@@ -19,7 +19,7 @@ What landed
 
 Settled behavior decisions
 - identity remains first-cut canonical `ext-path` + `id`
-- current live behavior does not reject missing identity fields; after coercion, nil values normalize to empty string because `str` over keyword-map destructuring defaults now lands as empty in practice at this seam; blank strings are still accepted
+- current live behavior does not reject missing identity fields; after coercion, nil values normalize to empty string because `str` on nil yields `""`; blank strings are still accepted
 - this task preserves that loose contract rather than tightening to structured rejection, because the task goal was behavior-preserving extraction first
 - section normalization preserves existing `str` behavior, so keyword sections become strings like `":capabilities"`
 - content normalization preserves existing `str` behavior

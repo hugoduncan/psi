@@ -8,7 +8,7 @@
   "Return the canonical first-cut contribution identity map.
 
    Current preserved behavior intentionally coerces both identity parts with
-   `str`, so nil becomes the string \"nil\" and blank strings remain allowed."
+   `str`, so nil becomes the empty string and blank strings remain allowed."
   [ext-path id]
   {:ext-path (str ext-path)
    :id (str id)})
