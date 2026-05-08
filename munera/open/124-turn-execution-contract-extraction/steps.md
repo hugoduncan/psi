@@ -13,3 +13,5 @@
 - [x] Support and record how judge-session reuse across no-match retries works without re-exposing high-level orchestration internals
 - [x] Update focused tests to prove canonical execution-result return for both session-backed actor and judge paths
 - [x] Record final boundary decisions, chosen contract shape, and follow-on implications in `implementation.md`
+- [x] Review `:execution-result` retained in workflow pending actor state; remove it if unused or document the intentional retention boundary in code/task notes
+- [x] Add or update focused proof for the chosen `:execution-result` retention decision if the implementation keeps it

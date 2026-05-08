@@ -94,3 +94,7 @@ Verification
 
 Follow-on implication
 - task 125 can now target workflow runtime extraction against `turn-execution-contract` rather than against direct `turn` usage for session-backed actor/judge execution
+
+Review note
+- implementation review passed against task intent and architecture
+- follow-up completed: removed unused `:execution-result` retention from workflow pending actor state and added focused proof that successful actor pending state no longer carries that internal execution detail

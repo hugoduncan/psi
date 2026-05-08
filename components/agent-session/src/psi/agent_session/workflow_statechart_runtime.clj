@@ -441,7 +441,7 @@
                                 {}))
 
               :else
-              (let [{:keys [status assistant-text failure] :as actor-result}
+              (let [{:keys [status assistant-text failure]}
                     (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)]
                 (if (= :error status)
                   (do
@@ -463,7 +463,6 @@
                                                                         :payload envelope
                                                                         :step-id step-id
                                                                         :attempt-id attempt-id
-                                                                        :execution-result (:execution-result actor-result)
                                                                         :updated-at (now)})
                     (enqueue-event! event-queue* working-memory*
                                     (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done)

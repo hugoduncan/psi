@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.turn]
+   [psi.agent-session.turn-execution-contract]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-attempts]
    [psi.agent-session.workflow-judge]
@@ -200,6 +201,38 @@
       (is (= "APPROVED" (:judge-output review-attempt)))
       (is (= "APPROVED" (:judge-event review-attempt)))
       (is (= "judge-r" (:judge-session-id review-attempt))))))
+
+(deftest actor-success-does-not-retain-execution-result-in-pending-state-test
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx linear-definition "run-no-pending-execution-result")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-no-pending-execution-result")
+        pending-snapshots* (atom [])]
+    (add-watch (:working-memory* wf-ctx) ::capture-pending-actor-result
+               (fn [_ _ _ new-state]
+                 (when-let [pending (:pending-actor-result new-state)]
+                   (swap! pending-snapshots* conj pending))))
+    (try
+      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        {:attempt {:attempt-id (:attempt-id opts)
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session {:session-id sid}}))
+                    psi.agent-session.turn-execution-contract/execute-actor-turn!
+                    (fn [_ctx _sid _prompt]
+                      {:status :ok
+                       :session-id "actor-session"
+                       :turn-outcome :turn.outcome/stop
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text "actor output"}]}
+                       :assistant-text "actor output"
+                       :execution-result {:execution-result/turn-id "turn-1"}})]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (finally
+        (remove-watch (:working-memory* wf-ctx) ::capture-pending-actor-result)))
+    (is (seq @pending-snapshots*))
+    (is (every? #(not (contains? % :execution-result)) @pending-snapshots*))))
 
 (deftest cancel-from-blocked-state-test
   (let [[ctx session-id] (create-session-context)
