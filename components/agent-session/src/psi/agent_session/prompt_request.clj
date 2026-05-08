@@ -83,43 +83,6 @@
       (system-prompt/filter-prompt-contributions (:prompt-component-selection session-data))
       ss/sorted-prompt-contributions))
 
-(defn- developer-prompt-section
-  [session-data]
-  (let [dev (:developer-prompt session-data)]
-    (when-not (str/blank? dev)
-      dev)))
-
-(defn effective-system-prompt
-  "Assemble the effective provider-visible system prompt from canonical
-   request-preparation inputs."
-  [session-data]
-  (turn-request/effective-system-prompt
-   {:turn/base-system-prompt         (:base-system-prompt session-data)
-    :turn/developer-prompt           (developer-prompt-section session-data)
-    :turn/sorted-prompt-contributions (sorted-contributions session-data)}))
-
-(defn build-provider-conversation
-  "Project canonical session prompt state, messages, and tools into the
-   provider-facing conversation shape used for prompt execution."
-  [session-data messages]
-  (turn-request/build-provider-conversation
-   {:turn/base-system-prompt          (:base-system-prompt session-data)
-    :turn/developer-prompt            (developer-prompt-section session-data)
-    :turn/sorted-prompt-contributions (sorted-contributions session-data)
-    :turn/cache-breakpoints           (set (or (:cache-breakpoints session-data) #{}))
-    :turn/filtered-tool-defs          (system-prompt/filter-tool-defs (:tool-defs session-data)
-                                                                      (:prompt-component-selection session-data))
-    :turn/messages                    messages}))
-
-(defn build-prompt-layers
-  "Return prompt layers for the prepared request."
-  [session-data _opts]
-  (turn-request/build-prompt-layers
-   {:turn/base-system-prompt          (:base-system-prompt session-data)
-    :turn/developer-prompt            (:developer-prompt session-data)
-    :turn/developer-prompt-source     (:developer-prompt-source session-data)
-    :turn/sorted-prompt-contributions (sorted-contributions session-data)}))
-
 (defn- input-expansion
   [session-data text commands]
   (let [loaded-skills (:skills session-data)

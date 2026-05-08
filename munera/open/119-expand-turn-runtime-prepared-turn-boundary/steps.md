@@ -23,3 +23,11 @@
 - [x] Add focused lower component tests for request assembly and recording classification/decision shaping
 - [x] Verify higher consuming path remains green (`prompt_lifecycle_test`)
 - [x] Record compatibility-wrapper status and boundary notes in `implementation.md`
+- [x] Update `implementation.md` so its narrative matches the final landed shape after shim removal
+  - [x] remove or rewrite the stale note that says `psi.agent-session.conversation` remains as a compatibility wrapper
+- [x] Resolve the remaining `psi.agent-session.prompt-request` helper-wrapper surface
+  - [x] decide whether `effective-system-prompt`, `build-provider-conversation`, and `build-prompt-layers` are intentional boundary API or temporary compatibility/test helpers
+  - [x] if temporary, re-point the remaining tests/callers to `psi.turn-runtime.request` or remove the wrappers
+  - [x] if intentional, document that explicitly in `implementation.md` so the final ownership story is unambiguous
+- [x] Re-run focused verification after the follow-up cleanup/documentation pass
+  - [x] `bb clojure:test:unit --focus psi.turn-runtime.request-test --focus psi.turn-runtime.recording-test --focus psi.agent-session.prompt-lifecycle-test`

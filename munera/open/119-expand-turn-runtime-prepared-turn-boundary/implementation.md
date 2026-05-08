@@ -271,7 +271,7 @@ What landed
 
 Important boundary note
 - extracting lower request assembly also required moving the pure message->provider conversation translator below the boundary because `turn-runtime` cannot depend upward on `agent-session` without recreating the component-cycle problem fixed in task `103`
-- `psi.agent-session.conversation` now remains only as a compatibility wrapper delegating to `psi.turn-runtime.conversation`
+- `psi.agent-session.conversation` was temporarily retained as a compatibility wrapper during migration, then removed once callers/tests were rewired to `psi.turn-runtime.conversation`
 
 Compatibility / remaining wrappers
 - `psi.agent-session.prompt-request` and `psi.agent-session.prompt-recording` still exist as compatibility/session-normalization wrappers for current callers
@@ -293,3 +293,21 @@ Verification
 - focused unit verification green:
   - `bb clojure:test:unit --focus psi.turn-runtime.core-test`
   - `bb clojure:test:unit --focus psi.turn-runtime.request-test --focus psi.turn-runtime.recording-test --focus psi.agent-session.prompt-lifecycle-test`
+
+2026-05-08 review notes
+
+Actionable follow-ups found in review
+- task artifact drift: this file still contains one stale sentence saying `psi.agent-session.conversation` remains as a compatibility wrapper, but that namespace file has since been deleted; update the earlier narrative so the implementation notes match the final landed shape
+- residual passthrough helper surface remains in `psi.agent-session.prompt-request`:
+  - `effective-system-prompt`
+  - `build-provider-conversation`
+  - `build-prompt-layers`
+  these now delegate downward to `psi.turn-runtime.request` and appear to be used only by tests, not production code; they should be treated as temporary compatibility/test helpers rather than settled production boundary
+
+Review conclusion
+- core architectural intent is satisfied: lower prepared-turn ownership is in `psi.turn-runtime.*`, `psi.turn` is thinner, and the true passthrough shims called out during implementation have been removed
+- the review follow-up items have now been executed too:
+  - stale implementation narrative about `psi.agent-session.conversation` was corrected
+  - the remaining `prompt-request` helper wrappers (`effective-system-prompt`, `build-provider-conversation`, `build-prompt-layers`) were removed
+  - remaining tests were repointed to `psi.turn-runtime.request` using normalized lower-input data instead of session-state wrapper helpers
+- the final ownership story is now crisp enough to close `119`

@@ -5,8 +5,9 @@
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.prompt-request :as prompt-request]
+   [psi.prompt-assets.system-prompt :as system-prompt]
    [psi.turn-runtime.core]
+   [psi.turn-runtime.request :as turn-request]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))
@@ -18,6 +19,12 @@
    (let [ctx (session/create-context (test-support/safe-context-opts opts))
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
+
+(defn- normalized-sorted-contributions
+  [session-data]
+  (-> (:prompt-contributions session-data)
+      (system-prompt/filter-prompt-contributions (:prompt-component-selection session-data))
+      ss/sorted-prompt-contributions))
 
 (deftest create-child-session-creates-runtime-and-no-parent-statechart-test
   (testing "create-child-session allocates child runtime handles without changing the parent phase"
@@ -161,7 +168,10 @@
                      (:prompt-contributions child-sd))))
         (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
         (is (str/includes? (:base-system-prompt child-sd) "lambda-compiler"))
-        (is (str/includes? (prompt-request/effective-system-prompt child-sd)
+        (is (str/includes? (turn-request/effective-system-prompt
+                            {:turn/base-system-prompt (:base-system-prompt child-sd)
+                             :turn/developer-prompt (:developer-prompt child-sd)
+                             :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)})
                            "tool: /work-on"))))))
 
 (deftest create-child-session-selection-filters-extension-contributions-coherently-test
@@ -172,8 +182,14 @@
                     :prompt-contributions [{:id "a" :ext-path "/ext/a" :content "A" :enabled true}
                                            {:id "b" :ext-path "/ext/b" :content "B" :enabled true}]
                     :tool-defs []}]
-      (is (str/includes? (prompt-request/effective-system-prompt child-sd) "A"))
-      (is (not (str/includes? (prompt-request/effective-system-prompt child-sd) "B"))))))
+      (is (str/includes? (turn-request/effective-system-prompt
+                          {:turn/base-system-prompt (:base-system-prompt child-sd)
+                           :turn/developer-prompt (:developer-prompt child-sd)
+                           :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)}) "A"))
+      (is (not (str/includes? (turn-request/effective-system-prompt
+                               {:turn/base-system-prompt (:base-system-prompt child-sd)
+                                :turn/developer-prompt (:developer-prompt child-sd)
+                                :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)}) "B"))))))
 
 (deftest create-child-session-nil-selection-rebuilds-full-base-prompt-without-parent-build-opts-test
   (testing "child nil selection rebuilds from structured state without requiring parent build opts"
@@ -235,7 +251,13 @@
                                             {:name "bash" :description "Bash"}]
                                 :prompt-component-selection selection}))
             child-sd  (ss/get-session-data-in ctx child-id)
-            provider  (prompt-request/build-provider-conversation child-sd [])]
+            provider  (turn-request/build-provider-conversation
+                       {:turn/base-system-prompt (:base-system-prompt child-sd)
+                        :turn/developer-prompt (:developer-prompt child-sd)
+                        :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)
+                        :turn/cache-breakpoints (set (or (:cache-breakpoints child-sd) #{}))
+                        :turn/filtered-tool-defs (:tool-defs child-sd)
+                        :turn/messages []})]
         (is (= (assoc selection
                       :include-preamble? false
                       :include-context-files? false
