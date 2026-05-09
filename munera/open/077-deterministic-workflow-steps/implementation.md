@@ -99,5 +99,12 @@
   - live normalization follow-up now points at `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
   - proof references now point at `step_materialization_test.clj` and `source_resolution_test.clj` rather than removed `workflow_step_prep*` names
 - 2026-05-09 — Code-shaper review found no new actionable feedback beyond the already-recorded normalization seam.
-  - the only live task-077 shaping follow-up remains canonical session-output normalization in `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
-  - related watch-item: `workflow_file_authoring_session.clj` still has an older `[:outputs :text]` compatibility branch, but that should only become executable follow-up work if it remains live after the runtime source-resolution normalization is completed
+  - the only then-live task-077 shaping follow-up was canonical session-output normalization in `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
+  - related watch-item: `workflow_file_authoring_session.clj` still had an older `[:outputs :text]` compatibility branch, to be re-evaluated after the runtime source-resolution normalization
+- 2026-05-09 — Follow-up execution completed the remaining session-output normalization seams recorded in `steps.md`.
+  - removed the local `:outputs :text` compatibility branch from `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
+  - updated focused source-resolution proofs so canonical `:final-llm-reply` and legacy stored `:outputs :text` are no longer treated as the same logical output surface
+  - focused verification green for the runtime normalization slice: `18 tests, 38 assertions, 0 failures, 0 errors`; lint clean
+  - re-evaluated the older current-authoring compatibility branch in `components/agent-session/src/psi/agent_session/workflow_file_authoring_session.clj` and rewrote it to compile step-source `:projection :text` onto the canonical `:outputs :final-llm-reply` surface
+  - added focused authoring proof coverage in `workflow_file_authoring_session_test.clj`
+  - focused verification green for the authoring/compiler slice: `14 tests, 110 assertions, 0 failures, 0 errors`; lint clean
