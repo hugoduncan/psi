@@ -81,3 +81,7 @@
 - [ ] Remove legacy `[:outputs :text]` lookups from `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj` when resolving canonical IR session refs
   - tighten `resolve-binding-ref` / `resolve-accepted-result-path` so `:output :final-llm-reply` and `:yield :text` read through the canonical session output surface instead of a local legacy translation branch
   - keep workflow-runtime source resolution aligned with `workflow_runtime/ir.clj`, `workflow_current_ir_compiler.clj`, and `doc/workflow-ir.md`
+  - add or reshape focused proof coverage in `source_resolution_test.clj` so canonical `:final-llm-reply` / `:yield :text` resolution is still explicit after removing the compatibility lookup branch
+- [ ] After the workflow-runtime source-resolution cleanup lands, re-evaluate the older `[:outputs :text]` compatibility branch in `components/agent-session/src/psi/agent_session/workflow_file_authoring_session.clj`
+  - remove or rewrite that compatibility branch only if it is still live and no longer justified by the post-normalization authored-grammar boundary
+  - avoid duplicating the runtime normalization fix; this is a follow-on seam check, not an automatic second cleanup

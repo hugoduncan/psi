@@ -98,3 +98,6 @@
 - 2026-05-09 — Follow-up execution from task 127 review updated this task's stale `workflow_step_prep` / `step_prep_*` references to the current authoritative workflow-runtime owners.
   - live normalization follow-up now points at `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
   - proof references now point at `step_materialization_test.clj` and `source_resolution_test.clj` rather than removed `workflow_step_prep*` names
+- 2026-05-09 — Code-shaper review found no new actionable feedback beyond the already-recorded normalization seam.
+  - the only live task-077 shaping follow-up remains canonical session-output normalization in `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
+  - related watch-item: `workflow_file_authoring_session.clj` still has an older `[:outputs :text]` compatibility branch, but that should only become executable follow-up work if it remains live after the runtime source-resolution normalization is completed
