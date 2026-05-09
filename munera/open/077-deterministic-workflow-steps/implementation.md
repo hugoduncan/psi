@@ -59,31 +59,32 @@
   - aligned focused proof in `workflow_current_ir_compiler_test.clj`
   - this removes an avoidable naming drift between target grammar docs and normalized IR for session outputs
 - 2026-05-04 — Code-shaper review found one new actionable consistency seam.
-  - `workflow_step_prep.clj` still resolves canonical IR session refs through legacy accepted-result `[:outputs :text]` lookups for `:output :final-llm-reply` and `:yield :text`
+  - the workflow-runtime source-resolution seam still resolves canonical IR session refs through legacy accepted-result `[:outputs :text]` lookups for `:output :final-llm-reply` and `:yield :text`
+  - current authoritative owner of that seam is `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`, specifically `resolve-binding-ref` / `resolve-accepted-result-path`
   - this duplicates session-output translation outside the IR/output-normalization boundary and risks future drift against the now-canonical `:final-llm-reply` surface
-  - follow-up should centralize or normalize session output lookup so runtime step prep consumes the same canonical output naming as the IR/compiler/docs
+  - follow-up should centralize or normalize session output lookup so workflow-runtime source resolution consumes the same canonical output naming as the IR/compiler/docs
 - 2026-05-04 — Code-shaper pass found no new actionable feedback.
   - re-read task design/plan/steps plus the referenced IR/docs/runtime code
-  - confirmed the only current shaping seam is the already-recorded unchecked `workflow_step_prep.clj` follow-up
+  - confirmed the only current shaping seam is the already-recorded unchecked workflow-runtime source-resolution follow-up
   - no additional simplicity/consistency/robustness issues were identified beyond the existing note and step
 - 2026-05-04 — Code-shaper re-review found no new actionable feedback.
   - re-read task artifacts plus the referenced IR/compiler/runtime source and focused tests
-  - confirmed the previously recorded unchecked `workflow_step_prep.clj` normalization follow-up still covers the only live consistency seam from this shaping thread
-  - current `workflow_step_prep_test.clj` and `workflow_source_resolution.clj` already exercise canonical `:output :final-llm-reply` and `:yield :text` resolution, so no additional simplicity/consistency/robustness steps were added
+  - confirmed the previously recorded unchecked workflow-runtime source-resolution normalization follow-up still covers the only live consistency seam from this shaping thread
+  - current `step_materialization_test.clj` and `workflow_source_resolution.clj` / `source_resolution_test.clj` already exercise canonical `:output :final-llm-reply` and `:yield :text` resolution, so no additional simplicity/consistency/robustness steps were added
 - 2026-05-04 — Code-shaper pass found no new actionable feedback.
-  - re-read task artifacts plus referenced `workflow_step_prep.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `workflow_source_resolution.clj`, `workflow_file_authoring_session.clj`, and focused tests/docs
-  - confirmed the only live shaping seam remains the already-recorded unchecked `workflow_step_prep.clj` follow-up; no new simplicity/consistency/robustness issues were identified without duplicating prior notes
+  - re-read task artifacts plus referenced `workflow_runtime/source_resolution.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `workflow_source_resolution.clj`, `workflow_file_authoring_session.clj`, and focused tests/docs
+  - confirmed the only live shaping seam remains the already-recorded unchecked workflow-runtime source-resolution follow-up; no new simplicity/consistency/robustness issues were identified without duplicating prior notes
 - 2026-05-04 — Code-shaper pass found no new actionable feedback.
   - re-read the task artifacts and the referenced runtime/docs/tests with the prior implementation-review/code-shaper notes in mind
-  - confirmed the only still-live shaping seam is the already-recorded unchecked `workflow_step_prep.clj` output-normalization follow-up; no additional simplicity/consistency/robustness issues were found without duplicating existing notes or steps
+  - confirmed the only still-live shaping seam is the already-recorded unchecked workflow-runtime source-resolution output-normalization follow-up; no additional simplicity/consistency/robustness issues were found without duplicating existing notes or steps
   - spot-checking the broader focused workflow test surface showed an already-known unrelated regression in `workflow_statechart_runtime_test.clj` preload expectations, not a new task-077-specific shaping issue
 - 2026-05-04 — Code-shaper re-review found no new actionable feedback.
   - re-read `design.md`, `plan.md`, `steps.md`, and `implementation.md` plus the referenced IR/compiler/runtime/docs/tests to avoid duplicating already-recorded or already-addressed feedback
-  - confirmed the only live shaping item remains the existing unchecked `workflow_step_prep.clj` canonical session-output normalization follow-up already present in `steps.md`
+  - confirmed the only live shaping item remains the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already present in `steps.md`
   - spot-check verification still only surfaced the previously noted unrelated preload-duplication regression in `workflow_statechart_runtime_test.clj`, so no new task-077 simplicity/consistency/robustness follow-ups were added
 - 2026-05-04 — Code-shaper pass found no new actionable feedback.
   - re-read the task artifacts and referenced runtime/compiler/docs/tests with prior implementation-review and follow-up notes in mind
-  - confirmed the only live shaping seam is still the existing unchecked `workflow_step_prep.clj` canonical session-output normalization follow-up already recorded in `steps.md`
+  - confirmed the only live shaping seam is still the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already recorded in `steps.md`
   - no additional simplicity/consistency/robustness issues were found without duplicating existing notes or unchecked steps
 - 2026-05-04 — Code-shaper re-review found no new actionable feedback.
   - re-read `design.md`, `plan.md`, `steps.md`, and `implementation.md` plus the referenced `workflow_runtime/source_resolution.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `source_resolution_test.clj`, and `doc/workflow-ir.md`
