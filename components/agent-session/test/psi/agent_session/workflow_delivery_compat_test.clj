@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-loader-delivery-test
+(ns psi.agent-session.workflow-delivery-compat-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow.delivery :as delivery]))

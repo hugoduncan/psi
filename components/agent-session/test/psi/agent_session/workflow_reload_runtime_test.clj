@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-loader-reload-runtime-test
+(ns psi.agent-session.workflow-reload-runtime-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
@@ -35,7 +35,7 @@
 (defn- init-built-in-workflow! [ctx session-id]
   (wl/init-built-in! ctx session-id))
 
-(defn- workflow-loader-state []
+(defn- workflow-state []
   @@#'wl/state)
 
 (defn- first-step-tools
@@ -50,8 +50,8 @@
         (get-in first-step [:capability-policy :tools])
         (some-> first-step :tools set))))
 
-(deftest ^:integration reload-code-preserves-workflow-loader-state-across-namespace-reload
-  (testing "namespace reload preserves workflow-loader state so delegate-reload remains usable"
+(deftest ^:integration reload-code-preserves-built-in-workflow-state-across-namespace-reload
+  (testing "namespace reload preserves built-in workflow state so delegate-reload remains usable"
     (let [[ctx session-id] (create-session-context)
           qctx            (query/create-query-context)
           q               (fn [query-v]
@@ -67,7 +67,7 @@
           _               (init-built-in-workflow! ctx session-id)
           before-cmds     (command-registry/command-names-in reg)
           before-tools    (tool-registry/tool-names-in reg)
-          before-defs     (keys (:loaded-definitions (workflow-loader-state)))
+          before-defs     (keys (:loaded-definitions (workflow-state)))
           result          ((:execute tool) {"action" "reload-code"
                                             "namespaces" ["psi.agent-session.workflow.text"
                                                           "psi.agent-session.workflow.delivery"
@@ -77,7 +77,7 @@
           parsed          (read-string (:content result))
           after-cmds      (command-registry/command-names-in reg)
           after-tools     (tool-registry/tool-names-in reg)
-          after-defs      (:loaded-definitions (workflow-loader-state))
+          after-defs      (:loaded-definitions (workflow-state))
           complexity-def  (get after-defs "complexity-reduction-pr")]
       (is (false? (:is-error result)))
       (is (= :ok (:psi-tool/overall-status parsed)))

@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-loader-manifest-activation-test
+(ns psi.agent-session.workflow-manifest-activation-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is]]
@@ -18,7 +18,7 @@
     (.mkdirs (.getParentFile f))
     f))
 
-(deftest workflow-loader-minimal-manifest-entry-no-longer-expands-to-installed-extension
+(deftest built-in-workflow-minimal-manifest-entry-no-longer-expands-to-installed-extension
   (let [cwd  (test-support/temp-cwd)
         home (tmp-dir)]
     (with-redefs [installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))

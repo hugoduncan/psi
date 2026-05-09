@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-loader-tui-repro-test
+(ns psi.agent-session.workflow-tui-repro-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
@@ -21,13 +21,13 @@
         sd  (session/new-session-in! ctx nil {})]
     [ctx (:session-id sd)]))
 
-(defn- register-workflow-loader! [ctx session-id]
+(defn- init-built-in-workflow! [ctx session-id]
   (wl/init-built-in! ctx session-id))
 
 (deftest direct-workflow-execution-vs-extension-mutation-test
   (testing "direct workflow execution and extension mutation execution both avoid the keyword contains? failure on lambda-build in TUI-like context"
     (let [[ctx session-id] (create-context+session)]
-      (register-workflow-loader! ctx session-id)
+      (init-built-in-workflow! ctx session-id)
       (try
         (let [parsed (workflow-file-loader/scan-directory "/Users/duncan/projects/hugoduncan/psi/workflow-extensions/.psi/workflows")
               {:keys [definitions errors]} (workflow-file-compiler/compile-workflow-files parsed)
@@ -53,9 +53,9 @@
           (context/shutdown-context! ctx))))))
 
 (deftest delegate-lambda-build-from-tui-like-session-test
-  (testing "workflow-loader /delegate can launch lambda-build from a real TUI-like session context without keyword contains? failure"
+  (testing "built-in workflow /delegate can launch lambda-build from a real TUI-like session context without keyword contains? failure"
     (let [[ctx session-id] (create-context+session)]
-      (register-workflow-loader! ctx session-id)
+      (init-built-in-workflow! ctx session-id)
       (try
         (let [cmd (get-in @(:state (:extension-registry ctx))
                           [:extensions wl/built-in-workflow-path :commands "delegate"])

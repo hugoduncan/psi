@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-loader-async-path-test
+(ns psi.agent-session.workflow-async-path-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
@@ -19,7 +19,7 @@
         sd  (session/new-session-in! ctx nil {})]
     [ctx (:session-id sd)]))
 
-(defn- register-workflow-loader! [ctx session-id]
+(defn- init-built-in-workflow! [ctx session-id]
   (wl/init-built-in! ctx session-id))
 
 (defn- load-all-workflow-definitions! [ctx]
@@ -31,9 +31,9 @@
       (swap! (:state* ctx) assoc-in [:workflows :definitions (:definition-id d)] d))))
 
 (deftest delegate-async-path-avoids-keyword-contains-error-test
-  (testing "workflow-loader delegate async path no longer produces the keyword contains? failure in a TUI-like context"
+  (testing "built-in workflow delegate async path no longer produces the keyword contains? failure in a TUI-like context"
     (let [[ctx session-id] (create-context+session)]
-      (register-workflow-loader! ctx session-id)
+      (init-built-in-workflow! ctx session-id)
       (try
         (load-all-workflow-definitions! ctx)
         (let [cmd (get-in @(:state (:extension-registry ctx))
@@ -57,7 +57,7 @@
 (deftest direct-run-creation-does-not-have-keyword-contains-error-test
   (testing "creating the same run directly in the same context does not itself inject the keyword contains? failure"
     (let [[ctx session-id] (create-context+session)]
-      (register-workflow-loader! ctx session-id)
+      (init-built-in-workflow! ctx session-id)
       (try
         (load-all-workflow-definitions! ctx)
         (let [[st run-id _] (workflow-runtime/create-run @(:state* ctx)
