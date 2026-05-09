@@ -130,4 +130,4 @@
 
 (defn terminal-configuration?
   [configuration]
-  (boolean (some configuration [:completed :failed :cancelled])))
+  (boolean (some #{:completed :failed :cancelled} configuration)))

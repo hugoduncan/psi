@@ -151,3 +151,37 @@ Verification after decomposition:
 - lint green:
   - `clojure -M:lint --lint components/workflow-runtime/src components/workflow-runtime/test components/agent-session/src components/agent-session/test`
   - result: `0 errors, 0 warnings`
+
+2026-05-09 test review
+
+Terse review note:
+- test-shape follow-up: runtime decomposition tests still have duplicated/unclear proof ownership; narrow or remove overlapping façade-vs-lower tests and strengthen lifecycle-owned behavior proofs
+
+Findings:
+- shape concern: `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/public_test.clj` still overlaps with lower split role tests, especially `create-working-memory-test`, so proof ownership is not yet crisp after the decomposition
+- shape concern: `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime_test.clj` still exists alongside the split directory tests, which keeps the old pre-split proof surface around and makes test topology harder to read
+- coverage concern: `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/lifecycle_test.clj` only proves delegation of `send-and-drain!`; it does not yet prove the owned lifecycle behaviors that matter most: queued-event draining order, terminal tail discard, and overflow safety-bound failure
+
+2026-05-09 test follow-up execution
+
+Addressed the reviewed test-shape items:
+- removed overlapping runtime test surfaces:
+  - deleted `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime_test.clj`
+  - deleted `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/public_test.clj`
+- kept lower role-focused proofs with one clearer owner each:
+  - `state_test.clj` for working-memory/state helpers
+  - `step_execution_test.clj` for invoke result wrapping
+  - `lifecycle_test.clj` for lifecycle/drain behavior
+- repointed the remaining agent-session deterministic operation wrapper proof to the narrower extracted owner `psi.workflow-runtime.statechart-runtime.step-execution`
+- strengthened `lifecycle_test.clj` with owned-behavior proofs for:
+  - queued-event draining order
+  - terminal tail discard
+  - `max-drain-events` overflow failure
+- retained higher execution façade coverage in `psi.agent-session.workflow-execution-resume-test`
+
+Verification after test reshaping:
+- added `components/workflow-runtime/test` to top-level Kaocha `tests.edn` unit/integration `:test-paths`
+- added `components/workflow-runtime/src` to top-level Kaocha `tests.edn` unit/integration `:source-paths`
+- focused lifecycle/runtime/adapter checks green through the top-level Kaocha config:
+  - `clojure -M:test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.workflow-runtime.statechart-runtime.lifecycle-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.agent-session.deterministic-operation-registry-test`
+  - result: `8 tests, 26 assertions, 0 failures`
