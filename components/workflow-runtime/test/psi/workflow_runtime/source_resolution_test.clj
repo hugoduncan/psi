@@ -93,7 +93,30 @@
              (or (:workflow-original callee-run)
                  (workflow-source-resolution/resolve-source-ref callee-run :workflow-original)))))))
 
-(deftest resolve-delegate-yielded-text-from-canonical-terminal-envelope-test
+(defn- run-with-report-accepted-result
+  [run-id accepted-result]
+  (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                       {:definition {:steps [{:name "report"
+                                                                              :type :session
+                                                                              :contributions [{:type :template
+                                                                                               :text "x"
+                                                                                               :vars {}}]}]}
+                                                        :run-id run-id
+                                                        :workflow-input {}})
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "report" :accepted-result]
+                         accepted-result)]
+    (workflow-runtime/workflow-run-in state3 run-id)))
+
+(defn- run-with-transcript
+  [run-id transcript]
+  (run-with-report-accepted-result
+   run-id
+   {:outcome :ok
+    :outputs {:transcript transcript
+              :final-llm-reply "Done"}}))
+
+(defn- run-with-delegate-step-accepted-result
+  [run-id accepted-result]
   (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
                                                        {:definition {:steps [{:name "delegate-step"
                                                                               :type :delegate
@@ -108,15 +131,20 @@
                                                                                                :vars {"delegated" {:from {:step "delegate-step" :yield :text}}
                                                                                                       "issue" {:from {:step "delegate-step" :output :handoff}
                                                                                                                :path [:issue_number]}}}]}]}
-                                                        :run-id "run-delegate-yield"
+                                                        :run-id run-id
                                                         :workflow-input {}})
         state3 (assoc-in state2 [:workflows :runs run-id :step-runs "delegate-step" :accepted-result]
-                         {:outcome :ok
-                          :outputs {:final-llm-reply "delegated terminal text"
-                                    :handoff {:issue_number "42"}
-                                    :result {:outcome :ok}}
-                          :diagnostics {:delegate {:target "builder"}}})
-        run (workflow-runtime/workflow-run-in state3 run-id)]
+                         accepted-result)]
+    (workflow-runtime/workflow-run-in state3 run-id)))
+
+(deftest resolve-delegate-yielded-text-from-canonical-terminal-envelope-test
+  (let [run (run-with-delegate-step-accepted-result
+             "run-delegate-yield"
+             {:outcome :ok
+              :outputs {:final-llm-reply "delegated terminal text"
+                        :handoff {:issue_number "42"}
+                        :result {:outcome :ok}}
+              :diagnostics {:delegate {:target "builder"}}})]
     (is (= "delegated terminal text"
            (workflow-source-resolution/resolve-source-ref run {:step "delegate-step" :yield :text})))
     (is (= {:issue_number "42"}
@@ -136,22 +164,6 @@
           {:from {:step "discover" :output :data}
            :path [:issues]
            :projection :full})))))
-
-(defn- run-with-transcript
-  [run-id transcript]
-  (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
-                                                       {:definition {:steps [{:name "report"
-                                                                              :type :session
-                                                                              :contributions [{:type :template
-                                                                                               :text "x"
-                                                                                               :vars {}}]}]}
-                                                        :run-id run-id
-                                                        :workflow-input {}})
-        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "report" :accepted-result]
-                         {:outcome :ok
-                          :outputs {:transcript transcript
-                                    :final-llm-reply "Done"}})]
-    (workflow-runtime/workflow-run-in state3 run-id)))
 
 (deftest apply-source-spec-projects-transcript-surfaces-test
   (let [transcript [{:role "user" :content "Request"}
@@ -187,21 +199,12 @@
              :projection {:type :tail :turns 1 :tool-output false}})))))
 
 (deftest resolve-binding-ref-distinguishes-canonical-session-output-from-legacy-storage-key-test
-  (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
-                                                       {:definition {:steps [{:name "report"
-                                                                              :type :session
-                                                                              :session {:contributions [{:type :template
-                                                                                                         :text "x"
-                                                                                                         :vars {}}]}
-                                                                              :outputs {:final-llm-reply {:source :session/final-llm-reply}}
-                                                                              :yields {:type :text :text :final-llm-reply}}]}
-                                                        :run-id "run-binding-ref"
-                                                        :workflow-input {}})
-        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "report" :accepted-result]
-                         {:outcome :ok
-                          :outputs {:final-llm-reply "Done"
-                                    :text "legacy text"}})
-        run (workflow-runtime/workflow-run-in state3 run-id)]
+  (let [run (run-with-report-accepted-result
+             "run-binding-ref"
+             {:outcome :ok
+              :outputs {:transcript nil
+                        :final-llm-reply "Done"
+                        :text "legacy text"}})]
     (is (= "Done"
            (workflow-source-resolution/resolve-binding-ref
             run

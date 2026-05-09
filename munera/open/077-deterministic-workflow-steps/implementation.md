@@ -115,4 +115,8 @@
   - `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` was a namespace-only duplicate of the lower `workflow-runtime` proof surface
   - authoritative proof ownership now remains solely in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
 - 2026-05-09 — Test-shaper review found no correctness issue and no topology problem in the remaining authoritative proof surfaces.
-  - one optional shaping follow-up remains: reduce repeated workflow-run construction ceremony in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj` with a tiny local helper if that can be done without hiding arrangement intent
+  - one optional shaping follow-up remained: reduce repeated workflow-run construction ceremony in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj` with a tiny local helper if that could be done without hiding arrangement intent
+- 2026-05-09 — Follow-up execution completed the remaining optional test-shaping cleanup.
+  - reduced repeated workflow-run construction ceremony in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
+  - introduced tiny local helpers for report accepted-result setup and delegate-step accepted-result setup without changing proof ownership or behavioral assertions
+  - focused verification green: `8 tests, 15 assertions, 0 failures, 0 errors`; lint clean

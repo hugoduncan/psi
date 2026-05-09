@@ -89,6 +89,6 @@
 - [x] Re-evaluate the duplicated source-resolution regression proof across `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj` and `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj`
   - kept the authoritative proof with the lower workflow-runtime owner
   - removed the higher duplicate because it only mirrored lower behavior and added no boundary-specific signal
-- [ ] Re-evaluate repeated run-construction setup in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
-  - extract a tiny local helper only if it reduces ceremony without hiding arrange/act/assert intent
-  - keep proof ownership and behavioral focus unchanged; this is a readability cleanup, not a coverage expansion
+- [x] Re-evaluate repeated run-construction setup in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
+  - extracted tiny local helpers for report accepted-result and delegate-step accepted-result setup
+  - kept proof ownership and behavioral focus unchanged; this remained a readability cleanup rather than a coverage expansion
