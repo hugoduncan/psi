@@ -81,6 +81,23 @@
                                 :projection :full}]}}
     :expected-re #"value preload supports only `:projection :text`"}])
 
+(deftest compile-step-input-bindings-step-source-text-projection-compiles-to-canonical-session-output-surface-test
+  (testing "step-source text projection compiles to the canonical final-llm-reply surface"
+    (let [{:keys [ok error]}
+          (authoring-session/compile-step-input-bindings
+           {:session {:input {:from {:step "discover"
+                                     :kind :accepted-result}
+                              :projection :text}}}
+           nil
+           default-step-name->step-ref
+           1)]
+      (is (nil? error))
+      (is (= {:input {:source :step-output
+                      :path ["step-1-discover" :outputs :final-llm-reply]}
+              :original {:source :workflow-input
+                         :path [:original]}}
+             ok)))))
+
 (deftest compile-step-input-bindings-validation-table-test
   (testing "malformed projection/source validation remains clear across representative cases"
     (doseq [{:keys [label step expected-re]} input-validation-cases]

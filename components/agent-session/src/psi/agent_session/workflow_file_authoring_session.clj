@@ -94,7 +94,7 @@
     (case source
       :workflow-input [:input]
       :workflow-original []
-      [:outputs :text])
+      [:outputs :final-llm-reply])
 
     (= projection :full)
     []
