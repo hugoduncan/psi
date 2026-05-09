@@ -86,11 +86,14 @@
   - confirmed the only live shaping seam is still the existing unchecked `workflow_step_prep.clj` canonical session-output normalization follow-up already recorded in `steps.md`
   - no additional simplicity/consistency/robustness issues were found without duplicating existing notes or unchecked steps
 - 2026-05-04 — Code-shaper re-review found no new actionable feedback.
-  - re-read `design.md`, `plan.md`, `steps.md`, and `implementation.md` plus the referenced `workflow_step_prep.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `workflow_source_resolution.clj`, `workflow_step_prep_test.clj`, and `doc/workflow-ir.md`
-  - confirmed the only live shaping item remains the existing unchecked `workflow_step_prep.clj` canonical session-output normalization follow-up already present in `steps.md`
+  - re-read `design.md`, `plan.md`, `steps.md`, and `implementation.md` plus the referenced `workflow_runtime/source_resolution.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `source_resolution_test.clj`, and `doc/workflow-ir.md`
+  - confirmed the only live shaping item remains the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already present in `steps.md`
   - no new simplicity/consistency/robustness issues were identified without duplicating already-recorded notes or follow-up steps
 - 2026-05-05 — Code-shaper pass found no new actionable feedback.
   - re-read the task artifacts plus referenced runtime/compiler/docs/tests, including the already-recorded implementation-review and shaping results, to avoid duplicating closed or still-open feedback
-  - confirmed the only live shaping seam is still the existing unchecked `workflow_step_prep.clj` canonical session-output normalization follow-up already recorded in `steps.md`
+  - confirmed the only live shaping seam is still the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already recorded in `steps.md`
   - spot-checking current code also surfaced an older compatibility branch in `workflow_file_authoring_session.clj` (`[:outputs :text]` for legacy session binding defaults), but that belongs to the retired current-authoring seam rather than a new task-077-specific shaping item, so no duplicate follow-up was added here
   - no new simplicity/consistency/robustness issues were identified beyond the existing unchecked step
+- 2026-05-09 — Follow-up execution from task 127 review updated this task's stale `workflow_step_prep` / `step_prep_*` references to the current authoritative workflow-runtime owners.
+  - live normalization follow-up now points at `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
+  - proof references now point at `step_materialization_test.clj` and `source_resolution_test.clj` rather than removed `workflow_step_prep*` names
