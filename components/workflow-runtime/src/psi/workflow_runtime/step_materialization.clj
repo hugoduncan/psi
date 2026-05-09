@@ -15,10 +15,6 @@
 
 (def binding-source-value workflow-source-resolution/resolve-binding-ref)
 
-(defn- render-template-contribution
-  [workflow-run contribution]
-  (workflow-source-resolution/render-template-contribution workflow-run contribution))
-
 (defn materialize-step-inputs
   [workflow-run step-id]
   (let [step-def (effective-step-def workflow-run step-id)
@@ -64,7 +60,7 @@
     :source (contribution-value->messages
              (workflow-source-resolution/apply-source-spec workflow-run contribution))
     :template [(text-message
-                (render-template-contribution workflow-run contribution))]
+                (workflow-source-resolution/render-template-contribution workflow-run contribution))]
     []))
 
 (defn materialize-step-session-conversation

@@ -66,6 +66,7 @@ Final public vars:
 Residual ambiguity / follow-up notes:
 - `effective-step-def` is duplicated privately in both new owners. That duplication is intentional for now: it avoids introducing a third helper owner for a tiny lookup and keeps each namespace locally comprehensible.
 - review follow-up resolved the earlier public-surface question by making `render-template-contribution` private after code search confirmed there was no external consumer of the step-materialization alias.
+- code-shaper follow-up then inlined the now-private wrapper entirely because it added no meaningful local seam once the public-surface question was resolved.
 
 Verification:
 - initial split verification:
@@ -77,8 +78,11 @@ Verification:
   - `render-template-contribution` made private in `psi.workflow-runtime.step-materialization`
   - `clj-kondo --lint components/workflow-runtime/src/psi/workflow_runtime/step_materialization.clj components/workflow-runtime/src/psi/workflow_runtime/step_session_config.clj components/workflow-runtime/test/psi/workflow_runtime/step_materialization_test.clj components/workflow-runtime/test/psi/workflow_runtime/step_session_config_test.clj components/workflow-runtime/test/psi/workflow_runtime/ir_runtime_adoption_test.clj components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/psi_tool_workflow.clj components/agent-session/src/psi/agent_session/workflow_execution.clj components/agent-session/test/psi/agent_session/test_support.clj` → clean (`0 errors, 0 warnings`)
   - `clojure -M:test --focus psi.workflow-runtime.step-materialization-test --focus psi.workflow-runtime.step-session-config-test --focus psi.workflow-runtime.ir-runtime-adoption-test` → green (`11 tests, 36 assertions, 0 failures`)
+- code-shaper follow-up verification:
+  - inlined the private `render-template-contribution` wrapper in `psi.workflow-runtime.step-materialization`
 
 2026-05-07 review note
 - review pass: core role split is good and direct-consumer rewiring matches the design
 - resolved follow-up 1: removed the duplicate lower-level `agent-session` materialization proof file so authoritative helper proofs live under `workflow-runtime`
 - resolved follow-up 2: made `psi.workflow-runtime.step-materialization/render-template-contribution` private after code search confirmed there was no external consumer of the step-materialization alias
+- code-shaper note: implementation is now simple, consistent, and locally comprehensible; the last optional micro-cleanup was completed by inlining the former private `render-template-contribution` wrapper in `step-materialization`
