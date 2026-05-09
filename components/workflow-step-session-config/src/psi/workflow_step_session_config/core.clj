@@ -29,39 +29,41 @@
 
     :else nil))
 
+(defn- placeholder-skill
+  [skill-name]
+  {:name skill-name
+   :description ""
+   :file-path ""
+   :base-dir ""
+   :source :project
+   :disable-model-invocation false})
+
 (defn- resolve-step-skills
-  [ctx parent-session-id skill-config]
-  (let [session-skills (vec (or (:skills (execution-adapter/get-session-data ctx parent-session-id)) []))]
-    (when (some? skill-config)
-      (mapv (fn [skill]
-              (cond
-                (map? skill) skill
-                (string? skill)
-                (or (execution-adapter/find-skill ctx session-skills skill)
-                    {:name skill
-                     :description ""
-                     :file-path ""
-                     :base-dir ""
-                     :source :project
-                     :disable-model-invocation false})
-                :else skill))
-            skill-config))))
+  [ctx session-skills skill-config]
+  (when (some? skill-config)
+    (mapv (fn [skill]
+            (cond
+              (map? skill) skill
+              (string? skill)
+              (or (execution-adapter/find-skill ctx session-skills skill)
+                  (placeholder-skill skill))
+              :else skill))
+          skill-config)))
 
 (defn- resolve-step-tool-defs
-  [ctx parent-session-id tool-config]
-  (let [session-tool-defs (vec (or (:tool-defs (execution-adapter/get-session-data ctx parent-session-id)) []))]
-    (when (some? tool-config)
-      (mapv (fn [tool]
-              (cond
-                (map? tool)
-                (tool-defs/normalize-tool-def tool)
+  [session-tool-defs tool-config]
+  (when (some? tool-config)
+    (mapv (fn [tool]
+            (cond
+              (map? tool)
+              (tool-defs/normalize-tool-def tool)
 
-                (string? tool)
-                (or (some #(when (= tool (:name %)) %) session-tool-defs)
-                    (tool-defs/normalize-tool-def {:name tool}))
+              (string? tool)
+              (or (some #(when (= tool (:name %)) %) session-tool-defs)
+                  (tool-defs/normalize-tool-def {:name tool}))
 
-                :else tool))
-            tool-config))))
+              :else tool))
+          tool-config)))
 
 (defn- step-meta-for
   [ctx workflow-run step-id]
@@ -96,16 +98,19 @@
                               (some->> (execution-adapter/list-context-sessions ctx) first :session-id))
         parent-session (execution-adapter/get-session-data ctx parent-session-id)
         parent-session-model (:model parent-session)
+        parent-session-prompt-mode (:prompt-mode parent-session)
+        session-skills (vec (or (:skills parent-session) []))
+        session-tool-defs (vec (or (:tool-defs parent-session) []))
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))]
     {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
-     :prompt-mode (:prompt-mode parent-session)
-     :tool-defs (resolve-step-tool-defs ctx parent-session-id (:tools session-spec))
+     :prompt-mode parent-session-prompt-mode
+     :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
      :thinking-level (or (:thinking-level session-spec)
                          (:thinking-level base-meta)
                          :off)
-     :skills (resolve-step-skills ctx parent-session-id (:skills session-spec))
+     :skills (resolve-step-skills ctx session-skills (:skills session-spec))
      :model (or (:model session-spec)
                 (:model base-meta)
                 parent-session-model)

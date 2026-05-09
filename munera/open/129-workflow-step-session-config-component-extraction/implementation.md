@@ -62,3 +62,7 @@ Boundary verification notes
 Verification
 - focused tests: `5 tests, 20 assertions, 0 failures`
 - focused lint: `0 errors, 0 warnings`
+
+Review notes
+- code-shaper review (terse): extraction is clean, the new owner is small and coherent, and the rewiring avoided unnecessary compatibility seams; follow-up completed: parent-session data is now read once and reused across tool/skill/model/prompt-mode derivation, and the fallback placeholder skill map now lives behind a tiny private helper for better scanability
+- verification after code-shaper follow-up: focused tests remain `5 tests, 20 assertions, 0 failures` and focused lint remains clean

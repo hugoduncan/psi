@@ -13,3 +13,7 @@
 - [x] Verify `step-materialization` remains a separate role owner and was not accidentally merged into this extraction
 - [x] Verify workflow behavior remains unchanged
 - [x] Record the final boundary, name, public surface, dependency/input shape, responsibility inventory, transitional namespace status, and any residual dependency debt in `implementation.md`
+- [x] Refactor `psi.workflow-step-session-config.core/resolve-step-session-config` so parent-session data is read once and reused across tool/skill/model/prompt-mode derivation helpers
+- [x] Preserve current behavior and output contracts while reducing repeated `execution-adapter/get-session-data` reads across private helpers
+- [x] Extract the fallback placeholder skill map in `resolve-step-skills` into a tiny private helper to improve local scanability without broadening the component surface
+- [x] Verify the refactor preserves current focused workflow step session-config tests and lint cleanliness
