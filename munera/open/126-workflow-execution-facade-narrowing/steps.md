@@ -32,3 +32,5 @@
   - extracted façade-specific support into `components/agent-session/test/psi/agent_session/workflow_execution_test_support.clj`
 - [x] Re-evaluate whether `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` should remain as a minimal umbrella loader or be removed once direct focused namespace invocation is the clearer project convention
   - removed the umbrella loader and rely on direct focused lower-owner namespaces
+- [x] If duplicated support fixture evolution between `components/agent-session/test/psi/agent_session/workflow_execution_test_support.clj` and `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test_support.clj` starts to create churn, extract the truly shared subset while preserving boundary-specific fixtures locally
+  - extracted shared workflow fixture subset into `bases/main/test/psi/test_support/workflow_test_fixtures.clj` and kept boundary-specific fixtures in the component-local support namespaces

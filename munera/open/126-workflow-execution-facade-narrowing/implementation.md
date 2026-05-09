@@ -50,3 +50,11 @@ Test follow-up:
 - extracted façade-specific workflow execution fixtures into `components/agent-session/test/psi/agent_session/workflow_execution_test_support.clj`
 - removed the minimal `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` umbrella loader and rely on direct focused lower-owner namespaces instead
 - re-verified the affected test namespaces through top-level Kaocha focused runs
+
+Test-shaper review note:
+- tests are now well-shaped by boundary and concern; the remaining watch-item was duplicated support-fixture evolution between `workflow_execution_test_support.clj` and `step_prep_test_support.clj`
+
+Test-shaper follow-up:
+- extracted the truly shared workflow test fixture subset into `bases/main/test/psi/test_support/workflow_test_fixtures.clj`
+- rewired both boundary-specific support namespaces to depend on the shared subset while keeping boundary-specific fixtures local
+- re-verified the affected test namespaces through top-level Kaocha focused runs
