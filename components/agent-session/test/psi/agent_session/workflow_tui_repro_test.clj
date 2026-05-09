@@ -3,37 +3,21 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.context :as context]
-   [psi.agent-session.core :as session]
    [psi.agent-session.extensions.runtime-eql :as runtime-eql]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.workflow.core :as wl]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.workflow-loader.core :as workflow-file-loader]
-   [psi.workflow-loader.compiler :as workflow-file-compiler]
+   [psi.agent-session.workflow-test-support :as workflow-test-support]
+   [psi.command-registry.registry :as command-registry]
    [psi.workflow-runtime.core :as workflow-runtime]))
-
-(defn- create-context+session []
-  (let [ctx (session/create-context {:persist? false
-                                     :mutations mutations/all-mutations
-                                     :ui-type :tui
-                                     :worktree-path "/Users/duncan/projects/hugoduncan/psi/workflow-extensions"})
-        sd  (session/new-session-in! ctx nil {})]
-    [ctx (:session-id sd)]))
-
-(defn- init-built-in-workflow! [ctx session-id]
-  ((requiring-resolve 'psi.agent-session.workflow.bootstrap/init-built-in!) ctx session-id))
 
 (deftest direct-workflow-execution-vs-extension-mutation-test
   (testing "direct workflow execution and extension mutation execution both avoid the keyword contains? failure on lambda-build in TUI-like context"
-    (let [[ctx session-id] (create-context+session)]
-      (init-built-in-workflow! ctx session-id)
+    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
+      (workflow-test-support/init-built-in-workflow! ctx session-id)
       (try
-        (let [parsed (workflow-file-loader/scan-directory "/Users/duncan/projects/hugoduncan/psi/workflow-extensions/.psi/workflows")
-              {:keys [definitions errors]} (workflow-file-compiler/compile-workflow-files parsed)
-              _ (is (empty? errors))
-              _ (doseq [d definitions]
-                  (swap! (:state* ctx) assoc-in [:workflows :definitions (:definition-id d)] d))
+        (let [_ (workflow-test-support/load-all-workflow-definitions! ctx)
               [st direct-run-id _] (workflow-runtime/create-run @(:state* ctx)
                                                                 {:definition-id "lambda-build"
                                                                  :run-id "lambda-build-direct"
@@ -54,11 +38,10 @@
 
 (deftest delegate-lambda-build-from-tui-like-session-test
   (testing "built-in workflow /delegate can launch lambda-build from a real TUI-like session context without keyword contains? failure"
-    (let [[ctx session-id] (create-context+session)]
-      (init-built-in-workflow! ctx session-id)
+    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
+      (workflow-test-support/init-built-in-workflow! ctx session-id)
       (try
-        (let [cmd (get-in @(:state (:extension-registry ctx))
-                          [:extensions wl/built-in-workflow-path :commands "delegate"])
+        (let [cmd (command-registry/get-command-in (:extension-registry ctx) "delegate")
               _ (is (some? cmd))
               result ((:handler cmd) "lambda-build simple code is good code")]
           (is (string? result))

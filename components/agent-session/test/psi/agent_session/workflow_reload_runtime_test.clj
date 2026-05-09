@@ -51,8 +51,8 @@
         (get-in first-step [:capability-policy :tools])
         (some-> first-step :tools set))))
 
-(deftest ^:integration reload-code-preserves-built-in-workflow-state-across-namespace-reload
-  (testing "namespace reload preserves built-in workflow state so delegate-reload remains usable"
+(deftest ^:integration reload-code-preserves-built-in-workflow-command-and-tool-surfaces-test
+  (testing "namespace reload preserves built-in workflow command and tool surfaces so delegate-reload remains usable"
     (let [[ctx session-id] (create-session-context)
           qctx            (query/create-query-context)
           q               (fn [query-v]
@@ -77,15 +77,41 @@
                                                           "extensions.work-on"]})
           parsed          (read-string (:content result))
           after-cmds      (command-registry/command-names-in reg)
-          after-tools     (tool-registry/tool-names-in reg)
-          after-defs      (:loaded-definitions (workflow-state))
-          complexity-def  (get after-defs "complexity-reduction-pr")]
+          after-tools     (tool-registry/tool-names-in reg)]
       (is (false? (:is-error result)))
       (is (= :ok (:psi-tool/overall-status parsed)))
       (is (some #{"delegate-reload"} before-cmds))
       (is (some #{"delegate-reload"} after-cmds))
       (is (some #{"work-on"} before-tools))
       (is (some #{"work-on"} after-tools))
+      (is (some #{"complexity-reduction-pr"} before-defs)))))
+
+(deftest ^:integration reload-code-preserves-built-in-workflow-loaded-definition-state-test
+  (testing "namespace reload preserves built-in workflow loaded definition state"
+    (let [[ctx session-id] (create-session-context)
+          qctx            (query/create-query-context)
+          q               (fn [query-v]
+                            (query/query-in qctx
+                                            {:psi/agent-session-ctx ctx
+                                             :psi.agent-session/session-id session-id}
+                                            query-v))
+          tool            (tools/make-psi-tool q {:ctx ctx :session-id session-id})
+          _               (session/register-resolvers-in! qctx false)
+          _               (session/register-mutations-in! qctx mutations/all-mutations true)
+          _               (load-extension-path! ctx session-id "extensions/work-on/src/extensions/work_on.clj")
+          _               (init-built-in-workflow! ctx session-id)
+          before-defs     (keys (:loaded-definitions (workflow-state)))
+          result          ((:execute tool) {"action" "reload-code"
+                                            "namespaces" ["psi.agent-session.workflow.text"
+                                                          "psi.agent-session.workflow.delivery"
+                                                          "psi.agent-session.workflow.orchestration"
+                                                          "psi.agent-session.workflow.core"
+                                                          "extensions.work-on"]})
+          parsed          (read-string (:content result))
+          after-defs      (:loaded-definitions (workflow-state))
+          complexity-def  (get after-defs "complexity-reduction-pr")]
+      (is (false? (:is-error result)))
+      (is (= :ok (:psi-tool/overall-status parsed)))
       (is (some #{"complexity-reduction-pr"} before-defs))
       (is (some? complexity-def))
       (is (= #{"bash" "read" "edit" "write" "work-on"}
