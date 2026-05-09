@@ -119,7 +119,9 @@ Behavior verification
   - `clojure -M:lint --lint components/workflow-step-materialization components/workflow-runtime components/agent-session deps.edn tests.edn` → green (`0 errors, 0 warnings`)
 
 Review note
-- terse review: boundary extraction is correct and rewiring is complete, but copied effective-step and output/yield semantics should be reconverged behind one lower shared owner to avoid drift
+- terse implementation review: boundary extraction is correct and rewiring is complete, but copied effective-step and output/yield semantics should be reconverged behind one lower shared owner to avoid drift
+- terse code-shaper review: no new actionable shaping feedback; the `core` / `source-resolution` / `semantics` split is simple, consistent, and robust
+- terse test review: proof coverage is strong for the extraction, with only a few small edge-case gaps worth follow-up
 
 Follow-up execution — shared semantics reconvergence
 - chose the smallest lower shared owner inside the extracted component itself: `psi.workflow-step-materialization.semantics`
@@ -136,6 +138,15 @@ Follow-up execution — shared semantics reconvergence
   - `clojure -M:test --focus psi.workflow-step-materialization.core-test --focus psi.workflow-step-materialization.source-resolution-test --focus psi.workflow-runtime.ir-runtime-adoption-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.workflow-runtime.statechart-runtime.public-test --focus psi.agent-session.workflow-execution-test` → green (`24 tests, 79 assertions, 0 failures`)
 - lint remained green:
   - `clojure -M:lint --lint components/workflow-step-materialization components/workflow-runtime components/agent-session deps.edn tests.edn` → green (`0 errors, 0 warnings`)
+
+Test follow-up execution
+- added focused proof in `core_test.clj` that `materialize-step-session-conversation` returns `nil` for a session step with empty `:session :contributions`
+- added focused proof in `source_resolution_test.clj` that `apply-source-spec` returns `nil` for a missing nested `:path`
+- added focused proof in `source_resolution_test.clj` for the `resolve-binding-ref` `:workflow-runtime` branch
+- re-ran the focused edge-case proof set:
+  - `clojure -M:test --focus psi.workflow-step-materialization.core-test --focus psi.workflow-step-materialization.source-resolution-test` → green (`17 tests, 30 assertions, 0 failures`)
+- lint remained green for the touched test files:
+  - `clojure -M:lint --lint components/workflow-step-materialization/test/psi/workflow_step_materialization/core_test.clj components/workflow-step-materialization/test/psi/workflow_step_materialization/source_resolution_test.clj` → green (`0 errors, 0 warnings`)
 
 Residual debt
 - the review-found duplication inside the extracted component has been eliminated by `psi.workflow-step-materialization.semantics`

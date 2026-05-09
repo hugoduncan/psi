@@ -179,3 +179,17 @@
       (is (= {:preloaded-messages messages
               :prompt ""}
              (workflow-step-materialization/split-step-session-conversation messages))))))
+
+(deftest materialize-step-session-conversation-with-no-contributions-test
+  (testing "steps without session contributions materialize to nil"
+    (let [definition {:steps [{:name "empty-session"
+                               :type :session
+                               :session {:contributions []}}]}
+          [state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                         {:definition definition
+                                                          :run-id "run-empty-session"
+                                                          :workflow-input {}})
+          run (workflow-runtime/workflow-run-in state2 run-id)]
+      (is (nil? (workflow-step-materialization/materialize-step-session-conversation
+                 run
+                 "empty-session"))))))

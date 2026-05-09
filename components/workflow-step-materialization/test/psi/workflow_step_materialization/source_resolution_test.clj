@@ -198,6 +198,13 @@
             {:from {:step "report" :output :transcript}
              :projection {:type :tail :turns 1 :tool-output false}})))))
 
+(deftest apply-source-spec-missing-nested-path-returns-nil-test
+  (let [run (workflow-run-with-results)]
+    (is (nil? (workflow-source-resolution/apply-source-spec
+               run
+               {:from {:step "discover" :output :data}
+                :path [:issues 99 :missing]})))))
+
 (deftest resolve-binding-ref-distinguishes-canonical-session-output-from-legacy-storage-key-test
   (let [run (run-with-report-accepted-result
              "run-binding-ref"
@@ -215,3 +222,21 @@
             run
             {:source :step-output
              :path ["report" :outputs :text]})))))
+
+(deftest resolve-binding-ref-workflow-runtime-branch-test
+  (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                       {:definition {:steps [{:name "noop"
+                                                                              :type :session
+                                                                              :contributions [{:type :template
+                                                                                               :text "x"
+                                                                                               :vars {}}]}]}
+                                                        :run-id "run-workflow-runtime-ref"
+                                                        :workflow-input {}})
+        state3 (assoc-in state2 [:workflows :runs run-id :status] :blocked)
+        run (workflow-runtime/workflow-run-in state3 run-id)]
+    (is (= {:run-id "run-workflow-runtime-ref"
+            :status :blocked}
+           {:run-id (workflow-source-resolution/resolve-binding-ref run {:source :workflow-runtime
+                                                                         :path [:run-id]})
+            :status (workflow-source-resolution/resolve-binding-ref run {:source :workflow-runtime
+                                                                         :path [:status]})}))))

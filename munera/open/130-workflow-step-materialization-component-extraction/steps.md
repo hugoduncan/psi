@@ -25,3 +25,8 @@
 - [x] Rewire `psi.workflow-step-materialization.source-resolution` to consume the shared owner instead of maintaining local copies
 - [x] Re-run focused workflow step materialization, runtime adoption, and runtime execution proofs after the reconvergence
 - [x] Record the final shared-owner choice and the eliminated duplication in `implementation.md`
+- [x] Add a focused proof that `materialize-step-session-conversation` returns nil/empty for a step with no `:session :contributions`
+- [x] Add a focused proof that `apply-source-spec` returns nil for a missing nested `:path`
+- [x] Add a focused proof for the `resolve-binding-ref` `:workflow-runtime` branch
+- [x] Re-run the focused workflow step materialization/source-resolution proof set after adding the edge-case tests
+- [x] Record the test follow-up completion in `implementation.md`
