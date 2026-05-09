@@ -1,11 +1,11 @@
-(ns psi.workflow-runtime.step-session-config-test
+(ns psi.workflow-step-session-config.core-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter]
    [psi.workflow-runtime.step-test-support :as support]
-   [psi.workflow-runtime.step-session-config :as workflow-step-session-config]
+   [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (deftest resolve-step-session-config-single-step-test

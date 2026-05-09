@@ -21,7 +21,7 @@
    [psi.skill-registry.registry]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.step-materialization]
-   [psi.workflow-runtime.step-session-config]
+   [psi.workflow-step-session-config.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as session-sc]
    [psi.agent-session.tool-plan :as tool-plan]
@@ -197,7 +197,7 @@
                        :get-session-data-fn          ss/get-session-data-in
                        :list-context-sessions-fn     ss/list-context-sessions-in
                        :find-skill-fn                psi.skill-registry.registry/find-skill
-                       :resolve-workflow-step-session-config-fn psi.workflow-runtime.step-session-config/resolve-step-session-config
+                       :resolve-workflow-step-session-config-fn psi.workflow-step-session-config.core/resolve-step-session-config
                        :materialize-workflow-step-session-conversation-fn psi.workflow-runtime.step-materialization/materialize-step-session-conversation
                        :split-workflow-step-session-conversation-fn psi.workflow-runtime.step-materialization/split-step-session-conversation
                        :execute-workflow-judge-fn    psi.agent-session.workflow-judge/execute-judge!

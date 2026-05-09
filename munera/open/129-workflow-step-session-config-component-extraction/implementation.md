@@ -1,14 +1,64 @@
 2026-05-07
 
-Task created from post-123/124/125/126/127/128 workflow boundary review.
+Implemented extraction of authoritative workflow child-session config policy into a dedicated lower component.
 
-Creation rationale:
-- the main workflow-runtime extraction is now complete enough that the remaining question is conceptual fit, not whether workflow code can move below public entrypoints at all
-- `psi.workflow-runtime.step-session-config` is coherent lower-owned code, but its role is workflow child-session configuration policy rather than workflow runtime execution semantics
-- `127` already split session-config shaping from step materialization, which makes this extraction a natural next boundary cleanup
-- the intent is to give workflow child-session config policy a more precise lower component home without moving it back upward into `agent-session`
+Final component / namespace name
+- chosen component: `workflow-step-session-config`
+- chosen namespace family: `psi.workflow-step-session-config.*`
+- canonical public owner: `psi.workflow-step-session-config.core`
+- naming decision: kept the narrower `workflow-step-session-config` name because the final ownership surface remains specifically about workflow step child-session configuration rather than a broader workflow session policy domain
+- rejected alternative: `workflow-session-config` would imply a wider ownership surface than this task actually moved
 
-Initial boundary notes:
-- likely owned responsibilities: parent-session selection/fallback, tool/skill/model inheritance, workflow meta merge rules, and child-session developer-prompt/config derivation
-- expected dependency crossing to preserve: `psi.workflow-runtime.execution-adapter`
-- expected non-goal: do not bundle `step-materialization` into this extraction unless implementation proves the design is wrong
+Responsibility inventory now owned by the extracted component
+- parent session selection / fallback for workflow child-session config derivation
+- tool inheritance / normalization for workflow child sessions
+- skill inheritance / lookup fallback for workflow child sessions
+- model inheritance for workflow child sessions
+- prompt-mode inheritance from the parent session
+- thinking-level derivation / inheritance
+- prompt-component-selection derivation
+- workflow meta merge rules used during child-session config shaping
+- child-session developer-prompt / config derivation
+- canonical public behavior surface `resolve-step-session-config`
+
+Responsibility inventory intentionally left outside the extracted component
+- workflow runtime stepping / progression / statechart execution remains in `psi.workflow-runtime.*`
+- workflow step conversation materialization remains in `psi.workflow-runtime.step-materialization`
+- public workflow execution entrypoints remain under higher `agent-session` surfaces
+- session creation / prompt execution remains outside this lower component
+
+Public surface
+- public var: `resolve-step-session-config`
+  - remains public because it is the canonical lower behavior surface consumed by workflow runtime callers through ctx wiring
+- all helper functions remain private
+- externally consumed output contract was preserved unchanged
+
+Dependency / input shape
+- preserved the current direct dependency pattern
+- the extracted component still reads workflow registry state directly via `psi.workflow-registry.registry/workflow-definition` for referenced definition metadata lookup
+- the extracted component still depends on the named runtime → session seam `psi.workflow-runtime.execution-adapter` for session-bound reads
+- this task did not redesign the input shape because preserving behavior and boundary clarity was the smaller change
+
+Transitional namespace status
+- `psi.workflow-runtime.step-session-config` was removed entirely after rewiring
+- no forwarding seam remains
+- all production/test consumers were rewired directly to `psi.workflow-step-session-config.core`
+
+Residual dependency status
+- no workflow-runtime namespace directly depends on the removed `psi.workflow-runtime.step-session-config` namespace
+- workflow runtime continues to consume step session-config derivation through ctx callback wiring rather than a direct namespace dependency
+
+Consumer rewires completed
+- `psi.agent-session.context` now wires `:resolve-workflow-step-session-config-fn` from `psi.workflow-step-session-config.core/resolve-step-session-config`
+- `psi.agent-session.psi-tool-workflow` compatibility backfill now resolves the new namespace
+- `psi.agent-session.test-support` now wires the new owner
+- lower proofs moved from `components/workflow-runtime/test/.../step_session_config_test.clj` to `components/workflow-step-session-config/test/.../core_test.clj`
+
+Boundary verification notes
+- `step-materialization` remained separate and unchanged in role
+- execution adapter seam remained the canonical higher/session-bound crossing
+- no workflow behavior redesign was introduced during extraction
+
+Verification
+- focused tests: `5 tests, 20 assertions, 0 failures`
+- focused lint: `0 errors, 0 warnings`

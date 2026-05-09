@@ -4,7 +4,7 @@
    This slice owns the session-facing execution entrypoints that run and resume
    canonical workflow runs through the Phase A statechart runtime. Lower step
    preparation helpers live under `psi.workflow-runtime.step-materialization`
-   and `psi.workflow-runtime.step-session-config`."
+   and `psi.workflow-step-session-config.core`."
   (:require
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.statechart-runtime :as workflow-statechart-runtime]))

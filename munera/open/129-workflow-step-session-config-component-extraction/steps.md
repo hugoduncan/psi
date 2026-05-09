@@ -1,15 +1,15 @@
-- [ ] Review `psi.workflow-runtime.step-session-config` and confirm the exact workflow child-session config responsibilities it owns today
-- [ ] Confirm the extracted responsibility inventory includes model inheritance, prompt-mode derivation, thinking-level derivation, and prompt-component-selection derivation
-- [ ] Choose the narrowest accurate extracted component/component-name for that responsibility surface and record the naming decision
-- [ ] Create the dedicated lower component for workflow step child-session config ownership
-- [ ] Move the authoritative session-config shaping logic with minimal semantic change
-- [ ] Preserve `resolve-step-session-config` as the canonical public behavior surface and preserve its externally consumed output contract unless a justified replacement is recorded
-- [ ] Rewire workflow runtime callers to the new owner
-- [ ] Rewire `agent-session.context` callback assembly/backfill to the new owner
-- [ ] Rewire `psi_tool_workflow` compatibility/backfill paths to the new owner
-- [ ] Rewire affected tests so lower session-config behavior proofs point at the new component
-- [ ] Verify the workflow execution adapter seam remains the canonical higher/session-bound crossing for this logic
-- [ ] Decide whether `psi.workflow-runtime.step-session-config` disappears entirely or remains only as a tiny temporary forwarding seam, and record justification if retained
-- [ ] Verify `step-materialization` remains a separate role owner and was not accidentally merged into this extraction
-- [ ] Verify workflow behavior remains unchanged
-- [ ] Record the final boundary, name, public surface, dependency/input shape, responsibility inventory, transitional namespace status, and any residual dependency debt in `implementation.md`
+- [x] Review `psi.workflow-runtime.step-session-config` and confirm the exact workflow child-session config responsibilities it owns today
+- [x] Confirm the extracted responsibility inventory includes model inheritance, prompt-mode derivation, thinking-level derivation, and prompt-component-selection derivation
+- [x] Choose the narrowest accurate extracted component/component-name for that responsibility surface and record the naming decision
+- [x] Create the dedicated lower component for workflow step child-session config ownership
+- [x] Move the authoritative session-config shaping logic with minimal semantic change
+- [x] Preserve `resolve-step-session-config` as the canonical public behavior surface and preserve its externally consumed output contract unless a justified replacement is recorded
+- [x] Rewire workflow runtime callers to the new owner
+- [x] Rewire `agent-session.context` callback assembly/backfill to the new owner
+- [x] Rewire `psi_tool_workflow` compatibility/backfill paths to the new owner
+- [x] Rewire affected tests so lower session-config behavior proofs point at the new component
+- [x] Verify the workflow execution adapter seam remains the canonical higher/session-bound crossing for this logic
+- [x] Decide whether `psi.workflow-runtime.step-session-config` disappears entirely or remains only as a tiny temporary forwarding seam, and record justification if retained
+- [x] Verify `step-materialization` remains a separate role owner and was not accidentally merged into this extraction
+- [x] Verify workflow behavior remains unchanged
+- [x] Record the final boundary, name, public surface, dependency/input shape, responsibility inventory, transitional namespace status, and any residual dependency debt in `implementation.md`

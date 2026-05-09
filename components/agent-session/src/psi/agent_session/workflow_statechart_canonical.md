@@ -12,7 +12,7 @@ This note documents the authoritative workflow execution/compiler/runtime surfac
   - Canonical statechart-driven runtime boundary.
 - `psi.workflow-runtime.step-materialization`
   - Canonical shared step input materialization, child-session conversation materialization, and prompt derivation helpers.
-- `psi.workflow-runtime.step-session-config`
+- `psi.workflow-step-session-config.core`
   - Canonical child-session config shaping helpers for workflow steps.
 - `psi.workflow-runtime.progression-recording`
   - Canonical record/update substrate used by the Phase A runtime.

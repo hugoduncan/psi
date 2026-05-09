@@ -88,7 +88,7 @@
 (defn- find-required-fn
   [ns-name var-name]
   (or (some-> (find-var (symbol ns-name var-name)) var-get)
-      (throw (ex-info "Required workflow runtime function is not loaded"
+      (throw (ex-info "Required workflow function is not loaded"
                       {:phase :workflow
                        :ns ns-name
                        :var var-name}))))
@@ -137,7 +137,7 @@
 
     (not (contains? ctx :resolve-workflow-step-session-config-fn))
     (assoc :resolve-workflow-step-session-config-fn
-           (find-required-fn "psi.workflow-runtime.step-session-config" "resolve-step-session-config"))
+           (find-required-fn "psi.workflow-step-session-config.core" "resolve-step-session-config"))
 
     (not (contains? ctx :materialize-workflow-step-session-conversation-fn))
     (assoc :materialize-workflow-step-session-conversation-fn

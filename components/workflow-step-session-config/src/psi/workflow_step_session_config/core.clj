@@ -1,4 +1,4 @@
-(ns psi.workflow-runtime.step-session-config
+(ns psi.workflow-step-session-config.core
   "Workflow child-session config shaping helpers for canonical deterministic
    workflow runs.
 

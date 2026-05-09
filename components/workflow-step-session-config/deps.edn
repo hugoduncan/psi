@@ -1,0 +1,4 @@
+{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        psi/tool-registry {:local/root "../tool-registry"}
+        psi/workflow-registry {:local/root "../workflow-registry"}
+        psi/workflow-runtime {:local/root "../workflow-runtime"}}}

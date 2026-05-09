@@ -31,7 +31,7 @@
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
-   [psi.workflow-runtime.step-session-config :as workflow-step-session-config]
+   [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.skill-registry.registry :as skill-registry]
    [psi.agent-session.workflows :as wf]
    [psi.history.resolvers :as history-resolvers]
