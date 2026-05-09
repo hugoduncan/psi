@@ -58,9 +58,7 @@
    "extensions/mementum/src"
    "extensions/munera/src"
    "extensions/plan-state-learning/src"
-   "extensions/work-on/src"
-   "extensions/workflow-display/src"
-   "extensions/workflow-loader/src"])
+   "extensions/work-on/src"])
 
 ;; ---------------------------------------------------------------------------
 ;; Tasks

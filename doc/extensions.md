@@ -118,7 +118,6 @@ Built-in workflow surface:
     - `:session :preload` adds child-session context without implicitly changing `$INPUT` or `$ORIGINAL`
     - `{:step "..." ...}` references author-facing step `:name`, not delegated workflow names
 
-Legacy compatibility namespaces remain under `extensions/workflow-loader/*`, but they are compatibility shims rather than canonical owners.
 
 ### `extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj` (`extensions.mcp-tasks-run`)
 
@@ -212,7 +211,7 @@ Purpose: automate munera + mementum working-memory follow-up after non-PSL commi
   - may suggest memory/knowledge follow-ups, but does not auto-write gated mementum artifacts
 - Workflow public data:
   - exposes `:psl/display` using the shared workflow display-map convention
-  - `/psl` lists active PSL workflows by rendering that public display through `extensions.workflow-display/text-lines`
+  - `/psl` lists active PSL workflows by rendering that public display through `psi.agent-session.workflow.display/text-lines`
 - Widget: shows `⊕ PSL` header with workflow display lines for active runs
 
 ### `extensions/hello-ext/src/extensions/hello_ext.clj` (`extensions.hello-ext`)

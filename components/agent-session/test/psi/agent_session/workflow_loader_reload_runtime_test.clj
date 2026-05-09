@@ -2,7 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [extensions.workflow-loader :as wl]
+   [psi.agent-session.workflow.core :as wl]
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
    [psi.command-registry.registry :as command-registry]
@@ -31,6 +31,9 @@
     (when-let [error (:error result)]
       (throw (ex-info error {:path path})))
     result))
+
+(defn- init-built-in-workflow! [ctx session-id]
+  (wl/init-built-in! ctx session-id))
 
 (defn- workflow-loader-state []
   @@#'wl/state)
@@ -61,15 +64,15 @@
           _               (session/register-resolvers-in! qctx false)
           _               (session/register-mutations-in! qctx mutations/all-mutations true)
           _               (load-extension-path! ctx session-id "extensions/work-on/src/extensions/work_on.clj")
-          _               (load-extension-path! ctx session-id "extensions/workflow-loader/src/extensions/workflow_loader.clj")
+          _               (init-built-in-workflow! ctx session-id)
           before-cmds     (command-registry/command-names-in reg)
           before-tools    (tool-registry/tool-names-in reg)
           before-defs     (keys (:loaded-definitions (workflow-loader-state)))
           result          ((:execute tool) {"action" "reload-code"
-                                            "namespaces" ["extensions.workflow-loader.text"
-                                                          "extensions.workflow-loader.delivery"
-                                                          "extensions.workflow-loader.orchestration"
-                                                          "extensions.workflow-loader"
+                                            "namespaces" ["psi.agent-session.workflow.text"
+                                                          "psi.agent-session.workflow.delivery"
+                                                          "psi.agent-session.workflow.orchestration"
+                                                          "psi.agent-session.workflow.core"
                                                           "extensions.work-on"]})
           parsed          (read-string (:content result))
           after-cmds      (command-registry/command-names-in reg)

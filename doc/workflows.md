@@ -363,6 +363,6 @@ Good first workflow authoring loop:
 - [`doc/workflow-grammar.md`](workflow-grammar.md) — workflow grammar
 - [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md) — workflow concepts and semantics
 - [`doc/extensions-install.md`](extensions-install.md) — install optional extensions that may complement workflow usage
-- [`doc/extensions.md`](extensions.md) — extension/tool details for `workflow-loader`
+- [`doc/extensions.md`](extensions.md) — extension/tool details for workflow-adjacent extensions and shared workflow display conventions
 - [`doc/tui.md`](tui.md) — general in-session command usage
 - [`README.md`](../README.md) — top-level project overview

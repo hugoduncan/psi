@@ -12,7 +12,7 @@
 - [ ] Decide whether canonical workflow display/read-model helpers move into built-in core ownership or remain outside as truly optional residue; treat helpers that project canonical workflow state into stable built-in display/read-model forms as core-owned
 - [ ] Update capability-catalog, session-capability, and extension-install modeling so canonical workflow behavior is no longer represented as extension-originated, or record the exact residual exception
 - [ ] Decide whether any workflow-adjacent surface remains extension-owned; if so, record what it is and why it satisfies the optionality rubric rather than remaining canonical behavior
-- [ ] Delete `extensions/workflow-loader/` if direct rewiring is possible; otherwise leave only a tiny explicitly transitional façade with a recorded blocking reason
+- [x] Delete `extensions/workflow-loader/` if direct rewiring is possible; otherwise leave only a tiny explicitly transitional façade with a recorded blocking reason
 - [ ] Move `extensions/workflow-display` into built-in core ownership when it matches the canonical display/read-model rubric, or explicitly record why it remains outside core under the optionality rubric
 - [ ] Rehome or update affected tests so built-in workflow bootstrap/wiring is proved from the new core owner while lower workflow behavior proofs stay with the extracted components, and avoid leaving extension test namespaces as the primary proof surface for built-in workflow behavior
 - [ ] Verify canonical user-facing workflow behavior remains unchanged for must-preserve surfaces: `delegate`, `/delegate`, `.psi/workflows/` loading/reloading, registration/removal behavior after reload, session-switch reload behavior, and core workflow mutation/resolver/psi-tool surfaces

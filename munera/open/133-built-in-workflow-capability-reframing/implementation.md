@@ -27,14 +27,7 @@ Removed extension framing:
 
 Remaining outside built-in core:
 
-- `extensions/workflow-loader/*` remains only as a thin compatibility façade layer that delegates to the built-in core workflow owner
-- this façade preserves legacy namespace reload and legacy test/runtime loading paths while canonical ownership/bootstrap moved to built-in core
-
-Why the residue remains:
-
-- reload/runtime compatibility tests and legacy extension-path loading still exercise `extensions.workflow-loader*` namespace names directly
-- keeping the façade avoids broad same-task churn across reload/runtime compatibility surfaces while still removing canonical extension framing
-- the façade is not the canonical owner of workflow behavior; it only forwards to built-in core owners
+- no canonical workflow-owned extension package remains outside built-in core
 
 ## Built-in home for workflow framing
 
@@ -104,9 +97,8 @@ Incidental changes allowed by the task:
 
 `extensions/workflow-loader/` status:
 
-- remains as a thin compatibility façade only
+- deleted
 - canonical ownership/bootstrap moved to built-in core
-- façade exists to preserve direct legacy namespace loading and reload-code paths still referenced by compatibility/runtime tests
 
 `extensions/workflow-display/` status:
 
@@ -117,7 +109,6 @@ Why residue does not preserve old framing confusion:
 - runtime bootstrap no longer depends on manifest extension install of workflow-loader
 - built-in workflow is installed directly by core runtime assembly
 - lower and higher workflow owners now live under core components/namespaces
-- remaining extension namespaces are compatibility shims, not canonical owners
 
 ## Capability-model status
 
@@ -138,20 +129,17 @@ Explicit consequences:
 
 Residual exceptions kept in this task:
 
-- legacy compatibility namespaces under `extensions/workflow-loader/*` remain present
 - built-in workflow still reuses extension-registry/API registration machinery under built-in provenance id `built-in:workflow`
 
 Reason:
 
-- direct namespace reload proofs and extension-path compatibility tests still target those legacy namespaces and paths
-- removing them immediately would broaden the task into simultaneous compatibility-surface deletion and test-suite reauthoring well beyond the smallest reframing move
 - reusing extension-registry/API machinery keeps the built-in workflow surface aligned with existing command/tool/prompt registration paths while canonical provenance and bootstrap are now built-in rather than manifest-installed
 
 Why transitional rather than preferred end state:
 
 - canonical runtime bootstrap no longer loads workflow through manifest extension activation
 - canonical ownership already lives under built-in core owners
-- only compatibility entrypoints and shared registration machinery remain
+- only shared registration machinery remains
 
 ## Review note
 
