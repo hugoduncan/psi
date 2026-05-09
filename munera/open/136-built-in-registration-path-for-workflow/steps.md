@@ -1,0 +1,10 @@
+- [ ] Identify every built-in workflow use of extension-registry/API machinery
+- [ ] Decide the smallest built-in registration abstraction that can replace those uses
+- [ ] Move built-in workflow tool registration to the built-in path
+- [ ] Move built-in workflow command registration to the built-in path
+- [ ] Move built-in workflow prompt contribution registration to the built-in path
+- [ ] Move built-in workflow lifecycle hook registration to the built-in path
+- [ ] Remove `built-in:workflow` pseudo-extension registration if direct rewiring is possible; otherwise narrow and record the remaining compromise precisely
+- [ ] Update affected tests to prove built-in rather than pseudo-extension registration behavior
+- [ ] Update docs/implementation notes to reflect the new residual status
+- [ ] Verify preserved user-facing behavior for `delegate`, `/delegate`, `/delegate-reload`, reload behavior, and prompt contribution surfacing
