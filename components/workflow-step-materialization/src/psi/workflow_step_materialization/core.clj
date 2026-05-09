@@ -5,25 +5,14 @@
    step input materialization, child-session conversation materialization,
    and prompt derivation from materialized conversation."
   (:require
+   [psi.workflow-step-materialization.semantics :as semantics]
    [psi.workflow-step-materialization.source-resolution :as source-resolution]))
-
-(defn- effective-steps
-  [definition]
-  (or (some->> (get-in definition [:canonical-ir :steps])
-               (mapv (juxt :name identity))
-               (into {})
-               not-empty)
-      (:steps definition)))
-
-(defn- effective-step-def
-  [workflow-run step-id]
-  (get (effective-steps (:effective-definition workflow-run)) step-id))
 
 (def binding-source-value source-resolution/resolve-binding-ref)
 
 (defn materialize-step-inputs
   [workflow-run step-id]
-  (let [step-def (effective-step-def workflow-run step-id)
+  (let [step-def (semantics/effective-step-def workflow-run step-id)
         ir-template-vars (some->> (get-in step-def [:session :contributions])
                                   (filter #(= :template (:type %)))
                                   last
@@ -80,7 +69,7 @@
      user text messages via deterministic stringification
    - author order is preserved exactly across contributions"
   [workflow-run step-id]
-  (let [contributions (get-in (effective-step-def workflow-run step-id)
+  (let [contributions (get-in (semantics/effective-step-def workflow-run step-id)
                               [:session :contributions])]
     (some->> contributions
              (mapcat #(materialize-session-contribution workflow-run %))

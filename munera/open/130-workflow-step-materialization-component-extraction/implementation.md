@@ -118,6 +118,27 @@ Behavior verification
 - lint:
   - `clojure -M:lint --lint components/workflow-step-materialization components/workflow-runtime components/agent-session deps.edn tests.edn` → green (`0 errors, 0 warnings`)
 
+Review note
+- terse review: boundary extraction is correct and rewiring is complete, but copied effective-step and output/yield semantics should be reconverged behind one lower shared owner to avoid drift
+
+Follow-up execution — shared semantics reconvergence
+- chose the smallest lower shared owner inside the extracted component itself: `psi.workflow-step-materialization.semantics`
+- this owner now holds:
+  - canonical effective-step lookup
+  - canonical output-surface resolution
+  - canonical yield-field resolution
+  - projection application via `psi.workflow-judge/project-messages`
+- this avoided re-expanding `workflow-runtime` ownership while removing the copied semantics from both `psi.workflow-step-materialization.core` and `psi.workflow-step-materialization.source-resolution`
+- rewired:
+  - `psi.workflow-step-materialization.core` → `semantics/effective-step-def`
+  - `psi.workflow-step-materialization.source-resolution` → `semantics/effective-step-def`, `semantics/step-output-value`, `semantics/step-yield-field-value`, and `semantics/project-source-value`
+- focused reconvergence verification:
+  - `clojure -M:test --focus psi.workflow-step-materialization.core-test --focus psi.workflow-step-materialization.source-resolution-test --focus psi.workflow-runtime.ir-runtime-adoption-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.workflow-runtime.statechart-runtime.public-test --focus psi.agent-session.workflow-execution-test` → green (`24 tests, 79 assertions, 0 failures`)
+- lint remained green:
+  - `clojure -M:lint --lint components/workflow-step-materialization components/workflow-runtime components/agent-session deps.edn tests.edn` → green (`0 errors, 0 warnings`)
+
 Residual debt
-- none recorded for this extraction boundary
-- if future cleanup wants an even more explicit shared lower substrate for source-resolution independent of step materialization, that would be a separate follow-on decision rather than residual debt from this task
+- the review-found duplication inside the extracted component has been eliminated by `psi.workflow-step-materialization.semantics`
+- remaining intentional duplication still exists across component boundaries with `psi.workflow-runtime.statechart/effective-steps` and `psi.workflow-runtime.ir` output/yield helpers
+- that remaining overlap is now narrower and explicit: the extracted component owns its own lower shared semantics without depending upward on runtime-core owners, preserving the task-130 boundary decision
+- aside from that deliberate cross-component overlap in service of boundary direction, there is no remaining forwarding-seam or rewiring debt from this extraction boundary

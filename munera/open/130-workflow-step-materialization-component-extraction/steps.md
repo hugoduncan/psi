@@ -19,3 +19,9 @@
 - [x] Record whether the extracted component retains any direct dependency on `psi.workflow-judge` projection behavior and classify it as legitimate shared lower workflow semantics or residual debt, including whether the resulting dependency shape remains acceptably tree-like or preserves a graph edge that should be revisited later
 - [x] Verify workflow behavior remains unchanged
 - [x] Record the final boundary, name, public surface classification, source-resolution ownership status, dependency/input shape, source-resolution dependency status, responsibility inventory, transitional namespace status, and any residual dependency debt in `implementation.md`
+- [x] Design the smallest lower shared owner for effective-step lookup and canonical output/yield resolution semantics without re-expanding `workflow-runtime`
+- [x] Move the duplicated effective-step lookup used by `psi.workflow-step-materialization.core` and `psi.workflow-step-materialization.source-resolution` to that shared owner
+- [x] Move the duplicated canonical output/yield resolution logic now copied from `psi.workflow-runtime.ir` to that shared owner
+- [x] Rewire `psi.workflow-step-materialization.source-resolution` to consume the shared owner instead of maintaining local copies
+- [x] Re-run focused workflow step materialization, runtime adoption, and runtime execution proofs after the reconvergence
+- [x] Record the final shared-owner choice and the eliminated duplication in `implementation.md`

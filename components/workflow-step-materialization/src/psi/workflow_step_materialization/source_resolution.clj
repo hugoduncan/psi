@@ -12,19 +12,7 @@
    - binding-ref resolution used by step materialization consumers."
   (:require
    [clojure.string :as str]
-   [psi.workflow-judge :as workflow-judge]))
-
-(defn- effective-steps
-  [definition]
-  (or (some->> (get-in definition [:canonical-ir :steps])
-               (mapv (juxt :name identity))
-               (into {})
-               not-empty)
-      (:steps definition)))
-
-(defn- effective-step-def
-  [workflow-run step-id]
-  (get (effective-steps (:effective-definition workflow-run)) step-id))
+   [psi.workflow-step-materialization.semantics :as semantics]))
 
 (defn get-path*
   [m path]
@@ -54,44 +42,14 @@
     (and (map? source-ref) (:output source-ref))
     (let [step-id (:step source-ref)
           output-key (:output source-ref)
-          accepted (get-in workflow-run [:step-runs step-id :accepted-result])
-          raw-outputs (:outputs accepted)]
-      (case output-key
-        :result accepted
-        :final-llm-reply (or (get raw-outputs :final-llm-reply)
-                             (get raw-outputs :text))
-        :handoff (get raw-outputs :handoff)
-        (get raw-outputs output-key)))
+          accepted (get-in workflow-run [:step-runs step-id :accepted-result])]
+      (semantics/step-output-value accepted output-key))
 
     (and (map? source-ref) (:yield source-ref))
     (let [step-id (:step source-ref)
           accepted (get-in workflow-run [:step-runs step-id :accepted-result])
-          step-def (effective-step-def workflow-run step-id)
-          yield-spec (:yields step-def)]
-      (case (:type yield-spec)
-        :data (when (= :data (:yield source-ref))
-                (let [output-key (:data yield-spec)
-                      raw-outputs (:outputs accepted)]
-                  (case output-key
-                    :result accepted
-                    :final-llm-reply (or (get raw-outputs :final-llm-reply)
-                                         (get raw-outputs :text))
-                    :handoff (get raw-outputs :handoff)
-                    (get raw-outputs output-key))))
-        :text (when (= :text (:yield source-ref))
-                (let [output-key (:text yield-spec)
-                      raw-outputs (:outputs accepted)]
-                  (case output-key
-                    :result accepted
-                    :final-llm-reply (or (get raw-outputs :final-llm-reply)
-                                         (get raw-outputs :text))
-                    :handoff (get raw-outputs :handoff)
-                    (get raw-outputs output-key))))
-        :error (get-in accepted [:blocked (:yield source-ref)])
-        :delegated (when (= :text (:yield source-ref))
-                     (or (get-in accepted [:outputs :final-llm-reply])
-                         (get-in accepted [:outputs :text])))
-        nil))
+          step-def (semantics/effective-step-def workflow-run step-id)]
+      (semantics/step-yield-field-value step-def accepted (:yield source-ref)))
 
     :else nil))
 
@@ -108,9 +66,7 @@
       (get-path* base path)
 
       (some? projection)
-      (if (= :full projection)
-        base
-        (workflow-judge/project-messages base projection))
+      (semantics/project-source-value base projection)
 
       :else
       base)))
@@ -166,7 +122,7 @@
 (defn- resolve-accepted-result-path
   [workflow-run step-id path]
   (let [accepted-result (get-in workflow-run [:step-runs step-id :accepted-result])
-        step-def (effective-step-def workflow-run step-id)
+        step-def (semantics/effective-step-def workflow-run step-id)
         [k1 k2 & more] path]
     (cond
       (empty? path)
@@ -176,13 +132,7 @@
       (if (keyword? k2)
         (let [value (cond
                       (contains? (set (keys (:outputs step-def))) k2)
-                      (let [raw-outputs (:outputs accepted-result)]
-                        (case k2
-                          :result accepted-result
-                          :final-llm-reply (or (get raw-outputs :final-llm-reply)
-                                               (get raw-outputs :text))
-                          :handoff (get raw-outputs :handoff)
-                          (get raw-outputs k2)))
+                      (semantics/step-output-value accepted-result k2)
 
                       :else
                       (get-path* accepted-result path))]
