@@ -18,3 +18,9 @@
   - none kept
 - [x] Record the final remaining public vars of `psi.agent-session.workflow-execution` in `implementation.md`, justifying any public other than `execute-run!` and `resume-and-execute-run!`
 - [x] Record the final façade ownership decision and any follow-on cleanup notes in `implementation.md`
+- [x] Move lower helper proof cases out of `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` into `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` or adjacent lower-owner workflow-runtime test namespaces
+- [x] Re-focus `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` on higher façade behavior only: `execute-run!`, `resume-and-execute-run!`, and returned execution summary/result shaping
+- [x] Review the duplicated IR adoption binding-source proof across `components/agent-session/test/psi/agent_session/workflow_ir_runtime_adoption_test.clj` and `components/workflow-runtime/test/psi/workflow_runtime/ir_runtime_adoption_test.clj`, keep only the intentionally owned coverage, and remove any unnecessary duplicate test surface
+  - removed the duplicate `agent-session` proof and kept the `workflow-runtime` proof as the lower-owner surface
+- [x] Re-run top-level Kaocha focused coverage for the affected `agent-session` and `workflow-runtime` test namespaces after the proof-ownership cleanup
+  - `clojure -M:test --focus unit --focus psi.agent-session.workflow-execution-test --focus psi.workflow-runtime.step-prep-test --focus psi.workflow-runtime.ir-runtime-adoption-test` passed via top-level `tests.edn`

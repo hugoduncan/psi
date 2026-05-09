@@ -22,3 +22,12 @@ Implementation notes:
   - `resume-and-execute-run!`
 - no temporary compatibility seam was kept; removal was fully local to boundary cleanup and did not require crossing into task `127` or `128`
 - higher façade proofs remain in `workflow_execution_test`; lower helper proofs now point directly at `psi.workflow-runtime.step-prep`
+
+Review note:
+- lower-helper proof ownership was partially mixed: `workflow_execution_test` still housed step-prep proof cases, and the IR adoption binding-source proof was duplicated across `agent-session` and `workflow-runtime` suites
+
+Follow-up implementation:
+- moved lower step-prep proof cases out of `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` into `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj`
+- trimmed `workflow_execution_test` back to higher façade behavior only
+- removed the duplicate `components/agent-session/test/psi/agent_session/workflow_ir_runtime_adoption_test.clj` proof surface, keeping the workflow-runtime-owned IR adoption proof as the authoritative lower coverage
+- re-verified the affected namespaces through top-level Kaocha focused runs
