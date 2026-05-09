@@ -114,3 +114,5 @@
 - 2026-05-09 — Follow-up execution removed the duplicated higher source-resolution mirror proof.
   - `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` was a namespace-only duplicate of the lower `workflow-runtime` proof surface
   - authoritative proof ownership now remains solely in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
+- 2026-05-09 — Test-shaper review found no correctness issue and no topology problem in the remaining authoritative proof surfaces.
+  - one optional shaping follow-up remains: reduce repeated workflow-run construction ceremony in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj` with a tiny local helper if that can be done without hiding arrangement intent
