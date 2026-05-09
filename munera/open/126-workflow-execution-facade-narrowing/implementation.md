@@ -31,3 +31,6 @@ Follow-up implementation:
 - trimmed `workflow_execution_test` back to higher façade behavior only
 - removed the duplicate `components/agent-session/test/psi/agent_session/workflow_ir_runtime_adoption_test.clj` proof surface, keeping the workflow-runtime-owned IR adoption proof as the authoritative lower coverage
 - re-verified the affected namespaces through top-level Kaocha focused runs
+
+Code-shaper review note:
+- `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` is now the right lower-owner proof surface, but it has accumulated copied setup and mixed proof concerns; if more lower-owner proofs accrue, split fixtures or separate config-resolution proofs from prompt/materialization proofs before the file becomes another mixed-owner catchall
