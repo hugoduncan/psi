@@ -8,7 +8,6 @@ Backlog:
 
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
-`munera/open/133-built-in-workflow-capability-reframing/`
 `munera/open/136-built-in-registration-path-for-workflow/`
 `munera/open/135-higher-order-workflow-references/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`

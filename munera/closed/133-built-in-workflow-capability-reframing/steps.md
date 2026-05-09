@@ -21,3 +21,10 @@
 - [ ] Add/adjust tests proving built-in workflow tool execution targets the correct active session across new-session and switched-session flows, not only slash-command paths
 - [ ] Synchronize user-facing docs with the built-in workflow model: update `doc/workflows.md`, `doc/extensions-install.md`, `doc/extensions.md`, and any related top-level references that still describe workflow as an installable `psi/workflow-loader` extension
 - [ ] Re-review whether canonical built-in workflow should still be registered through extension-registry/API machinery under `built-in:workflow`; either reduce that residual extension-style modeling or record it explicitly as an additional residual exception with rationale in `implementation.md`
+- [ ] Split `psi.agent-session.workflow.core` by stable higher-core roles so it no longer mixes built-in bootstrap/init, definition reload/registration, delegate tool behavior, slash-command behavior, widget refresh, and session-targeting glue in one owner
+- [ ] Reduce or relocate process-global workflow state (`state`, `inflight-runs`) so built-in workflow runtime state is scoped more explicitly to a runtime/context owner or another narrower ownership surface
+- [ ] Rehome or rename remaining extension-era `workflow_loader_*` higher-core proof surfaces that now prove built-in workflow behavior, while keeping lower `components/workflow-loader/*` proof ownership intact for the still-legitimate lower loader component
+- [ ] Reduce direct raw extension-registry state inspection in built-in workflow tests where equivalent public command/runtime surface assertions can prove the same behavior with lower coupling
+- [ ] Add a minimal shared built-in workflow test helper for repeated context/session/bootstrap/workflow-definition setup, provided it compresses ceremony without hiding intent
+- [ ] Rename remaining built-in workflow test descriptions/messages that still say `workflow-loader` when the behavior under proof is built-in workflow
+- [ ] Split `workflow_reload_runtime_test.clj` into smaller behavior-focused proofs if that improves failure signal without introducing redundant setup noise

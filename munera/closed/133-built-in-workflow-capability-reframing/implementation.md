@@ -143,10 +143,11 @@ Why transitional rather than preferred end state:
 
 ## Review note
 
-Terse review: good reframing progress, but do not close yet.
+Terse test-shaper review: good regression coverage, moderate internal-coupling residue; do not close yet.
 
-Follow-up items flagged in implementation review:
+Follow-up items flagged in test-shaper review:
 
-- built-in workflow runtime ownership still relies on process-global `state`/`inflight-runs` plus runtime fns seeded from one bootstrapped session; review and fix or explicitly prove session targeting is correct for tool execution after session switches/new sessions
-- user-facing docs still describe workflow as an installable `psi/workflow-loader` extension and must be synchronized with the built-in capability model
-- built-in workflow still installs through extension-registry/API machinery under `built-in:workflow`; either reduce that residual extension-style modeling further or record it explicitly as a broader residual exception rather than only a compatibility-namespace residue
+- several built-in workflow tests still inspect raw extension-registry storage shape directly where public command/runtime surfaces could provide clearer, less coupled assertions
+- built-in workflow tests repeat context/session/bootstrap/workflow-definition setup enough to justify a very small shared helper that compresses ceremony without hiding intent
+- some remaining test descriptions still say `workflow-loader` where they are now proving built-in workflow behavior
+- `workflow_reload_runtime_test.clj` still mixes more than one behavior and could be split into smaller proofs with clearer failure signals
