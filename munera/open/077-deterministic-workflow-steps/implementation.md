@@ -109,5 +109,8 @@
   - added focused authoring proof coverage in `workflow_file_authoring_session_test.clj`
   - focused verification green for the authoring/compiler slice: `14 tests, 110 assertions, 0 failures, 0 errors`; lint clean
 - 2026-05-09 — Test review found no correctness issue in the new proofs.
-  - one cleanup follow-up remains: the source-resolution regression proof is duplicated in both the lower `workflow-runtime` suite and the higher `agent-session` mirror suite
-  - preferred shape is one authoritative lower-owner proof unless the higher duplicate is intentionally proving a distinct compatibility or wiring contract
+  - one cleanup follow-up remained: the source-resolution regression proof was duplicated in both the lower `workflow-runtime` suite and the higher `agent-session` mirror suite
+  - preferred shape was one authoritative lower-owner proof unless the higher duplicate was intentionally proving a distinct compatibility or wiring contract
+- 2026-05-09 — Follow-up execution removed the duplicated higher source-resolution mirror proof.
+  - `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` was a namespace-only duplicate of the lower `workflow-runtime` proof surface
+  - authoritative proof ownership now remains solely in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
