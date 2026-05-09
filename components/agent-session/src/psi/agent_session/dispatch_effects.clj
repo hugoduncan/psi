@@ -128,9 +128,23 @@
   (let [session-id (effect-session-id ctx effect)
         prepared-request (:prepared-request effect)
         progress-queue (:progress-queue effect)
-        execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)]
-    (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
-    execution-result))
+        execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)
+        _ (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
+        latest-summary (:last-execution-result-summary (ss/get-session-data-in ctx session-id))]
+    (if (= (:execution-result/turn-id execution-result)
+           (:turn-id latest-summary))
+      execution-result
+      {:execution-result/turn-id (:turn-id latest-summary)
+       :execution-result/session-id session-id
+       :execution-result/assistant-message (or (some (fn [entry]
+                                                       (let [message (get-in entry [:data :message])]
+                                                         (when (= "assistant" (:role message))
+                                                           message)))
+                                                     (rseq (vec (persist/all-entries-in ctx session-id))))
+                                               (:execution-result/assistant-message execution-result))
+       :execution-result/turn-outcome (:turn-outcome latest-summary)
+       :execution-result/tool-calls []
+       :execution-result/stop-reason (:stop-reason latest-summary)})))
 
 (defmethod execute-effect! :runtime/recover-query-prompt-execute-and-record [ctx effect]
   (when-let [query-text (:query-text effect)]

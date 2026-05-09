@@ -8,6 +8,7 @@
    [psi.agent-session.prompt-request]
    [psi.turn-runtime.core]
    [psi.agent-session.runtime :as runtime]
+   [psi.agent-session.turn]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
@@ -420,6 +421,63 @@
                          :tool_use_id "tc-1"
                          :content "file body"}]}
              (nth anthropic-messages 2))))))
+
+(deftest prompt-execution-result-returns-terminal-result-after-tool-continuation-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        tool-call-result {:execution-result/turn-id "turn-1"
+                          :execution-result/session-id session-id
+                          :execution-result/assistant-message {:role "assistant"
+                                                               :content [{:type :tool-call
+                                                                          :id "tc-1"
+                                                                          :name "read"
+                                                                          :arguments "{}"}]
+                                                               :stop-reason :stop
+                                                               :timestamp (java.time.Instant/now)}
+                          :execution-result/turn-outcome :turn.outcome/tool-use
+                          :execution-result/tool-calls [{:id "tc-1" :name "read" :arguments "{}"}]
+                          :execution-result/stop-reason :stop}
+        terminal-result  {:execution-result/turn-id "turn-2"
+                          :execution-result/session-id session-id
+                          :execution-result/assistant-message {:role "assistant"
+                                                               :content [{:type :text :text "final answer"}]
+                                                               :stop-reason :stop
+                                                               :timestamp (java.time.Instant/now)}
+                          :execution-result/turn-outcome :turn.outcome/stop
+                          :execution-result/tool-calls []
+                          :execution-result/stop-reason :stop}
+        execution-count* (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [_ai-ctx _ctx sid prepared _progress-queue]
+                    (swap! execution-count* inc)
+                    (is (= session-id sid))
+                    (if (= 1 @execution-count*)
+                      (do
+                        (is (= "hello"
+                               (get-in prepared [:prepared-request/user-message :content 0 :text])))
+                        tool-call-result)
+                      (do
+                        (is (= 2 @execution-count*))
+                        (is (nil? (:prepared-request/user-message prepared)))
+                        terminal-result)))
+                  psi.agent-session.prompt-chain/run-prompt-tools!
+                  (fn [ctx sid _execution-result _progress-queue]
+                    (session/dispatch-in! ctx :session/tool-record-result
+                                          {:session-id sid
+                                           :shaped-result {:result-message {:role "toolResult"
+                                                                            :tool-call-id "tc-1"
+                                                                            :tool-name "read"
+                                                                            :content [{:type :text :text "file body"}]
+                                                                            :timestamp (java.time.Instant/now)}}}
+                                          {:origin :core})
+                    {:continued? true :tool-call-count 1})]
+      (let [result (psi.agent-session.turn/prompt-execution-result-in! ctx session-id "hello")
+            assistant-msg (session/last-assistant-message-in ctx session-id)]
+        (is (= 2 @execution-count*))
+        (is (= :turn.outcome/stop (:execution-result/turn-outcome result)))
+        (is (= "final answer"
+               (get-in result [:execution-result/assistant-message :content 0 :text])))
+        (is (= "final answer"
+               (get-in assistant-msg [:content 0 :text])))))))
 
 (deftest prompt-prepare-request-consumes-queued-steering-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
