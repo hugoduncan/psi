@@ -1,332 +1,44 @@
 (ns psi.workflow-runtime.statechart-runtime
   "Phase A workflow statechart runtime scaffolding.
 
-   This namespace owns the execution context around the hierarchical workflow
-   statechart:
-   - working-memory seed creation
-   - event queue management
-   - action dispatch boundary
-   - active-chart-state -> workflow-run status projection
-
-   Slice 2 scope deliberately stops short of full step execution. It establishes
-   context shape, attempt identity semantics, and projection policy so later
-   slices can move actor/judge execution into entry/exit actions without changing
-   the runtime envelope again."
+   This namespace now serves as the public runtime façade over smaller role-
+   focused runtime namespaces:
+   - state/projection + working-memory helpers
+   - queue helpers
+   - step execution helpers
+   - delegate execution helpers
+   - statechart event lifecycle/draining"
   (:require
-   [clojure.string :as str]
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.data-model.working-memory-data-model :as wmdm]
-   [com.fulcrologic.statecharts.events :as evts]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
-   [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
-   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
-   [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
-   [psi.workflow-runtime.turn-execution-contract :as turn-execution]
    [psi.workflow-runtime.attempts :as workflow-attempts]
-   [psi.workflow-runtime.ir :as workflow-ir]
-   [psi.workflow-runtime.progression-recording :as workflow-progression-recording]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]
-   [psi.workflow-registry.registry :as registry]
+   [psi.workflow-runtime.progression-recording :as workflow-progression-recording]
    [psi.workflow-runtime.statechart :as workflow-statechart]
-   [psi.workflow-runtime.terminal-contract :as workflow-terminal-contract]))
+   [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
+   [psi.workflow-runtime.statechart-runtime.lifecycle :as lifecycle]
+   [psi.workflow-runtime.statechart-runtime.queue :as queue]
+   [psi.workflow-runtime.statechart-runtime.state :as state]
+   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]))
 
 (declare create-workflow-context send-and-drain!)
 
-(defn- runtime-step-order
-  [workflow-run]
-  (workflow-statechart/effective-step-order (:effective-definition workflow-run)))
-
-(defn- runtime-step-def
-  [workflow-run step-id]
-  (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
-
-(defn- now []
-  (java.time.Instant/now))
-
-(defn- initial-step-outputs
-  [workflow-run]
-  (into {}
-        (keep (fn [[step-id step-run]]
-                (when-let [accepted (:accepted-result step-run)]
-                  [step-id accepted])))
-        (:step-runs workflow-run)))
-
-(defn- initial-iteration-counts
-  [workflow-run]
-  (into {}
-        (map (fn [[step-id step-run]]
-               [step-id (or (:iteration-count step-run) 0)]))
-        (:step-runs workflow-run)))
-
-(defn- initial-attempt-counts
-  [workflow-run]
-  (into {}
-        (map (fn [[step-id step-run]]
-               [step-id (count (:attempts step-run))]))
-        (:step-runs workflow-run)))
-
-(defn- initial-attempt-ids
-  [workflow-run]
-  (into {}
-        (keep (fn [[step-id step-run]]
-                (when-let [attempt-id (:attempt-id (last (:attempts step-run)))]
-                  [step-id attempt-id])))
-        (:step-runs workflow-run)))
-
-(defn- initial-sessions
-  [workflow-run]
-  (into {}
-        (keep (fn [[step-id step-run]]
-                (when-let [execution-session-id (:execution-session-id (last (:attempts step-run)))]
-                  [step-id execution-session-id])))
-        (:step-runs workflow-run)))
-
-(defn create-working-memory
-  "Create the authoritative Phase A execution memory for a workflow run.
-
-   This is stored in an atom and snapshotted into the flat statechart data model
-   at event-processing boundaries so guards read a pure snapshot while actions can
-   still evolve execution state between events."
-  [ctx parent-session-id run-id]
-  (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-        steps (workflow-statechart/effective-steps (:effective-definition workflow-run))]
-    {:workflow-run-id run-id
-     :parent-session-id parent-session-id
-     :workflow-input (:workflow-input workflow-run)
-     :step-outputs (initial-step-outputs workflow-run)
-     :iteration-counts (initial-iteration-counts workflow-run)
-     :judge-results {}
-     :sessions (initial-sessions workflow-run)
-     :attempt-ids (initial-attempt-ids workflow-run)
-     :attempt-counts (initial-attempt-counts workflow-run)
-     :actor-retries {}
-     :actor-retry-limits (into {}
-                               (map (fn [[step-id step-def]]
-                                      [step-id (or (get-in step-def [:retry-policy :max-attempts]) 1)]))
-                               steps)
-     :judge-retries {}
-     :blocked-step-id nil
-     :pending-actor-result nil
-     :pending-judge-result nil
-     :pending-routing nil
-     :current-step-id (:current-step-id workflow-run)
-     :created-at (now)
-     :updated-at (now)}))
-
-(defn step-id-from-configuration
-  "Project the logical workflow step id from an active hierarchical chart config.
-
-   The returned step id is logical (`plan`, `build`, etc.), not the leaf state id.
-   Compound-state parent ids are ignored in favor of the leaf `.acting`/`.judging`/
-   `.blocked` state ids."
-  [configuration]
-  (some (fn [state-id]
-          (when (keyword? state-id)
-            (let [s (str state-id)]
-              (when (str/starts-with? s ":step/")
-                (let [suffix (subs s 6)]
-                  (if-let [idx (str/index-of suffix ".")]
-                    (subs suffix 0 idx)
-                    suffix))))))
-        configuration))
-
-(defn run-status-from-configuration
-  "Derive public workflow-run status from active hierarchical chart configuration."
-  [configuration]
-  (cond
-    (contains? configuration :pending) :pending
-    (contains? configuration :completed) :completed
-    (contains? configuration :failed) :failed
-    (contains? configuration :cancelled) :cancelled
-    (some #(str/ends-with? (name %) ".blocked") configuration) :blocked
-    :else :running))
-
-(defn sync-run-projection!
-  "Project active chart status/current-step-id onto the canonical workflow run."
-  [ctx run-id working-memory* configuration]
-  (let [status (run-status-from-configuration configuration)
-        step-id (or (step-id-from-configuration configuration)
-                    (:current-step-id @working-memory*))]
-    (swap! (:state* ctx)
-           update-in
-           [:workflows :runs run-id]
-           (fn [workflow-run]
-             (cond-> (assoc workflow-run
-                            :status status
-                            :current-step-id (case status
-                                               :completed nil
-                                               step-id)
-                            :updated-at (now))
-               (= status :blocked)
-               (assoc :blocked {:step-id (:blocked-step-id @working-memory*)})
-
-               (not= status :blocked)
-               (assoc :blocked nil)
-
-               (contains? #{:completed :failed :cancelled} status)
-               (assoc :finished-at (or (:finished-at workflow-run) (now))))))))
-
-(def assistant-message-text
-  turn-execution/assistant-message-text)
-
-(defn operation-result->invoke-step-result
-  "Wrap a canonical deterministic operation result into workflow invoke-step semantics."
-  [operation-result]
-  (when-not (deterministic-op-defs/valid-operation-result? operation-result)
-    (throw (ex-info "Cannot wrap malformed deterministic operation result"
-                    {:type :malformed-operation-result
-                     :result operation-result
-                     :explanation (deterministic-op-defs/explain-operation-result operation-result)})))
-  (case (:status operation-result)
-    :ok
-    {:kind :accepted-result
-     :accepted-result {:outcome :ok
-                       :outputs (cond-> {:data (:data operation-result)
-                                         :result operation-result}
-                                  (contains? operation-result :summary)
-                                  (assoc :summary (:summary operation-result)))}}
-
-    :error
-    {:kind :execution-error
-     :execution-error (cond-> {:reason (:reason operation-result)
-                               :message (:message operation-result)
-                               :operation-result operation-result}
-                        (:details operation-result)
-                        (assoc :operation-details (:details operation-result)))}
-
-    (throw (ex-info "Unknown deterministic operation result status"
-                    {:result operation-result}))))
-
-(defn- invoke-step-runtime-result
-  [ctx parent-session-id run-id step-id step-def workflow-run]
-  (let [invoke-spec (or (:invoke step-def)
-                        (get-in step-def [:judge :invoke]))
-        args (workflow-source-resolution/resolve-invoke-args workflow-run (:args invoke-spec))
-        operation-result (deterministic-op-registry/invoke-operation-in
-                          (:deterministic-operation-registry ctx)
-                          (:operation invoke-spec)
-                          {:ctx ctx
-                           :parent-session-id parent-session-id
-                           :workflow-run-id run-id
-                           :step-id step-id
-                           :args args}
-                          deterministic-op-runtime/invoke-operation)]
-    {:effective-args args
-     :operation-result operation-result}))
-
-(defn- apply-invoke-step-result
-  [{:keys [effective-args operation-result]}]
-  (let [{:keys [kind accepted-result execution-error]} (operation-result->invoke-step-result operation-result)]
-    (case kind
-      :accepted-result {:attempt-data {:effective-args effective-args}
-                        :pending-kind :success
-                        :payload accepted-result}
-      :execution-error {:attempt-data {:effective-args effective-args}
-                        :pending-kind :failure
-                        :payload execution-error})))
-
-(defn- resolve-delegate-target-definition
-  [ctx target]
-  (let [definition (registry/workflow-definition @(:state* ctx) target)]
-    (when-not definition
-      (throw (ex-info "Delegated workflow definition not found"
-                      {:target target})))
-    definition))
-
-(defn- terminal-step-result-envelope
-  [workflow-run]
-  (workflow-terminal-contract/terminal-result-envelope workflow-run))
-
-(defn- delegate-step-runtime-result
-  [ctx parent-session-id step-id step-def workflow-run]
-  (let [delegate-spec (:delegate step-def)
-        target (:target delegate-spec)
-        _ (resolve-delegate-target-definition ctx target)
-        prompt-string (workflow-source-resolution/render-delegate-prompt-string workflow-run (:prompt-string delegate-spec))
-        context (workflow-source-resolution/resolve-delegate-context workflow-run (:context delegate-spec))
-        [state' delegate-run-id _]
-        (workflow-runtime/create-run @(:state* ctx)
-                                     {:definition-id target
-                                      :workflow-input prompt-string
-                                      :workflow-original context})
-        _ (reset! (:state* ctx) state')
-        delegate-wf-ctx (create-workflow-context ctx parent-session-id delegate-run-id)
-        _ (send-and-drain! delegate-wf-ctx (:wm delegate-wf-ctx) :workflow/start nil)
-        delegate-run (workflow-runtime/workflow-run-in @(:state* ctx) delegate-run-id)
-        boundary {:delegate {:target target
-                             :run-id delegate-run-id
-                             :step-id step-id
-                             :prompt-string prompt-string
-                             :context context}}]
-    (case (:status delegate-run)
-      :completed
-      (let [contract-outputs (workflow-terminal-contract/terminal-contract-outputs delegate-run)]
-        {:pending-kind :success
-         :payload (cond-> (terminal-step-result-envelope delegate-run)
-                    (seq contract-outputs) (update :outputs #(merge contract-outputs (or % {})))
-                    true (update :diagnostics #(merge boundary (or % {}))))})
-
-      :blocked
-      {:pending-kind :blocked
-       :payload {:outcome :blocked
-                 :blocked {:delegate-run-id delegate-run-id
-                           :target target
-                           :step-id (get-in delegate-run [:blocked :step-id])}
-                 :diagnostics boundary}}
-
-      :failed
-      {:pending-kind :failure
-       :payload {:message "Delegated workflow failed"
-                 :delegate-run-id delegate-run-id
-                 :target target
-                 :details (or (:terminal-outcome delegate-run)
-                              {:status (:status delegate-run)})}}
-
-      :cancelled
-      {:pending-kind :failure
-       :payload {:message "Delegated workflow cancelled"
-                 :delegate-run-id delegate-run-id
-                 :target target
-                 :details (or (:terminal-outcome delegate-run)
-                              {:status (:status delegate-run)})}}
-
-      {:pending-kind :failure
-       :payload {:message "Delegated workflow did not reach terminal or blocked status"
-                 :delegate-run-id delegate-run-id
-                 :target target
-                 :details {:status (:status delegate-run)}}})))
-
-(defn- enqueue-event!
-  [event-queue* working-memory* event data]
-  (swap! event-queue* conj {:event event
-                            :data (merge {:current-step-id (:current-step-id @working-memory*)
-                                          :iteration-counts (:iteration-counts @working-memory*)}
-                                         data)}))
-
-(defn queue-event!
-  "Enqueue a workflow event onto the FIFO queue using the current authoritative
-   working-memory snapshot as the event-data base."
-  [{:keys [event-queue* working-memory*]} event data]
-  (enqueue-event! event-queue* working-memory* event data))
-
-(def ^:private max-drain-events
-  1000)
-
-(defn terminal-configuration?
-  [configuration]
-  (boolean (some configuration [:completed :failed :cancelled])))
+(def create-working-memory state/create-working-memory)
+(def step-id-from-configuration state/step-id-from-configuration)
+(def run-status-from-configuration state/run-status-from-configuration)
+(def sync-run-projection! state/sync-run-projection!)
+(def assistant-message-text step-execution/assistant-message-text)
+(def operation-result->invoke-step-result step-execution/operation-result->invoke-step-result)
+(def queue-event! queue/queue-event!)
+(def terminal-configuration? state/terminal-configuration?)
 
 (defn make-workflow-actions
   "Create the Phase A workflow actions dispatcher.
 
-   Slice 2 scope:
-   - allocate fresh attempt ids on `.acting` entry
-   - preserve same attempt id through `.judging`
-   - record blocked-step metadata on `.blocked` entry
-   - expose snapshot-only retry predicate placeholder
-   - keep the workflow-run projection synchronized for attempt creation metadata"
+   Keeps the statechart-owned control-flow switch local while delegating step,
+   delegate, queue, and projection sub-behaviors to lower focused helpers."
   [ctx parent-session-id run-id working-memory* event-queue*]
   (fn [action-key data]
     (let [step-id (:step-id data)]
@@ -339,7 +51,7 @@
         :step/enter
         (let [attempt-id (str (java.util.UUID/randomUUID))
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              step-def (runtime-step-def workflow-run step-id)
+              step-def (state/runtime-step-def workflow-run step-id)
               invoke-step? (= :invoke (:type step-def))
               delegate-step? (= :delegate (:type step-def))
               session-step? (= :session (:type step-def))
@@ -394,13 +106,13 @@
                                (assoc :current-step-id step-id
                                       :blocked-step-id nil
                                       :pending-actor-result nil
-                                      :updated-at (now))
+                                      :updated-at (state/now))
                                (update-in [:iteration-counts step-id] (fnil inc 0)))
                      (:session-id execution-session)
                      (assoc-in [:sessions step-id] (:session-id execution-session)))))
           (swap! (:state* ctx)
-                 (fn [state]
-                   (-> state
+                 (fn [state-map]
+                   (-> state-map
                        (update-in [:workflows :runs run-id]
                                   #(workflow-attempts/append-attempt-to-run % step-id attempt))
                        (workflow-progression-recording/start-latest-attempt run-id step-id)
@@ -408,78 +120,56 @@
           (try
             (cond
               invoke-step?
-              (let [invoke-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
-                    {:keys [attempt-data pending-kind payload]} (apply-invoke-step-result invoke-result)]
+              (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
+                    {:keys [attempt-data pending-kind payload]} (step-execution/apply-invoke-step-result invoke-result)]
                 (swap! (:state* ctx)
                        workflow-progression-recording/merge-latest-attempt-data run-id step-id attempt-data)
                 (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
                                                                     :payload payload
                                                                     :step-id step-id
                                                                     :attempt-id attempt-id
-                                                                    :updated-at (now)})
-                (enqueue-event! event-queue* working-memory*
-                                (case pending-kind
-                                  :success :actor/done
-                                  :blocked :actor/blocked
-                                  :failure :actor/failed
-                                  :actor/failed)
-                                {}))
+                                                                    :updated-at (state/now)})
+                (queue/enqueue-event! event-queue* working-memory*
+                                      (case pending-kind
+                                        :success :actor/done
+                                        :blocked :actor/blocked
+                                        :failure :actor/failed
+                                        :actor/failed)
+                                      {}))
 
               delegate-step?
-              (let [{:keys [pending-kind payload]} (delegate-step-runtime-result ctx parent-session-id step-id step-def workflow-run)]
+              (let [{:keys [pending-kind payload]}
+                    (delegate/delegate-step-runtime-result create-workflow-context send-and-drain!
+                                                           ctx parent-session-id step-id step-def workflow-run)]
                 (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
                                                                     :payload payload
                                                                     :step-id step-id
                                                                     :attempt-id attempt-id
-                                                                    :updated-at (now)})
-                (enqueue-event! event-queue* working-memory*
-                                (case pending-kind
-                                  :success :actor/done
-                                  :blocked :actor/blocked
-                                  :failure :actor/failed
-                                  :actor/failed)
-                                {}))
+                                                                    :updated-at (state/now)})
+                (queue/enqueue-event! event-queue* working-memory*
+                                      (case pending-kind
+                                        :success :actor/done
+                                        :blocked :actor/blocked
+                                        :failure :actor/failed
+                                        :actor/failed)
+                                      {}))
 
               :else
-              (let [{:keys [status assistant-text failure]}
-                    (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)]
-                (if (= :error status)
-                  (do
-                    (swap! working-memory* assoc :pending-actor-result {:kind :failure
-                                                                        :payload failure
-                                                                        :step-id step-id
-                                                                        :attempt-id attempt-id
-                                                                        :updated-at (now)})
-                    (enqueue-event! event-queue* working-memory* :actor/failed {}))
-                  (let [normalized-outputs (workflow-ir/step-output-surfaces
-                                            step-def
-                                            {:outcome :ok
-                                             :outputs {:final-llm-reply assistant-text
-                                                       :text assistant-text}})
-                        envelope {:outcome :ok
-                                  :outputs (merge {:text assistant-text}
-                                                  normalized-outputs)}]
-                    (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
-                                                                        :payload envelope
-                                                                        :step-id step-id
-                                                                        :attempt-id attempt-id
-                                                                        :updated-at (now)})
-                    (enqueue-event! event-queue* working-memory*
-                                    (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done)
-                                    {})))))
+              (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt))
             (catch Exception e
               (let [failure-payload {:message (ex-message e)}]
                 (swap! working-memory* assoc :pending-actor-result {:kind :failure
                                                                     :payload failure-payload
                                                                     :step-id step-id
                                                                     :attempt-id attempt-id
-                                                                    :updated-at (now)})
-                (enqueue-event! event-queue* working-memory* :actor/failed {}))))
+                                                                    :updated-at (state/now)})
+                (queue/enqueue-event! event-queue* working-memory* :actor/failed {}))))
           nil)
+
         :step/record-result
         (let [{:keys [payload]} (:pending-actor-result @working-memory*)
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              judged-step? (some? (:judge (runtime-step-def workflow-run step-id)))]
+              judged-step? (some? (:judge (state/runtime-step-def workflow-run step-id)))]
           (if judged-step?
             (swap! (:state* ctx)
                    workflow-progression-recording/record-actor-result run-id step-id payload)
@@ -490,7 +180,7 @@
                    (-> wm
                        (assoc :pending-actor-result nil
                               :step-outputs (assoc (:step-outputs wm) step-id payload)
-                              :updated-at (now)))))
+                              :updated-at (state/now)))))
           nil)
 
         :step/record-failure
@@ -501,12 +191,12 @@
                  (fn [wm]
                    (-> wm
                        (assoc :pending-actor-result nil
-                              :updated-at (now)))))
+                              :updated-at (state/now)))))
           nil)
 
         :judge/enter
         (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              step-def (runtime-step-def workflow-run step-id)
+              step-def (state/runtime-step-def workflow-run step-id)
               judge-spec (:judge step-def)
               routing-table (or (:on step-def) {})
               actor-session-id (get-in @working-memory* [:sessions step-id])
@@ -517,7 +207,7 @@
                             judge-spec
                             routing-table
                             {:current-step-id step-id
-                             :step-order (runtime-step-order workflow-run)
+                             :step-order (state/runtime-step-order workflow-run)
                              :step-runs (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])})
               routing-result (:routing-result judge-result)]
           (swap! working-memory*
@@ -526,13 +216,13 @@
                        (assoc :current-step-id step-id
                               :pending-judge-result judge-result
                               :pending-routing routing-result
-                              :updated-at (now))
+                              :updated-at (state/now))
                        (assoc-in [:judge-results step-id] judge-result)
                        (assoc-in [:sessions (str step-id "-judge")] (:judge-session-id judge-result)))))
-          (enqueue-event! event-queue* working-memory*
-                          (if (= :no-match (:action routing-result)) :judge/no-match :judge/signal)
-                          (cond-> {}
-                            (:judge-event judge-result) (assoc :signal (:judge-event judge-result))))
+          (queue/enqueue-event! event-queue* working-memory*
+                                (if (= :no-match (:action routing-result)) :judge/no-match :judge/signal)
+                                (cond-> {}
+                                  (:judge-event judge-result) (assoc :signal (:judge-event judge-result))))
           nil)
 
         :judge/record
@@ -541,8 +231,8 @@
           (swap! (:state* ctx)
                  workflow-progression-recording/record-judge-result run-id step-id judge-result)
           (swap! (:state* ctx)
-                 (fn [state]
-                   (update-in state [:workflows :runs run-id]
+                 (fn [state-map]
+                   (update-in state-map [:workflows :runs run-id]
                               (fn [workflow-run]
                                 (case (:action routing-result)
                                   :goto
@@ -554,7 +244,7 @@
                                   (-> workflow-run
                                       (assoc :status :completed
                                              :current-step-id nil
-                                             :finished-at (or (:finished-at workflow-run) (now))
+                                             :finished-at (or (:finished-at workflow-run) (state/now))
                                              :terminal-outcome {:outcome :completed
                                                                 :step-id step-id
                                                                 :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
@@ -562,7 +252,7 @@
 
                                   (-> workflow-run
                                       (assoc :status :failed
-                                             :finished-at (or (:finished-at workflow-run) (now))
+                                             :finished-at (or (:finished-at workflow-run) (state/now))
                                              :terminal-outcome {:outcome :failed
                                                                 :reason (or (:reason routing-result) :judge-no-match)
                                                                 :step-id step-id
@@ -573,7 +263,7 @@
                    (-> wm
                        (assoc :pending-judge-result nil
                               :pending-routing nil
-                              :updated-at (now)))))
+                              :updated-at (state/now)))))
           nil)
 
         :step/block
@@ -583,26 +273,23 @@
                    (-> wm
                        (assoc :blocked-step-id step-id
                               :current-step-id step-id
-                              :updated-at (now)))))
+                              :updated-at (state/now)))))
           nil)
 
         :terminal/record
         (do
-          (swap! working-memory* assoc :updated-at (now))
+          (swap! working-memory* assoc :updated-at (state/now))
           nil)
 
         :enqueue-event
         (do
-          (enqueue-event! event-queue* working-memory* (:event data) (:data data))
+          (queue/enqueue-event! event-queue* working-memory* (:event data) (:data data))
           nil)
 
         nil))))
 
 (defn create-workflow-context
-  "Create a statechart execution context for Phase A workflow execution.
-
-   Returns a map with the registered env/session, authoritative working memory,
-   FIFO event queue, and workflow actions dispatcher."
+  "Create a statechart execution context for Phase A workflow execution."
   ([ctx run-id]
    (create-workflow-context ctx nil run-id))
   ([ctx parent-session-id run-id]
@@ -628,57 +315,6 @@
         :event-queue* event-queue*
         :actions-fn actions-fn}))))
 
-(defn process-event!
-  "Process one workflow statechart event against a fresh working-memory snapshot,
-   then project active chart status back onto the workflow run."
-  [{:keys [ctx run-id env sc-session-id working-memory*] :as wf-ctx} wm event data]
-  (let [wm' (update wm ::wmdm/data-model merge (assoc @working-memory* :actions-fn (:actions-fn wf-ctx)) data)
-        wm'' (sp/process-event! (::sc/processor env) env wm' (evts/new-event {:name event :data (or data {})}))]
-    (sp/save-working-memory! (::sc/working-memory-store env) env sc-session-id wm'')
-    (sync-run-projection! ctx run-id working-memory* (::sc/configuration wm''))
-    wm''))
-
-(defn drain-events!
-  "Drain the workflow FIFO queue to quiescence.
-
-   Once the chart reaches a terminal configuration, any queued tail events are
-   discarded instead of being processed.
-
-   A hard safety bound prevents accidental infinite event churn in tests or
-   runtime regressions; overflow throws with queue/configuration context."
-  [{:keys [event-queue* run-id] :as wf-ctx} wm]
-  (loop [wm wm
-         processed 0]
-    (cond
-      (terminal-configuration? (::sc/configuration wm))
-      (do
-        (reset! event-queue* [])
-        wm)
-
-      (>= processed max-drain-events)
-      (throw (ex-info "Workflow event drain exceeded safety bound"
-                      {:run-id run-id
-                       :processed-events processed
-                       :max-drain-events max-drain-events
-                       :configuration (::sc/configuration wm)
-                       :queued-events @event-queue*}))
-
-      :else
-      (let [events @event-queue*]
-        (if (empty? events)
-          wm
-          (do
-            (reset! event-queue* [])
-            (let [wm' (reduce (fn [wm {:keys [event data]}]
-                                (if (terminal-configuration? (::sc/configuration wm))
-                                  wm
-                                  (process-event! wf-ctx wm event data)))
-                              wm
-                              events)]
-              (recur wm' (+ processed (count events))))))))))
-
-(defn send-and-drain!
-  "Send one event into the workflow chart and drain queued follow-on work."
-  [wf-ctx wm event data]
-  (->> (process-event! wf-ctx wm event data)
-       (drain-events! wf-ctx)))
+(def process-event! lifecycle/process-event!)
+(def drain-events! lifecycle/drain-events!)
+(def send-and-drain! lifecycle/send-and-drain!)

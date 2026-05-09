@@ -1,7 +1,7 @@
 (ns psi.agent-session.deterministic-operation-registry-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.workflow-runtime.statechart-runtime :as workflow-statechart-runtime]))
+   [psi.workflow-runtime.statechart-runtime.step-execution :as workflow-statechart-runtime]))
 
 (deftest invoke-step-wrapping-test
   (testing "successful operation result wraps into canonical invoke outputs"

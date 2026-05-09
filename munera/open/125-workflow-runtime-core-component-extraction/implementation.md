@@ -108,3 +108,46 @@ Follow-up verification:
 - lint green:
   - `clojure -M:lint --lint components/workflow-runtime/src components/workflow-runtime/test components/agent-session/src components/agent-session/test`
   - result: `0 errors, 0 warnings`
+
+2026-05-09 code-shaper review
+
+Terse review note:
+- shape follow-up: `psi.workflow-runtime.statechart-runtime` remains the main complexity hotspot and should be decomposed by role
+
+Findings:
+- good: the extracted ownership boundary is now coherent; lower workflow runtime code no longer relies on hidden classpath reachability or wrapper bounce paths for the reviewed seams
+- shape concern: `psi.workflow-runtime.statechart-runtime` still combines working-memory seeding, event queue handling, run projection, actor/delegate execution, judge orchestration, and statechart session lifecycle in one large namespace. This is acceptable for the extraction slice, but it is the obvious next shaping target for simplicity and local comprehensibility.
+
+2026-05-09 decomposition follow-up execution
+
+Decomposed `psi.workflow-runtime.statechart-runtime` by role while preserving its public façade:
+- added `psi.workflow-runtime.statechart-runtime.state`
+  - runtime working-memory seeding
+  - configuration → run status/current-step projection
+  - terminal configuration helpers
+- added `psi.workflow-runtime.statechart-runtime.queue`
+  - workflow event queue enqueue helpers
+- added `psi.workflow-runtime.statechart-runtime.step-execution`
+  - deterministic invoke result wrapping
+  - session-backed actor step execution normalization
+- added `psi.workflow-runtime.statechart-runtime.delegate`
+  - delegated workflow target resolution and delegated run execution/result shaping
+- added `psi.workflow-runtime.statechart-runtime.lifecycle`
+  - process-event/drain/send loop over the statechart session
+- kept `psi.workflow-runtime.statechart-runtime` as the orchestration façade and `make-workflow-actions` owner, now delegating to the smaller role-focused namespaces
+
+Additional proof shaping:
+- moved deterministic operation result wrapping proof to the narrower lower namespace `psi.workflow-runtime.statechart-runtime.step-execution`
+- split new focused runtime tests under `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/`
+  - `state_test.clj`
+  - `step_execution_test.clj`
+  - `lifecycle_test.clj`
+  - `public_test.clj`
+
+Verification after decomposition:
+- focused tests green:
+  - `clojure -M:test --focus psi.workflow-runtime.core-test --focus psi.workflow-runtime.statechart-runtime.public-test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.workflow-runtime.statechart-runtime.lifecycle-test --focus psi.workflow-runtime.attempts-test --focus psi.workflow-runtime.step-prep-test --focus psi.workflow-runtime.source-resolution-test --focus psi.workflow-runtime.target-ir-compiler-test --focus psi.workflow-runtime.ir-test --focus psi.workflow-runtime.model-test --focus psi.workflow-runtime.progression-recording-test --focus psi.workflow-runtime.ir-runtime-adoption-test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-judge-test --focus psi.agent-session.deterministic-operation-registry-test`
+  - result: `18 tests, 85 assertions, 0 failures`
+- lint green:
+  - `clojure -M:lint --lint components/workflow-runtime/src components/workflow-runtime/test components/agent-session/src components/agent-session/test`
+  - result: `0 errors, 0 warnings`

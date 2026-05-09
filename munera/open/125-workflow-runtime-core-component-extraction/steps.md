@@ -12,3 +12,4 @@
 - [x] Record final runtime-core membership, lower-seam consumption status, statechart-runtime decomposition decisions, residual above-boundary workflow logic, and follow-on cleanup candidates in `implementation.md`
 - [x] Add the missing component dependency path for `psi.agent-session.turn-execution-contract`, or lower that contract further so `components/workflow-runtime/deps.edn` is self-consistent
 - [x] Rewire `agent-session.context` step-prep callbacks directly to `psi.workflow-runtime.step-prep/*` instead of routing through `psi.agent-session.workflow-execution` wrapper vars
+- [x] Decompose `psi.workflow-runtime.statechart-runtime` by role so working-memory/projection helpers, step execution actions, delegate execution, and statechart lifecycle/drain logic are no longer concentrated in one large namespace
