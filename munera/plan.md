@@ -6,7 +6,6 @@ Queue:
 
 Backlog:
 
-`munera/open/131-workflow-loader-component-extraction/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
