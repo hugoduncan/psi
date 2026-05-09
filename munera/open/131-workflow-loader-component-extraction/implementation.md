@@ -189,7 +189,7 @@ Residual debt:
 
 Focused tests green:
 - `clojure -M:test --focus psi.workflow-loader.core-test --focus psi.workflow-loader.parser-test --focus psi.workflow-loader.compiler-test --focus psi.workflow-loader.compiler-target-authoring-test --focus psi.workflow-loader.authoring-session-test --focus extensions.workflow-loader-test --focus extensions.workflow-loader-delegate-test --focus psi.agent-session.workflow-loader-async-path-test --focus psi.agent-session.workflow-loader-tui-repro-test --focus psi.agent-session.workflow-migration-validation-test`
-- result: `56 tests, 369 assertions, 0 failures`
+- result: `58 tests, 381 assertions, 0 failures`
 
 Lint green:
 - `clojure -M:lint --lint components/workflow-loader components/agent-session extensions/workflow-loader deps.edn tests.edn`
@@ -216,3 +216,14 @@ Code-shaper review: approve as implemented.
   - split `psi.workflow-loader.core/load-workflow-definitions` into smaller pure assembly helpers for partitioning, validation error shaping, result shaping, and final load-result assembly
   - extracted shared prior-step source validation/resolution to `psi.workflow-loader.authoring-step-source` and rewired both session and preload compilation to use it
   - audited the loader public surface against actual non-test consumers and kept only the current used lower APIs public; no further narrowing was justified without either weakening proofs or broadening this task into test-only indirection work
+
+Test review: approve as implemented.
+- proof ownership is aligned with the extraction: lower loader behavior lives under `components/workflow-loader/test`, while extension and agent-session orchestration remain tested at their higher surfaces
+- coverage is good across loader discovery/loading, parser/compiler contracts, shared authoring validation, extension reload orchestration, and real checked-in workflow-file migration proofs
+- no blocking test gap was found
+- non-blocking follow-up items were then executed:
+  - replaced the brittle numeric workflow-file-count assertion in `psi.agent-session.workflow-migration-validation-test` with non-empty discovery plus a curated required workflow subset
+  - added `workflow-migration-view` in `psi.agent-session.workflow-migration-validation-test` so repeated parse/compile/by-name setup no longer spreads across the migration-proof tests
+  - added `with-project-loader-result` in `components/workflow-loader/test/psi/workflow_loader/core_test.clj` to reduce repeated temp-dir + disabled-global setup
+  - added an explicit loader API contract block in `psi.workflow-loader.core-test`
+  - added an explicit higher-proof seam block in `extensions.workflow-loader-test` showing parser/compiler/validation helpers remain intentional lower APIs used by higher proofs

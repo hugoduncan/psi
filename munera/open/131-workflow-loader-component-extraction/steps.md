@@ -34,3 +34,10 @@ Follow-up shaping:
 - [x] Review `psi.workflow-loader.authoring-session` and `psi.workflow-loader.authoring-preload` for a smallest shared lower helper around source-map validation / prior-step resolution / nested error wrapping, but only extract it if the result is simpler than the current local duplication
 - [x] Audit the `psi.workflow-loader.*` public surface against real non-test consumers and reduce helper publics where possible without weakening lower proofs or reintroducing mixed ownership
   - kept the current remaining public vars because they are exercised either by real higher consumers or by intentional lower proofs; no further narrowing was justified within this task
+
+Follow-up test shaping:
+- [x] Replace the brittle numeric workflow-file-count assertion in `psi.agent-session.workflow-migration-validation-test` with a less noisy expectation based on non-empty discovery plus a curated required workflow subset
+- [x] Add one local test helper in `psi.agent-session.workflow-migration-validation-test` that returns parsed files, compiled definitions, and a `by-name` view so repeated `scan-directory` / `compile-workflow-files` setup stops duplicating across migration-proof tests
+- [x] Add one tiny local helper in `components/workflow-loader/test/psi/workflow_loader/core_test.clj` for temp-dir loading with globals disabled so repeated temp-dir + `with-redefs` setup does not keep spreading
+- [x] Add one small explicit loader API contract test block that makes the intended canonical loader API versus intentionally-public helper APIs more obvious
+- [x] In that loader API contract block, prove at least that `load-workflow-definitions` remains the canonical lower entrypoint while `scan-directory`, parser, compiler, and validation seams remain intentional helper APIs with preserved result shapes used by real higher callers or lower proofs

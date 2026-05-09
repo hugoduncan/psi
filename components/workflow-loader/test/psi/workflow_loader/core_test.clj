@@ -18,6 +18,15 @@
         (doseq [f (.listFiles dir)] (.delete f))
         (.delete dir)))))
 
+(defn- with-project-loader-result
+  [files f]
+  (with-temp-workflow-dir
+    files
+    (fn [dir]
+      (with-redefs [loader/global-workflow-dirs (constantly [])
+                    loader/project-workflow-dir (constantly dir)]
+        (f dir (loader/load-workflow-definitions dir))))))
+
 (def planner-md
   (str "---\nname: planner\ndescription: Plans tasks\n---\n"
        "{:steps [{:name \"plan\"\n"
@@ -152,36 +161,30 @@
 
 (deftest load-workflow-definitions-test
   (testing "loads and compiles workflow files from a project directory"
-    (with-temp-workflow-dir
+    (with-project-loader-result
       {"planner.md" planner-md
        "builder.md" builder-md}
-      (fn [dir]
-        (with-redefs [loader/global-workflow-dirs (constantly [])
-                      loader/project-workflow-dir (constantly dir)]
-          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
-            (is (= #{"planner" "builder"} (set (keys definitions))))
-            (is (empty? errors))
-            (is (= [:session]
-                   (mapv :type (:steps (get definitions "planner")))))
-            (is (= [:session]
-                   (mapv :type (:steps (get definitions "builder"))))))))))
+      (fn [_dir {:keys [definitions errors]}]
+        (is (= #{"planner" "builder"} (set (keys definitions))))
+        (is (empty? errors))
+        (is (= [:session]
+               (mapv :type (:steps (get definitions "planner")))))
+        (is (= [:session]
+               (mapv :type (:steps (get definitions "builder"))))))))
 
   (testing "multi-step definitions compile with step references resolved"
-    (with-temp-workflow-dir
+    (with-project-loader-result
       {"planner.md" planner-md
        "builder.md" builder-md
        "reviewer.md" reviewer-md
        "plan-build-review.md" chain-md}
-      (fn [dir]
-        (with-redefs [loader/global-workflow-dirs (constantly [])
-                      loader/project-workflow-dir (constantly dir)]
-          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
-            (is (= 4 (count definitions)))
-            (is (contains? definitions "plan-build-review"))
-            (is (= 3 (count (get-in definitions ["plan-build-review" :steps]))))
-            (is (= [:delegate :delegate :delegate]
-                   (mapv :type (get-in definitions ["plan-build-review" :steps]))))
-            (is (empty? errors)))))))
+      (fn [_dir {:keys [definitions errors]}]
+        (is (= 4 (count definitions)))
+        (is (contains? definitions "plan-build-review"))
+        (is (= 3 (count (get-in definitions ["plan-build-review" :steps]))))
+        (is (= [:delegate :delegate :delegate]
+               (mapv :type (get-in definitions ["plan-build-review" :steps]))))
+        (is (empty? errors)))))
 
   (testing "explicit named prior-step source selection loads and compiles"
     (with-temp-workflow-dir
@@ -265,16 +268,13 @@
                    (mapv :type (:steps (get definitions "plan-build-review"))))))))))
 
   (testing "parse errors collected separately from successful compilations"
-    (with-temp-workflow-dir
+    (with-project-loader-result
       {"planner.md" planner-md
        "broken.md" bad-md}
-      (fn [dir]
-        (with-redefs [loader/global-workflow-dirs (constantly [])
-                      loader/project-workflow-dir (constantly dir)]
-          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
-            (is (= 1 (count definitions)))
-            (is (contains? definitions "planner"))
-            (is (= 1 (count errors)))))))))
+      (fn [_dir {:keys [definitions errors]}]
+        (is (= 1 (count definitions)))
+        (is (contains? definitions "planner"))
+        (is (= 1 (count errors)))))))
 
 (deftest load-workflow-definitions-target-only-compilation-test
   (testing "current-authored workflow files are rejected after retirement"
@@ -301,6 +301,28 @@
             (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
               (is (seq errors))
               (is (some #(re-find #"EOF while reading" (:error %)) errors)))))))))
+
+(deftest loader-api-contract-test
+  (testing "load-workflow-definitions remains the canonical lower entrypoint while helper APIs retain intentional result shapes"
+    (with-project-loader-result
+      {"planner.md" planner-md}
+      (fn [dir {:keys [definitions errors warnings] :as result}]
+        (is (= #{:definitions :errors :warnings}
+               (set (keys result))))
+        (is (= #{"planner"}
+               (set (keys definitions))))
+        (is (vector? errors))
+        (is (vector? warnings))
+        (is (vector? (loader/scan-directory dir))))))
+
+  (testing "scan-directory remains the lower file-scan helper shape used by higher proofs"
+    (with-temp-workflow-dir
+      {"planner.md" planner-md}
+      (fn [dir]
+        (let [parsed (loader/scan-directory dir)]
+          (is (= 1 (count parsed)))
+          (is (= #{:name :description :config :body :source-path}
+                 (set (keys (first parsed))))))))))
 
 (deftest directory-precedence-test
   (testing "project definitions override global definitions with same name"

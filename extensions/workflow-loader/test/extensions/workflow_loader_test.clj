@@ -143,6 +143,18 @@
       ;; No name collisions
       (is (true? (:valid? (compiler/validate-no-name-collisions definitions)))))))
 
+(deftest loader-api-seams-remain-intentional-test
+  (testing "parser/compiler/validation helper seams remain intentional lower APIs used by higher proofs"
+    (let [parsed (parser/parse-workflow-file planner-raw)
+          compiled (compiler/compile-workflow-file parsed)
+          definitions [(:definition compiled)]]
+      (is (= "planner" (:name parsed)))
+      (is (nil? (:error compiled)))
+      (is (= {:valid? true}
+             (compiler/validate-step-references definitions)))
+      (is (= {:valid? true}
+             (compiler/validate-no-name-collisions definitions))))))
+
 (deftest legacy-agent-profile-compatibility-test
   (testing "legacy agent-profile shaped files parse but no longer compile as workflows"
     ;; Task 090 retired current-authored / agent-profile workflow compilation.
