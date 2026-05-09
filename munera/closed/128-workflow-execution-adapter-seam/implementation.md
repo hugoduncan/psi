@@ -99,3 +99,4 @@ Review notes:
 - test-shaper follow-up had noted that `with-workflow-execution-adapter-overrides` was acceptable locally, but should move into shared test support if more adapter-consumer tests appeared
 - follow-up completed: moved the seam-aware adapter override helper into shared test support and rewired `workflow_attempts_test` to reuse it
 - verification after test-shaper follow-up: shared test support and workflow-attempts test lint cleanly, and focused workflow attempt/judge tests still pass
+- implementation review (terse): design intent is met, boundary direction is improved, and the named seam is coherent; follow-up completed: adapter operation slots now fail via seam-specific `ex-info` instead of opaque nil invocation when a present adapter is miswired

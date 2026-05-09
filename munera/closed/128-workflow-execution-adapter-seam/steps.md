@@ -39,3 +39,12 @@
   - updated `workflow_attempts_test` to reuse the shared seam-aware helper
   - verification: `clj-kondo --lint components/agent-session/test/psi/agent_session/test_support.clj components/agent-session/test/psi/agent_session/workflow_attempts_test.clj`
   - verification: `clojure -A:test-paths -e "(require 'clojure.test 'psi.agent-session.workflow-attempts-test 'psi.agent-session.workflow-judge-test) ..."`
+- [x] Add explicit validation for required workflow execution adapter operations so a present-but-miswired adapter fails with seam-specific `ex-info` instead of opaque nil invocation
+- [x] Choose and implement the validation shape in `psi.workflow-runtime.execution-adapter`:
+  - chose per-operation accessors via `required-op`
+  - missing operation failures now throw `ex-info` with `:adapter-key` and `:operation`
+- [x] Add focused tests proving each required adapter operation fails clearly when absent from an installed adapter value
+  - added `components/workflow-runtime/test/psi/workflow_runtime/execution_adapter_test.clj`
+- [x] Assert missing-operation failures include both `:adapter-key` and the missing operation identifier in `ex-data`
+- [x] Verify adapter validation changes preserve current canonical assembly behavior in `psi.agent-session.context`
+- [x] Verify focused workflow adapter consumer tests still pass after the missing-operation validation change

@@ -27,9 +27,16 @@
       (throw (ex-info "Workflow execution adapter is required"
                       {:adapter-key adapter-key}))))
 
+(defn- required-op
+  [ctx op-key]
+  (or (get (adapter ctx) op-key)
+      (throw (ex-info "Workflow execution adapter operation is required"
+                      {:adapter-key adapter-key
+                       :operation op-key}))))
+
 (defn create-child-session!
   [ctx parent-session-id opts]
-  ((:create-child-session! (adapter ctx)) ctx parent-session-id opts))
+  ((required-op ctx :create-child-session!) ctx parent-session-id opts))
 
 (defn prompt-execution-result!
   ([ctx session-id text]
@@ -37,7 +44,7 @@
   ([ctx session-id text images]
    (prompt-execution-result! ctx session-id text images nil))
   ([ctx session-id text images opts]
-   (let [f (:prompt-execution-result! (adapter ctx))]
+   (let [f (required-op ctx :prompt-execution-result!)]
      (cond
        (some? opts) (f ctx session-id text images opts)
        (some? images) (f ctx session-id text images)
@@ -45,17 +52,17 @@
 
 (defn get-session-data
   [ctx session-id]
-  ((:get-session-data (adapter ctx)) ctx session-id))
+  ((required-op ctx :get-session-data) ctx session-id))
 
 (defn list-context-sessions
   [ctx]
-  ((:list-context-sessions (adapter ctx)) ctx))
+  ((required-op ctx :list-context-sessions) ctx))
 
 (defn find-skill
   [ctx skills skill-name]
-  ((:find-skill (adapter ctx)) skills skill-name))
+  ((required-op ctx :find-skill) skills skill-name))
 
 (defn execute-judge!
   [ctx parent-session-id actor-session-id judge-spec routing-table routing-context]
-  ((:execute-judge! (adapter ctx))
+  ((required-op ctx :execute-judge!)
    ctx parent-session-id actor-session-id judge-spec routing-table routing-context))
