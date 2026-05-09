@@ -58,6 +58,7 @@
    [psi.agent-session.mutations :as mutations]
 
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.agent-session.workflow.core :as built-in-workflow]
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.runtime :as runtime]
@@ -352,6 +353,7 @@ Available: " (str/join ", " (map name (keys all))))
                             (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))
          cwd              (or cwd (System/getProperty "user.dir"))
          _                (background-job-ui/install-background-job-ui-refresh! ctx)
+         _                (built-in-workflow/init-built-in! ctx session-id)
          ctx-files        (sys-prompt/discover-context-files cwd)
          sd               (ss/get-session-data-in ctx session-id)
          prompt-mode      (or (:prompt-mode sd) :lambda)

@@ -1,0 +1,152 @@
+# 133 — Built-in workflow capability reframing
+
+## Current extension-surface review
+
+Reviewed extension-owned workflow surfaces:
+
+- `extensions/workflow-loader/src/extensions/workflow_loader.clj`
+- `extensions/workflow-loader/src/extensions/workflow_loader/{delivery,orchestration,text}.clj`
+- `extensions/workflow-display/src/extensions/workflow_display.clj`
+- related config/test path ownership in `deps.edn`, `tests.edn`, and extension-local `deps.edn`
+
+Moved into built-in core wiring/ownership:
+
+- canonical workflow display/read-model helpers moved from `extensions.workflow-display` to `psi.agent-session.workflow.display`
+- canonical workflow bootstrap/wiring moved into built-in core owner `psi.agent-session.workflow.core`
+- canonical workflow helper ownership for delivery/text/orchestration moved into built-in core owners:
+  - `psi.agent-session.workflow.delivery`
+  - `psi.agent-session.workflow.text`
+  - `psi.agent-session.workflow.orchestration`
+- runtime bootstrap now installs built-in workflow directly from `components/app-runtime/src/psi/app_runtime.clj`
+
+Removed extension framing:
+
+- `extensions/workflow-display/` disappeared entirely as an extension-owned canonical surface
+- `psi/workflow-loader` was removed from recognized manifest-installed built-in extension catalog in `psi.agent-session.extension-installs`
+- `.psi/extensions.edn` no longer lists `psi/workflow-loader`
+
+Remaining outside built-in core:
+
+- `extensions/workflow-loader/*` remains only as a thin compatibility façade layer that delegates to the built-in core workflow owner
+- this façade preserves legacy namespace reload and legacy test/runtime loading paths while canonical ownership/bootstrap moved to built-in core
+
+Why the residue remains:
+
+- reload/runtime compatibility tests and legacy extension-path loading still exercise `extensions.workflow-loader*` namespace names directly
+- keeping the façade avoids broad same-task churn across reload/runtime compatibility surfaces while still removing canonical extension framing
+- the façade is not the canonical owner of workflow behavior; it only forwards to built-in core owners
+
+## Built-in home for workflow framing
+
+Chosen built-in owners:
+
+- built-in composition root: `components/app-runtime/src/psi/app_runtime.clj`
+- higher core workflow owners:
+  - `psi.agent-session.workflow.core`
+  - `psi.agent-session.workflow.delivery`
+  - `psi.agent-session.workflow.text`
+  - `psi.agent-session.workflow.orchestration`
+  - `psi.agent-session.workflow.display`
+
+Composition choice:
+
+- the task preferred `system-bootstrap` first, but the actual smallest coherent move was to install built-in workflow from `app-runtime` because that is the existing live runtime bootstrap assembly point that already owns background-job UI refresh and startup session bootstrap sequencing
+- workflow installation here stays an assembly concern; lower workflow behavior remains in lower workflow components and session-facing behavior remains in `agent-session.workflow.*`
+- this does not broaden `agent-session` incorrectly into lower workflow semantics; it only gives higher workflow orchestration a coherent built-in namespace family
+
+## Naming rule for higher core workflow namespaces
+
+Followed the preferred nested `workflow.*` family:
+
+- `psi.agent-session.workflow.core`
+- `psi.agent-session.workflow.delivery`
+- `psi.agent-session.workflow.text`
+- `psi.agent-session.workflow.orchestration`
+- `psi.agent-session.workflow.display`
+
+No new flat `workflow-*` namespace family was introduced.
+
+## Preserved lower boundaries
+
+This task intentionally preserved extracted lower workflow component boundaries:
+
+- `components/workflow-loader/`
+- `components/workflow-runtime/`
+- `components/workflow-registry/`
+- `components/workflow-judge/`
+- `components/workflow-step-materialization/`
+- `components/workflow-step-session-config/`
+- `components/deterministic-operation-registry/`
+- `components/deterministic-operation-runtime/`
+
+No lower workflow authored-definition loading, registry semantics, runtime semantics, judge semantics, step materialization semantics, or step session-config semantics were moved upward by this task.
+
+## Public surface preservation
+
+Preserved user-facing workflow surfaces:
+
+- `delegate` tool availability and behavior
+- `/delegate`
+- `/delegate-reload`
+- workflow definition loading/reloading from `.psi/workflows/`
+- workflow registration/removal behavior after reload
+- current session-switch reload behavior
+- available-workflow prompt contribution surfacing via `workflow-loader-workflows`
+- workflow run execution through canonical core workflow mutations/resolvers/psi-tool surfaces
+
+Incidental changes allowed by the task:
+
+- canonical workflow bootstrap provenance now shows built-in workflow registration instead of manifest-installed workflow-loader ownership
+- canonical workflow background-job provenance id changed to built-in `built-in:workflow`
+- internal namespace placement and test placement changed
+
+## Extension residue status
+
+`extensions/workflow-loader/` status:
+
+- remains as a thin compatibility façade only
+- canonical ownership/bootstrap moved to built-in core
+- façade exists to preserve direct legacy namespace loading and reload-code paths still referenced by compatibility/runtime tests
+
+`extensions/workflow-display/` status:
+
+- moved into built-in core ownership and the extension-owned canonical surface disappeared
+
+Why residue does not preserve old framing confusion:
+
+- runtime bootstrap no longer depends on manifest extension install of workflow-loader
+- built-in workflow is installed directly by core runtime assembly
+- lower and higher workflow owners now live under core components/namespaces
+- remaining extension namespaces are compatibility shims, not canonical owners
+
+## Capability-model status
+
+After the change workflow is treated as:
+
+- built-in core capability
+- not extension-provided canonical behavior
+
+Explicit consequences:
+
+- `psi.agent-session.extension-installs/psi-owned-extension-catalog` no longer lists `psi/workflow-loader`
+- minimal manifest entry expansion no longer treats `psi/workflow-loader` as a recognized installed built-in extension
+- `.psi/extensions.edn` no longer needs `psi/workflow-loader`
+- runtime bootstrap installs workflow directly through built-in core assembly
+- live extension registry still contains a workflow registration entry, but its provenance is built-in (`built-in:workflow`) rather than manifest extension ownership
+
+## Residual exception
+
+Residual exception kept in this task:
+
+- legacy compatibility namespaces under `extensions/workflow-loader/*` remain present
+
+Reason:
+
+- direct namespace reload proofs and extension-path compatibility tests still target those legacy namespaces and paths
+- removing them immediately would broaden the task into simultaneous compatibility-surface deletion and test-suite reauthoring well beyond the smallest reframing move
+
+Why transitional rather than preferred end state:
+
+- canonical runtime bootstrap no longer loads workflow through manifest extension activation
+- canonical ownership already lives under built-in core owners
+- only compatibility entrypoints remain

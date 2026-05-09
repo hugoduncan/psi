@@ -35,6 +35,18 @@
 (defn- workflow-loader-state []
   @@#'wl/state)
 
+(defn- first-step-tools
+  [definition]
+  (let [steps (:steps definition)
+        first-step (cond
+                     (map? steps) (or (some->> (:step-order definition) first (get steps))
+                                      (some-> steps vals first))
+                     (sequential? steps) (first steps)
+                     :else nil)]
+    (or (get-in definition [:steps "step-1" :capability-policy :tools])
+        (get-in first-step [:capability-policy :tools])
+        (some-> first-step :tools set))))
+
 (deftest ^:integration reload-code-preserves-workflow-loader-state-across-namespace-reload
   (testing "namespace reload preserves workflow-loader state so delegate-reload remains usable"
     (let [[ctx session-id] (create-session-context)
@@ -73,4 +85,4 @@
       (is (some #{"complexity-reduction-pr"} before-defs))
       (is (some? complexity-def))
       (is (= #{"bash" "read" "edit" "write" "work-on"}
-             (get-in complexity-def [:steps "step-1" :capability-policy :tools]))))))
+             (first-step-tools complexity-def))))))

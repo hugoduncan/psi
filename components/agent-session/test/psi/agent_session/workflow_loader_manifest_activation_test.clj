@@ -18,7 +18,7 @@
     (.mkdirs (.getParentFile f))
     f))
 
-(deftest recognized-workflow-loader-minimal-entry-resolves-to-init-var-activation
+(deftest workflow-loader-minimal-manifest-entry-no-longer-expands-to-installed-extension
   (let [cwd  (test-support/temp-cwd)
         home (tmp-dir)]
     (with-redefs [installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
@@ -26,11 +26,10 @@
       (spit (installs/project-manifest-file cwd)
             (pr-str {:deps {'psi/workflow-loader {}
                             'psi/work-on {}}}))
-      (is (= {:lib 'psi/workflow-loader
-              :id "manifest:psi/workflow-loader"
-              :kind :init-var
-              :init-var 'extensions.workflow-loader/init}
-             (installs/resolve-local-root-entry
-              'psi/workflow-loader
-              {:dep {:local/root "/tmp/ignored"
-                     :psi/init 'extensions.workflow-loader/init}}))))))
+      (let [install-state (installs/compute-install-state cwd)]
+        (is (= false
+               (get-in install-state
+                       [:psi.extensions/effective :entries-by-lib 'psi/workflow-loader :extension?])))
+        (is (= :not-applicable
+               (get-in install-state
+                       [:psi.extensions/effective :entries-by-lib 'psi/workflow-loader :status])))))))
