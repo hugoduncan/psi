@@ -13,3 +13,5 @@
 - [x] If `psi.workflow-runtime.step-prep` remains as a façade, record why that was better than direct use of the split owners
 - [x] Record the final remaining public vars of `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.step-session-config` in `implementation.md`, justifying any non-obvious public
 - [x] Record the final split rationale and any residual ambiguity in `implementation.md`
+- [x] Remove or replace duplicated lower-level materialization proofs that still remain under `components/agent-session/test/psi/agent_session/workflow_step_materialization_test.clj` so proof ownership lives authoritatively under `workflow-runtime`
+- [x] Decide whether `psi.workflow-runtime.step-materialization/render-template-contribution` should remain public; either privatize it or tighten the implementation rationale with a concrete intended consumer

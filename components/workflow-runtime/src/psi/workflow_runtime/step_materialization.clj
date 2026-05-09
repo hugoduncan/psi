@@ -15,8 +15,9 @@
 
 (def binding-source-value workflow-source-resolution/resolve-binding-ref)
 
-(def render-template-contribution
-  workflow-source-resolution/render-template-contribution)
+(defn- render-template-contribution
+  [workflow-run contribution]
+  (workflow-source-resolution/render-template-contribution workflow-run contribution))
 
 (defn materialize-step-inputs
   [workflow-run step-id]
