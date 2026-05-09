@@ -1,10 +1,30 @@
-- [ ] Identify every built-in workflow use of extension-registry/API machinery
+- [ ] Inventory every built-in workflow use of extension-registry/API machinery
+- [ ] Inventory every runtime projection and test that still assumes workflow is extension-owned state
 - [ ] Decide the smallest built-in registration abstraction that can replace those uses
+- [ ] Decide whether shared registries gain built-in-specific entrypoints/provenance or whether any surface needs a small dedicated built-in store
+- [ ] Make the built-in lifecycle invocation path explicit
+  - [ ] runtime/session/reload ownership named
+  - [ ] reload and session-switch preservation path named
+  - [ ] reload and session-switch projection verification path named
+- [ ] Make the built-in prompt contribution path explicit
+  - [ ] storage/provenance decision recorded
+  - [ ] prompt rendering/projection path recorded
+  - [ ] any remaining "extension" wording debt recorded explicitly if retained
+- [ ] Make the built-in active tool aggregation path explicit
+  - [ ] built-in tool aggregation path recorded
+  - [ ] built-in vs extension provenance at aggregation time recorded
+- [ ] Make the built-in introspection/projection path explicit
+  - [ ] extension-registry visibility removed or narrowed
+  - [ ] replacement built-in visibility recorded if needed
+- [ ] Move built-in workflow bootstrap off `ext/register-extension-in!`
+- [ ] Move built-in workflow bootstrap off `ext/create-extension-api`
 - [ ] Move built-in workflow tool registration to the built-in path
 - [ ] Move built-in workflow command registration to the built-in path
 - [ ] Move built-in workflow prompt contribution registration to the built-in path
 - [ ] Move built-in workflow lifecycle hook registration to the built-in path
-- [ ] Remove `built-in:workflow` pseudo-extension registration if direct rewiring is possible; otherwise narrow and record the remaining compromise precisely
+- [ ] Remove built-in workflow extension identity registration and extension-API-based installation
+  - [ ] if `built-in:workflow` remains, keep it only as a built-in provenance identifier rather than extension identity
+  - [ ] if any shared storage remains, record exactly which surfaces remain shared and why that is no longer pseudo-extension modeling
 - [ ] Update affected tests to prove built-in rather than pseudo-extension registration behavior
 - [ ] Update docs/implementation notes to reflect the new residual status
 - [ ] Verify preserved user-facing behavior for `delegate`, `/delegate`, `/delegate-reload`, reload behavior, and prompt contribution surfacing
