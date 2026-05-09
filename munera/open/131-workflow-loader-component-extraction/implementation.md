@@ -13,7 +13,7 @@ Reviewed as possible loader owners:
   - `psi.agent-session.workflow-file-authoring-session`
   - `psi.agent-session.workflow-file-authoring-preload`
   - `psi.agent-session.workflow-file-authoring-routing`
-- retained only as a temporary compatibility façade:
+- removed after direct rewiring:
   - `psi.agent-session.workflow-file-authoring-resolution`
 
 Review conclusion:
@@ -164,38 +164,23 @@ Adjacent extracted lower owners remain separate:
 
 ## Transitional namespace status
 
-Retained compatibility façades under `components/agent-session/src/psi/agent_session/`:
-- `workflow_file_loader.clj`
-- `workflow_file_parser.clj`
-- `workflow_file_compiler.clj`
-- `workflow_file_authoring_errors.clj`
-- `workflow_file_authoring_session.clj`
-- `workflow_file_authoring_preload.clj`
-- `workflow_file_authoring_routing.clj`
-- `workflow_file_authoring_resolution.clj`
-
-Why retained:
-- they are now tiny forwarding seams only
-- they preserve compatibility for any still-unrewired callers outside the reviewed focused set
-- they allow this extraction to land without broad opportunistic rewiring beyond task scope
+Final status:
+- removed old mixed `psi.agent-session.workflow-file-*` namespaces entirely after direct rewiring
+- `psi.agent-session.workflow-file-authoring-resolution` does not remain
 
 Specific `workflow-file-authoring-resolution` decision:
-- retained only as a temporary compatibility façade
-- no longer preferred or authoritative
-- canonical owner is now the `psi.workflow-loader.authoring-*` family
-
-Residual debt from retained seams:
-- old `psi.agent-session.workflow-file-*` façades should be removed in a follow-up once all consumers are rewritten directly to `psi.workflow-loader.*`
+- removed after rewiring
+- it is no longer present as either an authoritative owner or compatibility façade
+- canonical owner is the `psi.workflow-loader.authoring-*` family
 
 ## Residual dependency status
 
-Residual direct dependencies on old mixed owners remain only through the forwarding façade files themselves.
+Residual direct dependencies on old mixed owners do not remain.
 
-No reviewed higher caller in the implemented focused set continues to prefer the old owners.
+No reviewed higher or lower caller continues to depend on the removed `psi.agent-session.workflow-file-*` namespaces.
 
 Residual debt:
-- compatibility façade removal remains a later cleanup step
-- because the façades are tiny and authoritative ownership has moved, this is documented debt rather than ongoing mixed ownership
+- none for forwarding seam cleanup; that cleanup is complete
 
 ## Verification
 
@@ -217,5 +202,4 @@ Acceptance is met for authoritative ownership:
 - behavior contracts were preserved
 
 Explicit residual debt:
-- old `psi.agent-session.workflow-file-*` namespaces remain as documented temporary forwarding seams instead of being fully removed in this task
-- this is the only intentional incompleteness left from the preferred final state
+- none for forwarding seams; the old `psi.agent-session.workflow-file-*` namespaces were removed after direct rewiring

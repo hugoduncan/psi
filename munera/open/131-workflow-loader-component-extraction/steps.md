@@ -14,8 +14,8 @@
 - [x] Verify workflow registry ownership remains limited to definition storage/query concerns and is not recombined with loader ownership
 - [x] Verify workflow runtime ownership remains limited to execution/progression concerns and is not recombined with loader ownership
 - [x] Verify workflow step session-config and workflow step materialization remain separate lower owners and are not recombined with loader ownership
-- [x] Decide whether previous mixed workflow-loading owners disappear entirely or remain only as tiny temporary forwarding seams, and record justification if retained; explicitly decide the fate of `workflow-file-authoring-resolution`, with preferred final state being removal after rewiring
-- [x] Remove any temporary forwarding seams before task completion unless a blocking reason is recorded; if a seam remains, record it as explicit residual debt
+- [x] Decide whether previous mixed workflow-loading owners disappear entirely or remain only as tiny temporary forwarding seams, and record justification if retained; explicitly decide the fate of `workflow-file-authoring-resolution`, with final state being removal after rewiring
+- [x] Remove any temporary forwarding seams before task completion unless a blocking reason is recorded; final state: all forwarding seams removed
 - [x] Record how the extracted loader component hands off to workflow registry/runtime consumers and whether the downstream handoff artifact is raw authored definitions, normalized definitions, canonical prepared definitions, or a load-result envelope including metadata/context; prefer canonical prepared definitions plus loader-owned metadata/diagnostics, and record that registration remains outside loader authoritative ownership
 - [x] Record whether any mixed load-register-run boundary awkwardness remains
 - [x] Record whether the resulting loader -> registry/runtime dependency shape is acceptably tree-like or still preserves graph edges for later cleanup
@@ -27,4 +27,4 @@ Verification:
 - [x] `clojure -M:lint --lint components/workflow-loader components/agent-session extensions/workflow-loader deps.edn tests.edn`
 
 Residual debt:
-- [x] Document retained `psi.agent-session.workflow-file-*` forwarding seams as explicit follow-up cleanup debt
+- [x] No retained forwarding seams remain
