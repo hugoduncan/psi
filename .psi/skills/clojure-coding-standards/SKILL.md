@@ -34,12 +34,13 @@ Comprehensive Clojure coding standards for maintainable, readable code.
 
 ### Architecture
 
-- Prefer not to use dynamic vars.  Use explicit arguments instead.
+- Use explicit arguments instead, not dynamic vars.
 - Prefer not to use multimethods.  Use something that does use global mutable state.
-- only use `declere` for mutual recursion
+- Only use `declere` for mutual recursion
 - Do not use `in-ns` in production code.
 - Do not use `try` `catch` exception handling for flow control
 - Do not shadow locals, vars or functions
+- Break dependency cycles architecturally, not use requiring-resolve
 
 λx.prefer(compose(transducers))∧when(working_with(sequences),thread(sequence_functions))
 
