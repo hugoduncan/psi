@@ -66,3 +66,5 @@ Verification
 Review notes
 - code-shaper review (terse): extraction is clean, the new owner is small and coherent, and the rewiring avoided unnecessary compatibility seams; follow-up completed: parent-session data is now read once and reused across tool/skill/model/prompt-mode derivation, and the fallback placeholder skill map now lives behind a tiny private helper for better scanability
 - verification after code-shaper follow-up: focused tests remain `5 tests, 20 assertions, 0 failures` and focused lint remains clean
+- test review (terse): the extracted owner tests cover the main inheritance/override contract well at the public boundary; follow-up completed: added focused missing-skill and missing-tool fallback proofs at `resolve-step-session-config`, and re-evaluated test shape — the matrix is still small enough that direct setup remains clearer than introducing shared or table-driven indirection
+- verification after test follow-up: focused tests are now `7 tests, 22 assertions, 0 failures` and focused lint remains clean

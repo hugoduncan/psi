@@ -141,3 +141,55 @@
       (is (= [first-session-id second-session-id] listed-session-ids))
       (is (= :first-mode (:prompt-mode config)))
       (is (= {:provider "openai" :id "first-model"} (:model config))))))
+
+(deftest resolve-step-session-config-missing-skill-falls-back-to-placeholder-shape-test
+  (testing "missing skill references fall back to the placeholder skill map shape at the public boundary"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          missing-skill-definition {:definition-id "planner-missing-skill"
+                                    :name "planner-missing-skill"
+                                    :steps [{:name "step-1"
+                                             :type :session
+                                             :skills ["missing-skill"]
+                                             :contributions [{:type :template
+                                                              :text "{{input}}"
+                                                              :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                                    :workflow-file-meta {:system-prompt "You are a planner."}}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-registry/register-definition state missing-skill-definition)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner-missing-skill"
+                                                                   :run-id "run-missing-skill"
+                                                                   :workflow-input {:input "plan it"}})]
+                       s)))
+          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-missing-skill")
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= [{:name "missing-skill"
+               :description ""
+               :file-path ""
+               :base-dir ""
+               :source :project
+               :disable-model-invocation false}]
+             (:skills config))))))
+
+(deftest resolve-step-session-config-missing-tool-falls-back-to-normalized-tool-shape-test
+  (testing "missing tool references fall back to normalized tool definition shape at the public boundary"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          missing-tool-definition {:definition-id "planner-missing-tool"
+                                   :name "planner-missing-tool"
+                                   :steps [{:name "step-1"
+                                            :type :session
+                                            :tools ["missing-tool"]
+                                            :contributions [{:type :template
+                                                             :text "{{input}}"
+                                                             :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                                   :workflow-file-meta {:system-prompt "You are a planner."}}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-registry/register-definition state missing-tool-definition)
+                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner-missing-tool"
+                                                                   :run-id "run-missing-tool"
+                                                                   :workflow-input {:input "plan it"}})]
+                       s)))
+          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-missing-tool")
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= ["missing-tool"] (mapv :name (:tool-defs config)))))))

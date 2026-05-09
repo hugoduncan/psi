@@ -17,3 +17,8 @@
 - [x] Preserve current behavior and output contracts while reducing repeated `execution-adapter/get-session-data` reads across private helpers
 - [x] Extract the fallback placeholder skill map in `resolve-step-skills` into a tiny private helper to improve local scanability without broadening the component surface
 - [x] Verify the refactor preserves current focused workflow step session-config tests and lint cleanliness
+- [x] Add a focused test proving missing skill references fall back to the placeholder skill map shape when no matching parent/session skill exists
+- [x] Add a focused test proving missing tool references fall back to the normalized tool definition shape when no matching parent/session tool exists
+- [x] Verify the new fallback tests continue to exercise `resolve-step-session-config` at the extracted public boundary rather than private helpers
+- [x] Re-evaluate whether shared setup helpers or a table-driven shape are warranted only if the inheritance/override test matrix grows further; preserve the current direct style unless that growth actually occurs
+  - current matrix remains small enough that direct setup is still clearer than introducing shared or table-driven test indirection
