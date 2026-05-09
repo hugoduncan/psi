@@ -19,60 +19,33 @@
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
+   [psi.agent-session.workflow.runtime-state :as runtime-state]
    [psi.agent-session.workflow.text :as text]
    [psi.agent-core.core :as agent]
    [psi.session-state.state :as ss]
    [psi.tool-registry.registry :as tool-registry]
    [psi.workflow-loader.core :as loader]))
 
-;;; Extension state
+;;; Runtime state aliases
 
-(defonce state (atom nil))
-(def ^:dynamic *active-workflow-session-id* nil)
-
-(def built-in-workflow-path "built-in:workflow")
-(def prompt-contribution-id "workflow-loader-workflows")
-
-;; Minimal non-authoritative sync wait registry: {run-id {:future ... :job-id ...}}
-(def inflight-runs (atom {}))
+(def state runtime-state/state)
+(def built-in-workflow-path runtime-state/built-in-workflow-path)
+(def prompt-contribution-id runtime-state/prompt-contribution-id)
+(def inflight-runs runtime-state/inflight-runs)
 
 ;;; Helpers
 
-(declare current-session-id)
-
-(defn- query-fn [] (:query-fn @state))
-
-(defn- mutate! [sym params]
-  ((:mutate-fn @state) sym params))
-(defn- log! [msg] ((:log-fn @state) msg))
-(defn- notify!
-  [msg level]
-  (let [notify-fn (:notify-fn @state)]
-    (try
-      (notify-fn msg {:role "assistant"
-                      :custom-type "workflow-loader"
-                      :level level})
-      (catch clojure.lang.ArityException _
-        (notify-fn msg level)))))
-(defn- ui-notify! [msg level]
-  (if-let [notify-fn (some-> @state :ui :notify)]
-    (notify-fn msg level)
-    (notify! msg level)))
-
-(defn- worktree-path []
-  (when-let [qf (query-fn)]
-    (:psi.agent-session/worktree-path
-     (qf [:psi.agent-session/worktree-path]))))
-
-(defn- current-session-id []
-  (or *active-workflow-session-id*
-      (:current-session-id @state)
-      (when-let [qf (query-fn)]
-        (:psi.agent-session/session-id
-         (qf [:psi.agent-session/session-id])))))
-
-(defn- query-session-fn [] (:query-session-fn @state))
-(defn- mutate-session-fn [] (:mutate-session-fn @state))
+(def query-fn runtime-state/query-fn)
+(def mutate! runtime-state/mutate!)
+(def log! runtime-state/log!)
+(def notify! runtime-state/notify!)
+(def ui-notify! runtime-state/ui-notify!)
+(def worktree-path runtime-state/worktree-path)
+(defn current-session-id []
+  (or runtime-state/*active-workflow-session-id*
+      (runtime-state/current-session-id)))
+(def query-session-fn runtime-state/query-session-fn)
+(def mutate-session-fn runtime-state/mutate-session-fn)
 
 (defn- start-background-job!
   [session-id run-id workflow-name]
@@ -100,14 +73,14 @@
    Returns {:registered-count ... :errors [...] :warnings [...] :retired-definition-ids [...]}"
   []
   (let [wtp (worktree-path)
-        old-definitions (:loaded-definitions @state)
+        old-definitions (runtime-state/loaded-definitions)
         {:keys [definitions errors warnings]} (loader/load-workflow-definitions wtp)
         retired-definition-ids (retire-removed-definitions! old-definitions definitions)]
     ;; Register each definition via mutation
     (doseq [[_name definition] definitions]
       (mutate! 'psi.workflow/register-definition {:definition definition}))
     ;; Store loaded definitions in extension state for prompt contribution
-    (swap! state assoc :loaded-definitions definitions)
+    (runtime-state/assoc-state! :loaded-definitions definitions)
     {:registered-count (count definitions)
      :definition-names (sort (keys definitions))
      :retired-definition-ids retired-definition-ids
@@ -117,10 +90,10 @@
 (defn- build-prompt-contribution
   "Build the prompt contribution text listing available workflows."
   []
-  (text/build-prompt-contribution (:loaded-definitions @state)))
+  (text/build-prompt-contribution (runtime-state/loaded-definitions)))
 
 (defn- register-prompt-contribution! []
-  (when-let [register-fn (:register-prompt-contribution @state)]
+  (when-let [register-fn (runtime-state/register-prompt-contribution-fn)]
     (register-fn {:id prompt-contribution-id
                   :section "Extension Capabilities"
                   :content (build-prompt-contribution)})))
@@ -189,7 +162,7 @@
         jobs-result (when-let [qf (query-fn)]
                       (qf [:psi.agent-session/background-jobs]))
         jobs (:psi.agent-session/background-jobs jobs-result)]
-    (text/delegate-list-text (:loaded-definitions @state) runs jobs)))
+    (text/delegate-list-text (runtime-state/loaded-definitions) runs jobs)))
 
 (defn- delegate-run
   "Handle action=run: resolve workflow, create + execute canonical workflow run.
@@ -211,7 +184,7 @@
       (= ::invalid mode*)
       {:error "mode must be one of: sync, async"}
 
-      (nil? (get (:loaded-definitions @state) workflow-name))
+      (nil? (get (runtime-state/loaded-definitions) workflow-name))
       {:error (str "Unknown workflow '" workflow-name "'. Use action=list to see available workflows.")}
 
       :else
@@ -370,7 +343,7 @@
 (defn- refresh-widgets!
   "Update widgets for workflow-loader background jobs using canonical workflow and background-job state."
   []
-  (when-let [ui (:ui @state)]
+  (when-let [ui (runtime-state/ui)]
     (let [runs-result (try
                         (mutate! 'psi.workflow/list-runs {})
                         (catch Exception _ {:psi.workflow/runs []}))
@@ -387,7 +360,7 @@
                              (sort-by :psi.background-job/started-at)
                              vec)
           current-wids (into #{} (map #(str "delegate-" (:psi.background-job/workflow-id %)) delegate-jobs))
-          old-wids (or (:widget-ids @state) #{})]
+          old-wids (or (runtime-state/widget-ids) #{})]
       (doseq [wid (set/difference old-wids current-wids)]
         ((:clear-widget ui) wid))
       (doseq [job delegate-jobs]
@@ -399,28 +372,28 @@
                                            job
                                            (or run-info {}))]
           ((:set-widget ui) wid text/widget-placement lines)))
-      (swap! state assoc :widget-ids current-wids))))
+      (runtime-state/assoc-state! :widget-ids current-wids))))
 
 ;;; Delegate command
 
 ;;; Built-in + compatibility init
 
 (defn init [api]
-  (swap! state merge
-         {:api api
-          :query-fn (:query api)
-          :query-session-fn (:query-session api)
-          :mutate-fn (:mutate api)
-          :mutate-session-fn (:mutate-session api)
-          :log-fn (or (:log api) println)
-          :notify-fn (or (:notify api) (fn [m _] (println m)))
-          :append-message-fn (:append-message api)
-          :ui (:ui api)
-          :register-prompt-contribution
-          (when-let [rpc (:register-prompt-contribution api)]
-            rpc)
-          :loaded-definitions (or (:loaded-definitions @state) {})
-          :widget-ids (or (:widget-ids @state) #{})})
+  (runtime-state/swap-state! merge
+                             {:api api
+                              :query-fn (:query api)
+                              :query-session-fn (:query-session api)
+                              :mutate-fn (:mutate api)
+                              :mutate-session-fn (:mutate-session api)
+                              :log-fn (or (:log api) println)
+                              :notify-fn (or (:notify api) (fn [m _] (println m)))
+                              :append-message-fn (:append-message api)
+                              :ui (:ui api)
+                              :register-prompt-contribution
+                              (when-let [rpc (:register-prompt-contribution api)]
+                                rpc)
+                              :loaded-definitions (or (runtime-state/loaded-definitions) {})
+                              :widget-ids (or (runtime-state/widget-ids) #{})})
 
   ;; Load and register all workflow definitions
   (let [{:keys [registered-count errors]} (reload-definitions!)]
@@ -461,7 +434,7 @@
                    ([args opts]
                     (runtime-fns/with-active-extension-session-id
                       (:session-id opts)
-                      #(binding [*active-workflow-session-id* (:session-id opts)]
+                      #(binding [runtime-state/*active-workflow-session-id* (:session-id opts)]
                          (execute-delegate-tool args opts)))))})
 
   ;; Register /delegate command
@@ -473,7 +446,7 @@
                                            (nil? workflow)
                                            (str "Available workflows:\n"
                                                 (text/available-workflows-text
-                                                 (:loaded-definitions @state)))
+                                                 (runtime-state/loaded-definitions)))
 
                                            (= "list" workflow)
                                            (delegate-list)
@@ -506,7 +479,7 @@
   ;; Session lifecycle cleanup
   ((:on api) "session_switch"
              (fn [{:keys [session-id]}]
-               (swap! state assoc :current-session-id session-id)
+               (runtime-state/assoc-state! :current-session-id session-id)
                (reload-definitions!)
                nil)))
 
@@ -524,14 +497,14 @@
   [ctx session-id]
   (let [reg         (:extension-registry ctx)
         runtime-fns (runtime-fns/make-extension-runtime-fns ctx session-id nil)
-        _           (swap! state assoc :ctx ctx)
+        _           (runtime-state/assoc-state! :ctx ctx)
         _           (ext/register-extension-in! reg built-in-workflow-path)
         api         (ext/create-extension-api reg built-in-workflow-path runtime-fns)]
     (runtime-fns/with-active-extension-session-id
       session-id
-      #(binding [*active-workflow-session-id* session-id]
+      #(binding [runtime-state/*active-workflow-session-id* session-id]
          (init api)
-         (swap! state assoc :ctx ctx :current-session-id session-id)
+         (runtime-state/assoc-state! :ctx ctx :current-session-id session-id)
          (refresh-active-tools! ctx session-id)))
     {:path built-in-workflow-path
-     :loaded-definitions (:loaded-definitions @state)}))
+     :loaded-definitions (runtime-state/loaded-definitions)}))
