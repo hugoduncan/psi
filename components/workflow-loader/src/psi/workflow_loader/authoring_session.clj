@@ -9,7 +9,8 @@
   (:require
    [malli.core :as m]
    [psi.session-state.model :as session]
-   [psi.workflow-loader.authoring-errors :as authoring-errors]))
+   [psi.workflow-loader.authoring-errors :as authoring-errors]
+   [psi.workflow-loader.authoring-step-source :as step-source]))
 
 (def ^:private binding-session-keys
   #{:input :reference})
@@ -28,9 +29,6 @@
 
 (def ^:private projection-entry-keys
   #{:from :projection})
-
-(def ^:private source-map-keys
-  #{:step :kind})
 
 (defn- default-binding
   [binding-key previous-step-id]
@@ -58,29 +56,17 @@
           :path [:original]}}
 
     (map? source)
-    (let [{:keys [step kind] :as source-map} source]
-      (or (authoring-errors/unexpected-keys-error ":session source"
-                                                  source-map-keys
-                                                  source-map)
-          (cond
-            (not (string? step))
-            (authoring-errors/invalid-in ":session source"
-                                         "expected `{:step \"...\" :kind :accepted-result}`")
-
-            (not= kind :accepted-result)
-            (authoring-errors/invalid-in ":session source"
-                                         (str "unsupported step source kind `"
-                                              kind "`"))
-
-            :else
-            (if-let [{:keys [step-id idx]} (get step-name->step-ref step)]
-              (if (< idx current-step-idx)
-                {:ok {:source :step-output
-                      :path [step-id]}}
-                (authoring-errors/invalid (str "Forward step reference: `"
-                                               step
-                                               "` must refer to an earlier step")))
-              (authoring-errors/invalid (str "Unknown step name: `" step "`"))))))
+    (let [{resolved :ok source-error :error}
+          (step-source/resolve-prior-step-source ":session source"
+                                                 "expected `{:step \"...\" :kind :accepted-result}`"
+                                                 #{:accepted-result}
+                                                 source
+                                                 step-name->step-ref
+                                                 current-step-idx)]
+      (if source-error
+        {:error source-error}
+        {:ok {:source :step-output
+              :path [(:step-id resolved)]}}))
 
     :else
     (authoring-errors/invalid-in ":session source"

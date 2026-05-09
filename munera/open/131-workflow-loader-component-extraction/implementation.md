@@ -37,6 +37,7 @@ Chosen internal split:
 - `psi.workflow-loader.authoring-session`
 - `psi.workflow-loader.authoring-preload`
 - `psi.workflow-loader.authoring-routing`
+- `psi.workflow-loader.authoring-step-source`
 
 Naming decision:
 - kept `workflow-loader` rather than broader or narrower alternatives because the final owned surface remains specifically about authored-definition discovery/loading/preparation before registry or runtime use
@@ -57,6 +58,7 @@ It owns:
   - session override compilation
   - session preload compilation
   - routing target resolution helpers
+  - shared prior-step source validation/resolution used by session and preload compilation
 - workflow-file metadata attachment during compile/load
 - downstream handoff of canonical prepared definitions to higher registry consumers
 
@@ -89,6 +91,7 @@ Additional intentionally public lower APIs:
 - `psi.workflow-loader.authoring-session/compile-step-session-overrides`
 - `psi.workflow-loader.authoring-session/step-source-reference-map`
 - `psi.workflow-loader.authoring-preload/compile-step-session-preload`
+- `psi.workflow-loader.authoring-step-source/resolve-prior-step-source`
 - `psi.workflow-loader.authoring-routing/routing-target->step-id-map`
 - `psi.workflow-loader.authoring-routing/resolve-routing-table`
 
@@ -186,7 +189,7 @@ Residual debt:
 
 Focused tests green:
 - `clojure -M:test --focus psi.workflow-loader.core-test --focus psi.workflow-loader.parser-test --focus psi.workflow-loader.compiler-test --focus psi.workflow-loader.compiler-target-authoring-test --focus psi.workflow-loader.authoring-session-test --focus extensions.workflow-loader-test --focus extensions.workflow-loader-delegate-test --focus psi.agent-session.workflow-loader-async-path-test --focus psi.agent-session.workflow-loader-tui-repro-test --focus psi.agent-session.workflow-migration-validation-test`
-- result: `55 tests, 365 assertions, 0 failures`
+- result: `56 tests, 369 assertions, 0 failures`
 
 Lint green:
 - `clojure -M:lint --lint components/workflow-loader components/agent-session extensions/workflow-loader deps.edn tests.edn`
@@ -203,3 +206,13 @@ Acceptance is met for authoritative ownership:
 
 Explicit residual debt:
 - none for forwarding seams; the old `psi.agent-session.workflow-file-*` namespaces were removed after direct rewiring
+
+## Review note
+
+Code-shaper review: approve as implemented.
+- shape is substantially improved: the extracted component is coherent, the split is small and role-focused, and higher orchestration now depends on one clear lower owner
+- no blocking simplicity, consistency, or robustness issue was found
+- follow-up shaping was then executed:
+  - split `psi.workflow-loader.core/load-workflow-definitions` into smaller pure assembly helpers for partitioning, validation error shaping, result shaping, and final load-result assembly
+  - extracted shared prior-step source validation/resolution to `psi.workflow-loader.authoring-step-source` and rewired both session and preload compilation to use it
+  - audited the loader public surface against actual non-test consumers and kept only the current used lower APIs public; no further narrowing was justified without either weakening proofs or broadening this task into test-only indirection work

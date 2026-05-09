@@ -58,9 +58,7 @@
   [dir-path]
   (mapv parse-file (md-files-in-dir dir-path)))
 
-(defn scan-all-directories
-  "Scan all workflow directories in precedence order.
-   Returns seq of parsed workflow data from all sources."
+(defn- scan-all-directories
   [worktree-path]
   (let [dirs (concat (global-workflow-dirs)
                      [(project-workflow-dir worktree-path)])]
@@ -78,6 +76,65 @@
            {}
            parsed-files)))
 
+(defn- partition-parsed-files
+  [parsed-files]
+  (group-by #(boolean (:error %)) parsed-files))
+
+(defn- parsed-file-error
+  [parsed]
+  {:name (:name parsed)
+   :error (:error parsed)
+   :source-path (:source-path parsed)})
+
+(defn- reference-validation-errors
+  [ref-result]
+  (when-not (:valid? ref-result)
+    (mapv (fn [{:keys [definition step missing]}]
+            {:name definition
+             :error (str "Step `" step "` references unknown workflow `" missing "`")})
+          (:errors ref-result))))
+
+(defn- judge-validation-errors
+  [judge-result]
+  (when-not (:valid? judge-result)
+    (mapv (fn [{:keys [definition step error target]}]
+            {:name definition
+             :error (case error
+                      :on-without-judge
+                      (str "Step `" step "` has `:on` routing table but no `:judge`")
+                      :unknown-goto-target
+                      (str "Step `" step "` has `:goto` target `" target "` which is not a known step")
+                      (str "Step `" step "` has judge/routing error: " error))})
+          (:errors judge-result))))
+
+(defn- compile-and-validate
+  [parsed-files]
+  (let [{errored true valid false} (partition-parsed-files parsed-files)
+        {:keys [definitions errors]} (compiler/compile-workflow-files valid)
+        ref-result (compiler/validate-step-references definitions)
+        collision-result (compiler/validate-no-name-collisions definitions)
+        judge-result (compiler/validate-judge-routing definitions)]
+    {:definitions definitions
+     :errors (vec (concat (map parsed-file-error errored)
+                          errors
+                          (reference-validation-errors ref-result)
+                          (judge-validation-errors judge-result)))
+     :warnings (if-not (:valid? collision-result)
+                 (mapv (fn [dup-name]
+                         {:message (str "Duplicate workflow name `" dup-name "` — last definition wins")})
+                       (:duplicates collision-result))
+                 [])}))
+
+(defn- definition-map
+  [definitions]
+  (into {} (map (juxt :name identity)) definitions))
+
+(defn- load-result
+  [{:keys [definitions errors warnings]}]
+  {:definitions (definition-map definitions)
+   :errors errors
+   :warnings warnings})
+
 (defn load-workflow-definitions
   "Load all workflow definitions from disk.
 
@@ -89,41 +146,8 @@
     :errors      [{:name ... :error ... :source-path ...} ...]
     :warnings    [{:message ...} ...]}"
   [worktree-path]
-  (let [all-parsed (scan-all-directories worktree-path)
-        merged (merge-by-name all-parsed)
-        {errored true valid false} (group-by #(boolean (:error %)) merged)
-        {:keys [definitions errors]} (compiler/compile-workflow-files valid)
-        ref-result (compiler/validate-step-references definitions)
-        collision-result (compiler/validate-no-name-collisions definitions)
-        judge-result (compiler/validate-judge-routing definitions)
-        def-map (into {} (map (juxt :name identity)) definitions)
-        all-errors (into (vec (concat
-                               (map (fn [p]
-                                      {:name (:name p)
-                                       :error (:error p)
-                                       :source-path (:source-path p)})
-                                    errored)
-                               errors))
-                         (concat
-                          (when-not (:valid? ref-result)
-                            (mapv (fn [{:keys [definition step missing]}]
-                                    {:name definition
-                                     :error (str "Step `" step "` references unknown workflow `" missing "`")})
-                                  (:errors ref-result)))
-                          (when-not (:valid? judge-result)
-                            (mapv (fn [{:keys [definition step error target]}]
-                                    {:name definition
-                                     :error (case error
-                                              :on-without-judge
-                                              (str "Step `" step "` has `:on` routing table but no `:judge`")
-                                              :unknown-goto-target
-                                              (str "Step `" step "` has `:goto` target `" target "` which is not a known step")
-                                              (str "Step `" step "` has judge/routing error: " error))})
-                                  (:errors judge-result)))))
-        warnings (when-not (:valid? collision-result)
-                   (mapv (fn [dup-name]
-                           {:message (str "Duplicate workflow name `" dup-name "` — last definition wins")})
-                         (:duplicates collision-result)))]
-    {:definitions def-map
-     :errors all-errors
-     :warnings (vec (or warnings []))}))
+  (-> worktree-path
+      scan-all-directories
+      merge-by-name
+      compile-and-validate
+      load-result))

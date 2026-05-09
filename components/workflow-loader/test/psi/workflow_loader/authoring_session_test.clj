@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-loader.authoring-preload :as authoring-preload]
-   [psi.workflow-loader.authoring-session :as authoring-session]))
+   [psi.workflow-loader.authoring-session :as authoring-session]
+   [psi.workflow-loader.authoring-step-source :as step-source]))
 
 (def ^:private default-step-name->step-ref
   {"discover" {:step-id "step-1-discover" :idx 0}})
@@ -80,6 +81,32 @@
     :step {:session {:preload [{:from {:step "discover" :kind :accepted-result}
                                 :projection :full}]}}
     :expected-re #"value preload supports only `:projection :text`"}])
+
+(deftest resolve-prior-step-source-validation-table-test
+  (testing "shared prior-step source validation remains clear across session and preload callers"
+    (let [{:keys [error]}
+          (step-source/resolve-prior-step-source ":session source"
+                                                 "expected `{:step \"...\" :kind :accepted-result}`"
+                                                 #{:accepted-result}
+                                                 {:step "discover" :kind :accepted-result :extra true}
+                                                 default-step-name->step-ref
+                                                 1)]
+      (is (string? error))
+      (is (re-find #"unexpected keys .*`:session source`" error))))
+
+  (testing "shared prior-step source resolution returns canonical prior-step info"
+    (let [{:keys [ok error]}
+          (step-source/resolve-prior-step-source ":session preload source"
+                                                 "expected `{:step \"...\" :kind ...}`"
+                                                 #{:accepted-result :session-transcript}
+                                                 {:step "discover" :kind :session-transcript}
+                                                 default-step-name->step-ref
+                                                 1)]
+      (is (nil? error))
+      (is (= {:step-id "step-1-discover"
+              :idx 0
+              :kind :session-transcript}
+             ok)))))
 
 (deftest compile-step-input-bindings-step-source-text-projection-compiles-to-canonical-session-output-surface-test
   (testing "step-source text projection compiles to the canonical final-llm-reply surface"

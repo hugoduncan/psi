@@ -28,3 +28,9 @@ Verification:
 
 Residual debt:
 - [x] No retained forwarding seams remain
+
+Follow-up shaping:
+- [x] Shape `psi.workflow-loader.core/load-workflow-definitions` by extracting tiny pure helpers for parse-error shaping, validation-error shaping, and final result assembly so the top-level function carries less mixed assembly flow
+- [x] Review `psi.workflow-loader.authoring-session` and `psi.workflow-loader.authoring-preload` for a smallest shared lower helper around source-map validation / prior-step resolution / nested error wrapping, but only extract it if the result is simpler than the current local duplication
+- [x] Audit the `psi.workflow-loader.*` public surface against real non-test consumers and reduce helper publics where possible without weakening lower proofs or reintroducing mixed ownership
+  - kept the current remaining public vars because they are exercised either by real higher consumers or by intentional lower proofs; no further narrowing was justified within this task

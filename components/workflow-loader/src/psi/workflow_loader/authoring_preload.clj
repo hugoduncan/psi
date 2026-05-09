@@ -9,7 +9,8 @@
      prior-step result text)"
   (:require
    [psi.workflow-loader.authoring-errors :as authoring-errors]
-   [psi.workflow-loader.authoring-session :as session]))
+   [psi.workflow-loader.authoring-session :as session]
+   [psi.workflow-loader.authoring-step-source :as step-source]))
 
 (def ^:private projection-entry-keys
   #{:from :projection})
@@ -19,9 +20,6 @@
 
 (def ^:private value-preload-projections
   #{:text})
-
-(def ^:private source-map-keys
-  #{:step :kind})
 
 (defn- compile-transcript-projection
   [projection]
@@ -83,32 +81,20 @@
           :role "user"}}
 
     (map? source)
-    (let [{:keys [step kind] :as source-map} source]
-      (or (authoring-errors/unexpected-keys-error ":session preload source"
-                                                  source-map-keys
-                                                  source-map)
-          (cond
-            (not (string? step))
-            (authoring-errors/invalid-in ":session preload source"
-                                         "expected `{:step \"...\" :kind ...}`")
-
-            (not (contains? #{:accepted-result :session-transcript} kind))
-            (authoring-errors/invalid-in ":session preload source"
-                                         (str "unsupported step source kind `"
-                                              kind "`"))
-
-            :else
-            (if-let [{:keys [step-id idx]} (get step-name->step-ref step)]
-              (if (< idx current-step-idx)
-                {:ok (if (= kind :session-transcript)
-                       {:kind :session-transcript
-                        :step-id step-id}
-                       {:kind :value
-                        :role "assistant"})}
-                (authoring-errors/invalid (str "Forward step reference: `"
-                                               step
-                                               "` must refer to an earlier step")))
-              (authoring-errors/invalid (str "Unknown step name: `" step "`"))))))
+    (let [{resolved :ok source-error :error}
+          (step-source/resolve-prior-step-source ":session preload source"
+                                                 "expected `{:step \"...\" :kind ...}`"
+                                                 #{:accepted-result :session-transcript}
+                                                 source
+                                                 step-name->step-ref
+                                                 current-step-idx)]
+      (if source-error
+        {:error source-error}
+        {:ok (if (= :session-transcript (:kind resolved))
+               {:kind :session-transcript
+                :step-id (:step-id resolved)}
+               {:kind :value
+                :role "assistant"})}))
 
     :else
     (authoring-errors/invalid-in ":session preload source"
