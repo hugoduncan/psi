@@ -1,11 +1,20 @@
-- [ ] Review `psi.agent-session.workflow-execution` and list which publics are true higher façade entrypoints versus lower helper forwards
-- [ ] Use code search to identify all current references to the forwarded helper vars across ordinary callers, callback wiring sites, dynamic lookup/backfill sites, and tests
-- [ ] Decide which lower helper publics should be removed from `workflow-execution` and whether any tiny temporary compatibility seam is truly necessary
-- [ ] Rewire ordinary callers, callback wiring sites, and dynamic lookup/backfill consumers to use the current lower authoritative workflow-runtime helper namespaces instead of `workflow-execution`
-- [ ] Rewire lower helper tests/proofs to point at the lower owners rather than the higher façade
-- [ ] Keep or add higher façade proofs for run/resume behavior under `agent-session` while keeping lower helper proofs with the lower owners
-- [ ] Keep `execute-run!` and `resume-and-execute-run!` as the clear higher façade surface, with only directly adjacent façade-local result-shaping helpers remaining, unless implementation proves a simpler explicit shape
-- [ ] Verify workflow behavior is unchanged
-- [ ] If any temporary compatibility seam is kept, ensure it is minimal and record the justification explicitly in `implementation.md`
-- [ ] Record the final remaining public vars of `psi.agent-session.workflow-execution` in `implementation.md`, justifying any public other than `execute-run!` and `resume-and-execute-run!`
-- [ ] Record the final façade ownership decision and any follow-on cleanup notes in `implementation.md`
+- [x] Review `psi.agent-session.workflow-execution` and list which publics are true higher façade entrypoints versus lower helper forwards
+  - confirmed with `clj-surgeon :op :ls` that only `execute-run!` and `resume-and-execute-run!` are true façade entrypoints; `execution-result` stays private and six helper forwards were lower-owner leakage
+- [x] Use code search to identify all current references to the forwarded helper vars across ordinary callers, callback wiring sites, dynamic lookup/backfill sites, and tests
+  - found affected test consumers; production callback wiring and dynamic lookup/backfill were already direct to `psi.workflow-runtime.step-prep`
+- [x] Decide which lower helper publics should be removed from `workflow-execution` and whether any tiny temporary compatibility seam is truly necessary
+  - removed all lower helper forwards; no compatibility seam needed
+- [x] Rewire ordinary callers, callback wiring sites, and dynamic lookup/backfill consumers to use the current lower authoritative workflow-runtime helper namespaces instead of `workflow-execution`
+  - no production rewiring required beyond confirming existing direct lower-owner targets
+- [x] Rewire lower helper tests/proofs to point at the lower owners rather than the higher façade
+  - updated affected binding/config/prompt/conversation proof sites to use `psi.workflow-runtime.step-prep`
+- [x] Keep or add higher façade proofs for run/resume behavior under `agent-session` while keeping lower helper proofs with the lower owners
+  - kept `workflow_execution_test` focused on execution façade behavior while helper assertions now use the lower namespace directly
+- [x] Keep `execute-run!` and `resume-and-execute-run!` as the clear higher façade surface, with only directly adjacent façade-local result-shaping helpers remaining, unless implementation proves a simpler explicit shape
+  - final public surface is exactly those two entrypoints
+- [x] Verify workflow behavior is unchanged
+  - `clj-kondo` clean on touched files; focused Kaocha run passed for `psi.agent-session.workflow-execution-test`, `psi.agent-session.workflow-ir-runtime-adoption-test`, `psi.workflow-runtime.ir-runtime-adoption-test`, and `psi.workflow-runtime.step-prep-test`
+- [x] If any temporary compatibility seam is kept, ensure it is minimal and record the justification explicitly in `implementation.md`
+  - none kept
+- [x] Record the final remaining public vars of `psi.agent-session.workflow-execution` in `implementation.md`, justifying any public other than `execute-run!` and `resume-and-execute-run!`
+- [x] Record the final façade ownership decision and any follow-on cleanup notes in `implementation.md`

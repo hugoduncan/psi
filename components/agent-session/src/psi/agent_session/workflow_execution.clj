@@ -1,41 +1,13 @@
 (ns psi.agent-session.workflow-execution
-  "Impure execution helpers for canonical deterministic workflow runs.
+  "Higher workflow execution façade for canonical deterministic workflow runs.
 
-   This slice bridges canonical workflow definitions/runs to actual bounded
-   session execution for workflow attempts. It now provides:
-   - materialize step inputs from canonical bindings
-   - resolve step session config from workflow-file-meta
-   - create one attempt child session for the current step
-   - prompt that session
-   - record a canonical structured result envelope back onto the workflow run
-   - loop execution across sequential steps until terminal or blocked state
-   - resume a blocked run and continue execution with a fresh attempt
-
-   Canonical execution note:
-   - Phase A statechart execution is the sole canonical workflow-run execution path"
+   This slice owns the session-facing execution entrypoints that run and resume
+   canonical workflow runs through the Phase A statechart runtime. Lower step
+   preparation and session-config materialization helpers live under
+   `psi.workflow-runtime.step-prep`."
   (:require
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.statechart-runtime :as workflow-statechart-runtime]
-   [psi.workflow-runtime.step-prep :as workflow-step-prep]))
-
-(def binding-source-value workflow-step-prep/binding-source-value)
-(def materialize-step-inputs workflow-step-prep/materialize-step-inputs)
-(def materialize-step-session-conversation workflow-step-prep/materialize-step-session-conversation)
-(def split-step-session-conversation workflow-step-prep/split-step-session-conversation)
-(def step-prompt workflow-step-prep/step-prompt)
-
-(defn resolve-step-session-config
-  "Resolve child session configuration for a workflow step.
-
-   For single-step workflows, uses the run's own :workflow-file-meta.
-   For multi-step workflows, looks up the referenced workflow's definition
-   from registered definitions to get that step's :workflow-file-meta.
-
-   Returns a map with composed prompt/config for child session creation."
-  ([ctx workflow-run step-id]
-   (resolve-step-session-config ctx nil workflow-run step-id))
-  ([ctx parent-session-id workflow-run step-id]
-   (workflow-step-prep/resolve-step-session-config ctx parent-session-id workflow-run step-id)))
+   [psi.workflow-runtime.statechart-runtime :as workflow-statechart-runtime]))
 
 (defn- execution-result
   [run-id workflow-run]

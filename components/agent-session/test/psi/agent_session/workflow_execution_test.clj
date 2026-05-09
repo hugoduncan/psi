@@ -12,6 +12,7 @@
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.step-prep :as workflow-step-prep]
    [psi.workflow-runtime.statechart-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -132,7 +133,7 @@
                                                                    :workflow-input {:input "plan it"}})]
                        s)))
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-1")
-          config (workflow-execution/resolve-step-session-config ctx workflow-run "step-1")]
+          config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= "You are a planner." (:developer-prompt config)))
       (is (= :medium (:thinking-level config)))
       (is (= {:provider :anthropic :id "claude-test"} (:model config)))
@@ -155,8 +156,8 @@
           _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
                    {:provider "openai" :id "gpt-test"})
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-2")
-          planner-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-1-planner")
-          builder-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-2-builder")]
+          planner-config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-1-planner")
+          builder-config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Coordinate a plan-build cycle." (:developer-prompt planner-config)))
       (is (= "You are a builder.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
       (is (= ["read" "bash"] (mapv :name (:tool-defs planner-config))))
@@ -202,7 +203,7 @@
                      :source :project
                      :disable-model-invocation false}])
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-overrides")
-          builder-config (workflow-execution/resolve-step-session-config ctx workflow-run "step-2-builder")]
+          builder-config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
       (is (= [] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config))))
@@ -217,11 +218,11 @@
                                                                :workflow-input {:input "ship it"
                                                                                 :original "build this feature"}})
         run0 (workflow-runtime/workflow-run-in state2 run-id)
-        prompt0 (workflow-execution/step-prompt run0 "step-1-planner")
+        prompt0 (workflow-step-prep/step-prompt run0 "step-1-planner")
         state3 (assoc-in state2 [:workflows :runs run-id :step-runs "step-1-planner" :accepted-result]
                          {:outcome :ok :outputs {:final-llm-reply "plan text"}})
         run1 (workflow-runtime/workflow-run-in state3 run-id)
-        prompt1 (workflow-execution/step-prompt run1 "step-2-builder")]
+        prompt1 (workflow-step-prep/step-prompt run1 "step-2-builder")]
     (is (= {:input "ship it" :original "build this feature"} (:step-inputs prompt0)))
     (is (= "ship it" (:prompt prompt0)))
     (is (= {:input "plan text" :original "build this feature"} (:step-inputs prompt1)))
@@ -256,7 +257,7 @@
                           :outputs {:final-llm-reply "plan text"}
                           :diagnostics {:summary "need logs"}})
         run (workflow-runtime/workflow-run-in state3 run-id)
-        prompt (workflow-execution/step-prompt run "step-2-request-more-info")]
+        prompt (workflow-step-prep/step-prompt run "step-2-request-more-info")]
     (is (= {:input "need logs"
             :original "Bug 123"}
            (:step-inputs prompt)))
@@ -416,8 +417,8 @@
                             :outputs {:final-llm-reply "plan text"
                                       :text "plan text"}})
           workflow-run (workflow-runtime/workflow-run-in state3 run-id)
-          conversation (workflow-execution/materialize-step-session-conversation workflow-run "review")
-          split (workflow-execution/split-step-session-conversation conversation)]
+          conversation (workflow-step-prep/materialize-step-session-conversation workflow-run "review")
+          split (workflow-step-prep/split-step-session-conversation conversation)]
       (is (= [{:role "user" :content "Original request"}
               {:role "user" :content "plan text"}
               {:role "user" :content "Review plan text"}]
@@ -595,7 +596,7 @@
                                                                    :workflow-input {:input "plan it"}})]
                        (assoc-in s [:agent-session :sessions session-id :data :prompt-mode] :prose))))
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mode-1")
-          config (workflow-execution/resolve-step-session-config ctx session-id workflow-run "step-1")]
+          config (workflow-step-prep/resolve-step-session-config ctx session-id workflow-run "step-1")]
       (is (= :prose (:prompt-mode config))))))
 
 (deftest execute-run-preserves-parent-extension-prompt-contributions-test
