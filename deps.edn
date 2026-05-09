@@ -77,7 +77,6 @@
                         "extensions/munera/resources"
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
-                        "extensions/workflow-display/src"
                         "extensions/workflow-loader/src"]
           :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
@@ -115,7 +114,6 @@
                         "extensions/munera/resources"
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
-                        "extensions/workflow-display/src"
                         "extensions/workflow-loader/src"]
           :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
@@ -152,7 +150,6 @@
                            "extensions/munera/resources"
                            "extensions/plan-state-learning/src"
                            "extensions/work-on/src"
-                           "extensions/workflow-display/src"
                            "extensions/workflow-loader/src"]
              :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
              :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
@@ -226,7 +223,6 @@
                              "extensions/munera/test"
                              "extensions/plan-state-learning/test"
                              "extensions/work-on/test"
-                             "extensions/workflow-display/test"
                              "extensions/workflow-loader/test"
                              "components/extension-test-helpers/src"]
                :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
@@ -278,7 +274,6 @@
                         "extensions/munera/test"
                         "extensions/plan-state-learning/test"
                         "extensions/work-on/test"
-                        "extensions/workflow-display/test"
                         "extensions/workflow-loader/test"
                         "components/ai/src"
                         "components/engine/src"
@@ -325,7 +320,6 @@
                         "extensions/munera/resources"
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
-                        "extensions/workflow-display/src"
                         "extensions/workflow-loader/src"
                         "components/extension-test-helpers/src"]
           :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}

@@ -1,5 +1,5 @@
-(ns extensions.workflow-display
-  "Shared helpers for extension workflow display/read-model rendering.")
+(ns psi.agent-session.workflow.display
+  "Shared helpers for built-in workflow display/read-model rendering.")
 
 (defn merged-display
   "Merge workflow display maps, preferring public read-model fields for the

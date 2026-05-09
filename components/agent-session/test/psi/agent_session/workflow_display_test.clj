@@ -1,7 +1,7 @@
-(ns extensions.workflow-display-test
+(ns psi.agent-session.workflow-display-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [extensions.workflow-display :as sut]))
+   [psi.agent-session.workflow.display :as sut]))
 
 (deftest merged-display-prefers-public-fields-test
   (testing "public display fields override fallback display fields"
