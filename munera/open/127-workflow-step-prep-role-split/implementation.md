@@ -80,9 +80,13 @@ Verification:
   - `clojure -M:test --focus psi.workflow-runtime.step-materialization-test --focus psi.workflow-runtime.step-session-config-test --focus psi.workflow-runtime.ir-runtime-adoption-test` → green (`11 tests, 36 assertions, 0 failures`)
 - code-shaper follow-up verification:
   - inlined the private `render-template-contribution` wrapper in `psi.workflow-runtime.step-materialization`
+- test follow-up verification:
+  - added a focused `step-materialization` proof for the non-user-final-message preload branch in `split-step-session-conversation`
+  - added a focused `step-session-config` proof for nil `parent-session-id` falling back to the first context session
 
 2026-05-07 review note
 - review pass: core role split is good and direct-consumer rewiring matches the design
 - resolved follow-up 1: removed the duplicate lower-level `agent-session` materialization proof file so authoritative helper proofs live under `workflow-runtime`
 - resolved follow-up 2: made `psi.workflow-runtime.step-materialization/render-template-contribution` private after code search confirmed there was no external consumer of the step-materialization alias
 - code-shaper note: implementation is now simple, consistent, and locally comprehensible; the last optional micro-cleanup was completed by inlining the former private `render-template-contribution` wrapper in `step-materialization`
+- test review note: tests are acceptance-complete and topology-aligned; the identified materialization edge-case proof and parent-session fallback proof have now been added

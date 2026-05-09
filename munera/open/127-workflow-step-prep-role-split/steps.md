@@ -16,3 +16,5 @@
 - [x] Remove or replace duplicated lower-level materialization proofs that still remain under `components/agent-session/test/psi/agent_session/workflow_step_materialization_test.clj` so proof ownership lives authoritatively under `workflow-runtime`
 - [x] Decide whether `psi.workflow-runtime.step-materialization/render-template-contribution` should remain public; either privatize it or tighten the implementation rationale with a concrete intended consumer
 - [x] Decide whether the private `render-template-contribution` wrapper in `components/workflow-runtime/src/psi/workflow_runtime/step_materialization.clj` improves local readability enough to keep, or whether it should be inlined for simpler local shape
+- [x] Add a focused `step-materialization` proof for the `split-step-session-conversation` branch where the final message is not a user text message, proving the whole conversation is preloaded and the prompt becomes `""`
+- [x] Add a focused `step-session-config` proof for nil `parent-session-id` fallback selection onto the first context session, if that fallback is intended to remain part of the lower contract

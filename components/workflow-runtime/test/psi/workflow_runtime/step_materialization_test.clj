@@ -171,3 +171,11 @@
                                    {:role "user" :content "plan text"}]
               :prompt "Review plan text"}
              split)))))
+
+(deftest split-step-session-conversation-preloads-entire-conversation-when-final-message-is-not-user-text-test
+  (testing "non-user final messages stay preloaded and produce an empty prompt"
+    (let [messages [{:role "user" :content "Earlier context"}
+                    {:role "assistant" :content "Assistant summary"}]]
+      (is (= {:preloaded-messages messages
+              :prompt ""}
+             (workflow-step-materialization/split-step-session-conversation messages))))))

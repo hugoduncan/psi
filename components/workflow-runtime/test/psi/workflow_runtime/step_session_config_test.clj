@@ -109,3 +109,31 @@
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mode-1")
           config (workflow-step-session-config/resolve-step-session-config ctx session-id workflow-run "step-1")]
       (is (= :prose (:prompt-mode config))))))
+
+(deftest resolve-step-session-config-falls-back-to-first-context-session-when-parent-session-id-is-nil-test
+  (testing "nil parent-session-id falls back to the first context session"
+    (let [[ctx first-session-id] (support/create-session-context {:persist? false})
+          second-session-id "session-fallback-second"
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (-> state
+                         (assoc-in [:agent-session :sessions first-session-id :data :prompt-mode] :first-mode)
+                         (assoc-in [:agent-session :sessions first-session-id :data :model]
+                                   {:provider "openai" :id "first-model"})
+                         (assoc-in [:agent-session :sessions second-session-id]
+                                   {:data {:session-id second-session-id
+                                           :prompt-mode :second-mode
+                                           :model {:provider "openai" :id "second-model"}
+                                           :tool-defs []
+                                           :skills []}})
+                         (update-in [:agent-session :session-order] (fnil conj []) second-session-id)
+                         ((fn [s]
+                            (let [[s _ _] (workflow-registry/register-definition s support/single-step-definition-with-meta)
+                                  [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
+                                                                          :run-id "run-fallback-1"
+                                                                          :workflow-input {:input "plan it"}})]
+                              s))))))
+          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-fallback-1")
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= :first-mode (:prompt-mode config)))
+      (is (= {:provider "openai" :id "first-model"} (:model config))))))
