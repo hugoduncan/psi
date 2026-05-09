@@ -4,9 +4,6 @@ Open tasks in suggested execution order:
 
 Queue:
 
-`munera/open/077-deterministic-workflow-steps/`
-
-
 Backlog:
 
 `munera/open/128-workflow-execution-adapter-seam/`
