@@ -1,4 +1,4 @@
-(ns psi.agent-session.turn-execution-contract
+(ns psi.workflow-runtime.turn-execution-contract
   "Lower bounded turn-execution contract for workflow callers.
 
    Owns execution of one already-shaped session-backed prompt turn and returns a
@@ -7,7 +7,6 @@
    semantic results from journals/transcripts."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.turn :as turn]
    [psi.turn-runtime.recording :as turn-recording]))
 
 (defn assistant-message-text
@@ -50,10 +49,11 @@
 
 (defn- prompt-execution-result
   [ctx session-id text images opts]
-  (cond
-    (some? opts) (turn/prompt-execution-result-in! ctx session-id text images opts)
-    (some? images) (turn/prompt-execution-result-in! ctx session-id text images)
-    :else (turn/prompt-execution-result-in! ctx session-id text)))
+  (let [f (:workflow-prompt-execution-result-fn ctx)]
+    (cond
+      (some? opts) (f ctx session-id text images opts)
+      (some? images) (f ctx session-id text images)
+      :else (f ctx session-id text))))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt

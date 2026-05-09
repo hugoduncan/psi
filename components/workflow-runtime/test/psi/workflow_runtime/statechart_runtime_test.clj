@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.turn]
-   [psi.agent-session.turn-execution-contract]
+   [psi.workflow-runtime.turn-execution-contract]
    [psi.agent-session.test-support :as test-support]
    [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-judge]
@@ -219,7 +219,7 @@
                                    :status :pending
                                    :execution-session-id sid}
                          :execution-session {:session-id sid}}))
-                    psi.agent-session.turn-execution-contract/execute-actor-turn!
+                    psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
                     (fn [_ctx _sid _prompt]
                       {:status :ok
                        :session-id "actor-session"

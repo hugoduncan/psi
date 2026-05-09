@@ -1,7 +1,7 @@
 (ns psi.agent-session.workflow-judge-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.turn-execution-contract]
+   [psi.workflow-runtime.turn-execution-contract]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.session-persistence.core]))
 
@@ -27,7 +27,7 @@
                     (fn [_ctx _sid]
                       [{:role "user" :content "Build it"}
                        {:role "assistant" :content [{:type :text :text "Done building."}]}])
-                    psi.agent-session.turn-execution-contract/execute-judge-turn!
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
                     (fn [_ctx sid text]
                       (swap! prompts* conj {:session-id sid :text text})
                       {:status :ok
@@ -62,7 +62,7 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.turn-execution-contract/execute-judge-turn!
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
                     (fn [_ctx sid _text]
                       (swap! prompt-count* inc)
                       (if (<= @prompt-count* 1)
@@ -100,7 +100,7 @@
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
-                    psi.agent-session.turn-execution-contract/execute-judge-turn!
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
                     (fn [_ctx sid _text]
                       (swap! prompt-count* inc)
                       {:status :ok

@@ -5,7 +5,7 @@
    This namespace owns only judge-session execution/orchestration above that boundary."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.turn-execution-contract :as turn-execution]
+   [psi.workflow-runtime.turn-execution-contract :as turn-execution]
    [psi.session-persistence.core :as persist]
    [psi.workflow-judge :as workflow-judge]))
 

@@ -29,6 +29,7 @@
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.workflow-runtime.model :as workflow-model]
+   [psi.workflow-runtime.step-prep]
    [psi.skill-registry.registry :as skill-registry]
    [psi.agent-session.workflows :as wf]
    [psi.history.resolvers :as history-resolvers]
@@ -148,6 +149,7 @@
    :execute-tool-runtime-fn #'tool-plan/execute-tool-runtime-in!
    :build-prepared-request-fn #'prompt-request/build-prepared-request
    :execute-prepared-request-fn #'turn/execute-prepared-request!
+   :workflow-prompt-execution-result-fn #'turn/prompt-execution-result-in!
    :build-record-response-fn #'prompt-recording/build-record-response
    :continue-prompt-chain-fn #'prompt-chain/run-prompt-tools!
    :refresh-system-prompt-fn (fn
@@ -164,9 +166,9 @@
    :get-session-data-fn #'ss/get-session-data-in
    :list-context-sessions-fn #'ss/list-context-sessions-in
    :find-skill-fn #'skill-registry/find-skill
-   :resolve-workflow-step-session-config-fn #'workflow-execution/resolve-step-session-config
-   :materialize-workflow-step-session-conversation-fn #'workflow-execution/materialize-step-session-conversation
-   :split-workflow-step-session-conversation-fn #'workflow-execution/split-step-session-conversation
+   :resolve-workflow-step-session-config-fn #'psi.workflow-runtime.step-prep/resolve-step-session-config
+   :materialize-workflow-step-session-conversation-fn #'psi.workflow-runtime.step-prep/materialize-step-session-conversation
+   :split-workflow-step-session-conversation-fn #'psi.workflow-runtime.step-prep/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
    :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!

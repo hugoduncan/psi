@@ -114,6 +114,10 @@
     (assoc :execute-workflow-run-fn
            (find-required-fn "psi.agent-session.workflow-execution" "execute-run!"))
 
+    (not (contains? ctx :workflow-prompt-execution-result-fn))
+    (assoc :workflow-prompt-execution-result-fn
+           (find-required-fn "psi.agent-session.turn" "prompt-execution-result-in!"))
+
     (not (contains? ctx :resume-and-execute-workflow-run-fn))
     (assoc :resume-and-execute-workflow-run-fn
            (find-required-fn "psi.agent-session.workflow-execution" "resume-and-execute-run!"))
@@ -132,15 +136,15 @@
 
     (not (contains? ctx :resolve-workflow-step-session-config-fn))
     (assoc :resolve-workflow-step-session-config-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "resolve-step-session-config"))
+           (find-required-fn "psi.workflow-runtime.step-prep" "resolve-step-session-config"))
 
     (not (contains? ctx :materialize-workflow-step-session-conversation-fn))
     (assoc :materialize-workflow-step-session-conversation-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "materialize-step-session-conversation"))
+           (find-required-fn "psi.workflow-runtime.step-prep" "materialize-step-session-conversation"))
 
     (not (contains? ctx :split-workflow-step-session-conversation-fn))
     (assoc :split-workflow-step-session-conversation-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "split-step-session-conversation"))
+           (find-required-fn "psi.workflow-runtime.step-prep" "split-step-session-conversation"))
 
     (not (contains? ctx :execute-workflow-judge-fn))
     (assoc :execute-workflow-judge-fn

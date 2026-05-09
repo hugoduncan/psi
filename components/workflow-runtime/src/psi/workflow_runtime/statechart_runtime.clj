@@ -22,7 +22,7 @@
    [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
-   [psi.agent-session.turn-execution-contract :as turn-execution]
+   [psi.workflow-runtime.turn-execution-contract :as turn-execution]
    [psi.workflow-runtime.attempts :as workflow-attempts]
    [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.progression-recording :as workflow-progression-recording]

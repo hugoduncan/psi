@@ -46,7 +46,7 @@ Statechart-runtime decomposition decision:
 
 Lower-seam consumption status:
 - judge/routing seam from task 123 is consumed directly: runtime orchestration still calls the higher impure `psi.agent-session.workflow-judge/execute-judge!`, while pure routing/projection stays below that in the already-extracted `psi.workflow-judge`
-- bounded step-execution seam from task 124 is consumed directly via `psi.agent-session.turn-execution-contract`
+- bounded step-execution seam from task 124 is consumed directly via `psi.workflow-runtime.turn-execution-contract`
 - deterministic operation runtime remains consumed through the already-lower deterministic runtime/registry seams
 
 Residual dependency treatment:
@@ -77,3 +77,34 @@ Verification:
 Follow-on candidates:
 - `psi.agent-session.turn-execution-contract` remains outside `workflow-runtime`; that is acceptable for this task because task 124 intentionally introduced it as a lower bounded seam, but a later slice could relocate it further downward if the project wants all workflow-bounded execution helpers co-located
 - child-session creation and judge execution still originate from session-owned callbacks; further extraction would need a separate task to decide whether those session-boundary effects deserve a dedicated lower execution adapter surface
+
+2026-05-08 review
+
+Terse review note:
+- fix required: `components/workflow-runtime/deps.edn` is missing the dependency path for `psi.agent-session.turn-execution-contract`
+- follow-up: rewire step-prep callbacks in `agent-session.context` directly to `psi.workflow-runtime.step-prep/*` instead of bouncing through `psi.agent-session.workflow-execution`
+
+Findings:
+- issue: `components/workflow-runtime/deps.edn` does not declare a dependency that provides `psi.agent-session.turn-execution-contract`, even though `psi.workflow-runtime.statechart-runtime` requires that namespace directly. Top-level tests passed because the root classpath includes `components/agent-session/src`, but the extracted component metadata is incomplete and component-local use/reuse would fail. This should be fixed before closing the task, either by moving the contract to a lower component or by declaring the explicit dependency.
+- shape concern: `agent-session.context` wires `:resolve-workflow-step-session-config-fn`, `:materialize-workflow-step-session-conversation-fn`, and `:split-workflow-step-session-conversation-fn` to `psi.agent-session.workflow-execution` wrapper vars even though those wrappers only delegate back down into `psi.workflow-runtime.step-prep`. This keeps behavior correct, but it is unnecessary upward bounce/indirection rather than the most direct downward dependency shape. Consider rewiring those callbacks straight to `psi.workflow-runtime.step-prep/*` in a follow-up if task scope stays closed here.
+
+2026-05-09 follow-up execution
+
+Addressed both review items:
+- moved the bounded step execution seam fully into the extracted component as `psi.workflow-runtime.turn-execution-contract`
+- deleted the old `components/agent-session/src/psi/agent_session/turn_execution_contract.clj` owner instead of leaving a compatibility shim
+- rewired `psi.workflow-runtime.statechart-runtime`, `psi.agent-session.workflow-judge`, and workflow-focused tests to the new lower namespace
+- changed the lower contract to call a ctx-supplied `:workflow-prompt-execution-result-fn`, so `workflow-runtime` no longer depends back upward on `psi.agent-session.turn`
+- added `:workflow-prompt-execution-result-fn` to `agent-session.context`, `psi_tool_workflow` compatibility backfill, and test-support wiring
+- rewired `agent-session.context` and `psi_tool_workflow` step-prep callback wiring directly to `psi.workflow-runtime.step-prep/*` instead of bouncing through `psi.agent-session.workflow-execution`
+
+Follow-up verification:
+- focused tests green:
+  - `clojure -M:test --focus psi.workflow-runtime.core-test --focus psi.workflow-runtime.statechart-runtime-test --focus psi.workflow-runtime.attempts-test --focus psi.workflow-runtime.step-prep-test --focus psi.workflow-runtime.source-resolution-test --focus psi.workflow-runtime.target-ir-compiler-test --focus psi.workflow-runtime.ir-test --focus psi.workflow-runtime.model-test --focus psi.workflow-runtime.progression-recording-test --focus psi.workflow-runtime.ir-runtime-adoption-test --focus psi.agent-session.workflow-execution-test --focus psi.agent-session.workflow-judge-test`
+  - result: `57 tests, 275 assertions, 0 failures`
+- focused execution integration re-check green:
+  - `clojure -M:test --focus psi.agent-session.workflow-execution-test`
+  - result: `17 tests, 83 assertions, 0 failures`
+- lint green:
+  - `clojure -M:lint --lint components/workflow-runtime/src components/workflow-runtime/test components/agent-session/src components/agent-session/test`
+  - result: `0 errors, 0 warnings`
