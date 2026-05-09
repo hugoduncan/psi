@@ -1,128 +1,18 @@
-(ns psi.workflow-runtime.step-prep
-  "Shared pure-ish workflow step preparation helpers used by both the execution
-   wrapper namespace and the Phase A statechart runtime. Centralizes step input
-   materialization, prompt rendering, and child-session configuration shaping so
-   prompt/config semantics stay aligned across workflow paths."
+(ns psi.workflow-runtime.step-session-config
+  "Workflow child-session config shaping helpers for canonical deterministic
+   workflow runs.
+
+   Owns lower workflow-domain session-config behavior: parent session lookup,
+   inherited tool/skill/model shaping, workflow meta merge rules, and final
+   child-session prompt/config derivation."
   (:require
    [psi.tool-registry.defs :as tool-defs]
    [psi.workflow-registry.registry :as registry]
-   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.statechart :as workflow-statechart]))
 
 (defn- effective-step-def
   [workflow-run step-id]
   (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
-
-(def binding-source-value workflow-source-resolution/resolve-binding-ref)
-
-(defn materialize-step-inputs
-  [workflow-run step-id]
-  (let [step-def (effective-step-def workflow-run step-id)
-        ir-template-vars (some->> (get-in step-def [:session :contributions])
-                                  (filter #(= :template (:type %)))
-                                  last
-                                  :vars)]
-    (into {}
-          (map (fn [[var-name source-spec]]
-                 [(keyword var-name) (workflow-source-resolution/apply-source-spec workflow-run source-spec)]))
-          ir-template-vars)))
-
-(def render-template-contribution
-  workflow-source-resolution/render-template-contribution)
-
-(defn- text-message
-  [text]
-  {:role "user"
-   :content (str text)})
-
-(defn- conversation-message?
-  [x]
-  (and (map? x)
-       (string? (:role x))
-       (contains? x :content)))
-
-(defn- contribution-value->messages
-  [value]
-  (cond
-    (nil? value)
-    []
-
-    (conversation-message? value)
-    [value]
-
-    (and (sequential? value)
-         (every? conversation-message? value))
-    (vec value)
-
-    :else
-    [(text-message value)]))
-
-(defn- materialize-session-contribution
-  [workflow-run contribution]
-  (case (:type contribution)
-    :source (contribution-value->messages
-             (workflow-source-resolution/apply-source-spec workflow-run contribution))
-    :template [(text-message
-                (render-template-contribution workflow-run contribution))]
-    []))
-
-(defn materialize-step-session-conversation
-  "Materialize canonical IR `:session :contributions` into ordered child-session
-   conversation messages.
-
-   Semantics:
-   - `:template` contributions become synthetic user text messages
-   - `:source` contributions preserve canonical conversation messages when the
-     resolved value is already message-shaped, otherwise they become synthetic
-     user text messages via deterministic stringification
-   - author order is preserved exactly across contributions"
-  [workflow-run step-id]
-  (let [contributions (get-in (effective-step-def workflow-run step-id)
-                              [:session :contributions])]
-    (some->> contributions
-             (mapcat #(materialize-session-contribution workflow-run %))
-             vec
-             not-empty)))
-
-(defn- prompt-text-from-message
-  [message]
-  (when (= "user" (:role message))
-    (let [content (:content message)]
-      (cond
-        (string? content)
-        content
-
-        (and (vector? content)
-             (seq content)
-             (every? #(= :text (:type %)) content))
-        (apply str (map :text content))
-
-        :else nil))))
-
-(defn split-step-session-conversation
-  "Split a materialized child-session conversation into canonical preloaded
-   messages plus the final prompt text submitted through the normal prompt path.
-
-   When the last materialized message is a user text message, it becomes the
-   actual prompt submission and all prior messages preload the child session.
-   Otherwise the whole conversation is preloaded and the execution prompt is the
-   empty string so execution still routes through the canonical prompt path."
-  [messages]
-  (let [messages' (vec (or messages []))
-        last-msg (peek messages')
-        prompt (prompt-text-from-message last-msg)]
-    (if (some? prompt)
-      {:preloaded-messages (not-empty (pop messages'))
-       :prompt prompt}
-      {:preloaded-messages (not-empty messages')
-       :prompt ""})))
-
-(defn step-prompt
-  [workflow-run step-id]
-  (let [step-inputs (materialize-step-inputs workflow-run step-id)
-        session-conversation (materialize-step-session-conversation workflow-run step-id)]
-    {:step-inputs step-inputs
-     :prompt (:prompt (split-step-session-conversation session-conversation))}))
 
 (defn- compose-system-prompt
   [base-system-prompt framing-prompt]

@@ -1,8 +1,8 @@
-(ns psi.agent-session.workflow-step-prep-test
+(ns psi.agent-session.workflow-step-materialization-test
   (:require
    [clojure.test :refer [deftest is]]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.step-prep :as workflow-step-prep]))
+   [psi.workflow-runtime.step-materialization :as workflow-step-materialization]))
 
 (deftest materialize-step-inputs-uses-canonical-output-and-yield-surfaces-test
   (let [definition {:steps [{:name "discover"
@@ -38,7 +38,7 @@
     (is (= {:reply "session text"
             :data {:issues [1 2]}
             :text "session text"}
-           (workflow-step-prep/materialize-step-inputs run "consume")))))
+           (workflow-step-materialization/materialize-step-inputs run "consume")))))
 
 (deftest materialize-step-session-conversation-and-prompt-splitting-test
   (let [definition {:steps [{:name "plan"
@@ -65,8 +65,8 @@
                           :outputs {:final-llm-reply "plan text"
                                     :text "plan text"}})
         run (workflow-runtime/workflow-run-in state3 run-id)
-        messages (workflow-step-prep/materialize-step-session-conversation run "review")
-        split (workflow-step-prep/split-step-session-conversation messages)]
+        messages (workflow-step-materialization/materialize-step-session-conversation run "review")
+        split (workflow-step-materialization/split-step-session-conversation messages)]
     (is (= [{:role "user" :content "{:ticket 123}"}
             {:role "user" :content "plan text"}
             {:role "user" :content "Review plan text"}]

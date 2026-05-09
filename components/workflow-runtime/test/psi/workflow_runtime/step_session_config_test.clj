@@ -1,9 +1,9 @@
-(ns psi.workflow-runtime.step-prep-config-test
+(ns psi.workflow-runtime.step-session-config-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.step-prep :as workflow-step-prep]
-   [psi.workflow-runtime.step-prep-test-support :as support]
+   [psi.workflow-runtime.step-test-support :as support]
+   [psi.workflow-runtime.step-session-config :as workflow-step-session-config]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (deftest resolve-step-session-config-single-step-test
@@ -19,7 +19,7 @@
                                                                    :workflow-input {:input "plan it"}})]
                        s)))
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-1")
-          config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-1")]
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= "You are a planner." (:developer-prompt config)))
       (is (= :medium (:thinking-level config)))
       (is (= {:provider :anthropic :id "claude-test"} (:model config)))
@@ -42,8 +42,8 @@
           _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
                    {:provider "openai" :id "gpt-test"})
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-2")
-          planner-config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-1-planner")
-          builder-config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
+          planner-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1-planner")
+          builder-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Coordinate a plan-build cycle." (:developer-prompt planner-config)))
       (is (= "You are a builder.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
       (is (= ["read" "bash"] (mapv :name (:tool-defs planner-config))))
@@ -89,7 +89,7 @@
                      :source :project
                      :disable-model-invocation false}])
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-overrides")
-          builder-config (workflow-step-prep/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
+          builder-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
       (is (= [] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config))))
@@ -107,5 +107,5 @@
                                                                    :workflow-input {:input "plan it"}})]
                        (assoc-in s [:agent-session :sessions session-id :data :prompt-mode] :prose))))
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mode-1")
-          config (workflow-step-prep/resolve-step-session-config ctx session-id workflow-run "step-1")]
+          config (workflow-step-session-config/resolve-step-session-config ctx session-id workflow-run "step-1")]
       (is (= :prose (:prompt-mode config))))))

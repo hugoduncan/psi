@@ -1,4 +1,4 @@
-(ns psi.workflow-runtime.step-prep-test-support
+(ns psi.workflow-runtime.step-test-support
   (:require
    [psi.test-support.workflow-test-fixtures :as workflow-fixtures]))
 

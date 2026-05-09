@@ -7,7 +7,7 @@
    [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.step-prep :as workflow-step-prep]
+   [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
@@ -112,7 +112,7 @@
           (is (= :ok (:outcome accepted)))
           (is (= "build output" (get-in accepted [:outputs :final-llm-reply])))
           (is (= "build output"
-                 (workflow-step-prep/binding-source-value run {:source :step-output
-                                                               :path ["build" :outputs :final-llm-reply]})))
+                 (workflow-step-materialization/binding-source-value run {:source :step-output
+                                                                          :path ["build" :outputs :final-llm-reply]})))
           (is (= ["ship it" "Build: plan output"]
                  (mapv :prompt @prompts*))))))))

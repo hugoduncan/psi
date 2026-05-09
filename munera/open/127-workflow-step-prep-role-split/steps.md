@@ -1,15 +1,15 @@
-- [ ] Review `psi.workflow-runtime.step-prep` and classify helpers by role: materialization versus session-config shaping
-- [ ] Use code search to identify all current references to `psi.workflow-runtime.step-prep` publics across runtime, context, tool, and test consumers
-- [ ] Create the expected split owners `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.step-session-config`, unless a justified naming variation is recorded
-- [ ] Move materialization-oriented helpers to their new owner with minimal semantic change
-- [ ] Move session-config shaping helpers to their new owner with minimal semantic change
-- [ ] Apply the borderline-helper tie-break rule, and if a tiny third helper owner is introduced, record why that shape is better than forcing ownership into one of the two main roles
-- [ ] Rewire runtime/context/tool/test consumers to the new owners
-- [ ] Rewire callback/backfill wiring directly to the split owners when no façade is justified; if a façade remains, record why direct wiring was not the better shape
-- [ ] Repoint materialization proofs to the materialization owner and session-config shaping proofs to the session-config owner, keeping higher integration tests with higher/runtime consumers as appropriate
-- [ ] Move or rename tests when needed so proof ownership reflects the new role topology rather than preserving the old mixed topology by inertia
-- [ ] Remove `psi.workflow-runtime.step-prep` as the mixed owner if direct use of the split owners is the cleaner shape, or leave only a tiny explicit façade if justified
-- [ ] Verify behavior remains unchanged
-- [ ] If `psi.workflow-runtime.step-prep` remains as a façade, record why that was better than direct use of the split owners
-- [ ] Record the final remaining public vars of `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.step-session-config` in `implementation.md`, justifying any non-obvious public
-- [ ] Record the final split rationale and any residual ambiguity in `implementation.md`
+- [x] Review `psi.workflow-runtime.step-prep` and classify helpers by role: materialization versus session-config shaping
+- [x] Use code search to identify all current references to `psi.workflow-runtime.step-prep` publics across runtime, context, tool, and test consumers
+- [x] Create the expected split owners `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.step-session-config`, unless a justified naming variation is recorded
+- [x] Move materialization-oriented helpers to their new owner with minimal semantic change
+- [x] Move session-config shaping helpers to their new owner with minimal semantic change
+- [x] Apply the borderline-helper tie-break rule, and if a tiny third helper owner is introduced, record why that shape is better than forcing ownership into one of the two main roles
+- [x] Rewire runtime/context/tool/test consumers to the new owners
+- [x] Rewire callback/backfill wiring directly to the split owners when no façade is justified; if a façade remains, record why direct wiring was not the better shape
+- [x] Repoint materialization proofs to the materialization owner and session-config shaping proofs to the session-config owner, keeping higher integration tests with higher/runtime consumers as appropriate
+- [x] Move or rename tests when needed so proof ownership reflects the new role topology rather than preserving the old mixed topology by inertia
+- [x] Remove `psi.workflow-runtime.step-prep` as the mixed owner if direct use of the split owners is the cleaner shape, or leave only a tiny explicit façade if justified
+- [x] Verify behavior remains unchanged
+- [x] If `psi.workflow-runtime.step-prep` remains as a façade, record why that was better than direct use of the split owners
+- [x] Record the final remaining public vars of `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.step-session-config` in `implementation.md`, justifying any non-obvious public
+- [x] Record the final split rationale and any residual ambiguity in `implementation.md`

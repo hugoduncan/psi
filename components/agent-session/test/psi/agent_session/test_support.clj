@@ -18,7 +18,8 @@
    [psi.agent-session.workflow-judge]
    [psi.session-state.model :as session-data]
    [psi.skill-registry.registry]
-   [psi.workflow-runtime.step-prep]
+   [psi.workflow-runtime.step-materialization]
+   [psi.workflow-runtime.step-session-config]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as session-sc]
    [psi.agent-session.tool-plan :as tool-plan]
@@ -186,9 +187,9 @@
                        :get-session-data-fn          ss/get-session-data-in
                        :list-context-sessions-fn     ss/list-context-sessions-in
                        :find-skill-fn                psi.skill-registry.registry/find-skill
-                       :resolve-workflow-step-session-config-fn psi.workflow-runtime.step-prep/resolve-step-session-config
-                       :materialize-workflow-step-session-conversation-fn psi.workflow-runtime.step-prep/materialize-step-session-conversation
-                       :split-workflow-step-session-conversation-fn psi.workflow-runtime.step-prep/split-step-session-conversation
+                       :resolve-workflow-step-session-config-fn psi.workflow-runtime.step-session-config/resolve-step-session-config
+                       :materialize-workflow-step-session-conversation-fn psi.workflow-runtime.step-materialization/materialize-step-session-conversation
+                       :split-workflow-step-session-conversation-fn psi.workflow-runtime.step-materialization/split-step-session-conversation
                        :execute-workflow-judge-fn    psi.agent-session.workflow-judge/execute-judge!
                        :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
                        :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!

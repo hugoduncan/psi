@@ -29,7 +29,8 @@
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.workflow-runtime.model :as workflow-model]
-   [psi.workflow-runtime.step-prep]
+   [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
+   [psi.workflow-runtime.step-session-config :as workflow-step-session-config]
    [psi.skill-registry.registry :as skill-registry]
    [psi.agent-session.workflows :as wf]
    [psi.history.resolvers :as history-resolvers]
@@ -166,9 +167,9 @@
    :get-session-data-fn #'ss/get-session-data-in
    :list-context-sessions-fn #'ss/list-context-sessions-in
    :find-skill-fn #'skill-registry/find-skill
-   :resolve-workflow-step-session-config-fn #'psi.workflow-runtime.step-prep/resolve-step-session-config
-   :materialize-workflow-step-session-conversation-fn #'psi.workflow-runtime.step-prep/materialize-step-session-conversation
-   :split-workflow-step-session-conversation-fn #'psi.workflow-runtime.step-prep/split-step-session-conversation
+   :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
+   :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
+   :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
    :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!

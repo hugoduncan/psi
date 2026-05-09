@@ -1,9 +1,9 @@
-(ns psi.workflow-runtime.step-prep-prompt-test
+(ns psi.workflow-runtime.step-materialization-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.step-prep :as workflow-step-prep]
-   [psi.workflow-runtime.step-prep-test-support :as support]
+   [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
+   [psi.workflow-runtime.step-test-support :as support]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (deftest materialize-step-inputs-uses-canonical-output-and-yield-surfaces-test
@@ -40,7 +40,7 @@
     (is (= {:reply "session text"
             :data {:issues [1 2]}
             :text "session text"}
-           (workflow-step-prep/materialize-step-inputs run "consume")))))
+           (workflow-step-materialization/materialize-step-inputs run "consume")))))
 
 (deftest materialize-step-inputs-and-prompt-test
   (let [[state1 _ _] (workflow-registry/register-definition {:workflows {:definitions {} :runs {} :run-order []}}
@@ -50,11 +50,11 @@
                                                                :workflow-input {:input "ship it"
                                                                                 :original "build this feature"}})
         run0 (workflow-runtime/workflow-run-in state2 run-id)
-        prompt0 (workflow-step-prep/step-prompt run0 "step-1-planner")
+        prompt0 (workflow-step-materialization/step-prompt run0 "step-1-planner")
         state3 (assoc-in state2 [:workflows :runs run-id :step-runs "step-1-planner" :accepted-result]
                          {:outcome :ok :outputs {:final-llm-reply "plan text"}})
         run1 (workflow-runtime/workflow-run-in state3 run-id)
-        prompt1 (workflow-step-prep/step-prompt run1 "step-2-builder")]
+        prompt1 (workflow-step-materialization/step-prompt run1 "step-2-builder")]
     (is (= {:input "ship it" :original "build this feature"} (:step-inputs prompt0)))
     (is (= "ship it" (:prompt prompt0)))
     (is (= {:input "plan text" :original "build this feature"} (:step-inputs prompt1)))
@@ -89,7 +89,7 @@
                           :outputs {:final-llm-reply "plan text"}
                           :diagnostics {:summary "need logs"}})
         run (workflow-runtime/workflow-run-in state3 run-id)
-        prompt (workflow-step-prep/step-prompt run "step-2-request-more-info")]
+        prompt (workflow-step-materialization/step-prompt run "step-2-request-more-info")]
     (is (= {:input "need logs"
             :original "Bug 123"}
            (:step-inputs prompt)))
@@ -121,8 +121,8 @@
                           :outputs {:final-llm-reply "plan text"
                                     :text "plan text"}})
         run (workflow-runtime/workflow-run-in state3 run-id)
-        messages (workflow-step-prep/materialize-step-session-conversation run "review")
-        split (workflow-step-prep/split-step-session-conversation messages)]
+        messages (workflow-step-materialization/materialize-step-session-conversation run "review")
+        split (workflow-step-materialization/split-step-session-conversation messages)]
     (is (= [{:role "user" :content "{:ticket 123}"}
             {:role "user" :content "plan text"}
             {:role "user" :content "Review plan text"}]
@@ -161,8 +161,8 @@
                             :outputs {:final-llm-reply "plan text"
                                       :text "plan text"}})
           workflow-run (workflow-runtime/workflow-run-in state3 run-id)
-          conversation (workflow-step-prep/materialize-step-session-conversation workflow-run "review")
-          split (workflow-step-prep/split-step-session-conversation conversation)]
+          conversation (workflow-step-materialization/materialize-step-session-conversation workflow-run "review")
+          split (workflow-step-materialization/split-step-session-conversation conversation)]
       (is (= [{:role "user" :content "Original request"}
               {:role "user" :content "plan text"}
               {:role "user" :content "Review plan text"}]
