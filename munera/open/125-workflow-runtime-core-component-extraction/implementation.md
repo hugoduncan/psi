@@ -185,3 +185,29 @@ Verification after test reshaping:
 - focused lifecycle/runtime/adapter checks green through the top-level Kaocha config:
   - `clojure -M:test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.workflow-runtime.statechart-runtime.lifecycle-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.agent-session.deterministic-operation-registry-test`
   - result: `8 tests, 26 assertions, 0 failures`
+
+2026-05-09 test-shaper review
+
+Terse review note:
+- test polish follow-up: trim incidental setup in `state_test.clj` and consider removing low-value delegation proof from `lifecycle_test.clj` if higher façade coverage already makes it redundant
+
+Findings:
+- shape concern: `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/state_test.clj` still uses heavier-than-needed integration setup for what is primarily a working-memory seed shape proof; a slimmer fixture or direct state map would improve signal
+- shape concern: `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/lifecycle_test.clj` mixes one delegation test with stronger owned-behavior tests; the delegation test may be redundant now that higher execution façade coverage exists elsewhere
+- shape note: the remaining tests are otherwise solid, deterministic, and much clearer than the earlier overlapping runtime test surfaces
+
+2026-05-09 test-shaper follow-up execution
+
+Addressed both remaining test-polish items:
+- trimmed incidental setup in `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/state_test.clj`
+  - removed full session/context + registry setup
+  - now builds the minimal root-state fixture directly through `workflow-runtime/create-run`
+  - keeps the proof focused on working-memory seed invariants instead of broader integration wiring
+- removed the low-value lifecycle delegation proof from `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/lifecycle_test.clj`
+  - deleted `send-and-drain-delegates-through-lifecycle-test`
+  - retained only owned lifecycle behavior proofs: drain order, terminal discard, and overflow failure
+
+Verification after test-polish follow-up:
+- focused test check green:
+  - `clojure -M:test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.workflow-runtime.statechart-runtime.lifecycle-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.agent-session.deterministic-operation-registry-test`
+  - result: `7 tests, 24 assertions, 0 failures`

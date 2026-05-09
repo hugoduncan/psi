@@ -16,3 +16,5 @@
 - [x] Remove or narrowly repurpose overlapping runtime test surfaces so `statechart_runtime_test.clj`, `statechart_runtime/public_test.clj`, and lower role tests have one clear proof owner each
 - [x] Narrow `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/public_test.clj` to façade-specific behavior only, or delete it if the lower role tests plus higher integration tests fully cover the public surface
 - [x] Strengthen `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/lifecycle_test.clj` with owned-behavior proofs for queued-event drain order, terminal tail discard, and `max-drain-events` overflow failure
+- [x] Trim incidental integration setup in `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/state_test.clj` so the working-memory seed proof uses only the necessary fixture surface
+- [x] Re-evaluate `send-and-drain-delegates-through-lifecycle-test` in `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/lifecycle_test.clj`; delete it if higher façade coverage already makes the delegation proof redundant
