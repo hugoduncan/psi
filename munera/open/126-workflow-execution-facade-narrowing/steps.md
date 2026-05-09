@@ -24,5 +24,7 @@
   - removed the duplicate `agent-session` proof and kept the `workflow-runtime` proof as the lower-owner surface
 - [x] Re-run top-level Kaocha focused coverage for the affected `agent-session` and `workflow-runtime` test namespaces after the proof-ownership cleanup
   - `clojure -M:test --focus unit --focus psi.agent-session.workflow-execution-test --focus psi.workflow-runtime.step-prep-test --focus psi.workflow-runtime.ir-runtime-adoption-test` passed via top-level `tests.edn`
-- [ ] If more lower-owner workflow step-prep proofs accrue, split shared test fixtures or extract them to keep `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` locally comprehensible
-- [ ] If `step_prep_test.clj` continues to grow, split config-resolution proofs from prompt/materialization proofs so the lower-owner proof surface stays simple and role-focused
+- [x] If more lower-owner workflow step-prep proofs accrue, split shared test fixtures or extract them to keep `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` locally comprehensible
+  - extracted shared setup into `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test_support.clj`
+- [x] If `step_prep_test.clj` continues to grow, split config-resolution proofs from prompt/materialization proofs so the lower-owner proof surface stays simple and role-focused
+  - split proofs into `step_prep_config_test.clj` and `step_prep_prompt_test.clj`, leaving `step_prep_test.clj` as a minimal umbrella loader

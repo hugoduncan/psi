@@ -33,4 +33,12 @@ Follow-up implementation:
 - re-verified the affected namespaces through top-level Kaocha focused runs
 
 Code-shaper review note:
-- `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` is now the right lower-owner proof surface, but it has accumulated copied setup and mixed proof concerns; if more lower-owner proofs accrue, split fixtures or separate config-resolution proofs from prompt/materialization proofs before the file becomes another mixed-owner catchall
+- `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` was the right lower-owner proof surface, but it had accumulated copied setup and mixed proof concerns
+
+Code-shaper follow-up:
+- extracted shared workflow step-prep test setup into `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test_support.clj`
+- split the lower-owner proof surface into role-focused namespaces:
+  - `components/workflow-runtime/test/psi/workflow_runtime/step_prep_config_test.clj`
+  - `components/workflow-runtime/test/psi/workflow_runtime/step_prep_prompt_test.clj`
+- reduced `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` to a minimal umbrella loader
+- re-verified the reshaped lower-owner tests through top-level Kaocha focused runs
