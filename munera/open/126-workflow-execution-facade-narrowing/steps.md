@@ -28,3 +28,7 @@
   - extracted shared setup into `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test_support.clj`
 - [x] If `step_prep_test.clj` continues to grow, split config-resolution proofs from prompt/materialization proofs so the lower-owner proof surface stays simple and role-focused
   - split proofs into `step_prep_config_test.clj` and `step_prep_prompt_test.clj`, leaving `step_prep_test.clj` as a minimal umbrella loader
+- [x] If `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` grows materially, extract façade-specific fixtures or helpers so the higher-owner proof surface stays locally comprehensible
+  - extracted façade-specific support into `components/agent-session/test/psi/agent_session/workflow_execution_test_support.clj`
+- [x] Re-evaluate whether `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` should remain as a minimal umbrella loader or be removed once direct focused namespace invocation is the clearer project convention
+  - removed the umbrella loader and rely on direct focused lower-owner namespaces

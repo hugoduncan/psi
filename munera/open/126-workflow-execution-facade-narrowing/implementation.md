@@ -42,3 +42,11 @@ Code-shaper follow-up:
   - `components/workflow-runtime/test/psi/workflow_runtime/step_prep_prompt_test.clj`
 - reduced `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` to a minimal umbrella loader
 - re-verified the reshaped lower-owner tests through top-level Kaocha focused runs
+
+Test review note:
+- test ownership and role-splitting are now good; only minor future shaping remained around façade fixture extraction and whether the minimal `step_prep_test.clj` umbrella still paid for itself
+
+Test follow-up:
+- extracted façade-specific workflow execution fixtures into `components/agent-session/test/psi/agent_session/workflow_execution_test_support.clj`
+- removed the minimal `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` umbrella loader and rely on direct focused lower-owner namespaces instead
+- re-verified the affected test namespaces through top-level Kaocha focused runs
