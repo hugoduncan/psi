@@ -2,9 +2,9 @@
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.workflow-loader :as wl]
-   [psi.agent-session.workflow-file-loader :as loader]
-   [psi.agent-session.workflow-file-parser :as parser]
-   [psi.agent-session.workflow-file-compiler :as compiler]
+   [psi.workflow-loader.compiler :as compiler]
+   [psi.workflow-loader.core :as loader]
+   [psi.workflow-loader.parser :as parser]
    [psi.workflow-registry.definition :as workflow-definition]))
 
 ;;; End-to-end: raw file text → parsed → compiled → valid canonical definition
@@ -168,7 +168,7 @@
                                                {'psi.workflow/register-definition (fn [_] {:psi.workflow/registered? true})
                                                 'psi.workflow/remove-definition (fn [_] {:psi.workflow/removed? true})})
           load-call* (atom 0)]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [psi.workflow-loader.core/load-workflow-definitions
                     (fn [_]
                       (case (swap! load-call* inc)
                         1 {:definitions {"planner" {:definition-id "planner"
@@ -191,7 +191,7 @@
                                                {'psi.workflow/register-definition (fn [_] {:psi.workflow/registered? true})
                                                 'psi.workflow/remove-definition (fn [_] {:psi.workflow/removed? true})})
           load-call* (atom 0)]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [psi.workflow-loader.core/load-workflow-definitions
                     (fn [_]
                       (case (swap! load-call* inc)
                         1 {:definitions {"planner" {:definition-id "planner"
@@ -220,7 +220,7 @@
                                                {'psi.workflow/register-definition (fn [_] {:psi.workflow/registered? true})
                                                 'psi.workflow/remove-definition (fn [_] {:psi.workflow/removed? true})})
           load-call* (atom 0)]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [psi.workflow-loader.core/load-workflow-definitions
                     (fn [_]
                       (case (swap! load-call* inc)
                         1 {:definitions {"planner" {:definition-id "planner"
@@ -423,7 +423,7 @@
                                                {'psi.workflow/register-definition (fn [_] {:psi.workflow/registered? true})
                                                 'psi.workflow/remove-definition (fn [_] {:psi.workflow/removed? true})})
           load-call* (atom 0)]
-      (with-redefs [psi.agent-session.workflow-file-loader/load-workflow-definitions
+      (with-redefs [psi.workflow-loader.core/load-workflow-definitions
                     (fn [_]
                       (case (swap! load-call* inc)
                         1 {:definitions {"complexity-reduction-pr" {:definition-id "complexity-reduction-pr"

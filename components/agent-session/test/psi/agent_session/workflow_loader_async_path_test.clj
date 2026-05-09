@@ -8,8 +8,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.workflow-file-compiler :as workflow-file-compiler]
-   [psi.agent-session.workflow-file-loader :as workflow-file-loader]
+   [psi.workflow-loader.compiler :as workflow-file-compiler]
+   [psi.workflow-loader.core :as workflow-file-loader]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (defn- create-context+session []

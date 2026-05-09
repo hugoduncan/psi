@@ -1,7 +1,7 @@
-(ns psi.agent-session.workflow-file-compiler-test
+(ns psi.workflow-loader.compiler-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-file-compiler :as compiler]
+   [psi.workflow-loader.compiler :as compiler]
    [psi.workflow-registry.definition :as workflow-definition]))
 
 (def target-session-parsed

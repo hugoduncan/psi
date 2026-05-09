@@ -1,8 +1,8 @@
-(ns psi.agent-session.workflow-file-parser-test
+(ns psi.workflow-loader.parser-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-file-parser :as parser]))
+   [psi.workflow-loader.parser :as parser]))
 
 (deftest parse-workflow-file-test
   (testing "body-only workflow files are no longer valid authored workflow files"

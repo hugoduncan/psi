@@ -1,8 +1,8 @@
-(ns psi.agent-session.workflow-file-loader-test
+(ns psi.workflow-loader.core-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-file-loader :as loader]))
+   [psi.workflow-loader.core :as loader]))
 
 (defn- with-temp-workflow-dir
   "Create a temp directory with workflow files, call f with the dir path, then cleanup."

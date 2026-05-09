@@ -1,13 +1,12 @@
 (ns psi.agent-session.workflow-file-authoring-resolution
   "Compatibility authoring-resolution façade.
 
-   Canonical authoring helpers now live in narrower namespaces:
-   - `workflow-file-authoring-session` for `:session` source/projection/override compilation
-   - `workflow-file-authoring-routing` for author-facing routing target resolution"
+   Canonical authoring helpers now live in `psi.workflow-loader.authoring-*`.
+   This namespace remains only as a temporary compatibility seam."
   (:require
-   [psi.agent-session.workflow-file-authoring-preload :as preload]
-   [psi.agent-session.workflow-file-authoring-routing :as routing]
-   [psi.agent-session.workflow-file-authoring-session :as session]))
+   [psi.workflow-loader.authoring-preload :as preload]
+   [psi.workflow-loader.authoring-routing :as routing]
+   [psi.workflow-loader.authoring-session :as session]))
 
 (def compile-step-input-bindings session/compile-step-input-bindings)
 (def compile-step-session-overrides session/compile-step-session-overrides)

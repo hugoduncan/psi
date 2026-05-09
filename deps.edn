@@ -37,6 +37,7 @@
         psi/workflow-registry                         {:local/root "components/workflow-registry"}
         psi/workflow-judge                            {:local/root "components/workflow-judge"}
         psi/workflow-runtime                          {:local/root "components/workflow-runtime"}
+        psi/workflow-loader                           {:local/root "components/workflow-loader"}
         psi/workflow-step-materialization             {:local/root "components/workflow-step-materialization"}
         psi/workflow-step-session-config              {:local/root "components/workflow-step-session-config"}
         psi/turn-statechart                           {:local/root "components/turn-statechart"}
@@ -93,6 +94,7 @@
                         "components/session-persistence/src"
                         "components/shared-config/src"
                         "components/project-nrepl/src"
+                        "components/workflow-loader/src"
                         "components/workflow-step-materialization/src"
                         "components/workflow-step-session-config/src"
                         "components/turn-statechart/src"
@@ -201,6 +203,7 @@
                              "components/workflow-registry/test"
                              "components/workflow-judge/test"
                              "components/workflow-runtime/test"
+                             "components/workflow-loader/test"
                              "components/turn-statechart/test"
                              "components/turn-runtime/test"
                              "components/tool-runtime/test"
@@ -250,6 +253,7 @@
                         "components/workflow-registry/test"
                         "components/workflow-judge/test"
                         "components/workflow-runtime/test"
+                        "components/workflow-loader/test"
                         "components/workflow-step-materialization/test"
                         "components/turn-statechart/test"
                         "components/turn-runtime/test"
@@ -292,6 +296,7 @@
                         "components/workflow-registry/src"
                         "components/workflow-judge/src"
                         "components/workflow-runtime/src"
+                        "components/workflow-loader/src"
                         "components/workflow-step-materialization/src"
                         "components/workflow-step-session-config/src"
                         "components/tool-runtime/src"

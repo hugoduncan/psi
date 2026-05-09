@@ -1,8 +1,8 @@
-(ns psi.agent-session.workflow-file-authoring-session-test
+(ns psi.workflow-loader.authoring-session-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-file-authoring-preload :as authoring-preload]
-   [psi.agent-session.workflow-file-authoring-session :as authoring-session]))
+   [psi.workflow-loader.authoring-preload :as authoring-preload]
+   [psi.workflow-loader.authoring-session :as authoring-session]))
 
 (def ^:private default-step-name->step-ref
   {"discover" {:step-id "step-1-discover" :idx 0}})

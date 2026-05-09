@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.workflow-loader :as wl]
    [extensions.workflow-loader.orchestration :as orchestration]
-   [psi.agent-session.workflow-file-loader :as workflow-file-loader])
+   [psi.workflow-loader.core :as workflow-file-loader])
   (:import
    [java.util.concurrent Future]))
 

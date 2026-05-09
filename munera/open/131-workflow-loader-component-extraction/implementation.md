@@ -1,25 +1,221 @@
 2026-05-07
 
-Task created from post-123/124/125/126/127/128/129/130 workflow extraction review.
+Implemented workflow authored-definition loading extraction into a dedicated lower component.
 
-Creation rationale:
-- after the runtime, judge, step session-config, and step materialization extractions, the strongest remaining workflow-shaped area is authored-definition loading
-- loader ownership is distinct from registry ownership and runtime ownership: it acquires and prepares definitions before they are stored or executed
-- the intent is to give workflow discovery/loading/authored-definition preparation a more precise lower component home without folding it into registry, runtime, or higher `agent-session`/tool entrypoints
+## Current surface review
 
-Initial boundary notes:
-- likely owned responsibilities: workflow file discovery/loading, authored-definition ingestion, load-time preparation/normalization, workflow-file metadata loading context where applicable, and downstream handoff to registry/runtime consumers
-- expected non-goal: do not silently absorb registry storage/query ownership or runtime execution ownership
-- expected review point: current loader behavior may be spread across higher tool/entrypoint surfaces and lower helper namespaces, so implementation must identify the true authoritative loader owner rather than assuming one file maps one-to-one to the component
+Reviewed as possible loader owners:
+- moved to the extracted loader component:
+  - `psi.agent-session.workflow-file-loader`
+  - `psi.agent-session.workflow-file-parser`
+  - `psi.agent-session.workflow-file-compiler`
+  - `psi.agent-session.workflow-file-authoring-errors`
+  - `psi.agent-session.workflow-file-authoring-session`
+  - `psi.agent-session.workflow-file-authoring-preload`
+  - `psi.agent-session.workflow-file-authoring-routing`
+- retained only as a temporary compatibility façade:
+  - `psi.agent-session.workflow-file-authoring-resolution`
 
-Architectural decisions agreed during refinement:
-- choose component name `workflow-loader` and namespace family `psi.workflow-loader.*` unless implementation proves a materially narrower or broader owner is required
-- treat the extraction as one coherent authored-definition loading owner with a small internal split for discovery, parsing, compilation, and authoring-preparation roles rather than as an arbitrary pre-runtime bundle
-- expect workflow-file authoring compilation helpers to move with the loader when they are part of load-time preparation of canonical prepared definitions
-- expected concrete review set includes `workflow-file-loader`, `workflow-file-parser`, `workflow-file-compiler`, `workflow-file-authoring-errors`, `workflow-file-authoring-session`, `workflow-file-authoring-preload`, `workflow-file-authoring-routing`, and `workflow-file-authoring-resolution`, each with an explicit move/stay/delete disposition
-- prefer one small canonical lower loader API centered on `load-workflow-definitions`, while allowing parser/compiler/discovery/validation seams such as `validate-step-references`, `validate-no-name-collisions`, and `validate-judge-routing` to remain public if direct lower tests or extension callers intentionally need them
-- preserve current caller-visible behavior at least for `load-workflow-definitions`, `scan-directory`, direct parser/compiler caller contracts, directory precedence semantics, duplicate-resolution behavior, source-path attachment behavior, and load-time error/warning shaping unless justified replacements are recorded and all affected callers are rewired
-- prefer the downstream handoff artifact to be canonical prepared workflow definitions plus loader-owned metadata/diagnostics rather than raw authored sources or registry-owned state
-- registration remains outside loader authoritative ownership even when higher callers immediately consume loader results for registry operations
-- prefer direct rewiring and removal of old mixed `psi.agent-session.workflow-file-*` owners rather than long-lived forwarding façades
-- preferred final state is removal of `workflow-file-authoring-resolution` after rewiring; if retained during implementation, treat it only as a short-lived move-sequencing façade
+Review conclusion:
+- the authoritative loader owner is one coherent authored-definition loading boundary spanning discovery, parsing, compilation, load-result shaping, and authoring-time session/preload/routing compilation helpers used during load-time preparation
+- none of the reviewed `workflow-file-*` namespaces belonged in registry or runtime ownership
+- `workflow-file-authoring-resolution` was already only a façade over narrower helpers and was not the true authoritative owner
+
+## Final component and namespace name
+
+Chosen component name:
+- `workflow-loader`
+
+Chosen namespace family:
+- `psi.workflow-loader.*`
+
+Chosen internal split:
+- `psi.workflow-loader.core`
+- `psi.workflow-loader.parser`
+- `psi.workflow-loader.compiler`
+- `psi.workflow-loader.authoring-errors`
+- `psi.workflow-loader.authoring-session`
+- `psi.workflow-loader.authoring-preload`
+- `psi.workflow-loader.authoring-routing`
+
+Naming decision:
+- kept `workflow-loader` rather than broader or narrower alternatives because the final owned surface remains specifically about authored-definition discovery/loading/preparation before registry or runtime use
+- rejected `workflow-authoring-loader` because the component does not own authoring semantics broadly, only the load-time preparation portion
+- rejected `workflow-definition-loader` because the existing repo vocabulary already centers the loading boundary around workflow files and loader behavior rather than a wider definition lifecycle owner
+
+## Loader responsibility shape
+
+The extracted component is one coherent authored-definition loading owner.
+
+It owns:
+- workflow file discovery/loading
+- file parsing
+- target-authored workflow-file compilation
+- load-time error and warning shaping
+- workflow-file authoring helper compilation used during loading:
+  - session input binding compilation
+  - session override compilation
+  - session preload compilation
+  - routing target resolution helpers
+- workflow-file metadata attachment during compile/load
+- downstream handoff of canonical prepared definitions to higher registry consumers
+
+It does not own:
+- workflow definition registration/removal in canonical state
+- workflow registry storage/query semantics
+- workflow runtime execution/progression/statechart semantics
+- workflow judge ownership
+- workflow step session-config runtime ownership
+- workflow step materialization runtime ownership
+
+## Public surface
+
+Canonical lower public API:
+- `psi.workflow-loader.core/load-workflow-definitions`
+
+Additional intentionally public lower APIs:
+- `psi.workflow-loader.core/global-workflow-dirs`
+- `psi.workflow-loader.core/project-workflow-dir`
+- `psi.workflow-loader.core/scan-directory`
+- `psi.workflow-loader.core/scan-all-directories`
+- `psi.workflow-loader.parser/parse-workflow-file`
+- `psi.workflow-loader.compiler/compile-workflow-file`
+- `psi.workflow-loader.compiler/compile-workflow-files`
+- `psi.workflow-loader.compiler/validate-step-references`
+- `psi.workflow-loader.compiler/validate-no-name-collisions`
+- `psi.workflow-loader.compiler/validate-judge-routing`
+- `psi.workflow-loader.authoring-session/source+projection->binding`
+- `psi.workflow-loader.authoring-session/compile-step-input-bindings`
+- `psi.workflow-loader.authoring-session/compile-step-session-overrides`
+- `psi.workflow-loader.authoring-session/step-source-reference-map`
+- `psi.workflow-loader.authoring-preload/compile-step-session-preload`
+- `psi.workflow-loader.authoring-routing/routing-target->step-id-map`
+- `psi.workflow-loader.authoring-routing/resolve-routing-table`
+
+Why they remain public:
+- direct lower proofs intentionally exercise parser/compiler/loader/authoring helper seams
+- extension and integration callers intentionally use the canonical loader entrypoint and, in a few cases, parser/compiler seams for proof setup
+- these are intentional lower APIs, not accidental leftovers
+
+## Contract preservation
+
+Preserved behavior/call/output contracts:
+- `load-workflow-definitions` result shape
+- `scan-directory` result shape
+- parser and compiler direct caller contracts used by tests and extension proofs
+- directory precedence semantics
+- duplicate-name resolution semantics
+- `:source-path` attachment behavior
+- load-time error and warning shaping
+
+No caller-visible contract redesign was introduced.
+
+## Rewiring performed
+
+Higher workflow entrypoints/adapters rewired to the new owner:
+- `extensions.workflow-loader` now depends on `psi.workflow-loader.core`
+- `extensions.workflow-loader-test` now depends on `psi.workflow-loader.core`, `psi.workflow-loader.parser`, and `psi.workflow-loader.compiler`
+- `extensions.workflow-loader-delegate-test` now redefines `psi.workflow-loader.core/load-workflow-definitions`
+- `psi.agent-session.workflow-loader-async-path-test`
+- `psi.agent-session.workflow-loader-tui-repro-test`
+- `psi.agent-session.workflow-migration-validation-test`
+
+Lower proofs moved to the new component:
+- `psi.workflow-loader.core-test`
+- `psi.workflow-loader.parser-test`
+- `psi.workflow-loader.compiler-test`
+- `psi.workflow-loader.compiler-target-authoring-test`
+- `psi.workflow-loader.authoring-session-test`
+
+Build/test wiring added:
+- new component dependency entry in root `deps.edn`
+- new component dependency entry in `components/agent-session/deps.edn`
+- new component dependency entry in `extensions/workflow-loader/deps.edn`
+- new source/test paths in `tests.edn`
+- new source/test paths in test aliases in root `deps.edn`
+
+## Registry/runtime boundary status
+
+Downstream handoff artifact:
+- canonical prepared workflow definitions keyed by workflow name, plus loader-owned `:errors` and `:warnings`
+
+Boundary shape:
+- loader returns canonical prepared definitions and diagnostics
+- `extensions.workflow-loader` remains the higher orchestration surface that immediately consumes those loaded definitions and delegates registration/removal through canonical workflow mutations
+- registration remains outside loader authoritative ownership
+
+Mixed boundary status:
+- no new load-and-register ownership was introduced into the loader component
+- the loader still feeds a higher orchestrator that performs registry mutations immediately, but that is an acceptable tree-like boundary: loader prepares definitions, higher orchestration registers them
+
+## Ownership separation verification
+
+Registry ownership remains separate:
+- compiler still depends only on `psi.workflow-registry.definition` validation/contracts, not registry state ownership
+- definition registration/removal remains in higher orchestration via workflow mutations
+
+Runtime ownership remains separate:
+- no runtime execution/progression code moved into the loader component
+- runtime consumers remain outside and consume already loaded/registered definitions
+
+Adjacent extracted lower owners remain separate:
+- workflow step session-config ownership was not recombined with loader ownership
+- workflow step materialization ownership was not recombined with loader ownership
+
+## Transitional namespace status
+
+Retained compatibility façades under `components/agent-session/src/psi/agent_session/`:
+- `workflow_file_loader.clj`
+- `workflow_file_parser.clj`
+- `workflow_file_compiler.clj`
+- `workflow_file_authoring_errors.clj`
+- `workflow_file_authoring_session.clj`
+- `workflow_file_authoring_preload.clj`
+- `workflow_file_authoring_routing.clj`
+- `workflow_file_authoring_resolution.clj`
+
+Why retained:
+- they are now tiny forwarding seams only
+- they preserve compatibility for any still-unrewired callers outside the reviewed focused set
+- they allow this extraction to land without broad opportunistic rewiring beyond task scope
+
+Specific `workflow-file-authoring-resolution` decision:
+- retained only as a temporary compatibility façade
+- no longer preferred or authoritative
+- canonical owner is now the `psi.workflow-loader.authoring-*` family
+
+Residual debt from retained seams:
+- old `psi.agent-session.workflow-file-*` façades should be removed in a follow-up once all consumers are rewritten directly to `psi.workflow-loader.*`
+
+## Residual dependency status
+
+Residual direct dependencies on old mixed owners remain only through the forwarding façade files themselves.
+
+No reviewed higher caller in the implemented focused set continues to prefer the old owners.
+
+Residual debt:
+- compatibility façade removal remains a later cleanup step
+- because the façades are tiny and authoritative ownership has moved, this is documented debt rather than ongoing mixed ownership
+
+## Verification
+
+Focused tests green:
+- `clojure -M:test --focus psi.workflow-loader.core-test --focus psi.workflow-loader.parser-test --focus psi.workflow-loader.compiler-test --focus psi.workflow-loader.compiler-target-authoring-test --focus psi.workflow-loader.authoring-session-test --focus extensions.workflow-loader-test --focus extensions.workflow-loader-delegate-test --focus psi.agent-session.workflow-loader-async-path-test --focus psi.agent-session.workflow-loader-tui-repro-test --focus psi.agent-session.workflow-migration-validation-test`
+- result: `55 tests, 365 assertions, 0 failures`
+
+Lint green:
+- `clojure -M:lint --lint components/workflow-loader components/agent-session extensions/workflow-loader deps.edn tests.edn`
+- result: `0 errors, 0 warnings`
+
+## Final assessment
+
+Acceptance is met for authoritative ownership:
+- a dedicated lower workflow loader component now exists at `components/workflow-loader/`
+- authoritative loader logic now lives under `psi.workflow-loader.*`
+- higher workflow entrypoints depend downward on that component
+- registry/runtime/step-materialization/step-session-config ownership remains separate
+- behavior contracts were preserved
+
+Explicit residual debt:
+- old `psi.agent-session.workflow-file-*` namespaces remain as documented temporary forwarding seams instead of being fully removed in this task
+- this is the only intentional incompleteness left from the preferred final state

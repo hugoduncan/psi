@@ -1,17 +1,9 @@
 (ns psi.agent-session.workflow-file-authoring-errors
-  "Shared error-shaping helpers for workflow-file authoring compilation.")
+  "Compatibility workflow-file authoring-errors façade. Canonical loader ownership now
+   lives in `psi.workflow-loader.authoring-errors`."
+  (:require
+   [psi.workflow-loader.authoring-errors :as workflow-loader.authoring-errors]))
 
-(defn invalid
-  [message]
-  {:error message})
-
-(defn invalid-in
-  [scope message]
-  (invalid (str message " in `" scope "`")))
-
-(defn unexpected-keys-error
-  [scope allowed-keys actual-map]
-  (when-let [unknown-keys (seq (remove allowed-keys (keys actual-map)))]
-    (invalid-in scope
-                (str "unexpected keys "
-                     (pr-str (vec unknown-keys))))))
+(def invalid workflow-loader.authoring-errors/invalid)
+(def invalid-in workflow-loader.authoring-errors/invalid-in)
+(def unexpected-keys-error workflow-loader.authoring-errors/unexpected-keys-error)

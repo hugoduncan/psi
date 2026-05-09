@@ -2,8 +2,8 @@
   "Validate that all migrated .psi/workflows/*.md files parse and compile correctly."
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-file-compiler :as compiler]
-   [psi.agent-session.workflow-file-loader :as loader]))
+   [psi.workflow-loader.compiler :as compiler]
+   [psi.workflow-loader.core :as loader]))
 
 (deftest migrated-workflow-files-test
   (testing "all .psi/workflows/ files parse, compile, and validate"
