@@ -27,6 +27,15 @@
                     loader/project-workflow-dir (constantly dir)]
         (f dir (loader/load-workflow-definitions dir))))))
 
+(defn- with-project-definitions
+  [files f]
+  (with-project-loader-result
+    files
+    (fn [_dir {:keys [definitions errors warnings]}]
+      (f {:definitions definitions
+          :errors errors
+          :warnings warnings}))))
+
 (def planner-md
   (str "---\nname: planner\ndescription: Plans tasks\n---\n"
        "{:steps [{:name \"plan\"\n"
@@ -187,85 +196,73 @@
         (is (empty? errors)))))
 
   (testing "explicit named prior-step source selection loads and compiles"
-    (with-temp-workflow-dir
+    (with-project-definitions
       {"planner.md" planner-md
        "builder.md" builder-md
        "reviewer.md" reviewer-md
        "bug-triage.md" explicit-source-chain-md}
-      (fn [dir]
-        (with-redefs [loader/global-workflow-dirs (constantly [])
-                      loader/project-workflow-dir (constantly dir)]
-          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
-                definition (get definitions "bug-triage")]
-            (is (empty? errors))
-            (is (= [:delegate :delegate :delegate :delegate]
-                   (mapv :type (:steps definition))))
-            (is (= :workflow-input
-                   (get-in definition [:steps 0 :prompt-string :vars "input" :from])))
-            (is (= :text
-                   (get-in definition [:steps 1 :prompt-string :vars "input" :from :yield])))
-            (is (= :text
-                   (get-in definition [:steps 2 :prompt-string :vars "input" :from :yield])))
-            (is (= :text
-                   (get-in definition [:steps 3 :prompt-string :vars "input" :from :yield]))))))))
+      (fn [{:keys [definitions errors]}]
+        (let [definition (get definitions "bug-triage")]
+          (is (empty? errors))
+          (is (= [:delegate :delegate :delegate :delegate]
+                 (mapv :type (:steps definition))))
+          (is (= :workflow-input
+                 (get-in definition [:steps 0 :prompt-string :vars "input" :from])))
+          (is (= :text
+                 (get-in definition [:steps 1 :prompt-string :vars "input" :from :yield])))
+          (is (= :text
+                 (get-in definition [:steps 2 :prompt-string :vars "input" :from :yield])))
+          (is (= :text
+                 (get-in definition [:steps 3 :prompt-string :vars "input" :from :yield])))))))
 
   (testing "projected source selection loads and compiles"
-    (with-temp-workflow-dir
+    (with-project-definitions
       {"planner.md" planner-md
        "builder.md" builder-md
        "reviewer.md" reviewer-md
        "projection-chain.md" projected-chain-md}
-      (fn [dir]
-        (with-redefs [loader/global-workflow-dirs (constantly [])
-                      loader/project-workflow-dir (constantly dir)]
-          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
-                definition (get definitions "projection-chain")]
-            (is (empty? errors))
-            (is (= [:delegate :delegate :delegate]
-                   (mapv :type (:steps definition))))
-            (is (= [:task]
-                   (get-in definition [:steps 0 :prompt-string :vars "input" :path])))
-            (is (= :full
-                   (get-in definition [:steps 0 :context 0 :projection])))
-            (is (= [:ticket :title]
-                   (get-in definition [:steps 1 :context 0 :path])))
-            (is (= :text
-                   (get-in definition [:steps 2 :context 0 :projection]))))))))
+      (fn [{:keys [definitions errors]}]
+        (let [definition (get definitions "projection-chain")]
+          (is (empty? errors))
+          (is (= [:delegate :delegate :delegate]
+                 (mapv :type (:steps definition))))
+          (is (= [:task]
+                 (get-in definition [:steps 0 :prompt-string :vars "input" :path])))
+          (is (= :full
+                 (get-in definition [:steps 0 :context 0 :projection])))
+          (is (= [:ticket :title]
+                 (get-in definition [:steps 1 :context 0 :path])))
+          (is (= :text
+                 (get-in definition [:steps 2 :context 0 :projection])))))))
 
   (testing "session preload loads and compiles"
-    (with-temp-workflow-dir
+    (with-project-definitions
       {"planner.md" planner-md
        "builder.md" builder-md
        "reviewer.md" reviewer-md
        "preload-chain.md" preload-chain-md}
-      (fn [dir]
-        (with-redefs [loader/global-workflow-dirs (constantly [])
-                      loader/project-workflow-dir (constantly dir)]
-          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)
-                definition (get definitions "preload-chain")]
-            (is (empty? errors))
-            (is (= [:delegate :delegate :session]
-                   (mapv :type (:steps definition))))
-            (is (= :workflow-original
-                   (get-in definition [:steps 2 :contributions 0 :from])))
-            (is (= :text
-                   (get-in definition [:steps 2 :contributions 1 :from :yield])))
-            (is (= :transcript
-                   (get-in definition [:steps 2 :contributions 2 :from :output])))
-            (is (= {:type :tail :turns 4 :tool-output false}
-                   (get-in definition [:steps 2 :contributions 2 :projection]))))))))
+      (fn [{:keys [definitions errors]}]
+        (let [definition (get definitions "preload-chain")]
+          (is (empty? errors))
+          (is (= [:delegate :delegate :session]
+                 (mapv :type (:steps definition))))
+          (is (= :workflow-original
+                 (get-in definition [:steps 2 :contributions 0 :from])))
+          (is (= :text
+                 (get-in definition [:steps 2 :contributions 1 :from :yield])))
+          (is (= :transcript
+                 (get-in definition [:steps 2 :contributions 2 :from :output])))
+          (is (= {:type :tail :turns 4 :tool-output false}
+                 (get-in definition [:steps 2 :contributions 2 :projection])))))))
 
   (testing "delegate targets remain loader-time data and do not require local target definitions to compile"
-    (with-temp-workflow-dir
+    (with-project-definitions
       {"plan-build-review.md" chain-md}
-      (fn [dir]
-        (with-redefs [loader/global-workflow-dirs (constantly [])
-                      loader/project-workflow-dir (constantly dir)]
-          (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
-            (is (= 1 (count definitions)))
-            (is (empty? errors))
-            (is (= [:delegate :delegate :delegate]
-                   (mapv :type (:steps (get definitions "plan-build-review"))))))))))
+      (fn [{:keys [definitions errors]}]
+        (is (= 1 (count definitions)))
+        (is (empty? errors))
+        (is (= [:delegate :delegate :delegate]
+               (mapv :type (:steps (get definitions "plan-build-review"))))))))
 
   (testing "parse errors collected separately from successful compilations"
     (with-project-loader-result
@@ -280,27 +277,21 @@
   (testing "current-authored workflow files are rejected after retirement"
     (let [current-authored-md (str "---\nname: current-authored\ndescription: Old grammar\n---\n"
                                    "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}]}\n")]
-      (with-temp-workflow-dir
+      (with-project-definitions
         {"current-authored.md" current-authored-md}
-        (fn [dir]
-          (with-redefs [loader/global-workflow-dirs (constantly [])
-                        loader/project-workflow-dir (constantly dir)]
-            (let [{:keys [definitions errors]} (loader/load-workflow-definitions dir)]
-              (is (empty? definitions))
-              (is (seq errors))
-              (is (some #(re-find #"Workflow files must define target-authored `\{:steps \[\.\.\.\]\}` config" (:error %)) errors))))))))
+        (fn [{:keys [definitions errors]}]
+          (is (empty? definitions))
+          (is (seq errors))
+          (is (some #(re-find #"Workflow files must define target-authored `\{:steps \[\.\.\.\]\}` config" (:error %)) errors))))))
 
   (testing "malformed EDN still surfaces as a parse/compile error"
     (let [bad-edn-md (str "---\nname: bad-edn\ndescription: Bad edn\n---\n"
                           "{:steps [")]
-      (with-temp-workflow-dir
+      (with-project-definitions
         {"bad-edn.md" bad-edn-md}
-        (fn [dir]
-          (with-redefs [loader/global-workflow-dirs (constantly [])
-                        loader/project-workflow-dir (constantly dir)]
-            (let [{:keys [errors]} (loader/load-workflow-definitions dir)]
-              (is (seq errors))
-              (is (some #(re-find #"EOF while reading" (:error %)) errors)))))))))
+        (fn [{:keys [errors]}]
+          (is (seq errors))
+          (is (some #(re-find #"EOF while reading" (:error %)) errors)))))))
 
 (deftest loader-api-contract-test
   (testing "load-workflow-definitions remains the canonical lower entrypoint while helper APIs retain intentional result shapes"

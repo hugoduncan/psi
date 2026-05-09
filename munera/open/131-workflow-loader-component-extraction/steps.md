@@ -41,3 +41,10 @@ Follow-up test shaping:
 - [x] Add one tiny local helper in `components/workflow-loader/test/psi/workflow_loader/core_test.clj` for temp-dir loading with globals disabled so repeated temp-dir + `with-redefs` setup does not keep spreading
 - [x] Add one small explicit loader API contract test block that makes the intended canonical loader API versus intentionally-public helper APIs more obvious
 - [x] In that loader API contract block, prove at least that `load-workflow-definitions` remains the canonical lower entrypoint while `scan-directory`, parser, compiler, and validation seams remain intentional helper APIs with preserved result shapes used by real higher callers or lower proofs
+
+Optional future test polish:
+- [x] If `components/workflow-loader/test/psi/workflow_loader/core_test.clj` changes again, reduce the remaining mixed setup style by preferring either `with-project-loader-result` or a clearly justified alternative consistently across the file
+- [x] If workflow migration proof runtime becomes noticeable, consider whether `workflow-migration-view` should be shared more aggressively without weakening test independence or failure locality
+  - current verdict: keep per-test recomputation for independence; no runtime pressure justifies stronger sharing yet
+- [x] Keep canonical loader API proofs split between `psi.workflow-loader.core-test` and `extensions.workflow-loader-test` only while that split remains clearer than a merged contract surface; revisit only if future proofs make the distinction muddy
+  - current verdict: the split remains clearer than a merged contract surface, so no further consolidation was done

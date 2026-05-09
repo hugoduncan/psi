@@ -227,3 +227,11 @@ Test review: approve as implemented.
   - added `with-project-loader-result` in `components/workflow-loader/test/psi/workflow_loader/core_test.clj` to reduce repeated temp-dir + disabled-global setup
   - added an explicit loader API contract block in `psi.workflow-loader.core-test`
   - added an explicit higher-proof seam block in `extensions.workflow-loader-test` showing parser/compiler/validation helpers remain intentional lower APIs used by higher proofs
+
+Test-shaper review: approve as implemented.
+- the tests now have better clarity and signal than the initial extraction landing: setup noise is reduced, canonical API intent is more explicit, and the migration proof is less brittle
+- no blocking robustness issue was found
+- optional future polish was then reviewed and addressed where justified:
+  - `components/workflow-loader/test/psi/workflow_loader/core_test.clj` no longer keeps the previously noted mixed setup style across the reviewed loader-behavior examples; the file now prefers the local helper path more consistently
+  - `psi.agent-session.workflow-migration-validation-test` still recomputes `workflow-migration-view` per test, and that remains the preferred current shape because independence is preserved and there is no runtime pressure yet
+  - canonical loader API intent remains explicitly split across `psi.workflow-loader.core-test` and `extensions.workflow-loader-test`; that split is currently clearer than a merged contract surface, so no further consolidation was done
