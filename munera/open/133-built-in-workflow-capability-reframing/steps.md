@@ -1,0 +1,19 @@
+- [ ] Review `extensions/workflow-loader/` and classify each owned responsibility as built-in canonical workflow behavior or optional residue
+- [ ] Review `extensions/workflow-display/` and decide whether its display/read-model helpers are canonical workflow UX semantics that belong in built-in core ownership
+- [ ] Review any workflow-loader or workflow-display extension manifest/resource/config surfaces and classify whether they are purely extension framing or still carry genuinely needed behavior
+- [ ] Identify the smallest correct built-in owner(s) for workflow bootstrap/wiring and record why they are the right composition roots, preferring `system-bootstrap` for built-in installation decisions, `app-runtime` only for process/runtime assembly glue, and `agent-session` only for session-scoped orchestration
+- [ ] Use nested higher core workflow namespace names under `workflow.*` families rather than flat `workflow-*` names for any new namespaces introduced by this task
+- [ ] Confirm and record the lower workflow component boundaries that must remain authoritative and unchanged in this task
+- [ ] Move canonical workflow bootstrap/registration out of extension packaging and into built-in core assembly
+- [ ] Move canonical workflow tool registration out of extension packaging and into built-in core assembly
+- [ ] Move canonical workflow command registration out of extension packaging and into built-in core assembly
+- [ ] Move canonical workflow prompt-contribution or capability-surfacing registration out of extension packaging and into built-in core assembly where it remains part of the built-in workflow UX, keeping content/projection semantics with the appropriate domain owner and moving only registration/wiring upward as needed
+- [ ] Move canonical workflow lifecycle hooks/session-switch reload behavior out of extension packaging and into built-in core assembly, preserving the current session-switch reload behavior in this task even if a later task revisits whether that lifecycle is ideal
+- [ ] Decide whether canonical workflow display/read-model helpers move into built-in core ownership or remain outside as truly optional residue; treat helpers that project canonical workflow state into stable built-in display/read-model forms as core-owned
+- [ ] Update capability-catalog, session-capability, and extension-install modeling so canonical workflow behavior is no longer represented as extension-originated, or record the exact residual exception
+- [ ] Decide whether any workflow-adjacent surface remains extension-owned; if so, record what it is and why it satisfies the optionality rubric rather than remaining canonical behavior
+- [ ] Delete `extensions/workflow-loader/` if direct rewiring is possible; otherwise leave only a tiny explicitly transitional façade with a recorded blocking reason
+- [ ] Move `extensions/workflow-display` into built-in core ownership when it matches the canonical display/read-model rubric, or explicitly record why it remains outside core under the optionality rubric
+- [ ] Rehome or update affected tests so built-in workflow bootstrap/wiring is proved from the new core owner while lower workflow behavior proofs stay with the extracted components, and avoid leaving extension test namespaces as the primary proof surface for built-in workflow behavior
+- [ ] Verify canonical user-facing workflow behavior remains unchanged for must-preserve surfaces: `delegate`, `/delegate`, `.psi/workflows/` loading/reloading, registration/removal behavior after reload, session-switch reload behavior, and core workflow mutation/resolver/psi-tool surfaces
+- [ ] Record the reviewed responsibilities, chosen built-in owners, preserved lower boundaries, public surface preservation, extension residue status, and resulting built-in capability model in `implementation.md`
