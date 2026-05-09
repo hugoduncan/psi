@@ -61,7 +61,8 @@
                             (psi-tool/telemetry-args args)
                             args))
      :execute-opts      {:cwd          (session/session-worktree-path-in ctx session-id)
-                         :overrides    overrides}
+                         :overrides    overrides
+                         :session-id   session-id}
      :on-event          (partial on-tool-event ctx session-id progress-queue)}))
 
 (defn execute-tool-call!

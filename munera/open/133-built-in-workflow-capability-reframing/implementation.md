@@ -136,17 +136,29 @@ Explicit consequences:
 
 ## Residual exception
 
-Residual exception kept in this task:
+Residual exceptions kept in this task:
 
 - legacy compatibility namespaces under `extensions/workflow-loader/*` remain present
+- built-in workflow still reuses extension-registry/API registration machinery under built-in provenance id `built-in:workflow`
 
 Reason:
 
 - direct namespace reload proofs and extension-path compatibility tests still target those legacy namespaces and paths
 - removing them immediately would broaden the task into simultaneous compatibility-surface deletion and test-suite reauthoring well beyond the smallest reframing move
+- reusing extension-registry/API machinery keeps the built-in workflow surface aligned with existing command/tool/prompt registration paths while canonical provenance and bootstrap are now built-in rather than manifest-installed
 
 Why transitional rather than preferred end state:
 
 - canonical runtime bootstrap no longer loads workflow through manifest extension activation
 - canonical ownership already lives under built-in core owners
-- only compatibility entrypoints remain
+- only compatibility entrypoints and shared registration machinery remain
+
+## Review note
+
+Terse review: good reframing progress, but do not close yet.
+
+Follow-up items flagged in implementation review:
+
+- built-in workflow runtime ownership still relies on process-global `state`/`inflight-runs` plus runtime fns seeded from one bootstrapped session; review and fix or explicitly prove session targeting is correct for tool execution after session switches/new sessions
+- user-facing docs still describe workflow as an installable `psi/workflow-loader` extension and must be synchronized with the built-in capability model
+- built-in workflow still installs through extension-registry/API machinery under `built-in:workflow`; either reduce that residual extension-style modeling further or record it explicitly as a broader residual exception rather than only a compatibility-namespace residue

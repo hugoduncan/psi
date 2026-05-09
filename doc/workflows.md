@@ -3,25 +3,20 @@
 Psi can delegate reusable tasks to named workflows.
 
 A workflow is a named prompt or orchestration loaded from `.psi/workflows/*.md`
-by the `psi/workflow-loader` extension. Some workflows are single focused agents;
+as a built-in core capability. Some workflows are single focused agents;
 others are multi-step flows that pass results from one step to the next.
 
 This document is the primary example-led guide for workflow authoring. It
 covers the user-facing workflow surface, how to enable and run workflows, and
 the supported target-authored grammar.
 
-## Prerequisite: enable workflow loading
+## Prerequisite
 
-Workflows are provided by the `psi/workflow-loader` extension.
+Workflow loading is built in.
 
-Project-local example:
+No extension manifest entry is required to enable `/delegate` or `.psi/workflows/*.md` discovery.
 
-```clojure
-{:deps {psi/workflow-loader {}
-        psi/mementum {}}}
-```
-
-Put that in one of the supported extension manifest locations, then start psi.
+Optional workflow-adjacent extensions such as `psi/mementum` still use normal extension install manifests.
 For manifest details and install options, see [`doc/extensions-install.md`](extensions-install.md).
 
 ## Where workflows live
@@ -51,7 +46,7 @@ The authoritative example set is:
 
 ## User-facing workflow commands
 
-When `psi/workflow-loader` is active, psi exposes:
+Psi exposes:
 
 - `/delegate <workflow> <prompt>`
 - `/delegate-reload`
@@ -367,7 +362,7 @@ Good first workflow authoring loop:
 
 - [`doc/workflow-grammar.md`](workflow-grammar.md) — workflow grammar
 - [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md) — workflow concepts and semantics
-- [`doc/extensions-install.md`](extensions-install.md) — enable `psi/workflow-loader`
+- [`doc/extensions-install.md`](extensions-install.md) — install optional extensions that may complement workflow usage
 - [`doc/extensions.md`](extensions.md) — extension/tool details for `workflow-loader`
 - [`doc/tui.md`](tui.md) — general in-session command usage
 - [`README.md`](../README.md) — top-level project overview

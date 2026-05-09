@@ -201,6 +201,7 @@
       (let [opts     {:cwd          (ss/session-worktree-path-in ctx session-id)
                       :overrides    (:tool-output-overrides (ss/get-session-data-in ctx session-id))
                       :tool-call-id tool-call-id}
+            opts     (assoc opts :session-id session-id)
             result   (try
                        (execute-tool-runtime-in! ctx session-id tool-name args opts)
                        (catch Exception e

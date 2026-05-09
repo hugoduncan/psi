@@ -28,6 +28,7 @@
 ;;; Extension state
 
 (defonce state (atom nil))
+(def ^:dynamic *active-workflow-session-id* nil)
 
 (def built-in-workflow-path "built-in:workflow")
 (def prompt-contribution-id "workflow-loader-workflows")
@@ -37,8 +38,12 @@
 
 ;;; Helpers
 
+(declare current-session-id)
+
 (defn- query-fn [] (:query-fn @state))
-(defn- mutate! [sym params] ((:mutate-fn @state) sym params))
+
+(defn- mutate! [sym params]
+  ((:mutate-fn @state) sym params))
 (defn- log! [msg] ((:log-fn @state) msg))
 (defn- notify!
   [msg level]
@@ -60,9 +65,11 @@
      (qf [:psi.agent-session/worktree-path]))))
 
 (defn- current-session-id []
-  (when-let [qf (query-fn)]
-    (:psi.agent-session/session-id
-     (qf [:psi.agent-session/session-id]))))
+  (or *active-workflow-session-id*
+      (:current-session-id @state)
+      (when-let [qf (query-fn)]
+        (:psi.agent-session/session-id
+         (qf [:psi.agent-session/session-id])))))
 
 (defn- query-session-fn [] (:query-session-fn @state))
 (defn- mutate-session-fn [] (:mutate-session-fn @state))
@@ -399,21 +406,21 @@
 ;;; Built-in + compatibility init
 
 (defn init [api]
-  (swap! state assoc
-         :api api
-         :query-fn (:query api)
-         :query-session-fn (:query-session api)
-         :mutate-fn (:mutate api)
-         :mutate-session-fn (:mutate-session api)
-         :log-fn (or (:log api) println)
-         :notify-fn (or (:notify api) (fn [m _] (println m)))
-         :append-message-fn (:append-message api)
-         :ui (:ui api)
-         :register-prompt-contribution
-         (when-let [rpc (:register-prompt-contribution api)]
-           rpc)
-         :loaded-definitions {}
-         :widget-ids #{})
+  (swap! state merge
+         {:api api
+          :query-fn (:query api)
+          :query-session-fn (:query-session api)
+          :mutate-fn (:mutate api)
+          :mutate-session-fn (:mutate-session api)
+          :log-fn (or (:log api) println)
+          :notify-fn (or (:notify api) (fn [m _] (println m)))
+          :append-message-fn (:append-message api)
+          :ui (:ui api)
+          :register-prompt-contribution
+          (when-let [rpc (:register-prompt-contribution api)]
+            rpc)
+          :loaded-definitions (or (:loaded-definitions @state) {})
+          :widget-ids (or (:widget-ids @state) #{})})
 
   ;; Load and register all workflow definitions
   (let [{:keys [registered-count errors]} (reload-definitions!)]
@@ -451,7 +458,11 @@
                                                            :description "Sync mode timeout in milliseconds (default 300000)"}}}
     :execute     (fn
                    ([args] (execute-delegate-tool args nil))
-                   ([args opts] (execute-delegate-tool args opts)))})
+                   ([args opts]
+                    (runtime-fns/with-active-extension-session-id
+                      (:session-id opts)
+                      #(binding [*active-workflow-session-id* (:session-id opts)]
+                         (execute-delegate-tool args opts)))))})
 
   ;; Register /delegate command
   ((:register-command api) "delegate"
@@ -494,7 +505,8 @@
 
   ;; Session lifecycle cleanup
   ((:on api) "session_switch"
-             (fn [_event]
+             (fn [{:keys [session-id]}]
+               (swap! state assoc :current-session-id session-id)
                (reload-definitions!)
                nil)))
 
@@ -512,9 +524,14 @@
   [ctx session-id]
   (let [reg         (:extension-registry ctx)
         runtime-fns (runtime-fns/make-extension-runtime-fns ctx session-id nil)
+        _           (swap! state assoc :ctx ctx)
         _           (ext/register-extension-in! reg built-in-workflow-path)
         api         (ext/create-extension-api reg built-in-workflow-path runtime-fns)]
-    (init api)
-    (refresh-active-tools! ctx session-id)
+    (runtime-fns/with-active-extension-session-id
+      session-id
+      #(binding [*active-workflow-session-id* session-id]
+         (init api)
+         (swap! state assoc :ctx ctx :current-session-id session-id)
+         (refresh-active-tools! ctx session-id)))
     {:path built-in-workflow-path
      :loaded-definitions (:loaded-definitions @state)}))

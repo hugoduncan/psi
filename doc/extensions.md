@@ -86,11 +86,20 @@ For cwd-sensitive extensions (e.g. reading project-local `.psi/` config), wrap w
 These extensions ship with the project as per-extension local-root libraries and
 are activated in this repo through `.psi/extensions.edn`.
 
-### `extensions/workflow-loader/src/extensions/workflow_loader.clj` (`extensions.workflow-loader`)
+## Built-in workflow capability
 
-Purpose: discover workflow definitions from `.psi/workflows/`, compile/register
-canonical workflow definitions, and expose a unified delegation surface for both
-single-step profiles and multi-step orchestrations.
+Workflow definition discovery from `.psi/workflows/*.md`, canonical definition registration,
+and the unified delegation surface are now built-in core behavior rather than an installable extension.
+
+Canonical higher-core ownership now lives under:
+
+- `psi.agent-session.workflow.core`
+- `psi.agent-session.workflow.delivery`
+- `psi.agent-session.workflow.text`
+- `psi.agent-session.workflow.orchestration`
+- `psi.agent-session.workflow.display`
+
+Built-in workflow surface:
 
 - Tool: `delegate`
   - actions: `run`, `list`, `continue`, `remove`
@@ -108,6 +117,8 @@ single-step profiles and multi-step orchestrations.
     - `:session :reference` owns `$ORIGINAL`
     - `:session :preload` adds child-session context without implicitly changing `$INPUT` or `$ORIGINAL`
     - `{:step "..." ...}` references author-facing step `:name`, not delegated workflow names
+
+Legacy compatibility namespaces remain under `extensions/workflow-loader/*`, but they are compatibility shims rather than canonical owners.
 
 ### `extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj` (`extensions.mcp-tasks-run`)
 
@@ -139,12 +150,12 @@ for example:
 - `:delegate/display`
 
 Preferred helper path:
-- widget/UI consumers: `extensions.workflow-display/merged-display` + `display-lines`
-- CLI/list consumers: `extensions.workflow-display/text-lines`
+- widget/UI consumers: `psi.agent-session.workflow.display/merged-display` + `display-lines`
+- CLI/list consumers: `psi.agent-session.workflow.display/text-lines`
 
 Current in-repo examples:
 - `extensions.mcp-tasks-run` — widget + list output reuse `:run/display`
-- `extensions.workflow-loader` — widget + `action=list` reuse unified workflow run display
+- built-in workflow surfaces — widget + `action=list` reuse unified workflow run display
 
 ### `extensions/commit-checks/src/extensions/commit_checks.clj` (`extensions.commit-checks`)
 
