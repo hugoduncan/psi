@@ -186,7 +186,7 @@
             {:from {:step "report" :output :transcript}
              :projection {:type :tail :turns 1 :tool-output false}})))))
 
-(deftest resolve-binding-ref-normalizes-session-output-paths-through-canonical-ir-test
+(deftest resolve-binding-ref-distinguishes-canonical-session-output-from-legacy-storage-key-test
   (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
                                                        {:definition {:steps [{:name "report"
                                                                               :type :session
@@ -207,7 +207,7 @@
             run
             {:source :step-output
              :path ["report" :outputs :final-llm-reply]})))
-    (is (= "Done"
+    (is (= "legacy text"
            (workflow-source-resolution/resolve-binding-ref
             run
             {:source :step-output

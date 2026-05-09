@@ -146,9 +146,6 @@
                       (contains? (set (keys (:outputs step-def))) k2)
                       (workflow-ir/step-output-value step-def accepted-result k2)
 
-                      (= k2 :text)
-                      (workflow-ir/step-yield-field-value step-def accepted-result :text)
-
                       :else
                       (get-path* accepted-result path))]
           (get-path* value more))
