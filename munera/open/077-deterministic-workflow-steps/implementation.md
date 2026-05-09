@@ -108,3 +108,6 @@
   - re-evaluated the older current-authoring compatibility branch in `components/agent-session/src/psi/agent_session/workflow_file_authoring_session.clj` and rewrote it to compile step-source `:projection :text` onto the canonical `:outputs :final-llm-reply` surface
   - added focused authoring proof coverage in `workflow_file_authoring_session_test.clj`
   - focused verification green for the authoring/compiler slice: `14 tests, 110 assertions, 0 failures, 0 errors`; lint clean
+- 2026-05-09 — Test review found no correctness issue in the new proofs.
+  - one cleanup follow-up remains: the source-resolution regression proof is duplicated in both the lower `workflow-runtime` suite and the higher `agent-session` mirror suite
+  - preferred shape is one authoritative lower-owner proof unless the higher duplicate is intentionally proving a distinct compatibility or wiring contract

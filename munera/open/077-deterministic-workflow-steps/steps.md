@@ -86,3 +86,6 @@
   - rewrote the still-live authoring/compiler branch to compile `:projection :text` for prior step accepted-result references onto the canonical `:outputs :final-llm-reply` surface
   - added focused proof coverage in `workflow_file_authoring_session_test.clj`
   - avoided duplicating the runtime normalization fix; this remained a distinct current-authoring compatibility seam
+- [ ] Re-evaluate the duplicated source-resolution regression proof across `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj` and `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj`
+  - keep the authoritative proof with the lower workflow-runtime owner unless the higher duplicate is intentionally proving a distinct compatibility or wiring contract
+  - remove the higher duplicate if it is only mirroring lower behavior without adding boundary-specific signal
