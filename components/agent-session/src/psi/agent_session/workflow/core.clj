@@ -14,16 +14,11 @@
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
-   [psi.agent-session.core :as session]
-   [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
    [psi.agent-session.workflow.runtime-state :as runtime-state]
    [psi.agent-session.workflow.text :as text]
-   [psi.agent-core.core :as agent]
-   [psi.session-state.state :as ss]
-   [psi.tool-registry.registry :as tool-registry]
    [psi.workflow-loader.core :as loader]))
 
 ;;; Runtime state aliases
@@ -483,28 +478,3 @@
                (reload-definitions!)
                nil)))
 
-(defn- refresh-active-tools!
-  [ctx session-id]
-  (let [active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
-        ext-tools    (tool-registry/all-tools-in (:extension-registry ctx))]
-    (session/dispatch-in! ctx
-                          :session/set-active-tools
-                          {:session-id session-id
-                           :tool-maps (into (vec active-tools) ext-tools)}
-                          {:origin :core})))
-
-(defn init-built-in!
-  [ctx session-id]
-  (let [reg         (:extension-registry ctx)
-        runtime-fns (runtime-fns/make-extension-runtime-fns ctx session-id nil)
-        _           (runtime-state/assoc-state! :ctx ctx)
-        _           (ext/register-extension-in! reg built-in-workflow-path)
-        api         (ext/create-extension-api reg built-in-workflow-path runtime-fns)]
-    (runtime-fns/with-active-extension-session-id
-      session-id
-      #(binding [runtime-state/*active-workflow-session-id* session-id]
-         (init api)
-         (runtime-state/assoc-state! :ctx ctx :current-session-id session-id)
-         (refresh-active-tools! ctx session-id)))
-    {:path built-in-workflow-path
-     :loaded-definitions (runtime-state/loaded-definitions)}))

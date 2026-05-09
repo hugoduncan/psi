@@ -20,7 +20,7 @@
     [ctx (:session-id sd)]))
 
 (defn- init-built-in-workflow! [ctx session-id]
-  (wl/init-built-in! ctx session-id))
+  ((requiring-resolve 'psi.agent-session.workflow.bootstrap/init-built-in!) ctx session-id))
 
 (defn- load-all-workflow-definitions! [ctx]
   (let [parsed (workflow-file-loader/scan-directory "/Users/duncan/projects/hugoduncan/psi/workflow-extensions/.psi/workflows")

@@ -4,6 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.agent-session.workflow.core :as workflow]))
 
 (defn- create-two-session-context []
@@ -15,7 +16,7 @@
     [ctx (:session-id s1) (:session-id s2)]))
 
 (defn- init-built-in-workflow! [ctx session-id]
-  (workflow/init-built-in! ctx session-id)
+  (workflow-bootstrap/init-built-in! ctx session-id)
   (swap! workflow/state assoc
          :loaded-definitions
          {"planner" {:definition-id "planner"

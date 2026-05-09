@@ -22,7 +22,7 @@
     [ctx (:session-id sd)]))
 
 (defn- init-built-in-workflow! [ctx session-id]
-  (wl/init-built-in! ctx session-id))
+  ((requiring-resolve 'psi.agent-session.workflow.bootstrap/init-built-in!) ctx session-id))
 
 (deftest direct-workflow-execution-vs-extension-mutation-test
   (testing "direct workflow execution and extension mutation execution both avoid the keyword contains? failure on lambda-build in TUI-like context"

@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.agent-session.workflow.core :as wl]
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
@@ -33,7 +34,7 @@
     result))
 
 (defn- init-built-in-workflow! [ctx session-id]
-  (wl/init-built-in! ctx session-id))
+  (workflow-bootstrap/init-built-in! ctx session-id))
 
 (defn- workflow-state []
   @@#'wl/state)
