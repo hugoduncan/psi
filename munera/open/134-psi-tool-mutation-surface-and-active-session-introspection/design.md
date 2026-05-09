@@ -104,7 +104,8 @@ Required:
 - `action`
   - must be `"mutate"`
 - `mutation`
-  - qualified mutation symbol string
+  - string form of a qualified mutation symbol
+  - must parse as a qualified symbol
   - example: `"psi.extension/close-session"`
 
 Optional:
@@ -112,7 +113,9 @@ Optional:
 - `params`
   - canonical mutation parameter payload
   - canonical external shape in v1: map / object
-  - implementations may normalize string-keyed input into the keyword-keyed map shape expected by the canonical mutation path
+  - when provided, must be a map/object shape rather than a scalar or collection payload
+  - implementations may normalize top-level string-keyed input into the keyword-keyed map shape expected by the canonical mutation path
+  - v1 should preserve values and unknown keys rather than performing broader semantic rewriting
 
 Explicitly unsupported in v1:
 
@@ -138,6 +141,8 @@ Rationale:
 3. invoke the canonical registered mutation path
 4. return the mutation payload in structured tool-result form
 5. fail explicitly when the request is invalid or unsupported
+
+For this task, “canonical registered mutation path” means the same production-owned runtime mutation execution helper/path already used to invoke registered graph mutations with their normal capability, permission, and validation enforcement. Implementation must identify that concrete owner/helper before coding and route `action: "mutate"` through it rather than introducing a parallel execution path.
 
 For this task, “registered mutation” means:
 
@@ -188,6 +193,7 @@ Result invariants:
 
 - on success, `:psi-tool/error` is absent
 - on error, `:psi-tool/result` is absent
+- `:psi-tool/result nil` is still a valid successful result when the invoked mutation canonically returns `nil`
 
 #### Successful result example
 
@@ -208,6 +214,8 @@ Canonical error fields:
 
 - `:phase`
   - one of `:validate`, `:mutation`, or another intentionally chosen narrow phase label
+  - `:validate` means the tool request was malformed, unsupported, or named an unknown mutation before canonical mutation invocation began
+  - `:mutation` means canonical mutation invocation was attempted and failed
 - `:message`
   - human-readable summary
 - `:class`
@@ -256,9 +264,12 @@ Missing required mutation input example:
 
 ### Validation rules
 
+- `mutation` must be a string and must parse as a qualified symbol
 - `mutation` must resolve to a registered mutation on the canonical runtime graph
 - malformed or unknown mutation names must return explicit structured errors
 - malformed `params` must return explicit structured errors
+- when present, `params` must be a map/object payload
+- top-level string map keys may be normalized to keywords; broader coercion or semantic rewriting is out of scope for v1
 - mutation invocation must not silently fall back to raw eval or command parsing
 - if the mutation requires explicit parameters, missing required inputs must fail clearly
 - mutation execution must preserve explicit targeting semantics rather than silently hitting the wrong session
@@ -272,6 +283,8 @@ Canonical name:
 - `:psi.agent-session/active-session-id`
 
 This attr means the session id that the current live runtime uses as the active conversation target for the invoking tool context.
+
+It is intentionally relative to the invoking tool context rather than a process-global UI focus concept. Implementation must identify and document the concrete runtime source of truth used to resolve this attr so adapter-specific or incidental ordering semantics do not leak into the contract.
 
 It must not mean:
 
@@ -313,6 +326,8 @@ Canonical entry shape:
 - `:psi.session-info/updated`
 - `:psi.session-info/parent-session-id`
 - `:psi.session-info/worktree-path`
+
+In v1, this compact surface should expose exactly those fields and no additional fields.
 
 Explicitly excluded from this summary surface:
 
