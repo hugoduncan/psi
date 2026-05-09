@@ -1,6 +1,7 @@
 (ns psi.workflow-runtime.step-session-config-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.core :as session]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.step-test-support :as support]
    [psi.workflow-runtime.step-session-config :as workflow-step-session-config]
@@ -111,29 +112,31 @@
       (is (= :prose (:prompt-mode config))))))
 
 (deftest resolve-step-session-config-falls-back-to-first-context-session-when-parent-session-id-is-nil-test
-  (testing "nil parent-session-id falls back to the first context session"
+  (testing "nil parent-session-id falls back to the first listed context session"
     (let [[ctx first-session-id] (support/create-session-context {:persist? false})
-          second-session-id "session-fallback-second"
+          second-session-id (:session-id (session/new-session-in! ctx nil {:session-name "fallback-second"}))
           _ (swap! (:state* ctx)
                    (fn [state]
                      (-> state
                          (assoc-in [:agent-session :sessions first-session-id :data :prompt-mode] :first-mode)
                          (assoc-in [:agent-session :sessions first-session-id :data :model]
                                    {:provider "openai" :id "first-model"})
-                         (assoc-in [:agent-session :sessions second-session-id]
-                                   {:data {:session-id second-session-id
-                                           :prompt-mode :second-mode
-                                           :model {:provider "openai" :id "second-model"}
-                                           :tool-defs []
-                                           :skills []}})
-                         (update-in [:agent-session :session-order] (fnil conj []) second-session-id)
+                         (assoc-in [:agent-session :sessions first-session-id :data :updated-at]
+                                   (java.time.Instant/parse "2026-05-07T10:00:00Z"))
+                         (assoc-in [:agent-session :sessions second-session-id :data :prompt-mode] :second-mode)
+                         (assoc-in [:agent-session :sessions second-session-id :data :model]
+                                   {:provider "openai" :id "second-model"})
+                         (assoc-in [:agent-session :sessions second-session-id :data :updated-at]
+                                   (java.time.Instant/parse "2026-05-07T11:00:00Z"))
                          ((fn [s]
                             (let [[s _ _] (workflow-registry/register-definition s support/single-step-definition-with-meta)
                                   [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                           :run-id "run-fallback-1"
                                                                           :workflow-input {:input "plan it"}})]
                               s))))))
+          listed-session-ids (mapv :session-id ((:list-context-sessions-fn ctx) ctx))
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-fallback-1")
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= [first-session-id second-session-id] listed-session-ids))
       (is (= :first-mode (:prompt-mode config)))
       (is (= {:provider "openai" :id "first-model"} (:model config))))))

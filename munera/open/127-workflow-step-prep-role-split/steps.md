@@ -18,3 +18,4 @@
 - [x] Decide whether the private `render-template-contribution` wrapper in `components/workflow-runtime/src/psi/workflow_runtime/step_materialization.clj` improves local readability enough to keep, or whether it should be inlined for simpler local shape
 - [x] Add a focused `step-materialization` proof for the `split-step-session-conversation` branch where the final message is not a user text message, proving the whole conversation is preloaded and the prompt becomes `""`
 - [x] Add a focused `step-session-config` proof for nil `parent-session-id` fallback selection onto the first context session, if that fallback is intended to remain part of the lower contract
+- [x] Reshape `resolve-step-session-config-falls-back-to-first-context-session-when-parent-session-id-is-nil-test` so it arranges the extra context session through a canonical test seam or helper instead of mutating low-level root-state/session-order structure inline

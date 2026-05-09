@@ -83,10 +83,13 @@ Verification:
 - test follow-up verification:
   - added a focused `step-materialization` proof for the non-user-final-message preload branch in `split-step-session-conversation`
   - added a focused `step-session-config` proof for nil `parent-session-id` falling back to the first context session
+- test-shaper follow-up verification:
+  - reshaped the nil-`parent-session-id` fallback proof to create the second context session through `session/new-session-in!` and assert fallback ordering via `list-context-sessions-fn`, removing the earlier inline low-level session-order mutation
 
 2026-05-07 review note
 - review pass: core role split is good and direct-consumer rewiring matches the design
 - resolved follow-up 1: removed the duplicate lower-level `agent-session` materialization proof file so authoritative helper proofs live under `workflow-runtime`
 - resolved follow-up 2: made `psi.workflow-runtime.step-materialization/render-template-contribution` private after code search confirmed there was no external consumer of the step-materialization alias
 - code-shaper note: implementation is now simple, consistent, and locally comprehensible; the last optional micro-cleanup was completed by inlining the former private `render-template-contribution` wrapper in `step-materialization`
-- test review note: tests are acceptance-complete and topology-aligned; the identified materialization edge-case proof and parent-session fallback proof have now been added
+- test review note: tests are acceptance-complete and topology-aligned; the brittle low-level setup in the nil-`parent-session-id` fallback proof has been replaced with a more canonical session-creation seam
+- test-shaper note: the materialization suite is strong, and the session-config fallback proof is now less storage-coupled and more behavior-focused
