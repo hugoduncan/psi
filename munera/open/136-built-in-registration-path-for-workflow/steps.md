@@ -1,5 +1,12 @@
-- [ ] Inventory every built-in workflow use of extension-registry/API machinery
-- [ ] Inventory every runtime projection and test that still assumes workflow is extension-owned state
+- [x] Inventory every built-in workflow use of extension-registry/API machinery
+  - found canonical built-in bootstrap in `components/agent-session/src/psi/agent_session/workflow/bootstrap.clj` still seeds `built-in:workflow` via `ext/register-extension-in!` and constructs an extension API via `ext/create-extension-api`
+  - found built-in surface installation in `components/agent-session/src/psi/agent_session/workflow/core.clj` still depends on extension-shaped API callbacks for tool registration, command registration, prompt contribution registration, and lifecycle hook registration (`:on "session_switch"`)
+  - found active tool aggregation and command lookup continue to read extension-registry-backed tool/command storage, so any built-in path must either register into shared storage through built-in entrypoints or teach those readers to merge built-in state
+  - found lifecycle dispatch currently comes from extension event dispatch in `components/agent-session/src/psi/agent_session/session_lifecycle.clj` through `ext/dispatch-in` `"session_switch"` / related events, so built-in workflow reload/session-switch behavior needs an explicit non-extension invocation path
+- [x] Inventory every runtime projection and test that still assumes workflow is extension-owned state
+  - found direct test assertions against extension-owned built-in workflow tool storage in `components/agent-session/test/psi/agent_session/workflow_built_in_targeting_test.clj`
+  - found reload/runtime tests proving built-in command and tool preservation through extension-registry queries in `components/agent-session/test/psi/agent_session/workflow_reload_runtime_test.clj` and command lookup in `components/agent-session/test/psi/agent_session/workflow_async_path_test.clj`
+  - found resolver/projection surfaces in `components/agent-session/src/psi/agent_session/resolvers/extensions.clj` that currently expose tools and commands only through extension-oriented projections
 - [ ] Decide the smallest built-in registration abstraction that can replace those uses
 - [ ] Decide whether shared registries gain built-in-specific entrypoints/provenance or whether any surface needs a small dedicated built-in store
 - [ ] Make the built-in lifecycle invocation path explicit
