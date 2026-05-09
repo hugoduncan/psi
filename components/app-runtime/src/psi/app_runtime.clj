@@ -797,5 +797,4 @@ Available: " (str/join ", " (map name (keys all))))
                      :fork-session-fn!     fork-session-fn!
                      :event-queue          event-queue
                      :alt-screen           false}))))
-
 ;; RPC runtime moved to psi.rpc.
