@@ -93,3 +93,4 @@ Verification:
 - code-shaper note: implementation is now simple, consistent, and locally comprehensible; the last optional micro-cleanup was completed by inlining the former private `render-template-contribution` wrapper in `step-materialization`
 - test review note: tests are acceptance-complete and topology-aligned; the brittle low-level setup in the nil-`parent-session-id` fallback proof has been replaced with a more canonical session-creation seam
 - test-shaper note: the materialization suite is strong, and the session-config fallback proof is now less storage-coupled and more behavior-focused
+- review note: no new implementation defects found; only follow-up is downstream task/doc drift that still names the removed `workflow_step_prep` / `psi.workflow-runtime.step-prep` owner, especially in open task `077`
