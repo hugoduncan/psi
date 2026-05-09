@@ -141,11 +141,11 @@
 
     (not (contains? ctx :materialize-workflow-step-session-conversation-fn))
     (assoc :materialize-workflow-step-session-conversation-fn
-           (find-required-fn "psi.workflow-runtime.step-materialization" "materialize-step-session-conversation"))
+           (find-required-fn "psi.workflow-step-materialization.core" "materialize-step-session-conversation"))
 
     (not (contains? ctx :split-workflow-step-session-conversation-fn))
     (assoc :split-workflow-step-session-conversation-fn
-           (find-required-fn "psi.workflow-runtime.step-materialization" "split-step-session-conversation"))
+           (find-required-fn "psi.workflow-step-materialization.core" "split-step-session-conversation"))
 
     (not (contains? ctx :execute-workflow-judge-fn))
     (assoc :execute-workflow-judge-fn

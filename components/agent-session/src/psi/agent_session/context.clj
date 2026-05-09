@@ -30,7 +30,7 @@
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.model :as workflow-model]
-   [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
+   [psi.workflow-step-materialization.core :as workflow-step-materialization]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.skill-registry.registry :as skill-registry]
    [psi.agent-session.workflows :as wf]

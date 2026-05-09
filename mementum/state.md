@@ -54,6 +54,28 @@ Bootstrapped on 2026-04-02.
   - focused tests now stub the named seam where they are proving workflow-runtime consumption
   - intentionally left lower-owned workflow step session-config/materialization collaborators outside the seam because they are not runtime → session crossings
   - focused verification green: `12 tests, 66 assertions, 0 failures, 0 errors`; lint clean
+- Task 130 workflow step materialization component extraction is now landed locally:
+  - added lower component `components/workflow-step-materialization/`
+  - moved authoritative owners out of `components/workflow-runtime/` into:
+    - `psi.workflow-step-materialization.core`
+    - `psi.workflow-step-materialization.source-resolution`
+  - preserved the `127` role split: step materialization remains separate from `psi.workflow-step-session-config.core`
+  - rewired lower runtime consumers downward to the new owner:
+    - `psi.workflow-runtime.statechart-runtime.step-execution`
+    - `psi.workflow-runtime.statechart-runtime.delegate`
+  - rewired higher session assembly/backfill surfaces downward to the new owner:
+    - `psi.agent-session.context`
+    - `psi.agent-session.psi-tool-workflow`
+    - `psi.agent-session.test-support`
+  - moved lower proof ownership to the new component:
+    - `psi.workflow-step-materialization.core-test`
+    - `psi.workflow-step-materialization.source-resolution-test`
+  - removed the old runtime owners entirely instead of leaving forwarding seams:
+    - `psi.workflow-runtime.step-materialization`
+    - `psi.workflow-runtime.source-resolution`
+  - preserved existing public behavior/call/output contracts while changing only ownership and namespace placement
+  - retained direct dependency on `psi.workflow-judge/project-messages` inside the new lower source-resolution owner as legitimate shared lower workflow projection semantics
+  - focused verification green: `16 tests, 35 assertions, 0 failures`; broader workflow/session verification green: `24 tests, 79 assertions, 0 failures`; lint green `0 errors, 0 warnings`
 
 ## Suggested next step
-- Review `105-agent-session-component-extraction-map` against the now-complete workflow-runtime extraction and workflow execution seam cleanup to identify the next smallest boundary cleanup.
+- Review `105-agent-session-component-extraction-map` against the now-complete workflow-runtime extraction, workflow execution seam cleanup, and workflow step materialization extraction to identify the next smallest boundary cleanup.

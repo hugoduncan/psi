@@ -1,7 +1,7 @@
-(ns psi.workflow-runtime.source-resolution
-  "Canonical shared workflow-runtime source reference and source-spec resolution.
+(ns psi.workflow-step-materialization.source-resolution
+  "Canonical workflow step materialization source resolution semantics.
 
-   Owns normalized IR-shaped runtime semantics for:
+   Owns normalized workflow-domain value derivation for:
    - source refs (`:workflow-input`, `:workflow-original`, step `:output`, step `:yield`)
    - source specs (`{:from ...}` with optional `:path` or `:projection`)
    - first-cut path traversal
@@ -9,19 +9,22 @@
    - invoke arg materialization
    - template var resolution / rendering
    - delegate context / prompt-string materialization
-
-   This substrate is runtime-owned. Authoring/compiler namespaces may translate
-   authored syntax into canonical IR-compatible source specs, but they should
-   delegate runtime value resolution semantics here rather than re-encode them."
+   - binding-ref resolution used by step materialization consumers."
   (:require
    [clojure.string :as str]
-   [psi.workflow-runtime.ir :as workflow-ir]
-   [psi.workflow-runtime.statechart :as workflow-statechart]
    [psi.workflow-judge :as workflow-judge]))
+
+(defn- effective-steps
+  [definition]
+  (or (some->> (get-in definition [:canonical-ir :steps])
+               (mapv (juxt :name identity))
+               (into {})
+               not-empty)
+      (:steps definition)))
 
 (defn- effective-step-def
   [workflow-run step-id]
-  (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
+  (get (effective-steps (:effective-definition workflow-run)) step-id))
 
 (defn get-path*
   [m path]
@@ -52,14 +55,43 @@
     (let [step-id (:step source-ref)
           output-key (:output source-ref)
           accepted (get-in workflow-run [:step-runs step-id :accepted-result])
-          step-def (effective-step-def workflow-run step-id)]
-      (workflow-ir/step-output-value step-def accepted output-key))
+          raw-outputs (:outputs accepted)]
+      (case output-key
+        :result accepted
+        :final-llm-reply (or (get raw-outputs :final-llm-reply)
+                             (get raw-outputs :text))
+        :handoff (get raw-outputs :handoff)
+        (get raw-outputs output-key)))
 
     (and (map? source-ref) (:yield source-ref))
     (let [step-id (:step source-ref)
           accepted (get-in workflow-run [:step-runs step-id :accepted-result])
-          step-def (effective-step-def workflow-run step-id)]
-      (workflow-ir/step-yield-field-value step-def accepted (:yield source-ref)))
+          step-def (effective-step-def workflow-run step-id)
+          yield-spec (:yields step-def)]
+      (case (:type yield-spec)
+        :data (when (= :data (:yield source-ref))
+                (let [output-key (:data yield-spec)
+                      raw-outputs (:outputs accepted)]
+                  (case output-key
+                    :result accepted
+                    :final-llm-reply (or (get raw-outputs :final-llm-reply)
+                                         (get raw-outputs :text))
+                    :handoff (get raw-outputs :handoff)
+                    (get raw-outputs output-key))))
+        :text (when (= :text (:yield source-ref))
+                (let [output-key (:text yield-spec)
+                      raw-outputs (:outputs accepted)]
+                  (case output-key
+                    :result accepted
+                    :final-llm-reply (or (get raw-outputs :final-llm-reply)
+                                         (get raw-outputs :text))
+                    :handoff (get raw-outputs :handoff)
+                    (get raw-outputs output-key))))
+        :error (get-in accepted [:blocked (:yield source-ref)])
+        :delegated (when (= :text (:yield source-ref))
+                     (or (get-in accepted [:outputs :final-llm-reply])
+                         (get-in accepted [:outputs :text])))
+        nil))
 
     :else nil))
 
@@ -144,7 +176,13 @@
       (if (keyword? k2)
         (let [value (cond
                       (contains? (set (keys (:outputs step-def))) k2)
-                      (workflow-ir/step-output-value step-def accepted-result k2)
+                      (let [raw-outputs (:outputs accepted-result)]
+                        (case k2
+                          :result accepted-result
+                          :final-llm-reply (or (get raw-outputs :final-llm-reply)
+                                               (get raw-outputs :text))
+                          :handoff (get raw-outputs :handoff)
+                          (get raw-outputs k2)))
 
                       :else
                       (get-path* accepted-result path))]

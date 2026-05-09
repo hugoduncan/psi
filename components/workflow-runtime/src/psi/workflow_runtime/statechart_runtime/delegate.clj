@@ -1,7 +1,7 @@
 (ns psi.workflow-runtime.statechart-runtime.delegate
   (:require
+   [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.terminal-contract :as workflow-terminal-contract]
    [psi.workflow-registry.registry :as registry]))
 

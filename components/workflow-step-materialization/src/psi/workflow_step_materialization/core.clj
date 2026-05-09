@@ -1,19 +1,25 @@
-(ns psi.workflow-runtime.step-materialization
+(ns psi.workflow-step-materialization.core
   "Workflow step materialization helpers for canonical deterministic workflow runs.
 
-   Owns lower workflow-runtime shaping/materialization behavior:
-   step input materialization, template rendering exposure, child-session
-   conversation materialization, and prompt derivation from materialized
-   conversation."
+   Owns lower workflow-domain shaping/materialization behavior:
+   step input materialization, child-session conversation materialization,
+   and prompt derivation from materialized conversation."
   (:require
-   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]
-   [psi.workflow-runtime.statechart :as workflow-statechart]))
+   [psi.workflow-step-materialization.source-resolution :as source-resolution]))
+
+(defn- effective-steps
+  [definition]
+  (or (some->> (get-in definition [:canonical-ir :steps])
+               (mapv (juxt :name identity))
+               (into {})
+               not-empty)
+      (:steps definition)))
 
 (defn- effective-step-def
   [workflow-run step-id]
-  (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
+  (get (effective-steps (:effective-definition workflow-run)) step-id))
 
-(def binding-source-value workflow-source-resolution/resolve-binding-ref)
+(def binding-source-value source-resolution/resolve-binding-ref)
 
 (defn materialize-step-inputs
   [workflow-run step-id]
@@ -24,7 +30,7 @@
                                   :vars)]
     (into {}
           (map (fn [[var-name source-spec]]
-                 [(keyword var-name) (workflow-source-resolution/apply-source-spec workflow-run source-spec)]))
+                 [(keyword var-name) (source-resolution/apply-source-spec workflow-run source-spec)]))
           ir-template-vars)))
 
 (defn- text-message
@@ -58,9 +64,9 @@
   [workflow-run contribution]
   (case (:type contribution)
     :source (contribution-value->messages
-             (workflow-source-resolution/apply-source-spec workflow-run contribution))
+             (source-resolution/apply-source-spec workflow-run contribution))
     :template [(text-message
-                (workflow-source-resolution/render-template-contribution workflow-run contribution))]
+                (source-resolution/render-template-contribution workflow-run contribution))]
     []))
 
 (defn materialize-step-session-conversation

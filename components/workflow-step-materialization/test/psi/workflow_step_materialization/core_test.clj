@@ -1,8 +1,8 @@
-(ns psi.workflow-runtime.step-materialization-test
+(ns psi.workflow-step-materialization.core-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.workflow-step-materialization.core :as workflow-step-materialization]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
    [psi.workflow-runtime.step-test-support :as support]
    [psi.workflow-registry.registry :as workflow-registry]))
 

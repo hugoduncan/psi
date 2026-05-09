@@ -10,8 +10,10 @@ This note documents the authoritative workflow execution/compiler/runtime surfac
   - Canonical run lifecycle chart plus workflow definition-order helpers such as `initial-step-id` and `next-step-id`.
 - `psi.workflow-runtime.statechart-runtime`
   - Canonical statechart-driven runtime boundary.
-- `psi.workflow-runtime.step-materialization`
+- `psi.workflow-step-materialization.core`
   - Canonical shared step input materialization, child-session conversation materialization, and prompt derivation helpers.
+- `psi.workflow-step-materialization.source-resolution`
+  - Canonical shared source binding/source-spec resolution, template rendering, and delegate/invoke materialization helpers.
 - `psi.workflow-step-session-config.core`
   - Canonical child-session config shaping helpers for workflow steps.
 - `psi.workflow-runtime.progression-recording`

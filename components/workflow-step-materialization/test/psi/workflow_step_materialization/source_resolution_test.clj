@@ -1,8 +1,8 @@
-(ns psi.workflow-runtime.source-resolution-test
+(ns psi.workflow-step-materialization.source-resolution-test
   (:require
    [clojure.test :refer [deftest is]]
-   [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]))
+   [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
+   [psi.workflow-runtime.core :as workflow-runtime]))
 
 (def mixed-form-definition
   {:steps [{:name "discover"

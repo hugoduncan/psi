@@ -3,8 +3,8 @@
    [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
+   [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.ir :as workflow-ir]
-   [psi.workflow-runtime.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.statechart-runtime.queue :as queue]
    [psi.workflow-runtime.statechart-runtime.state :as state]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))

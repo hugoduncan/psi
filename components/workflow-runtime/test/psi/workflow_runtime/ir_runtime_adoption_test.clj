@@ -6,8 +6,8 @@
    [psi.agent-session.test-support :as test-support]
    [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
+   [psi.workflow-step-materialization.core :as workflow-step-materialization]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context

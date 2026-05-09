@@ -1,21 +1,21 @@
-- [ ] Review `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.source-resolution` and confirm the exact workflow step materialization responsibilities they own today
-- [ ] Confirm the extracted responsibility inventory includes source binding resolution, source-spec application, template rendering, step input materialization, child-session conversation materialization, prompt/preload splitting, and prompt derivation
-- [ ] Choose the narrowest accurate extracted component/component-name for that responsibility surface and record the naming decision
-- [ ] Decide whether one namespace or a small internal split best fits the extracted ownership surface and record the decision
-- [ ] Record whether `source-resolution` is intrinsic to the extracted materialization component or co-extracted as the smallest clean current boundary
-- [ ] Create the dedicated lower component for workflow step materialization ownership
-- [ ] Move the authoritative materialization and source-resolution logic with minimal semantic change
-- [ ] Preserve the canonical public behavior surfaces and preserve their externally consumed call and output contracts unless a justified replacement is recorded
-- [ ] Classify preserved public vars as canonical long-term behavior surfaces versus currently consumed surfaces kept stable for extraction safety
-- [ ] Rewire workflow runtime callers to the new owner
-- [ ] Rewire `agent-session.context` callback assembly/backfill to the new owner
-- [ ] Rewire `psi_tool_workflow` compatibility/backfill paths to the new owner
-- [ ] Rewire affected tests so lower materialization behavior proofs point at the new component
-- [ ] Verify the role split with workflow step session-config remains intact and was not accidentally recombined
-- [ ] Verify the workflow execution adapter seam is not broadened by this task unless a compelling reason is recorded
-- [ ] Decide whether `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.source-resolution` disappear entirely or remain only as tiny temporary forwarding seams, and record justification if retained
-- [ ] Remove any temporary forwarding seams before task completion unless a blocking reason is recorded; if a seam remains, record it as explicit residual debt
-- [ ] Record whether the extracted component derives solely from provided workflow-run/effective-definition inputs or retains other direct lower-workflow dependencies beyond those inputs
-- [ ] Record whether the extracted component retains any direct dependency on `psi.workflow-judge` projection behavior and classify it as legitimate shared lower workflow semantics or residual debt, including whether the resulting dependency shape remains acceptably tree-like or preserves a graph edge that should be revisited later
-- [ ] Verify workflow behavior remains unchanged
-- [ ] Record the final boundary, name, public surface classification, source-resolution ownership status, dependency/input shape, source-resolution dependency status, responsibility inventory, transitional namespace status, and any residual dependency debt in `implementation.md`
+- [x] Review `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.source-resolution` and confirm the exact workflow step materialization responsibilities they own today
+- [x] Confirm the extracted responsibility inventory includes source binding resolution, source-spec application, template rendering, step input materialization, child-session conversation materialization, prompt/preload splitting, and prompt derivation
+- [x] Choose the narrowest accurate extracted component/component-name for that responsibility surface and record the naming decision
+- [x] Decide whether one namespace or a small internal split best fits the extracted ownership surface and record the decision
+- [x] Record whether `source-resolution` is intrinsic to the extracted materialization component or co-extracted as the smallest clean current boundary
+- [x] Create the dedicated lower component for workflow step materialization ownership
+- [x] Move the authoritative materialization and source-resolution logic with minimal semantic change
+- [x] Preserve the canonical public behavior surfaces and preserve their externally consumed call and output contracts unless a justified replacement is recorded
+- [x] Classify preserved public vars as canonical long-term behavior surfaces versus currently consumed surfaces kept stable for extraction safety
+- [x] Rewire workflow runtime callers to the new owner
+- [x] Rewire `agent-session.context` callback assembly/backfill to the new owner
+- [x] Rewire `psi_tool_workflow` compatibility/backfill paths to the new owner
+- [x] Rewire affected tests so lower materialization behavior proofs point at the new component
+- [x] Verify the role split with workflow step session-config remains intact and was not accidentally recombined
+- [x] Verify the workflow execution adapter seam is not broadened by this task unless a compelling reason is recorded
+- [x] Decide whether `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.source-resolution` disappear entirely or remain only as tiny temporary forwarding seams, and record justification if retained
+- [x] Remove any temporary forwarding seams before task completion unless a blocking reason is recorded; if a seam remains, record it as explicit residual debt
+- [x] Record whether the extracted component derives solely from provided workflow-run/effective-definition inputs or retains other direct lower-workflow dependencies beyond those inputs
+- [x] Record whether the extracted component retains any direct dependency on `psi.workflow-judge` projection behavior and classify it as legitimate shared lower workflow semantics or residual debt, including whether the resulting dependency shape remains acceptably tree-like or preserves a graph edge that should be revisited later
+- [x] Verify workflow behavior remains unchanged
+- [x] Record the final boundary, name, public surface classification, source-resolution ownership status, dependency/input shape, source-resolution dependency status, responsibility inventory, transitional namespace status, and any residual dependency debt in `implementation.md`

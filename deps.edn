@@ -37,6 +37,7 @@
         psi/workflow-registry                         {:local/root "components/workflow-registry"}
         psi/workflow-judge                            {:local/root "components/workflow-judge"}
         psi/workflow-runtime                          {:local/root "components/workflow-runtime"}
+        psi/workflow-step-materialization             {:local/root "components/workflow-step-materialization"}
         psi/workflow-step-session-config              {:local/root "components/workflow-step-session-config"}
         psi/turn-statechart                           {:local/root "components/turn-statechart"}
         psi/turn-runtime                              {:local/root "components/turn-runtime"}
@@ -92,6 +93,7 @@
                         "components/session-persistence/src"
                         "components/shared-config/src"
                         "components/project-nrepl/src"
+                        "components/workflow-step-materialization/src"
                         "components/workflow-step-session-config/src"
                         "components/turn-statechart/src"
                         "components/turn-runtime/src"
@@ -248,6 +250,7 @@
                         "components/workflow-registry/test"
                         "components/workflow-judge/test"
                         "components/workflow-runtime/test"
+                        "components/workflow-step-materialization/test"
                         "components/turn-statechart/test"
                         "components/turn-runtime/test"
                         "components/tool-runtime/test"
@@ -289,6 +292,7 @@
                         "components/workflow-registry/src"
                         "components/workflow-judge/src"
                         "components/workflow-runtime/src"
+                        "components/workflow-step-materialization/src"
                         "components/workflow-step-session-config/src"
                         "components/tool-runtime/src"
                         "components/state-kernel/src"
