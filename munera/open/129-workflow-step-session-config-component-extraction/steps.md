@@ -22,3 +22,7 @@
 - [x] Verify the new fallback tests continue to exercise `resolve-step-session-config` at the extracted public boundary rather than private helpers
 - [x] Re-evaluate whether shared setup helpers or a table-driven shape are warranted only if the inheritance/override test matrix grows further; preserve the current direct style unless that growth actually occurs
   - current matrix remains small enough that direct setup is still clearer than introducing shared or table-driven test indirection
+- [x] Add one tiny local helper in `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj` to compress repeated definition registration/run creation/fetch setup without hiding per-test intent
+- [x] Keep any new test helper local and narrow in purpose; do not broaden into shared fixtures or table-driven indirection
+- [x] Normalize assertion grouping style slightly across the test ns for easier scanability while preserving the current public-boundary behavioral focus
+- [x] Verify the test-shaping cleanup preserves focused workflow step session-config test speed, determinism, and current coverage

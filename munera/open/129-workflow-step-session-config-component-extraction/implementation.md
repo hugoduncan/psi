@@ -68,3 +68,5 @@ Review notes
 - verification after code-shaper follow-up: focused tests remain `5 tests, 20 assertions, 0 failures` and focused lint remains clean
 - test review (terse): the extracted owner tests cover the main inheritance/override contract well at the public boundary; follow-up completed: added focused missing-skill and missing-tool fallback proofs at `resolve-step-session-config`, and re-evaluated test shape — the matrix is still small enough that direct setup remains clearer than introducing shared or table-driven indirection
 - verification after test follow-up: focused tests are now `7 tests, 22 assertions, 0 failures` and focused lint remains clean
+- test-shaper review (terse): tests are strong, boundary-focused, deterministic, and now cover the main behavior partitions including fallback cases; follow-up completed: added one tiny local helper to compress repeated definition/run setup without broadening into shared fixtures, and normalized assertion grouping slightly for easier scanability
+- verification after test-shaper follow-up: focused tests remain `7 tests, 22 assertions, 0 failures` and focused lint remains clean

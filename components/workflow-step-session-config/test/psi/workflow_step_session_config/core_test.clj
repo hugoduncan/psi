@@ -8,50 +8,61 @@
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.workflow-registry.registry :as workflow-registry]))
 
+(defn- workflow-run-for
+  [ctx definitions run-opts]
+  (swap! (:state* ctx)
+         (fn [state]
+           (let [state (reduce (fn [s definition]
+                                 (let [[s' _ _] (workflow-registry/register-definition s definition)]
+                                   s'))
+                               state
+                               definitions)
+                 [state' _ _] (workflow-runtime/create-run state run-opts)]
+             state')))
+  (workflow-runtime/workflow-run-in @(:state* ctx) (:run-id run-opts)))
+
 (deftest resolve-step-session-config-single-step-test
   (testing "single-step workflow pulls config from its own workflow-file-meta"
     (let [[ctx _] (support/create-session-context {:persist? false})
           single-step-with-model (assoc-in support/single-step-definition-with-meta [:workflow-file-meta :model]
                                            {:provider :anthropic :id "claude-test"})
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state single-step-with-model)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
-                                                                   :run-id "run-1"
-                                                                   :workflow-input {:input "plan it"}})]
-                       s)))
-          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-1")
+          workflow-run (workflow-run-for ctx
+                                         [single-step-with-model]
+                                         {:definition-id "planner"
+                                          :run-id "run-1"
+                                          :workflow-input {:input "plan it"}})
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= "You are a planner." (:developer-prompt config)))
+
       (is (= :medium (:thinking-level config)))
       (is (= {:provider :anthropic :id "claude-test"} (:model config)))
+
       (is (= ["read" "bash"] (mapv :name (:tool-defs config))))
       (is (= ["clojure-coding-standards"] (mapv :name (:skills config)))))))
 
 (deftest resolve-step-session-config-multi-step-test
   (testing "multi-step workflow composes referenced workflow prompt with framing prompt"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state support/single-step-definition-with-meta)
-                           [s _ _] (workflow-registry/register-definition s support/builder-definition-with-meta)
-                           [s _ _] (workflow-registry/register-definition s support/multi-step-definition-with-meta)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build"
-                                                                   :run-id "run-2"
-                                                                   :workflow-input {:input "build it"
-                                                                                    :original "build this"}})]
-                       s)))
           _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
                    {:provider "openai" :id "gpt-test"})
-          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-2")
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta
+                                          support/builder-definition-with-meta
+                                          support/multi-step-definition-with-meta]
+                                         {:definition-id "plan-build"
+                                          :run-id "run-2"
+                                          :workflow-input {:input "build it"
+                                                           :original "build this"}})
           planner-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1-planner")
           builder-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Coordinate a plan-build cycle." (:developer-prompt planner-config)))
       (is (= "You are a builder.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
-      (is (= ["read" "bash"] (mapv :name (:tool-defs planner-config))))
-      (is (= ["read" "bash" "edit" "write"] (mapv :name (:tool-defs builder-config))))
+
       (is (= {:provider "openai" :id "gpt-test"} (:model planner-config)))
-      (is (= {:provider "openai" :id "gpt-test"} (:model builder-config))))))
+      (is (= {:provider "openai" :id "gpt-test"} (:model builder-config)))
+
+      (is (= ["read" "bash"] (mapv :name (:tool-defs planner-config))))
+      (is (= ["read" "bash" "edit" "write"] (mapv :name (:tool-defs builder-config)))))))
 
 (deftest resolve-step-session-config-step-overrides-test
   (testing "step overrides replace delegated defaults while system prompt still composes with framing prompt"
@@ -74,15 +85,6 @@
                                                          :text "{{input}}"
                                                          :vars {"input" {:from {:step "step-1-planner" :output :final-llm-reply}}}}]}]
                                :workflow-file-meta {:framing-prompt "Coordinate a plan-build cycle."}}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state support/single-step-definition-with-meta)
-                           [s _ _] (workflow-registry/register-definition s support/builder-definition-with-meta)
-                           [s _ _] (workflow-registry/register-definition s override-definition)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "plan-build-overrides"
-                                                                   :run-id "run-overrides"
-                                                                   :workflow-input {:input "build it"}})]
-                       s)))
           _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :skills]
                    [{:name "testing-best-practices"
                      :description "Testing"
@@ -90,25 +92,39 @@
                      :base-dir ""
                      :source :project
                      :disable-model-invocation false}])
-          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-overrides")
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta
+                                          support/builder-definition-with-meta
+                                          override-definition]
+                                         {:definition-id "plan-build-overrides"
+                                          :run-id "run-overrides"
+                                          :workflow-input {:input "build it"}})
           builder-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
-      (is (= [] (mapv :name (:tool-defs builder-config))))
-      (is (= ["testing-best-practices"] (mapv :name (:skills builder-config))))
+
+      (is (= :high (:thinking-level builder-config)))
       (is (= "gpt-5" (:model builder-config)))
-      (is (= :high (:thinking-level builder-config))))))
+
+      (is (= [] (mapv :name (:tool-defs builder-config))))
+      (is (= ["testing-best-practices"] (mapv :name (:skills builder-config)))))))
 
 (deftest resolve-step-session-config-inherits-parent-prompt-mode-test
   (testing "workflow child sessions inherit parent prompt mode into step session config"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state support/single-step-definition-with-meta)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
-                                                                   :run-id "run-mode-1"
-                                                                   :workflow-input {:input "plan it"}})]
-                       (assoc-in s [:agent-session :sessions session-id :data :prompt-mode] :prose))))
-          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-mode-1")
+          workflow-run (do
+                         (swap! (:state* ctx)
+                                (fn [state]
+                                  (let [state (reduce (fn [s definition]
+                                                        (let [[s' _ _] (workflow-registry/register-definition s definition)]
+                                                          s'))
+                                                      state
+                                                      [support/single-step-definition-with-meta])
+                                        [state' _ _] (workflow-runtime/create-run state
+                                                                                  {:definition-id "planner"
+                                                                                   :run-id "run-mode-1"
+                                                                                   :workflow-input {:input "plan it"}})]
+                                    (assoc-in state' [:agent-session :sessions session-id :data :prompt-mode] :prose))))
+                         (workflow-runtime/workflow-run-in @(:state* ctx) "run-mode-1"))
           config (workflow-step-session-config/resolve-step-session-config ctx session-id workflow-run "step-1")]
       (is (= :prose (:prompt-mode config))))))
 
@@ -128,17 +144,16 @@
                          (assoc-in [:agent-session :sessions second-session-id :data :model]
                                    {:provider "openai" :id "second-model"})
                          (assoc-in [:agent-session :sessions second-session-id :data :updated-at]
-                                   (java.time.Instant/parse "2026-05-07T11:00:00Z"))
-                         ((fn [s]
-                            (let [[s _ _] (workflow-registry/register-definition s support/single-step-definition-with-meta)
-                                  [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
-                                                                          :run-id "run-fallback-1"
-                                                                          :workflow-input {:input "plan it"}})]
-                              s))))))
+                                   (java.time.Instant/parse "2026-05-07T11:00:00Z")))))
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta]
+                                         {:definition-id "planner"
+                                          :run-id "run-fallback-1"
+                                          :workflow-input {:input "plan it"}})
           listed-session-ids (mapv :session-id (psi.workflow-runtime.execution-adapter/list-context-sessions ctx))
-          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-fallback-1")
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= [first-session-id second-session-id] listed-session-ids))
+
       (is (= :first-mode (:prompt-mode config)))
       (is (= {:provider "openai" :id "first-model"} (:model config))))))
 
@@ -154,14 +169,11 @@
                                                               :text "{{input}}"
                                                               :vars {"input" {:from :workflow-input :path [:input]}}}]}]
                                     :workflow-file-meta {:system-prompt "You are a planner."}}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state missing-skill-definition)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner-missing-skill"
-                                                                   :run-id "run-missing-skill"
-                                                                   :workflow-input {:input "plan it"}})]
-                       s)))
-          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-missing-skill")
+          workflow-run (workflow-run-for ctx
+                                         [missing-skill-definition]
+                                         {:definition-id "planner-missing-skill"
+                                          :run-id "run-missing-skill"
+                                          :workflow-input {:input "plan it"}})
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= [{:name "missing-skill"
                :description ""
@@ -183,13 +195,10 @@
                                                              :text "{{input}}"
                                                              :vars {"input" {:from :workflow-input :path [:input]}}}]}]
                                    :workflow-file-meta {:system-prompt "You are a planner."}}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state missing-tool-definition)
-                           [s _ _] (workflow-runtime/create-run s {:definition-id "planner-missing-tool"
-                                                                   :run-id "run-missing-tool"
-                                                                   :workflow-input {:input "plan it"}})]
-                       s)))
-          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-missing-tool")
+          workflow-run (workflow-run-for ctx
+                                         [missing-tool-definition]
+                                         {:definition-id "planner-missing-tool"
+                                          :run-id "run-missing-tool"
+                                          :workflow-input {:input "plan it"}})
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= ["missing-tool"] (mapv :name (:tool-defs config)))))))
