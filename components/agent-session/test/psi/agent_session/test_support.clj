@@ -16,9 +16,10 @@
    [psi.agent-session.services :as services]
    [psi.agent-session.turn]
    [psi.agent-session.workflow-judge]
+   [psi.agent-session.context :as session-context]
    [psi.session-state.model :as session-data]
-   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.skill-registry.registry]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.step-materialization]
    [psi.workflow-runtime.step-session-config]
    [psi.session-state.state :as ss]
@@ -80,6 +81,14 @@
   [ctx k f & args]
   (apply ss/update-state-value-in! ctx (resolve-state-path ctx k) f args)
   ctx)
+
+(defn with-workflow-execution-adapter-overrides
+  "Replace the named workflow execution adapter as one seam value while
+   allowing targeted operation overrides for adapter-consumer tests."
+  [ctx overrides]
+  (assoc ctx
+         workflow-execution-adapter/adapter-key
+         (merge (get ctx workflow-execution-adapter/adapter-key) overrides)))
 
 (defn make-session-ctx
   "Create a minimal canonical-root-backed session-like context for tests.
@@ -209,13 +218,7 @@
                        :validate-dispatch-result-fn  dispatch-schema/validate-dispatch-schemas
                        :validate-result-fn           dispatch-schema/validate-dispatch-schemas}
         ctx           (assoc ctx0 workflow-execution-adapter/adapter-key
-                             (workflow-execution-adapter/create
-                              {:create-child-session! (:create-workflow-child-session-fn ctx0)
-                               :prompt-execution-result! (:workflow-prompt-execution-result-fn ctx0)
-                               :get-session-data (:get-session-data-fn ctx0)
-                               :list-context-sessions (:list-context-sessions-fn ctx0)
-                               :find-skill (:find-skill-fn ctx0)
-                               :execute-judge! (:execute-workflow-judge-fn ctx0)}))
+                             (session-context/workflow-execution-adapter ctx0))
         _             (dispatch-handlers/register-all! ctx)
         actions-fn     (dispatch-handlers/make-actions-fn ctx)
         ctx            (assoc ctx :session-actions-fn actions-fn)]

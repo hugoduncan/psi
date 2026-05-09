@@ -83,3 +83,19 @@ Verification:
 Follow-on notes:
 - broader cleanup of raw callback keys inside `agent-session` plumbing remains out of scope for this task
 - if later workflow runtime needs another higher/session-bound operation, extend the named adapter intentionally rather than adding new direct raw ctx key reads
+
+Review notes:
+- shared test support had been reassembling `:workflow-execution-adapter` manually instead of reusing the canonical `psi.agent-session.context/workflow-execution-adapter` assembly helper
+- follow-up completed: shared test support now reuses the canonical assembly helper, removing the duplicated adapter map shape from tests
+- verification after follow-up: focused workflow attempt/judge tests pass and test-support lint is clean
+- code-shaper follow-up had identified that shared test support still installed the adapter under the literal `:workflow-execution-adapter` key instead of reusing `psi.workflow-runtime.execution-adapter/adapter-key`
+- follow-up completed: shared test support now uses the adapter-owned key constant, so seam identity remains owned by the adapter namespace
+- verification after code-shaper follow-up: test-support lint is clean and focused workflow attempt/judge tests still pass
+- test review follow-up had identified that `workflow_attempts_test` still patched nested adapter internals inline via `assoc-in` on the adapter map instead of replacing the seam as one boundary value
+- follow-up completed: `workflow_attempts_test` now uses a small helper to replace the workflow execution adapter coherently as one boundary value
+- test review follow-up had identified missing focused proof that adapter consumers fail clearly when the named adapter is absent
+- follow-up completed: added a focused missing-adapter failure test asserting both the error message and `:adapter-key` in `ex-data`
+- verification after test follow-up: focused workflow attempt/judge tests still pass and `workflow_attempts_test` lint is clean
+- test-shaper follow-up had noted that `with-workflow-execution-adapter-overrides` was acceptable locally, but should move into shared test support if more adapter-consumer tests appeared
+- follow-up completed: moved the seam-aware adapter override helper into shared test support and rewired `workflow_attempts_test` to reuse it
+- verification after test-shaper follow-up: shared test support and workflow-attempts test lint cleanly, and focused workflow attempt/judge tests still pass
