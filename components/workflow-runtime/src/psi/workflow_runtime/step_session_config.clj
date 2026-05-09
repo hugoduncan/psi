@@ -8,6 +8,7 @@
   (:require
    [psi.tool-registry.defs :as tool-defs]
    [psi.workflow-registry.registry :as registry]
+   [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.statechart :as workflow-statechart]))
 
 (defn- effective-step-def
@@ -30,13 +31,13 @@
 
 (defn- resolve-step-skills
   [ctx parent-session-id skill-config]
-  (let [session-skills (vec (or (:skills ((:get-session-data-fn ctx) ctx parent-session-id)) []))]
+  (let [session-skills (vec (or (:skills (execution-adapter/get-session-data ctx parent-session-id)) []))]
     (when (some? skill-config)
       (mapv (fn [skill]
               (cond
                 (map? skill) skill
                 (string? skill)
-                (or ((:find-skill-fn ctx) session-skills skill)
+                (or (execution-adapter/find-skill ctx session-skills skill)
                     {:name skill
                      :description ""
                      :file-path ""
@@ -48,7 +49,7 @@
 
 (defn- resolve-step-tool-defs
   [ctx parent-session-id tool-config]
-  (let [session-tool-defs (vec (or (:tool-defs ((:get-session-data-fn ctx) ctx parent-session-id)) []))]
+  (let [session-tool-defs (vec (or (:tool-defs (execution-adapter/get-session-data ctx parent-session-id)) []))]
     (when (some? tool-config)
       (mapv (fn [tool]
               (cond
@@ -92,8 +93,8 @@
   [ctx parent-session-id workflow-run step-id]
   (let [{:keys [step-def base-meta framing-prompt]} (step-meta-for ctx workflow-run step-id)
         parent-session-id (or parent-session-id
-                              (some->> ((:list-context-sessions-fn ctx) ctx) first :session-id))
-        parent-session ((:get-session-data-fn ctx) ctx parent-session-id)
+                              (some->> (execution-adapter/list-context-sessions ctx) first :session-id))
+        parent-session (execution-adapter/get-session-data ctx parent-session-id)
         parent-session-model (:model parent-session)
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)

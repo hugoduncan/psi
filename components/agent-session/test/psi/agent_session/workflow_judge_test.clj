@@ -1,9 +1,10 @@
 (ns psi.agent-session.workflow-judge-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.workflow-runtime.turn-execution-contract]
    [psi.agent-session.workflow-judge :as workflow-judge]
-   [psi.session-persistence.core]))
+   [psi.session-persistence.core]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
+   [psi.workflow-runtime.turn-execution-contract]))
 
 (def step-order ["step-1-plan" "step-2-build" "step-3-review"])
 
@@ -19,10 +20,11 @@
           step-runs {"step-1-plan"   {:step-id "step-1-plan" :attempts [] :iteration-count 1}
                      "step-2-build"  {:step-id "step-2-build" :attempts [] :iteration-count 1}
                      "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}
-          ctx {:create-workflow-child-session-fn
-               (fn [_ctx _parent opts]
-                 (swap! created-sessions* conj opts)
-                 nil)}]
+          ctx {workflow-execution-adapter/adapter-key
+               (workflow-execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent opts]
+                                          (swap! created-sessions* conj opts)
+                                          nil)})}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid]
                       [{:role "user" :content "Build it"}
@@ -53,7 +55,9 @@
 (deftest execute-judge-retry-then-match-test
   (testing "judge retries on no-match then matches"
     (let [prompt-count* (atom 0)
-          ctx {:create-workflow-child-session-fn (fn [_ctx _parent _opts] nil)}
+          ctx {workflow-execution-adapter/adapter-key
+               (workflow-execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent _opts] nil)})}
           judge-spec {:prompt "APPROVED or REVISE?"
                       :projection :none}
           routing-table {"APPROVED" {:goto :next}
@@ -91,7 +95,9 @@
 (deftest execute-judge-retry-exhaustion-test
   (testing "judge retries exhausted — returns no-match routing"
     (let [prompt-count* (atom 0)
-          ctx {:create-workflow-child-session-fn (fn [_ctx _parent _opts] nil)}
+          ctx {workflow-execution-adapter/adapter-key
+               (workflow-execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent _opts] nil)})}
           judge-spec {:prompt "APPROVED or REVISE?"
                       :projection :none}
           routing-table {"APPROVED" {:goto :next}

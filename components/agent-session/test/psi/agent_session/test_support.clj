@@ -17,6 +17,7 @@
    [psi.agent-session.turn]
    [psi.agent-session.workflow-judge]
    [psi.session-state.model :as session-data]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.skill-registry.registry]
    [psi.workflow-runtime.step-materialization]
    [psi.workflow-runtime.step-session-config]
@@ -116,7 +117,7 @@
         sc-env        (session-sc/create-sc-env)
         dispatch-statechart-event-fn dispatch-handlers/dispatch-statechart-event-in!
         tool-batch-executor (Executors/newFixedThreadPool 4)
-        ctx           {:state*                       state*
+        ctx0          {:state*                       state*
                        :sc-env                       sc-env
                        :config                       {}
                        :session-defaults             (or session-data {})
@@ -207,6 +208,14 @@
                        :effective-cwd-fn             (fn [ctx session-id] (ss/session-worktree-path-in ctx session-id))
                        :validate-dispatch-result-fn  dispatch-schema/validate-dispatch-schemas
                        :validate-result-fn           dispatch-schema/validate-dispatch-schemas}
+        ctx           (assoc ctx0 workflow-execution-adapter/adapter-key
+                             (workflow-execution-adapter/create
+                              {:create-child-session! (:create-workflow-child-session-fn ctx0)
+                               :prompt-execution-result! (:workflow-prompt-execution-result-fn ctx0)
+                               :get-session-data (:get-session-data-fn ctx0)
+                               :list-context-sessions (:list-context-sessions-fn ctx0)
+                               :find-skill (:find-skill-fn ctx0)
+                               :execute-judge! (:execute-workflow-judge-fn ctx0)}))
         _             (dispatch-handlers/register-all! ctx)
         actions-fn     (dispatch-handlers/make-actions-fn ctx)
         ctx            (assoc ctx :session-actions-fn actions-fn)]

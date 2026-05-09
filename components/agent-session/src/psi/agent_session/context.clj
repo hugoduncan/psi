@@ -28,6 +28,7 @@
    [psi.agent-session.session-runtime :as session-runtime]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-runtime.step-materialization :as workflow-step-materialization]
    [psi.workflow-runtime.step-session-config :as workflow-step-session-config]
@@ -139,6 +140,16 @@
     (when (seq messages)
       (agent-core/replace-messages-in! (:agent-ctx fresh) messages)))
   {:psi.agent-session/session-id child-session-id})
+
+(defn workflow-execution-adapter
+  [ctx]
+  (workflow-execution-adapter/create
+   {:create-child-session! (:create-workflow-child-session-fn ctx)
+    :prompt-execution-result! (:workflow-prompt-execution-result-fn ctx)
+    :get-session-data (:get-session-data-fn ctx)
+    :list-context-sessions (:list-context-sessions-fn ctx)
+    :find-skill (:find-skill-fn ctx)
+    :execute-judge! (:execute-workflow-judge-fn ctx)}))
 
 (defn- callback-fns [mutations projection-listeners*]
   {:apply-root-state-update-fn ss/apply-root-state-update-in!
@@ -263,6 +274,8 @@
 
                       (contains? opts :execute-workflow-judge-fn)
                       (assoc :execute-workflow-judge-fn execute-workflow-judge-fn)))
+        ctx0 (assoc ctx0 workflow-execution-adapter/adapter-key
+                    (workflow-execution-adapter ctx0))
         _ (dispatch-handlers/register-all! ctx0)
         actions-fn (dispatch-handlers/make-actions-fn ctx0)
         ctx (assoc ctx0 :session-actions-fn actions-fn)]

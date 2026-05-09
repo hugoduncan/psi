@@ -4,7 +4,8 @@
    [psi.agent-session.core :as session-core]
    [psi.session-state.state :as session-state]
    [psi.agent-session.test-support :as test-support]
-   [psi.workflow-runtime.attempts :as workflow-attempts]))
+   [psi.workflow-runtime.attempts :as workflow-attempts]
+   [psi.workflow-runtime.execution-adapter]))
 
 (defn- create-session-context
   ([]
@@ -19,7 +20,7 @@
     (let [[ctx parent-session-id] (create-session-context {:persist? false})
           {:keys [attempt execution-session]}
           (workflow-attempts/create-step-attempt-session!
-           (assoc ctx :get-session-data-fn session-state/get-session-data-in)
+           (assoc-in ctx [psi.workflow-runtime.execution-adapter/adapter-key :get-session-data] session-state/get-session-data-in)
            parent-session-id
            {:workflow-run-id "run-1"
             :workflow-step-id "plan"

@@ -41,6 +41,19 @@ Bootstrapped on 2026-04-02.
     - shared `psi.workflow-runtime.step-test-support`
   - wired `components/workflow-runtime/{src,test}` into the top-level Kaocha `tests.edn` unit and integration suites
   - verification green for the role split: focused workflow/runtime proofs `13 tests, 39 assertions, 0 failures`; lint green `0 errors, 0 warnings`
+- Task 128 workflow execution adapter seam is now implemented locally:
+  - added lower owner `components/workflow-runtime/src/psi/workflow_runtime/execution_adapter.clj`
+  - chose named seam `psi.workflow-runtime.execution-adapter` with adapter value key `:workflow-execution-adapter`
+  - moved lower workflow-runtime higher/session-bound crossings behind the named seam in:
+    - `psi.workflow-runtime.attempts`
+    - `psi.workflow-runtime.turn-execution-contract`
+    - `psi.workflow-runtime.step-session-config`
+    - `psi.workflow-runtime.statechart-runtime`
+  - canonical adapter assembly now lives in `psi.agent-session.context/workflow-execution-adapter`
+  - `psi_tool_workflow` now backfills the named seam for older live ctx maps after compatibility callback backfill
+  - focused tests now stub the named seam where they are proving workflow-runtime consumption
+  - intentionally left lower-owned workflow step session-config/materialization collaborators outside the seam because they are not runtime → session crossings
+  - focused verification green: `12 tests, 66 assertions, 0 failures, 0 errors`; lint clean
 
 ## Suggested next step
-- Review `105-agent-session-component-extraction-map` against the now-complete workflow-runtime extraction and identify the next smallest boundary cleanup.
+- Review `105-agent-session-component-extraction-map` against the now-complete workflow-runtime extraction and workflow execution seam cleanup to identify the next smallest boundary cleanup.

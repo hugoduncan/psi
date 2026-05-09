@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.execution-adapter]
    [psi.workflow-runtime.step-test-support :as support]
    [psi.workflow-runtime.step-session-config :as workflow-step-session-config]
    [psi.workflow-registry.registry :as workflow-registry]))
@@ -134,7 +135,7 @@
                                                                           :run-id "run-fallback-1"
                                                                           :workflow-input {:input "plan it"}})]
                               s))))))
-          listed-session-ids (mapv :session-id ((:list-context-sessions-fn ctx) ctx))
+          listed-session-ids (mapv :session-id (psi.workflow-runtime.execution-adapter/list-context-sessions ctx))
           workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-fallback-1")
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= [first-session-id second-session-id] listed-session-ids))

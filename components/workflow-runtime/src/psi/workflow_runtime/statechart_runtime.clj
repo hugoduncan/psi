@@ -15,6 +15,7 @@
    [com.fulcrologic.statecharts.simple :as simple]
    [psi.workflow-runtime.attempts :as workflow-attempts]
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.progression-recording :as workflow-progression-recording]
    [psi.workflow-runtime.statechart :as workflow-statechart]
    [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
@@ -200,7 +201,7 @@
               judge-spec (:judge step-def)
               routing-table (or (:on step-def) {})
               actor-session-id (get-in @working-memory* [:sessions step-id])
-              judge-result ((:execute-workflow-judge-fn ctx)
+              judge-result (execution-adapter/execute-judge!
                             ctx
                             parent-session-id
                             actor-session-id

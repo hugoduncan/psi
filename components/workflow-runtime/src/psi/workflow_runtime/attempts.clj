@@ -4,11 +4,12 @@
    This slice owns creation of one canonical execution session per workflow step attempt,
    with explicit workflow linkage written onto the child session data.
 
-   Child-session creation is delegated via :create-workflow-child-session-fn on ctx
+   Child-session creation is delegated via the named workflow execution adapter
    to avoid a load cycle through mutations/session → core → context."
   (:require
    [clojure.string :as str]
-   [psi.session-state.model :as session]))
+   [psi.session-state.model :as session]
+   [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn- now []
   (java.time.Instant/now))
@@ -52,7 +53,7 @@
   [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection]}]
   (let [attempt-id'      (normalize-attempt-id attempt-id)
         child-session-id (str (java.util.UUID/randomUUID))
-        result           ((:create-workflow-child-session-fn ctx)
+        result           (execution-adapter/create-child-session!
                           ctx
                           parent-session-id
                           {:child-session-id           child-session-id
@@ -72,7 +73,7 @@
                            :workflow-attempt-id        attempt-id'
                            :workflow-owned?            true})
         _                result
-        child-sd         ((:get-session-data-fn ctx) ctx child-session-id)
+        child-sd         (execution-adapter/get-session-data ctx child-session-id)
         attempt          (new-attempt {:attempt-id attempt-id'
                                        :status :pending
                                        :execution-session-id child-session-id})]

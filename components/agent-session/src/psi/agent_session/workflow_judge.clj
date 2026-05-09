@@ -5,9 +5,10 @@
    This namespace owns only judge-session execution/orchestration above that boundary."
   (:require
    [clojure.string :as str]
-   [psi.workflow-runtime.turn-execution-contract :as turn-execution]
    [psi.session-persistence.core :as persist]
-   [psi.workflow-judge :as workflow-judge]))
+   [psi.workflow-judge :as workflow-judge]
+   [psi.workflow-runtime.execution-adapter :as execution-adapter]
+   [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
 
 ;;; Judge session execution — impure
 
@@ -37,7 +38,7 @@
         projected     (workflow-judge/project-messages actor-msgs projection)
         judge-sid     (str (java.util.UUID/randomUUID))
         expected-sigs (keys routing-table)]
-    ((:create-workflow-child-session-fn ctx)
+    (execution-adapter/create-child-session!
      ctx
      parent-session-id
      {:child-session-id   judge-sid

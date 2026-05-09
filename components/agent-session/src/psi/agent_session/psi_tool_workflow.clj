@@ -3,6 +3,7 @@
   (:require
    [clojure.edn :as edn]
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-registry.registry :as workflow-registry]))
 
 ;; ── Helpers (local copies of private psi_tool utilities) ────────────────────
@@ -150,6 +151,15 @@
     (assoc :execute-workflow-judge-fn
            (find-required-fn "psi.agent-session.workflow-judge" "execute-judge!"))))
 
+(defn- ensure-workflow-execution-adapter
+  [ctx]
+  (if (contains? ctx workflow-execution-adapter/adapter-key)
+    ctx
+    (assoc ctx
+           workflow-execution-adapter/adapter-key
+           ((find-required-fn "psi.agent-session.context" "workflow-execution-adapter")
+            (ensure-workflow-callbacks ctx)))))
+
 ;; ── Workflow op handler ──────────────────────────────────────────────────────
 
 (defn execute-psi-tool-workflow-report
@@ -159,7 +169,9 @@
       (when-not ctx
         (throw (ex-info "psi-tool workflow action requires live runtime ctx"
                         {:phase :validate :action "workflow" :op op})))
-      (let [ctx (ensure-workflow-callbacks ctx)
+      (let [ctx (-> ctx
+                    ensure-workflow-callbacks
+                    ensure-workflow-execution-adapter)
             session-id (require-session-id! session-id op)
             result
             (case op

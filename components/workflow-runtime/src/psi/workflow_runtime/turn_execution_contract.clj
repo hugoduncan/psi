@@ -7,7 +7,8 @@
    semantic results from journals/transcripts."
   (:require
    [clojure.string :as str]
-   [psi.turn-runtime.recording :as turn-recording]))
+   [psi.turn-runtime.recording :as turn-recording]
+   [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn assistant-message-text
   [assistant-message]
@@ -49,11 +50,7 @@
 
 (defn- prompt-execution-result
   [ctx session-id text images opts]
-  (let [f (:workflow-prompt-execution-result-fn ctx)]
-    (cond
-      (some? opts) (f ctx session-id text images opts)
-      (some? images) (f ctx session-id text images)
-      :else (f ctx session-id text))))
+  (execution-adapter/prompt-execution-result! ctx session-id text images opts))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt

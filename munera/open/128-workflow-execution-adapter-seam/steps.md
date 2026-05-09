@@ -1,13 +1,20 @@
-- [ ] Inventory the workflow-specific callback keys currently consumed by `psi.workflow-runtime.*`, preferably against the post-`127` workflow-runtime shape when available
-- [ ] Decide the smallest cohesive higher/session-bound workflow execution adapter surface they imply
-- [ ] Choose one explicit representation for the seam and record why it was better than the main rejected alternatives, including the most plausible alternatives named in the design
-- [ ] Choose and record the adapter seam name (`execution-adapter` versus `session-adapter`, or justified equivalent) using the naming decision rule
-- [ ] Record why any operation from the expected initial responsibility inventory is intentionally left outside the seam
-- [ ] Define the named seam and route workflow-runtime call sites through it
-- [ ] Provide the canonical implementation from `agent-session`, allowing `agent-session.context` to remain the assembly site for that implementation
-- [ ] Rewire any workflow-specific backfill/compatibility wiring in `psi_tool_workflow` to prefer the named seam over raw callback-key provisioning where applicable
-- [ ] Ensure workflow-runtime no longer directly depends on raw workflow-specific callback keys for its main higher/session-bound operations
-- [ ] Rework tests that currently stub workflow-specific callback keys consumed by workflow-runtime so they stub the named seam instead, unless a specific lower-layer exception is recorded because the test is intentionally proving the adapter implementation/assembly layer rather than workflow-runtime consumption
-- [ ] Verify behavior remains unchanged
-- [ ] Record any residual raw-key plumbing left behind the seam and any remaining direct raw-key dependence as explicit debt in `implementation.md`
-- [ ] Record the final seam name, representation, responsibilities, excluded concerns, and follow-on notes in `implementation.md`
+- [x] Inventory the workflow-specific callback keys currently consumed by `psi.workflow-runtime.*`, preferably against the post-`127` workflow-runtime shape when available
+  - found main higher/session-bound raw ctx reads in `attempts`, `turn-execution-contract`, `step-session-config`, and `statechart-runtime`
+- [x] Decide the smallest cohesive higher/session-bound workflow execution adapter surface they imply
+  - child-session creation, bounded prompt execution, judge execution, session data reads, context-session listing, skill lookup
+- [x] Choose one explicit representation for the seam and record why it was better than the main rejected alternatives, including the most plausible alternatives named in the design
+  - chose named adapter value/map plus lower wrapper namespace
+- [x] Choose and record the adapter seam name (`execution-adapter` versus `session-adapter`, or justified equivalent) using the naming decision rule
+  - chose `psi.workflow-runtime.execution-adapter`
+- [x] Record why any operation from the expected initial responsibility inventory is intentionally left outside the seam
+  - excluded lower-owned step-session-config/materialization collaborators because they are not runtime → session crossings
+- [x] Define the named seam and route workflow-runtime call sites through it
+- [x] Provide the canonical implementation from `agent-session`, allowing `agent-session.context` to remain the assembly site for that implementation
+- [x] Rewire any workflow-specific backfill/compatibility wiring in `psi_tool_workflow` to prefer the named seam over raw callback-key provisioning where applicable
+- [x] Ensure workflow-runtime no longer directly depends on raw workflow-specific callback keys for its main higher/session-bound operations
+- [x] Rework tests that currently stub workflow-specific callback keys consumed by workflow-runtime so they stub the named seam instead, unless a specific lower-layer exception is recorded because the test is intentionally proving the adapter implementation/assembly layer rather than workflow-runtime consumption
+- [x] Verify behavior remains unchanged
+  - focused tests: `12 tests, 66 assertions, 0 failures, 0 errors`
+  - focused lint: clean
+- [x] Record any residual raw-key plumbing left behind the seam and any remaining direct raw-key dependence as explicit debt in `implementation.md`
+- [x] Record the final seam name, representation, responsibilities, excluded concerns, and follow-on notes in `implementation.md`
