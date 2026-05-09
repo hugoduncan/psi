@@ -9,6 +9,9 @@ Queue:
 
 Backlog:
 
+`munera/open/126-workflow-execution-facade-narrowing/`
+`munera/open/127-workflow-step-prep-role-split/`
+`munera/open/128-workflow-execution-adapter-seam/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`

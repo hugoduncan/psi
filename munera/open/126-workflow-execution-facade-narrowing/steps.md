@@ -1,0 +1,11 @@
+- [ ] Review `psi.agent-session.workflow-execution` and list which publics are true higher façade entrypoints versus lower helper forwards
+- [ ] Use code search to identify all current references to the forwarded helper vars across ordinary callers, callback wiring sites, dynamic lookup/backfill sites, and tests
+- [ ] Decide which lower helper publics should be removed from `workflow-execution` and whether any tiny temporary compatibility seam is truly necessary
+- [ ] Rewire ordinary callers, callback wiring sites, and dynamic lookup/backfill consumers to use the current lower authoritative workflow-runtime helper namespaces instead of `workflow-execution`
+- [ ] Rewire lower helper tests/proofs to point at the lower owners rather than the higher façade
+- [ ] Keep or add higher façade proofs for run/resume behavior under `agent-session` while keeping lower helper proofs with the lower owners
+- [ ] Keep `execute-run!` and `resume-and-execute-run!` as the clear higher façade surface, with only directly adjacent façade-local result-shaping helpers remaining, unless implementation proves a simpler explicit shape
+- [ ] Verify workflow behavior is unchanged
+- [ ] If any temporary compatibility seam is kept, ensure it is minimal and record the justification explicitly in `implementation.md`
+- [ ] Record the final remaining public vars of `psi.agent-session.workflow-execution` in `implementation.md`, justifying any public other than `execute-run!` and `resume-and-execute-run!`
+- [ ] Record the final façade ownership decision and any follow-on cleanup notes in `implementation.md`
