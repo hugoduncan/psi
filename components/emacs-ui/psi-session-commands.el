@@ -310,7 +310,7 @@ Returns selected MODEL-ENTRY map or nil when cancelled/no selection."
           (psi-emacs--slash-completion-token normalized-names templates))))
 
 (defun psi-emacs--refresh-slash-completion-data ()
-  "Refresh cached extension command names and prompt templates for slash completion."
+  "Refresh cached slash-completion command names and prompt templates."
   (let ((buffer (current-buffer))
         (state psi-emacs--state))
     (psi-emacs--request-slash-completion-data
