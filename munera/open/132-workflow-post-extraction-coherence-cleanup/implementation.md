@@ -35,13 +35,13 @@ Reviewed namespace classifications:
   - Pathom mutation surface remains distinct from lower runtime ownership and preserves its higher contract shaping
 - `psi.agent-session.resolvers.workflows` → keep
   - Pathom resolver projection is intentionally EQL-specific rather than accidental duplication
-- `psi.agent-session.workflows` → rename
+- `psi.agent-session.workflows` → rename → delete
   - current name is materially misleading after canonical deterministic workflow extraction because it suggests generic workflow ownership
   - authoritative owner renamed to `psi.agent-session.extension-workflow-runtime`
-  - legacy namespace retained as a compatibility shim that simply re-exports the renamed owner
-- `psi.agent-session.workflow-mutations` → rename
+  - legacy namespace was temporarily retained as a compatibility shim, then deleted after confirming no remaining in-repo callers
+- `psi.agent-session.workflow-mutations` → rename → delete
   - authoritative owner renamed to `psi.agent-session.extension-workflow-mutations`
-  - legacy namespace retained as a compatibility shim that re-exports the renamed owner
+  - legacy namespace was temporarily retained as a compatibility shim, then deleted after confirming no remaining in-repo callers
 
 Compatibility-backfill decision:
 - removed `psi.agent-session.psi-tool-workflow` dynamic callback backfill and lazy execution-adapter assembly
@@ -63,12 +63,8 @@ Implemented code changes:
   - switched workflow psi-tool execution to validation of assembled ctx instead of runtime patching
 - `components/agent-session/src/psi/agent_session/extension_workflow_runtime.clj`
   - introduced explicit authoritative extension-workflow runtime owner by moving the prior `workflows` implementation under a clearer name
-- `components/agent-session/src/psi/agent_session/workflows.clj`
-  - rewritten as a compatibility shim re-exporting `extension-workflow-runtime`
 - `components/agent-session/src/psi/agent_session/extension_workflow_mutations.clj`
   - introduced explicit authoritative extension-workflow mutation owner by moving the prior `workflow-mutations` implementation under a clearer name
-- `components/agent-session/src/psi/agent_session/workflow_mutations.clj`
-  - rewritten as a compatibility shim re-exporting `extension-workflow-mutations`
 - rewired direct authoritative callers to the renamed owners where touched in this slice:
   - `context.clj`
   - `mutations.clj`
@@ -78,6 +74,9 @@ Implemented code changes:
   - `session_lifecycle.clj`
   - `dispatch_effects.clj`
   - selected tests and test support
+- follow-up cleanup then deleted the temporary shim namespaces after confirming no remaining in-repo callers:
+  - `components/agent-session/src/psi/agent_session/workflows.clj`
+  - `components/agent-session/src/psi/agent_session/workflow_mutations.clj`
 - renamed extension-workflow runtime proof file to match the new authoritative namespace:
   - `components/agent-session/test/psi/agent_session/extension_workflow_runtime_test.clj`
 
@@ -121,10 +120,10 @@ Why these slices were chosen now:
 Deferred / residual debt:
 - `psi.agent-session.context` workflow-specific assembly remains embedded in the composition root; reviewed as coherent for now, but could still be reshaped later for readability
 - canonical workflow projection duplication across psi-tool / resolver / mutation / execution surfaces remains reviewed-but-unextracted because current duplication appears mostly contract-specific rather than clearly accidental
-- legacy compatibility shim namespaces remain intentionally for transition:
+- legacy shim namespaces have now been deleted after confirming no remaining in-repo callers:
   - `psi.agent-session.workflows`
   - `psi.agent-session.workflow-mutations`
-  - a later cleanup can delete them once direct callers are fully migrated
+- out-of-repo callers would now need to use the authoritative renamed namespaces directly
 
 Verification:
 - lint:

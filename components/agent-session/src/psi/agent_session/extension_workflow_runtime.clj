@@ -2,11 +2,7 @@
   "Extension workflow runtime.
 
    Provides a shared, statechart-backed workflow substrate for extensions.
-   Workflows are scoped by extension path and workflow id.
-
-   This namespace is the explicit extension-workflow owner. The historical
-   `psi.agent-session.workflows` namespace remains only as a compatibility shim
-   during the rename transition."
+   Workflows are scoped by extension path and workflow id."
   (:require
    [clojure.string :as str]
    [com.fulcrologic.statecharts :as sc]
