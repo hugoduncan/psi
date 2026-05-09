@@ -19,7 +19,7 @@
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.workflows :as wf]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.query.core :as query]))
 
 (defn- start-job!
@@ -578,16 +578,16 @@
                                                        (assoc :session-id thread-id)))])
                            op))]
       ;; Register workflow type and create/start a workflow instance
-      (wf/register-type-in! reg ext-path {:type :instant-done :chart instant-done-chart})
-      (wf/ensure-pump! reg)
-      (wf/create-workflow-in! reg ext-path {:type :instant-done :id wf-id :auto-start? true})
+      (extension-workflow-runtime/register-type-in! reg ext-path {:type :instant-done :chart instant-done-chart})
+      (extension-workflow-runtime/ensure-pump! reg)
+      (extension-workflow-runtime/create-workflow-in! reg ext-path {:type :instant-done :id wf-id :auto-start? true})
       ;; Wait for the statechart to reach :done
       (loop [i 0]
-        (let [w (wf/workflow-in reg ext-path wf-id)]
+        (let [w (extension-workflow-runtime/workflow-in reg ext-path wf-id)]
           (when (and (< i 200) (not (:done? w)))
             (Thread/sleep 10)
             (recur (inc i)))))
-      (is (true? (:done? (wf/workflow-in reg ext-path wf-id)))
+      (is (true? (:done? (extension-workflow-runtime/workflow-in reg ext-path wf-id)))
           "workflow should be done before we register the background job")
       ;; Register a background job that is linked to the now-done workflow
       (session/dispatch-in! ctx :session/update-background-jobs-state
@@ -612,7 +612,7 @@
         (is (bj/terminal-status? (:status job))
             "background job should be terminal after notify")
         (is (= :completed (:status job))))
-      (wf/shutdown-in! reg))))
+      (extension-workflow-runtime/shutdown-in! reg))))
 
 (def ^:private delayed-done-chart
   "Statechart that reaches :done asynchronously shortly after start."
@@ -646,9 +646,9 @@
                                                        (not (contains? params :session-id))
                                                        (assoc :session-id thread-id)))])
                            op))]
-      (wf/register-type-in! reg ext-path {:type :delayed-done :chart delayed-done-chart})
-      (wf/ensure-pump! reg)
-      (wf/create-workflow-in! reg ext-path {:type :delayed-done :id wf-id :auto-start? true})
+      (extension-workflow-runtime/register-type-in! reg ext-path {:type :delayed-done :chart delayed-done-chart})
+      (extension-workflow-runtime/ensure-pump! reg)
+      (extension-workflow-runtime/create-workflow-in! reg ext-path {:type :delayed-done :id wf-id :auto-start? true})
       (session/dispatch-in! ctx :session/update-background-jobs-state
                             {:update-fn (fn [store]
                                           (:state (bj/start-background-job
@@ -673,7 +673,7 @@
             (do
               (Thread/sleep 10)
               (recur (inc i))))))
-      (wf/shutdown-in! reg))))
+      (extension-workflow-runtime/shutdown-in! reg))))
 
 (deftest background-job-resolver-self-heals-stale-workflow-status-test
   (testing "background-job resolver reconciles stale workflow-backed running jobs"
@@ -682,12 +682,12 @@
           wf-id     "wf-resolve-1"
           thread-id session-id
           reg       (:workflow-registry ctx)]
-      (wf/register-type-in! reg ext-path {:type :instant-done :chart instant-done-chart})
-      (wf/ensure-pump! reg)
-      (wf/create-workflow-in! reg ext-path {:type :instant-done :id wf-id :auto-start? true})
+      (extension-workflow-runtime/register-type-in! reg ext-path {:type :instant-done :chart instant-done-chart})
+      (extension-workflow-runtime/ensure-pump! reg)
+      (extension-workflow-runtime/create-workflow-in! reg ext-path {:type :instant-done :id wf-id :auto-start? true})
       ;; Wait workflow done
       (loop [i 0]
-        (let [w (wf/workflow-in reg ext-path wf-id)]
+        (let [w (extension-workflow-runtime/workflow-in reg ext-path wf-id)]
           (when (and (< i 200) (not (:done? w)))
             (Thread/sleep 10)
             (recur (inc i)))))
@@ -710,4 +710,4 @@
             jobs (:psi.agent-session/background-jobs resp)
             job  (first (filter #(= "job-resolve-1" (:psi.background-job/id %)) jobs))]
         (is (= :completed (:psi.background-job/status job))))
-      (wf/shutdown-in! reg))))
+      (extension-workflow-runtime/shutdown-in! reg))))

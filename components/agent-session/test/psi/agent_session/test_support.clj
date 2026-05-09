@@ -25,7 +25,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as session-sc]
    [psi.agent-session.tool-plan :as tool-plan]
-   [psi.agent-session.workflows :as wf]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.ui.state :as ui-state])
   (:import
    (java.util.concurrent Executors)))
@@ -122,7 +122,7 @@
                        :ui {:extension-ui @(ui-state/create-ui-state)}}
         state*               (atom (merge base-state (or state {})))
         ext-reg       (ext/create-registry)
-        wf-reg        (wf/create-registry)
+        wf-reg        (extension-workflow-runtime/create-registry)
         sc-env        (session-sc/create-sc-env)
         dispatch-statechart-event-fn dispatch-handlers/dispatch-statechart-event-in!
         tool-batch-executor (Executors/newFixedThreadPool 4)

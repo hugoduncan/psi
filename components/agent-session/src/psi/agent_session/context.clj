@@ -33,7 +33,7 @@
    [psi.workflow-step-materialization.core :as workflow-step-materialization]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.skill-registry.registry :as skill-registry]
-   [psi.agent-session.workflows :as wf]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.history.resolvers :as history-resolvers]
    [psi.query.core :as query]
    [psi.ui.state :as ui-state])
@@ -226,7 +226,7 @@
                      :nrepl-runtime-atom nrepl-runtime-atom
                      :extension-registry (ext/create-registry)
                      :deterministic-operation-registry (deterministic-op-registry/create-registry)
-                     :workflow-registry (wf/create-registry)
+                     :workflow-registry (extension-workflow-runtime/create-registry)
                      :service-registry (services/create-registry)
                      :project-nrepl-registry (project-nrepl-runtime/create-registry)
                      :post-tool-registry (post-tool/create-registry)

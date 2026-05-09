@@ -7,7 +7,7 @@
    [psi.agent-session.resolvers :as resolvers]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]
-   [psi.agent-session.workflows :as wf]))
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]))
 
 (defn replay-dispatch-event-log-in!
   "Replay retained dispatch entries against this session context.
@@ -42,8 +42,8 @@
      :auto-compaction-enabled (:auto-compaction-enabled sd)
      :context-fraction        (session/context-fraction-used sd)
      :extension-count         (ext/extension-count-in (:extension-registry ctx))
-     :workflow-count          (wf/workflow-count-in (:workflow-registry ctx))
-     :workflow-running-count  (wf/running-count-in (:workflow-registry ctx))
+     :workflow-count          (extension-workflow-runtime/workflow-count-in (:workflow-registry ctx))
+     :workflow-running-count  (extension-workflow-runtime/running-count-in (:workflow-registry ctx))
      :journal-entries         (count (ss/get-state-value-in ctx (ss/state-path :journal session-id)))
      :agent-diagnostics       (agent/diagnostics-in (ss/agent-ctx-in ctx session-id))}))
 

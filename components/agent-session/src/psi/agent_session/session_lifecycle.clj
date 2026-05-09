@@ -10,7 +10,7 @@
    [psi.session-journal.store :as journal-store]
    [psi.agent-session.session-runtime :as runtime]
    [psi.session-state.state :as session]
-   [psi.agent-session.workflows :as wf]))
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]))
 
 (defn- initialize-top-level-session!
   [ctx source-session-id {:keys [dispatch-event session-name worktree-path scheduled-origin-session-id scheduled-from-schedule-id scheduled-from-label]}]
@@ -75,7 +75,7 @@
   (let [reg                  (:extension-registry ctx)
         {:keys [cancelled?]} (ext/dispatch-in reg "session_before_switch" {:reason :new})]
     (when-not cancelled?
-      (wf/clear-all-in! (:workflow-registry ctx))
+      (extension-workflow-runtime/clear-all-in! (:workflow-registry ctx))
       (let [sd (initialize-top-level-session! ctx source-session-id {:dispatch-event :session/new-initialize
                                                                      :session-name (:session-name opts)
                                                                      :worktree-path (:worktree-path opts)})]
@@ -101,7 +101,7 @@
   (let [reg                  (:extension-registry ctx)
         {:keys [cancelled?]} (ext/dispatch-in reg "session_before_switch" {:reason :resume})]
     (when-not cancelled?
-      (wf/clear-all-in! (:workflow-registry ctx))
+      (extension-workflow-runtime/clear-all-in! (:workflow-registry ctx))
       (let [loaded (journal-store/load-session-file session-path)]
         (if-not loaded
           (do

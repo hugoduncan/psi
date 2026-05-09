@@ -275,7 +275,7 @@
         (when (and (:workflow-ext-path job) (:workflow-id job))
           (let [wf-reg (:workflow-registry ctx)]
             (when wf-reg
-              ((requiring-resolve 'psi.agent-session.workflows/abort-workflow-in!) wf-reg (:workflow-ext-path job) (:workflow-id job) "cancel requested"))))
+              ((requiring-resolve 'psi.agent-session.extension-workflow-runtime/abort-workflow-in!) wf-reg (:workflow-ext-path job) (:workflow-id job) "cancel requested"))))
         (catch Exception _ nil)))
     (when-let [refresh-fn (some-> ctx :background-job-ui-refresh-fn deref)]
       (refresh-fn ctx (:session-id effect)))

@@ -85,80 +85,31 @@
                                (:step-runs workflow-run))
    :history              (:history workflow-run)})
 
-(defn- find-required-fn
-  [ns-name var-name]
-  (or (some-> (find-var (symbol ns-name var-name)) var-get)
-      (throw (ex-info "Required workflow function is not loaded"
-                      {:phase :workflow
-                       :ns ns-name
-                       :var var-name}))))
-
 (defn- require-session-id!
   [session-id op]
   (or session-id
       (throw (ex-info "psi-tool workflow action requires invoking or explicit `session-id`"
                       {:phase :validate :action "workflow" :op op}))))
 
-(defn- ensure-workflow-callbacks
-  "Patch older live ctx maps on demand so workflow execution controls can run
-   without requiring a full runtime/context rebuild.
+(def ^:private required-workflow-ctx-keys
+  [:state*
+   :apply-root-state-update-fn
+   :execute-workflow-run-fn
+   :resume-and-execute-workflow-run-fn
+   workflow-execution-adapter/adapter-key])
 
-   Presence is authoritative: explicit nil means intentionally disabled and must
-   not be backfilled. Only absent keys are auto-wired for compatibility."
-  [ctx]
-  (cond-> ctx
-    (not (contains? ctx :create-workflow-child-session-fn))
-    (assoc :create-workflow-child-session-fn
-           (find-required-fn "psi.agent-session.context" "create-workflow-child-session!"))
-
-    (not (contains? ctx :execute-workflow-run-fn))
-    (assoc :execute-workflow-run-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "execute-run!"))
-
-    (not (contains? ctx :workflow-prompt-execution-result-fn))
-    (assoc :workflow-prompt-execution-result-fn
-           (find-required-fn "psi.agent-session.turn" "prompt-execution-result-in!"))
-
-    (not (contains? ctx :resume-and-execute-workflow-run-fn))
-    (assoc :resume-and-execute-workflow-run-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "resume-and-execute-run!"))
-
-    (not (contains? ctx :get-session-data-fn))
-    (assoc :get-session-data-fn
-           (find-required-fn "psi.session-state.state" "get-session-data-in"))
-
-    (not (contains? ctx :list-context-sessions-fn))
-    (assoc :list-context-sessions-fn
-           (find-required-fn "psi.session-state.state" "list-context-sessions-in"))
-
-    (not (contains? ctx :find-skill-fn))
-    (assoc :find-skill-fn
-           (find-required-fn "psi.skill-registry.registry" "find-skill"))
-
-    (not (contains? ctx :resolve-workflow-step-session-config-fn))
-    (assoc :resolve-workflow-step-session-config-fn
-           (find-required-fn "psi.workflow-step-session-config.core" "resolve-step-session-config"))
-
-    (not (contains? ctx :materialize-workflow-step-session-conversation-fn))
-    (assoc :materialize-workflow-step-session-conversation-fn
-           (find-required-fn "psi.workflow-step-materialization.core" "materialize-step-session-conversation"))
-
-    (not (contains? ctx :split-workflow-step-session-conversation-fn))
-    (assoc :split-workflow-step-session-conversation-fn
-           (find-required-fn "psi.workflow-step-materialization.core" "split-step-session-conversation"))
-
-    (not (contains? ctx :execute-workflow-judge-fn))
-    (assoc :execute-workflow-judge-fn
-           (find-required-fn "psi.agent-session.workflow-judge" "execute-judge!"))))
-
-(defn- ensure-workflow-execution-adapter
-  [ctx]
-  (if (contains? ctx workflow-execution-adapter/adapter-key)
-    ctx
-    (assoc ctx
-           workflow-execution-adapter/adapter-key
-           ((find-required-fn "psi.agent-session.context" "workflow-execution-adapter")
-            (ensure-workflow-callbacks ctx)))))
+(defn- require-workflow-runtime-ctx!
+  [ctx op]
+  (let [missing (->> required-workflow-ctx-keys
+                     (remove #(contains? ctx %))
+                     vec)]
+    (when (seq missing)
+      (throw (ex-info "psi-tool workflow action requires an assembled workflow runtime ctx"
+                      {:phase :validate
+                       :action "workflow"
+                       :op op
+                       :missing-keys missing}))))
+  ctx)
 
 ;; ── Workflow op handler ──────────────────────────────────────────────────────
 
@@ -169,9 +120,7 @@
       (when-not ctx
         (throw (ex-info "psi-tool workflow action requires live runtime ctx"
                         {:phase :validate :action "workflow" :op op})))
-      (let [ctx (-> ctx
-                    ensure-workflow-callbacks
-                    ensure-workflow-execution-adapter)
+      (let [ctx (require-workflow-runtime-ctx! ctx op)
             session-id (require-session-id! session-id op)
             result
             (case op
