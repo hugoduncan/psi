@@ -37,6 +37,26 @@ All seven design-steps resolved:
 7. **`extension-test` update under-specified** — steps say "assert four registrations" but do not say to assert all four operation ids specifically (not just count).
 8. **No `plan.md`** — task has no `plan.md`; Munera requires one before execution.
 
+## 2026-05-10 — Design review pass 2
+
+**Inconsistencies found:**
+
+1. **Label-ops :number arg vs find-issue/find-pr output key names** — design data flow says
+   label-ops receive `:number from upstream :data`, but find-issue outputs `:issue-number`
+   and find-pr outputs `:pr-number`. The wiring requires `:path [:issue-number]` or
+   `:path [:pr-number]` respectively. Neither design.md nor steps.md specifies this mapping.
+
+2. **Existing find-issue :outputs missing :data** — `gh-issue-refine` and `gh-bug-fix-and-pr`
+   already have a `find-issue` step that only declares `:outputs {:summary {:source :invoke/summary}}`.
+   Label-ops steps need `:data` from that step. Steps.md migration items for these two workflows
+   do not say to add `:data {:source :invoke/data}` to the discover step `:outputs`.
+
+3. **gh-issue-refine add-label (PR target): PR number not in structured :data** — the PR is
+   created inside the `publish` delegate step. The publish step handoff includes `pr_url` in
+   markdown text but no structured `:data` with `:pr-number`. There is no upstream `:data`
+   source for the add-label `:number` arg (PR target). Design.md does not specify how to
+   obtain the PR number for this step.
+
 ## 2026-05-10 — Task created
 
 Initial scope survey:

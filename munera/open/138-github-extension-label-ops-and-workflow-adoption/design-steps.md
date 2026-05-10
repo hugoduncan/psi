@@ -15,3 +15,11 @@ Unchecked items added by design review pass 1 (2026-05-10).
 - [x] **F. Tighten `extension-test` update spec.** Steps say "Update `extension-test` to assert four registrations." Specify that the test must assert all four operation ids explicitly (`"github/find-issue"`, `"github/find-pr"`, `"github/add-label"`, `"github/remove-label"`) — not just `(= 4 (count @calls*))`. Update steps.md Phase 3 item accordingly.
 
 - [x] **G. Create `plan.md`.** Task has no `plan.md`. Munera requires one before execution. Write it now.
+
+Unchecked items added by design review pass 2 (2026-05-10).
+
+- [ ] **H. Specify :path wiring for label-ops :number arg.** Design data flow says label-ops receive `:number from upstream :data`, but find-issue outputs `:issue-number` and find-pr outputs `:pr-number`. The wiring requires `{:from {:step "discover" :output :data} :path [:issue-number]}` or `{:path [:pr-number]}` respectively. Add explicit wiring syntax to design.md §data flow and to the relevant steps.md Phase 5 migration items for each workflow.
+
+- [ ] **I. Add :data to :outputs for existing find-issue steps in gh-issue-refine and gh-bug-fix-and-pr.** Both workflows already have a `find-issue` step that only declares `:outputs {:summary ...}`. Label-ops steps need `:data` from that step. Add a sub-item to each workflow's steps.md migration block: "Add `:data {:source :invoke/data}` to the discover step `:outputs`."
+
+- [ ] **J. Resolve PR number source for gh-issue-refine add-label (PR target).** The `publish` step creates the PR inside a delegate; its handoff text includes `pr_url` but no structured `:data` with `:pr-number`. The add-label step (`:target "pr"`) has no upstream `:data` source for `:number`. Design.md must specify how to obtain the PR number — options include: (a) update the publish step prompt to output `pr_number:` in handoff data and add `:outputs {:data {:source :delegate/handoff}}` to the publish step so downstream steps can wire from it; or (b) use a separate `find-pr` step after publish to look up the PR by branch name. Pick one and update design.md and steps.md accordingly.
