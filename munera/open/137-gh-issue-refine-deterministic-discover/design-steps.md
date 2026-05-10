@@ -54,7 +54,7 @@ Unchecked items added by design review pass 6 (2026-05-10).
 
 - [x] **W. Specify `gh` CLI non-zero exit code handling.** Decided: when `(:exit result)` ≠ 0, return `{:status :error :reason :psi.github/shell-error :message (:err result)}`. Unit test stub returns `{:exit 1 :out "" :err "gh: not authenticated"}` and asserts this error shape. Design.md updated.
 
-- [x] **X. Specify integration test assertion for "no session spawned".** Decided: run `workflow-execution/execute-run!` with a test ctx that has the operation registered but no `:workflow-execution-adapter`. Assert `:completed` status. If a session were spawned, `execution-adapter/adapter` would throw `"Workflow execution adapter is required"`. Test passing at `:completed` is the proof. Also assert handler `calls*` count = 1. Pattern matches `invoke-step-executes-through-deterministic-operation-registry-test` in `workflow_invoke_runtime_test.clj`. Design.md updated.
+- [x] **X. Specify integration test assertion for "no session spawned".** Decided: run `workflow-execution/execute-run!` with a test ctx created by `create-session-context` (which always wires `:workflow-execution-adapter`). The adapter IS present. The actual proof that no session is spawned is: (a) `@calls*` count = 1, (b) `:completed` status, and (c) the `:invoke` step calls `invoke-step-runtime-result` directly without calling `create-step-attempt-session!`. Also assert handler `calls*` count = 1. Pattern matches `invoke-step-executes-through-deterministic-operation-registry-test` in `workflow_invoke_runtime_test.clj`. Design.md updated. *(Corrected by GG: initial description wrongly claimed the adapter was absent.)*
 
 Unchecked items added by design review pass 8 (2026-05-10).
 
@@ -74,7 +74,7 @@ Unchecked items added by design review pass 9 (2026-05-10).
 
 Unchecked items added by design review pass 10 (2026-05-10).
 
-- [ ] **GG. Correct integration test proof mechanism description in `design.md`.** Line 114 says "test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired." This is wrong: `session/create-context` always adds `:workflow-execution-adapter`. The adapter IS present. Correct the description to: the actual proof is (a) `@calls*` count = 1, (b) `:completed` status, and (c) the `:invoke` step calls `invoke-step-runtime-result` directly without calling `create-step-attempt-session!`. Also correct design-steps.md item X which repeats the same inaccuracy.
+- [x] **GG. Correct integration test proof mechanism description in `design.md`.** Line 114 says "test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired." This is wrong: `session/create-context` always adds `:workflow-execution-adapter`. The adapter IS present. Correct the description to: the actual proof is (a) `@calls*` count = 1, (b) `:completed` status, and (c) the `:invoke` step calls `invoke-step-runtime-result` directly without calling `create-step-attempt-session!`. Also correct design-steps.md item X which repeats the same inaccuracy.
 
 Unchecked items added by design review pass 7 (2026-05-10).
 

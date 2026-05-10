@@ -111,7 +111,7 @@ When `input` is `nil`: no narrowing applied; all label-filtered candidates are e
 ```
 Unit test: stub returning `{:exit 1 :out "" :err "gh: not authenticated"}` must produce this error result.
 
-**Integration test "no session spawned" assertion**: run `workflow-execution/execute-run!` with a test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired. Assert the run reaches `:completed` status. If the `:invoke` step were to spawn a session, `execution-adapter/adapter` would throw `"Workflow execution adapter is required"` — the test passing at `:completed` is the proof. Also assert the handler `calls*` atom has exactly one entry. Pattern: identical to `invoke-step-executes-through-deterministic-operation-registry-test` in `psi.agent-session.workflow-invoke-runtime-test`.
+**Integration test "no session spawned" assertion**: run `workflow-execution/execute-run!` with a test ctx created by `create-session-context` (which always wires `:workflow-execution-adapter` via `create-context*`). The adapter IS present in the test ctx — its absence is not the proof mechanism. The actual proof that no session is spawned is: (a) `@calls*` count = 1 (handler invoked exactly once), (b) the run reaches `:completed` status (no error from missing session infrastructure), and (c) the `:invoke` step calls `invoke-step-runtime-result` directly without calling `create-step-attempt-session!` — confirmed by the test passing without any session allocation side-effects. Also assert the handler `calls*` atom has exactly one entry. Pattern: identical to `invoke-step-executes-through-deterministic-operation-registry-test` in `psi.agent-session.workflow-invoke-runtime-test`.
 
 **Shell seam** (for testability):
 ```clojure

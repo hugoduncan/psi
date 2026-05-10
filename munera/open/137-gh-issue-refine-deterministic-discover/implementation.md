@@ -1,5 +1,9 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 10 follow-up (design-step GG resolved)
+
+**GG resolved**: `design.md` integration test proof mechanism corrected. Removed the incorrect claim that the test ctx lacks `:workflow-execution-adapter` — `create-session-context` always wires it via `create-context*`. The correct proof description is now: (a) `@calls*` count = 1, (b) `:completed` status, and (c) `:invoke` step calls `invoke-step-runtime-result` directly without `create-step-attempt-session!`. Design-steps.md item X also corrected with the same fix and a note marking it was updated by GG.
+
 ## 2026-05-10 — Design review pass 10
 
 **GG. `design.md` integration test proof mechanism is inaccurate.** Line 114 says "test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired." This is wrong: `session/create-context` (called by `create-session-context` in both the reference test and the integration test) always adds `:workflow-execution-adapter` via `create-context*`. The adapter IS present in the test ctx. The actual proof that no session is spawned is: (a) `@calls*` count = 1 (handler invoked exactly once), (b) `:completed` status (no error from missing session infrastructure), and (c) the `:invoke` step never calls `create-step-attempt-session!` — it calls `invoke-step-runtime-result` directly. The test implementation is correct; only the design's description of the proof mechanism is wrong.
