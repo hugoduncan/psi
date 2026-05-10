@@ -1,5 +1,9 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 11
+
+**HH. Integration test comment contradicts corrected design.** `find_issue_integration_test.clj` lines 48–51 still say "no `:workflow-execution-adapter` is wired in the test ctx. The test passing at `:completed` is the proof." This is the pre-GG description that design.md and design-steps.md item X explicitly corrected: `create-session-context` calls `session/create-context` which always wires `:workflow-execution-adapter` via `create-context*`. The adapter IS present. The correct proof is `@calls*` count = 1 + `:completed` status + `:invoke` step bypasses `create-step-attempt-session!`. The comment in the test file was never updated when GG resolved the design. Fix: replace the stale comment with the accurate proof description.
+
 ## 2026-05-10 — Design review pass 10 follow-up (design-step GG resolved)
 
 **GG resolved**: `design.md` integration test proof mechanism corrected. Removed the incorrect claim that the test ctx lacks `:workflow-execution-adapter` — `create-session-context` always wires it via `create-context*`. The correct proof description is now: (a) `@calls*` count = 1, (b) `:completed` status, and (c) `:invoke` step calls `invoke-step-runtime-result` directly without `create-step-attempt-session!`. Design-steps.md item X also corrected with the same fix and a note marking it was updated by GG.

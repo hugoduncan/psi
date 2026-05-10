@@ -45,9 +45,13 @@
 
 (deftest ^:integration invoke-step-with-github-find-issue-completes-without-session-test
   (testing "github/find-issue `:invoke` step completes without spawning a session"
-    ;; Proof: if the step spawned a session, `execution-adapter/adapter` would throw
-    ;; "Workflow execution adapter is required" because no :workflow-execution-adapter
-    ;; is wired in the test ctx. The test passing at :completed is the proof.
+    ;; Proof that no session is spawned:
+    ;; `create-session-context` calls `session/create-context` which always wires
+    ;; `:workflow-execution-adapter` via `create-context*` — the adapter IS present.
+    ;; The actual proof is: (a) @calls* count = 1 (handler invoked exactly once),
+    ;; (b) run reaches :completed status (no session-allocation error), and
+    ;; (c) the :invoke step calls invoke-step-runtime-result directly without
+    ;; calling create-step-attempt-session!.
     (let [[ctx session-id] (create-session-context)
           calls*           (atom [])
           stub-issues      [{"number" 42

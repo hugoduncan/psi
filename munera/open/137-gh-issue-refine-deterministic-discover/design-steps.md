@@ -72,6 +72,10 @@ Unchecked items added by design review pass 9 (2026-05-10).
 
 - [x] **FF. Annotate blocked steps in `steps.md`.** The smoke-test and downstream-verify items are `[ ]` with no indication they are environment-blocked. Add a `<!-- blocked: requires real GitHub repo with labeled issues -->` note (or inline text) so readers know they are blocked, not merely pending.
 
+Unchecked items added by design review pass 11 (2026-05-10).
+
+- [x] **HH. Fix stale comment in `find_issue_integration_test.clj`.** Lines 48–51 say "no `:workflow-execution-adapter` is wired in the test ctx" — contradicts the GG-corrected design. `create-session-context` always wires the adapter via `create-context*`. Replace the comment with the accurate proof: adapter IS present; proof is `@calls*` count = 1, `:completed` status, and `:invoke` step bypasses `create-step-attempt-session!`.
+
 Unchecked items added by design review pass 10 (2026-05-10).
 
 - [x] **GG. Correct integration test proof mechanism description in `design.md`.** Line 114 says "test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired." This is wrong: `session/create-context` always adds `:workflow-execution-adapter`. The adapter IS present. Correct the description to: the actual proof is (a) `@calls*` count = 1, (b) `:completed` status, and (c) the `:invoke` step calls `invoke-step-runtime-result` directly without calling `create-step-attempt-session!`. Also correct design-steps.md item X which repeats the same inaccuracy.
