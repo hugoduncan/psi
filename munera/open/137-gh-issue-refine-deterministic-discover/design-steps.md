@@ -41,3 +41,17 @@ Unchecked items added by design review pass 5 (2026-05-10).
 - [x] **Q. Fix `deps.edn` `:test-paths` alias wiring instruction.** Design and plan say add `extensions/github/src` to `:test-paths` alias. Actual `:test-paths` contains only test paths for extensions (e.g. `extensions/work-on/test`), never extension `src` paths. Extension `src` paths appear in `:test` alias only. Correct instruction: add `extensions/github/src` to `:test` alias (not `:test-paths`); add `extensions/github/test` to both `:test-paths` and `:test` aliases. Update design.md, plan.md, and steps.md to reflect the corrected wiring.
 
 - [x] **R. Specify Phase 2 integration test file location.** Design and steps call for a "focused workflow-runtime integration test" but do not specify where the test file lives (`extensions/github/test` vs `components/workflow-runtime/test`). Placement determines which Kaocha suite runs it and whether additional source-paths wiring is needed. Decide and document in design.md and steps.md before Phase 2 execution.
+
+Unchecked items added by design review pass 6 (2026-05-10).
+
+- [ ] **S. Specify `cheshire/parse-string` keywordize flag.** Design says use `cheshire.core/parse-string` but does not specify whether to use keyword keys (`(parse-string json true)`) or string keys (`(parse-string json)`). Field access code and unit test stubs depend on this. Specify in design.md and ensure unit test stubs use the same key type.
+
+- [ ] **T. Specify URL detection and number-extraction regex.** Design says "if it looks like a URL → extract number from URL" but gives no detection pattern or extraction regex. Specify the detection predicate (e.g. `(str/starts-with? input "https://")`) and extraction regex (e.g. `#"/issues/(\d+)"`) in design.md. Decide what happens if the URL does not match the expected pattern (fall back to text match, or error).
+
+- [ ] **U. Specify integer-parsing rule and edge cases.** Design says "if `input` parses as an integer → filter by issue number" but does not name the parsing mechanism. Specify: use `re-matches #"^\d+$"` (positive integers only, no leading zeros allowed, or allowed?), or `Long/parseLong` wrapped in try/catch. Clarify handling of "0", "-1", "007". Update design.md.
+
+- [ ] **V. Specify text-substring match case sensitivity.** Design says "text substring match on title" but does not specify case-insensitive vs case-sensitive. Specify in design.md (recommended: case-insensitive via `str/lower-case` on both sides). Add a unit test case that exercises case folding.
+
+- [ ] **W. Specify `gh` CLI non-zero exit code handling.** Design does not say what to do when `clojure.java.shell/sh` returns `:exit` ≠ 0. Specify: return `{:status :error :reason :psi.github/shell-error :message (:err result)}` (or similar). Add a unit test case for the non-zero exit path with a stub that returns `{:exit 1 :out "" :err "gh: not authenticated"}`.
+
+- [ ] **X. Specify integration test assertion for "no session spawned".** Design says the Phase 2 test "proves no session is spawned" but gives no assertion mechanism. Specify: e.g. verify the compiled IR step has `:type :invoke`; or run the workflow with a nullable runtime and assert no `execute-session-step!` call occurred; or check session count in registry before/after. Document the chosen approach in design.md before Phase 2 execution.

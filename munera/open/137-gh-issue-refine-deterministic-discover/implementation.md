@@ -1,5 +1,19 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 6
+
+**S. `cheshire/parse-string` keywordize flag unspecified.** Design says use `cheshire.core/parse-string` but does not say whether to call `(parse-string json true)` (keyword keys) or `(parse-string json)` (string keys). The field access code (`"number"` vs `:number`) depends on this. Must be specified before implementation.
+
+**T. URL detection regex unspecified.** Design says "if it looks like a URL → extract number from URL" but gives no detection pattern. GitHub issue URLs are `https://github.com/owner/repo/issues/NNN`. No regex for detection or number extraction is specified. Must be specified.
+
+**U. Integer parsing rule unspecified.** Design says "if `input` parses as an integer → filter by issue number" but does not specify the parsing mechanism (e.g. `re-matches #"^\d+$"`, `Long/parseLong`, `Integer/parseInt`). Edge cases (negative numbers, zero, leading zeros) are unaddressed. Must be specified.
+
+**V. Text substring match case sensitivity unspecified.** Design says "text substring match on title" but does not specify case-insensitive vs case-sensitive matching. Unit tests for text narrowing cannot be written deterministically without this. Must be specified.
+
+**W. `gh` CLI non-zero exit code handling unspecified.** `clojure.java.shell/sh` returns `{:exit N :out "..." :err "..."}`. Design does not say what to do when `:exit` is non-zero (e.g. `gh` not authenticated, network error). Should return `{:status :error :reason :psi.github/shell-error ...}` or throw? Must be specified.
+
+**X. Integration test "no session spawned" assertion mechanism unspecified.** Design says the Phase 2 integration test "proves no session is spawned" but does not specify how to assert this (e.g. check session count in registry, verify step type is `:invoke` in compiled IR, or simply confirm workflow completes without session allocation). Must be specified before Phase 2 execution.
+
 ## 2026-05-10 — Design review pass 5 follow-up (design-steps Q–R resolved)
 
 **Q resolved**: `deps.edn` `:test-paths` alias wiring corrected. `extensions/github/src` goes to `:run`, `:psi`, `:tui-demo`, and `:test` aliases only — NOT `:test-paths`. `:test-paths` contains only test paths (e.g. `extensions/work-on/test`); extension `src` paths never appear there. `extensions/github/test` goes to both `:test-paths` and `:test`. Confirmed against actual `deps.edn`. Design.md, plan.md, and steps.md updated.
