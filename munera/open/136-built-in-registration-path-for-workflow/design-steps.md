@@ -1,2 +1,5 @@
 - [x] Extend the inventory to include non-agent-session proofs and projections that still encode built-in workflow as extension-owned state, especially `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` asserting `built-in:workflow` lives in the extension registry.
   - decided this proof should migrate to a built-in runtime-boundary invariant/projection rather than remain an extension-registry exception, because task success explicitly requires canonical built-in workflow bootstrap to stop seeding extension identity
+- [ ] Reconcile the prompt contribution label decision with the chosen built-in provenance model
+  - [ ] decide whether `# Extension Prompt Contributions` remains as temporary wording debt or changes in this task
+  - [ ] inventory and update/record affected prompt assembly and proof surfaces, including `components/agent-session/test/psi/agent_session/prompt_lifecycle_test.clj`, so task artifacts stop implying the label is both preserved behavior and removable wording debt
