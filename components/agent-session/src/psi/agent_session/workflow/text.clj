@@ -109,7 +109,7 @@
                                              "")))))))
 
 (defn parse-delegate-command
-  "Parse `/delegate <workflow> <prompt>` args."
+  "Parse `/delegate <workflow> [<prompt>]` args. prompt is optional."
   [args-str]
   (let [trimmed (str/trim (or args-str ""))]
     (when-not (str/blank? trimmed)

@@ -66,6 +66,12 @@
      :installed   {:local/root "extensions/plan-state-learning"}
      :jar         {:mvn/version :psi/release-version}}}
 
+   'psi/github
+   {:psi/init 'psi.github.extension/init
+    :source-policies
+    {:development {:local/root "extensions/github"}
+     :installed   {:local/root "extensions/github"}}}
+
    'psi/work-on
    {:psi/init 'extensions.work-on/init
     :source-policies

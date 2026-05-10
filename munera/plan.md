@@ -4,6 +4,8 @@ Open tasks in suggested execution order:
 
 Queue:
 
+`munera/open/137-gh-issue-refine-deterministic-discover/`
+
 Backlog:
 
 `munera/open/108-project-nrepl-testing-without-mocks/`

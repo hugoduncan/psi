@@ -110,15 +110,15 @@
                :from {:step "plan" :yield :text}}]
              (get-in delegate-build-review [:steps 1 :context])))))
 
-  (testing "gh-bug-triage-modular now compiles as the richer target-authored delegate example with distinct yielded text and structured handoff surfaces"
+  (testing "gh-bug-triage-modular discover is a deterministic :invoke step; downstream steps use yielded text and structured handoff surfaces"
     (let [{:keys [by-name]} (workflow-migration-view)
           gh-bug-triage-modular (get by-name "gh-bug-triage-modular")]
-      (is (= [:delegate :delegate :delegate :delegate]
+      (is (= [:invoke :delegate :delegate :delegate]
              (mapv :type (:steps gh-bug-triage-modular))))
       (is (= :text
              (get-in gh-bug-triage-modular [:steps 1 :prompt-string :vars "discover_report" :from :yield])))
-      (is (= :handoff
-             (get-in gh-bug-triage-modular [:steps 1 :context 1 :from :output])))
+      (is (= :text
+             (get-in gh-bug-triage-modular [:steps 1 :context 1 :from :yield])))
       (is (= :handoff
              (get-in gh-bug-triage-modular [:steps 2 :context 2 :from :output])))
       (is (= :handoff
