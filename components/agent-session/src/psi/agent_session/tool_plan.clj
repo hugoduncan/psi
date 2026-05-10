@@ -13,6 +13,15 @@
    [psi.agent-session.tools :as tools]
    [psi.query.core :as query]))
 
+(defn- ctx-all-mutations
+  "Read the current all-mutations from ctx.
+   Uses :all-mutations-atom when present (updated by reload-code) so that
+   new mutations from reloaded namespaces are visible."
+  [ctx]
+  (if-let [a (:all-mutations-atom ctx)]
+    @a
+    (:all-mutations ctx)))
+
 ;;; Runtime tool invocation boundary
 
 (defn- find-tool-def
@@ -47,7 +56,7 @@
         register-mutations! (:register-mutations-fn ctx)
         qctx                (query/create-query-context)
         _                   (register-resolvers! qctx false)
-        _                   (register-mutations! qctx (:all-mutations ctx) true)
+        _                   (register-mutations! qctx (ctx-all-mutations ctx) true)
         tool                (tools/make-psi-tool
                              (fn
                                ([eql-query]

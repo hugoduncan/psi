@@ -5,6 +5,15 @@
    [psi.history.git :as history-git]
    [psi.query.core :as query]))
 
+(defn- ctx-all-mutations
+  "Read the current all-mutations from ctx.
+   Uses :all-mutations-atom when present (updated by reload-code) so that
+   new mutations from reloaded namespaces are visible."
+  [ctx]
+  (if-let [a (:all-mutations-atom ctx)]
+    @a
+    (:all-mutations ctx)))
+
 (def ^:private session-scoped-extension-mutation-ops
   #{'psi.extension/set-session-name
     'psi.extension/set-active-tools
@@ -47,7 +56,7 @@
         register-mutations! (:register-mutations-fn ctx)
         qctx                (query/create-query-context)
         _                   (register-resolvers! qctx false)
-        _                   (register-mutations! qctx (:all-mutations ctx) true)
+        _                   (register-mutations! qctx (ctx-all-mutations ctx) true)
         git-ctx             (history-git/create-context (ss/session-worktree-path-in ctx session-id))
         seed                {:psi/agent-session-ctx ctx
                              :git/context git-ctx}
@@ -71,7 +80,7 @@
   [register-resolvers! register-mutations! ctx session-id eql-query]
   (let [qctx (query/create-query-context)
         _    (register-resolvers! qctx false)
-        _    (register-mutations! qctx (:all-mutations ctx) true)]
+        _    (register-mutations! qctx (ctx-all-mutations ctx) true)]
     (query/query-in qctx
                     {:psi/agent-session-ctx        ctx
                      :psi.agent-session/session-id session-id}

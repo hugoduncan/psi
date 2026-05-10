@@ -9,6 +9,7 @@
    [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
+   [psi.agent-session.context :as context]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
@@ -116,3 +117,43 @@
       (is (some? complexity-def))
       (is (= #{"bash" "read" "edit" "write" "work-on"}
              (first-step-tools complexity-def))))))
+
+(deftest ^:integration reload-code-propagates-mutations-to-all-mutations-atom-test
+  (testing "namespace reload updates :all-mutations-atom so new mutations are visible via context/all-mutations-in"
+    (let [[ctx session-id] (create-session-context)
+          qctx            (query/create-query-context)
+          q               (fn [query-v]
+                            (query/query-in qctx
+                                            {:psi/agent-session-ctx ctx
+                                             :psi.agent-session/session-id session-id}
+                                            query-v))
+          tool            (tools/make-psi-tool q {:ctx ctx :session-id session-id})
+          _               (session/register-resolvers-in! qctx false)
+          _               (session/register-mutations-in! qctx mutations/all-mutations true)
+          before-count    (count (context/all-mutations-in ctx))
+          result          ((:execute tool) {"action" "reload-code"
+                                            "namespaces" ["psi.agent-session.mutations.session"
+                                                          "psi.agent-session.mutations.prompts"
+                                                          "psi.agent-session.mutations.tools"
+                                                          "psi.agent-session.mutations.extensions"
+                                                          "psi.agent-session.mutations.services"
+                                                          "psi.agent-session.mutations.ui"
+                                                          "psi.agent-session.mutations.canonical-workflows"
+                                                          "psi.agent-session.extension-workflow-mutations"
+                                                          "psi.agent-session.mutations"]})
+          parsed          (read-string (:content result))
+          after-count     (count (context/all-mutations-in ctx))
+          refresh-steps   (get-in parsed [:psi-tool/graph-refresh :steps])
+          mutation-step   (some #(when (= :mutation-registration-refresh (:step %)) %) refresh-steps)]
+      (is (false? (:is-error result)))
+      (is (= :ok (:psi-tool/overall-status parsed)))
+      ;; mutation-registration-refresh step must be real (not a no-op placeholder)
+      (is (some? mutation-step))
+      (is (= :ok (:status mutation-step)))
+      (is (string? (:summary mutation-step)))
+      (is (not= "mutation registrations refreshed with query runtime" (:summary mutation-step))
+          "step summary must not be the old no-op placeholder text")
+      ;; all-mutations-atom must have been refreshed
+      (is (pos? after-count))
+      (is (>= after-count before-count)
+          "reload must not reduce the visible mutation count"))))

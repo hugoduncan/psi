@@ -68,6 +68,15 @@
    (when rebuild?
      (query/rebuild-env-in! qctx))))
 
+(defn all-mutations-in
+  "Return the current all-mutations vector from `ctx`.
+   Reads from the mutable `:all-mutations-atom` when present (updated by
+   reload-code), falling back to the frozen `:all-mutations` snapshot."
+  [ctx]
+  (if-let [a (:all-mutations-atom ctx)]
+    @a
+    (:all-mutations ctx)))
+
 (defn- resolve-session-defaults [session-defaults resolved-cwd ui-type]
   (cond-> (or session-defaults {})
     (not (contains? (or session-defaults {}) :worktree-path))
@@ -204,7 +213,8 @@
    :register-projection-listener-fn (fn [_ctx listener-fn] (register-projection-listener! projection-listeners* listener-fn))
    :unregister-projection-listener-fn (fn [_ctx listener-id] (unregister-projection-listener! projection-listeners* listener-id))
    :publish-projection-change-fn (fn [_ctx change] (publish-projection-change! projection-listeners* change))
-   :all-mutations mutations})
+   :all-mutations mutations
+   :all-mutations-atom (atom mutations)})
 
 (defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
                                 create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn

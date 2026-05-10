@@ -13,8 +13,7 @@
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.psi-tool-workflow :as psi-tool-workflow]
    [psi.session-state.state :as session-state]
-   [psi.agent-session.tool-output :as tool-output]
-   [psi.query.core :as query]))
+   [psi.agent-session.tool-output :as tool-output]))
 
 (def psi-tool
   {:name        "psi-tool"
@@ -283,14 +282,30 @@
        vec))
 
 (defn- refresh-query-runtime! [ctx]
+  ;; Resolvers are derived fresh per-request via session-resolver-surface — no stale
+  ;; snapshot to refresh.  Mutation registrations are handled separately by
+  ;; refresh-all-mutations! which updates the :all-mutations-atom in ctx.
   (if-not ctx
-    {:status :ok :summary "resolver and mutation registrations unchanged (no runtime ctx provided)"}
-    (let [register-resolvers! (:register-resolvers-fn ctx)
-          register-mutations! (:register-mutations-fn ctx)
-          qctx (query/create-query-context)]
-      (register-resolvers! qctx true)
-      (register-mutations! qctx (:all-mutations ctx) true)
-      {:status :ok :summary "resolver and mutation registrations refreshed"})))
+    {:status :ok :summary "resolver registrations unchanged (no runtime ctx provided)"}
+    {:status :ok :summary "resolver registrations are derived per-request; no snapshot to refresh"}))
+
+(defn- refresh-all-mutations!
+  "Reset the ctx :all-mutations-atom to the live value of
+   psi.agent-session.mutations/all-mutations, making new mutations from
+   reloaded namespaces visible to extension EQL and tool-plan per-request qctx."
+  [ctx]
+  (if-not ctx
+    {:status :ok :summary "mutation registrations unchanged (no runtime ctx provided)"}
+    (if-let [a (:all-mutations-atom ctx)]
+      (if-let [v (resolve 'psi.agent-session.mutations/all-mutations)]
+        (let [fresh @v]
+          (reset! a fresh)
+          {:status :ok
+           :summary (str "all-mutations-atom refreshed from live namespace var (" (count fresh) " mutations)")
+           :mutation-count (count fresh)})
+        {:status :ok
+         :summary "all-mutations-atom unchanged (psi.agent-session.mutations/all-mutations var not resolved)"})
+      {:status :ok :summary "all-mutations-atom unchanged (ctx has no :all-mutations-atom)"})))
 
 (defn- refresh-live-tool-defs! [ctx session-id]
   (if-not (and ctx session-id)
@@ -385,7 +400,7 @@
                                :error (assoc (psi-tool-error-summary :reload-code (:error step-result)) :namespace ns-name)}))
                           {:status :ok :namespace-count (count reloaded) :namespaces reloaded :summary (str "reloaded " (count reloaded) " namespaces")}))
         refresh-steps [(assoc (refresh-query-runtime! ctx) :step :resolver-registration-refresh)
-                       {:step :mutation-registration-refresh :status :ok :summary "mutation registrations refreshed with query runtime"}
+                       (assoc (refresh-all-mutations! ctx) :step :mutation-registration-refresh)
                        (assoc (refresh-live-tool-defs! ctx session-id) :step :live-tool-definition-refresh)
                        (assoc (if namespace-mode? (preserve-extension-registry-step) (refresh-worktree-extensions! ctx session-id effective-path)) :step :extension-refresh)]
         refresh-error (some #(when (= :error (:status %)) %) refresh-steps)
