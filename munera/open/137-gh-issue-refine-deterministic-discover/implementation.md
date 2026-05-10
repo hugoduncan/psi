@@ -1,5 +1,9 @@
 # Implementation notes
 
+## 2026-05-10 — Implementation review pass 12
+
+**II. Integration test CC invocation-shape assertion is incomplete.** The CC assertion checks `(:args invocation)` and `(:step-id invocation)` but not `(:run-id invocation)` (i.e. `:workflow-run-id` captured as `:run-id` in the stub). The reference pattern (`workflow_invoke_runtime_test.clj` line 91) explicitly asserts `{:args args :run-id workflow-run-id :step-id step-id}`. The integration test stub captures the full invocation but only asserts two of the three fields — the run-id proof is missing. Fix: capture `(:workflow-run-id invocation)` as `:run-id` in the stub (matching the reference pattern) and assert `(= "run-github-find-issue" (:run-id invocation))`.
+
 ## 2026-05-10 — Design review pass 11
 
 **HH. Integration test comment contradicts corrected design.** `find_issue_integration_test.clj` lines 48–51 still say "no `:workflow-execution-adapter` is wired in the test ctx. The test passing at `:completed` is the proof." This is the pre-GG description that design.md and design-steps.md item X explicitly corrected: `create-session-context` calls `session/create-context` which always wires `:workflow-execution-adapter` via `create-context*`. The adapter IS present. The correct proof is `@calls*` count = 1 + `:completed` status + `:invoke` step bypasses `create-step-attempt-session!`. The comment in the test file was never updated when GG resolved the design. Fix: replace the stale comment with the accurate proof description.
