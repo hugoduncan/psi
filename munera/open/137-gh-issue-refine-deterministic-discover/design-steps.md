@@ -23,3 +23,15 @@ Unchecked items added by design review pass 2 (2026-05-10).
 - [x] **J. Specify root `deps.edn` wiring.** Specified: add `psi/github {:local/root "extensions/github"}` under `:deps`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, `:test-paths`, `:test` aliases; add `extensions/github/test` to `:test-paths` and `:test` aliases. Design.md, plan.md, and steps.md updated with explicit wiring requirements.
 
 - [x] **K. Align `tests.edn` suite with placement decision.** Resolved: `extensions/github/` → `:extensions` suite in `tests.edn`. Add `extensions/github/test` to `:test-paths` and `extensions/github/src` to `:source-paths` of the `:extensions` suite. Plan.md and steps.md updated.
+
+Unchecked items added by design review pass 3 (2026-05-10).
+
+- [ ] **L. Specify how `psi.github.extension/init` is tested.** The nullable API has no `:register-operation`. Options: (a) use a real extension registry + `create-extension-api` with `{:register-deterministic-operation-fn ...}` override (pattern from `extensions_test.clj`); (b) test `psi.github.find-issue/invoke` directly without going through `init`. Choose one, document in design.md, and reflect in steps.md test cases.
+
+- [ ] **M. Specify slug truncation rule precisely.** Decide: word-boundary truncation vs hard-truncate at 40 chars; strip trailing hyphens after truncation? Document in design.md implementation approach so the unit test can be written without ambiguity.
+
+- [ ] **N. Fix `:input` arg schema for nil case.** When `:input` is absent from `workflow-input`, `resolve-invoke-args` resolves it to `nil`. The operation malli schema `:input {:optional true} :string` rejects `nil`. Either change to `[:maybe :string]` in the operation's input validation, or document that the authored step should omit `:input` from `:args` when not provided. Update design.md.
+
+- [ ] **O. Add `extensions/github/src` to `tests.edn` `:unit` suite `:source-paths`.** All other extension `src` paths appear there for component-test compilation. Add `extensions/github/src` to maintain parity. Update plan.md and steps.md.
+
+- [ ] **P. Confirm `extensions/tests.edn` requires no change.** Explicitly verify and document that `extensions/tests.edn` does not need to be updated for `psi/github`.

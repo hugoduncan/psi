@@ -1,5 +1,17 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 3
+
+**L. `nullable_api` does not expose `:register-operation`.** The design says the extension `init` test uses a "nullable shell stub", but `psi.extension-test-helpers.nullable-api/create-nullable-extension-api` has no `:register-operation` key. Testing `psi.github.extension/init` requires either (a) a real extension registry + `create-extension-api` with `{:register-deterministic-operation-fn ...}` override (matching the pattern in `extensions_test.clj`), or (b) a direct call to `psi.github.find-issue/invoke` without going through `init`. The design must specify which approach is used for the `init` registration test.
+
+**M. Slug truncation rule underspecified.** The design says `worktree-description` is "≤ 40 chars, `[a-z0-9-]`" but does not specify: word-boundary truncation vs hard-truncate, or whether trailing hyphens must be stripped. The unit test for slug derivation cannot be written deterministically without this rule.
+
+**N. `:input` nil vs absent — operation schema gap.** When `:input` is absent from `workflow-input`, `resolve-invoke-args` with `{:from :workflow-input :path [:input]}` resolves to `nil`. The operation's malli schema shows `:input {:optional true} :string` — but `nil` is not a `:string`. The schema must either use `[:maybe :string]` or the authored step must omit `:input` from `:args` entirely when no narrowing is provided. Decide and document.
+
+**O. `tests.edn` `:unit` suite source-paths gap.** All other extensions' `src` paths appear in the `:unit` suite `:source-paths` (for compilation of component tests that import extension code). `extensions/github/src` must also be added to `:unit` `:source-paths` to maintain parity. The plan only mentions the `:extensions` suite.
+
+**P. `extensions/tests.edn` not addressed.** A separate `extensions/tests.edn` exists. No existing extension is listed there. Plan should explicitly confirm `extensions/tests.edn` requires no change (or update it if needed).
+
 ## 2026-05-10 — Task created
 
 Motivation: The `gh-issue-refine` `discover` step is a full builder-delegate AI invocation for what is a deterministic shell-command + selection-rule operation. Replace with a `:tool` step that executes synchronously via a registered psi extension tool.
