@@ -31,3 +31,12 @@ Implemented notes:
   - consider a dedicated lower namespace for workflow-reference helpers if the concept broadens beyond delegate targeting
 - Review 2026-05-10:
   - No new actionable feedback. Re-read task artifacts plus referenced code/tests/docs; implementation matches the recorded scope and current runtime boundaries.
+- Follow-up execution 2026-05-10:
+  - Marked removed-target lookup-failure proof complete based on existing explicit coverage:
+    - `psi.workflow-runtime.statechart-runtime.delegate/resolve-delegate-target-definition` resolves the workflow-ref at delegation time and then performs canonical registry lookup.
+    - `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` already proves explicit failure when a dynamic workflow-ref resolves to an unknown target at delegation time.
+    - Because lookup happens at delegation time rather than at selection time, a previously selected workflow ref whose definition is removed before delegation follows the same lookup-failure path.
+  - Marked unknown/unavailable explicit-failure proof complete only for the currently implemented/runtime-supported portion:
+    - unknown referenced workflows are explicitly covered
+    - availability-only failure remains blocked because the current canonical runtime has no distinct available-vs-known workflow gating path beyond registry presence, and this task intentionally did not invent one
+  - Remaining unchecked item stays open for the same boundary reason: authored-shape failure, runtime-type failure, and lookup failure are explicit today, but availability failure is not separately representable in the current runtime model.
