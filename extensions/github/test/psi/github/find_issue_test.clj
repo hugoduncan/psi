@@ -28,11 +28,39 @@
      :out  ""
      :err  err-msg}))
 
+(defn- capturing-shell
+  "Returns [shell-fn calls*] where calls* captures each invocation's arg list."
+  [issues]
+  (let [calls* (atom [])]
+    [(fn [& args]
+       (swap! calls* conj (vec args))
+       {:exit 0
+        :out  (json/generate-string issues)
+        :err  ""})
+     calls*]))
+
 (defn- invoke
   "Call sut/invoke with a stub ctx and args map."
   [shell-fn args]
   (sut/invoke {:ctx {:github-shell-fn shell-fn}
                :args args}))
+
+;;; ---------------------------------------------------------------------------
+;;; gh CLI arg construction
+
+(deftest gh-cli-args-are-constructed-correctly-test
+  (testing "gh issue list called with correct --state, --json, and --label args"
+    (let [[shell-fn calls*] (capturing-shell [(issue 1 "x" "https://github.com/org/repo/issues/1")])]
+      (invoke shell-fn {:labels ["enhancement" "refine"]})
+      (is (= 1 (count @calls*)))
+      (let [args (first @calls*)]
+        (is (= "gh" (first args)))
+        (is (some #{"issue"} args))
+        (is (some #{"list"} args))
+        (is (some #{"--state"} args))
+        (is (some #{"--json"} args))
+        (is (= ["--label" "enhancement" "--label" "refine"]
+               (subvec args (- (count args) 4))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; No candidates → error
@@ -62,6 +90,7 @@
       (is (str/includes? (:summary result) "## Handoff Data"))
       (is (str/includes? (:summary result) "issue_number: 42"))
       (is (str/includes? (:summary result) "issue_title: Add foo bar"))
+      (is (str/includes? (:summary result) "issue_url: https://github.com/org/repo/issues/42"))
       (is (str/includes? (:summary result) "worktree_description: add-foo-bar")))))
 
 ;;; ---------------------------------------------------------------------------
@@ -118,6 +147,17 @@
       (is (= :error (:status result)))
       (is (= :psi.github/invalid-url-input (:reason result)))
       (is (clojure.string/includes? (:message result) "Cannot extract issue number from URL")))))
+
+;;; ---------------------------------------------------------------------------
+;;; Text narrowing → zero candidates → error
+
+(deftest narrowing-by-text-no-match-returns-error-test
+  (testing "text narrowing that filters to zero candidates → :psi.github/no-matching-issue"
+    (let [result (invoke (stub-shell [(issue 42 "Add dark mode" "https://github.com/org/repo/issues/42")])
+                         {:labels ["enhancement"]
+                          :input "login bug"})]
+      (is (= :error (:status result)))
+      (is (= :psi.github/no-matching-issue (:reason result))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Narrowing by text substring (case-insensitive)
