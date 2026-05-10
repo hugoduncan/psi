@@ -31,8 +31,8 @@
 - [x] Update `gh-issue-refine.md`: replace `discover` `:delegate` step with `:invoke` step
   - `{:name "discover" :type :invoke :operation "github/find-issue" :args {:labels ["enhancement" "refine"] :input {:from :workflow-input :path [:input]}} :outputs {:summary {:source :invoke/summary}} :yields {:type :text :text :summary}}`
 - [x] Write focused workflow-runtime integration test: `^:integration`-tagged test in `extensions/github/test`; `:invoke` step with `github/find-issue` produces correct Markdown handoff, no session spawned; runs under `:integration` suite (`:focus-meta [:integration]`), skipped by `:extensions` suite
-- [ ] Smoke test: run `gh-issue-refine` end-to-end against a real labeled issue, confirm discover step emits correct handoff
-- [ ] Verify downstream steps (`worktree`, `refine-design`) parse the new handoff correctly (format unchanged)
+- [ ] Smoke test: run `gh-issue-refine` end-to-end against a real labeled issue, confirm discover step emits correct handoff <!-- blocked: requires real GitHub repo with issues labeled `enhancement` + `refine` -->
+- [ ] Verify downstream steps (`worktree`, `refine-design`) parse the new handoff correctly (format unchanged) <!-- blocked: requires real GitHub repo with labeled issues; handoff format is structurally identical to previous builder output so no downstream change expected -->
 
 ## Phase 3 — Coherence
 

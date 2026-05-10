@@ -91,7 +91,7 @@ The `:summary` field carries the serialized Markdown handoff block. This is the 
 - Parses JSON output with `(cheshire.core/parse-string json)` — **string keys, no keywordize flag**. The `gh` CLI returns camelCase JSON fields (`"number"`, `"title"`, `"url"`, `"state"`) and labels as objects with a `"name"` subfield (`[{"name" "enhancement" ...}]`). All field access uses string keys: `(get issue "number")`, `(get issue "title")`, `(get issue "url")`, `(map #(get % "name") (get issue "labels"))`.
 - Applies narrowing (see narrowing rules below).
 - Selects the lowest `number` among candidates.
-- Derives `worktree-description` as a kebab-slug from the title using word-boundary truncation: lower-case the title, extract `[a-z0-9]+` words, join with `-`, hard-truncate the joined string at 40 chars, strip any trailing `-`. Result is `[a-z0-9-]`, ≤ 40 chars, never ends with `-`. Example: `"Add foo-bar baz"` → `"add-foo-bar-baz"` (15 chars, no truncation needed).
+- Derives `worktree-description` as a kebab-slug from the title using hard truncation: lower-case the title, extract `[a-z0-9]+` words, join with `-`, hard-truncate the joined string at 40 chars, strip any trailing `-`. Result is `[a-z0-9-]`, ≤ 40 chars, never ends with `-`. Example: `"Add foo-bar baz"` → `"add-foo-bar-baz"` (15 chars, no truncation needed).
 - Returns `{:status :ok :data {...} :summary "<markdown>"}` or `{:status :error :reason :psi.github/no-matching-issue :message "..."}`.
 - On non-zero `gh` CLI exit: returns `{:status :error :reason :psi.github/shell-error :message (:err result)}` where `result` is the map returned by `clojure.java.shell/sh`.
 

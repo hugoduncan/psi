@@ -1,5 +1,13 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 9 follow-up (design-steps DD–FF resolved)
+
+**DD resolved**: `design.md` slug derivation line changed from "using word-boundary truncation:" to "using hard truncation:" — label now matches the rule and design-steps M.
+
+**EE resolved**: `plan.md` Phase 1 second step 7 ("Lint clean") renumbered to 8. No duplicate step numbers remain.
+
+**FF resolved**: `steps.md` smoke-test and downstream-verify items annotated with `<!-- blocked: requires real GitHub repo with labeled issues -->` inline HTML comments so readers know they are environment-blocked, not merely pending.
+
 ## 2026-05-10 — Design review pass 9
 
 **DD. `design.md` slug description uses contradictory label.** Line 94 says "using word-boundary truncation:" but then describes hard truncation. `design-steps M` explicitly says "Word-boundary truncation is NOT used." The introductory label is wrong and contradicts both the rule and design-steps M.

@@ -66,11 +66,11 @@ Unchecked items added by design review pass 8 (2026-05-10).
 
 Unchecked items added by design review pass 9 (2026-05-10).
 
-- [ ] **DD. Fix contradictory slug label in `design.md`.** Line 94 says "using word-boundary truncation:" but the rule is hard truncation and `design-steps M` says "Word-boundary truncation is NOT used." Change the introductory phrase to "using hard truncation:" so the label matches the rule.
+- [x] **DD. Fix contradictory slug label in `design.md`.** Line 94 says "using word-boundary truncation:" but the rule is hard truncation and `design-steps M` says "Word-boundary truncation is NOT used." Change the introductory phrase to "using hard truncation:" so the label matches the rule.
 
-- [ ] **EE. Fix duplicate step 7 in `plan.md` Phase 1.** Two items are numbered `7.` Renumber the second one (`Lint clean`) to `8.`.
+- [x] **EE. Fix duplicate step 7 in `plan.md` Phase 1.** Two items are numbered `7.` Renumber the second one (`Lint clean`) to `8.`.
 
-- [ ] **FF. Annotate blocked steps in `steps.md`.** The smoke-test and downstream-verify items are `[ ]` with no indication they are environment-blocked. Add a `<!-- blocked: requires real GitHub repo with labeled issues -->` note (or inline text) so readers know they are blocked, not merely pending.
+- [x] **FF. Annotate blocked steps in `steps.md`.** The smoke-test and downstream-verify items are `[ ]` with no indication they are environment-blocked. Add a `<!-- blocked: requires real GitHub repo with labeled issues -->` note (or inline text) so readers know they are blocked, not merely pending.
 
 Unchecked items added by design review pass 7 (2026-05-10).
 

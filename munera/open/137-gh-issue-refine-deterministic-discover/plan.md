@@ -17,7 +17,7 @@ No new step types, IR schema changes, or execution-adapter keys are needed — t
 5. Register `psi/github {}` in `.psi/extensions.edn`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, and `:test` aliases `:extra-paths`; add `extensions/github/test` to `:test-paths` and `:test` aliases (note: `extensions/github/src` must NOT be added to `:test-paths` — that alias contains test paths only; do NOT add `psi/github` to root `deps.edn` `:deps` — extensions are wired via `:extra-paths` only)
 6. Wire `extensions/github/` into Kaocha `tests.edn`: add `extensions/github/test` to `:extensions` suite `:test-paths`; add `extensions/github/src` to `:extensions` suite `:source-paths`; add `extensions/github/src` to `:unit` suite `:source-paths` (parity with all other extensions); add `extensions/github/test` to `:integration` suite `:test-paths` and `extensions/github/src` to `:integration` suite `:source-paths` (for the Phase 2 `^:integration` test)
 7. Confirm `extensions/tests.edn` requires no change (standalone relative-path config; root `tests.edn` is authoritative)
-7. Lint clean
+8. Lint clean
 
 ### Phase 2 — Workflow update (requires Phase 1 complete)
 
