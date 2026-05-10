@@ -25,12 +25,16 @@
     - prompt assembly currently renders the shared contribution layer in `components/prompt-assets/src/psi/prompt_assets/system_prompt.clj`, and request-preparation proofs assert that composed prompt in `components/agent-session/test/psi/agent_session/prompt_lifecycle_test.clj` and `components/turn-runtime/test/psi/turn_runtime/request_test.clj`; this task should preserve that rendering while changing only how the built-in workflow contribution reaches the shared store
   - [x] any remaining "extension" wording debt recorded explicitly if retained
     - keep `# Extension Prompt Contributions` unchanged in this task as deliberate wording debt because the task’s architectural goal is built-in registration provenance, not prompt-copy churn; record that retained label as a shared prompt-layer heading, not proof that built-in workflow remains extension-owned
-- [ ] Make the built-in active tool aggregation path explicit
-  - [ ] built-in tool aggregation path recorded
-  - [ ] built-in vs extension provenance at aggregation time recorded
-- [ ] Make the built-in introspection/projection path explicit
-  - [ ] extension-registry visibility removed or narrowed
-  - [ ] replacement built-in visibility recorded if needed
+- [x] Make the built-in active tool aggregation path explicit
+  - [x] built-in tool aggregation path recorded
+    - active tool aggregation should stop reading built-in workflow from `tool-registry/all-tools-in (:extension-registry ctx)` as if it were extension-owned; instead, runtime tool assembly should merge extension tools with built-in-registered tools from the built-in registration layer before exposing session active tools
+  - [x] built-in vs extension provenance at aggregation time recorded
+    - aggregated tool projections may still share one user-facing list, but each built-in workflow tool should carry built-in provenance keyed by `built-in:workflow` so aggregation no longer implies extension ownership
+- [x] Make the built-in introspection/projection path explicit
+  - [x] extension-registry visibility removed or narrowed
+    - `components/agent-session/src/psi/agent_session/resolvers/extensions.clj` should stop treating built-in workflow commands/tools as extension-registry-owned canonical state; extension-oriented EQL surfaces should narrow to true extensions only
+  - [x] replacement built-in visibility recorded if needed
+    - if runtime introspection still needs workflow command/tool visibility, add or reuse a built-in-aware projection that exposes the same user-facing availability while distinguishing built-in provenance from extension provenance; direct extension-registry assertions in `workflow_built_in_targeting_test.clj`, `workflow_reload_runtime_test.clj`, `workflow_async_path_test.clj`, and `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` should migrate to built-in-aware behavior proofs instead
 - [ ] Move built-in workflow bootstrap off `ext/register-extension-in!`
 - [ ] Move built-in workflow bootstrap off `ext/create-extension-api`
 - [ ] Move built-in workflow tool registration to the built-in path

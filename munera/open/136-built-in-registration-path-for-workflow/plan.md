@@ -19,7 +19,7 @@ Decision rules:
 - reuse of shared storage is allowed only through built-in-specific registration paths, not through extension-shaped registration calls
 - keep the prompt rendering heading `# Extension Prompt Contributions` unchanged in this task unless implementation shows a near-zero-cost rename, and treat the retained heading as explicit wording debt rather than ownership truth
 - if any prompt rendering or introspection wording still says "extension" for shared built-in surfaces, record it explicitly as wording debt rather than ownership truth
-- if `built-in:workflow` remains anywhere, it must remain only as a built-in provenance identifier rather than as extension identity in extension-owned state
+- retain `built-in:workflow` only as the stable built-in provenance identifier for workflow-owned surfaces; it must be removed from extension-owned identity state and from proofs that equate it with an extension install
 
 Scope boundaries:
 - no lower workflow component redesign

@@ -167,6 +167,17 @@ Questions this task must answer explicitly:
 
 Tests and runtime projections should stop asserting that canonical built-in workflow is extension-owned state unless the task records a precise temporary exception.
 
+## Built-in provenance identifier decision
+
+This task should retain `built-in:workflow` only as a stable built-in provenance identifier, not as extension identity.
+
+That means:
+
+- `built-in:workflow` may continue to label built-in-owned command/tool/prompt/lifecycle registrations where provenance needs a stable key
+- `built-in:workflow` must stop appearing under extension-owned canonical state such as `:extensions` registry identity
+- any shared registry or projection that still includes `built-in:workflow` after this task must do so as explicit built-in provenance, not as evidence that workflow was installed through extension bootstrap
+- implementation should prefer preserving this stable identifier over inventing a new built-in key unless code review finds a concrete collision or semantic mismatch
+
 ## Key design questions
 
 1. What is the smallest built-in registration abstraction that can replace pseudo-extension registration for workflow?
