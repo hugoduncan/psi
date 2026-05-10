@@ -4,6 +4,7 @@ Open tasks in suggested execution order:
 
 Queue:
 
+`munera/open/138-github-extension-label-ops-and-workflow-adoption/`
 `munera/open/137-gh-issue-refine-deterministic-discover/`
 
 Backlog:
