@@ -15,7 +15,8 @@ No new step types, IR schema changes, or execution-adapter keys are needed — t
 3. Implement `psi.github.extension/init` registering the `github/find-issue` operation
 4. Write focused unit tests (nullable shell stub): no candidates → error; single candidate → correct map + slug; multiple → lowest number; narrowing by integer; narrowing by URL
 5. Register `psi/github {}` in `.psi/extensions.edn`; add `psi/github {:local/root "extensions/github"}` to root `deps.edn` `:deps`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, `:test-paths`, `:test` aliases; add `extensions/github/test` to `:test-paths` and `:test` aliases
-6. Wire `extensions/github/` into Kaocha `tests.edn` `:extensions` suite (test-paths + source-paths)
+6. Wire `extensions/github/` into Kaocha `tests.edn`: add `extensions/github/test` to `:extensions` suite `:test-paths`; add `extensions/github/src` to `:extensions` suite `:source-paths`; add `extensions/github/src` to `:unit` suite `:source-paths` (parity with all other extensions)
+7. Confirm `extensions/tests.edn` requires no change (standalone relative-path config; root `tests.edn` is authoritative)
 7. Lint clean
 
 ### Phase 2 — Workflow update (requires Phase 1 complete)

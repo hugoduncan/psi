@@ -1,5 +1,17 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 4 (design-steps L–P resolved)
+
+**L resolved**: Two-layer test approach. `psi.github.find-issue/invoke` unit tests call the fn directly with stub ctx. `psi.github.extension/init` registration test uses `create-extension-api` with captured `register-deterministic-operation-fn` override (pattern from `extensions_test.clj`). Nullable API cannot be used for `init` — no `:register-operation` key. Design.md and steps.md updated.
+
+**M resolved**: Slug rule: lower-case title → extract `[a-z0-9]+` words → join with `-` → hard-truncate at 40 chars → strip trailing `-`. Hard truncation on joined string (not word-boundary truncation). Simple and deterministic. Design.md updated with precise rule and example.
+
+**N resolved**: Schema changed to `[:maybe :string]`. `resolve-invoke-args` resolves absent `:input` to `nil`; `[:maybe :string]` accepts `nil` as "no narrowing". Authored step keeps `:input {:from :workflow-input :path [:input]}` in `:args` — no conditional omission. Design.md updated.
+
+**O resolved**: `extensions/github/src` must be added to `:unit` suite `:source-paths` in root `tests.edn`. All other extension `src` paths are listed there. Plan.md and steps.md updated.
+
+**P resolved**: `extensions/tests.edn` requires no change. It is a standalone relative-path kaocha config for running within `extensions/`; root `tests.edn` is authoritative. No existing extension is listed by absolute path there. `psi/github` is fully covered by root `tests.edn` `:extensions` suite.
+
 ## 2026-05-10 — Design review pass 3
 
 **L. `nullable_api` does not expose `:register-operation`.** The design says the extension `init` test uses a "nullable shell stub", but `psi.extension-test-helpers.nullable-api/create-nullable-extension-api` has no `:register-operation` key. Testing `psi.github.extension/init` requires either (a) a real extension registry + `create-extension-api` with `{:register-deterministic-operation-fn ...}` override (matching the pattern in `extensions_test.clj`), or (b) a direct call to `psi.github.find-issue/invoke` without going through `init`. The design must specify which approach is used for the `init` registration test.

@@ -61,10 +61,12 @@ A `:tool` step type would be appropriate only if the operation needed to appear 
 
 **Input args (passed via `:args` in the `:invoke` spec)**:
 ```clojure
-{:labels [:vector :string]           ; required label filters (AND)
- :input  {:optional true} :string    ; optional narrowing hint: number, url, or text
- :state  {:optional true} :string}   ; default "open"
+{:labels [:vector :string]             ; required label filters (AND)
+ :input  {:optional true} [:maybe :string]  ; optional narrowing hint: number, url, or text; nil accepted (absent workflow-input)
+ :state  {:optional true} :string}     ; default "open"
 ```
+
+**`:input` nil handling**: when `:input` is absent from `workflow-input`, `resolve-invoke-args` resolves `{:from :workflow-input :path [:input]}` to `nil`. The operation input schema uses `[:maybe :string]` (not `:string`) so `nil` is valid and treated as "no narrowing". The authored step keeps `:input {:from :workflow-input :path [:input]}` in `:args` — no conditional omission needed.
 
 **Operation result**:
 ```clojure
@@ -89,7 +91,7 @@ The `:summary` field carries the serialized Markdown handoff block. This is the 
 - Parses JSON output with `cheshire.core/parse-string` (project standard; declare `cheshire/cheshire "5.13.0"` in `extensions/github/deps.edn`).
 - Applies narrowing: if `input` parses as an integer → filter by issue number; if it looks like a URL → extract number from URL; otherwise → text substring match on title.
 - Selects the lowest `number` among candidates.
-- Derives `worktree-description` as a kebab-slug from the title (≤ 40 chars, `[a-z0-9-]`).
+- Derives `worktree-description` as a kebab-slug from the title using word-boundary truncation: lower-case the title, extract `[a-z0-9]+` words, join with `-`, hard-truncate the joined string at 40 chars, strip any trailing `-`. Result is `[a-z0-9-]`, ≤ 40 chars, never ends with `-`. Example: `"Add foo-bar baz"` → `"add-foo-bar-baz"` (15 chars, no truncation needed).
 - Returns `{:status :ok :data {...} :summary "<markdown>"}` or `{:status :error :reason :psi.github/no-matching-issue :message "..."}`.
 
 **Shell seam** (for testability):
@@ -127,6 +129,8 @@ A private `result->handoff-md` fn in `psi.github.find-issue` converts the struct
     :handler     psi.github.find-issue/invoke}))
 ```
 
+**Testing `psi.github.extension/init`**: use `create-extension-api` (from `psi.agent-session.extensions`) with a captured `register-deterministic-operation-fn` override — the pattern shown in `extensions_test.clj` (`extension-api-registration-test`). The nullable API (`create-nullable-extension-api`) does NOT expose `:register-operation` and cannot be used for `init` registration tests. For `psi.github.find-issue/invoke` unit tests, call the fn directly with a stub `ctx` carrying `:github-shell-fn` — no extension API needed.
+
 **Extension manifest** (added to `.psi/extensions.edn`):
 ```edn
 psi/github {}
@@ -148,6 +152,10 @@ Under `:test-paths` and `:test` aliases, also add:
 ```
 "extensions/github/test"
 ```
+
+Also add `"extensions/github/src"` to the `:unit` suite `:source-paths` in `tests.edn` — all other extension `src` paths are listed there for compilation of component tests that import extension code. Parity requires `extensions/github/src` to be included.
+
+**`extensions/tests.edn`**: no change required. `extensions/tests.edn` is a standalone kaocha config for running tests within the `extensions/` directory using relative paths (`src`/`test`). It is not the authoritative suite config; root `tests.edn` owns all suite definitions. No existing extension is listed in `extensions/tests.edn` by path — it uses `src`/`test` relative to the working directory. `psi/github` tests are covered by root `tests.edn` `:extensions` suite.
 
 ### 2. `gh-issue-refine.md` update
 
