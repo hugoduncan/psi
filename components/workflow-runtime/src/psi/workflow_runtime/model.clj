@@ -35,9 +35,8 @@
 
 (def workflow-ref-schema
   [:map
-   [:run-id workflow-run-id-schema]
-   [:step-id workflow-step-id-schema]
-   [:attempt-id workflow-attempt-id-schema]])
+   [:type [:= :workflow-ref]]
+   [:name workflow-definition-id-schema]])
 
 (def workflow-retry-policy-schema
   [:map

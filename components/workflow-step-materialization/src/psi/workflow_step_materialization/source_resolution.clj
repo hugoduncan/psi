@@ -12,6 +12,8 @@
    - binding-ref resolution used by step materialization consumers."
   (:require
    [clojure.string :as str]
+   [malli.core :as m]
+   [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-step-materialization.semantics :as semantics]))
 
 (defn get-path*
@@ -70,6 +72,20 @@
 
       :else
       base)))
+
+(defn workflow-ref?
+  [x]
+  (m/validate workflow-model/workflow-ref-schema x))
+
+(defn resolve-workflow-ref-source-spec
+  [workflow-run source-spec]
+  (let [resolved (apply-source-spec workflow-run source-spec)]
+    (when-not (workflow-ref? resolved)
+      (throw (ex-info "Dynamic delegate target must resolve to a workflow reference"
+                      {:source-spec source-spec
+                       :resolved-value resolved
+                       :expected {:type :workflow-ref :name "workflow-name"}})))
+    resolved))
 
 (defn materialize-template-vars
   [workflow-run vars]

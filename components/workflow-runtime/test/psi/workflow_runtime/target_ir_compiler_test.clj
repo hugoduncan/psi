@@ -54,6 +54,19 @@
                  "REVISE" {:goto "build" :max-iterations 3}}
             :max-iterations 5}]})
 
+(def target-dynamic-delegate-definition
+  {:steps [{:name "choose-workflow"
+            :type :invoke
+            :operation "demo/select-workflow"
+            :args {}}
+           {:name "run-selected-workflow"
+            :type :delegate
+            :target {:from {:step "choose-workflow" :output :data}
+                     :path [:selected-workflow]}
+            :prompt-string "Handle the issue using the selected workflow."
+            :context [{:type :source
+                       :from :workflow-original}]}]})
+
 (deftest compile-target-invoke-session-delegate-workflow-test
   (testing "target authored invoke/session/delegate workflows compile into canonical IR"
     (let [ir (target-compiler/compile-workflow-definition target-invoke-session-delegate-definition)]
@@ -139,6 +152,29 @@
                 {:steps [{:name "plan" :type :session}]})))
     (is (false? (target-compiler/target-authored-workflow-definition? {:steps {}})))))
 
+(deftest compile-target-dynamic-delegate-workflow-test
+  (testing "target authored delegate workflows compile dynamic target source-specs into canonical IR"
+    (let [ir (target-compiler/compile-workflow-definition target-dynamic-delegate-definition)]
+      (is (= {:version :workflow-ir/v1
+              :steps [{:name "choose-workflow"
+                       :type :invoke
+                       :invoke {:operation "demo/select-workflow"
+                                :args {}}
+                       :outputs {:data {:source :invoke/data}
+                                 :summary {:source :invoke/summary}
+                                 :result {:source :invoke/result}}
+                       :yields {:type :data :data :data}}
+                      {:name "run-selected-workflow"
+                       :type :delegate
+                       :delegate {:target {:from {:step "choose-workflow" :output :data}
+                                           :path [:selected-workflow]}
+                                  :prompt-string "Handle the issue using the selected workflow."
+                                  :context [{:type :source
+                                             :from :workflow-original}]}
+                       :outputs {:handoff {:source :delegate/handoff}}
+                       :yields {:type :delegated}}]}
+             ir)))))
+
 (deftest compile-target-judge-routing-and-loop-bounds-test
   (testing "target authored judges, routing, and loop bounds compile into canonical IR"
     (let [ir (target-compiler/compile-workflow-definition target-judged-definition)
@@ -191,7 +227,18 @@
       (is (false? valid?))
       (is (some? structural-errors))
       (is (= [] semantic-errors))
-      (is (nil? compile-error)))))
+      (is (nil? compile-error))))
+
+  (testing "delegate target authored shape fails clearly when not a workflow name string or source-spec"
+    (let [{:keys [valid? compile-error]}
+          (target-compiler/compile-and-validate-workflow-definition
+           {:steps [{:name "run-selected-workflow"
+                     :type :delegate
+                     :target {:path [:selected-workflow]}
+                     :prompt-string "Handle the issue using the selected workflow."}]})]
+      (is (false? valid?))
+      (is (= "Delegate target must be a workflow name string or workflow source-spec"
+             compile-error)))))
 
 (deftest create-run-compiles-target-authored-definition-at-effective-definition-seam-test
   (testing "create-run compiles target-authored definitions at the effective-definition seam"

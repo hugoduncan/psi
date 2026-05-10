@@ -154,6 +154,56 @@
             run
             (-> run :effective-definition :canonical-ir :steps second :session :contributions first))))))
 
+(deftest resolve-workflow-ref-source-spec-test
+  (let [[state2 run-id _] (workflow-runtime/create-run
+                           {:workflows {:definitions {} :runs {} :run-order []}}
+                           {:definition {:steps [{:name "choose-workflow"
+                                                  :type :invoke
+                                                  :operation "demo/select-workflow"
+                                                  :args {}}
+                                                 {:name "run-selected-workflow"
+                                                  :type :delegate
+                                                  :target {:from {:step "choose-workflow" :output :data}
+                                                           :path [:selected-workflow]}
+                                                  :prompt-string "Handle the issue using the selected workflow."}]}
+                            :run-id "run-dynamic-target"
+                            :workflow-input {}})
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "choose-workflow" :accepted-result]
+                         {:outcome :ok
+                          :outputs {:data {:selected-workflow {:type :workflow-ref
+                                                               :name "builder"}}}})
+        run (workflow-runtime/workflow-run-in state3 run-id)]
+    (is (= {:type :workflow-ref :name "builder"}
+           (workflow-source-resolution/resolve-workflow-ref-source-spec
+            run
+            {:from {:step "choose-workflow" :output :data}
+             :path [:selected-workflow]}))))
+
+  (let [[state2 run-id _] (workflow-runtime/create-run
+                           {:workflows {:definitions {} :runs {} :run-order []}}
+                           {:definition {:steps [{:name "choose-workflow"
+                                                  :type :invoke
+                                                  :operation "demo/select-workflow"
+                                                  :args {}}
+                                                 {:name "run-selected-workflow"
+                                                  :type :delegate
+                                                  :target {:from {:step "choose-workflow" :output :data}
+                                                           :path [:selected-workflow]}
+                                                  :prompt-string "Handle the issue using the selected workflow."}]}
+                            :run-id "run-dynamic-target-invalid"
+                            :workflow-input {}})
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "choose-workflow" :accepted-result]
+                         {:outcome :ok
+                          :outputs {:data {:selected-workflow "builder"}}})
+        run (workflow-runtime/workflow-run-in state3 run-id)]
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Dynamic delegate target must resolve to a workflow reference"
+         (workflow-source-resolution/resolve-workflow-ref-source-spec
+          run
+          {:from {:step "choose-workflow" :output :data}
+           :path [:selected-workflow]})))))
+
 (deftest apply-source-spec-rejects-both-path-and-projection-test
   (let [run (workflow-run-with-results)]
     (is (thrown-with-msg?

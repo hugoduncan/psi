@@ -3,6 +3,14 @@
 This document describes the supported workflow authoring grammar for the
 deterministic-workflow-step design.
 
+Higher-order workflow references are supported in a narrow, explicit form:
+- workflows remain canonical named definitions
+- dynamic delegation happens only through `:type :delegate`
+- dynamic `:target` reuses canonical `source-spec` shape
+- resolved dynamic targets must be explicit workflow references of the form
+  `{:type :workflow-ref :name "builder"}`
+- plain strings remain the static authored delegate-target form only
+
 It documents the author-facing `:type :invoke | :session | :delegate` model.
 For the conceptual explanation of this design, see
 `doc/workflow-grammar-concepts.md`.
@@ -33,7 +41,7 @@ session-step ::= {:name step-name
 
 delegate-step ::= {:name step-name
                    :type :delegate
-                   :target workflow-name
+                   :target (workflow-name | source-spec)
                    :prompt-string (string | template-contribution)
                    :context? [source-item*]
                    outputs?
@@ -80,6 +88,12 @@ source-item ::= {:type :source
 source-spec ::= {:from source-ref
                  source-projection?}
 
+For delegate targets:
+- `:target "builder"` is the static form
+- `:target {:from ... :path [...]}` is the dynamic higher-order form
+- dynamic target resolution must produce a `workflow-ref`
+- free-form text and plain strings are not valid dynamic workflow-reference values
+
 source-projection ::= :path path
                     | :projection projection
 
@@ -116,6 +130,9 @@ yields ::= {:type :data :data output-keyword}
 output-keyword ::= keyword
 
 step-name ::= string
+workflow-ref ::= {:type :workflow-ref
+                 :name workflow-name}
+
 workflow-name ::= string
 operation-id ::= string
 tool-id ::= string

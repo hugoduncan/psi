@@ -144,9 +144,12 @@
 (def delegate-prompt-string-schema
   [:or :string template-contribution-schema])
 
+(def delegate-target-schema
+  [:or workflow-name-schema source-spec-schema])
+
 (def delegate-spec-schema
   [:map
-   [:target workflow-name-schema]
+   [:target delegate-target-schema]
    [:prompt-string delegate-prompt-string-schema]
    [:context {:optional true} [:vector source-contribution-schema]]])
 
@@ -322,6 +325,7 @@
      :session (mapcat source-refs-in-contribution
                       (get-in step [:session :contributions]))
      :delegate (concat
+                (source-refs-in-source-spec (get-in step [:delegate :target]))
                 (when-let [prompt-string (get-in step [:delegate :prompt-string])]
                   (if (and (map? prompt-string)
                            (= :template (:type prompt-string)))

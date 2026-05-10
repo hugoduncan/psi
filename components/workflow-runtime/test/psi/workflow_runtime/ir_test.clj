@@ -80,7 +80,10 @@
     (is (m/validate workflow-ir/source-ref-schema {:step "discover" :yield :custom-field}))
     (is (m/validate workflow-ir/source-spec-schema {:from :workflow-input :path [:repo]}))
     (is (m/validate workflow-ir/source-spec-schema {:from {:step "discover" :output :data}
-                                                    :projection {:type :tail :turns 1}})))
+                                                    :projection {:type :tail :turns 1}}))
+    (is (m/validate workflow-ir/delegate-target-schema "builder"))
+    (is (m/validate workflow-ir/delegate-target-schema {:from {:step "discover" :output :data}
+                                                        :path [:selected-workflow]})))
 
   (testing "contribution schemas accept source and template variants"
     (is (m/validate workflow-ir/source-contribution-schema
@@ -124,6 +127,10 @@
                          {:name "bad"
                           :type :invoke
                           :session {:contributions []}}))))
+
+  (testing "delegate target rejects authored map shapes that are not source-specs"
+    (is (not (m/validate workflow-ir/delegate-target-schema
+                         {:path [:selected-workflow]}))))
 
   (testing "judge rejects unsupported tag"
     (is (not (m/validate workflow-ir/judge-schema

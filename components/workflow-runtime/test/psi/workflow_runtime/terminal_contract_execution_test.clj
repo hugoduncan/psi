@@ -84,6 +84,8 @@
           (is (= {:issue_number "42"
                   :issue_url "https://example.test/issues/42"}
                  (get-in run [:step-runs "discover" :accepted-result :outputs :handoff])))
+          (is (= "bug-discover"
+                 (get-in run [:step-runs "discover" :accepted-result :diagnostics :delegate :resolved-target])))
           (is (= "## Outcome\nDone\n\n## Handoff Data\n- issue_number: 42\n- issue_url: https://example.test/issues/42\n"
                  (get-in run [:step-runs "discover" :accepted-result :outputs :final-llm-reply])))
           (is (= "Issue 42 => ## Outcome\nDone\n\n## Handoff Data\n- issue_number: 42\n- issue_url: https://example.test/issues/42\n"

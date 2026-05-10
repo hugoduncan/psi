@@ -55,6 +55,19 @@
     (contains? source-spec :path) (assoc :path path)
     (contains? source-spec :projection) (assoc :projection projection)))
 
+(defn- compile-delegate-target
+  [target]
+  (cond
+    (string? target)
+    target
+
+    (and (map? target) (contains? target :from))
+    (compile-source-spec target)
+
+    :else
+    (throw (ex-info "Delegate target must be a workflow name string or workflow source-spec"
+                    {:target target}))))
+
 (defn- compile-contribution
   [{:keys [type] :as contribution}]
   (case type
@@ -168,7 +181,7 @@
 
     :delegate
     (assoc (compile-common-step-fields step)
-           :delegate (cond-> {:target (:target step)
+           :delegate (cond-> {:target (compile-delegate-target (:target step))
                               :prompt-string (let [prompt-string (:prompt-string step)]
                                                (if (and (map? prompt-string)
                                                         (= :template (:type prompt-string)))
