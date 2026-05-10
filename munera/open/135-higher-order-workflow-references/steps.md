@@ -20,18 +20,20 @@ Slice 2 — Grammar / IR / compiler extension
 - [x] Preserve current static delegate compilation behavior
 
 Slice 3 — Runtime resolution
-- [x] Extend canonical workflow source/delegate resolution to accept workflow-reference targets
-- [x] Reuse canonical workflow lookup/enforcement for dynamic targets rather than inventing a parallel path
-- [ ] Fail explicitly with distinct semantics for authored-shape failure, runtime-type failure, lookup failure, and availability failure
-- [x] Prove that a previously selected workflow reference whose target was removed before delegation fails as a lookup failure at delegation time
-- [x] Preserve existing delegated yield/handoff behavior after target resolution
-- [x] Verify deterministic/replay-friendly target resolution semantics
+- [x] Add explicit executable proof that valid-shaped dynamic workflow refs whose `:name` is unknown fail as lookup failures at delegation time
+- [x] Add explicit executable proof that a previously selected workflow ref whose target is removed before delegation fails through the same lookup-failure path
+- [x] Reconcile `steps.md` status with actual implemented/runtime-supported failure semantics so availability-only failure remains open and lookup failure is tracked separately
+- [x] Keep authored-shape, runtime-type, lookup-failure, and availability-failure distinctions explicit in task notes after the follow-up proof lands
+- [x] Preserve existing delegated yield/handoff behavior after target resolution while adding the follow-up failure proof
+- [x] Re-verify deterministic/replay-friendly target resolution semantics after the added failure proof
 
 Slice 4 — Proof
 - [x] Add focused proof that static delegate targets still compile and run as before
 - [x] Add focused proof that valid dynamic workflow-reference targets compile and resolve successfully
 - [x] Add focused proof that malformed higher-order target shapes fail explicitly
-- [x] Add focused proof that unknown or unavailable referenced workflows fail explicitly
+- [x] Add focused proof that valid-shaped but unknown referenced workflows fail explicitly as lookup failures
+- [x] Add focused proof that removed-before-delegation targets fail explicitly as lookup failures at delegation time
+- [x] Keep availability-only failure explicitly unproven/open unless a distinct runtime gate is implemented
 - [x] Add at least one end-to-end higher-order workflow example proving selected workflow reference → later delegate execution
 - [x] Verify downstream delegated yield/handoff behavior remains unchanged in the end-to-end proof
 

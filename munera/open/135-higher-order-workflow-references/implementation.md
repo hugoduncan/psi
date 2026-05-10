@@ -49,3 +49,13 @@ Implemented notes:
     - lookup failure is explicit in `psi.workflow-runtime.statechart-runtime.delegate/resolve-delegate-target-definition`
     - availability-only failure remains unrepresentable because canonical delegate resolution currently reads only registry presence and has no separate session-available workflow gate
   - Left the remaining unchecked step open; no additional executable follow-up was possible within this task's recorded scope and current runtime model.
+- Review 2026-05-10 (tests):
+  - Good coverage for IR shape, compiler behavior, runtime-type failure, dynamic success, and downstream delegated behavior preservation.
+  - Missing explicit executable proof for valid-shaped dynamic workflow refs whose `:name` is unknown at delegation time.
+  - “Removed before delegation” is argued correctly from delegation-time lookup semantics, but still benefits from direct executable proof rather than note-only reasoning.
+  - Availability-only failure remains a real runtime-model gap and should stay separately marked from lookup failure.
+- Follow-up execution 2026-05-10 (test gap closure):
+  - Added explicit execution proof that valid-shaped dynamic workflow refs whose `:name` is unknown fail as lookup failures at delegation time.
+  - Added explicit execution proof that a previously selected workflow ref whose target is removed before delegation fails through the same lookup-failure path.
+  - Reconfirmed that availability-only failure remains open because the current canonical runtime still has no distinct session-available workflow gate separate from registry presence.
+  - Kept lookup failure and availability-only failure distinct in task notes rather than conflating them.
