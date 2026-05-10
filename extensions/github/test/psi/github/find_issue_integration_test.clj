@@ -71,21 +71,25 @@
           result           (workflow-execution/execute-run! ctx session-id "run-github-find-issue")
           run              (workflow-runtime/workflow-run-in @(:state* ctx) "run-github-find-issue")
           accepted         (get-in run [:step-runs "discover" :accepted-result])]
+      ;; workflow completes without session allocation
       (is (= :completed (:status result)))
-      ;; CC: invocation shape — proves operation was called with correctly resolved args
+
+      ;; operation invoked exactly once with correctly resolved args
       (is (= 1 (count @calls*)))
       (let [invocation (first @calls*)]
         (is (= {:labels ["enhancement" "refine"] :input nil} (:args invocation)))
         (is (= "discover" (:step-id invocation)))
         (is (= "run-github-find-issue" (:workflow-run-id invocation))))
-      ;; AA: effective-args — proves resolve-invoke-args resolved {:from :workflow-input :path [:input]} → nil
+
+      ;; resolve-invoke-args resolved {:from :workflow-input :path [:input]} → nil
       (is (= {:labels ["enhancement" "refine"] :input nil}
              (get-in run [:step-runs "discover" :attempts 0 :effective-args])))
+
+      ;; step accepted with full handoff structure in :summary output
       (is (= :ok (get-in accepted [:outcome])))
       (is (string? (get-in accepted [:outputs :summary])))
       (is (str/includes? (get-in accepted [:outputs :summary]) "## Handoff Data"))
       (is (str/includes? (get-in accepted [:outputs :summary]) "issue_number: 42"))
       (is (str/includes? (get-in accepted [:outputs :summary]) "issue_title: Add dark mode"))
-      ;; BB: issue_url included in handoff
       (is (str/includes? (get-in accepted [:outputs :summary]) "issue_url: https://github.com/org/repo/issues/42"))
       (is (str/includes? (get-in accepted [:outputs :summary]) "worktree_description: add-dark-mode")))))

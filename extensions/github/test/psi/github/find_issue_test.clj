@@ -49,18 +49,16 @@
 ;;; gh CLI arg construction
 
 (deftest gh-cli-args-are-constructed-correctly-test
-  (testing "gh issue list called with correct --state, --json, and --label args"
+  (testing "gh issue list receives exact --state, --json, and --label args"
     (let [[shell-fn calls*] (capturing-shell [(issue 1 "x" "https://github.com/org/repo/issues/1")])]
       (invoke shell-fn {:labels ["enhancement" "refine"]})
       (is (= 1 (count @calls*)))
-      (let [args (first @calls*)]
-        (is (= "gh" (first args)))
-        (is (some #{"issue"} args))
-        (is (some #{"list"} args))
-        (is (some #{"--state"} args))
-        (is (some #{"--json"} args))
-        (is (= ["--label" "enhancement" "--label" "refine"]
-               (subvec args (- (count args) 4))))))))
+      (is (= ["gh" "issue" "list"
+              "--state" "open"
+              "--json" "number,title,url,state,labels"
+              "--label" "enhancement"
+              "--label" "refine"]
+             (first @calls*))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; No candidates → error
@@ -146,7 +144,7 @@
                           :input "https://github.com/org/repo/pull/5"})]
       (is (= :error (:status result)))
       (is (= :psi.github/invalid-url-input (:reason result)))
-      (is (clojure.string/includes? (:message result) "Cannot extract issue number from URL")))))
+      (is (str/includes? (:message result) "Cannot extract issue number from URL")))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Text narrowing → zero candidates → error
@@ -214,10 +212,9 @@
   (testing "slug is hard-truncated at 40 chars and never ends with -"
     (let [long-title "This is a very long issue title that exceeds forty characters easily"
           result (invoke (stub-shell [(issue 1 long-title "https://github.com/org/repo/issues/1")])
-                         {:labels ["enhancement"]})
-          slug   (get-in result [:data :worktree-description])]
-      (is (<= (count slug) 40))
-      (is (not (str/ends-with? slug "-")))))
+                         {:labels ["enhancement"]})]
+      (is (= "this-is-a-very-long-issue-title-that-exc"
+             (get-in result [:data :worktree-description])))))
 
   (testing "nil title produces empty slug (documents behavior)"
     (let [result (invoke (stub-shell [(issue 1 nil "https://github.com/org/repo/issues/1")])
