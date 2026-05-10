@@ -22,6 +22,18 @@ Motivation: The `gh-issue-refine` `discover` step is a full builder-delegate AI 
 - Is `clojure.data.json` the right JSON parser or should this use `cheshire` (check transitive deps in the github component)?
 - Does the target-IR compiler need changes, or does the step-execution branch consuming `:tool` steps short-circuit before IR compilation? Clarify during Phase 2.
 
+## 2026-05-10 — Design review pass 2
+
+**G. `implementation.md` initial entry is stale.** The "Task created" section still describes `:tool` as the chosen step type and poses open questions about tool registration and `clojure.data.json`. These were superseded by pass 1 resolutions. The stale entry is misleading noise but is historical record — no edit needed; noted here for clarity.
+
+**H. `:outputs` partial override drops compiler defaults.** The design's authored step specifies `{:outputs {:summary {:source :invoke/summary}}}`. `target-ir-compiler/compile-common-step-fields` applies `(or outputs (step-default-outputs type))` — full replacement, not merge. The compiled IR will have only `{:summary ...}`, losing `:data` and `:result`. Design must explicitly confirm no downstream step consumes `{:output :data}` or `{:output :result}` from the discover step, OR recommend omitting `:outputs` to keep all three defaults.
+
+**I. `components/github/` placement contradicts extension pattern.** All domain-specific extensions live in `extensions/` and are listed in `.psi/extensions.edn`. The design says `components/github/` ("parallel to `components/workflow-runtime/`") but the extension registration path (`(:register-operation api)`) and `.psi/extensions.edn` entry are extension patterns, not component patterns. The placement must be resolved: `extensions/github/` (extension) or `components/github/` (core infrastructure with no `.psi/extensions.edn` entry).
+
+**J. `deps.edn` wiring not specified.** The design mentions `.psi/extensions.edn` registration but omits the required root `deps.edn` changes: `psi/github {:local/root "..."}` under `:deps`, and source paths added to `:run`/`:psi` aliases. Without this the extension code is not on the classpath at runtime.
+
+**K. `tests.edn` suite target depends on placement.** Plan says "Wire `components/github/` into Kaocha `tests.edn`". If placed in `extensions/`, the test paths belong in the `:extensions` suite; if in `components/`, the `:unit` suite. Must align with the placement decision (issue I).
+
 ## 2026-05-10 — Design review pass 1 follow-up (design-steps A–F resolved)
 
 **A resolved**: `:invoke` + deterministic-operation-registry. `gh-find-issue` is workflow-internal, never AI-callable. Zero new step types. Phase 2 (`:tool` step type) removed from scope.
