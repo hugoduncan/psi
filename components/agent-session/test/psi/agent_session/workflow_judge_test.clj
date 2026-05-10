@@ -92,6 +92,45 @@
           (is (= {:action :complete} (:routing-result result)))
           (is (= 2 @prompt-count*)))))))
 
+(deftest execute-judge-llm-spec-contributions-test
+  (testing "judge derives prompt from :session :contributions when :prompt key is absent"
+    (let [prompts* (atom [])
+          ctx {workflow-execution-adapter/adapter-key
+               (workflow-execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent _opts] nil)})}
+          ;; Compiled :llm judge spec — no :prompt key, contributions hold the text
+          judge-spec {:type :llm
+                      :session {:contributions [{:type :template
+                                                 :text "Respond with exactly one word: REPEAT or DONE."
+                                                 :vars {}}]}}
+          routing-table {"REPEAT" {:goto "step-1" :max-iterations 3}
+                         "DONE"   {:goto :next}}
+          step-runs {"step-1" {:step-id "step-1" :attempts [] :iteration-count 1}
+                     "step-2" {:step-id "step-2" :attempts [] :iteration-count 1}}]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid text]
+                      (swap! prompts* conj {:session-id sid :text text})
+                      {:status :ok
+                       :session-id sid
+                       :turn-outcome :turn.outcome/stop
+                       :assistant-message {:role "assistant" :content [{:type :text :text "DONE"}]}
+                       :assistant-text "DONE"
+                       :execution-result {:execution-result/session-id sid}})]
+        (let [result (workflow-judge/execute-judge!
+                      ctx "parent-1" "actor-1" judge-spec routing-table
+                      {:current-step-id "step-2"
+                       :step-order ["step-1" "step-2"]
+                       :step-runs step-runs})]
+          (is (= "DONE" (:judge-output result)))
+          (is (= "DONE" (:judge-event result)))
+          (is (= {:action :complete} (:routing-result result)))
+          (is (= 1 (count @prompts*)))
+          ;; Key assertion: the contribution text was used as the prompt, not nil
+          (is (= "Respond with exactly one word: REPEAT or DONE."
+                 (:text (first @prompts*)))))))))
+
 (deftest execute-judge-retry-exhaustion-test
   (testing "judge retries exhausted — returns no-match routing"
     (let [prompt-count* (atom 0)

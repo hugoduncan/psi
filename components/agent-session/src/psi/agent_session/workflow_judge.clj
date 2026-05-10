@@ -14,6 +14,20 @@
 
 (def ^:private max-judge-retries 2)
 
+(defn- judge-prompt
+  "Derive the judge prompt string from the compiled judge spec.
+
+   For `:invoke`-style specs the prompt lives at `:prompt` (legacy path).
+   For `:llm`-style specs the prompt comes from the last `:template` contribution
+   in `:session :contributions`. Template vars are not rendered here; all current
+   judge specs use static template text with empty `:vars {}`."
+  [judge-spec]
+  (or (:prompt judge-spec)
+      (some->> (get-in judge-spec [:session :contributions])
+               (filter #(= :template (:type %)))
+               last
+               :text)))
+
 (defn- judge-retry-feedback
   "Build a feedback message for a judge retry when no signal matched."
   [judge-output expected-signals]
@@ -49,7 +63,7 @@
       :preloaded-messages projected
       :workflow-owned?    true})
     ;; First attempt
-    (let [initial-result (turn-execution/execute-judge-turn! ctx judge-sid (:prompt judge-spec))]
+    (let [initial-result (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec))]
       (loop [attempt 0
              last-output (str/trim (:assistant-text initial-result))]
         (let [routing-result (workflow-judge/evaluate-routing last-output routing-table
