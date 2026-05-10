@@ -72,6 +72,10 @@ Unchecked items added by design review pass 9 (2026-05-10).
 
 - [x] **FF. Annotate blocked steps in `steps.md`.** The smoke-test and downstream-verify items are `[ ]` with no indication they are environment-blocked. Add a `<!-- blocked: requires real GitHub repo with labeled issues -->` note (or inline text) so readers know they are blocked, not merely pending.
 
+Unchecked items added by design review pass 10 (2026-05-10).
+
+- [ ] **GG. Correct integration test proof mechanism description in `design.md`.** Line 114 says "test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired." This is wrong: `session/create-context` always adds `:workflow-execution-adapter`. The adapter IS present. Correct the description to: the actual proof is (a) `@calls*` count = 1, (b) `:completed` status, and (c) the `:invoke` step calls `invoke-step-runtime-result` directly without calling `create-step-attempt-session!`. Also correct design-steps.md item X which repeats the same inaccuracy.
+
 Unchecked items added by design review pass 7 (2026-05-10).
 
 - [x] **Y. Remove wrong `psi/github {:local/root "extensions/github"}` entry from root `deps.edn` `:deps` instruction.** No existing extension has a `:local/root` entry in root `deps.edn` `:deps` — extensions are wired exclusively via `:extra-paths` in aliases. Removed the `:local/root` line from design.md "Root `deps.edn` wiring" section and from steps.md and plan.md Phase 1 wiring steps. The `:extra-paths` instructions are correct and remain.

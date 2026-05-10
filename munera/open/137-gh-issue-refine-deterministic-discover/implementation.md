@@ -1,5 +1,9 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 10
+
+**GG. `design.md` integration test proof mechanism is inaccurate.** Line 114 says "test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired." This is wrong: `session/create-context` (called by `create-session-context` in both the reference test and the integration test) always adds `:workflow-execution-adapter` via `create-context*`. The adapter IS present in the test ctx. The actual proof that no session is spawned is: (a) `@calls*` count = 1 (handler invoked exactly once), (b) `:completed` status (no error from missing session infrastructure), and (c) the `:invoke` step never calls `create-step-attempt-session!` — it calls `invoke-step-runtime-result` directly. The test implementation is correct; only the design's description of the proof mechanism is wrong.
+
 ## 2026-05-10 — Design review pass 9 follow-up (design-steps DD–FF resolved)
 
 **DD resolved**: `design.md` slug derivation line changed from "using word-boundary truncation:" to "using hard truncation:" — label now matches the rule and design-steps M.
