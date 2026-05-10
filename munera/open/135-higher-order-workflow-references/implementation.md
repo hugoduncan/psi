@@ -29,3 +29,5 @@ Implemented notes:
 - Deferred follow-on:
   - add explicit workflow availability/capability gating for dynamic/static delegation if/when the canonical runtime grows a distinct available-vs-known workflow model
   - consider a dedicated lower namespace for workflow-reference helpers if the concept broadens beyond delegate targeting
+- Review 2026-05-10:
+  - No new actionable feedback. Re-read task artifacts plus referenced code/tests/docs; implementation matches the recorded scope and current runtime boundaries.
