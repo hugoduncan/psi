@@ -1,5 +1,18 @@
 # Implementation Notes
 
+## 2026-05-10 — Design review pass 1
+
+**Ambiguities found:**
+
+1. **`design-steps.md` absent** — workflow protocol expects follow-up items in `design-steps.md`; only `steps.md` exists. Created `design-steps.md`.
+2. **Conditional label migration contradictory in steps.md** — `gh-bug-triage` and `gh-bug-post-repro` steps say "Add trailing `:invoke github/add-label` (add `waiting` or `fix`, determined by AI classify output)" but implementation.md correctly notes this must stay AI-driven. The steps item is misleading — needs clarification/split.
+3. **`gh-bug-triage` vs `gh-bug-triage-modular` scope gap** — `gh-bug-triage-modular` already uses `:invoke github/find-issue` for discovery. Design does not address whether `gh-bug-triage` (monolithic) should be migrated or deprecated. Steps only touch `gh-bug-triage.md`.
+4. **`find-pr` URL narrowing regex unspecified** — design says "same narrowing logic as `find-issue`" but `find-issue` uses `/issues/(\d+)` regex; PRs live at `/pull/NNN`. The difference is not called out in design or steps.
+5. **`psi.github.slug` extraction vs inline copy — unresolved OR** — design says "extract to `psi.github.slug` shared ns, or inline a parallel copy." Must pick one before implementation.
+6. **`:input` wiring for `find-pr` steps in migrated workflows** — design specifies `find-pr` args include `:input nil-or-hint` but does not specify how the narrowing hint from `:workflow-input` is wired into the `:invoke` step in `gh-issue-implement` and `gh-pr-fix-checks`.
+7. **`extension-test` update under-specified** — steps say "assert four registrations" but do not say to assert all four operation ids specifically (not just count).
+8. **No `plan.md`** — task has no `plan.md`; Munera requires one before execution.
+
 ## 2026-05-10 — Task created
 
 Initial scope survey:
