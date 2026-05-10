@@ -45,7 +45,7 @@ A `:tool` step type would be appropriate only if the operation needed to appear 
 - If no matching issue exists, the workflow stops with a clear error before the worktree step.
 - The handoff data format emitted by the deterministic step is identical in structure to the current builder-produced handoff (`issue_number`, `issue_title`, `issue_url`, `worktree_description`).
 - The `github/find-issue` operation is exercised by a focused unit test using a nullable shell adapter.
-- The `:invoke` step in `gh-issue-refine.md` is exercised by a focused workflow-runtime integration test that proves no session is spawned.
+- The `:invoke` step in `gh-issue-refine.md` is exercised by a focused workflow-runtime integration test (tagged `^:integration`, located in `extensions/github/test`) that proves no session is spawned.
 
 ---
 
@@ -143,17 +143,26 @@ Under `:deps`, add:
 psi/github {:local/root "extensions/github"}
 ```
 
-Under `:run`, `:psi`, `:tui-demo`, `:test-paths`, and `:test` aliases, add to `:extra-paths`:
+Under `:run`, `:psi`, `:tui-demo`, and `:test` aliases, add to `:extra-paths`:
 ```
 "extensions/github/src"
 ```
 
-Under `:test-paths` and `:test` aliases, also add:
+Under `:test-paths` alias, add to `:extra-paths`:
 ```
 "extensions/github/test"
 ```
 
+Under `:test` alias, also add:
+```
+"extensions/github/test"
+```
+
+Note: `extensions/github/src` must NOT be added to `:test-paths` alias. The `:test-paths` alias contains only test paths (e.g. `extensions/work-on/test`), never extension `src` paths. Extension `src` paths appear in `:test` alias only.
+
 Also add `"extensions/github/src"` to the `:unit` suite `:source-paths` in `tests.edn` — all other extension `src` paths are listed there for compilation of component tests that import extension code. Parity requires `extensions/github/src` to be included.
+
+Also add `"extensions/github/test"` to the `:integration` suite `:test-paths` and `"extensions/github/src"` to the `:integration` suite `:source-paths` in `tests.edn`. The Phase 2 workflow-runtime integration test lives in `extensions/github/test` tagged `^:integration`; the `:integration` kaocha suite uses `:focus-meta [:integration]` so it will pick it up. The `:extensions` suite uses `:skip-meta [:integration]` so it will skip the integration test but still run the unit tests in `extensions/github/test`.
 
 **`extensions/tests.edn`**: no change required. `extensions/tests.edn` is a standalone kaocha config for running tests within the `extensions/` directory using relative paths (`src`/`test`). It is not the authoritative suite config; root `tests.edn` owns all suite definitions. No existing extension is listed in `extensions/tests.edn` by path — it uses `src`/`test` relative to the working directory. `psi/github` tests are covered by root `tests.edn` `:extensions` suite.
 

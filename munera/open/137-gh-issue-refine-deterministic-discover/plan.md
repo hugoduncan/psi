@@ -14,15 +14,15 @@ No new step types, IR schema changes, or execution-adapter keys are needed — t
 2. Implement `psi.github.find-issue/invoke` with `:github-shell-fn` seam, JSON parsing via cheshire, narrowing logic, slug derivation, and `result->handoff-md` serializer
 3. Implement `psi.github.extension/init` registering the `github/find-issue` operation
 4. Write focused unit tests (nullable shell stub): no candidates → error; single candidate → correct map + slug; multiple → lowest number; narrowing by integer; narrowing by URL
-5. Register `psi/github {}` in `.psi/extensions.edn`; add `psi/github {:local/root "extensions/github"}` to root `deps.edn` `:deps`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, `:test-paths`, `:test` aliases; add `extensions/github/test` to `:test-paths` and `:test` aliases
-6. Wire `extensions/github/` into Kaocha `tests.edn`: add `extensions/github/test` to `:extensions` suite `:test-paths`; add `extensions/github/src` to `:extensions` suite `:source-paths`; add `extensions/github/src` to `:unit` suite `:source-paths` (parity with all other extensions)
+5. Register `psi/github {}` in `.psi/extensions.edn`; add `psi/github {:local/root "extensions/github"}` to root `deps.edn` `:deps`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, and `:test` aliases; add `extensions/github/test` to `:test-paths` and `:test` aliases (note: `extensions/github/src` must NOT be added to `:test-paths` — that alias contains test paths only, never extension src paths)
+6. Wire `extensions/github/` into Kaocha `tests.edn`: add `extensions/github/test` to `:extensions` suite `:test-paths`; add `extensions/github/src` to `:extensions` suite `:source-paths`; add `extensions/github/src` to `:unit` suite `:source-paths` (parity with all other extensions); add `extensions/github/test` to `:integration` suite `:test-paths` and `extensions/github/src` to `:integration` suite `:source-paths` (for the Phase 2 `^:integration` test)
 7. Confirm `extensions/tests.edn` requires no change (standalone relative-path config; root `tests.edn` is authoritative)
 7. Lint clean
 
 ### Phase 2 — Workflow update (requires Phase 1 complete)
 
 1. Update `gh-issue-refine.md`: replace `discover` `:delegate` step with `:invoke` step (`operation "github/find-issue"`, `:outputs {:summary {:source :invoke/summary}}`, `:yields {:type :text :text :summary}`)
-2. Write focused workflow-runtime integration test: prove `:invoke` step with `github/find-issue` operation produces correct Markdown handoff and no session is spawned
+2. Write focused workflow-runtime integration test: `^:integration`-tagged test in `extensions/github/test`; prove `:invoke` step with `github/find-issue` operation produces correct Markdown handoff and no session is spawned; runs under `:integration` kaocha suite (`:focus-meta [:integration]`), skipped by `:extensions` suite (`:skip-meta [:integration]`)
 3. Smoke test: run `gh-issue-refine` end-to-end against a real labeled issue, confirm discover step emits correct handoff
 4. Verify downstream steps (`worktree`, `refine-design`) parse the new handoff correctly
 

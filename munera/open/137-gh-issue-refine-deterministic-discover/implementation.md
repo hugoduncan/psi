@@ -1,5 +1,11 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 5 follow-up (design-steps Q–R resolved)
+
+**Q resolved**: `deps.edn` `:test-paths` alias wiring corrected. `extensions/github/src` goes to `:run`, `:psi`, `:tui-demo`, and `:test` aliases only — NOT `:test-paths`. `:test-paths` contains only test paths (e.g. `extensions/work-on/test`); extension `src` paths never appear there. `extensions/github/test` goes to both `:test-paths` and `:test`. Confirmed against actual `deps.edn`. Design.md, plan.md, and steps.md updated.
+
+**R resolved**: Phase 2 integration test lives in `extensions/github/test`, tagged `^:integration`. Rationale: extension tests belong in the extension's own test dir; `^:integration` meta ensures the `:integration` kaocha suite (`:focus-meta [:integration]`) picks it up and the `:extensions` suite (`:skip-meta [:integration]`) skips it. Requires adding `extensions/github/test` to `:integration` suite `:test-paths` and `extensions/github/src` to `:integration` suite `:source-paths` in root `tests.edn`. Design.md, plan.md, and steps.md updated.
+
 ## 2026-05-10 — Design review pass 5
 
 **Q. `deps.edn` `:test-paths` wiring instruction is wrong.** Design and plan say add `extensions/github/src` to `:test-paths` alias. The actual `:test-paths` alias contains only test paths for extensions (e.g. `extensions/work-on/test`), never extension `src` paths. Extension `src` paths appear in `:test` alias only. Instruction should be: add `extensions/github/src` to `:test` alias (not `:test-paths`). Add `extensions/github/test` to both `:test-paths` and `:test` aliases (consistent with work-on pattern).
