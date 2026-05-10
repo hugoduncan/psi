@@ -17,6 +17,7 @@
   - `:input nil` (absent workflow-input) → treated as no narrowing, selects lowest candidate
 - [x] Write `init` registration test for `psi.github.extension/init` using `create-extension-api` with captured `register-deterministic-operation-fn` override (pattern from `extensions_test.clj`; nullable API cannot be used for this)
 - [x] Register `psi/github {}` in `.psi/extensions.edn`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, and `:test` aliases `:extra-paths`; add `extensions/github/test` to `:test-paths` and `:test` aliases (note: `extensions/github/src` must NOT be added to `:test-paths` alias — that alias contains test paths only; do NOT add `psi/github` to root `deps.edn` `:deps` — extensions are wired via `:extra-paths` only, not `:local/root`)
+- [x] Add `psi/github` entry to `psi-owned-extension-catalog` in `components/agent-session/src/psi/agent_session/extension_installs.clj` pointing to `psi.github.extension/init` — **was missing**: without this entry the runtime has no `:psi/init` to resolve and silently skips the extension, causing "Deterministic operation not found" at runtime (fixed in dfb45b03)
 - [x] Wire `extensions/github/` into Kaocha `tests.edn`:
   - add `extensions/github/test` to `:extensions` suite `:test-paths`
   - add `extensions/github/src` to `:extensions` suite `:source-paths`

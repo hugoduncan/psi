@@ -155,6 +155,14 @@ A private `result->handoff-md` fn in `psi.github.find-issue` converts the struct
 psi/github {}
 ```
 
+**Built-in extension catalog** (required — add to `components/agent-session/src/psi/agent_session/extension_installs.clj`):
+
+`psi-owned-extension-catalog` maps extension library symbols to `{:psi/init init-var ...}`. Without a catalog entry, the runtime has no `:psi/init` to resolve and **silently skips** the extension (it is not counted as an error). Any new psi-owned extension declared in `.psi/extensions.edn` **must** also appear in this catalog:
+```clojure
+'psi/github {:psi/init 'psi.github.extension/init
+             :source-policies {:installed {:local/root "extensions/github"}}}
+```
+
 **Root `deps.edn` wiring** (required for classpath):
 
 Extensions are not listed under root `deps.edn` `:deps` — no existing extension has a `:local/root` entry there. Wiring is via `:extra-paths` in aliases only.
