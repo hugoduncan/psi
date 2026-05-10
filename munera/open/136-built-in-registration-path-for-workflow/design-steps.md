@@ -1,2 +1,2 @@
-- [ ] Extend the inventory to include non-agent-session proofs and projections that still encode built-in workflow as extension-owned state, especially `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` asserting `built-in:workflow` lives in the extension registry.
-  - decide whether that proof should move to a built-in projection/invariant or become an explicit temporary exception
+- [x] Extend the inventory to include non-agent-session proofs and projections that still encode built-in workflow as extension-owned state, especially `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` asserting `built-in:workflow` lives in the extension registry.
+  - decided this proof should migrate to a built-in runtime-boundary invariant/projection rather than remain an extension-registry exception, because task success explicitly requires canonical built-in workflow bootstrap to stop seeding extension identity

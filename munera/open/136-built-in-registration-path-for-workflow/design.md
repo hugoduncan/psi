@@ -111,6 +111,7 @@ Before choosing the final registration shape, implementation must inventory ever
 - reload/session-switch lifecycle
 - introspection/resolver projections
 - tests that assert workflow appears in extension-owned state
+- non-agent-session runtime-boundary proofs or launch/bootstrap projections that still encode built-in workflow as extension-owned state
 
 The implementation decision must be based on that inventory rather than on a guessed target abstraction.
 

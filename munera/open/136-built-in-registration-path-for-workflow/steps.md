@@ -7,12 +7,17 @@
   - found direct test assertions against extension-owned built-in workflow tool storage in `components/agent-session/test/psi/agent_session/workflow_built_in_targeting_test.clj`
   - found reload/runtime tests proving built-in command and tool preservation through extension-registry queries in `components/agent-session/test/psi/agent_session/workflow_reload_runtime_test.clj` and command lookup in `components/agent-session/test/psi/agent_session/workflow_async_path_test.clj`
   - found resolver/projection surfaces in `components/agent-session/src/psi/agent_session/resolvers/extensions.clj` that currently expose tools and commands only through extension-oriented projections
-- [ ] Decide the smallest built-in registration abstraction that can replace those uses
-- [ ] Decide whether shared registries gain built-in-specific entrypoints/provenance or whether any surface needs a small dedicated built-in store
-- [ ] Make the built-in lifecycle invocation path explicit
-  - [ ] runtime/session/reload ownership named
-  - [ ] reload and session-switch preservation path named
-  - [ ] reload and session-switch projection verification path named
+- [x] Decide the smallest built-in registration abstraction that can replace those uses
+  - use a small higher-core built-in registration layer owned beside workflow bootstrap/runtime-state that exposes built-in-specific registration entrypoints for tools, commands, prompt contributions, and lifecycle hooks while reusing existing shared command/tool/prompt storage behind those entrypoints
+- [x] Decide whether shared registries gain built-in-specific entrypoints/provenance or whether any surface needs a small dedicated built-in store
+  - commands and tools should reuse shared registries through built-in-specific provenance-aware entrypoints; prompt contributions should keep using shared session prompt-contribution storage through a built-in-specific registration path; lifecycle hooks need a small dedicated built-in lifecycle store/invocation path because that surface cannot stay extension-event-shaped
+- [x] Make the built-in lifecycle invocation path explicit
+  - [x] runtime/session/reload ownership named
+    - built-in lifecycle ownership should live in higher-core workflow bootstrap/runtime-state support, with session lifecycle invocation from `psi.agent-session.session-lifecycle` and reload-time reinstallation from the built-in bootstrap path
+  - [x] reload and session-switch preservation path named
+    - `init-built-in!` should install a built-in `session-switch` callback via the built-in registration layer, and `session_lifecycle.clj` should invoke built-in lifecycle callbacks explicitly after core session transitions instead of routing workflow through `ext/dispatch-in`
+  - [x] reload and session-switch projection verification path named
+    - replace extension-registry preservation proofs with built-in runtime-boundary proofs over command/tool availability and session-switch reload behavior, including the app-runtime launcher boundary test
 - [ ] Make the built-in prompt contribution path explicit
   - [ ] storage/provenance decision recorded
   - [ ] prompt rendering/projection path recorded

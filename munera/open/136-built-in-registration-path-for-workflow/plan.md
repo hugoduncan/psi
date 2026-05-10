@@ -7,7 +7,7 @@ Approach:
 - make lifecycle, prompt contribution, provenance, and introspection decisions explicit in the implementation notes
 
 Planned outcomes:
-1. map the exact places where built-in workflow still depends on extension-registry/API machinery
+1. map the exact places where built-in workflow still depends on extension-registry/API machinery, including non-agent-session runtime-boundary proofs
 2. classify which of those uses require new built-in entrypoints, shared provenance-aware storage, or a small dedicated built-in store
 3. decide and document the built-in invocation path for lifecycle and reload/session-switch behavior
 4. migrate built-in workflow bootstrap off extension identity seeding and extension API creation
