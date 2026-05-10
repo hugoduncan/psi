@@ -1,5 +1,29 @@
 # Implementation Notes
 
+## 2026-05-10 — Design review pass 1 follow-up execution (design-steps A–G)
+
+All seven design-steps resolved:
+
+- **A** — steps.md `gh-bug-triage` and `gh-bug-post-repro` conditional-label items split:
+  unconditional `remove-label triage` is a deterministic `:invoke` step; conditional add
+  (`waiting` vs `fix`) stays AI-driven with explicit NOTE in steps.md.  design.md scope
+  table updated to match.
+- **B** — decided: extract to `psi.github.slug` (not inline copy).  design.md §slug
+  derivation updated; steps.md Phase 1 already reflects this.
+- **C** — decided: `find-pr` URL regex is `#"/pull/(\d+)"`.  design.md §find-pr URL
+  narrowing added; steps.md Phase 2 test item updated with explicit regex note.
+- **D** — decided: `:input` wired as `{:from :workflow-input :path [:input]}` in both
+  `gh-issue-implement` and `gh-pr-fix-checks` `find-pr` steps.  design.md §:input wiring
+  added; steps.md Phase 5 items updated.
+- **E** — clarified: `gh-bug-triage-modular` already migrated for discovery; not touched
+  here.  `gh-bug-triage` (monolithic) migrated for discovery + unconditional label step
+  only.  Neither variant deprecated.  design.md Out of scope updated.
+- **F** — tightened: `extension-test` must assert all four operation ids explicitly, not
+  just count.  steps.md Phase 3 item updated.
+- **G** — `plan.md` created with six-phase approach, key decisions, and risks.
+
+
+
 ## 2026-05-10 — Design review pass 1
 
 **Ambiguities found:**

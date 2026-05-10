@@ -16,6 +16,7 @@
   - [ ] Summary markdown: `## PR Selection` + `## Handoff Data` lines
 - [ ] Create `extensions/github/test/psi/github/find_pr_test.clj`
   - [ ] Stub `github-shell-fn`; cover ok / no-match / shell-error / narrow-by-number / narrow-by-url / narrow-by-title
+  - [ ] narrow-by-url case must use a `/pull/NNN` URL (not `/issues/NNN`); regex is `#"/pull/(\d+)"`
 - [ ] Register `github/find-pr` in `psi.github.extension/init`
 
 ## Phase 3 — Extension: `github/add-label` and `github/remove-label`
@@ -28,7 +29,7 @@
 - [ ] Create `extensions/github/test/psi/github/label_ops_test.clj`
   - [ ] Stub shell-fn; cover add/remove for issue, add/remove for pr, shell-error cases
 - [ ] Register `github/add-label` and `github/remove-label` in `psi.github.extension/init`
-- [ ] Update `extension-test` to assert four registrations
+- [ ] Update `extension-test` to assert all four operation ids explicitly: `"github/find-issue"`, `"github/find-pr"`, `"github/add-label"`, `"github/remove-label"` — not just `(= 4 (count @calls*))`
 
 ## Phase 4 — Lint and focused verification
 
@@ -47,9 +48,9 @@
 - [ ] `gh-bug-triage.md`
   - [ ] Add leading `:invoke github/find-issue` discover step
   - [ ] Wire discover output into existing AI triage session
-  - [ ] Add trailing `:invoke github/remove-label` (remove `triage`) step
-  - [ ] Add trailing `:invoke github/add-label` (add `waiting` or `fix`) step — conditional on AI output
-  - [ ] Strip `gh issue list` and `gh issue edit` label instructions from AI prompt
+  - [ ] Add unconditional trailing `:invoke github/remove-label` (remove `triage`) step
+  - [ ] NOTE: conditional add (`waiting` vs `fix`) stays AI-driven — no `:invoke` step for it here
+  - [ ] Strip `gh issue list` instruction from AI prompt; leave conditional label-add instruction in AI prompt
 
 - [ ] `gh-issue-ingest.md`
   - [ ] Add leading `:invoke github/find-issue` discover step
@@ -60,6 +61,7 @@
 
 - [ ] `gh-issue-implement.md`
   - [ ] Replace inline `gh pr list` AI discover session → `:invoke github/find-pr` step
+  - [ ] Wire `:input` as `{:from :workflow-input :path [:input]}` in the `find-pr` step
   - [ ] Wire PR data into prep and implement sessions
   - [ ] Add trailing `:invoke github/remove-label` (remove `implement`)
   - [ ] Add trailing `:invoke github/add-label` (add `review`)
@@ -67,14 +69,15 @@
 
 - [ ] `gh-pr-fix-checks.md`
   - [ ] Replace inline `gh pr list` AI discover session → `:invoke github/find-pr` step
+  - [ ] Wire `:input` as `{:from :workflow-input :path [:input]}` in the `find-pr` step
   - [ ] Wire PR data into remaining sessions
 
 ### Label-mutation-only migrations
 
 - [ ] `gh-bug-post-repro.md`
-  - [ ] Add trailing `:invoke github/remove-label` (remove `triage`)
-  - [ ] Add trailing `:invoke github/add-label` (add `waiting` or `fix`, determined by AI classify output)
-  - [ ] Strip `gh issue edit` label instructions from AI prompt
+  - [ ] Add unconditional trailing `:invoke github/remove-label` (remove `triage`)
+  - [ ] NOTE: conditional add (`waiting` vs `fix`) stays AI-driven — no `:invoke` step for it here
+  - [ ] Strip unconditional `gh issue edit` label instructions from AI prompt; leave conditional add instruction in AI prompt
 
 - [ ] `gh-bug-request-more-info.md`
   - [ ] Add trailing `:invoke github/remove-label` (remove `triage`)

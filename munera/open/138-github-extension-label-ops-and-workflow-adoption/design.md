@@ -53,11 +53,11 @@ auditable record separate from the session transcript.
 | Workflow | Change |
 |---|---|
 | `gh-bug-discover-and-read` | Replace inline `gh issue list` AI step → `:invoke github/find-issue` step; AI session reads the issue only |
-| `gh-bug-triage` | Add `:invoke github/find-issue` discover step; add `:invoke` label steps after AI classify step |
+| `gh-bug-triage` | Add `:invoke github/find-issue` discover step; add unconditional `:invoke github/remove-label` (remove `triage`) step after AI classify step; conditional add (`waiting` vs `fix`) remains AI-driven — out of scope here |
 | `gh-issue-ingest` | Add `:invoke github/find-issue` discover step; add `:invoke` label steps after AI triage step |
 | `gh-issue-implement` | Replace inline `gh pr list` AI step → `:invoke github/find-pr`; replace inline label AI step → `:invoke` label steps |
 | `gh-pr-fix-checks` | Replace inline `gh pr list` AI step → `:invoke github/find-pr` |
-| `gh-bug-post-repro` | Add `:invoke` label steps after the AI classify step; remove label instructions from AI prompt |
+| `gh-bug-post-repro` | Add unconditional `:invoke github/remove-label` (remove `triage`) step after AI classify step; conditional add (`waiting` vs `fix`) remains AI-driven — out of scope here; strip unconditional label instructions from AI prompt |
 | `gh-bug-request-more-info` | Add `:invoke` label steps after the AI post step; remove label instructions from AI prompt |
 | `gh-issue-refine` | Add `:invoke` label steps after the AI publish step; remove label instructions from AI prompt |
 | `gh-bug-fix-and-pr` | Add `:invoke` label step to remove `fix` label; remove label instruction from AI prompt |
@@ -68,6 +68,12 @@ auditable record separate from the session transcript.
 - Any extension operations beyond the three above.
 - `github/find-issue` changes (already correct).
 - PR check healing or worktree creation logic.
+- `gh-bug-triage-modular` discovery migration — already uses `:invoke github/find-issue`
+  for discovery; the monolithic `gh-bug-triage` is the migration target here.
+  `gh-bug-triage-modular` is not deprecated by this task.
+- Conditional label add (`waiting` vs `fix`) in `gh-bug-triage` and `gh-bug-post-repro`
+  — the workflow IR has no conditional branching; the AI session remains responsible for
+  the conditional label add until that capability exists.
 
 ## Architecture Alignment
 
@@ -97,8 +103,25 @@ deterministically after the AI step succeeds.
 
 ### `github/find-pr` slug derivation
 
-Reuse `derive-slug` from `psi.github.find-issue` (extract to `psi.github.slug` shared
-ns, or inline a parallel copy).  Input to slug is `headRefName` (branch name).
+**Decision (B):** Extract `derive-slug` into `psi.github.slug` shared ns — eliminates
+duplication, is a one-file change, and is the natural first step before `find-pr` is
+added.  Do not inline a parallel copy.  Both `find-issue` and `find-pr` require
+`psi.github.slug/derive-slug`.
+
+Input to slug is `headRefName` (branch name).
+
+### `github/find-pr` URL narrowing regex
+
+**Decision (C):** `find-pr` uses `#"/pull/(\d+)"` for URL extraction — not
+`#"/issues/(\d+)"`.  PR URLs contain `/pull/NNN`; issue URLs contain `/issues/NNN`.
+The `find-pr` unit tests must include a narrow-by-url case using a `/pull/NNN` URL.
+
+### `:input` wiring for `find-pr` in migrated workflows
+
+**Decision (D):** In `gh-issue-implement` and `gh-pr-fix-checks`, the `:invoke
+github/find-pr` step wires `:input` as `{:from :workflow-input :path [:input]}` —
+matching the `find-issue` pattern used in `gh-bug-discover-and-read`.  This passes the
+optional narrowing hint through from the workflow caller.
 
 ## Implementation Approach
 
