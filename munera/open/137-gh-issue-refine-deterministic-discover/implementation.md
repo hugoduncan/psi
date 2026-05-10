@@ -1,5 +1,19 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 6 follow-up (design-steps S–X resolved)
+
+**S resolved**: `(cheshire.core/parse-string json)` — string keys, no keywordize flag. `gh` CLI returns camelCase JSON (`"number"`, `"title"`, `"url"`, `"state"`); labels are objects with `"name"` subfield. Confirmed by running `gh issue list --json number,title,url,labels,state` against live repo. All field access uses string keys: `(get issue "number")`, `(map #(get % "name") (get issue "labels"))`.
+
+**T resolved**: URL detection: `(str/starts-with? input "https://")`. Extraction: `(re-find #"/issues/(\d+)" input)`. No match → `{:status :error :reason :psi.github/invalid-url-input :message "Cannot extract issue number from URL: <input>"}`. No text-match fallback for malformed URLs.
+
+**U resolved**: `(re-matches #"^\d+$" input)` detects integer strings; `(Long/parseLong input)` parses. `"007"` → 7, `"0"` → 0, `"-1"` → no match. Leading zeros accepted by regex and parsed as decimal by `Long/parseLong`.
+
+**V resolved**: Case-insensitive text match: `(str/includes? (str/lower-case title) (str/lower-case input))`. Unit tests must include a case-folding case.
+
+**W resolved**: Non-zero exit → `{:status :error :reason :psi.github/shell-error :message (:err result)}`. Unit test stub: `{:exit 1 :out "" :err "gh: not authenticated"}`.
+
+**X resolved**: Integration test "no session spawned" assertion: run `execute-run!` without `:workflow-execution-adapter` in ctx. Assert `:completed`. If session spawned, `execution-adapter/adapter` throws. Pattern: `invoke-step-executes-through-deterministic-operation-registry-test` in `workflow_invoke_runtime_test.clj`. Also assert handler `calls*` count = 1.
+
 ## 2026-05-10 — Design review pass 6
 
 **S. `cheshire/parse-string` keywordize flag unspecified.** Design says use `cheshire.core/parse-string` but does not say whether to call `(parse-string json true)` (keyword keys) or `(parse-string json)` (string keys). The field access code (`"number"` vs `:number`) depends on this. Must be specified before implementation.

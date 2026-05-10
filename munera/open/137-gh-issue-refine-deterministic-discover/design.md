@@ -88,11 +88,30 @@ The `:summary` field carries the serialized Markdown handoff block. This is the 
 
 **Implementation**:
 - Invokes `gh issue list --state <state> --label <l1> --label <l2> ... --json number,title,labels,state,url` via `clojure.java.shell/sh` (or a configurable `:github-shell-fn` ctx key for testing).
-- Parses JSON output with `cheshire.core/parse-string` (project standard; declare `cheshire/cheshire "5.13.0"` in `extensions/github/deps.edn`).
-- Applies narrowing: if `input` parses as an integer → filter by issue number; if it looks like a URL → extract number from URL; otherwise → text substring match on title.
+- Parses JSON output with `(cheshire.core/parse-string json)` — **string keys, no keywordize flag**. The `gh` CLI returns camelCase JSON fields (`"number"`, `"title"`, `"url"`, `"state"`) and labels as objects with a `"name"` subfield (`[{"name" "enhancement" ...}]`). All field access uses string keys: `(get issue "number")`, `(get issue "title")`, `(get issue "url")`, `(map #(get % "name") (get issue "labels"))`.
+- Applies narrowing (see narrowing rules below).
 - Selects the lowest `number` among candidates.
 - Derives `worktree-description` as a kebab-slug from the title using word-boundary truncation: lower-case the title, extract `[a-z0-9]+` words, join with `-`, hard-truncate the joined string at 40 chars, strip any trailing `-`. Result is `[a-z0-9-]`, ≤ 40 chars, never ends with `-`. Example: `"Add foo-bar baz"` → `"add-foo-bar-baz"` (15 chars, no truncation needed).
 - Returns `{:status :ok :data {...} :summary "<markdown>"}` or `{:status :error :reason :psi.github/no-matching-issue :message "..."}`.
+- On non-zero `gh` CLI exit: returns `{:status :error :reason :psi.github/shell-error :message (:err result)}` where `result` is the map returned by `clojure.java.shell/sh`.
+
+**Narrowing rules** (applied when `input` is non-nil):
+
+1. **Integer match**: `(re-matches #"^\d+$" input)` → parse with `(Long/parseLong input)` → filter by `(= (get issue "number") parsed-number)`. Matches `"0"`, `"007"` (parsed as 0 and 7 respectively), does NOT match `"-1"` or `"1.5"`. Leading zeros are accepted by `re-matches` and `Long/parseLong` treats them as decimal (not octal).
+2. **URL match**: `(str/starts-with? input "https://")` → extract issue number with `(re-find #"/issues/(\d+)" input)` → parse the capture group with `Long/parseLong` → filter by number. If the URL does not match the pattern (no `/issues/NNN` segment), return `{:status :error :reason :psi.github/invalid-url-input :message "Cannot extract issue number from URL: <input>"}`.
+3. **Text substring match** (fallback): case-insensitive — `(str/includes? (str/lower-case (get issue "title")) (str/lower-case input))`.
+
+When `input` is `nil`: no narrowing applied; all label-filtered candidates are eligible.
+
+**Shell error handling**: when `(:exit result)` is non-zero, return immediately:
+```clojure
+{:status :error
+ :reason :psi.github/shell-error
+ :message (:err result)}
+```
+Unit test: stub returning `{:exit 1 :out "" :err "gh: not authenticated"}` must produce this error result.
+
+**Integration test "no session spawned" assertion**: run `workflow-execution/execute-run!` with a test ctx that has the `github/find-issue` operation registered but no `:workflow-execution-adapter` wired. Assert the run reaches `:completed` status. If the `:invoke` step were to spawn a session, `execution-adapter/adapter` would throw `"Workflow execution adapter is required"` — the test passing at `:completed` is the proof. Also assert the handler `calls*` atom has exactly one entry. Pattern: identical to `invoke-step-executes-through-deterministic-operation-registry-test` in `psi.agent-session.workflow-invoke-runtime-test`.
 
 **Shell seam** (for testability):
 ```clojure
