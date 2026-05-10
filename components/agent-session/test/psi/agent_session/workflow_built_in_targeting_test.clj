@@ -36,37 +36,57 @@
                      :step-order ["step-1"]
                      :steps {"step-1" {:label "plan" :tools ["read"]}}}}))
 
+(defn- delegate-tool-for [ctx]
+  (some #(when (= "delegate" (:name %)) %)
+        (-> ctx :extension-registry :state deref :extensions (get workflow/built-in-workflow-path) :tools vals)))
+
+(defn- stub-workflow-mutate [run-id]
+  (fn [sym _params]
+    (case sym
+      psi.workflow/create-run {:psi.workflow/run-id run-id}
+      psi.workflow/list-runs  {:psi.workflow/runs []}
+      {})))
+
 (deftest built-in-workflow-delegate-tool-targets-explicit-runtime-session-test
   (testing "built-in workflow delegate tool follows the executing runtime session rather than the originally bootstrapped session"
     (let [[ctx s1 s2] (create-two-session-context)
           created*    (atom [])]
       (init-built-in-workflow! ctx s1)
-      (with-redefs [psi.agent-session.workflow.core/execute-async!
+      (with-redefs [psi.agent-session.workflow.core/mutate! (stub-workflow-mutate "run-1")
+                    psi.agent-session.workflow.core/execute-async!
                     (fn [run-id session-id workflow-name include?]
                       (swap! created* conj {:run-id run-id
                                             :session-id session-id
                                             :workflow-name workflow-name
                                             :include? include?})
                       run-id)]
-        (let [delegate-tool (some #(when (= "delegate" (:name %)) %)
-                                  (-> ctx :extension-registry :state deref :extensions (get workflow/built-in-workflow-path) :tools vals))]
+        (let [delegate-tool (delegate-tool-for ctx)]
           (is (some? delegate-tool))
           ((:execute delegate-tool) {:workflow "planner" :prompt "hello"} {:session-id s2})
-          (is (= s2 (:session-id (last @created*)))))))))
+          (is (= [{:run-id "run-1"
+                   :session-id s2
+                   :workflow-name "planner"
+                   :include? false}]
+                 @created*)))))))
 
 (deftest built-in-workflow-delegate-tool-follows-explicit-new-session-runtime-target-test
   (testing "built-in workflow delegate tool retargets when runtime execution supplies a newer session id after bootstrap"
     (let [[ctx sid1 sid2] (create-two-session-context)
           created*        (atom [])]
       (init-built-in-workflow! ctx sid1)
-      (let [delegate-tool (some #(when (= "delegate" (:name %)) %)
-                                (-> ctx :extension-registry :state deref :extensions (get workflow/built-in-workflow-path) :tools vals))]
-        (with-redefs [psi.agent-session.workflow.core/execute-async!
-                      (fn [run-id session-id workflow-name include?]
-                        (swap! created* conj {:run-id run-id
-                                              :session-id session-id
-                                              :workflow-name workflow-name
-                                              :include? include?})
-                        run-id)]
+      (with-redefs [psi.agent-session.workflow.core/mutate! (stub-workflow-mutate "run-2")
+                    psi.agent-session.workflow.core/execute-async!
+                    (fn [run-id session-id workflow-name include?]
+                      (swap! created* conj {:run-id run-id
+                                            :session-id session-id
+                                            :workflow-name workflow-name
+                                            :include? include?})
+                      run-id)]
+        (let [delegate-tool (delegate-tool-for ctx)]
+          (is (some? delegate-tool))
           ((:execute delegate-tool) {:workflow "planner" :prompt "hello"} {:session-id sid2})
-          (is (= sid2 (:session-id (last @created*)))))))))
+          (is (= [{:run-id "run-2"
+                   :session-id sid2
+                   :workflow-name "planner"
+                   :include? false}]
+                 @created*)))))))
