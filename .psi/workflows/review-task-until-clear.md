@@ -19,8 +19,7 @@ description: Repeatedly review a Munera task for ambiguities and inconsistencies
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
-                           :from {:step "ambiguity-review" :yield :text}
-                           :projection :text}
+                           :from {:step "ambiguity-review" :yield :text}}
                           {:type :template
                            :text "For the Munera task identified by {{input}}, execute the newly added actionable follow-up items in design-steps.md for ambiguities. Work independently. Use the preloaded ambiguity-review result to understand what was added in the preceding review pass. Read and update the task's design.md, plan.md, steps.md, and implementation.md, as needed. Complete the newly added unchecked design-steps when possible, updating task artifacts as you work. If a design-step is completed, mark it done in design-steps.md. If a design-step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit when done."
                            :vars {"input" {:from :workflow-input
@@ -42,8 +41,7 @@ description: Repeatedly review a Munera task for ambiguities and inconsistencies
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
-                           :from {:step "inconsistency-review" :yield :text}
-                           :projection :text}
+                           :from {:step "inconsistency-review" :yield :text}}
                           {:type :template
                            :text "For the Munera task identified by {{input}}, execute the newly added actionable follow-up items in design-steps.md. Work independently. Use the preloaded inconsistency-review result to understand what was added in the preceding review pass. Read and update the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in design-steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit when done."
                            :vars {"input" {:from :workflow-input
@@ -54,17 +52,13 @@ description: Repeatedly review a Munera task for ambiguities and inconsistencies
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
-                           :from {:step "ambiguity-review" :yield :text}
-                           :projection :text}
+                           :from {:step "ambiguity-review" :yield :text}}
                           {:type :source
-                           :from {:step "ambiguity-follow-up" :yield :text}
-                           :projection :text}
+                           :from {:step "ambiguity-follow-up" :yield :text}}
                           {:type :source
-                           :from {:step "inconsistency-review" :yield :text}
-                           :projection :text}
+                           :from {:step "inconsistency-review" :yield :text}}
                           {:type :source
-                           :from {:step "inconsistency-follow-up" :yield :text}
-                           :projection :text}
+                           :from {:step "inconsistency-follow-up" :yield :text}}
                           {:type :template
                            :text "Review the Munera task identified by {{input}} and decide whether there is still actionable ambiguity or inconsistency follow-up remaining from the just-completed review cycle. Independently inspect that specific task's artifacts, especially design.md, plan.md, steps.md, and implementation.md. Respond with exactly one word: REPEAT or DONE. Return REPEAT if there is still actionable ambiguity or inconsistency follow-up remaining from the review cycle, including newly added unchecked steps or unresolved review findings. Return DONE only if the task has no remaining new actionable ambiguity or inconsistency feedback from the cycle."
                            :vars {"input" {:from :workflow-input
