@@ -1,5 +1,13 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 8
+
+**AA. Integration test missing `effective-args` assertion.** The reference pattern (`workflow_invoke_runtime_test.clj`) asserts `(get-in run [:step-runs "discover" :attempts 0 :effective-args])` to prove that `{:from :workflow-input :path [:input]}` was resolved to `nil` through `resolve-invoke-args`. The integration test in `find_issue_integration_test.clj` does not assert this. Without it, the test does not prove arg resolution works correctly — only that the handler was called.
+
+**BB. Integration test missing `issue_url` assertion in `:summary`.** The handoff Markdown includes `issue_url:` but the integration test only checks `issue_number`, `issue_title`, and `worktree_description` in `:summary`. The design states the handoff format should be structurally verified.
+
+**CC. Integration test `calls*` invocation shape not asserted.** The test asserts `(count @calls*)` = 1 but does not assert the invocation shape (`{:args {:labels [...] :input nil} :run-id "..." :step-id "discover"}`). The reference test asserts this shape. Without it, the test does not prove the operation was invoked with the correct resolved args.
+
 ## 2026-05-10 — Phase 1 + Phase 2 execution complete
 
 Phase 1 (psi/github extension) and Phase 2 (gh-issue-refine.md update) are fully implemented.

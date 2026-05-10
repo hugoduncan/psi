@@ -56,6 +56,14 @@ Unchecked items added by design review pass 6 (2026-05-10).
 
 - [x] **X. Specify integration test assertion for "no session spawned".** Decided: run `workflow-execution/execute-run!` with a test ctx that has the operation registered but no `:workflow-execution-adapter`. Assert `:completed` status. If a session were spawned, `execution-adapter/adapter` would throw `"Workflow execution adapter is required"`. Test passing at `:completed` is the proof. Also assert handler `calls*` count = 1. Pattern matches `invoke-step-executes-through-deterministic-operation-registry-test` in `workflow_invoke_runtime_test.clj`. Design.md updated.
 
+Unchecked items added by design review pass 8 (2026-05-10).
+
+- [x] **AA. Add `effective-args` assertion to integration test.** `find_issue_integration_test.clj` does not assert `(get-in run [:step-runs "discover" :attempts 0 :effective-args])`. Add assertion that effective-args equals `{:labels ["enhancement" "refine"] :input nil}` — proving `resolve-invoke-args` resolved the `{:from :workflow-input :path [:input]}` reference correctly. Pattern: `workflow_invoke_runtime_test.clj` line asserting `:effective-args`.
+
+- [x] **BB. Add `issue_url` assertion to integration test `:summary` check.** The handoff Markdown includes `issue_url:` but the integration test only checks `issue_number`, `issue_title`, and `worktree_description`. Add `(is (str/includes? (get-in accepted [:outputs :summary]) "issue_url: https://github.com/org/repo/issues/42"))`.
+
+- [x] **CC. Add invocation shape assertion to integration test `calls*` check.** Test asserts `(count @calls*)` = 1 but not the invocation shape. Add assertion that `(first @calls*)` contains `{:args {:labels ["enhancement" "refine"] :input nil} :step-id "discover"}` — proving the operation was invoked with correctly resolved args.
+
 Unchecked items added by design review pass 7 (2026-05-10).
 
 - [x] **Y. Remove wrong `psi/github {:local/root "extensions/github"}` entry from root `deps.edn` `:deps` instruction.** No existing extension has a `:local/root` entry in root `deps.edn` `:deps` — extensions are wired exclusively via `:extra-paths` in aliases. Removed the `:local/root` line from design.md "Root `deps.edn` wiring" section and from steps.md and plan.md Phase 1 wiring steps. The `:extra-paths` instructions are correct and remain.
