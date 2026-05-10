@@ -6,7 +6,7 @@ description: Discover a triage bug, reproduce it in an issue worktree, then clas
           :type      :invoke
           :operation "github/find-issue"
           :args      {:labels ["bug" "triage"]
-                      :input  {:from :workflow-input :path [:input]}}
+                      :input  nil}
           :outputs   {:summary {:source :invoke/summary}}
           :yields    {:type :text :text :summary}}
          {:name "worktree"
