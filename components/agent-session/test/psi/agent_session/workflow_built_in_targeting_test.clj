@@ -1,11 +1,23 @@
 (ns psi.agent-session.workflow-built-in-targeting-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
-   [psi.agent-session.workflow.core :as workflow]))
+   [psi.agent-session.workflow.core :as workflow]
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]))
+
+(defn- clean-workflow-runtime-state [f]
+  (reset! workflow-runtime-state/state nil)
+  (reset! workflow-runtime-state/inflight-runs {})
+  (try
+    (f)
+    (finally
+      (reset! workflow-runtime-state/state nil)
+      (reset! workflow-runtime-state/inflight-runs {}))))
+
+(use-fixtures :each clean-workflow-runtime-state)
 
 (defn- create-two-session-context []
   (let [[ctx s0] (test-support/create-test-session {:persist? false
