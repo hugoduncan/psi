@@ -138,6 +138,13 @@ Implementation must answer:
 
 It is not sufficient to say that lifecycle behavior is preserved; the built-in invocation path must be named.
 
+Lifecycle scope invariant for this slice:
+
+- current inventory shows built-in workflow registers only `session_switch` in `components/agent-session/src/psi/agent_session/workflow/core.clj`
+- built-in workflow does not currently depend on `session_before_switch`, `session_before_fork`, or `session_fork`
+- therefore this task only needs a built-in registration/invocation path for `session_switch`
+- preserving or refactoring the other session lifecycle extension events is an explicit non-goal here unless implementation uncovers a concrete workflow dependency on them
+
 ## Prompt contribution modeling requirement
 
 This task must make prompt contribution ownership explicit.

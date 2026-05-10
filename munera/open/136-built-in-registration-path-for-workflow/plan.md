@@ -17,6 +17,7 @@ Planned outcomes:
 Decision rules:
 - success requires removing `ext/register-extension-in!` and `ext/create-extension-api` from canonical built-in workflow bootstrap
 - reuse of shared storage is allowed only through built-in-specific registration paths, not through extension-shaped registration calls
+- built-in lifecycle scope for this slice is `session_switch` only; `session_before_switch`, `session_before_fork`, and `session_fork` remain extension-only lifecycle surfaces unless implementation uncovers a concrete built-in workflow dependency on them
 - keep the prompt rendering heading `# Extension Prompt Contributions` unchanged in this task unless implementation shows a near-zero-cost rename, and treat the retained heading as explicit wording debt rather than ownership truth
 - if any prompt rendering or introspection wording still says "extension" for shared built-in surfaces, record it explicitly as wording debt rather than ownership truth
 - retain `built-in:workflow` only as the stable built-in provenance identifier for workflow-owned surfaces; it must be removed from extension-owned identity state and from proofs that equate it with an extension install

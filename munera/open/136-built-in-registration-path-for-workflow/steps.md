@@ -18,6 +18,8 @@
     - `init-built-in!` should install a built-in `session-switch` callback via the built-in registration layer, and `session_lifecycle.clj` should invoke built-in lifecycle callbacks explicitly after core session transitions instead of routing workflow through `ext/dispatch-in`
   - [x] reload and session-switch projection verification path named
     - replace extension-registry preservation proofs with built-in runtime-boundary proofs over command/tool availability and session-switch reload behavior, including the app-runtime launcher boundary test
+  - [x] lifecycle scope narrowed explicitly against the broader extension session lifecycle surface
+    - inventory confirms built-in workflow currently depends only on `session_switch`; `session_before_switch`, `session_before_fork`, and `session_fork` remain extension-only non-goals for this slice
 - [x] Make the built-in prompt contribution path explicit
   - [x] storage/provenance decision recorded
     - built-in workflow prompt contributions should continue to use the shared session prompt-contribution store, but registration must come from a built-in-specific path that records built-in provenance directly instead of deriving it from extension API wrapping or extension identity seeding
