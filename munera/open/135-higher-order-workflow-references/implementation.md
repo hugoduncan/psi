@@ -40,3 +40,12 @@ Implemented notes:
     - unknown referenced workflows are explicitly covered
     - availability-only failure remains blocked because the current canonical runtime has no distinct available-vs-known workflow gating path beyond registry presence, and this task intentionally did not invent one
   - Remaining unchecked item stays open for the same boundary reason: authored-shape failure, runtime-type failure, and lookup failure are explicit today, but availability failure is not separately representable in the current runtime model.
+- Follow-up execution 2026-05-10 (preloaded code-shape-review result):
+  - Re-read `steps.md`, `implementation.md`, `design.md`, `plan.md`, workflow grammar docs, and the canonical delegate/source-resolution owners.
+  - Confirmed no newer unchecked follow-up steps were added beyond the existing availability-failure distinction item.
+  - Reconfirmed the blocker in code rather than by task prose alone:
+    - authored-shape failure is explicit in `psi.workflow-runtime.target-ir-compiler/compile-delegate-target`
+    - runtime-type failure is explicit in `psi.workflow-step-materialization.source-resolution/resolve-workflow-ref-source-spec`
+    - lookup failure is explicit in `psi.workflow-runtime.statechart-runtime.delegate/resolve-delegate-target-definition`
+    - availability-only failure remains unrepresentable because canonical delegate resolution currently reads only registry presence and has no separate session-available workflow gate
+  - Left the remaining unchecked step open; no additional executable follow-up was possible within this task's recorded scope and current runtime model.
