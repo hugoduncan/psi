@@ -76,23 +76,6 @@
        "- worktree_description: " worktree-description "\n"))
 
 ;;; ---------------------------------------------------------------------------
-;;; Shell invocation
-
-(defn- build-gh-args
-  [labels state]
-  (let [state* (or state "open")
-        label-args (mapcat #(list "--label" %) labels)]
-    (apply vector "gh" "issue" "list"
-           "--state" state*
-           "--json" "number,title,url,state,labels"
-           label-args)))
-
-(defn- invoke-shell
-  [shell-fn labels state]
-  (let [args (build-gh-args labels state)]
-    (apply shell-fn args)))
-
-;;; ---------------------------------------------------------------------------
 ;;; Public operation handler
 
 (defn invoke
@@ -105,11 +88,16 @@
      :input   - optional narrowing hint (integer string, URL, or text); nil = no narrowing
      :state   - optional issue state string (default \"open\")"
   [{:keys [ctx args]}]
-  (let [shell-fn (or (:github-shell-fn ctx) shell/sh)
-        labels   (:labels args)
-        input    (:input args)
-        state    (:state args)
-        result   (invoke-shell shell-fn labels state)]
+  (let [shell-fn   (or (:github-shell-fn ctx) shell/sh)
+        labels     (:labels args)
+        input      (:input args)
+        state      (or (:state args) "open")
+        label-args (into [] (mapcat #(list "--label" %) labels))
+        gh-args    (into ["gh" "issue" "list"
+                          "--state" state
+                          "--json" "number,title,url,state,labels"]
+                         label-args)
+        result     (apply shell-fn gh-args)]
     (if (not= 0 (:exit result))
       {:status  :error
        :reason  :psi.github/shell-error

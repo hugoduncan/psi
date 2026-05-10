@@ -1,5 +1,15 @@
 # Implementation notes
 
+## 2026-05-10 — Follow-up execution: JJ KK LL MM resolved
+
+**JJ resolved**: Deleted `build-gh-args` and `invoke-shell`. Inlined into `invoke` as a single `let` block: `label-args` built with `(into [] (mapcat ...))`, `gh-args` assembled with `(into ["gh" "issue" "list" ...] label-args)`, `result` from `(apply shell-fn gh-args)`. `(apply vector ...)` is gone. Lint clean.
+
+**KK resolved**: Integration test handler is now a pure stub returning a fixed `{:status :ok :data {...} :summary stub-handoff-summary}` map. No call to `find-issue/invoke`. Removed `stub-issues-json` and `stub-shell-fn` helpers. Removed `cheshire.core` and `psi.github.find-issue` requires. All 13 assertions preserved and passing.
+
+**LL resolved**: Superseded by KK — handler no longer contains a ctx assoc at all. The nested `assoc` pattern is gone.
+
+**MM resolved**: Added two tests to `slug-derivation-test` in `find_issue_test.clj`: nil title → `""`, empty string title → `""`. Documents current behavior explicitly; no guard added (empty slug is a valid documented output). Unit suite: 10 tests, 35 assertions, 0 failures. Integration: 1 test, 13 assertions, 0 failures. Extensions suite: 106 tests, 432 assertions, 0 failures. Lint clean.
+
 ## 2026-05-10 — Code-shaping pass
 
 **JJ. `build-gh-args` + `invoke-shell` split is needless indirection.** Both private fns are called only from `invoke`. `build-gh-args` produces a vector only to be immediately `apply`-spread in `invoke-shell`. Inline into a single `let` binding in `invoke`. Also: `(apply vector ...)` is non-idiomatic — `into []` or `vec` is standard.

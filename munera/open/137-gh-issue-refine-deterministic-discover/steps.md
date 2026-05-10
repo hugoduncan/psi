@@ -32,10 +32,10 @@
   - `{:name "discover" :type :invoke :operation "github/find-issue" :args {:labels ["enhancement" "refine"] :input {:from :workflow-input :path [:input]}} :outputs {:summary {:source :invoke/summary}} :yields {:type :text :text :summary}}`
 - [x] Write focused workflow-runtime integration test: `^:integration`-tagged test in `extensions/github/test`; `:invoke` step with `github/find-issue` produces correct Markdown handoff, no session spawned; runs under `:integration` suite (`:focus-meta [:integration]`), skipped by `:extensions` suite
 - [x] **II** Integration test CC: add `:run-id "run-github-find-issue"` assertion to the invocation-shape check in `find_issue_integration_test.clj`. The stub should capture `(:workflow-run-id invocation)` as `:run-id` (matching the reference pattern in `workflow_invoke_runtime_test.clj`) and assert `(= "run-github-find-issue" (:run-id invocation))`.
-- [ ] **JJ** Simplify `find_issue.clj`: inline `build-gh-args` + `invoke-shell` into `invoke` as a single `let` binding; replace `(apply vector ...)` with `into []`
-- [ ] **KK** Refactor integration test handler to a pure stub (fixed `:ok` result, no real `find-issue/invoke` call); remove `stub-issues-json` and `stub-shell-fn` helpers; keep all existing assertions
-- [ ] **LL** Replace nested `assoc` in integration test handler with `(update invocation :ctx assoc :github-shell-fn ...)` (applies even if KK is not done)
-- [ ] **MM** Add a test for empty/nil title in `derive-slug` (documents behavior); guard in `derive-slug` if empty slug is invalid downstream
+- [x] **JJ** Simplify `find_issue.clj`: inline `build-gh-args` + `invoke-shell` into `invoke` as a single `let` binding; replace `(apply vector ...)` with `into []`
+- [x] **KK** Refactor integration test handler to a pure stub (fixed `:ok` result, no real `find-issue/invoke` call); remove `stub-issues-json` and `stub-shell-fn` helpers; keep all existing assertions
+- [x] **LL** Replace nested `assoc` in integration test handler with `(update invocation :ctx assoc :github-shell-fn ...)` (applies even if KK is not done)
+- [x] **MM** Add a test for empty/nil title in `derive-slug` (documents behavior); guard in `derive-slug` if empty slug is invalid downstream
 - [ ] Smoke test: run `gh-issue-refine` end-to-end against a real labeled issue, confirm discover step emits correct handoff <!-- blocked: requires real GitHub repo with issues labeled `enhancement` + `refine` -->
 - [ ] Verify downstream steps (`worktree`, `refine-design`) parse the new handoff correctly (format unchanged) <!-- blocked: requires real GitHub repo with labeled issues; handoff format is structurally identical to previous builder output so no downstream change expected -->
 

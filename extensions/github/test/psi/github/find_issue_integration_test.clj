@@ -7,13 +7,11 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [cheshire.core :as json]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.deterministic-operation-registry.registry :as op-reg]
-   [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.github.find-issue :as find-issue]))
+   [psi.workflow-runtime.core :as workflow-runtime]))
 
 (def ^:private discover-workflow-definition
   {:definition-id "github-find-issue-proof"
@@ -26,16 +24,13 @@
                     :outputs   {:summary {:source :invoke/summary}}
                     :yields    {:type :text :text :summary}}]})
 
-(defn- stub-issues-json
-  [issues]
-  (json/generate-string issues))
-
-(defn- stub-shell-fn
-  [issues]
-  (fn [& _args]
-    {:exit 0
-     :out  (stub-issues-json issues)
-     :err  ""}))
+(def ^:private stub-handoff-summary
+  (str "## Issue Selection\n\nSelected issue #42: Add dark mode\n\n"
+       "## Handoff Data\n"
+       "- issue_number: 42\n"
+       "- issue_title: Add dark mode\n"
+       "- issue_url: https://github.com/org/repo/issues/42\n"
+       "- worktree_description: add-dark-mode\n"))
 
 (defn- create-session-context
   []
@@ -54,21 +49,17 @@
     ;; calling create-step-attempt-session!.
     (let [[ctx session-id] (create-session-context)
           calls*           (atom [])
-          stub-issues      [{"number" 42
-                             "title"  "Add dark mode"
-                             "url"    "https://github.com/org/repo/issues/42"
-                             "state"  "open"
-                             "labels" []}]
           _                (op-reg/register-operation-in!
                             (:deterministic-operation-registry ctx)
                             {:id      "github/find-issue"
                              :handler (fn [invocation]
                                         (swap! calls* conj invocation)
-                                        (find-issue/invoke
-                                         (assoc invocation
-                                                :ctx (assoc (:ctx invocation)
-                                                            :github-shell-fn
-                                                            (stub-shell-fn stub-issues)))))})
+                                        {:status  :ok
+                                         :data    {:issue-number        42
+                                                   :issue-title         "Add dark mode"
+                                                   :issue-url           "https://github.com/org/repo/issues/42"
+                                                   :worktree-description "add-dark-mode"}
+                                         :summary stub-handoff-summary})})
           _                (swap! (:state* ctx)
                                   (fn [state]
                                     (let [[s _ _] (workflow-runtime/create-run

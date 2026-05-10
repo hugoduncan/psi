@@ -177,4 +177,14 @@
                          {:labels ["enhancement"]})
           slug   (get-in result [:data :worktree-description])]
       (is (<= (count slug) 40))
-      (is (not (str/ends-with? slug "-"))))))
+      (is (not (str/ends-with? slug "-")))))
+
+  (testing "nil title produces empty slug (documents behavior)"
+    (let [result (invoke (stub-shell [(issue 1 nil "https://github.com/org/repo/issues/1")])
+                         {:labels ["enhancement"]})]
+      (is (= "" (get-in result [:data :worktree-description])))))
+
+  (testing "empty string title produces empty slug (documents behavior)"
+    (let [result (invoke (stub-shell [(issue 1 "" "https://github.com/org/repo/issues/1")])
+                         {:labels ["enhancement"]})]
+      (is (= "" (get-in result [:data :worktree-description]))))))
