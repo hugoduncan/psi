@@ -152,7 +152,8 @@ Either choice is acceptable if built-in workflow is no longer registered as an e
 Compatibility note:
 
 - user-visible prompt contribution behavior must remain preserved
-- internal prompt rendering labels such as `# Extension Prompt Contributions` may remain temporarily only if recorded explicitly as wording debt rather than as workflow still being extension-owned
+- this task should keep the rendered heading `# Extension Prompt Contributions` unchanged as deliberate temporary wording debt, not as ownership truth, so built-in workflow provenance can be corrected without broadening this slice into prompt-copy churn
+- if that wording remains after implementation, task artifacts and affected proofs must describe it explicitly as shared prompt-layer label debt rather than as evidence that built-in workflow is still extension-owned
 
 ## Introspection and provenance requirement
 

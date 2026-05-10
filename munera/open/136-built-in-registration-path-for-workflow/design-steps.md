@@ -1,5 +1,7 @@
 - [x] Extend the inventory to include non-agent-session proofs and projections that still encode built-in workflow as extension-owned state, especially `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` asserting `built-in:workflow` lives in the extension registry.
   - decided this proof should migrate to a built-in runtime-boundary invariant/projection rather than remain an extension-registry exception, because task success explicitly requires canonical built-in workflow bootstrap to stop seeding extension identity
-- [ ] Reconcile the prompt contribution label decision with the chosen built-in provenance model
-  - [ ] decide whether `# Extension Prompt Contributions` remains as temporary wording debt or changes in this task
-  - [ ] inventory and update/record affected prompt assembly and proof surfaces, including `components/agent-session/test/psi/agent_session/prompt_lifecycle_test.clj`, so task artifacts stop implying the label is both preserved behavior and removable wording debt
+- [x] Reconcile the prompt contribution label decision with the chosen built-in provenance model
+  - [x] decide whether `# Extension Prompt Contributions` remains as temporary wording debt or changes in this task
+    - keep `# Extension Prompt Contributions` unchanged in this task as deliberate temporary wording debt; this slice is about correcting built-in registration provenance, not broadening into prompt-copy churn
+  - [x] inventory and update/record affected prompt assembly and proof surfaces, including `components/agent-session/test/psi/agent_session/prompt_lifecycle_test.clj`, so task artifacts stop implying the label is both preserved behavior and removable wording debt
+    - affected rendering/proof surfaces recorded: `components/prompt-assets/src/psi/prompt_assets/system_prompt.clj`, `components/agent-session/test/psi/agent_session/prompt_lifecycle_test.clj`, and `components/turn-runtime/test/psi/turn_runtime/request_test.clj`; these should preserve the current heading while the built-in workflow contribution stops reaching the shared prompt store through extension-shaped registration

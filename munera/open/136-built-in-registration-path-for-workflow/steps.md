@@ -18,10 +18,13 @@
     - `init-built-in!` should install a built-in `session-switch` callback via the built-in registration layer, and `session_lifecycle.clj` should invoke built-in lifecycle callbacks explicitly after core session transitions instead of routing workflow through `ext/dispatch-in`
   - [x] reload and session-switch projection verification path named
     - replace extension-registry preservation proofs with built-in runtime-boundary proofs over command/tool availability and session-switch reload behavior, including the app-runtime launcher boundary test
-- [ ] Make the built-in prompt contribution path explicit
-  - [ ] storage/provenance decision recorded
-  - [ ] prompt rendering/projection path recorded
-  - [ ] any remaining "extension" wording debt recorded explicitly if retained
+- [x] Make the built-in prompt contribution path explicit
+  - [x] storage/provenance decision recorded
+    - built-in workflow prompt contributions should continue to use the shared session prompt-contribution store, but registration must come from a built-in-specific path that records built-in provenance directly instead of deriving it from extension API wrapping or extension identity seeding
+  - [x] prompt rendering/projection path recorded
+    - prompt assembly currently renders the shared contribution layer in `components/prompt-assets/src/psi/prompt_assets/system_prompt.clj`, and request-preparation proofs assert that composed prompt in `components/agent-session/test/psi/agent_session/prompt_lifecycle_test.clj` and `components/turn-runtime/test/psi/turn_runtime/request_test.clj`; this task should preserve that rendering while changing only how the built-in workflow contribution reaches the shared store
+  - [x] any remaining "extension" wording debt recorded explicitly if retained
+    - keep `# Extension Prompt Contributions` unchanged in this task as deliberate wording debt because the task’s architectural goal is built-in registration provenance, not prompt-copy churn; record that retained label as a shared prompt-layer heading, not proof that built-in workflow remains extension-owned
 - [ ] Make the built-in active tool aggregation path explicit
   - [ ] built-in tool aggregation path recorded
   - [ ] built-in vs extension provenance at aggregation time recorded
