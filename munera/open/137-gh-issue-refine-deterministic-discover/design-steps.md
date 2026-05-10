@@ -64,6 +64,14 @@ Unchecked items added by design review pass 8 (2026-05-10).
 
 - [x] **CC. Add invocation shape assertion to integration test `calls*` check.** Test asserts `(count @calls*)` = 1 but not the invocation shape. Add assertion that `(first @calls*)` contains `{:args {:labels ["enhancement" "refine"] :input nil} :step-id "discover"}` — proving the operation was invoked with correctly resolved args.
 
+Unchecked items added by design review pass 9 (2026-05-10).
+
+- [ ] **DD. Fix contradictory slug label in `design.md`.** Line 94 says "using word-boundary truncation:" but the rule is hard truncation and `design-steps M` says "Word-boundary truncation is NOT used." Change the introductory phrase to "using hard truncation:" so the label matches the rule.
+
+- [ ] **EE. Fix duplicate step 7 in `plan.md` Phase 1.** Two items are numbered `7.` Renumber the second one (`Lint clean`) to `8.`.
+
+- [ ] **FF. Annotate blocked steps in `steps.md`.** The smoke-test and downstream-verify items are `[ ]` with no indication they are environment-blocked. Add a `<!-- blocked: requires real GitHub repo with labeled issues -->` note (or inline text) so readers know they are blocked, not merely pending.
+
 Unchecked items added by design review pass 7 (2026-05-10).
 
 - [x] **Y. Remove wrong `psi/github {:local/root "extensions/github"}` entry from root `deps.edn` `:deps` instruction.** No existing extension has a `:local/root` entry in root `deps.edn` `:deps` — extensions are wired exclusively via `:extra-paths` in aliases. Removed the `:local/root` line from design.md "Root `deps.edn` wiring" section and from steps.md and plan.md Phase 1 wiring steps. The `:extra-paths` instructions are correct and remain.

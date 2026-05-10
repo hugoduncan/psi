@@ -1,5 +1,13 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 9
+
+**DD. `design.md` slug description uses contradictory label.** Line 94 says "using word-boundary truncation:" but then describes hard truncation. `design-steps M` explicitly says "Word-boundary truncation is NOT used." The introductory label is wrong and contradicts both the rule and design-steps M.
+
+**EE. `plan.md` Phase 1 has duplicate step number 7.** Two items are numbered `7.` — "Confirm `extensions/tests.edn` requires no change" and "Lint clean". One should be renumbered to `8.`.
+
+**FF. `steps.md` open smoke-test and downstream-verify items have no blocked annotation.** `implementation.md` records these as "blocked — requires a real GitHub repo". `steps.md` shows them as plain unchecked `[ ]` with no note. A reader of `steps.md` cannot tell they are environment-blocked rather than simply not-yet-started.
+
 ## 2026-05-10 — Design review pass 8
 
 **AA. Integration test missing `effective-args` assertion.** The reference pattern (`workflow_invoke_runtime_test.clj`) asserts `(get-in run [:step-runs "discover" :attempts 0 :effective-args])` to prove that `{:from :workflow-input :path [:input]}` was resolved to `nil` through `resolve-invoke-args`. The integration test in `find_issue_integration_test.clj` does not assert this. Without it, the test does not prove arg resolution works correctly — only that the handler was called.
