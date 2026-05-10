@@ -21,7 +21,7 @@ description: Repeatedly review a Munera task for ambiguities and inconsistencies
                           {:type :source
                            :from {:step "ambiguity-review" :yield :text}}
                           {:type :template
-                           :text "For the Munera task identified by {{input}}, execute the newly added actionable follow-up items in design-steps.md for ambiguities. Work independently. Use the preloaded ambiguity-review result to understand what was added in the preceding review pass. Read and update the task's design.md, plan.md, steps.md, and implementation.md, as needed. Complete the newly added unchecked design-steps when possible, updating task artifacts as you work. If a design-step is completed, mark it done in design-steps.md. If a design-step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit when done."
+                           :text "For the Munera task identified by {{input}}, execute the newly added actionable follow-up items in design-steps.md for ambiguities. Work independently. Use the preloaded ambiguity-review result to understand what was added in the preceding review pass. Read and update the task's design.md, plan.md, steps.md, and implementation.md, as needed. Complete any newly added unchecked design-steps when possible, updating task artifacts as you work. If a design-step is completed, mark it done in design-steps.md. If a design-step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Do not execute items from steps.md. Commit when done."
                            :vars {"input" {:from :workflow-input
                                             :path [:input]}}}]}
          {:name "inconsistency-review"
@@ -43,7 +43,7 @@ description: Repeatedly review a Munera task for ambiguities and inconsistencies
                           {:type :source
                            :from {:step "inconsistency-review" :yield :text}}
                           {:type :template
-                           :text "For the Munera task identified by {{input}}, execute the newly added actionable follow-up items in design-steps.md. Work independently. Use the preloaded inconsistency-review result to understand what was added in the preceding review pass. Read and update the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in design-steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit when done."
+                           :text "For the Munera task identified by {{input}}, execute any newly added actionable follow-up items in design-steps.md. Work independently. Use the preloaded inconsistency-review result to understand what was added in the preceding review pass. Read and update the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in design-steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Do not execute items from steps.md. Commit when done."
                            :vars {"input" {:from :workflow-input
                                             :path [:input]}}}]}
          {:name "clarity-status"
