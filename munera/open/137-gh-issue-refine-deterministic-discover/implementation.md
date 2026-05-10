@@ -1,5 +1,9 @@
 # Implementation notes
 
+## 2026-05-10 — Follow-up execution: II resolved
+
+**II resolved**: Added `(is (= "run-github-find-issue" (:workflow-run-id invocation)))` to the CC block in `find_issue_integration_test.clj`. The stub already captured the full invocation map; the assertion now checks all three fields (`:args`, `:step-id`, `:workflow-run-id`) matching the reference pattern in `workflow_invoke_runtime_test.clj`. Test: 1 test, 13 assertions, 0 failures. Lint clean.
+
 ## 2026-05-10 — Implementation review pass 12
 
 **II. Integration test CC invocation-shape assertion is incomplete.** The CC assertion checks `(:args invocation)` and `(:step-id invocation)` but not `(:run-id invocation)` (i.e. `:workflow-run-id` captured as `:run-id` in the stub). The reference pattern (`workflow_invoke_runtime_test.clj` line 91) explicitly asserts `{:args args :run-id workflow-run-id :step-id step-id}`. The integration test stub captures the full invocation but only asserts two of the three fields — the run-id proof is missing. Fix: capture `(:workflow-run-id invocation)` as `:run-id` in the stub (matching the reference pattern) and assert `(= "run-github-find-issue" (:run-id invocation))`.

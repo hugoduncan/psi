@@ -85,7 +85,8 @@
       (is (= 1 (count @calls*)))
       (let [invocation (first @calls*)]
         (is (= {:labels ["enhancement" "refine"] :input nil} (:args invocation)))
-        (is (= "discover" (:step-id invocation))))
+        (is (= "discover" (:step-id invocation)))
+        (is (= "run-github-find-issue" (:workflow-run-id invocation))))
       ;; AA: effective-args — proves resolve-invoke-args resolved {:from :workflow-input :path [:input]} → nil
       (is (= {:labels ["enhancement" "refine"] :input nil}
              (get-in run [:step-runs "discover" :attempts 0 :effective-args])))
