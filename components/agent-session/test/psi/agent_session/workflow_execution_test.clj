@@ -210,182 +210,134 @@
                             ["i-1" "i-2"]]}
                  (get-in run [:step-runs "report-call" :accepted-result :diagnostics :delegate]))))))))
 
-(deftest execute-run-dynamic-delegate-step-invokes-selected-workflow-reference-test
-  (testing "dynamic delegate steps resolve explicit workflow references and invoke the selected canonical workflow"
-    (let [[ctx session-id] (support/create-session-context {:persist? false})
-          callee-definition {:steps [{:name "callee"
-                                      :type :session
-                                      :contributions [{:type :source
-                                                       :from :workflow-original}
-                                                      {:type :template
-                                                       :text "Do {{input}}"
-                                                       :vars {"input" {:from :workflow-input}}}]}]}
-          caller-definition {:definition-id "dynamic-delegate-caller"
-                             :steps [{:name "choose-workflow"
-                                      :type :invoke
-                                      :operation "demo/select-workflow"
-                                      :args {}}
-                                     {:name "run-selected-workflow"
-                                      :type :delegate
-                                      :target {:from {:step "choose-workflow" :output :data}
-                                               :path [:selected-workflow]}
-                                      :prompt-string "Handle the issue using the selected workflow."
-                                      :context [{:type :source
-                                                 :from :workflow-original}]}]}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state (assoc callee-definition :definition-id "builder"))
-                           [s _ _] (workflow-runtime/create-run s {:definition caller-definition
-                                                                   :run-id "run-dynamic-delegate"
-                                                                   :workflow-input {:original {:ticket 123
-                                                                                               :request "Please triage"}}})]
-                       s)))
-          prompts* (atom [])]
-      (with-redefs [psi.deterministic-operation-registry.registry/invoke-operation-in
-                    (fn [_registry operation-id _invocation _invoke-operation]
-                      (if (= operation-id "demo/select-workflow")
-                        {:status :ok
-                         :data {:selected-workflow {:type :workflow-ref
-                                                    :name "builder"}}
-                         :summary "selected builder"}
-                        (throw (ex-info "unexpected operation" {:operation-id operation-id}))))
-                    psi.workflow-runtime.attempts/create-step-attempt-session!
-                    (fn [_ctx _parent-session-id opts]
-                      (let [sid (str (:workflow-step-id opts) "-child")]
-                        {:attempt {:attempt-id (str sid "-attempt")
-                                   :status :pending
-                                   :execution-session-id sid}
-                         :execution-session (support/valid-child-session sid)}))
-                    psi.agent-session.turn/prompt-execution-result-in!
-                    (fn [_ctx child-session-id prompt]
-                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
-                      {:execution-result/assistant-message
-                       {:content "delegated output"}})]
-        (let [result (workflow-execution/execute-run! ctx session-id "run-dynamic-delegate")
-              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-dynamic-delegate")]
-          (is (= :completed (:status result)))
-          (is (= "delegated output"
-                 (get-in run [:step-runs "run-selected-workflow" :accepted-result :outputs :final-llm-reply])))
-          (is (= {:target "builder"
-                  :resolved-target "builder"
-                  :run-id (get-in run [:step-runs "run-selected-workflow" :accepted-result :diagnostics :delegate :run-id])
-                  :step-id "run-selected-workflow"
-                  :prompt-string "Handle the issue using the selected workflow."
-                  :context [{:ticket 123 :request "Please triage"}]}
-                 (get-in run [:step-runs "run-selected-workflow" :accepted-result :diagnostics :delegate])))
-          (is (= [{:session-id "callee-child"
-                   :prompt "Do Handle the issue using the selected workflow."}]
-                 @prompts*))))))
+(defn- create-dynamic-delegate-run!
+  [{:keys [run-id workflow-input chooser-result register-builder? remove-builder-before-delegate?]}]
+  (let [[ctx session-id] (support/create-session-context {:persist? false})
+        caller-definition {:definition-id "dynamic-delegate-caller"
+                           :steps [{:name "choose-workflow"
+                                    :type :invoke
+                                    :operation "demo/select-workflow"
+                                    :args {}}
+                                   {:name "run-selected-workflow"
+                                    :type :delegate
+                                    :target {:from {:step "choose-workflow" :output :data}
+                                             :path [:selected-workflow]}
+                                    :prompt-string "Handle the issue using the selected workflow."
+                                    :context [{:type :source
+                                               :from :workflow-original}]}]}
+        builder-definition {:definition-id "builder"
+                            :steps [{:name "callee"
+                                     :type :session
+                                     :contributions [{:type :source
+                                                      :from :workflow-original}
+                                                     {:type :template
+                                                      :text "Do {{input}}"
+                                                      :vars {"input" {:from :workflow-input}}}]}]}
+        _ (swap! (:state* ctx)
+                 (fn [state]
+                   (let [state (if register-builder?
+                                 (first (workflow-registry/register-definition state builder-definition))
+                                 state)
+                         [s _ _] (workflow-runtime/create-run state {:definition caller-definition
+                                                                     :run-id run-id
+                                                                     :workflow-input (or workflow-input {})})]
+                     s)))
+        prompts* (atom [])]
+    {:ctx ctx
+     :session-id session-id
+     :prompts* prompts*
+     :run-id run-id
+     :execute! (fn []
+                 (with-redefs [psi.deterministic-operation-registry.registry/invoke-operation-in
+                               (fn [_registry operation-id _invocation _invoke-operation]
+                                 (if (= operation-id "demo/select-workflow")
+                                   (do
+                                     (when remove-builder-before-delegate?
+                                       (swap! (:state* ctx)
+                                              (fn [state]
+                                                (first (workflow-registry/remove-definition state "builder")))))
+                                     {:status :ok
+                                      :data chooser-result
+                                      :summary "selected workflow"})
+                                   (throw (ex-info "unexpected operation" {:operation-id operation-id}))))
+                               psi.workflow-runtime.attempts/create-step-attempt-session!
+                               (fn [_ctx _parent-session-id opts]
+                                 (let [sid (str (:workflow-step-id opts) "-child")]
+                                   {:attempt {:attempt-id (str sid "-attempt")
+                                              :status :pending
+                                              :execution-session-id sid}
+                                    :execution-session (support/valid-child-session sid)}))
+                               psi.agent-session.turn/prompt-execution-result-in!
+                               (fn [_ctx child-session-id prompt]
+                                 (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                                 {:execution-result/assistant-message
+                                  {:content "delegated output"}})]
+                   (workflow-execution/execute-run! ctx session-id run-id)))}))
 
-  (testing "dynamic delegate steps fail explicitly when the resolved target value is not a workflow reference"
-    (let [[ctx session-id] (support/create-session-context {:persist? false})
-          caller-definition {:definition-id "dynamic-delegate-caller-invalid"
-                             :steps [{:name "choose-workflow"
-                                      :type :invoke
-                                      :operation "demo/select-workflow"
-                                      :args {}}
-                                     {:name "run-selected-workflow"
-                                      :type :delegate
-                                      :target {:from {:step "choose-workflow" :output :data}
-                                               :path [:selected-workflow]}
-                                      :prompt-string "Handle the issue using the selected workflow."}]}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-runtime/create-run state {:definition caller-definition
-                                                                       :run-id "run-dynamic-delegate-invalid"
-                                                                       :workflow-input {}})]
-                       s)))]
-      (with-redefs [psi.deterministic-operation-registry.registry/invoke-operation-in
-                    (fn [_registry operation-id _invocation _invoke-operation]
-                      (if (= operation-id "demo/select-workflow")
-                        {:status :ok
-                         :data {:selected-workflow "builder"}
-                         :summary "selected builder"}
-                        (throw (ex-info "unexpected operation" {:operation-id operation-id}))))]
-        (let [result (workflow-execution/execute-run! ctx session-id "run-dynamic-delegate-invalid")
-              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-dynamic-delegate-invalid")]
-          (is (= :failed (:status result)))
-          (is (= "Dynamic delegate target must resolve to a workflow reference"
-                 (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))))))
+(deftest execute-run-dynamic-delegate-step-success-test
+  (let [{:keys [ctx prompts* execute! run-id]}
+        (create-dynamic-delegate-run!
+         {:run-id "run-dynamic-delegate"
+          :workflow-input {:original {:ticket 123 :request "Please triage"}}
+          :register-builder? true
+          :chooser-result {:selected-workflow {:type :workflow-ref
+                                               :name "builder"}}})
+        result (execute!)
+        run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+    (is (= :completed (:status result)))
+    (is (= "delegated output"
+           (get-in run [:step-runs "run-selected-workflow" :accepted-result :outputs :final-llm-reply])))
+    (is (= {:target "builder"
+            :resolved-target "builder"
+            :run-id (get-in run [:step-runs "run-selected-workflow" :accepted-result :diagnostics :delegate :run-id])
+            :step-id "run-selected-workflow"
+            :prompt-string "Handle the issue using the selected workflow."
+            :context [{:ticket 123 :request "Please triage"}]}
+           (get-in run [:step-runs "run-selected-workflow" :accepted-result :diagnostics :delegate])))
+    (is (= [{:session-id "callee-child"
+             :prompt "Do Handle the issue using the selected workflow."}]
+           @prompts*))))
 
-  (testing "dynamic delegate steps fail explicitly when the resolved workflow reference names an unknown workflow"
-    (let [[ctx session-id] (support/create-session-context {:persist? false})
-          caller-definition {:definition-id "dynamic-delegate-caller-unknown"
-                             :steps [{:name "choose-workflow"
-                                      :type :invoke
-                                      :operation "demo/select-workflow"
-                                      :args {}}
-                                     {:name "run-selected-workflow"
-                                      :type :delegate
-                                      :target {:from {:step "choose-workflow" :output :data}
-                                               :path [:selected-workflow]}
-                                      :prompt-string "Handle the issue using the selected workflow."}]}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-runtime/create-run state {:definition caller-definition
-                                                                       :run-id "run-dynamic-delegate-unknown"
-                                                                       :workflow-input {}})]
-                       s)))]
-      (with-redefs [psi.deterministic-operation-registry.registry/invoke-operation-in
-                    (fn [_registry operation-id _invocation _invoke-operation]
-                      (if (= operation-id "demo/select-workflow")
-                        {:status :ok
-                         :data {:selected-workflow {:type :workflow-ref
-                                                    :name "missing-workflow"}}
-                         :summary "selected missing workflow"}
-                        (throw (ex-info "unexpected operation" {:operation-id operation-id}))))]
-        (let [result (workflow-execution/execute-run! ctx session-id "run-dynamic-delegate-unknown")
-              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-dynamic-delegate-unknown")]
-          (is (= :failed (:status result)))
-          (is (= "Delegated workflow definition not found"
-                 (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))
-          (is (= :workflow/execution-failure-recorded
-                 (get-in run [:history (dec (count (:history run))) :event])))))))
+(deftest execute-run-dynamic-delegate-step-wrong-type-failure-test
+  (let [{:keys [ctx execute! run-id]}
+        (create-dynamic-delegate-run!
+         {:run-id "run-dynamic-delegate-invalid"
+          :chooser-result {:selected-workflow "builder"}})
+        result (execute!)
+        run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+    (is (= :failed (:status result)))
+    (is (= "Dynamic delegate target must resolve to a workflow reference"
+           (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))))
 
-  (testing "dynamic delegate steps fail through the same lookup path when a previously selected workflow is removed before delegation"
-    (let [[ctx session-id] (support/create-session-context {:persist? false})
-          callee-definition {:definition-id "builder"
-                             :steps [{:name "callee"
-                                      :type :session
-                                      :contributions [{:type :template
-                                                       :text "Do {{input}}"
-                                                       :vars {"input" {:from :workflow-input}}}]}]}
-          caller-definition {:definition-id "dynamic-delegate-caller-removed"
-                             :steps [{:name "choose-workflow"
-                                      :type :invoke
-                                      :operation "demo/select-workflow"
-                                      :args {}}
-                                     {:name "run-selected-workflow"
-                                      :type :delegate
-                                      :target {:from {:step "choose-workflow" :output :data}
-                                               :path [:selected-workflow]}
-                                      :prompt-string "Handle the issue using the selected workflow."}]}
-          _ (swap! (:state* ctx)
-                   (fn [state]
-                     (let [[s _ _] (workflow-registry/register-definition state callee-definition)
-                           [s _ _] (workflow-runtime/create-run s {:definition caller-definition
-                                                                   :run-id "run-dynamic-delegate-removed"
-                                                                   :workflow-input {}})]
-                       s)))]
-      (with-redefs [psi.deterministic-operation-registry.registry/invoke-operation-in
-                    (fn [_registry operation-id _invocation _invoke-operation]
-                      (if (= operation-id "demo/select-workflow")
-                        (do
-                          (swap! (:state* ctx)
-                                 (fn [state]
-                                   (first (workflow-registry/remove-definition state "builder"))))
-                          {:status :ok
-                           :data {:selected-workflow {:type :workflow-ref
-                                                      :name "builder"}}
-                           :summary "selected builder"})
-                        (throw (ex-info "unexpected operation" {:operation-id operation-id}))))]
-        (let [result (workflow-execution/execute-run! ctx session-id "run-dynamic-delegate-removed")
-              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-dynamic-delegate-removed")]
-          (is (= :failed (:status result)))
-          (is (= "Delegated workflow definition not found"
-                 (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))
-          (is (= :workflow/execution-failure-recorded
-                 (get-in run [:history (dec (count (:history run))) :event]))))))))
+(deftest execute-run-dynamic-delegate-step-unknown-target-lookup-failure-test
+  (let [{:keys [ctx execute! run-id]}
+        (create-dynamic-delegate-run!
+         {:run-id "run-dynamic-delegate-unknown"
+          :chooser-result {:selected-workflow {:type :workflow-ref
+                                               :name "missing-workflow"}}})
+        result (execute!)
+        run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+    (is (= :failed (:status result)))
+    (is (= "Delegated workflow definition not found"
+           (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))
+    (is (= :workflow/execution-failure-recorded
+           (get-in run [:history (dec (count (:history run))) :event])))))
+
+(deftest execute-run-dynamic-delegate-step-removed-target-lookup-failure-test
+  (let [{:keys [ctx execute! run-id]}
+        (create-dynamic-delegate-run!
+         {:run-id "run-dynamic-delegate-removed"
+          :register-builder? true
+          :remove-builder-before-delegate? true
+          :chooser-result {:selected-workflow {:type :workflow-ref
+                                               :name "builder"}}})
+        result (execute!)
+        run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+    (is (= :failed (:status result)))
+    (is (= "Delegated workflow definition not found"
+           (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))
+    (is (= :workflow/execution-failure-recorded
+           (get-in run [:history (dec (count (:history run))) :event])))))
 
 (deftest execute-run-mixed-session-then-delegate-propagates-callee-yield-test
   (testing "mixed session and delegate workflows propagate the callee yielded value back through the delegating step"

@@ -27,12 +27,12 @@ Slice 3 — Runtime resolution
 - [x] Preserve existing delegated yield/handoff behavior after target resolution while adding the follow-up failure proof
 - [x] Re-verify deterministic/replay-friendly target resolution semantics after the added failure proof
 
-Slice 4 — Proof
-- [x] Add focused proof that static delegate targets still compile and run as before
-- [x] Add focused proof that valid dynamic workflow-reference targets compile and resolve successfully
-- [x] Add focused proof that malformed higher-order target shapes fail explicitly
-- [x] Add focused proof that valid-shaped but unknown referenced workflows fail explicitly as lookup failures
-- [x] Add focused proof that removed-before-delegation targets fail explicitly as lookup failures at delegation time
+Slice 4 — Proof shaping
+- [x] Split `execute-run-dynamic-delegate-step-invokes-selected-workflow-reference-test` into focused tests for success, wrong-type failure, unknown-target lookup failure, and removed-before-delegation lookup failure
+- [x] Add a shallow local helper in `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` to compress repeated dynamic-delegate setup without hiding intent
+- [x] Split `resolve-workflow-ref-source-spec-test` into separate success and rejection tests for clearer single-concern signal
+- [x] Move malformed dynamic delegate-target compiler proof into its own dedicated compiler test with a name that matches the behavior under proof
+- [x] Re-read shaped tests for clarity, signal, and robustness after the splits
 - [x] Keep availability-only failure explicitly unproven/open unless a distinct runtime gate is implemented
 - [x] Add at least one end-to-end higher-order workflow example proving selected workflow reference → later delegate execution
 - [x] Verify downstream delegated yield/handoff behavior remains unchanged in the end-to-end proof

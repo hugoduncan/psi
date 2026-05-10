@@ -175,6 +175,18 @@
                        :yields {:type :delegated}}]}
              ir)))))
 
+(deftest compile-target-dynamic-delegate-invalid-target-shape-test
+  (testing "delegate target authored shape fails clearly when not a workflow name string or source-spec"
+    (let [{:keys [valid? compile-error]}
+          (target-compiler/compile-and-validate-workflow-definition
+           {:steps [{:name "run-selected-workflow"
+                     :type :delegate
+                     :target {:path [:selected-workflow]}
+                     :prompt-string "Handle the issue using the selected workflow."}]})]
+      (is (false? valid?))
+      (is (= "Delegate target must be a workflow name string or workflow source-spec"
+             compile-error)))))
+
 (deftest compile-target-judge-routing-and-loop-bounds-test
   (testing "target authored judges, routing, and loop bounds compile into canonical IR"
     (let [ir (target-compiler/compile-workflow-definition target-judged-definition)

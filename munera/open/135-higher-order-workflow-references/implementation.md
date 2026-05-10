@@ -59,3 +59,14 @@ Implemented notes:
   - Added explicit execution proof that a previously selected workflow ref whose target is removed before delegation fails through the same lookup-failure path.
   - Reconfirmed that availability-only failure remains open because the current canonical runtime still has no distinct session-available workflow gate separate from registry presence.
   - Kept lookup failure and availability-only failure distinct in task notes rather than conflating them.
+- Review 2026-05-10 (test-shaper):
+  - Coverage is good, but the main dynamic execution test carries too many behaviors in one `deftest`.
+  - Unknown-target and removed-target tests duplicate setup that should be compressed with a shallow helper.
+  - Dynamic workflow-ref resolution tests would be clearer split into one success test and one rejection test.
+  - Compiler malformed-dynamic-target proof should live in its own dedicated test instead of sharing a broader compiler test body.
+- Follow-up execution 2026-05-10 (test shaping):
+  - Split the prior multi-behavior dynamic execution test into four focused tests: success, wrong-type failure, unknown-target lookup failure, and removed-before-delegation lookup failure.
+  - Added a shallow `create-dynamic-delegate-run!` helper to compress repeated execution setup while keeping the chooser result and registry conditions explicit at call sites.
+  - Split workflow-ref source-resolution proof into separate success and rejection tests with a small `run-with-chosen-workflow` helper.
+  - Moved malformed dynamic delegate-target compiler proof into its own dedicated compiler test.
+  - Re-ran unit tests and lint after shaping changes; behavior remained green while failure localization and local comprehensibility improved.
