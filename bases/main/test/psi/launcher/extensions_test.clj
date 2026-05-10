@@ -44,12 +44,18 @@
   (testing "recognized libs are catalogued explicitly"
     (is (ext/recognized-psi-owned-lib? 'psi/mementum))
     (is (ext/recognized-psi-owned-lib? 'psi/workflow-loader))
+    (is (ext/recognized-psi-owned-lib? 'psi/github))
     (is (not (ext/recognized-psi-owned-lib? 'third-party/ext))))
   (testing "catalog entry contains explicit init and installed policy"
     (is (= 'extensions.mementum/init
            (get-in ext/psi-owned-extension-catalog ['psi/mementum :psi/init])))
     (is (= "extensions/mementum"
            (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :installed :local/root]))))
+  (testing "psi/github catalog entry has correct init and local installed policy"
+    (is (= 'psi.github.extension/init
+           (get-in ext/psi-owned-extension-catalog ['psi/github :psi/init])))
+    (is (= "extensions/github"
+           (get-in ext/psi-owned-extension-catalog ['psi/github :source-policies :installed :local/root]))))
   (testing "catalog entry contains jar policy with release-version placeholder"
     (is (= :psi/release-version
            (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :jar :mvn/version])))
@@ -73,6 +79,10 @@
     (is (= {:mvn/version :psi/release-version
             :psi/init 'extensions.mementum/init}
            (ext/expand-entry 'psi/mementum {} {:policy :jar}))))
+  (testing "psi/github minimal syntax expands to local/root and project-local init"
+    (is (= '{:local/root "extensions/github"
+             :psi/init psi.github.extension/init}
+           (ext/expand-entry 'psi/github {}))))
   (testing "unrecognized libs do not receive psi-owned defaults"
     (is (= '{:mvn/version "1.2.3"}
            (ext/expand-entry 'third-party/ext {:mvn/version "1.2.3"}))))
