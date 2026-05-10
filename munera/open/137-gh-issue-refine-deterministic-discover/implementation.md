@@ -1,5 +1,30 @@
 # Implementation notes
 
+## 2026-05-10 — Phase 1 + Phase 2 execution complete
+
+Phase 1 (psi/github extension) and Phase 2 (gh-issue-refine.md update) are fully implemented.
+
+**Files created:**
+- `extensions/github/deps.edn` — cheshire 5.13.0 dep, :test alias with kaocha + extension-test-helpers + agent-session
+- `extensions/github/src/psi/github/find_issue.clj` — deterministic operation handler; `:github-shell-fn` seam; cheshire string-key JSON; narrowing (integer, URL, text); slug derivation; `result->handoff-md` serializer; shell error handling
+- `extensions/github/src/psi/github/extension.clj` — `init` registering `github/find-issue` via `(:register-operation api)`
+- `extensions/github/test/psi/github/find_issue_test.clj` — 11 unit tests, 38 assertions, all passing
+- `extensions/github/test/psi/github/extension_test.clj` — init registration test using `create-extension-api` with captured `register-deterministic-operation-fn`
+- `extensions/github/test/psi/github/find_issue_integration_test.clj` — `^:integration`-tagged integration test; proves no session spawned; 1 test, 8 assertions, passing
+
+**Files modified:**
+- `.psi/extensions.edn` — added `psi/github {}`
+- `deps.edn` — added `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, `:test` aliases; added `extensions/github/test` to `:test-paths` and `:test` aliases
+- `tests.edn` — added `extensions/github/src` to `:unit` `:source-paths`; added `extensions/github/test` + `extensions/github/src` to `:extensions` suite; added both to `:integration` suite
+- `.psi/workflows/gh-issue-refine.md` — replaced `discover` `:delegate` step with `:invoke` step using `github/find-issue`
+- `CHANGELOG.md` — added `[Unreleased]` entry
+
+**Smoke test (steps.md)**: blocked — requires a real GitHub repo with issues labeled `enhancement` + `refine`. Cannot be executed in this environment.
+
+**Downstream verify (steps.md)**: blocked — same reason; the handoff format is structurally identical to the previous builder output so no downstream change is expected.
+
+
+
 ## 2026-05-10 — Design review pass 7
 
 **Y. `root deps.edn :deps` wiring instruction is wrong.** Design.md and steps.md both say add `psi/github {:local/root "extensions/github"}` under root `deps.edn` `:deps`. No existing extension has a `:local/root` entry in root `deps.edn` `:deps` — extensions are wired exclusively via `:extra-paths` in aliases (`:run`, `:psi`, `:tui-demo`, `:test`). The `:local/root` instruction contradicts the actual codebase pattern and must be removed; only the `:extra-paths` wiring is needed.

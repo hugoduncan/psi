@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- `gh-issue-refine` workflow: the `discover` step is now a deterministic `:invoke` step backed by the new `psi/github` extension, replacing a non-deterministic AI builder-delegate step. Issue selection is fully determined by the `gh` CLI and selection rules — no AI sampling occurs during issue discovery.
+
 ### Fixed
 - Custom model providers whose selected session model stores `:provider` as a string now resolve provider-scoped auth, request options, and runtime model lookup consistently instead of falling back to built-in provider auth behavior.
 

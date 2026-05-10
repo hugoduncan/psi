@@ -2,15 +2,13 @@
 name: gh-issue-refine
 description: Find an enhancement issue labeled refine, create an issue worktree, refine its design until unambiguous, then push a PR and advance labels
 ---
-{:steps [{:name "discover"
-          :type :delegate
-          :target "builder"
-          :prompt-string {:type :template
-                          :text "Find exactly one open GitHub issue in this repository carrying both the `enhancement` and `refine` labels. Use `{{input}}` only as an optional narrowing hint such as an issue number, URL, or short selector.\n\nRequired procedure:\n1. Use `gh issue list --state open --label enhancement --label refine --json number,title,labels,state,url` to discover candidates.\n2. If none match, stop and report that there is nothing to process.\n3. If multiple match and `{{input}}` does not narrow to one, pick the lowest issue number.\n4. Emit a compact Markdown handoff with these headings exactly:\n   - `## Issue Selection`\n   - `## Handoff Data`\n5. Under `## Handoff Data`, include machine-friendly bullet lines for:\n   - `issue_number:`\n   - `issue_title:`\n   - `issue_url:`\n   - `worktree_description:`\n\nThe worktree description should be a short issue-derived slug suitable for the downstream worktree step."
-                          :vars {"input" {:from :workflow-input
-                                           :path [:input]}}}
-          :context [{:type :source
-                     :from :workflow-original}]}
+{:steps [{:name      "discover"
+          :type      :invoke
+          :operation "github/find-issue"
+          :args      {:labels ["enhancement" "refine"]
+                      :input  {:from :workflow-input :path [:input]}}
+          :outputs   {:summary {:source :invoke/summary}}
+          :yields    {:type :text :text :summary}}
          {:name "worktree"
           :type :delegate
           :target "gh-issue-create-worktree"
