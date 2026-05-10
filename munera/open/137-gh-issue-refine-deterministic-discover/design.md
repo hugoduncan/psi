@@ -157,10 +157,7 @@ psi/github {}
 
 **Root `deps.edn` wiring** (required for classpath):
 
-Under `:deps`, add:
-```edn
-psi/github {:local/root "extensions/github"}
-```
+Extensions are not listed under root `deps.edn` `:deps` — no existing extension has a `:local/root` entry there. Wiring is via `:extra-paths` in aliases only.
 
 Under `:run`, `:psi`, `:tui-demo`, and `:test` aliases, add to `:extra-paths`:
 ```

@@ -1,5 +1,11 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 7
+
+**Y. `root deps.edn :deps` wiring instruction is wrong.** Design.md and steps.md both say add `psi/github {:local/root "extensions/github"}` under root `deps.edn` `:deps`. No existing extension has a `:local/root` entry in root `deps.edn` `:deps` — extensions are wired exclusively via `:extra-paths` in aliases (`:run`, `:psi`, `:tui-demo`, `:test`). The `:local/root` instruction contradicts the actual codebase pattern and must be removed; only the `:extra-paths` wiring is needed.
+
+**Z. `steps.md` unit test list missing 3 cases.** Design (V, W, T resolved) specifies these unit test cases but they are absent from `steps.md`: (a) text substring narrowing with case-folding assertion; (b) non-zero `gh` CLI exit → `{:status :error :reason :psi.github/shell-error ...}`; (c) invalid URL (no `/issues/NNN` segment) → `{:status :error :reason :psi.github/invalid-url-input ...}`. All three must be added to the steps.md unit test checklist.
+
 ## 2026-05-10 — Design review pass 6 follow-up (design-steps S–X resolved)
 
 **S resolved**: `(cheshire.core/parse-string json)` — string keys, no keywordize flag. `gh` CLI returns camelCase JSON (`"number"`, `"title"`, `"url"`, `"state"`); labels are objects with `"name"` subfield. Confirmed by running `gh issue list --json number,title,url,labels,state` against live repo. All field access uses string keys: `(get issue "number")`, `(map #(get % "name") (get issue "labels"))`.

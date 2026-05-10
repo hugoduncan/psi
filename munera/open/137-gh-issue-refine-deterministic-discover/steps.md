@@ -11,9 +11,12 @@
   - multiple candidates + no narrowing → lowest number selected
   - narrowing by integer → exact match
   - narrowing by URL → number extracted, correct match
+  - invalid URL (no `/issues/NNN` segment) → `{:status :error :reason :psi.github/invalid-url-input ...}`
+  - narrowing by text substring (case-insensitive) → include a case-folding assertion
+  - non-zero `gh` CLI exit → `{:status :error :reason :psi.github/shell-error :message "gh: not authenticated"}`
   - `:input nil` (absent workflow-input) → treated as no narrowing, selects lowest candidate
 - [ ] Write `init` registration test for `psi.github.extension/init` using `create-extension-api` with captured `register-deterministic-operation-fn` override (pattern from `extensions_test.clj`; nullable API cannot be used for this)
-- [ ] Register `psi/github {}` in `.psi/extensions.edn`; add `psi/github {:local/root "extensions/github"}` to root `deps.edn` `:deps`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, and `:test` aliases; add `extensions/github/test` to `:test-paths` and `:test` aliases (note: `extensions/github/src` must NOT be added to `:test-paths` alias — that alias contains test paths only)
+- [ ] Register `psi/github {}` in `.psi/extensions.edn`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, and `:test` aliases `:extra-paths`; add `extensions/github/test` to `:test-paths` and `:test` aliases (note: `extensions/github/src` must NOT be added to `:test-paths` alias — that alias contains test paths only; do NOT add `psi/github` to root `deps.edn` `:deps` — extensions are wired via `:extra-paths` only, not `:local/root`)
 - [ ] Wire `extensions/github/` into Kaocha `tests.edn`:
   - add `extensions/github/test` to `:extensions` suite `:test-paths`
   - add `extensions/github/src` to `:extensions` suite `:source-paths`
