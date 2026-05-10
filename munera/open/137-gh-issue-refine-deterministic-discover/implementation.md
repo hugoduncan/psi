@@ -1,5 +1,11 @@
 # Implementation notes
 
+## 2026-05-10 — Design review pass 5
+
+**Q. `deps.edn` `:test-paths` wiring instruction is wrong.** Design and plan say add `extensions/github/src` to `:test-paths` alias. The actual `:test-paths` alias contains only test paths for extensions (e.g. `extensions/work-on/test`), never extension `src` paths. Extension `src` paths appear in `:test` alias only. Instruction should be: add `extensions/github/src` to `:test` alias (not `:test-paths`). Add `extensions/github/test` to both `:test-paths` and `:test` aliases (consistent with work-on pattern).
+
+**R. Phase 2 integration test placement unspecified.** Design and steps call for a "focused workflow-runtime integration test" for the `:invoke` + `github/find-issue` step, but neither specifies where the test file lives (`extensions/github/test` vs `components/workflow-runtime/test`). This determines which Kaocha suite runs it and whether `extensions/github/src` must be in the `:unit` suite source-paths. Must be decided before Phase 2 execution.
+
 ## 2026-05-10 — Design review pass 4 (design-steps L–P resolved)
 
 **L resolved**: Two-layer test approach. `psi.github.find-issue/invoke` unit tests call the fn directly with stub ctx. `psi.github.extension/init` registration test uses `create-extension-api` with captured `register-deterministic-operation-fn` override (pattern from `extensions_test.clj`). Nullable API cannot be used for `init` — no `:register-operation` key. Design.md and steps.md updated.

@@ -35,3 +35,9 @@ Unchecked items added by design review pass 3 (2026-05-10).
 - [x] **O. Add `extensions/github/src` to `tests.edn` `:unit` suite `:source-paths`.** Confirmed: all other extension `src` paths appear in `:unit` `:source-paths` for compilation parity. `extensions/github/src` must be added. Plan.md and steps.md updated.
 
 - [x] **P. Confirm `extensions/tests.edn` requires no change.** Confirmed: `extensions/tests.edn` is a standalone kaocha config using relative paths (`src`/`test`) for running tests within the `extensions/` directory. It is not the authoritative suite config. Root `tests.edn` owns all suite definitions. No existing extension is listed by absolute path in `extensions/tests.edn`. `psi/github` tests are fully covered by root `tests.edn` `:extensions` suite. No change to `extensions/tests.edn` needed.
+
+Unchecked items added by design review pass 5 (2026-05-10).
+
+- [ ] **Q. Fix `deps.edn` `:test-paths` alias wiring instruction.** Design and plan say add `extensions/github/src` to `:test-paths` alias. Actual `:test-paths` contains only test paths for extensions (e.g. `extensions/work-on/test`), never extension `src` paths. Extension `src` paths appear in `:test` alias only. Correct instruction: add `extensions/github/src` to `:test` alias (not `:test-paths`); add `extensions/github/test` to both `:test-paths` and `:test` aliases. Update design.md, plan.md, and steps.md to reflect the corrected wiring.
+
+- [ ] **R. Specify Phase 2 integration test file location.** Design and steps call for a "focused workflow-runtime integration test" but do not specify where the test file lives (`extensions/github/test` vs `components/workflow-runtime/test`). Placement determines which Kaocha suite runs it and whether additional source-paths wiring is needed. Decide and document in design.md and steps.md before Phase 2 execution.
