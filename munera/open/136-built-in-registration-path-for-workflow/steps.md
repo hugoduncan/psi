@@ -47,5 +47,6 @@
   - [ ] if `built-in:workflow` remains, keep it only as a built-in provenance identifier rather than extension identity
   - [ ] if any shared storage remains, record exactly which surfaces remain shared and why that is no longer pseudo-extension modeling
 - [ ] Update affected tests to prove built-in rather than pseudo-extension registration behavior
+  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_tui_repro_test.clj` off `command-registry/get-command-in (:extension-registry ctx) "delegate"` so the TUI-like `/delegate` proof uses the same built-in-aware command resolution path as the other workflow behavior proofs
 - [ ] Update docs/implementation notes to reflect the new residual status
 - [ ] Verify preserved user-facing behavior for `delegate`, `/delegate`, `/delegate-reload`, reload behavior, and prompt contribution surfacing

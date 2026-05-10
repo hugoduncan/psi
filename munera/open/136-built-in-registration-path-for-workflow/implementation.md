@@ -49,3 +49,4 @@
     - `workflow_async_path_test.clj` should prove delegate command resolution through the built-in path rather than using extension-registry-backed lookup as an ownership proxy.
     - `gordian_launcher_manifest_runtime_boundary_test.clj` should assert runtime built-in availability without extension identity seeding.
   - no blocker found; the newly added unchecked design-step items were design clarifications and are now reflected in `design.md`, `plan.md`, `steps.md`, and `design-steps.md`.
+- 2026-05-10 code-shaper review: found one more consistency gap in the proof inventory. `components/agent-session/test/psi/agent_session/workflow_tui_repro_test.clj` still resolves the built-in `/delegate` command through `command-registry/get-command-in (:extension-registry ctx)`, so the task should classify it with the other built-in proof migrations rather than leaving one more extension-owned lookup in a TUI-like behavior proof.
