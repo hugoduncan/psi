@@ -50,8 +50,7 @@ description: Discover a triage bug, reproduce it in an issue worktree, then clas
                     {:type :source
                      :from {:step "worktree" :output :handoff}}
                     {:type :source
-                     :from {:step "reproduce" :output :transcript}
-                     :projection {:type :tail :turns 4 :tool-output false}}]}]}
+                     :from {:step "reproduce" :output :handoff}}]}]}
 
 Coordinate a modular GitHub bug-triage workflow.
 

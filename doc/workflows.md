@@ -281,8 +281,7 @@ Representative target-style classification step:
            {:type :source
             :from {:step "worktree" :output :handoff}}
            {:type :source
-            :from {:step "reproduce" :output :transcript}
-            :projection {:type :tail :turns 4 :tool-output false}}]}
+            :from {:step "reproduce" :output :handoff}}]}
 ```
 
 What this teaches:
@@ -290,7 +289,7 @@ What this teaches:
 - yielded text and structured handoff are distinct delegated contracts
 - `:yield :text` is the human-facing chaining surface
 - `:output :handoff` is the machine-facing orchestration surface
-- transcript-tail projection remains support context rather than the main machine contract
+- downstream orchestration should prefer declared handoff data over assuming delegated transcript export
 
 ## Input and context flow
 

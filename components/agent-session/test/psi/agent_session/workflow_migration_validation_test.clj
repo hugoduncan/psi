@@ -121,5 +121,5 @@
              (get-in gh-bug-triage-modular [:steps 1 :context 1 :from :output])))
       (is (= :handoff
              (get-in gh-bug-triage-modular [:steps 2 :context 2 :from :output])))
-      (is (= :transcript
+      (is (= :handoff
              (get-in gh-bug-triage-modular [:steps 3 :context 3 :from :output]))))))
