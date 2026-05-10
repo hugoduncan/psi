@@ -37,4 +37,4 @@
 ## Phase 3 — Coherence
 
 - [x] Update CHANGELOG.md under `[Unreleased]`
-- [ ] Commit all changes with appropriate symbols
+- [x] Commit all changes with appropriate symbols
