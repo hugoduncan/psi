@@ -97,9 +97,67 @@ The new operations follow the same pattern as `psi.github.find-issue`:
 :invoke github/add-label     :number from upstream :data
 ```
 
+**Explicit :number wiring for label-ops steps (item H):**
+
+`find-issue` outputs `:issue-number`; `find-pr` outputs `:pr-number`.  Label-ops steps
+wire `:number` from the upstream discover step's `:data` output using the appropriate
+path:
+
+```edn
+;; After a find-issue "discover" step:
+:args {:number {:from {:step "discover" :output :data} :path [:issue-number]}
+       :labels [...]
+       :target "issue"}
+
+;; After a find-pr "discover" step:
+:args {:number {:from {:step "discover" :output :data} :path [:pr-number]}
+       :labels [...]
+       :target "pr"}
+```
+
+The discover step must expose `:data` in its `:outputs` map:
+
+```edn
+:outputs {:summary {:source :invoke/summary}
+          :data    {:source :invoke/data}}
+```
+
+Workflows that already have a `find-issue` discover step with only `:summary` in
+`:outputs` (`gh-issue-refine`, `gh-bug-fix-and-pr`) must add `:data {:source
+:invoke/data}` to that step's `:outputs` before adding label-ops steps.
+
 The AI step narrows its responsibility to content: reading, analysing, composing
 replies, implementing changes.  Label mutation is a post-condition executed
 deterministically after the AI step succeeds.
+
+### PR number source for gh-issue-refine label-ops (item J)
+
+**Decision (J):** Use option (a) — update the `publish` delegate step prompt to
+output `pr_number:` as a structured bullet under `## Handoff Data`, and add
+`:outputs {:data {:source :delegate/handoff}}` to the publish step so downstream
+label-ops steps can wire `:number` from it.
+
+Rationale: the publish delegate already creates the PR and has the PR number
+available at that point.  Requiring it to emit `pr_number:` in the structured
+handoff costs nothing extra and avoids an additional `find-pr` round-trip.
+
+Wiring for the add-label step that follows publish:
+
+```edn
+:args {:number {:from {:step "publish" :output :data} :path [:pr-number]}
+       :labels ["waiting"]
+       :target "pr"}
+```
+
+The publish step's `:outputs` must include:
+
+```edn
+:outputs {:summary {:source :delegate/summary}
+          :data    {:source :delegate/handoff}}
+```
+
+And the publish prompt must include `pr_number:` under `## Handoff Data` (alongside
+the existing `pr_url:` bullet).
 
 ### `github/find-pr` slug derivation
 

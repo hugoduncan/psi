@@ -37,6 +37,23 @@ All seven design-steps resolved:
 7. **`extension-test` update under-specified** — steps say "assert four registrations" but do not say to assert all four operation ids specifically (not just count).
 8. **No `plan.md`** — task has no `plan.md`; Munera requires one before execution.
 
+## 2026-05-10 — Design review pass 2 follow-up execution (design-steps H–J)
+
+All three design-steps resolved:
+
+- **H** — design.md §data flow expanded with explicit `:path` wiring syntax for both
+  `find-issue` (`:path [:issue-number]`) and `find-pr` (`:path [:pr-number]`) cases.
+  All Phase 5 steps.md migration items updated with concrete wiring expressions.
+  New/existing discover steps must expose `:data {:source :invoke/data}` in `:outputs`.
+- **I** — steps.md `gh-issue-refine` and `gh-bug-fix-and-pr` migration blocks each
+  gained a sub-item: "Add `:data {:source :invoke/data}` to the existing `discover`
+  step `:outputs`."
+- **J** — decided: option (a) — update publish delegate prompt to output `pr_number:`
+  in `## Handoff Data` and add `:outputs {:data {:source :delegate/handoff}}` to the
+  publish step.  Avoids extra `find-pr` round-trip; publish already has the PR number.
+  design.md §PR number source added; steps.md `gh-issue-refine` migration block updated
+  with two sub-items (update publish step; wire add-label `:number` from publish `:data`).
+
 ## 2026-05-10 — Design review pass 2
 
 **Inconsistencies found:**
