@@ -10,7 +10,7 @@
    Single-step profiles and multi-step orchestrations use the same format.
 
    Tool: delegate(action, workflow, prompt, ...)
-   Command: /delegate <workflow> <prompt>"
+   Command: /delegate <workflow> [<prompt>]"
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
@@ -172,9 +172,6 @@
     (cond
       (nil? workflow-name)
       {:error "workflow is required"}
-
-      (nil? prompt-text)
-      {:error "prompt is required"}
 
       (= ::invalid mode*)
       {:error "mode must be one of: sync, async"}
@@ -434,7 +431,7 @@
 
   ;; Register /delegate command
   ((:register-command api) "delegate"
-                           {:description "Delegate to a workflow: /delegate [list|<workflow> <prompt>]"
+                           {:description "Delegate to a workflow: /delegate [list|<workflow> [<prompt>]]"
                             :handler (fn [args]
                                        (let [{:keys [workflow prompt]} (text/parse-delegate-command args)]
                                          (cond
@@ -445,9 +442,6 @@
 
                                            (= "list" workflow)
                                            (delegate-list)
-
-                                           (nil? prompt)
-                                           (str "Usage: /delegate " workflow " <prompt>")
 
                                            :else
                                            ;; Slash-command delegation is conversational: successful final
