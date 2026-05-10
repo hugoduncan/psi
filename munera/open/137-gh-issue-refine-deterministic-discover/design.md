@@ -53,7 +53,7 @@ A `:tool` step type would be appropriate only if the operation needed to appear 
 
 ### 1. `psi/github` extension
 
-**Location**: `components/github/` (new component, parallel to `components/workflow-runtime/`).
+**Location**: `extensions/github/` (new extension, parallel to `extensions/work-on/`).
 
 **Namespace**: `psi.github.find-issue`
 
@@ -86,7 +86,7 @@ The `:summary` field carries the serialized Markdown handoff block. This is the 
 
 **Implementation**:
 - Invokes `gh issue list --state <state> --label <l1> --label <l2> ... --json number,title,labels,state,url` via `clojure.java.shell/sh` (or a configurable `:github-shell-fn` ctx key for testing).
-- Parses JSON output with `cheshire.core/parse-string` (project standard; declare `cheshire/cheshire "5.13.0"` in the github component `deps.edn`).
+- Parses JSON output with `cheshire.core/parse-string` (project standard; declare `cheshire/cheshire "5.13.0"` in `extensions/github/deps.edn`).
 - Applies narrowing: if `input` parses as an integer → filter by issue number; if it looks like a URL → extract number from URL; otherwise → text substring match on title.
 - Selects the lowest `number` among candidates.
 - Derives `worktree-description` as a kebab-slug from the title (≤ 40 chars, `[a-z0-9-]`).
@@ -132,6 +132,23 @@ A private `result->handoff-md` fn in `psi.github.find-issue` converts the struct
 psi/github {}
 ```
 
+**Root `deps.edn` wiring** (required for classpath):
+
+Under `:deps`, add:
+```edn
+psi/github {:local/root "extensions/github"}
+```
+
+Under `:run`, `:psi`, `:tui-demo`, `:test-paths`, and `:test` aliases, add to `:extra-paths`:
+```
+"extensions/github/src"
+```
+
+Under `:test-paths` and `:test` aliases, also add:
+```
+"extensions/github/test"
+```
+
 ### 2. `gh-issue-refine.md` update
 
 Replace the current `discover` step:
@@ -154,6 +171,8 @@ Replace the current `discover` step:
 ```
 
 The `:yields {:type :text :text :summary}` declaration means `step-yield-field-value` for `:text` returns the `:summary` output value — the Markdown handoff string. Downstream steps consuming `{:from {:step "discover" :yield :text}}` require no change.
+
+**`:outputs` override behavior**: `target-ir-compiler/compile-common-step-fields` uses `(or outputs (step-default-outputs type))` — full replacement, not merge. Specifying `{:outputs {:summary {:source :invoke/summary}}}` drops the default `:data` and `:result` outputs. This is intentional: no downstream step in `gh-issue-refine.md` references `{:output :data}` or `{:output :result}` from the `discover` step. All downstream steps use `{:from {:step "discover" :yield :text}}` exclusively. Explicitly declaring only `:summary` is correct and avoids unnecessary output bindings.
 
 No changes to downstream steps — they consume the same Markdown handoff format.
 

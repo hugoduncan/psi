@@ -67,3 +67,13 @@ The `worktree` step consumes `{:from {:step "discover" :yield :text}}`. For a `:
 
 **F. No `plan.md` — Munera protocol requires it before execution.**
 The task has `design.md`, `steps.md`, and `implementation.md` but no `plan.md`. Per the Munera protocol, `plan.md` must exist and be written before execution begins.
+
+## 2026-05-10 — Design review pass 2 follow-up (design-steps H–K resolved)
+
+**H resolved**: `:outputs {:summary {:source :invoke/summary}}` is correct and intentional. No downstream step in `gh-issue-refine.md` references `:data` or `:result` from `discover` — all consume `{:yield :text}` only. Compiler replaces defaults entirely (no merge), so the explicit single-key `:outputs` is the right shape. Design.md updated with override-behavior note.
+
+**I resolved**: `extensions/github/` is the correct placement. `psi/github` is domain-specific (GitHub-only) and uses the extension registration pattern (`(:register-operation api)` + `.psi/extensions.edn`). Components are reusable core infrastructure; this is not. All references to `components/github/` in design.md, plan.md, and steps.md corrected to `extensions/github/`.
+
+**J resolved**: Root `deps.edn` wiring specified explicitly. Add `psi/github {:local/root "extensions/github"}` under `:deps`. Add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, `:test-paths`, `:test` alias `:extra-paths`. Add `extensions/github/test` to `:test-paths` and `:test` aliases. Design.md, plan.md, and steps.md updated.
+
+**K resolved**: `tests.edn` `:extensions` suite. Add `extensions/github/test` to `:test-paths` and `extensions/github/src` to `:source-paths`. Plan.md and steps.md updated.

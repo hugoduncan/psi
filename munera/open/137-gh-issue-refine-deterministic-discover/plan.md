@@ -10,12 +10,12 @@ No new step types, IR schema changes, or execution-adapter keys are needed — t
 
 ### Phase 1 — `psi/github` extension (prerequisite for Phase 2)
 
-1. Scaffold `components/github/` (`deps.edn` with `cheshire 5.13.0`, `src/`, `test/`)
+1. Scaffold `extensions/github/` (`deps.edn` with `cheshire 5.13.0`, `src/`, `test/`)
 2. Implement `psi.github.find-issue/invoke` with `:github-shell-fn` seam, JSON parsing via cheshire, narrowing logic, slug derivation, and `result->handoff-md` serializer
 3. Implement `psi.github.extension/init` registering the `github/find-issue` operation
 4. Write focused unit tests (nullable shell stub): no candidates → error; single candidate → correct map + slug; multiple → lowest number; narrowing by integer; narrowing by URL
-5. Register `psi/github {}` in `.psi/extensions.edn`
-6. Wire `components/github/` into Kaocha `tests.edn`
+5. Register `psi/github {}` in `.psi/extensions.edn`; add `psi/github {:local/root "extensions/github"}` to root `deps.edn` `:deps`; add `extensions/github/src` to `:run`, `:psi`, `:tui-demo`, `:test-paths`, `:test` aliases; add `extensions/github/test` to `:test-paths` and `:test` aliases
+6. Wire `extensions/github/` into Kaocha `tests.edn` `:extensions` suite (test-paths + source-paths)
 7. Lint clean
 
 ### Phase 2 — Workflow update (requires Phase 1 complete)
