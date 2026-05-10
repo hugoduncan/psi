@@ -27,11 +27,9 @@ description: Prepare a PR worktree, inspect checks, wait for completion, repair 
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
-                           :from {:step "prep" :yield :text}
-                           :projection :text}
+                           :from {:step "prep" :yield :text}}
                           {:type :source
-                           :from {:step "inspect" :yield :text}
-                           :projection :text}
+                           :from {:step "inspect" :yield :text}}
                           {:type :template
                            :text "Respond exactly with one word: PASS, PENDING, FAIL, or BLOCKED.\n\nRead the actor output and route strictly from the `check_overall_status` in its `## Handoff Data`.\n- Return PASS only when all checks are passing and none are pending or failing.\n- Return PENDING when any checks are still running or queued.\n- Return FAIL when any checks are failing, cancelled, or otherwise terminally unsuccessful.\n- Return BLOCKED when the actor output says the PR/check state could not be inspected reliably or could not be proceeded with safely.\n\nDo not infer a different classification from narrative prose when the handoff data is explicit."
                            :vars {}}]
@@ -61,8 +59,7 @@ description: Prepare a PR worktree, inspect checks, wait for completion, repair 
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
-                           :from {:step "wait" :yield :text}
-                           :projection :text}
+                           :from {:step "wait" :yield :text}}
                           {:type :template
                            :text "Respond exactly with one word: PASS, PENDING, FAIL, or BLOCKED.\n\nRead the actor output and route strictly from the `check_overall_status` in its `## Handoff Data`.\n- Return PASS only when all checks are passing and none are pending or failing.\n- Return PENDING when checks are still running or queued after the wait step.\n- Return FAIL when any checks are failing, cancelled, or otherwise terminally unsuccessful.\n- Return BLOCKED when the actor output says the state could not be inspected reliably or proceeded with safely.\n\nDo not infer a different classification from narrative prose when the handoff data is explicit."
                            :vars {}}]
@@ -92,8 +89,7 @@ description: Prepare a PR worktree, inspect checks, wait for completion, repair 
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
-                           :from {:step "repair" :yield :text}
-                           :projection :text}
+                           :from {:step "repair" :yield :text}}
                           {:type :template
                            :text "Respond exactly with one word: WAIT or BLOCKED.\n\nRead the actor output and route strictly from the `repair_mode` in its `## Handoff Data`.\n- Return BLOCKED only when `repair_mode` is `blocked` or the actor explicitly reports it could not make safe progress.\n- Otherwise return WAIT so the workflow waits for the new or rerun checks to complete.\n\nDo not infer a different classification from narrative prose when the handoff data is explicit."
                            :vars {}}]

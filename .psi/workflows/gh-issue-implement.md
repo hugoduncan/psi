@@ -39,14 +39,11 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
-                           :from {:step "search" :yield :text}
-                           :projection :text}
+                           :from {:step "search" :yield :text}}
                           {:type :source
-                           :from {:step "prep" :yield :text}
-                           :projection :text}
+                           :from {:step "prep" :yield :text}}
                           {:type :source
-                           :from {:step "design" :yield :text}
-                           :projection :text}
+                           :from {:step "design" :yield :text}}
                           {:type :template
                            :text "Respond exactly with one word: REPEAT or DONE.\n\nUse the actor step context to identify the specific Munera task under review, especially the `munera_task_path`, `worktree_path`, and PR metadata. Then independently inspect the task artifacts in that task directory, especially `design.md`, and use `steps.md` / `implementation.md` when helpful.\n\nReturn REPEAT if the identified task design still has material ambiguities, missing decisions, incomplete acceptance criteria, or an underspecified implementation approach. Return DONE only if the identified Munera task design is complete and unambiguous enough to begin implementation, including the implementation strategy, key algorithms, data structures, and interface changes.\n\nDo not re-review the whole repository generically. Judge the specific Munera task named by the actor output."
                            :vars {}}]
