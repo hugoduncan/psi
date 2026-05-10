@@ -2,7 +2,7 @@
 
 ## Intent
 
-Replace the non-deterministic AI `discover` step in `gh-issue-refine` with a **deterministic workflow step** that invokes a GitHub extension tool to find the target issue. No AI sampling should occur during issue selection — the output is fully determined by the `gh` CLI and the selection rules.
+Replace the non-deterministic AI `discover` step in `gh-issue-refine` with a **deterministic workflow step** that invokes a GitHub deterministic operation to find the target issue. No AI sampling should occur during issue selection — the output is fully determined by the `gh` CLI and the selection rules.
 
 ## Problem
 
@@ -14,17 +14,29 @@ The current `discover` step delegates to the `builder` workflow, which spawns an
 
 ## Scope
 
-Three coordinated changes:
+Two coordinated changes:
 
-1. **`psi/github` extension** — a new psi extension that registers a `gh-find-issue` tool providing deterministic issue lookup.
-2. **`:tool` workflow step type** — a new deterministic step type in the workflow runtime that invokes a named psi tool directly (no AI session).
-3. **`gh-issue-refine.md` update** — replace the `discover` `:delegate` step with a `:tool` step referencing `gh-find-issue`.
+1. **`psi/github` extension** — a new psi extension that registers a `github/find-issue` deterministic operation providing deterministic issue lookup.
+2. **`gh-issue-refine.md` update** — replace the `discover` `:delegate` step with an `:invoke` step referencing `github/find-issue`.
 
 ### Out of scope
 
+- A new `:tool` workflow step type — not needed; the existing `:invoke` step type is the correct fit (see Architecture Decision below).
 - Changes to other `gh-*` workflows (they may benefit later from the same extension; separate task).
 - Changes to the `worktree`, `refine-design`, `design-status`, or `publish` steps.
 - Authentication or OAuth for the `gh` CLI — assumes `gh` is already authenticated in the shell environment.
+
+## Architecture Decision: `:invoke` + deterministic operation, not `:tool`
+
+The codebase already has a `:invoke` step type that calls deterministic operations registered in `deterministic-operation-registry`. `gh-find-issue` is a synchronous, deterministic, no-session operation — exactly what the operation registry exists for.
+
+Using `:invoke` + a new `github/find-issue` operation:
+- requires **zero new step types** in the IR or target-IR compiler
+- requires **zero new execution-adapter keys**
+- requires **zero IR schema changes**
+- integrates with the existing extension registration path (`(:register-operation api)`)
+
+A `:tool` step type would be appropriate only if the operation needed to appear in the AI agent tool catalog (for AI-driven use). `gh-find-issue` is workflow-internal — it is never offered to an AI agent as a callable tool. Therefore `:invoke` is the correct choice.
 
 ## Acceptance criteria
 
@@ -32,8 +44,8 @@ Three coordinated changes:
 - Running `gh-issue-refine` with an issue-number narrowing hint selects exactly that issue.
 - If no matching issue exists, the workflow stops with a clear error before the worktree step.
 - The handoff data format emitted by the deterministic step is identical in structure to the current builder-produced handoff (`issue_number`, `issue_title`, `issue_url`, `worktree_description`).
-- The `:tool` step type is exercised by a focused workflow-runtime test that proves deterministic execution (no session spawn).
-- The `gh-find-issue` tool is exercised by a focused unit test using a nullable shell adapter.
+- The `github/find-issue` operation is exercised by a focused unit test using a nullable shell adapter.
+- The `:invoke` step in `gh-issue-refine.md` is exercised by a focused workflow-runtime integration test that proves no session is spawned.
 
 ---
 
@@ -45,86 +57,57 @@ Three coordinated changes:
 
 **Namespace**: `psi.github.find-issue`
 
-**Registered tool name**: `gh-find-issue`
+**Deterministic operation id**: `"github/find-issue"`
 
-**Tool schema (malli)**:
+**Input args (passed via `:args` in the `:invoke` spec)**:
 ```clojure
-;; Input
-[:map
- [:labels [:vector :string]]           ; required label filters (AND)
- [:input  {:optional true} :string]    ; optional narrowing hint: number, url, or text
- [:state  {:optional true} :string]]   ; default "open"
-
-;; Output
-[:map
- [:issue-number :int]
- [:issue-title  :string]
- [:issue-url    :string]
- [:worktree-description :string]]      ; kebab-slug derived from title
+{:labels [:vector :string]           ; required label filters (AND)
+ :input  {:optional true} :string    ; optional narrowing hint: number, url, or text
+ :state  {:optional true} :string}   ; default "open"
 ```
 
+**Operation result**:
+```clojure
+;; Success
+{:status :ok
+ :data {:issue-number :int
+        :issue-title  :string
+        :issue-url    :string
+        :worktree-description :string}   ; kebab-slug derived from title
+ :summary "<Markdown handoff string>"}   ; canonical ## Handoff Data block
+
+;; Failure
+{:status :error
+ :reason :psi.github/no-matching-issue
+ :message "No open issue matching labels [...] and input [...]"}
+```
+
+The `:summary` field carries the serialized Markdown handoff block. This is the string exposed as `:yield :text` by the `:invoke` step (see below).
+
 **Implementation**:
-- Invokes `gh issue list --state <state> --label <l1> --label <l2> ... --json number,title,labels,state,url` via `clojure.java.shell/sh` (or a configurable `:shell-fn` seam for testing).
-- Parses JSON output with `clojure.data.json` (already available).
+- Invokes `gh issue list --state <state> --label <l1> --label <l2> ... --json number,title,labels,state,url` via `clojure.java.shell/sh` (or a configurable `:github-shell-fn` ctx key for testing).
+- Parses JSON output with `cheshire.core/parse-string` (project standard; declare `cheshire/cheshire "5.13.0"` in the github component `deps.edn`).
 - Applies narrowing: if `input` parses as an integer → filter by issue number; if it looks like a URL → extract number from URL; otherwise → text substring match on title.
 - Selects the lowest `number` among candidates.
 - Derives `worktree-description` as a kebab-slug from the title (≤ 40 chars, `[a-z0-9-]`).
-- Returns the structured map or throws `ex-info` with `:psi.github/no-matching-issue` if no candidates.
-
-**Extension manifest** (added to `.psi/extensions.edn`):
-```edn
-psi/github {}
-```
-
-**Extension registration** in `psi.github.extension/manifest`:
-```clojure
-{:tools [{:name    "gh-find-issue"
-          :fn      psi.github.find-issue/invoke
-          :schema  psi.github.find-issue/schema}]}
-```
+- Returns `{:status :ok :data {...} :summary "<markdown>"}` or `{:status :error :reason :psi.github/no-matching-issue :message "..."}`.
 
 **Shell seam** (for testability):
 ```clojure
-;; Default
-(def default-shell-fn clojure.java.shell/sh)
-
-;; Nullable seam — tests inject this
-(defn invoke [{:keys [shell-fn] :or {shell-fn default-shell-fn}} params]
-  ...)
+(defn invoke
+  [{:keys [ctx args]}]
+  (let [shell-fn (or (:github-shell-fn ctx) clojure.java.shell/sh)
+        ...]
+    ...))
 ```
 
-The ctx carries `:github-shell-fn` so the extension assembly can inject a nullable stub in tests.
+The operation handler receives the standard invocation map `{:ctx ctx :args args ...}`. The ctx carries `:github-shell-fn` so tests inject a nullable stub.
 
-### 2. `:tool` workflow step type
-
-**Affected namespaces**:
-- `psi.workflow-runtime.model` — add `:tool` to the step-type enum; add `:tool-name` and `:tool-params` to the step spec.
-- `psi.workflow-runtime.statechart-runtime.step-execution` — add a `:tool` branch that calls the tool via the execution adapter instead of spawning a session.
-- `psi.workflow-runtime.ir` (and target-IR compiler if applicable) — thread `:tool` step through the IR.
-- `psi.workflow-runtime.execution-adapter` — add `execute-tool` to the adapter contract (alongside the existing session-execution seam).
-
-**Step shape in workflow EDN**:
-```clojure
-{:name       "discover"
- :type       :tool
- :tool-name  "gh-find-issue"
- :tool-params {:labels    ["enhancement" "refine"]
-               :input     {:from :workflow-input :path [:input]}}}
-```
-
-`:tool-params` values support the same template-var resolution that `:prompt-string :vars` uses (`:from :workflow-input`, `:from {:step "..." :yield :text}`, literals).
-
-**Step execution contract**:
-1. Resolve `:tool-params` template vars against current workflow state.
-2. Look up the tool in the capability catalog by `:tool-name`.
-3. Call the tool's `:fn` with `(ctx, resolved-params)`.
-4. Serialize the return value to a Markdown handoff block (see below) and store as the step's `:yield :text`.
-5. If the tool throws with `:psi.github/no-matching-issue`, transition the workflow to a terminal error state instead of propagating into the next step.
-
-**Output serialization** (`:tool` steps → Markdown handoff):
+**Output serialization** (`:summary` field):
 ```markdown
 ## Issue Selection
-...auto-generated from tool return value...
+
+Selected issue #42: Add foo bar
 
 ## Handoff Data
 - issue_number: 42
@@ -133,17 +116,23 @@ The ctx carries `:github-shell-fn` so the extension assembly can inject a nullab
 - worktree_description: add-foo-bar
 ```
 
-A shared `psi.workflow-runtime.step-execution/tool-result->handoff-md` fn converts the tool output map to the canonical Markdown handoff format. This keeps downstream steps identical — they still parse `## Handoff Data` bullet lines.
+A private `result->handoff-md` fn in `psi.github.find-issue` converts the structured result map to the canonical Markdown handoff format. This keeps downstream steps identical — they still parse `## Handoff Data` bullet lines.
 
-**Execution adapter extension**:
+**Extension registration** in `psi.github.extension`:
 ```clojure
-;; New key in the adapter map
-:execute-tool-fn  (fn [ctx tool-name resolved-params] ...)
+(defn init [api]
+  ((:register-operation api)
+   {:id          "github/find-issue"
+    :description "Find a GitHub issue matching labels and optional narrowing input"
+    :handler     psi.github.find-issue/invoke}))
 ```
 
-The higher `psi.agent-session.context/workflow-execution-adapter` assembly wires the real tool dispatch here. Tests inject a stub.
+**Extension manifest** (added to `.psi/extensions.edn`):
+```edn
+psi/github {}
+```
 
-### 3. `gh-issue-refine.md` update
+### 2. `gh-issue-refine.md` update
 
 Replace the current `discover` step:
 ```clojure
@@ -154,27 +143,33 @@ Replace the current `discover` step:
  :prompt-string {...}
  :context [...]}
 
-;; After (deterministic tool step)
-{:name "discover"
- :type :tool
- :tool-name "gh-find-issue"
- :tool-params {:labels ["enhancement" "refine"]
-               :input  {:from :workflow-input :path [:input]}}}
+;; After (deterministic invoke step)
+{:name    "discover"
+ :type    :invoke
+ :operation "github/find-issue"
+ :args    {:labels ["enhancement" "refine"]
+           :input  {:from :workflow-input :path [:input]}}
+ :outputs {:summary {:source :invoke/summary}}
+ :yields  {:type :text :text :summary}}
 ```
+
+The `:yields {:type :text :text :summary}` declaration means `step-yield-field-value` for `:text` returns the `:summary` output value — the Markdown handoff string. Downstream steps consuming `{:from {:step "discover" :yield :text}}` require no change.
 
 No changes to downstream steps — they consume the same Markdown handoff format.
 
 ## Key invariants
 
-- The `:tool` step type never spawns an agent session or allocates a turn.
-- Tool params are fully resolved before the tool fn is called — no partial application.
-- If a tool step fails, the workflow enters a terminal error state; it does not fall through to the next step.
-- The handoff Markdown produced by a `:tool` step is structurally identical to the handoff the builder agent previously produced — downstream steps require no change.
+- The `github/find-issue` operation never spawns an agent session or allocates a turn.
+- Operation args are fully resolved before the handler is called — no partial application.
+- If the operation returns `{:status :error :reason :psi.github/no-matching-issue ...}`, the workflow enters a terminal error state via the existing `:invoke` error path in `step_execution.clj`; it does not fall through to the next step.
+- The handoff Markdown produced by the operation `:summary` is structurally identical to the handoff the builder agent previously produced — downstream steps require no change.
 
 ## Alternatives considered
 
-**A. `:session` step with tightly constrained tools and scripted prompt** — still AI-driven, still non-deterministic by definition. Rejected.
+**A. `:tool` step type** — appropriate for AI-callable tools in the tool catalog. `gh-find-issue` is workflow-internal and never exposed to AI agents. Rejected in favor of `:invoke` + deterministic operation registry, which requires zero new step types and zero IR changes.
 
-**B. bb task invoked via a `:script` step type** — simpler in some ways, but does not leverage the existing psi tool/extension infrastructure and adds a new step type with different wiring than the tool catalog. Rejected in favor of `:tool` which integrates more cleanly.
+**B. `:session` step with tightly constrained tools and scripted prompt** — still AI-driven, still non-deterministic by definition. Rejected.
 
-**C. Inline shell exec in a new `:sh` step type** — avoids the extension layer but bypasses the capability catalog, permissions, and testability seams. Rejected.
+**C. bb task invoked via a `:script` step type** — simpler in some ways, but does not leverage the existing psi operation/extension infrastructure and adds a new step type. Rejected.
+
+**D. Inline shell exec in a new `:sh` step type** — avoids the extension layer but bypasses the capability catalog, permissions, and testability seams. Rejected.

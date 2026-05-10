@@ -22,6 +22,20 @@ Motivation: The `gh-issue-refine` `discover` step is a full builder-delegate AI 
 - Is `clojure.data.json` the right JSON parser or should this use `cheshire` (check transitive deps in the github component)?
 - Does the target-IR compiler need changes, or does the step-execution branch consuming `:tool` steps short-circuit before IR compilation? Clarify during Phase 2.
 
+## 2026-05-10 — Design review pass 1 follow-up (design-steps A–F resolved)
+
+**A resolved**: `:invoke` + deterministic-operation-registry. `gh-find-issue` is workflow-internal, never AI-callable. Zero new step types. Phase 2 (`:tool` step type) removed from scope.
+
+**B resolved**: No IR schema changes. `:invoke` step type handles this directly. Target-IR compiler already supports `:invoke`.
+
+**C resolved**: Moot — not a tool. Extension uses `(:register-operation api)` with `{:id :handler :description?}` matching `operation-definition-schema`.
+
+**D resolved**: `cheshire/cheshire "5.13.0"` in `components/github/deps.edn`. `clojure.data.json` removed from design.
+
+**E resolved**: `{:outputs {:summary {:source :invoke/summary}} :yields {:type :text :text :summary}}`. Operation handler returns Markdown handoff as `:summary`. `step-yield-field-value :text` → `:summary` output → Markdown string. Downstream steps unchanged.
+
+**F resolved**: `plan.md` written.
+
 ## 2026-05-10 — Design review pass 1
 
 **A. `:tool` step type vs `:invoke` step type — architectural overlap unresolved.**

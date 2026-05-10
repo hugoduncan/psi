@@ -2,12 +2,12 @@
 
 ## Phase 1 — `psi/github` extension
 
-- [ ] Create `components/github/` component scaffold (`deps.edn`, `src/`, `test/`)
-- [ ] Implement `psi.github.find-issue` with shell seam + narrowing logic
-- [ ] Implement `psi.github.extension` manifest registration (tool name, fn, schema)
+- [ ] Create `components/github/` component scaffold (`deps.edn` with `cheshire/cheshire "5.13.0"`, `src/`, `test/`)
+- [ ] Implement `psi.github.find-issue` with `:github-shell-fn` seam, cheshire JSON parsing, narrowing logic, slug derivation, and `result->handoff-md` Markdown serializer
+- [ ] Implement `psi.github.extension` registering the `github/find-issue` deterministic operation via `(:register-operation api)`
 - [ ] Write focused unit tests for `psi.github.find-issue` using nullable shell stub
-  - no candidates → `ex-info` with `:psi.github/no-matching-issue`
-  - single candidate → correct structured map + slug derivation
+  - no candidates → `{:status :error :reason :psi.github/no-matching-issue ...}`
+  - single candidate → correct structured map + slug derivation in `:data`; correct `## Handoff Data` in `:summary`
   - multiple candidates + no narrowing → lowest number selected
   - narrowing by integer → exact match
   - narrowing by URL → number extracted, correct match
@@ -15,29 +15,15 @@
 - [ ] Wire `components/github/` into Kaocha `tests.edn`
 - [ ] Lint clean
 
-## Phase 2 — `:tool` workflow step type
+## Phase 2 — Workflow update
 
-- [ ] Add `:tool` to the step-type enum in `psi.workflow-runtime.model`
-- [ ] Add `:tool-name` and `:tool-params` fields to the step model + malli schema
-- [ ] Thread `:tool` through the IR and target-IR compiler
-- [ ] Add `execute-tool-fn` key to `psi.workflow-runtime.execution-adapter` contract
-- [ ] Implement `:tool` branch in `psi.workflow-runtime.statechart-runtime.step-execution`
-  - resolve `:tool-params` template vars
-  - call `:execute-tool-fn` via adapter
-  - serialize result to Markdown handoff via `tool-result->handoff-md`
-  - on `:psi.github/no-matching-issue` → terminal error transition
-- [ ] Implement `tool-result->handoff-md` serializer (generic map → `## Handoff Data` bullets)
-- [ ] Wire `execute-tool-fn` in `psi.agent-session.context/workflow-execution-adapter`
-- [ ] Write focused workflow-runtime test for `:tool` step — proves no session spawned, correct yield
-- [ ] Lint clean
-
-## Phase 3 — Workflow update
-
-- [ ] Update `gh-issue-refine.md`: replace `discover` `:delegate` step with `:tool` step
+- [ ] Update `gh-issue-refine.md`: replace `discover` `:delegate` step with `:invoke` step
+  - `{:name "discover" :type :invoke :operation "github/find-issue" :args {:labels ["enhancement" "refine"] :input {:from :workflow-input :path [:input]}} :outputs {:summary {:source :invoke/summary}} :yields {:type :text :text :summary}}`
+- [ ] Write focused workflow-runtime integration test: `:invoke` step with `github/find-issue` produces correct Markdown handoff, no session spawned
 - [ ] Smoke test: run `gh-issue-refine` end-to-end against a real labeled issue, confirm discover step emits correct handoff
 - [ ] Verify downstream steps (`worktree`, `refine-design`) parse the new handoff correctly (format unchanged)
 
-## Phase 4 — Coherence
+## Phase 3 — Coherence
 
 - [ ] Update CHANGELOG.md under `[Unreleased]`
 - [ ] Commit all changes with appropriate symbols
