@@ -1,0 +1,39 @@
+- Review: ambiguity — the design says the runtime-owned operation contract should define "the canonical result contract returned by operations" and mentions malformed-result rejection or normalization, but it never makes authoritative whether the operation implementation itself must return the full invoke-step envelope (`:data`/`:summary`/`:result`), only a lower-level operation result that runtime wraps, or a tagged success/failure shape; make one boundary authoritative and prove it with focused tests so task `083` does not have to guess where invoke-step output shaping lives.
+- 2026-05-04 resolution: settled the authoritative boundary in task artifacts. Registered deterministic operations return a tagged operation result, not the full workflow invoke-step envelope. Canonical first cut:
+  - success -> `{:status :ok :data ... :summary? string :details? map}`
+  - failure -> `{:status :error :reason keyword :message string :details? map}`
+  Runtime-owned invoke execution is the only layer that wraps that operation result into canonical invoke-step outputs (`:data`, optional `:summary`, full `:result`) and into invoke-step failure/yield recording semantics. This keeps workflow-step shaping runtime-owned and prevents task `083` from guessing whether extensions should fabricate accepted-result envelopes.
+- 2026-05-04 evidence read before settling it:
+  - `doc/workflow-ir.md` defines invoke-step output surfaces (`:data`, `:summary`, `:result`) at the workflow IR layer, which is a stronger fit for runtime-owned wrapping than for extension-authored whole-step envelopes.
+  - `workflow_source_resolution.clj` already treats invoke args as a runtime-owned materialization boundary, reinforcing that operation implementations should receive resolved args and return a small explicit contract rather than workflow envelopes.
+  - task `077` already frames operation identity as runtime-registry-owned and workflow execution as a runtime boundary rather than direct implementation coupling.
+- 2026-05-04 follow-up status: the design ambiguity itself is resolved and the newly added design-step is complete. Focused malformed-return tests remain part of the future code implementation slice for this task and should reject malformed operation results at the boundary rather than attempting lossy normalization.
+- Review: inconsistency — `implementation.md` now records the authoritative boundary decision as resolved via a completed design-step, but `steps.md` still tracks only the implementation-facing checklist and has no item acknowledging or linking that design-resolution follow-through; add an explicit task-local step (or checked note) so the task files agree that the boundary ambiguity has already been resolved in design while malformed-return proof remains future implementation work.
+- 2026-05-04 follow-up executed: updated `steps.md` to carry an explicit checked task-local note that the return-boundary decision is settled (tagged operation results from operations; runtime-owned invoke-step wrapping) while malformed-return rejection proof remains future implementation work.
+- 2026-05-04 implementation landed:
+  - added canonical runtime-owned deterministic operation boundary in `components/agent-session/src/psi/agent_session/deterministic_operations.clj`
+  - added authoritative deterministic operation registry in `components/agent-session/src/psi/agent_session/deterministic_operation_registry.clj`
+  - rooted the registry in session context as `:deterministic-operation-registry`
+  - extended extension API/runtime registration with `:register-operation` routed through runtime-owned duplicate detection and extension ownership recording
+  - recorded extension-owned operation ids in extension registry introspection surfaces
+  - wired invoke-step execution in `workflow_statechart_runtime.clj` to resolve stable operation ids through the runtime registry, materialize args through `workflow_source_resolution/resolve-invoke-args`, and normalize successful/error operation results at the runtime boundary
+  - malformed returned values are now rejected at the operation boundary with explicit `ex-info` rather than lossy normalization
+  - focused proof added in:
+    - `deterministic_operation_registry_test.clj`
+    - `workflow_invoke_runtime_test.clj`
+    - extension API registration coverage in `extensions_test.clj`
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.workflow-invoke-runtime-test --skip-meta :integration`
+    - `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.extensions-test --focus psi.agent-session.workflow-statechart-runtime-test --skip-meta :integration`
+    - `clj-kondo --lint ...` across changed source/test files (0 warnings)
+- Review: cleanup gap — extension/runtime registration records deterministic operations in both the extension registry and the separate runtime-owned `:deterministic-operation-registry`, but this task's proof/read-through does not show an unload/reload cleanup path removing an extension's operation ids from the runtime registry when the extension is unregistered. That risks stale invoke ids surviving extension removal or reload and diverging from extension introspection. Add runtime-owned unregister wiring and a focused reload/unregister regression proof.
+- 2026-05-04 follow-up executed:
+  - wired `extensions/unregister-extension-in!` and `extensions/unregister-all-in!` to optionally remove extension-owned deterministic operation ids from the runtime-owned registry via `deterministic_operation_registry/unregister-operations-by-extension-in!`
+  - threaded the runtime deterministic operation registry through extension load/init-var activation/reload cleanup paths by wrapping loader-supplied unregister fns with runtime-owned cleanup in `components/agent-session/src/psi/agent_session/extensions.clj`
+  - exposed `:deterministic-operation-registry` in extension runtime fns so reload paths can perform runtime-owned cleanup without guessing at global state
+  - added focused registry cleanup proof in `components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj`
+  - added focused extension unload/reload regressions in `components/agent-session/test/psi/agent_session/extensions_test.clj` proving stale deterministic invoke ids are not resolvable after extension removal or reload
+  - verification green:
+    - `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.extensions-test --skip-meta :integration` (`30 tests, 114 assertions, 0 failures`)
+    - `clj-kondo --lint components/agent-session/src/psi/agent_session/extensions.clj components/agent-session/src/psi/agent_session/extensions/runtime_fns.clj components/agent-session/test/psi/agent_session/deterministic_operation_registry_test.clj components/agent-session/test/psi/agent_session/extensions_test.clj` (0 warnings)
+- 2026-05-04 execution pass: read `steps.md`, `implementation.md`, `design.md`, and `plan.md` after the preloaded code-shape review result. No newly added unchecked actionable follow-up items remained in `steps.md`, so no code or task-file execution changes were needed in this pass.

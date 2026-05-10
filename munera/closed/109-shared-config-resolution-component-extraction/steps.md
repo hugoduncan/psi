@@ -1,0 +1,29 @@
+- [x] Create `components/shared-config/` with src/test structure and local component dep wiring
+- [x] Move user-global config ownership into `psi.shared-config.user`
+  - [x] preserve `~/.psi/agent/config.edn`
+  - [x] preserve authoritative full-file read/write behavior including `:version`
+  - [x] preserve existing `:agent-session` persisted subtree shape for current consumers
+  - [x] preserve explicit user write/update helper surface for consumers
+- [x] Move project shared/local config ownership into `psi.shared-config.project`
+  - [x] preserve `<cwd>/.psi/project.edn`
+  - [x] preserve `<cwd>/.psi/project.local.edn`
+  - [x] preserve authoritative layered full-file read behavior including `:version`
+  - [x] preserve current malformed-project-file warning behavior as the shared authoritative policy
+  - [x] preserve explicit project-local write/update helper surface for consumers
+- [x] Move layered shared agent-session config resolution into `psi.shared-config.resolution`
+  - [x] preserve `:agent-session` subtree extraction from full maps
+  - [x] preserve precedence `system < user < project-shared < project-local`
+  - [x] preserve current typed accessor behavior used by `app-runtime`
+- [x] Update `components/app-runtime/src/psi/app_runtime.clj` to depend on `psi.shared-config.resolution`
+- [x] Update `components/agent-session/src/psi/agent_session/dispatch_effects.clj` to depend on shared-config write helpers
+- [x] Update `components/project-nrepl/src/psi/project_nrepl/config.clj` to consume shared-config full-map readers and/or `:agent-session` subtree extraction instead of duplicated lower-level file logic
+  - [x] keep project-nREPL-specific validation and target-discovery helpers local to project-nREPL ownership
+- [x] Remove old authoritative ownership from `psi.agent-session.config-resolution`, `psi.agent-session.project-preferences`, and `psi.agent-session.user-config`
+- [x] Remove any temporary compatibility shims before completion
+- [x] Move or add focused tests for shared-config user/project/resolution behavior
+- [x] Rerun focused app-runtime config-driven defaulting verification
+- [x] Rerun focused project-nREPL config verification
+- [x] Record final ownership and migration notes in `implementation.md`
+- [x] Decide and document whether `psi.shared-config.resolution/agent-session-map` is an intentional public API or should move to a more explicitly shared helper if more subtree consumers appear
+- [x] Preserve the current no-abstraction choice for `shared-config.user` / `shared-config.project` unless another real config owner appears; record that decision tersely in `implementation.md`
+- [x] Run one broader consuming-path verification pass beyond the focused checks and record the result in `implementation.md`

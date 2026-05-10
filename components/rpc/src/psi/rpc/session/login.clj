@@ -3,7 +3,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.commands :as commands]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.state-accessors :as sa]
    [psi.rpc.session.emit :as emit]
    [psi.rpc.state :as rpc.state]

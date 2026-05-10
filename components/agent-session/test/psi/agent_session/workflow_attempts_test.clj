@@ -2,9 +2,10 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session-core]
-   [psi.agent-session.session-state :as session-state]
+   [psi.session-state.state :as session-state]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]))
+   [psi.workflow-runtime.attempts :as workflow-attempts]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]))
 
 (defn- create-session-context
   ([]
@@ -19,7 +20,9 @@
     (let [[ctx parent-session-id] (create-session-context {:persist? false})
           {:keys [attempt execution-session]}
           (workflow-attempts/create-step-attempt-session!
-           ctx
+           (test-support/with-workflow-execution-adapter-overrides
+             ctx
+             {:get-session-data session-state/get-session-data-in})
            parent-session-id
            {:workflow-run-id "run-1"
             :workflow-step-id "plan"
@@ -41,6 +44,27 @@
       (is (= (:created-at execution-session) (:updated-at execution-session)))
       (is (some? (session-state/agent-ctx-in ctx (:session-id execution-session))))
       (is (some? (session-state/sc-session-id-in ctx (:session-id execution-session))))
+      (session-core/shutdown-context! ctx))))
+
+(deftest create-step-attempt-session-requires-workflow-execution-adapter-test
+  (testing "workflow attempt session creation fails clearly when the named adapter is absent"
+    (let [[ctx parent-session-id] (create-session-context {:persist? false})
+          ex (try
+               (workflow-attempts/create-step-attempt-session!
+                (dissoc ctx workflow-execution-adapter/adapter-key)
+                parent-session-id
+                {:workflow-run-id "run-1"
+                 :workflow-step-id "plan"
+                 :attempt-id "attempt-1"
+                 :session-name "workflow plan attempt"
+                 :tool-defs []
+                 :thinking-level :off})
+               nil
+               (catch clojure.lang.ExceptionInfo ex
+                 ex))]
+      (is (some? ex))
+      (is (re-find #"Workflow execution adapter is required" (ex-message ex)))
+      (is (= workflow-execution-adapter/adapter-key (:adapter-key (ex-data ex))))
       (session-core/shutdown-context! ctx))))
 
 (deftest append-attempt-to-run-test

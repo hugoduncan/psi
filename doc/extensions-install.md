@@ -84,8 +84,7 @@ Canonical minimal form:
 {:deps
  {psi/mementum {}
   psi/munera {}
-  psi/work-on {}
-  psi/workflow-loader {}}}
+  psi/work-on {}}}
 ```
 
 For those recognized libs, the launcher supplies missing fields from its
@@ -141,8 +140,8 @@ Runtime:
 For recognized psi-owned minimal manifest entries such as:
 
 ```clojure
-{:deps {psi/workflow-loader {}
-        psi/mementum {}}}
+{:deps {psi/mementum {}
+        psi/work-on {}}}
 ```
 
 ownership is split deliberately:
@@ -153,8 +152,8 @@ This means launcher-started `psi` is the authoritative proof path for classpath-
 Direct bootstrap or in-process test paths that do not cross the launcher boundary are useful for runtime activation testing, but they are **not** equivalent proofs of launcher-owned classpath construction.
 
 For recognized psi-owned minimal entries, runtime activation is canonicalized through `:psi/init` and the live registry identity is stable `manifest:{lib}` rather than a source file path, for example:
-- `manifest:psi/workflow-loader`
 - `manifest:psi/mementum`
+- `manifest:psi/work-on`
 
 ## Introspection
 
@@ -195,7 +194,7 @@ stable live-registry identities of the form:
 
 Examples:
 - `manifest:psi/mementum`
-- `manifest:psi/workflow-loader`
+- `manifest:psi/work-on`
 
 ## Recommended workflow
 

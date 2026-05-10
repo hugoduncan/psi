@@ -3,9 +3,10 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]
-   [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.workflow-runtime.attempts :as workflow-attempts]
+   [psi.workflow-runtime.progression-recording :as workflow-recording]
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
   ([]
@@ -19,28 +20,25 @@
   {:definition-id "plan-build-review"
    :name "Plan Build Review"
    :summary "Plan, then build, then review"
-   :step-order ["plan" "build"]
-   :steps {"plan" {:label "Plan"
-                   :description "Create a plan"
-                   :executor {:type :agent :profile "planner" :mode :sync}
-                   :prompt-template "$INPUT"
-                   :input-bindings {:task {:source :workflow-input :path [:task]}}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                   :capability-policy {:tools #{"read" "bash"}}}
-           "build" {:label "Build"
-                    :description "Implement the plan"
-                    :executor {:type :agent :profile "builder" :mode :async}
-                    :prompt-template "Execute this plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
-                    :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                    :capability-policy {:tools #{"read" "edit" "write"}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :system-prompt "Create a plan"
+            :tools ["read" "bash"]
+            :contributions [{:type :template
+                             :text "{{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}
+           {:name "build"
+            :type :session
+            :system-prompt "Implement the plan"
+            :tools ["read" "edit" "write"]
+            :contributions [{:type :template
+                             :text "Execute this plan:\n\n{{plan}}"
+                             :vars {"plan" {:from {:step "plan" :yield :text}}}}]}]})
 
 (defn- install-run-with-attempt!
   [ctx parent-session-id]
   (let [[state1 definition-id _]
-        (workflow-runtime/register-definition @(:state* ctx) registered-definition)
+        (workflow-registry/register-definition @(:state* ctx) registered-definition)
         [state2 run-id _]
         (workflow-runtime/create-run state1 {:definition-id definition-id
                                              :run-id "run-1"
@@ -108,7 +106,6 @@
           definitions (:psi.workflow/definitions result)
           runs (:psi.workflow/runs result)
           workflow-run (first runs)
-          plan-step (first (get-in definitions [0 :psi.workflow.definition/steps]))
           plan-step-run (first (:psi.workflow.run/step-runs workflow-run))]
       (is (= 1 (:psi.workflow/definition-count result)))
       (is (= ["plan-build-review"] (:psi.workflow/definition-ids result)))
@@ -116,13 +113,6 @@
       (is (= [run-id] (:psi.workflow/run-ids result)))
       (is (= [:running] (:psi.workflow/run-statuses result)))
       (is (= "plan-build-review" (:psi.workflow.definition/id (first definitions))))
-      (is (= "Plan" (:psi.workflow.step/label plan-step)))
-      (is (= {:type :agent :profile "planner" :mode :sync}
-             (:psi.workflow.step/executor plan-step)))
-      (is (= "$INPUT"
-             (:psi.workflow.step/prompt-template plan-step)))
-      (is (= #{"read" "bash"}
-             (get-in plan-step [:psi.workflow.step/capability-policy :tools])))
       (is (= run-id (:psi.workflow.run/id workflow-run)))
       (is (= :running (:psi.workflow.run/status workflow-run)))
       (is (= "plan" (:psi.workflow.run/current-step-id workflow-run)))
@@ -146,10 +136,7 @@
       (is (= :running (:psi.workflow.run/status run-detail)))
       (is (= "plan-build-review"
              (get-in run-detail [:psi.workflow.run/effective-definition :psi.workflow.definition/id])))
-      (is (= "$INPUT"
-             (get-in run-detail [:psi.workflow.run/effective-definition
-                                 :psi.workflow.definition/steps 0
-                                 :psi.workflow.step/prompt-template])))
+      (is (= 2 (count (get-in run-detail [:psi.workflow.run/effective-definition :psi.workflow.definition/steps]))))
       (is (= 2 (count (:psi.workflow.run/step-runs run-detail))))
       (is (= [(:session-id execution-session)]
              (:psi.workflow.run/execution-session-ids run-detail)))

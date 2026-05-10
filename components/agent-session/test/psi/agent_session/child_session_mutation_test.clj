@@ -4,11 +4,11 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.prompt-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.prompt-assets.system-prompt :as system-prompt]
+   [psi.turn-runtime.core]
+   [psi.turn-runtime.request :as turn-request]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))
 
@@ -19,6 +19,12 @@
    (let [ctx (session/create-context (test-support/safe-context-opts opts))
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
+
+(defn- normalized-sorted-contributions
+  [session-data]
+  (-> (:prompt-contributions session-data)
+      (system-prompt/filter-prompt-contributions (:prompt-component-selection session-data))
+      ss/sorted-prompt-contributions))
 
 (deftest create-child-session-creates-runtime-and-no-parent-statechart-test
   (testing "create-child-session allocates child runtime handles without changing the parent phase"
@@ -128,21 +134,21 @@
                         op))]
       (session/register-resolvers-in! qctx false)
       (session/register-mutations-in! qctx mutations/all-mutations true)
-      (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
-                          {:session-id session-id
-                           :opts {:selected-tools ["read" "bash" "psi-tool"]
-                                  :skills [{:name "lambda-compiler" :description "Compile lambda expressions"
-                                            :file-path "/s/SKILL.md" :base-dir "/s"
-                                            :source :user :disable-model-invocation false}]}}
-                          {:origin :test})
-      (dispatch/dispatch! ctx :session/register-prompt-contribution
-                          {:session-id session-id
-                           :ext-path "/ext/work-on"
-                           :id "work-on"
-                           :contribution {:section "Extension Capabilities"
-                                          :content "tool: /work-on"
-                                          :enabled true}}
-                          {:origin :test})
+      (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                            {:session-id session-id
+                             :opts {:selected-tools ["read" "bash" "psi-tool"]
+                                    :skills [{:name "lambda-compiler" :description "Compile lambda expressions"
+                                              :file-path "/s/SKILL.md" :base-dir "/s"
+                                              :source :user :disable-model-invocation false}]}}
+                            {:origin :test})
+      (session/dispatch-in! ctx :session/register-prompt-contribution
+                            {:session-id session-id
+                             :ext-path "/ext/work-on"
+                             :id "work-on"
+                             :contribution {:section "Extension Capabilities"
+                                            :content "tool: /work-on"
+                                            :enabled true}}
+                            {:origin :test})
       (let [child-id (:psi.agent-session/session-id
                       (mutate 'psi.extension/create-child-session
                               {:session-name "child"
@@ -162,7 +168,10 @@
                      (:prompt-contributions child-sd))))
         (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
         (is (str/includes? (:base-system-prompt child-sd) "lambda-compiler"))
-        (is (str/includes? (prompt-request/effective-system-prompt child-sd)
+        (is (str/includes? (turn-request/effective-system-prompt
+                            {:turn/base-system-prompt (:base-system-prompt child-sd)
+                             :turn/developer-prompt (:developer-prompt child-sd)
+                             :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)})
                            "tool: /work-on"))))))
 
 (deftest create-child-session-selection-filters-extension-contributions-coherently-test
@@ -173,8 +182,14 @@
                     :prompt-contributions [{:id "a" :ext-path "/ext/a" :content "A" :enabled true}
                                            {:id "b" :ext-path "/ext/b" :content "B" :enabled true}]
                     :tool-defs []}]
-      (is (str/includes? (prompt-request/effective-system-prompt child-sd) "A"))
-      (is (not (str/includes? (prompt-request/effective-system-prompt child-sd) "B"))))))
+      (is (str/includes? (turn-request/effective-system-prompt
+                          {:turn/base-system-prompt (:base-system-prompt child-sd)
+                           :turn/developer-prompt (:developer-prompt child-sd)
+                           :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)}) "A"))
+      (is (not (str/includes? (turn-request/effective-system-prompt
+                               {:turn/base-system-prompt (:base-system-prompt child-sd)
+                                :turn/developer-prompt (:developer-prompt child-sd)
+                                :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)}) "B"))))))
 
 (deftest create-child-session-nil-selection-rebuilds-full-base-prompt-without-parent-build-opts-test
   (testing "child nil selection rebuilds from structured state without requiring parent build opts"
@@ -216,14 +231,14 @@
                         op))]
       (session/register-resolvers-in! qctx false)
       (session/register-mutations-in! qctx mutations/all-mutations true)
-      (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
-                          {:session-id session-id
-                           :opts {:context-files [{:path "/AGENTS.md" :content "Context text"}]
-                                  :skills [{:name "skill-a" :description "A"
-                                            :file-path "/s/SKILL.md" :base-dir "/s"
-                                            :source :user :disable-model-invocation false}]
-                                  :selected-tools ["read" "bash"]}}
-                          {:origin :test})
+      (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                            {:session-id session-id
+                             :opts {:context-files [{:path "/AGENTS.md" :content "Context text"}]
+                                    :skills [{:name "skill-a" :description "A"
+                                              :file-path "/s/SKILL.md" :base-dir "/s"
+                                              :source :user :disable-model-invocation false}]
+                                    :selected-tools ["read" "bash"]}}
+                            {:origin :test})
       (let [selection {:agents-md? false
                        :extension-prompt-contributions []
                        :tool-names ["read"]
@@ -236,7 +251,13 @@
                                             {:name "bash" :description "Bash"}]
                                 :prompt-component-selection selection}))
             child-sd  (ss/get-session-data-in ctx child-id)
-            provider  (prompt-request/build-provider-conversation child-sd [])]
+            provider  (turn-request/build-provider-conversation
+                       {:turn/base-system-prompt (:base-system-prompt child-sd)
+                        :turn/developer-prompt (:developer-prompt child-sd)
+                        :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)
+                        :turn/cache-breakpoints (set (or (:cache-breakpoints child-sd) #{}))
+                        :turn/filtered-tool-defs (:tool-defs child-sd)
+                        :turn/messages []})]
         (is (= (assoc selection
                       :include-preamble? false
                       :include-context-files? false
@@ -268,7 +289,7 @@
                                :system-prompt "child prompt"
                                :tool-defs []
                                :thinking-level :off}))]
-        (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+        (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                       (fn [_ai-ctx _ctx sid prepared _progress-queue]
                         {:execution-result/turn-id (:prepared-request/id prepared)
                          :execution-result/session-id sid
@@ -280,7 +301,7 @@
                          :execution-result/tool-calls []
                          :execution-result/stop-reason :stop})]
           ;; Force the parent session into :streaming. Child execution must still work.
-          (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
+          (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
           (is (= :streaming (ss/sc-phase-in ctx session-id)))
           (is (ss/idle-in? ctx child-id))
           (let [result (mutate 'psi.extension/run-agent-loop-in-session

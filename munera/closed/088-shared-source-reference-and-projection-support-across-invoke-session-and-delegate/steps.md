@@ -1,0 +1,30 @@
+- [x] Identify existing source-selection/projection helpers for reuse or convergence
+  - Current runtime semantics live in `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`; compiler/authoring shaping remains split across `workflow_file_authoring_session.clj`, `workflow_current_ir_compiler.clj`, and `workflow_target_ir_compiler.clj`.
+- [x] Define the canonical resolution contract for workflow source refs and source specs
+  - Canonical owner is a shared workflow-runtime IR substrate for source-ref/source-spec, `:path`, and `:projection` resolution; compiler/authoring helpers remain translation/validation seams rather than runtime value resolvers.
+- [x] Implement resolution for `:workflow-input` and `:workflow-original`
+  - Extracted canonical runtime source resolution into `components/agent-session/src/psi/agent_session/workflow_source_resolution.clj` and delegated IR-shaped source-spec reads from step prep to it.
+- [x] Implement resolution for prior step `:output` refs
+  - Shared source-ref resolution now reads prior-step logical outputs through canonical IR step output semantics.
+- [x] Implement resolution for prior step `:yield` refs
+  - Shared source-ref resolution now reads prior-step yielded fields through canonical IR yield semantics.
+- [x] Implement first-cut `:path` selection
+  - Shared source-spec application now owns sibling `:path` traversal against resolved canonical refs.
+- [x] Implement first-cut richer `:projection` handling
+  - Shared source-spec application now owns canonical `:projection` application, delegating transcript/message projections to `workflow-judge/project-messages`.
+- [x] Enforce the exclusivity rule for `:path` vs `:projection`
+  - Shared source-spec application now rejects specs that carry both siblings at runtime as well as at schema/compiler boundaries.
+- [x] Thread the shared substrate into invoke arg resolution
+  - Added canonical `workflow_source_resolution/resolve-invoke-args` for normalized IR invoke-arg materialization.
+- [x] Thread the shared substrate into session contribution/template-var resolution
+  - Template var materialization/rendering now lives canonically in `workflow_source_resolution` and `workflow_step_prep` delegates to it.
+- [x] Thread the shared substrate into delegate context and templated prompt-string resolution
+  - Added canonical `resolve-delegate-context` and `render-delegate-prompt-string` helpers for normalized IR delegate boundaries.
+- [x] Add focused mixed-form resolution tests
+  - Added `workflow_source_resolution_test.clj` proving shared semantics across invoke/session/delegate consumers.
+- [x] Add focused invalid-source/invalid-spec tests
+  - Added focused runtime exclusivity proof for invalid source-specs carrying both `:path` and `:projection`.
+- [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`
+  - Updated `doc/workflow-ir.md` to make delegated prompt-string template vars part of the shared source-spec family explicitly and to name `workflow_source_resolution.clj` as the canonical runtime materialization owner.
+- [x] Update stale runtime expectation in `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`
+  - `linear-success-recording-test` now asserts the canonical accepted-result envelope with `:text`, `:final-llm-reply`, `:transcript`, and nested `:result`, matching the current runtime-recorded session output surfaces.

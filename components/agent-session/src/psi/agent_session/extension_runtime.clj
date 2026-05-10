@@ -19,7 +19,7 @@
    [psi.agent-session.extensions.runtime-delivery :as runtime-delivery]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.extensions.runtime-ui :as runtime-ui]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn load-extensions-in!
   "Discover and load all extensions into this session's registry.

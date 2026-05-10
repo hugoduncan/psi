@@ -5,21 +5,27 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session-core]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-handlers :as dispatch-handlers]
+   [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
+   [psi.agent-session.prompt-recording]
+   [psi.agent-session.prompt-request]
    [psi.agent-session.services :as services]
-   [psi.agent-session.session :as session-data]
-   [psi.agent-session.persistence :as persistence]
-   [psi.agent-session.prompt-recording :as prompt-recording]
-   [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.session-state :as ss]
+   [psi.agent-session.turn]
+   [psi.agent-session.workflow-judge]
+   [psi.agent-session.context :as session-context]
+   [psi.session-state.model :as session-data]
+   [psi.skill-registry.registry]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
+   [psi.workflow-step-materialization.core]
+   [psi.workflow-step-session-config.core]
+   [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as session-sc]
    [psi.agent-session.tool-plan :as tool-plan]
-   [psi.agent-session.workflows :as wf]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.ui.state :as ui-state])
   (:import
    (java.util.concurrent Executors)))
@@ -76,6 +82,14 @@
   (apply ss/update-state-value-in! ctx (resolve-state-path ctx k) f args)
   ctx)
 
+(defn with-workflow-execution-adapter-overrides
+  "Replace the named workflow execution adapter as one seam value while
+   allowing targeted operation overrides for adapter-consumer tests."
+  [ctx overrides]
+  (assoc ctx
+         workflow-execution-adapter/adapter-key
+         (merge (get ctx workflow-execution-adapter/adapter-key) overrides)))
+
 (defn make-session-ctx
   "Create a minimal canonical-root-backed session-like context for tests.
    Returns [ctx session-id] where session-id is the initial session id.
@@ -108,11 +122,11 @@
                        :ui {:extension-ui @(ui-state/create-ui-state)}}
         state*               (atom (merge base-state (or state {})))
         ext-reg       (ext/create-registry)
-        wf-reg        (wf/create-registry)
+        wf-reg        (extension-workflow-runtime/create-registry)
         sc-env        (session-sc/create-sc-env)
         dispatch-statechart-event-fn dispatch-handlers/dispatch-statechart-event-in!
         tool-batch-executor (Executors/newFixedThreadPool 4)
-        ctx           {:state*                       state*
+        ctx0          {:state*                       state*
                        :sc-env                       sc-env
                        :config                       {}
                        :session-defaults             (or session-data {})
@@ -127,16 +141,17 @@
                        :apply-root-state-update-fn   ss/apply-root-state-update-in!
                        :read-session-state-fn        ss/get-state-value-in
                        :execute-dispatch-effect-fn   (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
+                       :execute-effect-fn            (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
                        :dispatch-statechart-event-fn dispatch-statechart-event-fn
                        :runtime-tool-executor-fn     tool-plan/default-execute-runtime-tool-in!
                        :execute-tool-runtime-fn      #'tool-plan/execute-tool-runtime-in!
-                       :build-prepared-request-fn    #'prompt-request/build-prepared-request
-                       :build-record-response-fn     #'prompt-recording/build-record-response
+                       :build-prepared-request-fn    #'psi.agent-session.prompt-request/build-prepared-request
+                       :build-record-response-fn     #'psi.agent-session.prompt-recording/build-record-response
                        :continue-prompt-chain-fn     (fn [_ctx _session-id _execution-result _progress-queue]
                                                        {:continued? true})
                        :refresh-system-prompt-fn     (fn
                                                        ([_ctx] (throw (ex-info "refresh-system-prompt-fn requires explicit session-id" {:callback :refresh-system-prompt-fn})))
-                                                       ([ctx session-id] (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})))
+                                                       ([ctx session-id] (session-core/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})))
                        :execute-prepared-request-fn  (fn [_ai-ctx _ctx sid prepared _progress-queue]
                                                        {:execution-result/turn-id (:prepared-request/id prepared)
                                                         :execution-result/session-id sid
@@ -147,6 +162,11 @@
                                                         :execution-result/turn-outcome :turn.outcome/stop
                                                         :execution-result/tool-calls []
                                                         :execution-result/stop-reason :stop})
+                       :workflow-prompt-execution-result-fn (fn [ctx sid text images opts]
+                                                              (cond
+                                                                (some? opts) (psi.agent-session.turn/prompt-execution-result-in! ctx sid text images opts)
+                                                                (some? images) (psi.agent-session.turn/prompt-execution-result-in! ctx sid text images)
+                                                                :else (psi.agent-session.turn/prompt-execution-result-in! ctx sid text)))
                        :persist?                     false
                        :notify-extension-fn         (fn
                                                       ([ctx role content custom-type]
@@ -157,10 +177,10 @@
                                                                    custom-type (assoc :custom-type custom-type)
                                                                    (not custom-type) (assoc :custom-type "extension-notification"))
                                                              session-id (some-> (ss/list-context-sessions-in ctx) first :session-id)]
-                                                         (dispatch/dispatch! ctx
-                                                                             :session/notify-extension
-                                                                             {:session-id session-id :message msg}
-                                                                             {:origin :core})
+                                                         (session-core/dispatch-in! ctx
+                                                                                    :session/notify-extension
+                                                                                    {:session-id session-id :message msg}
+                                                                                    {:origin :core})
                                                          msg))
                                                       ([ctx session-id role content custom-type]
                                                        (let [msg {:role      role
@@ -169,11 +189,18 @@
                                                              msg (cond-> msg
                                                                    custom-type (assoc :custom-type custom-type)
                                                                    (not custom-type) (assoc :custom-type "extension-notification"))]
-                                                         (dispatch/dispatch! ctx
-                                                                             :session/notify-extension
-                                                                             {:session-id session-id :message msg}
-                                                                             {:origin :core})
+                                                         (session-core/dispatch-in! ctx
+                                                                                    :session/notify-extension
+                                                                                    {:session-id session-id :message msg}
+                                                                                    {:origin :core})
                                                          msg)))
+                       :get-session-data-fn          ss/get-session-data-in
+                       :list-context-sessions-fn     ss/list-context-sessions-in
+                       :find-skill-fn                psi.skill-registry.registry/find-skill
+                       :resolve-workflow-step-session-config-fn psi.workflow-step-session-config.core/resolve-step-session-config
+                       :materialize-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/materialize-step-session-conversation
+                       :split-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/split-step-session-conversation
+                       :execute-workflow-judge-fn    psi.agent-session.workflow-judge/execute-judge!
                        :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
                        :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
                        :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
@@ -188,7 +215,10 @@
                                                          (.interrupt ^Thread handle)))
                        :daemon-thread-fn             (fn [f] (doto (Thread. ^Runnable f) (.setDaemon true) (.start)))
                        :effective-cwd-fn             (fn [ctx session-id] (ss/session-worktree-path-in ctx session-id))
-                       :journal-append-fn            persistence/append-entry-in!}
+                       :validate-dispatch-result-fn  dispatch-schema/validate-dispatch-schemas
+                       :validate-result-fn           dispatch-schema/validate-dispatch-schemas}
+        ctx           (assoc ctx0 workflow-execution-adapter/adapter-key
+                             (session-context/workflow-execution-adapter ctx0))
         _             (dispatch-handlers/register-all! ctx)
         actions-fn     (dispatch-handlers/make-actions-fn ctx)
         ctx            (assoc ctx :session-actions-fn actions-fn)]

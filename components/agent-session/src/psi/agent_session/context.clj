@@ -5,28 +5,35 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.compaction :as compaction]
    [psi.agent-session.compaction-runtime :as compaction-runtime]
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
+   [psi.agent-session.dispatch-schema :as schema]
    [psi.agent-session.dispatch-handlers :as dispatch-handlers]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
-   [psi.agent-session.project-nrepl-runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.prompt-chain :as prompt-chain]
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.prompt-runtime :as prompt-runtime]
+   [psi.agent-session.turn :as turn]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.model :as session]
+   [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.tool-plan :as tool-plan]
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.session-runtime :as session-runtime]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflows :as wf]
+   [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
+   [psi.workflow-runtime.model :as workflow-model]
+   [psi.workflow-step-materialization.core :as workflow-step-materialization]
+   [psi.workflow-step-session-config.core :as workflow-step-session-config]
+   [psi.skill-registry.registry :as skill-registry]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.history.resolvers :as history-resolvers]
    [psi.query.core :as query]
    [psi.ui.state :as ui-state])
@@ -60,16 +67,6 @@
      (query/register-mutation-in! qctx m))
    (when rebuild?
      (query/rebuild-env-in! qctx))))
-
-(defn register-resolvers! []
-  (doseq [r resolvers/all-resolvers]
-    (query/register-resolver! r))
-  (query/rebuild-env!))
-
-(defn register-mutations! [mutations]
-  (doseq [m mutations]
-    (query/register-mutation! m))
-  (query/rebuild-env!))
 
 (defn- resolve-session-defaults [session-defaults resolved-cwd ui-type]
   (cond-> (or session-defaults {})
@@ -144,15 +141,27 @@
       (agent-core/replace-messages-in! (:agent-ctx fresh) messages)))
   {:psi.agent-session/session-id child-session-id})
 
+(defn workflow-execution-adapter
+  [ctx]
+  (workflow-execution-adapter/create
+   {:create-child-session! (:create-workflow-child-session-fn ctx)
+    :prompt-execution-result! (:workflow-prompt-execution-result-fn ctx)
+    :get-session-data (:get-session-data-fn ctx)
+    :list-context-sessions (:list-context-sessions-fn ctx)
+    :find-skill (:find-skill-fn ctx)
+    :execute-judge! (:execute-workflow-judge-fn ctx)}))
+
 (defn- callback-fns [mutations projection-listeners*]
   {:apply-root-state-update-fn ss/apply-root-state-update-in!
    :read-session-state-fn ss/get-state-value-in
    :execute-dispatch-effect-fn (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
+   :execute-effect-fn (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))
    :dispatch-statechart-event-fn dispatch-handlers/dispatch-statechart-event-in!
    :runtime-tool-executor-fn tool-plan/default-execute-runtime-tool-in!
    :execute-tool-runtime-fn #'tool-plan/execute-tool-runtime-in!
    :build-prepared-request-fn #'prompt-request/build-prepared-request
-   :execute-prepared-request-fn #'prompt-runtime/execute-prepared-request!
+   :execute-prepared-request-fn #'turn/execute-prepared-request!
+   :workflow-prompt-execution-result-fn #'turn/prompt-execution-result-in!
    :build-record-response-fn #'prompt-recording/build-record-response
    :continue-prompt-chain-fn #'prompt-chain/run-prompt-tools!
    :refresh-system-prompt-fn (fn
@@ -163,13 +172,19 @@
    :notify-extension-fn #'ext-rt/notify-extension-in!
    :register-resolvers-fn (fn [qctx rebuild?] (register-resolvers-in! qctx rebuild?))
    :register-mutations-fn (fn [qctx mutations rebuild?] (register-mutations-in! qctx mutations rebuild?))
-   :create-workflow-child-session-fn create-workflow-child-session!
-   :execute-workflow-run-fn workflow-execution/execute-run!
-   :resume-and-execute-workflow-run-fn workflow-execution/resume-and-execute-run!
+   :create-workflow-child-session-fn #'create-workflow-child-session!
+   :execute-workflow-run-fn #'workflow-execution/execute-run!
+   :resume-and-execute-workflow-run-fn #'workflow-execution/resume-and-execute-run!
+   :get-session-data-fn #'ss/get-session-data-in
+   :list-context-sessions-fn #'ss/list-context-sessions-in
+   :find-skill-fn #'skill-registry/find-skill
+   :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
+   :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
+   :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
+   :execute-workflow-judge-fn #'workflow-judge/execute-judge!
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
    :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
    :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
-   :journal-append-fn ss/journal-append-in!
    :effective-cwd-fn (fn
                        ([_ctx] (throw (ex-info "effective-cwd-fn requires explicit session-id" {:callback :effective-cwd-fn})))
                        ([ctx session-id] (ss/session-worktree-path-in ctx session-id)))
@@ -184,14 +199,18 @@
                                   (.interrupt ^Thread handle)))
    :daemon-thread-fn dispatch-handlers/daemon-thread
    :drop-trailing-overflow-error-fn dispatch-effects/drop-trailing-overflow-error!
-   :validate-dispatch-result-fn dispatch/validate-dispatch-schemas
+   :validate-dispatch-result-fn schema/validate-dispatch-schemas
+   :validate-result-fn schema/validate-dispatch-schemas
    :register-projection-listener-fn (fn [_ctx listener-fn] (register-projection-listener! projection-listeners* listener-fn))
    :unregister-projection-listener-fn (fn [_ctx listener-id] (unregister-projection-listener! projection-listeners* listener-id))
    :publish-projection-change-fn (fn [_ctx change] (publish-projection-change! projection-listeners* change))
    :all-mutations mutations})
 
 (defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
-                                create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn]
+                                create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn
+                                get-session-data-fn list-context-sessions-fn find-skill-fn
+                                resolve-workflow-step-session-config-fn materialize-workflow-step-session-conversation-fn
+                                split-workflow-step-session-conversation-fn execute-workflow-judge-fn]
                          :or {persist? true mutations []}
                          :as opts}]
   (let [resolved-cwd (or cwd (System/getProperty "user.dir"))
@@ -206,7 +225,8 @@
                      :agent-initial agent-initial
                      :nrepl-runtime-atom nrepl-runtime-atom
                      :extension-registry (ext/create-registry)
-                     :workflow-registry (wf/create-registry)
+                     :deterministic-operation-registry (deterministic-op-registry/create-registry)
+                     :workflow-registry (extension-workflow-runtime/create-registry)
                      :service-registry (services/create-registry)
                      :project-nrepl-registry (project-nrepl-runtime/create-registry)
                      :post-tool-registry (post-tool/create-registry)
@@ -232,7 +252,30 @@
                       (assoc :execute-workflow-run-fn execute-workflow-run-fn)
 
                       (contains? opts :resume-and-execute-workflow-run-fn)
-                      (assoc :resume-and-execute-workflow-run-fn resume-and-execute-workflow-run-fn)))
+                      (assoc :resume-and-execute-workflow-run-fn resume-and-execute-workflow-run-fn)
+
+                      (contains? opts :get-session-data-fn)
+                      (assoc :get-session-data-fn get-session-data-fn)
+
+                      (contains? opts :list-context-sessions-fn)
+                      (assoc :list-context-sessions-fn list-context-sessions-fn)
+
+                      (contains? opts :find-skill-fn)
+                      (assoc :find-skill-fn find-skill-fn)
+
+                      (contains? opts :resolve-workflow-step-session-config-fn)
+                      (assoc :resolve-workflow-step-session-config-fn resolve-workflow-step-session-config-fn)
+
+                      (contains? opts :materialize-workflow-step-session-conversation-fn)
+                      (assoc :materialize-workflow-step-session-conversation-fn materialize-workflow-step-session-conversation-fn)
+
+                      (contains? opts :split-workflow-step-session-conversation-fn)
+                      (assoc :split-workflow-step-session-conversation-fn split-workflow-step-session-conversation-fn)
+
+                      (contains? opts :execute-workflow-judge-fn)
+                      (assoc :execute-workflow-judge-fn execute-workflow-judge-fn)))
+        ctx0 (assoc ctx0 workflow-execution-adapter/adapter-key
+                    (workflow-execution-adapter ctx0))
         _ (dispatch-handlers/register-all! ctx0)
         actions-fn (dispatch-handlers/make-actions-fn ctx0)
         ctx (assoc ctx0 :session-actions-fn actions-fn)]

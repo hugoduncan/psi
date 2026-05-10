@@ -1,16 +1,16 @@
 (ns psi.agent-session.post-tool-test
   (:require
    [clojure.test :refer [deftest is use-fixtures]]
-   [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.post-tool :as post-tool]))
+   [psi.agent-session.post-tool :as post-tool]
+   [psi.state-kernel.dispatch :as kernel]))
 
 (defn- clean-state [f]
-  (dispatch/clear-handlers!)
-  (dispatch/clear-dispatch-trace!)
+  (kernel/clear-handlers!)
+  (kernel/clear-dispatch-trace!)
   (try (f)
        (finally
-         (dispatch/clear-handlers!)
-         (dispatch/clear-dispatch-trace!))))
+         (kernel/clear-handlers!)
+         (kernel/clear-dispatch-trace!))))
 
 (use-fixtures :each clean-state)
 
@@ -98,9 +98,9 @@
              (post-tool/telemetry-counts-in ctx))))))
 
 (deftest canonical-post-tool-trace-failure-and-timeout-test
-  (dispatch/register-handler! :session/post-tool-run
-                              (fn [ctx input]
-                                {:return (post-tool/run-post-tool-processing-direct-in! ctx input)}))
+  (kernel/register-handler! :session/post-tool-run
+                            (fn [ctx input]
+                              {:return (post-tool/run-post-tool-processing-direct-in! ctx input)}))
   (let [ctx (make-ctx)]
     (post-tool/register-processor-in!
      ctx
@@ -114,7 +114,7 @@
       :match {:tools #{"write"}}
       :timeout-ms 100
       :handler (fn [_] (throw (ex-info "boom" {})))})
-    (dispatch/clear-dispatch-trace!)
+    (kernel/clear-dispatch-trace!)
     (let [result (post-tool/run-post-tool-processing-in!
                   ctx
                   {:session-id "s1"
@@ -123,7 +123,7 @@
                    :tool-args {}
                    :tool-result base-result
                    :worktree-path "/repo"})
-          entries (dispatch/dispatch-trace-entries)
+          entries (kernel/dispatch-trace-entries)
           received (first entries)
           completed (last entries)]
       (is (= base-result result))

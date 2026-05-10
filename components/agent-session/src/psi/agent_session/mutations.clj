@@ -9,7 +9,7 @@
    [psi.agent-session.mutations.session :as session]
    [psi.agent-session.mutations.tools :as tools]
    [psi.agent-session.mutations.ui :as ui]
-   [psi.agent-session.workflow-mutations :as workflow-mutations]))
+   [psi.agent-session.extension-workflow-mutations :as extension-workflow-mutations]))
 
 (def all-mutations
   "All agent-session mutations defined in this namespace family."
@@ -20,5 +20,5 @@
                 extensions/all-mutations
                 services/all-mutations
                 ui/all-mutations
-                workflow-mutations/all-mutations
+                extension-workflow-mutations/all-mutations
                 canonical-workflows/all-mutations)))

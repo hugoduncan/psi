@@ -3,8 +3,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [charm.message :as msg]
-   [psi.agent-session.persistence :as persist]
    [psi.app-runtime.projections :as projections]
+   [psi.session-journal.store :as journal-store]
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.tui.app :as app]
    [psi.tui.app.update :as app-update]
@@ -93,8 +93,8 @@
 
 (deftest resume-command-opens-selector-test
   (testing "/resume enters :selecting-session phase"
-    (with-redefs [persist/session-dir-for (fn [_cwd] "/tmp/psi-test")
-                  persist/list-sessions
+    (with-redefs [journal-store/session-dir-for (fn [_cwd] "/tmp/psi-test")
+                  journal-store/list-sessions
                   (fn [_dir]
                     [{:path "/tmp/psi-test/a.ndedn"
                       :name "Session A"
@@ -122,8 +122,8 @@
                                             :is-error false
                                             :expanded? false}}
                          :tool-order ["t1"]}]
-      (with-redefs [persist/session-dir-for (fn [_cwd] "/tmp/psi-test")
-                    persist/list-sessions
+      (with-redefs [journal-store/session-dir-for (fn [_cwd] "/tmp/psi-test")
+                    journal-store/list-sessions
                     (fn [_dir]
                       [{:path "/tmp/psi-test/a.ndedn"
                         :name "Session A"
@@ -149,8 +149,8 @@
 
 (deftest resume-selector-escape-cancels-test
   (testing "escape from selector returns to idle without changing messages"
-    (with-redefs [persist/session-dir-for (fn [_cwd] "/tmp/psi-test")
-                  persist/list-sessions (fn [_dir] [])]
+    (with-redefs [journal-store/session-dir-for (fn [_cwd] "/tmp/psi-test")
+                  journal-store/list-sessions (fn [_dir] [])]
       (let [update-fn (app/make-update (stub-agent-fn ""))
             state     (assoc (init-state {:cwd "/tmp/psi-test"})
                              :messages [{:role :assistant :text "keep me"}])
@@ -162,8 +162,8 @@
 
 (deftest resume-selector-keyword-key-ignored-test
   (testing "non-printable keyword keys in selector are ignored (no exception)"
-    (with-redefs [persist/session-dir-for (fn [_cwd] "/tmp/psi-test")
-                  persist/list-sessions
+    (with-redefs [journal-store/session-dir-for (fn [_cwd] "/tmp/psi-test")
+                  journal-store/list-sessions
                   (fn [_dir]
                     [{:path "/tmp/psi-test/a.ndedn"
                       :name "Session A"
@@ -182,8 +182,8 @@
 
 (deftest resume-selector-backspace-keyword-test
   (testing "keyword backspace edits selector search"
-    (with-redefs [persist/session-dir-for (fn [_cwd] "/tmp/psi-test")
-                  persist/list-sessions
+    (with-redefs [journal-store/session-dir-for (fn [_cwd] "/tmp/psi-test")
+                  journal-store/list-sessions
                   (fn [_dir]
                     [{:path "/tmp/psi-test/a.ndedn"
                       :name "Session A"

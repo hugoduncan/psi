@@ -1,7 +1,7 @@
 (ns psi.agent-session.extensions.runtime-eql
   (:require
    [psi.agent-session.background-job-runtime :as bg-rt]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.history.git :as history-git]
    [psi.query.core :as query]))
 

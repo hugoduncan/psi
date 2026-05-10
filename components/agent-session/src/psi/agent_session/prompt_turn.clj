@@ -5,10 +5,10 @@
    preparation, live turn execution, and assistant-message journaling to the
    prompt runtime path."
   (:require
-   [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.agent-session.prompt-runtime :as prompt-runtime]
-   [psi.agent-session.tool-batch :as tool-batch]))
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
+   [psi.agent-session.turn :as turn]
+   [psi.turn-runtime.recording :as turn-recording]))
 
 (defn stream-turn!
   "Stream one LLM response into agent-core via the per-turn statechart.
@@ -16,7 +16,7 @@
    Stores turn context in canonical state for nREPL introspection."
   [ai-ctx ctx session-id ai-model extra-ai-options progress-queue]
   (:execution-result/assistant-message
-   (prompt-runtime/execute-prepared-request-and-journal!
+   (turn/execute-prepared-request-and-journal!
     ai-ctx ctx session-id
     (prompt-request/build-prepared-request
      ctx session-id
@@ -30,10 +30,10 @@
   [ai-ctx ctx session-id ai-model extra-ai-options progress-queue]
   (let [assistant-message (stream-turn! ai-ctx ctx session-id ai-model
                                         extra-ai-options progress-queue)
-        outcome           (prompt-recording/classify-assistant-message assistant-message)]
+        outcome           (turn-recording/classify-assistant-message assistant-message)]
     (case (:turn/outcome outcome)
       :turn.outcome/tool-use
-      (do (tool-batch/run-tool-calls! ctx session-id (:tool-calls outcome) progress-queue)
+      (do (tool-runtime-adapter/run-tool-calls! ctx session-id (:tool-calls outcome) progress-queue)
           (run-turn-loop! ai-ctx ctx session-id ai-model
                           extra-ai-options progress-queue))
 

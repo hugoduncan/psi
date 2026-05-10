@@ -1,0 +1,77 @@
+- [x] Implement the settled target component name, namespace family, and public API shape around `psi.session-persistence.core`
+  - [x] expose `session-journal-path` and `session-flush-state-path`
+  - [x] expose `flush-state` and `persistence-state`
+  - [x] expose `append-journal-entry-in!` and `persist-journal-in!`
+- [x] Create `components/session-persistence/`
+- [x] Add focused component-local tests for the extracted persistence owner
+  - [x] `session-journal-path` / `session-flush-state-path` ownership
+  - [x] `append-journal-entry-in!` append-first ctx semantics
+  - [x] lazy flush on first assistant message
+  - [x] append-after-flush semantics
+  - [x] persisted session file load/list wrappers
+  - [x] `flush-state` / `persistence-state` canonical persistence subtree initialization helpers
+- [x] Move persistence-specific path builders out of `psi.session-state.state`
+  - [x] move authoritative `session-journal-path` ownership
+  - [x] move authoritative `session-flush-state-path` ownership
+  - [x] move canonical `append-journal-entry-in!` ownership out of `psi.session-state.state`
+  - [x] leave only narrow delegating compatibility helpers in `session-state.state`
+- [x] Move `psi.agent-session.persistence` implementation into the new component
+  - [x] journal entry constructors
+  - [x] in-memory journal helpers
+  - [x] ctx-based journal helpers, ending on `append-journal-entry-in!` and the existing `*-in` read helper names
+  - [x] flush-state helpers, ending on `flush-state`, `persistence-state`, and `persist-journal-in!`
+  - [x] persisted session file wrappers over `session-journal.store`
+- [x] Move canonical persistence subtree initialization ownership into the new component
+  - [x] replace `session-runtime/persistence-state` with `psi.session-persistence.core/persistence-state`
+  - [x] replace manual child-session persistence map construction with `flush-state` / `persistence-state`
+  - [x] replace `psi.session-state.init/initialize-session-slots` journal initialization with a canonical persistence-owned helper or constructor
+  - [x] replace direct flush-state map construction in `initialize-resume-missing-state` with a canonical persistence-owned helper
+  - [x] replace direct flush-state map construction in `initialize-new-session-state` with a canonical persistence-owned helper
+  - [x] replace direct flush-state map construction in `initialize-resumed-session-state` with a canonical persistence-owned helper
+  - [x] replace direct flush-state map construction in `initialize-forked-session-state` with a canonical persistence-owned helper
+  - [x] add or refine persistence-owned pure subtree/update helpers as needed so `session-state.init` no longer rebuilds persistence shapes inline
+  - [x] preserve existing `:session-file` and `:flushed?` values when `initialize-session-slots` seeds journal state
+- [x] Update production consumers to depend downward on the new component
+  - [x] `psi.turn`
+  - [x] `agent-session` runtime/lifecycle/dispatch-effects/workflow consumers
+  - [x] app-runtime projections
+- [x] Remove broad production requires on `psi.agent-session.persistence`
+- [x] Remove direct production use of `psi.session-state.state/state-path` for `:journal` and `:flush-state` in favor of `session-journal-path` and `session-flush-state-path`
+- [x] Run focused regression coverage
+  - [x] extracted component tests
+  - [x] persistence/journal convergence tests
+  - [x] turn-focused regression tests
+  - [x] session lifecycle / fork-resume tests
+  - [x] app-runtime projection tests that consume journal helpers
+- [x] Verify `psi.turn` no longer requires `psi.agent-session.persistence` and instead uses `psi.session-persistence.core`
+- [x] Record final path-ownership and initialization-ownership decisions in `implementation.md`
+- [x] Execute review follow-up: finish moving top-level/session-state persistence subtree initialization ownership out of `psi.session-state.init`
+  - [x] complete the `session-state.init` follow-ups above
+  - [x] rerun focused `psi.session-persistence.core-test`
+  - [x] rerun focused `psi.session-state.init-test`
+  - [x] rerun focused `psi.agent-session.session-lifecycle-test`
+  - [x] rerun focused `psi.agent-session.journal-append-convergence-test`
+  - [x] append outcome/decisions to `implementation.md`
+- [x] Remove temporary compatibility wrappers unless a remaining wrapper is explicitly justified in `implementation.md`
+  - [x] audit remaining production/test consumers of `psi.agent-session.persistence`
+  - [x] remove the `psi.agent-session.persistence` re-export namespace if no justified consumers remain
+  - [x] audit remaining delegating seams in `psi.session-state.state`
+  - [x] explicitly justify retaining `session-journal-path`, `session-flush-state-path`, and `append-journal-entry-in!` in `psi.session-state.state` as generic compatibility/session-state query surfaces for now
+  - [x] rerun focused regressions after wrapper removal or seam-retention decision
+- [x] Review final implementation against task design and architecture after follow-up fixes
+  - [x] confirm no remaining task-local follow-up items block closure
+  - [x] distinguish non-blocking architectural follow-up `118-session-persistence-io-effect-extraction` from task-117 closure criteria
+- [x] Execute code-shaper follow-up cleanup
+  - [x] extract a local helper in `psi.session-persistence.core` for assistant-message detection used by `persist-state-entry!`, `persist-entry!`, and `persist-journal-in!`
+  - [x] review whether `psi.session-persistence.core` should be locally reorganized so subtree/update helpers, journal read helpers, and persistence execution helpers are easier to scan and mutate
+  - [x] decide that broader local reorganization should be deferred rather than folded into task `117` closure cleanup
+  - [x] rerun focused `psi.session-persistence.core-test`, `psi.session-state.init-test`, and `psi.agent-session.journal-append-convergence-test`
+  - [x] append shaping outcome/decision to `implementation.md`
+- [x] Execute test-shaping follow-up cleanup
+  - [x] review overlap between `components/session-persistence/test/psi/session_persistence/core_test.clj` and `components/session-persistence/test/psi/session_persistence/compat_removed_test.clj`
+  - [x] keep `core_test.clj` as the authoritative component behavior suite
+  - [x] narrow `compat_removed_test.clj` to unique migration/compatibility-removal assertions only
+  - [x] decide that explicit full-subtree persistence assertions in `session-state.init` tests are useful where they clarify ownership and state preservation
+  - [x] preserve the production persistence subtree state that the stronger tests now prove, specifically `:session-file` and `:flushed?` during `initialize-session-slots`
+  - [x] rerun focused `psi.session-persistence.core-test`, `psi.session-persistence.compat-removed-test`, and `psi.session-state.init-test`
+  - [x] append test-shaping outcome/decision to `implementation.md`

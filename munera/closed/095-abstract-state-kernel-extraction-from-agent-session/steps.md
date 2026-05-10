@@ -1,0 +1,26 @@
+- [x] Inspect `dispatch.clj`, `dispatch_schema.clj`, `dispatch_effects.clj`, `context.clj`, `agent-session.bootstrap`, and `system-bootstrap.core` in detail for kernel vs domain ownership
+- [x] Validate the settled narrowed kernel environment contract against current code and record any required refinements, especially how generic code stops depending on the broad global `ctx` shape
+- [x] Record the settled abstract kernel component name/path explicitly in implementation notes
+- [x] Create the new component and namespace family for the kernel
+- [x] Move the generic dispatch pipeline into the new component
+- [x] Move the generic dispatch schema/pure-result contract into the new component
+- [x] Either split `dispatch_effects.clj` into generic substrate vs app-specific effect methods, or explicitly record why effect execution remains above the kernel in this slice
+- [x] Either split generic listener/publication helpers from `context.clj`, or explicitly record why leaving them above the kernel does not keep generic dispatch code coupled to `context.clj`
+- [x] Rewire `agent-session` to consume the extracted kernel through explicit dependencies and the narrowed contract
+- [x] Verify the kernel has no dependency back into `agent-session`
+- [x] Remove the `agent-session` -> `system-bootstrap` dependency, or record the exact remaining blocker and why the cycle persists
+- [x] Retire the temporary `psi.agent-session.dispatch` compatibility wrapper by moving remaining generic dispatch consumers onto `psi.state-kernel.dispatch` directly, then reduce `psi.agent-session.dispatch` to only true domain-composition surfaces or remove it entirely if no wrapper-local entrypoints remain
+- [x] Add/update focused tests for the extracted kernel boundary and preserved behavior, covering at least pure-result apply, bounded event-log/trace, and one consuming `agent-session` path
+- [x] Record moved-vs-split decisions, kernel-contract decisions, and cycle-status rationale in implementation notes
+- [x] Run focused verification
+- [x] Move `permission-interceptor` and `statechart-interceptor` out of `psi.state-kernel.dispatch` into higher-layer composition/injection so kernel defaults are fully domain-independent
+- [x] Remove the remaining kernel compatibility fallbacks to `:apply-root-state-update-fn` and `:read-session-state-fn`, or explicitly document and isolate them as temporary migration-only seams
+- [x] Re-run focused and wider unit verification after the boundary-tightening follow-up
+- [x] Remove agent-session-shaped db summary logic from `components/state-kernel/src/psi/state_kernel/dispatch.clj` by reducing it to a truly generic kernel summary or injecting a higher-layer summary callback
+- [x] Remove or generalize kernel-owned `:statechart-claimed?` logging so the state-kernel event-log/trace surface no longer embeds composition-layer statechart semantics
+- [x] Add or update focused tests proving the tightened kernel trace/log boundary after the db-summary and statechart-log cleanup
+- [x] Re-run focused and full unit verification after the final kernel-boundary cleanup
+- [x] Remove duplicated apply-interceptor orchestration between `components/state-kernel/src/psi/state_kernel/dispatch.clj` and `components/agent-session/src/psi/agent_session/dispatch.clj` by centralizing the generic apply algorithm and leaving only injected read/apply hooks in the compatibility layer
+- [x] Clarify environment shaping in `psi.agent-session.dispatch` by either renaming `->kernel-env` or splitting kernel-vs-wrapper environment preparation so compatibility-only keys are not presented as kernel contract keys
+- [x] Remove or generalize residual `:statechart-claimed?` compatibility-layer ictx state if it no longer serves a clear local control-flow purpose after the kernel log cleanup
+- [x] Add/update focused proofs for the apply-path shaping follow-up and rerun focused verification

@@ -2,9 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.session-state :as ss]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-state.state :as ss]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.mutations :as mutations]
    [psi.rpc :as rpc]
    [psi.rpc.session.projections :as rpc.projections]
@@ -89,15 +88,15 @@
 (deftest session-updated-payload-includes-model-metadata-test
   (testing "session payload includes model metadata for frontend header projection"
     (let [[ctx sid] (support/create-session-context)
-          _         (dispatch/dispatch! ctx :session/set-model
-                                        {:session-id sid
-                                         :model {:provider "openai"
-                                                 :id "gpt-5.3-codex"
-                                                 :reasoning true}}
-                                        {:origin :core})
-          _         (dispatch/dispatch! ctx :session/set-thinking-level
-                                        {:session-id sid :level :xhigh}
-                                        {:origin :core})
+          _         (session/dispatch-in! ctx :session/set-model
+                                          {:session-id sid
+                                           :model {:provider "openai"
+                                                   :id "gpt-5.3-codex"
+                                                   :reasoning true}}
+                                          {:origin :core})
+          _         (session/dispatch-in! ctx :session/set-thinking-level
+                                          {:session-id sid :level :xhigh}
+                                          {:origin :core})
           _         (ss/apply-root-state-update-in! ctx
                                                     (ss/session-update sid #(assoc %
                                                                                    :retry-attempt 2
@@ -159,12 +158,12 @@
           state      (atom {:transport {:ready? true :pending {}}
                             :connection {:subscribed-topics #{"footer/updated"}}})
           handler (support/make-handler ctx state)
-          _          (ss/journal-append-in! ctx session-id
-                                            {:kind :message
-                                             :session-id session-id
-                                             :data {:message {:role "assistant"
-                                                              :usage {:input-tokens 111
-                                                                      :output-tokens 22}}}})
+          _          (ss/append-journal-entry-in! ctx session-id
+                                                  {:kind :message
+                                                   :session-id session-id
+                                                   :data {:message {:role "assistant"
+                                                                    :usage {:input-tokens 111
+                                                                            :output-tokens 22}}}})
           input   (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
                        "{:id \"n1\" :kind :request :op \"new_session\"}\n")
           {:keys [out-lines]} (support/run-loop input handler state)
@@ -178,17 +177,17 @@
 (deftest footer-updated-payload-includes-model-and-thinking-when-session-reasoning-enabled-test
   (testing "footer payload includes model/thinking details from active session query"
     (let [[ctx session-id] (support/create-session-context)
-          _          (dispatch/dispatch! ctx :session/set-model
-                                         {:session-id session-id :model {:provider "openai" :id "gpt-5.3-codex" :reasoning true}}
-                                         {:origin :core})
-          _          (dispatch/dispatch! ctx :session/set-thinking-level {:session-id session-id :level :high} {:origin :core})
-          _          (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 4000 :window 100000} {:origin :core})
-          _          (ss/journal-append-in! ctx session-id
-                                            {:kind :message
-                                             :session-id session-id
-                                             :data {:message {:role "assistant"
-                                                              :usage {:input-tokens 111
-                                                                      :output-tokens 22}}}})
+          _          (session/dispatch-in! ctx :session/set-model
+                                           {:session-id session-id :model {:provider "openai" :id "gpt-5.3-codex" :reasoning true}}
+                                           {:origin :core})
+          _          (session/dispatch-in! ctx :session/set-thinking-level {:session-id session-id :level :high} {:origin :core})
+          _          (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 4000 :window 100000} {:origin :core})
+          _          (ss/append-journal-entry-in! ctx session-id
+                                                  {:kind :message
+                                                   :session-id session-id
+                                                   :data {:message {:role "assistant"
+                                                                    :usage {:input-tokens 111
+                                                                            :output-tokens 22}}}})
           payload (rpc.events/footer-updated-payload ctx session-id)]
       (is (= ["↑111" "↓22" "4.0%/100k"]
              (:usage-parts payload)))
@@ -199,10 +198,10 @@
   (testing "subscribe emits context/updated with active-session-id and sessions list"
     (let [[ctx session-id] (support/create-session-context)
           user-ts          (java.time.Instant/parse "2026-03-16T10:47:00Z")
-          _                (ss/journal-append-in! ctx session-id
-                                                  (persist/message-entry {:role "user"
-                                                                          :content [{:type :text :text "hi"}]
-                                                                          :timestamp user-ts}))
+          _                (ss/append-journal-entry-in! ctx session-id
+                                                        (persist/message-entry {:role "user"
+                                                                                :content [{:type :text :text "hi"}]
+                                                                                :timestamp user-ts}))
           state            (atom {:transport {:ready? true :pending {}}
                                   :connection {:subscribed-topics #{"context/updated"}}})
           handler          (support/make-handler ctx state)
@@ -232,11 +231,11 @@
     (let [cwd     (str (System/getProperty "java.io.tmpdir") "/psi-rpc-fork-" (java.util.UUID/randomUUID))
           _       (.mkdirs (java.io.File. cwd))
           [ctx session-id] (support/create-session-context {:cwd cwd})
-          _       (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "anthropic" :id "claude-sonnet"}} {:origin :core})
+          _       (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "anthropic" :id "claude-sonnet"}} {:origin :core})
           ;; Append a message entry so fork has an entry-id to branch from
           entry   (persist/message-entry {:role "user" :content "hi"})
-          _       (ss/journal-append-in! ctx session-id entry)
-          _       (ss/journal-append-in! ctx session-id (persist/message-entry {:role "assistant" :content [{:type :text :text "reply"}]}))
+          _       (ss/append-journal-entry-in! ctx session-id entry)
+          _       (ss/append-journal-entry-in! ctx session-id (persist/message-entry {:role "assistant" :content [{:type :text :text "reply"}]}))
           entry-id (:id entry)
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{"context/updated" "session/rehydrated"}}})
@@ -271,8 +270,8 @@
           _        (.mkdirs (java.io.File. cwd))
           [ctx sid] (support/create-session-context {:cwd cwd})
           entry     (persist/message-entry {:role "user" :content "branch here"})
-          _         (ss/journal-append-in! ctx sid entry)
-          _         (ss/journal-append-in! ctx sid (persist/message-entry {:role "assistant" :content [{:type :text :text "reply here"}]}))
+          _         (ss/append-journal-entry-in! ctx sid entry)
+          _         (ss/append-journal-entry-in! ctx sid (persist/message-entry {:role "assistant" :content [{:type :text :text "reply here"}]}))
           state     (atom {:transport {:ready? true :pending {}}
                            :connection {:subscribed-topics #{"session/resumed" "session/rehydrated" "context/updated"}}})
           handler   (support/make-handler ctx state)

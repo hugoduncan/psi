@@ -3,8 +3,8 @@
    Thin wrappers over state-path + get-state-value-in / dispatch."
   (:require
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.oauth.core :as oauth]
-   [psi.agent-session.session-state :as session]))
+   [psi.provider-auth.oauth.core :as oauth]
+   [psi.session-state.state :as session]))
 
 ;;; Readers — non-session-scoped (no session-id required)
 
@@ -30,11 +30,6 @@
 
 ;;; Readers — session-scoped (explicit session-id required)
 
-(defn turn-context-in
-  "Return the current turn statechart context from canonical runtime state."
-  [ctx session-id]
-  (session/get-state-value-in ctx (session/state-path :turn-ctx session-id)))
-
 (defn journal-state-in
   "Return the canonical in-memory journal vector."
   [ctx session-id]
@@ -50,25 +45,10 @@
   [ctx session-id]
   (session/get-state-value-in ctx (session/state-path :tool-output-stats session-id)))
 
-(defn tool-call-attempts-in
-  "Return canonical tool-call attempt telemetry vector."
-  [ctx session-id]
-  (session/get-state-value-in ctx (session/state-path :tool-call-attempts session-id)))
-
 (defn tool-lifecycle-events-in
   "Return canonical tool lifecycle telemetry vector."
   [ctx session-id]
   (session/get-state-value-in ctx (session/state-path :tool-lifecycle-events session-id)))
-
-(defn provider-requests-in
-  "Return canonical provider request capture vector."
-  [ctx session-id]
-  (session/get-state-value-in ctx (session/state-path :provider-requests session-id)))
-
-(defn provider-replies-in
-  "Return canonical provider reply capture vector."
-  [ctx session-id]
-  (session/get-state-value-in ctx (session/state-path :provider-replies session-id)))
 
 ;;; Mutators — non-session-scoped
 
@@ -94,38 +74,6 @@
   [ctx session-id recursion-state]
   (dispatch/dispatch! ctx :session/set-recursion-state {:session-id session-id :recursion-state recursion-state} {:origin :core})
   (recursion-state-in ctx))
-
-(defn set-turn-context-in!
-  "Persist the current turn statechart context into canonical runtime state.
-   Intended for executor/runtime introspection plumbing.
-   Routed through the dispatch pipeline."
-  [ctx session-id turn-ctx]
-  (dispatch/dispatch! ctx :session/set-turn-context {:session-id session-id :turn-ctx turn-ctx} {:origin :core})
-  (session/get-state-value-in ctx (session/state-path :turn-ctx session-id)))
-
-(defn append-tool-call-attempt-in!
-  "Append one tool-call attempt telemetry entry into canonical state.
-   Intended for executor-side telemetry capture.
-   Routed through the dispatch pipeline."
-  [ctx session-id attempt]
-  (dispatch/dispatch! ctx :session/append-tool-call-attempt {:session-id session-id :attempt attempt} {:origin :core})
-  (session/get-state-value-in ctx (session/state-path :tool-call-attempts session-id)))
-
-(defn append-provider-request-capture-in!
-  "Append one provider request capture into canonical state with bounded retention.
-   Intended for executor-side provider telemetry capture.
-   Routed through the dispatch pipeline."
-  [ctx session-id capture]
-  (dispatch/dispatch! ctx :session/append-provider-request-capture {:session-id session-id :capture capture} {:origin :core})
-  (session/get-state-value-in ctx (session/state-path :provider-requests session-id)))
-
-(defn append-provider-reply-capture-in!
-  "Append one provider reply capture into canonical state with bounded retention.
-   Intended for executor-side provider telemetry capture.
-   Routed through the dispatch pipeline."
-  [ctx session-id capture]
-  (dispatch/dispatch! ctx :session/append-provider-reply-capture {:session-id session-id :capture capture} {:origin :core})
-  (session/get-state-value-in ctx (session/state-path :provider-replies session-id)))
 
 (defn record-tool-output-stat-in!
   "Record one tool-output statistics entry into canonical state.

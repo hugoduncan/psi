@@ -4,7 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-session-context
@@ -19,7 +19,7 @@
   (testing "start-timer dispatches scheduler/fired after delay and removes handle"
     (let [[ctx session-id] (create-session-context)
           fired (promise)]
-      (with-redefs [psi.agent-session.dispatch/dispatch!
+      (with-redefs [dispatch/dispatch!
                     (fn [_ctx event-type event-data _opts]
                       (when (= :scheduler/fired event-type)
                         (deliver fired event-data))
@@ -39,7 +39,7 @@
 
   (testing "cancel-timer interrupts and removes handle"
     (let [[ctx session-id] (create-session-context)]
-      (with-redefs [psi.agent-session.dispatch/dispatch!
+      (with-redefs [dispatch/dispatch!
                     (fn [_ctx _event-type _event-data _opts]
                       (throw (ex-info "should not fire" {})))]
         (dispatch-effects/execute-effect! ctx {:effect/type :scheduler/start-timer
@@ -56,24 +56,24 @@
 (deftest shutdown-context-cancels-scheduler-timers-test
   (dispatch-effects/cancel-all-scheduler-timers!)
   (let [[ctx session-id] (create-session-context)]
-    (dispatch/dispatch! ctx :scheduler/create
-                        {:session-id session-id
-                         :schedule-id "sch-3"
-                         :kind :message
-                         :message "shutdown cleanup"
-                         :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                         :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                         :delay-ms 500}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :scheduler/create
-                        {:session-id session-id
-                         :schedule-id "sch-4"
-                         :kind :message
-                         :message "shutdown cleanup 2"
-                         :created-at (java.time.Instant/parse "2099-04-21T18:00:01Z")
-                         :fire-at (java.time.Instant/parse "2099-04-21T18:05:01Z")
-                         :delay-ms 500}
-                        {:origin :core})
+    (session/dispatch-in! ctx :scheduler/create
+                          {:session-id session-id
+                           :schedule-id "sch-3"
+                           :kind :message
+                           :message "shutdown cleanup"
+                           :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                           :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                           :delay-ms 500}
+                          {:origin :core})
+    (session/dispatch-in! ctx :scheduler/create
+                          {:session-id session-id
+                           :schedule-id "sch-4"
+                           :kind :message
+                           :message "shutdown cleanup 2"
+                           :created-at (java.time.Instant/parse "2099-04-21T18:00:01Z")
+                           :fire-at (java.time.Instant/parse "2099-04-21T18:05:01Z")
+                           :delay-ms 500}
+                          {:origin :core})
     (is (= 2 (dispatch-effects/scheduler-timer-handle-count)))
     (session/shutdown-context! ctx)
     (is (= 0 (dispatch-effects/scheduler-timer-handle-count)))

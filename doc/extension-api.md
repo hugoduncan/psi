@@ -29,11 +29,11 @@ Preferred display-map keys:
 
 Store that map under an extension-specific public key such as `:run/display`,
 `:chain/display`, or `:agent/display`, then let consumers merge/render that
-public surface via shared helpers such as `extensions.workflow-display`.
+public surface via shared helpers such as `psi.agent-session.workflow.display`.
 
 Preferred helper usage:
-- widget/UI consumers: `extensions.workflow-display/merged-display` + `display-lines`
-- CLI/list consumers: `extensions.workflow-display/text-lines` over the rendered workflow lines
+- widget/UI consumers: `psi.agent-session.workflow.display/merged-display` + `display-lines`
+- CLI/list consumers: `psi.agent-session.workflow.display/text-lines` over the rendered workflow lines
 
 ## Memory durability operations
 

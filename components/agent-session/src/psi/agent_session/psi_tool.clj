@@ -8,11 +8,11 @@
    [psi.agent-core.core :as agent]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.extension-runtime :as extension-runtime]
-   [psi.agent-session.extensions :as extensions]
-   [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
+   [psi.tool-registry.registry :as tool-registry]
+   [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.psi-tool-workflow :as psi-tool-workflow]
-   [psi.agent-session.session-state :as session-state]
+   [psi.session-state.state :as session-state]
    [psi.agent-session.tool-output :as tool-output]
    [psi.query.core :as query]))
 
@@ -297,7 +297,7 @@
     {:status :ok :summary "live tool definitions unchanged (no session runtime provided)"}
     (let [agent-ctx (session-state/agent-ctx-in ctx session-id)
           builtins  (or (:tool-defs (session-state/get-session-data-in ctx session-id)) [])
-          ext-tools (extensions/all-tools-in (:extension-registry ctx))
+          ext-tools (tool-registry/all-tools-in (:extension-registry ctx))
           tool-defs (vec (concat builtins ext-tools))]
       (when agent-ctx
         (agent/set-tools-in! agent-ctx tool-defs))

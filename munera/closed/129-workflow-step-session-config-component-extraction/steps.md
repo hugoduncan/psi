@@ -1,0 +1,28 @@
+- [x] Review `psi.workflow-runtime.step-session-config` and confirm the exact workflow child-session config responsibilities it owns today
+- [x] Confirm the extracted responsibility inventory includes model inheritance, prompt-mode derivation, thinking-level derivation, and prompt-component-selection derivation
+- [x] Choose the narrowest accurate extracted component/component-name for that responsibility surface and record the naming decision
+- [x] Create the dedicated lower component for workflow step child-session config ownership
+- [x] Move the authoritative session-config shaping logic with minimal semantic change
+- [x] Preserve `resolve-step-session-config` as the canonical public behavior surface and preserve its externally consumed output contract unless a justified replacement is recorded
+- [x] Rewire workflow runtime callers to the new owner
+- [x] Rewire `agent-session.context` callback assembly/backfill to the new owner
+- [x] Rewire `psi_tool_workflow` compatibility/backfill paths to the new owner
+- [x] Rewire affected tests so lower session-config behavior proofs point at the new component
+- [x] Verify the workflow execution adapter seam remains the canonical higher/session-bound crossing for this logic
+- [x] Decide whether `psi.workflow-runtime.step-session-config` disappears entirely or remains only as a tiny temporary forwarding seam, and record justification if retained
+- [x] Verify `step-materialization` remains a separate role owner and was not accidentally merged into this extraction
+- [x] Verify workflow behavior remains unchanged
+- [x] Record the final boundary, name, public surface, dependency/input shape, responsibility inventory, transitional namespace status, and any residual dependency debt in `implementation.md`
+- [x] Refactor `psi.workflow-step-session-config.core/resolve-step-session-config` so parent-session data is read once and reused across tool/skill/model/prompt-mode derivation helpers
+- [x] Preserve current behavior and output contracts while reducing repeated `execution-adapter/get-session-data` reads across private helpers
+- [x] Extract the fallback placeholder skill map in `resolve-step-skills` into a tiny private helper to improve local scanability without broadening the component surface
+- [x] Verify the refactor preserves current focused workflow step session-config tests and lint cleanliness
+- [x] Add a focused test proving missing skill references fall back to the placeholder skill map shape when no matching parent/session skill exists
+- [x] Add a focused test proving missing tool references fall back to the normalized tool definition shape when no matching parent/session tool exists
+- [x] Verify the new fallback tests continue to exercise `resolve-step-session-config` at the extracted public boundary rather than private helpers
+- [x] Re-evaluate whether shared setup helpers or a table-driven shape are warranted only if the inheritance/override test matrix grows further; preserve the current direct style unless that growth actually occurs
+  - current matrix remains small enough that direct setup is still clearer than introducing shared or table-driven test indirection
+- [x] Add one tiny local helper in `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj` to compress repeated definition registration/run creation/fetch setup without hiding per-test intent
+- [x] Keep any new test helper local and narrow in purpose; do not broaden into shared fixtures or table-driven indirection
+- [x] Normalize assertion grouping style slightly across the test ns for easier scanability while preserving the current public-boundary behavioral focus
+- [x] Verify the test-shaping cleanup preserves focused workflow step session-config test speed, determinism, and current coverage

@@ -3,8 +3,9 @@
    [malli.core :as m]))
 
 (def effect-schema
-  "Schema for a single dispatch effect description.
-   Dispatch on :effect/type to validate per-effect payload."
+  "Agent-session-owned effect schema layered above the generic state kernel.
+   The kernel owns dispatch orchestration; this domain still owns the concrete
+   effect catalog and effect payload validation."
   [:multi {:dispatch :effect/type}
    [:runtime/agent-abort
     [:map [:effect/type [:= :runtime/agent-abort]]]]
@@ -92,16 +93,17 @@
      [:schedule-id :string]]]
    [:scheduler/drain-queue
     [:map [:effect/type [:= :scheduler/drain-queue]]]]
-   [:persist/journal-append-model-entry
-    [:map [:effect/type [:= :persist/journal-append-model-entry]]
-     [:provider :string] [:model-id :string]]]
-   [:persist/journal-append-message-entry
-    [:map [:effect/type [:= :persist/journal-append-message-entry]] [:message :map]]]
-   [:persist/journal-append-thinking-level-entry
-    [:map [:effect/type [:= :persist/journal-append-thinking-level-entry]]
-     [:level :keyword]]]
-   [:persist/journal-append-session-info-entry
-    [:map [:effect/type [:= :persist/journal-append-session-info-entry]] [:name :string]]]
+   [:persist/session-journal-io
+    [:map [:effect/type [:= :persist/session-journal-io]]
+     [:request [:map
+                [:op [:enum :append-entry :flush-journal]]
+                [:session-id :string]
+                [:session-file :any]
+                [:worktree-path [:maybe :string]]
+                [:parent-session-id {:optional true} [:maybe :string]]
+                [:parent-session-path {:optional true} [:maybe :string]]
+                [:entry {:optional true} :map]
+                [:entries {:optional true} [:vector :map]]]]]]
    [:persist/project-prefs-update
     [:map [:effect/type [:= :persist/project-prefs-update]] [:prefs :map]]]
    [:persist/user-config-update
@@ -153,8 +155,6 @@
      [:session-id {:optional true} [:maybe :string]]]]])
 
 (def pure-result-schema
-  "Schema for the unified pure handler result shape.
-   At least one recognized key must be present."
   [:and
    [:map
     [:root-state-update {:optional true} fn?]
@@ -170,26 +170,12 @@
           (contains? m :return-key)
           (contains? m :return-effect-result?)))]])
 
-(def valid-effect?
-  "Compiled malli validator for effect descriptions."
-  (m/validator effect-schema))
-
-(def explain-effect
-  "Compiled malli explainer for effect descriptions."
-  (m/explainer effect-schema))
-
-(def valid-pure-result?*
-  "Compiled malli validator for pure handler results."
-  (m/validator pure-result-schema))
-
-(def explain-pure-result
-  "Compiled malli explainer for pure handler results."
-  (m/explainer pure-result-schema))
+(def valid-effect? (m/validator effect-schema))
+(def explain-effect (m/explainer effect-schema))
+(def valid-pure-result?* (m/validator pure-result-schema))
+(def explain-pure-result (m/explainer pure-result-schema))
 
 (def validate-dispatch-schemas
-  "Malli schema validator for the dispatch pipeline.
-   Checks pure-result shape and nested effects against compiled schemas.
-   Compiled out when *assert* is false."
   (when *assert*
     (fn [_ctx ictx]
       (if-let [pr (:pure-result ictx)]

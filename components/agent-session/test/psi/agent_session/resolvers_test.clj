@@ -16,11 +16,11 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.session-state.state :as ss]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.oauth.core :as oauth]
-   [psi.agent-session.persistence :as persist]
+   [psi.provider-auth.oauth.core :as oauth]
+   [psi.session-persistence.core :as persist]
+   [psi.session-journal.store :as journal-store]
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]
    [psi.query.core :as query]))
@@ -192,31 +192,31 @@
           sd-1               (session/new-session-in! ctx nil {})
           sid-1              (:session-id sd-1)
           path-1             (:session-file sd-1)
-          _                  (ss/journal-append-in! ctx sid-1
-                                                    (persist/message-entry {:role "user"
-                                                                            :content [{:type :text :text "alpha"}]
-                                                                            :timestamp (java.time.Instant/parse "2026-03-16T10:47:00Z")}))
-          _                  (persist/flush-journal! (java.io.File. path-1)
-                                                     sid-1
-                                                     cwd
-                                                     nil
-                                                     nil
-                                                     [(persist/thinking-level-entry :off)
-                                                      (persist/session-info-entry "alpha")])
+          _                  (ss/append-journal-entry-in! ctx sid-1
+                                                          (persist/message-entry {:role "user"
+                                                                                  :content [{:type :text :text "alpha"}]
+                                                                                  :timestamp (java.time.Instant/parse "2026-03-16T10:47:00Z")}))
+          _                  (journal-store/flush-journal! (java.io.File. path-1)
+                                                           sid-1
+                                                           cwd
+                                                           nil
+                                                           nil
+                                                           [(persist/thinking-level-entry :off)
+                                                            (persist/session-info-entry "alpha")])
           sd-2               (session/new-session-in! ctx sid-1 {})
           sid-2              (:session-id sd-2)
           path-2             (:session-file sd-2)
-          _                  (ss/journal-append-in! ctx sid-2
-                                                    (persist/message-entry {:role "user"
-                                                                            :content [{:type :text :text "beta"}]
-                                                                            :timestamp (java.time.Instant/parse "2026-03-16T10:48:00Z")}))
-          _                  (persist/flush-journal! (java.io.File. path-2)
-                                                     sid-2
-                                                     cwd
-                                                     nil
-                                                     nil
-                                                     [(persist/thinking-level-entry :off)
-                                                      (persist/session-info-entry "beta")])
+          _                  (ss/append-journal-entry-in! ctx sid-2
+                                                          (persist/message-entry {:role "user"
+                                                                                  :content [{:type :text :text "beta"}]
+                                                                                  :timestamp (java.time.Instant/parse "2026-03-16T10:48:00Z")}))
+          _                  (journal-store/flush-journal! (java.io.File. path-2)
+                                                           sid-2
+                                                           cwd
+                                                           nil
+                                                           nil
+                                                           [(persist/thinking-level-entry :off)
+                                                            (persist/session-info-entry "beta")])
           process-result     (q-in ctx [:psi.agent-session/context-session-count
                                         {:psi.agent-session/context-sessions
                                          [:psi.session-info/id
@@ -388,18 +388,18 @@
   (testing "background job attrs resolve from session root and include nested job entities"
     (let [[ctx session-id] (test-support/create-test-session)
           thread-id     session-id
-          _         (dispatch/dispatch! ctx :session/update-background-jobs-state
-                                        {:update-fn (fn [store]
-                                                      (:state (bg-jobs/start-background-job
-                                                               store
-                                                               {:tool-call-id "tc-bg-1"
-                                                                :thread-id    thread-id
-                                                                :tool-name    "delegate"
-                                                                :job-id       "job-bg-1"
-                                                                :job-kind     :workflow
-                                                                :workflow-ext-path "extensions/workflow_loader.clj"
-                                                                :workflow-id  "planner"})))}
-                                        {:origin :core})
+          _         (session/dispatch-in! ctx :session/update-background-jobs-state
+                                          {:update-fn (fn [store]
+                                                        (:state (bg-jobs/start-background-job
+                                                                 store
+                                                                 {:tool-call-id "tc-bg-1"
+                                                                  :thread-id    thread-id
+                                                                  :tool-name    "delegate"
+                                                                  :job-id       "job-bg-1"
+                                                                  :job-kind     :workflow
+                                                                  :workflow-ext-path "extensions/workflow_loader.clj"
+                                                                  :workflow-id  "planner"})))}
+                                          {:origin :core})
           result    (session/query-in ctx session-id
                                       [:psi.agent-session/background-job-count
                                        :psi.agent-session/background-job-statuses
@@ -431,15 +431,15 @@
 (deftest scheduler-resolver-test
   (testing "scheduler attrs resolve from session root and background-job projection includes scheduled prompts"
     (let [[ctx session-id] (test-support/create-test-session)
-          _ (dispatch/dispatch! ctx :scheduler/create
-                                {:session-id session-id
-                                 :schedule-id "sch-1"
-                                 :label "check-build"
-                                 :message "check build"
-                                 :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                                 :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                                 :delay-ms 1000}
-                                {:origin :core})
+          _ (session/dispatch-in! ctx :scheduler/create
+                                  {:session-id session-id
+                                   :schedule-id "sch-1"
+                                   :label "check-build"
+                                   :message "check build"
+                                   :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                                   :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                                   :delay-ms 1000}
+                                  {:origin :core})
           result (session/query-in ctx session-id
                                    [:psi.scheduler/pending-count
                                     {:psi.scheduler/schedules
@@ -467,15 +467,15 @@
 
   (testing "scheduler supports entity-seeded single schedule lookup"
     (let [[ctx session-id] (test-support/create-test-session)
-          _ (dispatch/dispatch! ctx :scheduler/create
-                                {:session-id session-id
-                                 :schedule-id "sch-one"
-                                 :label "one"
-                                 :message "wake"
-                                 :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                                 :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                                 :delay-ms 1000}
-                                {:origin :core})
+          _ (session/dispatch-in! ctx :scheduler/create
+                                  {:session-id session-id
+                                   :schedule-id "sch-one"
+                                   :label "one"
+                                   :message "wake"
+                                   :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                                   :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                                   :delay-ms 1000}
+                                  {:origin :core})
           result (session/query-in ctx
                                    [:psi.scheduler/schedule-id
                                     :psi.scheduler/label

@@ -1,0 +1,71 @@
+- [x] Create `components/tool-runtime/src/psi/tool_runtime/` and `components/tool-runtime/test/psi/tool_runtime/`
+- [x] Update project/test configuration for the new component paths
+  - [x] add local component dep and source/test paths in `deps.edn`
+  - [x] add source/test paths in `tests.edn`
+  - [x] add `psi/tool-runtime` dep in `components/agent-session/deps.edn`
+  - [x] update `components/turn-runtime/deps.edn` only if needed during migration
+  - [x] update `tests-component-isolated.edn` only if needed in this slice
+- [x] Use `clj-surgeon` structural inspection to confirm move boundaries before editing
+  - [x] `clj-surgeon -op :deps -file components/turn-runtime/src/psi/turn_runtime/tool_args.clj`
+  - [x] `clj-surgeon -op :deps -file components/agent-session/src/psi/agent_session/tool_execution.clj`
+  - [x] `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/tool_execution.clj`
+  - [x] `clj-surgeon -op :deps -file components/agent-session/src/psi/agent_session/tool_batch.clj`
+  - [x] `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/tool_batch.clj`
+- [x] Move `components/turn-runtime/src/psi/turn_runtime/tool_args.clj` to `components/tool-runtime/src/psi/tool_runtime/args.clj`
+- [x] Rename moved namespace `psi.turn-runtime.tool-args` to `psi.tool-runtime.args`
+- [x] Extract the lower-level subset of `components/agent-session/src/psi/agent_session/tool_execution.clj` into `components/tool-runtime/src/psi/tool_runtime/core.clj`
+- [x] Rename extracted authoritative namespace to `psi.tool-runtime.core`
+- [x] Shape the first-cut lower-level API around generic inputs/outputs plus `:on-event` callback delivery for intermediate tool events
+- [x] Leave or reshape any residual `agent-session`-owned orchestration in place above the boundary until it can delegate to `psi.tool-runtime.core`
+- [x] Extract the lower-level subset of `components/agent-session/src/psi/agent_session/tool_batch.clj` into `components/tool-runtime/src/psi/tool_runtime/batch.clj`
+- [x] Rename extracted authoritative namespace to `psi.tool-runtime.batch`
+- [x] Leave or reshape any residual `agent-session`-owned orchestration in place above the boundary until it can delegate to `psi.tool-runtime.batch`
+- [x] Update all direct production consumers to require the extracted namespaces where appropriate
+  - [x] parser callers -> `psi.tool-runtime.args`
+  - [x] execution callers -> `psi.tool-runtime.core`
+  - [x] batch callers -> `psi.tool-runtime.batch`
+  - [x] make `turn-runtime` consume `tool-runtime` via generic tool events/data rather than the reverse
+  - [x] record any intentional direct higher-level production dependencies on `psi.tool-runtime.*` in `implementation.md`
+  - [x] update any remaining direct production consumers found by repo search
+- [x] Update all direct test consumers/test helpers to require the extracted namespaces where appropriate
+- [x] Move clearly component-owned focused tests into `components/tool-runtime/test/psi/tool_runtime/` where that improves ownership clarity without widening scope
+  - [x] rename moved tests to `psi.tool-runtime.*-test` namespaces
+  - [x] prefer moving whole focused test files rather than splitting mixed-purpose higher-level files
+  - [x] move tests whose primary subject is parser behavior, lower-level execution shaping, generic tool event delivery, or batch ordering/locking behavior
+  - [x] when an existing file is mixed-purpose, leave it in place and update requires/usages only, or add a small new component-owned focused test file instead
+  - [x] keep `tool_execution_test.clj` under `agent-session` when it is proving session-owned dispatch, telemetry, post-tool, or tool-output integration concerns
+  - [x] keep tests whose primary subject is prompt lifecycle, transcript semantics, tool-output telemetry integration, post-tool registry behavior, or service wiring under the higher-level component that owns those concerns
+- [x] Record in `implementation.md` which focused tests moved into `components/tool-runtime/test/psi/tool_runtime/` and which intentionally remained under higher-level component tests, with a brief reason
+- [x] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
+- [x] Remove any temporary compatibility shims before completion
+- [x] If no shim is used for the old `tool-execution` / `tool-batch` / `turn-runtime.tool-args` namespaces, remove the old source files in this slice rather than leaving inert duplicates
+- [x] Run focused tests from the new component boundary
+  - [x] at least one moved args-focused or single-tool-runtime-focused test namespace under `components/tool-runtime/test/psi/tool_runtime/`
+  - [x] at least one moved batch-focused test namespace under `components/tool-runtime/test/psi/tool_runtime/`
+  - [x] add or move a focused test proving the canonical `:on-event` tool event envelope and ordering
+- [x] Run focused higher-level consuming-path verification
+  - [x] `psi.agent-session.tool-output-integration-test`
+  - [x] record exact commands in `implementation.md`
+- [x] Confirm no remaining authoritative `psi.agent-session.tool-execution` / `tool-batch` / `psi.turn-runtime.tool-args` requires/usages remain in the repo
+- [x] Confirm extracted authoritative `psi.tool-runtime.*` namespaces do not require `psi.agent-session.*` or `psi.turn-runtime.*` implementation namespaces directly
+- [x] Record final ownership and migration notes in `implementation.md`
+- [x] Resolve the canonical event-contract mismatch for tool failures
+  - [x] either emit canonical `:tool-error` events from `psi.tool-runtime.core` on execution failure
+  - [x] or explicitly narrow the documented first-cut event vocabulary so `:tool-result` + `:is-error true` is the authoritative failure contract
+  - [x] add/update a focused `psi.tool-runtime.core-test` proving the chosen failure-event contract
+  - [x] update `implementation.md` to record the chosen contract
+- [x] Remove or justify residual wrapper surface in `psi.agent-session.tool-runtime-adapter`
+  - [x] repo-search each wrapper surface: `tool-content->text`, `normalize-tool-content`, `tool-lifecycle-event`, `start-tool-call!`, `run-tool-call-through-runtime-effect!`
+  - [x] remove wrappers with no legitimate production use
+  - [x] if any wrapper remains intentionally, record the reason in `implementation.md`
+  - [x] run focused verification for any changed adapter/test seams
+- [x] Shape exception-path duplication in `psi.tool-runtime.core/execute-tool-call-prepared!`
+  - [x] inspect the current exception branch and identify the smallest helper seam that removes duplication without hiding the local failure contract
+  - [x] factor duplicated exception shaping (`err-text`, `details`, tool-error event payload, result-message payload) into a small local helper only if the result remains locally comprehensible
+  - [x] keep canonical `:tool-error` emission and final shaped error result behavior unchanged
+  - [x] update/add focused `psi.tool-runtime.core-test` only if the refactor changes the test surface materially
+  - [x] record the shaping decision in `implementation.md`
+- [x] Tighten error-lifecycle coverage in `psi.tool-runtime.core-test`
+  - [x] add a focused proof that an execution exception emits canonical `:tool-error` during execute phase and final `:tool-result` during record phase for the same shaped error result
+  - [x] keep the proof component-owned at the `psi.tool-runtime.core-test` boundary unless the test naturally requires a higher-level integration seam
+  - [x] record the added focused verification in `implementation.md`

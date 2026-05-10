@@ -99,6 +99,7 @@
   [{:keys [register-handler-in!
            register-tool-in!
            register-command-in!
+           register-operation-in!
            register-shortcut-in!
            register-flag-in!
            set-allowed-events-in!
@@ -107,7 +108,7 @@
            bus-on-in!]}
    reg
    ext-path
-   {:keys [mutate-fn query-fn get-api-key-fn ui-type-fn ui-context-fn service-fn log-fn]}]
+   {:keys [mutate-fn query-fn get-api-key-fn ui-type-fn ui-context-fn service-fn log-fn register-deterministic-operation-fn]}]
   (let [mutate-local
         (fn [op params fallback-fn]
           (mutate-ext-or-local mutate-fn ext-path op params fallback-fn))
@@ -156,6 +157,13 @@
                         {:name name
                          :opts opts}
                         #(register-command-in! reg ext-path (assoc opts :name name))))
+        register-operation!
+        (fn [operation]
+          (if register-deterministic-operation-fn
+            (register-deterministic-operation-fn ext-path operation)
+            (do
+              (register-operation-in! reg ext-path operation)
+              {:id (:id operation)})))
         register-shortcut!
         (fn [key opts]
           (mutate-local 'psi.extension/register-shortcut
@@ -307,6 +315,7 @@
      :on                             on!
      :register-tool                  register-tool!
      :register-command               register-command!
+     :register-operation             register-operation!
      :register-shortcut              register-shortcut!
      :register-flag                  register-flag!
      :set-allowed-events             set-allowed-events!

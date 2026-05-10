@@ -5,7 +5,8 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
-   [psi.agent-session.workflow-runtime]))
+   [psi.workflow-runtime.core]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- complete-run-step
   [run step-id]
@@ -34,7 +35,7 @@
   [state*]
   (fn [_ctx _session-id run-id]
     (loop [steps-executed []]
-      (let [run (psi.agent-session.workflow-runtime/workflow-run-in @state* run-id)
+      (let [run (psi.workflow-runtime.core/workflow-run-in @state* run-id)
             status (:status run)]
         (cond
           (contains? #{:completed :failed :cancelled} status)
@@ -65,7 +66,7 @@
 (defn- resume-and-execute-run-nullable
   [state*]
   (fn [ctx session-id run-id]
-    (let [[new-state _run] (psi.agent-session.workflow-runtime/resume-run @state* run-id)]
+    (let [[new-state _run] (psi.workflow-runtime.core/resume-run @state* run-id)]
       (reset! state* new-state)
       ((execute-run-nullable state*) ctx session-id run-id))))
 
@@ -87,6 +88,21 @@
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
 
+(def registered-definition
+  {:definition-id "plan-build-review"
+   :name "Plan Build Review"
+   :steps [{:name "plan"
+            :type :session
+            :contributions [{:type :template
+                             :text "Plan {{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}]})
+
+(def inline-single-step-definition-edn
+  "{:name \"Inline\" :steps [{:name \"plan\" :type :session :contributions [{:type :template :text \"Plan {{task}}\" :vars {\"task\" {:from :workflow-input :path [:task]}}}]}]}")
+
+(def inline-lambda-build-definition-edn
+  "{:name \"Inline Lambda Build\" :steps [{:name \"step-1-lambda-compiler\" :type :session :contributions [{:type :template :text \"compile a lambda for: {{input}}\" :vars {\"input\" {:from :workflow-input :path [:input]}}}]} {:name \"step-2-lambda-decompiler\" :type :session :contributions [{:type :template :text \"decompile the lambda expression: {{input}}\" :vars {\"input\" {:from {:step \"step-1-lambda-compiler\" :yield :text}}}}]} {:name \"step-3-lambda-compiler\" :type :session :contributions [{:type :template :text \"compile a lambda for: {{input}}\" :vars {\"input\" {:from {:step \"step-2-lambda-decompiler\" :yield :text}}}}]}]}")
+
 (deftest make-psi-tool-workflow-test
   (testing "workflow list-definitions reports registered definitions"
     (let [[ctx session-id] (create-session-context {:persist? false})
@@ -94,14 +110,9 @@
                    (fn [state]
                      (first
                       (let [[state' _ _]
-                            (psi.agent-session.workflow-runtime/register-definition
+                            (workflow-registry/register-definition
                              state
-                             {:definition-id "plan-build-review"
-                              :name "Plan Build Review"
-                              :step-order ["plan"]
-                              :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                              :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                              :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}})]
+                             registered-definition)]
                         [state']))))
           tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow" "op" "list-definitions"})
@@ -118,7 +129,7 @@
           tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow"
                                    "op" "create-run"
-                                   "definition" "{:name \"Inline\" :step-order [\"plan\"] :steps {\"plan\" {:executor {:type :agent :profile \"planner\" :mode :sync} :result-schema [:map [:outcome [:= :ok]] [:outputs :map]] :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}"
+                                   "definition" inline-single-step-definition-edn
                                    "workflow-input" "{:task \"ship it\"}"})
           parsed (read-string (:content result))
           run-id (get-in parsed [:psi-tool/workflow :run-id])]
@@ -135,7 +146,7 @@
           tool          (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           create-result ((:execute tool) {"action" "workflow"
                                           "op" "create-run"
-                                          "definition" "{:name \"Inline Lambda Build\" :step-order [\"step-1-lambda-compiler\" \"step-2-lambda-decompiler\" \"step-3-lambda-compiler\"] :steps {\"step-1-lambda-compiler\" {:label \"lambda-compiler\" :executor {:type :agent :profile \"lambda-compiler\"} :prompt-template \"compile a lambda for: $INPUT\" :input-bindings {:input {:source :workflow-input :path [:input]}} :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]] :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}} \"step-2-lambda-decompiler\" {:label \"lambda-decompiler\" :executor {:type :agent :profile \"lambda-decompiler\"} :prompt-template \"decompile the lambda expression: $INPUT\" :input-bindings {:input {:source :step-output :path [\"step-1-lambda-compiler\" :outputs :text]}} :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]] :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}} \"step-3-lambda-compiler\" {:label \"lambda-compiler\" :executor {:type :agent :profile \"lambda-compiler\"} :prompt-template \"compile a lambda for: $INPUT\" :input-bindings {:input {:source :step-output :path [\"step-2-lambda-decompiler\" :outputs :text]}} :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]] :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}}}}"
+                                          "definition" inline-lambda-build-definition-edn
                                           "workflow-input" "{:input \"refine the scope clearly and collaboratively\"}"})
           create-parsed (read-string (:content create-result))
           run-id        (get-in create-parsed [:psi-tool/workflow :run-id])
@@ -154,16 +165,10 @@
 
   (testing "workflow list-runs and read-run return run summaries"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "plan-build-review"
-                      :name "Plan Build Review"
-                      :step-order ["plan"]
-                      :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                      :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                      :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[state1 definition-id _] (psi.agent-session.workflow-runtime/register-definition state definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                     (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
+                           [state2 _ _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        state2)))
           tool        (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           list-result ((:execute tool) {"action" "workflow" "op" "list-runs"})
@@ -181,17 +186,10 @@
 
   (testing "workflow resume-run resumes blocked runs and continues execution"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "plan-build-review"
-                      :name "Plan Build Review"
-                      :step-order ["plan"]
-                      :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                      :prompt-template "Return exactly {:outcome :ok :outputs {}}"
-                                      :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                      :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[state1 definition-id _] (psi.agent-session.workflow-runtime/register-definition state definition)
-                           [state2 run-id _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                     (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
+                           [state2 run-id _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        (-> state2
                            (assoc-in [:workflows :runs run-id :status] :blocked)
                            (assoc-in [:workflows :runs run-id :blocked] {:reason "needs resume"})))))
@@ -207,17 +205,10 @@
 
   (testing "workflow execute-run executes pending runs to completion"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "plan-build-review"
-                      :name "Plan Build Review"
-                      :step-order ["plan"]
-                      :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                      :prompt-template "Return exactly {:outcome :ok :outputs {}}"
-                                      :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                      :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[state1 definition-id _] (psi.agent-session.workflow-runtime/register-definition state definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                     (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
+                           [state2 _ _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        state2)))
           tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow" "op" "execute-run" "run-id" "run-1"})
@@ -231,16 +222,10 @@
 
   (testing "workflow cancel-run cancels non-terminal runs"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          definition {:definition-id "plan-build-review"
-                      :name "Plan Build Review"
-                      :step-order ["plan"]
-                      :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                                      :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                                      :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}}}}
           _ (swap! (:state* ctx)
                    (fn [state]
-                     (let [[state1 definition-id _] (psi.agent-session.workflow-runtime/register-definition state definition)
-                           [state2 _ _] (psi.agent-session.workflow-runtime/create-run state1 {:definition-id definition-id :run-id "run-1"})]
+                     (let [[state1 definition-id _] (workflow-registry/register-definition state registered-definition)
+                           [state2 _ _] (psi.workflow-runtime.core/create-run state1 {:definition-id definition-id :run-id "run-1"})]
                        state2)))
           tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow" "op" "cancel-run" "run-id" "run-1" "reason" "operator request"})

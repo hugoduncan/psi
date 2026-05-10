@@ -15,8 +15,7 @@
         psi/mementum                {:local/root "mementum"}
         psi/munera                  {:local/root "munera"}
         psi/plan-state-learning     {:local/root "plan-state-learning"}
-        psi/work-on                 {:local/root "work-on"}
-        psi/workflow-display        {:local/root "workflow-display"}}
+        psi/work-on                 {:local/root "work-on"}}
 
  :aliases
  {:test {:extra-paths ["auto-session-name/test"
@@ -24,7 +23,6 @@
                        "hello-ext/test"
                        "mcp-tasks-run/test"
                        "plan-state-learning/test"
-                       "work-on/test"
-                       "workflow-display/test"]
+                       "work-on/test"]
          :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
          :main-opts   ["-m" "kaocha.runner"]}}}

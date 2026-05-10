@@ -1,0 +1,17 @@
+- [x] Record the resolved return-boundary decision in task-local execution tracking so this task no longer implies the invoke/result boundary is still design-open
+  - Registered deterministic operations return tagged success/failure operation results, not full invoke-step envelopes.
+  - Runtime-owned invoke execution wraps successful results into canonical invoke-step outputs (`:data`, optional `:summary`, full `:result`) and turns unsuccessful results into canonical invoke-step failure/yield recording inputs.
+  - Focused malformed-return rejection proof remains future implementation work for this task.
+- [x] Inspect existing extension/runtime registration patterns for a suitable registry shape
+- [x] Choose the canonical runtime home for deterministic operation registration and lookup
+- [x] Define the operation registration shape, including stable id and minimal metadata
+- [x] Define the operation invocation input contract
+- [x] Define the canonical tagged success operation-result contract
+- [x] Define the canonical tagged failure/diagnostic operation-result contract
+- [x] Make runtime-owned invoke-step output wrapping explicit (`:data` / `:summary` / `:result` come from the operation result boundary rather than from operation-authored step envelopes)
+- [x] Define handling for duplicate ids, missing ids, and malformed returned values
+- [x] Add focused tests for registration and lookup behavior
+- [x] Add focused tests for representative invocation and result-shape enforcement
+- [x] Reconcile the implemented contract with task `077` and `doc/workflow-ir.md`
+- [x] Add runtime-owned deterministic operation unregister wiring so extension unload/reload removes that extension's operation ids from `:deterministic-operation-registry`, not only from extension-registry introspection.
+- [x] Add a focused regression proving extension unload/reload cannot leave stale deterministic invoke ids resolvable after the owning extension is removed.

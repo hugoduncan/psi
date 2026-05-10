@@ -6,11 +6,11 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session :as session-data]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-persistence.core :as persist]
+   [psi.session-state.model :as session-data]
+   [psi.session-state.state :as ss]))
 (defn- create-session-context
   ([]
    (create-session-context {}))
@@ -24,16 +24,16 @@
 (deftest session-naming-test
   (testing "set-session-name-in! updates name and appends entry"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "my session"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-session-name {:session-id session-id :name "my session"} {:origin :core})
       (is (= "my session" (:session-name (ss/get-session-data-in ctx session-id))))
       (is (some #(= :session-info (:kind %)) (persist/all-entries-in ctx session-id))))))
 
 (deftest session-config-dispatch-test
   (testing "set-session-name-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "my session"} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))
+      (kernel/clear-event-log!)
+      (session/dispatch-in! ctx :session/set-session-name {:session-id session-id :name "my session"} {:origin :core})
+      (let [entry (last (kernel/event-log-entries))
             sd    (ss/get-session-data-in ctx session-id)]
         (is (= "my session" (:session-name sd)))
         (is (= :session/set-session-name (:event-type entry)))
@@ -42,35 +42,35 @@
 
   (testing "set-worktree-path-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/feature-z"} {:origin :core})
+      (kernel/clear-event-log!)
+      (session/dispatch-in! ctx :session/set-worktree-path {:session-id session-id :worktree-path "/repo/feature-z"} {:origin :core})
       (is (= "/repo/feature-z" (:worktree-path (ss/get-session-data-in ctx session-id))))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-worktree-path (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:worktree-path "/repo/feature-z"} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-cache-breakpoints-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-cache-breakpoints {:session-id session-id :breakpoints #{:system :tools}} {:origin :core})
+      (kernel/clear-event-log!)
+      (session/dispatch-in! ctx :session/set-cache-breakpoints {:session-id session-id :breakpoints #{:system :tools}} {:origin :core})
       (is (= #{:system :tools} (:cache-breakpoints (ss/get-session-data-in ctx session-id))))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-cache-breakpoints (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:breakpoints #{:system :tools}} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-active-tools-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           tool-maps  [{:name "read"} {:name "bash"}]]
-      (dispatch/dispatch! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-maps} {:origin :core})
+      (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-maps} {:origin :core})
       (is (= #{"read" "bash"} (:active-tools (ss/get-session-data-in ctx session-id))))
       (is (= [{:name "read" :label "read" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}
               {:name "bash" :label "bash" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}]
              (:tool-defs (ss/get-session-data-in ctx session-id))))
       (let [entry (last (filter #(= :session/set-active-tools (:event-type %))
-                                (dispatch/event-log-entries)))]
+                                (kernel/event-log-entries)))]
         (is (= :session/set-active-tools (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:tool-maps tool-maps} (dissoc (:event-data entry) :session-id)))))))
@@ -80,39 +80,39 @@
 (deftest context-usage-test
   (testing "update-context-usage-in! stores tokens and window"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 5000 :window 100000} {:origin :core})
+      (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 5000 :window 100000} {:origin :core})
       (let [sd (ss/get-session-data-in ctx session-id)]
         (is (= 5000 (:context-tokens sd)))
         (is (= 100000 (:context-window sd))))))
 
   (testing "update-context-usage-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
-      (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 5000 :window 100000} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))]
+      (kernel/clear-event-log!)
+      (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 5000 :window 100000} {:origin :core})
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/update-context-usage (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:tokens 5000 :window 100000} (dissoc (:event-data entry) :session-id))))))
 
   (testing "context fraction reflects stored usage"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 80000 :window 100000} {:origin :core})
+      (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 80000 :window 100000} {:origin :core})
       (let [sd (ss/get-session-data-in ctx session-id)]
         (is (= 0.8 (session-data/context-fraction-used sd))))))
 
   (testing "queued input helpers and bootstrap resource registration route through dispatch"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           template   {:name "greet" :description "d" :content "c" :source :project :file-path "/tmp/greet.md"}
           skill      {:name "coding" :description "d" :file-path "/tmp/SKILL.md"
                       :base-dir "/tmp" :source :project :disable-model-invocation false}]
       (session/steer-in! ctx session-id "steer")
       (session/follow-up-in! ctx session-id "follow")
-      (dispatch/dispatch! ctx :session/register-prompt-template {:session-id session-id :template template} {:origin :core})
-      (dispatch/dispatch! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
+      (session/dispatch-in! ctx :session/register-prompt-template {:session-id session-id :template template} {:origin :core})
+      (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
       (session/consume-queued-input-text-in! ctx session-id)
       (let [sd         (ss/get-session-data-in ctx session-id)
-            entries    (dispatch/event-log-entries)
+            entries    (kernel/event-log-entries)
             event-types (mapv :event-type entries)]
         (is (= [] (:steering-messages sd)))
         (is (= [] (:follow-up-messages sd)))
@@ -134,57 +134,85 @@
                  :base-dir "/tmp"
                  :source :project
                  :disable-model-invocation false}]
-      (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
-                          {:session-id session-id
-                           :opts {:cwd "/tmp"
-                                  :selected-tools ["read" "bash" "edit" "write" "psi-tool"]
-                                  :skills []}}
-                          {:origin :test})
-      (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :test})
+      (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                            {:session-id session-id
+                             :opts {:cwd "/tmp"
+                                    :selected-tools ["read" "bash" "edit" "write" "psi-tool"]
+                                    :skills []}}
+                            {:origin :test})
+      (session/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :test})
       (let [before-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
         (is (not (str/includes? (or before-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md"))))
-      (dispatch/dispatch! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
+      (let [result (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})]
+        (is (= {:added? true :changed? true :count 1} result)))
       (let [after-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
-        (is (str/includes? (or after-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md"))))))
+        (is (str/includes? (or after-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md")))))
+
+  (testing "duplicate register-skill leaves skills and prompt unchanged"
+    (let [[ctx session-id] (create-session-context)
+          skill {:name "coding"
+                 :description "Use coding guidance"
+                 :file-path "/tmp/SKILL.md"
+                 :base-dir "/tmp"
+                 :source :project
+                 :disable-model-invocation false}]
+      (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                            {:session-id session-id
+                             :opts {:cwd "/tmp"
+                                    :selected-tools ["read" "bash" "edit" "write" "psi-tool"]
+                                    :skills []}}
+                            {:origin :test})
+      (session/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :test})
+      (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
+      (kernel/clear-event-log!)
+      (let [before-prompt (:system-prompt (ss/get-session-data-in ctx session-id))
+            result        (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill (assoc skill :description "Replacement attempt")} {:origin :core})
+            after-prompt  (:system-prompt (ss/get-session-data-in ctx session-id))
+            sd            (ss/get-session-data-in ctx session-id)
+            event-types   (mapv :event-type (kernel/event-log-entries))]
+        (is (= {:added? false :changed? false :count 1} result))
+        (is (= before-prompt after-prompt))
+        (is (= [skill] (:skills sd)))
+        (is (= [:session/register-skill] event-types))))))
 
 ;; ── Auto-retry and compaction config ───────────────────────────────────────
 
 (deftest config-flags-test
   (testing "set-auto-retry-in! enables/disables retry"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/set-auto-retry {:session-id session-id :enabled? false} {:origin :core})
+      (session/dispatch-in! ctx :session/set-auto-retry {:session-id session-id :enabled? false} {:origin :core})
       (is (false? (:auto-retry-enabled (ss/get-session-data-in ctx session-id))))))
 
   (testing "set-auto-compaction-in! enables/disables compaction"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/set-auto-compaction {:session-id session-id :enabled? true} {:origin :core})
+      (session/dispatch-in! ctx :session/set-auto-compaction {:session-id session-id :enabled? true} {:origin :core})
       (is (true? (:auto-compaction-enabled (ss/get-session-data-in ctx session-id)))))))
 
 (deftest config-flags-dispatch-test
   (testing "set-auto-retry-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-auto-retry {:session-id session-id :enabled? false} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))]
+      (kernel/clear-event-log!)
+      (session/dispatch-in! ctx :session/set-auto-retry {:session-id session-id :enabled? false} {:origin :core})
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-auto-retry (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:enabled? false} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-auto-compaction-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-auto-compaction {:session-id session-id :enabled? true} {:origin :core})
-      (let [entry (last (dispatch/event-log-entries))]
+      (kernel/clear-event-log!)
+      (session/dispatch-in! ctx :session/set-auto-compaction {:session-id session-id :enabled? true} {:origin :core})
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-auto-compaction (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:enabled? true} (dissoc (:event-data entry) :session-id))))))
 
   (testing "set-ui-type-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/clear-event-log!)
-      (dispatch/dispatch! ctx :session/set-ui-type {:session-id session-id :ui-type :emacs} {:origin :core})
+      (kernel/clear-event-log!)
+      (session/dispatch-in! ctx :session/set-ui-type {:session-id session-id :ui-type :emacs} {:origin :core})
       (is (= :emacs (:ui-type (ss/get-session-data-in ctx session-id))))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :session/set-ui-type (:event-type entry)))
         (is (= :core (:origin entry)))
         (is (= {:ui-type :emacs} (dissoc (:event-data entry) :session-id)))))))
@@ -194,19 +222,20 @@
 (deftest manual-compaction-test
   (testing "manual-compact-in! runs stub compaction and returns to idle"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           result     (session/manual-compact-in! ctx session-id nil)]
       (is (string? (:summary result)))
       (is (= :idle (ss/sc-phase-in ctx session-id)))
-      (let [event-types (mapv :event-type (dispatch/event-log-entries))]
+      (let [event-types (mapv :event-type (kernel/event-log-entries))]
         (is (= [:session/compact-start
+                :session/append-journal-entry
                 :session/compaction-finished
                 :session/manual-compaction-execute
                 :session/compact-done]
                event-types)))))
 
   (testing "manual-compact-in! with custom compaction-fn uses that fn"
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (let [custom-fn  (fn [_sd _prep _instr]
                        {:summary "custom summary"
                         :first-kept-entry-id nil
@@ -216,20 +245,20 @@
           result     (session/manual-compact-in! ctx session-id nil)]
       (is (= "custom summary" (:summary result)))
       (let [entry (first (filter #(= :session/manual-compaction-execute (:event-type %))
-                                 (dispatch/event-log-entries)))]
+                                 (kernel/event-log-entries)))]
         (is (= :core (:origin entry)))
         (is (= {:custom-instructions nil} (dissoc (:event-data entry) :session-id))))))
 
   (testing "manual-compact-in! can be cancelled by extension"
     (let [[ctx session-id] (create-session-context)
-          _                  (dispatch/clear-event-log!)
+          _                  (kernel/clear-event-log!)
           reg        (:extension-registry ctx)]
       (ext/register-extension-in! reg "/ext/c")
       (ext/register-handler-in! reg "/ext/c" "session_before_compact"
                                 (fn [_] {:cancel true}))
       (let [result (session/manual-compact-in! ctx session-id nil)]
         (is (nil? result))
-        (let [event-types (mapv :event-type (dispatch/event-log-entries))]
+        (let [event-types (mapv :event-type (kernel/event-log-entries))]
           (is (= [:session/compact-start
                   :session/manual-compaction-execute
                   :session/compact-done]
@@ -241,15 +270,16 @@
                          :tokens-before nil
                          :details nil}
           [ctx session-id] (create-session-context)
-          _             (dispatch/clear-event-log!)
+          _             (kernel/clear-event-log!)
           reg           (:extension-registry ctx)]
       (ext/register-extension-in! reg "/ext/c")
       (ext/register-handler-in! reg "/ext/c" "session_before_compact"
                                 (fn [_] {:compaction custom-result}))
       (let [result (session/manual-compact-in! ctx session-id nil)]
         (is (= "ext summary" (:summary result)))
-        (let [event-types (mapv :event-type (dispatch/event-log-entries))]
+        (let [event-types (mapv :event-type (kernel/event-log-entries))]
           (is (= [:session/compact-start
+                  :session/append-journal-entry
                   :session/compaction-finished
                   :session/manual-compaction-execute
                   :session/compact-done]
@@ -289,8 +319,8 @@
 
   (testing "diagnostics-in reflects session state"
     (let [[ctx session-id] (create-session-context)]
-      (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
-      (dispatch/dispatch! ctx :session/set-session-name {:session-id session-id :name "test"} {:origin :core})
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
+      (session/dispatch-in! ctx :session/set-session-name {:session-id session-id :name "test"} {:origin :core})
       (let [d  (session/diagnostics-in ctx session-id)
             sd (ss/get-session-data-in ctx session-id)]
         (is (= :idle (:phase d)))

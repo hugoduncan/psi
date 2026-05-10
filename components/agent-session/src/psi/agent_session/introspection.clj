@@ -3,10 +3,11 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.resolvers :as resolvers]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss]
-   [psi.agent-session.workflows :as wf]))
+   [psi.session-state.model :as session]
+   [psi.session-state.state :as ss]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]))
 
 (defn replay-dispatch-event-log-in!
   "Replay retained dispatch entries against this session context.
@@ -17,9 +18,9 @@
 
    Returns the updated root state map."
   ([ctx]
-   (replay-dispatch-event-log-in! ctx (dispatch/event-log-entries)))
+   (replay-dispatch-event-log-in! ctx (kernel/event-log-entries)))
   ([ctx entries]
-   (dispatch/replay-event-log! ctx entries)
+   (kernel/replay-event-log! dispatch/dispatch! ctx entries)
    @(:state* ctx)))
 
 (defn diagnostics-in
@@ -41,8 +42,8 @@
      :auto-compaction-enabled (:auto-compaction-enabled sd)
      :context-fraction        (session/context-fraction-used sd)
      :extension-count         (ext/extension-count-in (:extension-registry ctx))
-     :workflow-count          (wf/workflow-count-in (:workflow-registry ctx))
-     :workflow-running-count  (wf/running-count-in (:workflow-registry ctx))
+     :workflow-count          (extension-workflow-runtime/workflow-count-in (:workflow-registry ctx))
+     :workflow-running-count  (extension-workflow-runtime/running-count-in (:workflow-registry ctx))
      :journal-entries         (count (ss/get-state-value-in ctx (ss/state-path :journal session-id)))
      :agent-diagnostics       (agent/diagnostics-in (ss/agent-ctx-in ctx session-id))}))
 

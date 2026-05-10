@@ -6,12 +6,12 @@
   (:require
    [clojure.string :as str]
    [psi.ai.model-registry :as model-registry]
-   [psi.agent-session.conversation :as conv]
-   [psi.agent-session.prompt-templates :as prompt-templates]
-   [psi.agent-session.provider-auth :as provider-auth]
-   [psi.agent-session.session-state :as ss]
-   [psi.agent-session.skills :as skills]
-   [psi.agent-session.system-prompt :as system-prompt]))
+   [psi.turn-runtime.request :as turn-request]
+   [psi.prompt-assets.prompt-templates :as prompt-templates]
+   [psi.provider-auth.core :as provider-auth]
+   [psi.session-state.state :as ss]
+   [psi.prompt-assets.skills :as skills]
+   [psi.prompt-assets.system-prompt :as system-prompt]))
 
 (defn journal->provider-messages
   "Project persisted journal entries into agent/provider message maps."
@@ -83,78 +83,6 @@
       (system-prompt/filter-prompt-contributions (:prompt-component-selection session-data))
       ss/sorted-prompt-contributions))
 
-(defn- developer-prompt-section
-  [session-data]
-  (let [dev (:developer-prompt session-data)]
-    (when-not (str/blank? dev)
-      dev)))
-
-(defn effective-system-prompt
-  "Assemble the effective provider-visible system prompt from canonical
-   request-preparation inputs.
-
-   This makes request preparation the explicit home for the final
-   base-plus-developer-plus-contributions projection used for provider execution."
-  [session-data]
-  (let [base     (:base-system-prompt session-data)
-        dev      (developer-prompt-section session-data)
-        base+dev (cond-> (or base "")
-                   dev (str "\n\n" dev))]
-    (system-prompt/apply-prompt-contributions
-     base+dev
-     (sorted-contributions session-data))))
-
-(defn build-provider-conversation
-  "Project canonical session prompt state, messages, and tools into the
-   provider-facing conversation shape used for prompt execution."
-  [session-data messages]
-  (let [cache-bps (set (or (:cache-breakpoints session-data) #{}))
-        tool-defs (system-prompt/filter-tool-defs (:tool-defs session-data)
-                                                  (:prompt-component-selection session-data))]
-    (conv/agent-messages->ai-conversation
-     (effective-system-prompt session-data)
-     messages
-     tool-defs
-     {:cache-breakpoints cache-bps})))
-
-(defn build-prompt-layers
-  "Return prompt layers for the prepared request.
-
-   Current shape makes the main assembled layers explicit for introspection while
-   request preparation assembles the effective provider system prompt from those
-   canonical session-owned layers.
-
-   Layers currently surfaced:
-   - :system/base          assembled base system prompt
-   - :system/developer     optional developer prompt layer
-   - :system/contributions optional rendered prompt-contribution section"
-  [session-data _opts]
-  (let [base    (:base-system-prompt session-data)
-        dev     (:developer-prompt session-data)
-        contrib (->> (sorted-contributions session-data)
-                     (map :content)
-                     (remove str/blank?)
-                     (str/join "\n\n"))]
-    (cond-> []
-      (some? base)
-      (conj {:id      :system/base
-             :kind    :system
-             :stable? true
-             :content base})
-
-      (not (str/blank? dev))
-      (conj {:id      :system/developer
-             :kind    :developer
-             :stable? true
-             :source  (:developer-prompt-source session-data)
-             :content dev})
-
-      (not (str/blank? contrib))
-      (conj {:id      :system/contributions
-             :kind    :contributions
-             :stable? true
-             :content contrib}))))
-
 (defn- input-expansion
   [session-data text commands]
   (let [loaded-skills (:skills session-data)
@@ -212,6 +140,45 @@
          vec
          not-empty)))
 
+(defn- expanded-turn-input
+  [session-data user-message commands]
+  (or (expand-user-message session-data user-message commands)
+      {:user-message user-message
+       :expansion nil}))
+
+(defn- prepared-turn-messages
+  [ctx session-id session-data user-message]
+  (let [base-messages     (-> (session->provider-messages ctx session-id)
+                              (replace-current-user-message user-message))
+        steering-messages (queued-steering-messages session-data user-message)]
+    {:messages (cond-> base-messages
+                 (seq steering-messages) (into steering-messages))
+     :queued-steering-messages steering-messages}))
+
+(defn- normalized-turn-input
+  [ctx session-id session-data {:keys [turn-id user-message expansion runtime-opts runtime-model messages queued-steering-messages]}]
+  (let [cache-bps (set (or (:cache-breakpoints session-data) #{}))]
+    {:turn/id                           turn-id
+     :turn/session-id                   session-id
+     :turn/user-message                 user-message
+     :turn/input-expansion              expansion
+     :turn/queued-steering-messages     queued-steering-messages
+     :turn/messages                     messages
+     :turn/runtime-model                (or runtime-model
+                                            (resolve-runtime-model (:model session-data)))
+     :turn/ai-options                   (session->request-options ctx session-data (or runtime-opts {}))
+     :turn/cache-breakpoints            cache-bps
+     :turn/session-model                (:model session-data)
+     :turn/thinking-level               (:thinking-level session-data)
+     :turn/prompt-mode                  (:prompt-mode session-data)
+     :turn/active-tools                 (:active-tools session-data)
+     :turn/developer-prompt             (:developer-prompt session-data)
+     :turn/developer-prompt-source      (:developer-prompt-source session-data)
+     :turn/base-system-prompt           (:base-system-prompt session-data)
+     :turn/sorted-prompt-contributions  (sorted-contributions session-data)
+     :turn/filtered-tool-defs           (system-prompt/filter-tool-defs (:tool-defs session-data)
+                                                                        (:prompt-component-selection session-data))}))
+
 (defn build-prepared-request
   "Build a prepared-request artifact from canonical session state.
 
@@ -220,45 +187,16 @@
    - :user-message
    - :runtime-opts
    - :runtime-model"
-  [ctx session-id {:keys [turn-id user-message runtime-opts runtime-model commands] :as opts}]
-  (let [session-data       (ss/get-session-data-in ctx session-id)
-        {:keys [user-message expansion]} (or (expand-user-message session-data user-message commands)
-                                             {:user-message user-message
-                                              :expansion nil})
-        base-messages      (-> (session->provider-messages ctx session-id)
-                               (replace-current-user-message user-message))
-        steering-messages  (queued-steering-messages session-data user-message)
-        messages           (cond-> base-messages
-                             (seq steering-messages) (into steering-messages))
-        ai-options         (session->request-options ctx session-data (or runtime-opts {}))
-        cache-bps          (set (or (:cache-breakpoints session-data) #{}))
-        prompt-layers      (build-prompt-layers session-data opts)
-        provider-conv      (build-provider-conversation session-data messages)
-        runtime-model      (or runtime-model
-                               (resolve-runtime-model (:model session-data)))]
-    {:prepared-request/id                       turn-id
-     :prepared-request/session-id               session-id
-     :prepared-request/user-message             user-message
-     :prepared-request/input-expansion          expansion
-     :prepared-request/queued-steering-messages steering-messages
-     :prepared-request/session-snapshot         {:model                   (:model session-data)
-                                                 :thinking-level          (:thinking-level session-data)
-                                                 :prompt-mode             (:prompt-mode session-data)
-                                                 :cache-breakpoints       cache-bps
-                                                 :active-tools            (:active-tools session-data)
-                                                 :developer-prompt        (:developer-prompt session-data)
-                                                 :developer-prompt-source (:developer-prompt-source session-data)}
-     :prepared-request/prompt-layers            prompt-layers
-     :prepared-request/system-prompt            (:system-prompt provider-conv)
-     :prepared-request/system-prompt-blocks     (:system-prompt-blocks provider-conv)
-     :prepared-request/messages                 (:messages provider-conv)
-     :prepared-request/tools                    (:tools provider-conv)
-     :prepared-request/model                    runtime-model
-     :prepared-request/ai-options               ai-options
-     :prepared-request/cache-projection         {:cache-breakpoints cache-bps
-                                                 :system-cached?    (contains? cache-bps :system)
-                                                 :tools-cached?     (contains? cache-bps :tools)
-                                                 :message-breakpoint-count
-                                                 (count (filter #(= :user (:role %))
-                                                                (:messages provider-conv)))}
-     :prepared-request/provider-conversation    provider-conv}))
+  [ctx session-id {:keys [turn-id user-message runtime-opts runtime-model commands]}]
+  (let [session-data (ss/get-session-data-in ctx session-id)
+        {:keys [user-message expansion]} (expanded-turn-input session-data user-message commands)
+        {:keys [messages queued-steering-messages]} (prepared-turn-messages ctx session-id session-data user-message)
+        normalized-turn (normalized-turn-input ctx session-id session-data
+                                               {:turn-id turn-id
+                                                :user-message user-message
+                                                :expansion expansion
+                                                :runtime-opts runtime-opts
+                                                :runtime-model runtime-model
+                                                :messages messages
+                                                :queued-steering-messages queued-steering-messages})]
+    (turn-request/build-prepared-request normalized-turn)))

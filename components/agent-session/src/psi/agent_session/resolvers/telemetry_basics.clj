@@ -3,10 +3,10 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.background-job-runtime :as bg-runtime]
    [psi.agent-session.background-jobs :as bg-jobs]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.resolvers.support :as support]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
-   [psi.agent-session.session :as session]
+   [psi.session-state.state :as session]
    [psi.agent-session.state-accessors :as accessors]
    [psi.agent-session.tool-output :as tool-output]))
 
@@ -52,7 +52,7 @@
                  {:psi.agent-session/registered-dispatch-events
                   [:psi.dispatch-handler/event-type]}]}
   (let [_       agent-session-ctx
-        types   (sort (dispatch/registered-event-types))
+        types   (sort (kernel/registered-event-types))
         entries (mapv (fn [event-type]
                         {:psi.dispatch-handler/event-type event-type})
                       types)]
@@ -61,22 +61,21 @@
 
 (defn- dispatch-event->eql
   [entry]
-  {:psi.dispatch-event/event-type          (:event-type entry)
-   :psi.dispatch-event/event-data          (:event-data entry)
-   :psi.dispatch-event/origin              (:origin entry)
-   :psi.dispatch-event/ext-id              (:ext-id entry)
-   :psi.dispatch-event/blocked?            (:blocked? entry)
-   :psi.dispatch-event/block-reason        (:block-reason entry)
-   :psi.dispatch-event/replaying?          (:replaying? entry)
-   :psi.dispatch-event/statechart-claimed? (:statechart-claimed? entry)
-   :psi.dispatch-event/validation-error    (:validation-error entry)
-   :psi.dispatch-event/pure-result-kind    (:pure-result-kind entry)
-   :psi.dispatch-event/declared-effects    (:declared-effects entry)
-   :psi.dispatch-event/applied-effects     (:applied-effects entry)
-   :psi.dispatch-event/db-summary-before   (:db-summary-before entry)
-   :psi.dispatch-event/db-summary-after    (:db-summary-after entry)
-   :psi.dispatch-event/timestamp           (:timestamp entry)
-   :psi.dispatch-event/duration-ms         (:duration-ms entry)})
+  {:psi.dispatch-event/event-type        (:event-type entry)
+   :psi.dispatch-event/event-data        (:event-data entry)
+   :psi.dispatch-event/origin            (:origin entry)
+   :psi.dispatch-event/ext-id            (:ext-id entry)
+   :psi.dispatch-event/blocked?          (:blocked? entry)
+   :psi.dispatch-event/block-reason      (:block-reason entry)
+   :psi.dispatch-event/replaying?        (:replaying? entry)
+   :psi.dispatch-event/validation-error  (:validation-error entry)
+   :psi.dispatch-event/pure-result-kind  (:pure-result-kind entry)
+   :psi.dispatch-event/declared-effects  (:declared-effects entry)
+   :psi.dispatch-event/applied-effects   (:applied-effects entry)
+   :psi.dispatch-event/db-summary-before (:db-summary-before entry)
+   :psi.dispatch-event/db-summary-after  (:db-summary-after entry)
+   :psi.dispatch-event/timestamp         (:timestamp entry)
+   :psi.dispatch-event/duration-ms       (:duration-ms entry)})
 
 (pco/defresolver agent-session-dispatch-event-log
   [{_ctx :psi/agent-session-ctx}]
@@ -90,7 +89,6 @@
                    :psi.dispatch-event/blocked?
                    :psi.dispatch-event/block-reason
                    :psi.dispatch-event/replaying?
-                   :psi.dispatch-event/statechart-claimed?
                    :psi.dispatch-event/validation-error
                    :psi.dispatch-event/pure-result-kind
                    :psi.dispatch-event/declared-effects
@@ -99,7 +97,7 @@
                    :psi.dispatch-event/db-summary-after
                    :psi.dispatch-event/timestamp
                    :psi.dispatch-event/duration-ms]}]}
-  (let [entries (dispatch/event-log-entries)]
+  (let [entries (kernel/event-log-entries)]
     {:psi.agent-session/dispatch-event-log-count (count entries)
      :psi.agent-session/dispatch-event-log       (mapv dispatch-event->eql entries)}))
 

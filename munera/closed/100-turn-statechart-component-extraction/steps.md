@@ -1,0 +1,33 @@
+- [x] Create `components/turn-statechart/src/psi/turn_statechart/` and `components/turn-statechart/test/psi/turn_statechart/`
+- [x] Update project/test configuration for the new component paths
+  - [x] add local component dep and source/test paths in `deps.edn`
+  - [x] add source/test paths in `tests.edn`
+  - [x] update `tests-component-isolated.edn` only if needed in this slice
+- [x] Move `components/agent-session/src/psi/agent_session/turn_statechart.clj` to `components/turn-statechart/src/psi/turn_statechart/core.clj`
+- [x] Rename namespace `psi.agent-session.turn-statechart` to `psi.turn-statechart.core`
+- [x] Move focused statechart test `components/agent-session/test/psi/agent_session/turn_statechart_test.clj` into `components/turn-statechart/test/psi/turn_statechart/`
+- [x] Rename moved focused test namespace(s) to match the new component/namespace shape
+- [x] Update all direct production consumers to require `psi.turn-statechart.core`
+  - [x] `components/agent-session/src/psi/agent_session/turn_accumulator.clj`
+  - [x] `components/agent-session/src/psi/agent_session/prompt_stream.clj`
+  - [x] `components/agent-session/src/psi/agent_session/prompt_runtime.clj`
+  - [x] `components/agent-session/src/psi/agent_session/dispatch_effects.clj`
+  - [x] `components/agent-session/src/psi/agent_session/resolvers/telemetry.clj`
+- [x] Update all direct test consumers/test helpers to require `psi.turn-statechart.core`
+- [x] Use a temporary compatibility shim only if needed during migration
+- [x] Remove any temporary compatibility shim before completion
+- [x] Run focused statechart tests from the new component location
+  - [x] `clojure -M:test --focus psi.turn-statechart.core-test`
+- [x] Run at least one focused higher-level consuming-path verification
+  - [x] `clojure -M:test --focus psi.turn-statechart.core-test --focus psi.agent-session.turn-accumulator-test --focus psi.agent-session.prompt-execution-test`
+- [x] Confirm no remaining `psi.agent-session.turn-statechart` requires/usages remain in the repo
+- [x] Record final ownership and migration notes in `implementation.md`
+- [x] Remove duplicate `components/turn-statechart/src` entry from root `deps.edn :run`
+- [x] Update `design.md` to use corrected authoritative namespace `psi.turn-statechart.core`
+- [x] Update `plan.md` to use corrected authoritative namespace `psi.turn-statechart.core`
+- [x] Rerun focused verification after the review follow-up
+- [x] If `components/turn-statechart/src/psi/turn_statechart/core.clj` grows, split chart definition vs accumulation actions vs runtime helpers
+- [x] Clarify in code or docs whether `:thinking-blocks` and `:stop-reason` are intentionally shared turn-data shape in this component
+- [x] Decide whether `send-event!` should continue returning raw working memory or a narrower component-level result
+- [x] Consider replacing `components/turn-statechart/src/psi/turn_statechart/core.clj` facade `def` re-exports with explicit API vars/functions for richer doc/arglist introspection
+- [x] Add a focused test that locks in the narrowed `send-event!` return contract

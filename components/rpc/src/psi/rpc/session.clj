@@ -6,11 +6,10 @@
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.app-runtime.background-job-view :as app-bg-view]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.ai.models :as ai-models]
    [psi.ai.model-registry :as model-registry]
@@ -288,11 +287,11 @@
                                       :emit! emit!
                                       :progress-q progress-q
                                       :thread-name "rpc-poll-loop"})]
-                                (dispatch/dispatch! ctx :session/set-model
-                                                    {:session-id session-id
-                                                     :model session-model
-                                                     :scope :session}
-                                                    {:origin :core})
+                                (session/dispatch-in! ctx :session/set-model
+                                                      {:session-id session-id
+                                                       :model session-model
+                                                       :scope :session}
+                                                      {:origin :core})
                                 (session/prompt-in! ctx session-id text nil
                                                     {:progress-queue progress-q
                                                      :runtime-opts (cond-> {}

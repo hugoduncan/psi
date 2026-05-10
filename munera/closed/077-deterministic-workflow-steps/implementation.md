@@ -1,0 +1,122 @@
+2026-05-02
+- Created umbrella task 077 for deterministic workflow steps.
+- Framed this as design-first rather than implementation-first.
+- Captured open decisions from the discussion:
+  - argument passing needs explicit design
+  - extension contract might be as small as a named function/operation, but is not yet chosen
+  - deterministic outputs must feed both LLM-backed and deterministic downstream steps
+  - statechart-style invoke/input/output clarity is a useful design reference
+- Added a side-by-side syntax comparison section to `design.md` covering `:deterministic`, `:invoke`, and `:executor`/`:kind` shapes.
+- Current design recommendation is to prefer a general `:invoke` block with explicit map-shaped `:args`.
+- Added an operation identity comparison section covering canonical string operation ids, explicit extension+operation maps, and direct var/function-style references.
+- Current design recommendation is to use an author-facing canonical operation id resolved through a runtime-owned registry, avoiding direct implementation references in workflow files.
+- Added an argument-model comparison section covering single `:args`, split `:input` + `:args`, and positional/list-shaped arguments.
+- Current design recommendation is one explicit map-shaped `:args` surface with mixed literal and projected values, reusing the existing workflow source/path projection family.
+- Added a downstream result-reference comparison section covering explicit result kinds, implicit defaults, and full-result-envelope references.
+- Current design recommendation is explicit downstream result kinds with `:data` as the canonical machine-readable surface, `:summary` for human-readable output, and optional `:full-result` only for advanced/debug use.
+- Added a consolidated proposed end-state summary that gathers the current recommendations into one implementation-oriented view.
+- The summary now captures the leading design as: `:invoke` + canonical operation id + map-shaped `:args` + explicit result outputs + shared source/path projection across deterministic and LLM-backed consumers.
+- Added a naming review section to separate control-flow, deterministic-execution, session-conversation-assembly, and data-reference vocabulary.
+- Current naming direction prefers `:operation` over using `:deterministic` as a field name, and `:output` over overloading `:kind` for deterministic result references.
+- Rewrote the design around the newer inline-session conversation model: canonical inline session authoring now uses hoisted session-construction fields on `:type :session` steps rather than `:prompt` / `:input` / `:reference` / `:preload`.
+- The canonical contribution forms are now tagged maps with `:type`, currently `:source` and `:template`.
+- `:source` contributions explicitly reuse existing projection functionality, and the assembled output is modelled simply as the child session conversation.
+- Clean break decision captured: no new-model `:prompt` compatibility surface.
+- Expanded the execution algebra from 2 forms to 3 explicit mutually-exclusive forms: `:type :invoke`, `:type :session`, and `:type :delegate`.
+- Added explicit step `:type` so exclusivity is modelled directly in authored data rather than inferred only from field presence.
+- Removed per-type submaps and switched to hoisted step fields keyed by `:type`.
+- Renamed delegated execution vocabulary to match `/delegate`: hoisted delegated fields are now `:target`, `:prompt-string`, and `:context`.
+- Captured the design insight that `/delegate` effectively carries both caller context and explicit request text, so `:type :delegate` should model both.
+- Narrowed the delegated first cut: `:target` names existing workflows only, `:prompt-string` renders to a string but may be authored literally or via template shape, and delegated workflow session overrides are disallowed for now.
+- Tightened ambiguity around runtime contracts by adding: a first-cut per-`type` field validity matrix, delegated boundary semantics (`:prompt-string` becomes the callee's local `:workflow-input`), ordered source-only delegated `:context`, first-cut output surfaces for `:invoke`, `:session`, and `:delegate` steps, explicit allowance for control flow across all three execution forms, and explicit first-cut judge execution modes (`:judge {:type :llm ...}` and `:judge {:type :invoke ...}`).
+- Refined output modeling so step-local output surfaces and the step's resulting value are distinct concepts; introduced `:yields` as the step-level resulting value mapping, kept `:output ...` for step-local surfaces, made `:yields` a tagged union with hoisted type-specific fields (`:type :data` + `:data`, `:type :text` + `:text`, `:type :error` + `:reason`/`:message`/`:details`), made the inline-session default yielded value `{:type :text :text :final-llm-reply}`, and made delegated steps yield the called workflow's yielded value unchanged.
+- Materialized the grammar as project docs: `doc/workflow-grammar.md` for the bare grammar and `doc/workflow-grammar-concepts.md` for the conceptual explanation.
+- Extracted model selection into its own broader artifacts: `doc/model-selection-grammar.md` and `doc/model-selection-concepts.md`, and made the workflow grammar reference that external grammar through the nonterminal `model-selection-spec` rather than partially redefining it.
+- Added inline-session model selection flexibility: `:type :session` uses a single `:model` field whose value may be either a concrete model id or a query-shaped model-selection specification.
+- Reviewed the resulting design and grammar docs for residual ambiguity, then tightened the first-cut contract in response.
+- Updated `doc/workflow-grammar.md` so authored `:yields` are allowed on `:invoke`, `:session`, and `:delegate` steps rather than only some step forms.
+- Made delegated `:context` optional in the grammar and aligned the concepts/design docs on omitted `:context` meaning `[]`.
+- Added explicit yielded-value reference syntax `{:step ... :yield ...}` so downstream consumers can select a prior step's resulting value as distinct from step-local `:output` surfaces.
+- Clarified the source-spec rule that first-cut authors may use either `:path` or `:projection`, but not both in the same source selector.
+- Corrected the grammar/docs so transition-local routing directives may include optional `:max-iterations`, matching the implemented routing-directive schema.
+- Clarified that the earlier `:max-iterations?` spelling in the docs was only an imprecise optionality notation, not a distinct authored field name.
+- Tightened the judge contract in the concepts/design docs: normalized outcome is one string or keyword; string matching is case-sensitive; strings and keywords do not auto-coerce; missing `:on` match is a routing error.
+- Normalized first-cut session output naming on `:final-llm-reply` and aligned the design prose with the grammar.
+- Restricted template variable names in the grammar to strings so `{{var}}` placeholders map unambiguously to `:vars` keys.
+- Replaced the vague `yield-source ::= keyword` idea with the clearer rule that success-form `:yields` keywords point at step-local output surfaces.
+- Added explicit workflow result-composition rules: the workflow result is the yielded value of the step whose selected transition goes to `:done`; judge routing does not replace the parent step's yielded value.
+- Added an explicit framing note that `doc/workflow-grammar.md` is an EBNF-like documentation grammar rather than a complete executable parser specification.
+- After comparing the edited docs to `workflow_model.clj`, clarified that `doc/workflow-grammar.md` and `doc/workflow-grammar-concepts.md` describe the target converged authoring grammar from task 077, not the current implemented Malli schema surface.
+- Recorded the major current-model differences explicitly in the docs: current implementation still centers on `:executor`, `:prompt-template`, `:input-bindings`, `:session-preload`, `:session-overrides`, and the older judge/routing shape.
+- Added `doc/workflow-grammar-current.md` as a separate documentation artifact for the currently implemented workflow schema surface reflected by `workflow_model.clj`.
+- Tightened `doc/workflow-grammar-current.md` to better match the current Malli schemas: clarified optionality notation, corrected `:input-bindings` shape, made binding paths explicit as vectors of keywords/strings/ints, and called out the current optional map-shaped `:workflow-input` run field.
+- Added cross-links among `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-grammar-current.md` so target-design and current-implementation surfaces are explicitly navigable.
+- Wrote initial design/plan/steps surfaces.
+- Code-shaper review: found a new consistency gap between the target grammar and `doc/workflow-ir.md`; the target docs standardize the session output key as `:final-llm-reply`, but the IR examples/defaults still expose that surface via `:text`, which makes the normalization boundary less obvious.
+- 2026-05-04 — Closed the session-output naming follow-on.
+  - aligned `doc/workflow-ir.md` session examples, output-key prose, and default `:yields` to canonical `:final-llm-reply`
+  - aligned the current-grammar compatibility compiler in `workflow_current_ir_compiler.clj` so compiled session steps now expose `:final-llm-reply` instead of `:text`
+  - aligned focused proof in `workflow_current_ir_compiler_test.clj`
+  - this removes an avoidable naming drift between target grammar docs and normalized IR for session outputs
+- 2026-05-04 — Code-shaper review found one new actionable consistency seam.
+  - the workflow-runtime source-resolution seam still resolves canonical IR session refs through legacy accepted-result `[:outputs :text]` lookups for `:output :final-llm-reply` and `:yield :text`
+  - current authoritative owner of that seam is `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`, specifically `resolve-binding-ref` / `resolve-accepted-result-path`
+  - this duplicates session-output translation outside the IR/output-normalization boundary and risks future drift against the now-canonical `:final-llm-reply` surface
+  - follow-up should centralize or normalize session output lookup so workflow-runtime source resolution consumes the same canonical output naming as the IR/compiler/docs
+- 2026-05-04 — Code-shaper pass found no new actionable feedback.
+  - re-read task design/plan/steps plus the referenced IR/docs/runtime code
+  - confirmed the only current shaping seam is the already-recorded unchecked workflow-runtime source-resolution follow-up
+  - no additional simplicity/consistency/robustness issues were identified beyond the existing note and step
+- 2026-05-04 — Code-shaper re-review found no new actionable feedback.
+  - re-read task artifacts plus the referenced IR/compiler/runtime source and focused tests
+  - confirmed the previously recorded unchecked workflow-runtime source-resolution normalization follow-up still covers the only live consistency seam from this shaping thread
+  - current `step_materialization_test.clj` and `workflow_source_resolution.clj` / `source_resolution_test.clj` already exercise canonical `:output :final-llm-reply` and `:yield :text` resolution, so no additional simplicity/consistency/robustness steps were added
+- 2026-05-04 — Code-shaper pass found no new actionable feedback.
+  - re-read task artifacts plus referenced `workflow_runtime/source_resolution.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `workflow_source_resolution.clj`, `workflow_file_authoring_session.clj`, and focused tests/docs
+  - confirmed the only live shaping seam remains the already-recorded unchecked workflow-runtime source-resolution follow-up; no new simplicity/consistency/robustness issues were identified without duplicating prior notes
+- 2026-05-04 — Code-shaper pass found no new actionable feedback.
+  - re-read the task artifacts and the referenced runtime/docs/tests with the prior implementation-review/code-shaper notes in mind
+  - confirmed the only still-live shaping seam is the already-recorded unchecked workflow-runtime source-resolution output-normalization follow-up; no additional simplicity/consistency/robustness issues were found without duplicating existing notes or steps
+  - spot-checking the broader focused workflow test surface showed an already-known unrelated regression in `workflow_statechart_runtime_test.clj` preload expectations, not a new task-077-specific shaping issue
+- 2026-05-04 — Code-shaper re-review found no new actionable feedback.
+  - re-read `design.md`, `plan.md`, `steps.md`, and `implementation.md` plus the referenced IR/compiler/runtime/docs/tests to avoid duplicating already-recorded or already-addressed feedback
+  - confirmed the only live shaping item remains the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already present in `steps.md`
+  - spot-check verification still only surfaced the previously noted unrelated preload-duplication regression in `workflow_statechart_runtime_test.clj`, so no new task-077 simplicity/consistency/robustness follow-ups were added
+- 2026-05-04 — Code-shaper pass found no new actionable feedback.
+  - re-read the task artifacts and referenced runtime/compiler/docs/tests with prior implementation-review and follow-up notes in mind
+  - confirmed the only live shaping seam is still the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already recorded in `steps.md`
+  - no additional simplicity/consistency/robustness issues were found without duplicating existing notes or unchecked steps
+- 2026-05-04 — Code-shaper re-review found no new actionable feedback.
+  - re-read `design.md`, `plan.md`, `steps.md`, and `implementation.md` plus the referenced `workflow_runtime/source_resolution.clj`, `workflow_ir.clj`, `workflow_current_ir_compiler.clj`, `source_resolution_test.clj`, and `doc/workflow-ir.md`
+  - confirmed the only live shaping item remains the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already present in `steps.md`
+  - no new simplicity/consistency/robustness issues were identified without duplicating already-recorded notes or follow-up steps
+- 2026-05-05 — Code-shaper pass found no new actionable feedback.
+  - re-read the task artifacts plus referenced runtime/compiler/docs/tests, including the already-recorded implementation-review and shaping results, to avoid duplicating closed or still-open feedback
+  - confirmed the only live shaping seam is still the existing unchecked workflow-runtime source-resolution canonical session-output normalization follow-up already recorded in `steps.md`
+  - spot-checking current code also surfaced an older compatibility branch in `workflow_file_authoring_session.clj` (`[:outputs :text]` for legacy session binding defaults), but that belongs to the retired current-authoring seam rather than a new task-077-specific shaping item, so no duplicate follow-up was added here
+  - no new simplicity/consistency/robustness issues were identified beyond the existing unchecked step
+- 2026-05-09 — Follow-up execution from task 127 review updated this task's stale `workflow_step_prep` / `step_prep_*` references to the current authoritative workflow-runtime owners.
+  - live normalization follow-up now points at `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
+  - proof references now point at `step_materialization_test.clj` and `source_resolution_test.clj` rather than removed `workflow_step_prep*` names
+- 2026-05-09 — Code-shaper review found no new actionable feedback beyond the already-recorded normalization seam.
+  - the only then-live task-077 shaping follow-up was canonical session-output normalization in `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
+  - related watch-item: `workflow_file_authoring_session.clj` still had an older `[:outputs :text]` compatibility branch, to be re-evaluated after the runtime source-resolution normalization
+- 2026-05-09 — Follow-up execution completed the remaining session-output normalization seams recorded in `steps.md`.
+  - removed the local `:outputs :text` compatibility branch from `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj`
+  - updated focused source-resolution proofs so canonical `:final-llm-reply` and legacy stored `:outputs :text` are no longer treated as the same logical output surface
+  - focused verification green for the runtime normalization slice: `18 tests, 38 assertions, 0 failures, 0 errors`; lint clean
+  - re-evaluated the older current-authoring compatibility branch in `components/agent-session/src/psi/agent_session/workflow_file_authoring_session.clj` and rewrote it to compile step-source `:projection :text` onto the canonical `:outputs :final-llm-reply` surface
+  - added focused authoring proof coverage in `workflow_file_authoring_session_test.clj`
+  - focused verification green for the authoring/compiler slice: `14 tests, 110 assertions, 0 failures, 0 errors`; lint clean
+- 2026-05-09 — Test review found no correctness issue in the new proofs.
+  - one cleanup follow-up remained: the source-resolution regression proof was duplicated in both the lower `workflow-runtime` suite and the higher `agent-session` mirror suite
+  - preferred shape was one authoritative lower-owner proof unless the higher duplicate was intentionally proving a distinct compatibility or wiring contract
+- 2026-05-09 — Follow-up execution removed the duplicated higher source-resolution mirror proof.
+  - `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` was a namespace-only duplicate of the lower `workflow-runtime` proof surface
+  - authoritative proof ownership now remains solely in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
+- 2026-05-09 — Test-shaper review found no correctness issue and no topology problem in the remaining authoritative proof surfaces.
+  - one optional shaping follow-up remained: reduce repeated workflow-run construction ceremony in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj` with a tiny local helper if that could be done without hiding arrangement intent
+- 2026-05-09 — Follow-up execution completed the remaining optional test-shaping cleanup.
+  - reduced repeated workflow-run construction ceremony in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
+  - introduced tiny local helpers for report accepted-result setup and delegate-step accepted-result setup without changing proof ownership or behavioral assertions
+  - focused verification green: `8 tests, 15 assertions, 0 failures, 0 errors`; lint clean

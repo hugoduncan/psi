@@ -1,7 +1,7 @@
 (ns psi.agent-session.extensions.runtime-ui
   (:require
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (def extension-ui-allowed-events
   #{:session/ui-request-dialog

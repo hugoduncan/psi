@@ -2,12 +2,10 @@
 name: lambda-decompiler
 description: Decompiles a lambda expression
 ---
-{:tools ["read" "bash"]
- :skills ["lambda-compiler"]}
-
-Use the lambda-compiler skill.
-Decompile the specified lambda to prose.
-
-Requirements:
-- Return prose
-- Keep output minimal and structurally valid
+{:steps [{:name "decompile"
+          :type :session
+          :tools ["read" "bash"]
+          :skills ["lambda-compiler"]
+          :contributions [{:type :template
+                           :text "Use the lambda-compiler skill.\nDecompile the specified lambda to prose.\n\nRequirements:\n- Return prose\n- Keep output minimal and structurally valid\n\nInput:\n{{input}}"
+                           :vars {"input" {:from :workflow-input}}}]}]}

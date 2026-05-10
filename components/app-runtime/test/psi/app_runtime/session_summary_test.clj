@@ -2,9 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.app-runtime.session-summary :as summary]))
 
@@ -19,15 +18,15 @@
 (deftest session-summary-builds-shared-model-and-status-fragments-test
   (testing "session summary exposes shared header/status fragments"
     (let [[ctx sid] (create-session-context)
-          _         (dispatch/dispatch! ctx :session/set-model
-                                        {:session-id sid
-                                         :model {:provider "openai"
-                                                 :id "gpt-5.3-codex"
-                                                 :reasoning true}}
-                                        {:origin :core})
-          _         (dispatch/dispatch! ctx :session/set-thinking-level
-                                        {:session-id sid :level :high}
-                                        {:origin :core})
+          _         (session/dispatch-in! ctx :session/set-model
+                                          {:session-id sid
+                                           :model {:provider "openai"
+                                                   :id "gpt-5.3-codex"
+                                                   :reasoning true}}
+                                          {:origin :core})
+          _         (session/dispatch-in! ctx :session/set-thinking-level
+                                          {:session-id sid :level :high}
+                                          {:origin :core})
           _         (runtime/journal-user-message-in! ctx sid "Investigate failures" nil)
           model     (summary/session-summary ctx sid)]
       (is (= sid (:session-id model)))

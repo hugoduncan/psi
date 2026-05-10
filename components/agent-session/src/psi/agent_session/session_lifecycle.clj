@@ -1,16 +1,16 @@
 (ns psi.agent-session.session-lifecycle
   "Session lifecycle operations — create, resume, fork, switch, close."
   (:require
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [psi.agent-session.compaction :as compaction]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.session-close :as session-close]
+   [psi.session-journal.store :as journal-store]
    [psi.agent-session.session-runtime :as runtime]
-   [psi.agent-session.session-state :as session]
-   [psi.agent-session.workflows :as wf]))
+   [psi.session-state.state :as session]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]))
 
 (defn- initialize-top-level-session!
   [ctx source-session-id {:keys [dispatch-event session-name worktree-path scheduled-origin-session-id scheduled-from-schedule-id scheduled-from-label]}]
@@ -21,8 +21,8 @@
                            (:worktree-path (:session-defaults ctx))
                            (:cwd ctx))
         session-file   (when (:persist? ctx)
-                         (let [session-dir (persist/session-dir-for worktree-path)
-                               file        (persist/new-session-file-path session-dir new-session-id)]
+                         (let [session-dir (journal-store/session-dir-for worktree-path)
+                               file        (journal-store/new-session-file-path session-dir new-session-id)]
                            (str file)))]
     (dispatch/dispatch! ctx
                         dispatch-event
@@ -49,12 +49,20 @@
     (dispatch/dispatch! ctx :session/ensure-base-system-prompt {:session-id new-session-id} {:origin :core})
     (dispatch/dispatch! ctx :session/retarget-runtime-prompt-metadata {:session-id new-session-id} {:origin :core})
     (when session-name
-      (session/journal-append-in! ctx new-session-id (persist/session-info-entry session-name)))
-    (session/journal-append-in! ctx new-session-id
-                                (persist/thinking-level-entry
-                                 (:thinking-level (session/get-session-data-in ctx new-session-id))))
+      (dispatch/dispatch! ctx :session/append-journal-entry
+                          {:session-id new-session-id
+                           :entry (persist/session-info-entry session-name)}
+                          {:origin :core}))
+    (dispatch/dispatch! ctx :session/append-journal-entry
+                        {:session-id new-session-id
+                         :entry (persist/thinking-level-entry
+                                 (:thinking-level (session/get-session-data-in ctx new-session-id)))}
+                        {:origin :core})
     (when-let [model (:model (session/get-session-data-in ctx new-session-id))]
-      (session/journal-append-in! ctx new-session-id (persist/model-entry (:provider model) (:id model))))
+      (dispatch/dispatch! ctx :session/append-journal-entry
+                          {:session-id new-session-id
+                           :entry (persist/model-entry (:provider model) (:id model))}
+                          {:origin :core}))
     (session/get-session-data-in ctx new-session-id)))
 
 (defn new-session-in!
@@ -67,7 +75,7 @@
   (let [reg                  (:extension-registry ctx)
         {:keys [cancelled?]} (ext/dispatch-in reg "session_before_switch" {:reason :new})]
     (when-not cancelled?
-      (wf/clear-all-in! (:workflow-registry ctx))
+      (extension-workflow-runtime/clear-all-in! (:workflow-registry ctx))
       (let [sd (initialize-top-level-session! ctx source-session-id {:dispatch-event :session/new-initialize
                                                                      :session-name (:session-name opts)
                                                                      :worktree-path (:worktree-path opts)})]
@@ -93,8 +101,8 @@
   (let [reg                  (:extension-registry ctx)
         {:keys [cancelled?]} (ext/dispatch-in reg "session_before_switch" {:reason :resume})]
     (when-not cancelled?
-      (wf/clear-all-in! (:workflow-registry ctx))
-      (let [loaded (persist/load-session-file session-path)]
+      (extension-workflow-runtime/clear-all-in! (:workflow-registry ctx))
+      (let [loaded (journal-store/load-session-file session-path)]
         (if-not loaded
           (do
             (dispatch/dispatch! ctx
@@ -202,8 +210,8 @@
           branch-entries      (fork-branch-entries ctx parent-session-id entry-id)
           messages            (compaction/rebuild-messages-from-journal-entries branch-entries)
           session-file        (when (:persist? ctx)
-                                (let [session-dir (persist/session-dir-for (session/session-worktree-path-in ctx parent-session-id))
-                                      file        (persist/new-session-file-path session-dir new-session-id)]
+                                (let [session-dir (journal-store/session-dir-for (session/session-worktree-path-in ctx parent-session-id))
+                                      file        (journal-store/new-session-file-path session-dir new-session-id)]
                                   (str file)))]
       (dispatch/dispatch! ctx
                           :session/fork-initialize
@@ -229,16 +237,6 @@
                  (-> state
                      (assoc-in [:agent-session :sessions new-session-id :agent-ctx] (:agent-ctx fresh))
                      (assoc-in [:agent-session :sessions new-session-id :sc-session-id] (:sc-session-id fresh))))))
-      ;; Fork persistence: create/write child file immediately with lineage header.
-      (when session-file
-        (let [file (io/file session-file)]
-          (persist/flush-journal! file
-                                  new-session-id
-                                  (session/session-worktree-path-in ctx new-session-id)
-                                  parent-session-id
-                                  parent-session-file
-                                  branch-entries)))
-
       (ext/dispatch-in reg "session_fork" {})
       (session/get-session-data-in ctx new-session-id))))
 

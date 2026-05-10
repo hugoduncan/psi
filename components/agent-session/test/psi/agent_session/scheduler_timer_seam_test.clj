@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-session-context
@@ -26,13 +25,13 @@
                                                                   (reset! observed-delay* delay-ms)
                                                                   (reset! callback* f)
                                                                   {:handle :fake}))]
-      (dispatch/dispatch! ctx* :scheduler/create
-                          {:session-id session-id
-                           :schedule-id "sch-1"
-                           :label "later"
-                           :message "later"
-                           :fire-at fire-at}
-                          {:origin :core})
+      (session/dispatch-in! ctx* :scheduler/create
+                            {:session-id session-id
+                             :schedule-id "sch-1"
+                             :label "later"
+                             :message "later"
+                             :fire-at fire-at}
+                            {:origin :core})
       (is (= 5000 @observed-delay*))
       (is (= {:handle :fake} (get @(:scheduler-timers* ctx*) "sch-1")))
       (@callback*)
@@ -46,16 +45,16 @@
                                                                   {:handle :fake})
                                   :scheduler-cancel-delay-fn (fn [_ctx handle]
                                                                (reset! cancelled* handle)))]
-      (dispatch/dispatch! ctx* :scheduler/create
-                          {:session-id session-id
-                           :schedule-id "sch-1"
-                           :label "later"
-                           :message "later"
-                           :fire-at (.plusSeconds (java.time.Instant/now) 5)}
-                          {:origin :core})
-      (dispatch/dispatch! ctx* :scheduler/cancel
-                          {:session-id session-id
-                           :schedule-id "sch-1"}
-                          {:origin :core})
+      (session/dispatch-in! ctx* :scheduler/create
+                            {:session-id session-id
+                             :schedule-id "sch-1"
+                             :label "later"
+                             :message "later"
+                             :fire-at (.plusSeconds (java.time.Instant/now) 5)}
+                            {:origin :core})
+      (session/dispatch-in! ctx* :scheduler/cancel
+                            {:session-id session-id
+                             :schedule-id "sch-1"}
+                            {:origin :core})
       (is (= {:handle :fake} @cancelled*))
       (is (= :cancelled (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))

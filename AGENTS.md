@@ -344,6 +344,10 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
 - rpc is a minimal, transport only, layer between app-runtime and emacs-ui.
 - dispatch owns system state reads and writes.  Resolvers are used for reads, mutations for functional updates of tte that can return effects, that are run by dispatch for non-functional side-effects.
 
+λx. authoritative_owner(session_dispatch_invocation) ≡ agent-session
+   ∧ lower_components → pure_domain_apis
+   ∧ higher_adapters → route_through(agent-session)
+
 ### Frontier
 
 - **Handler purity**: pure-result shape (`{:root-state-update f :effects [...]}`) defined and validated; legacy handlers still perform side effects inline — migration ongoing

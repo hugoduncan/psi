@@ -1,0 +1,24 @@
+- [x] Review `psi.workflow-runtime.step-prep` and classify helpers by role: materialization versus session-config shaping
+- [x] Use code search to identify all current references to `psi.workflow-runtime.step-prep` publics across runtime, context, tool, and test consumers
+- [x] Create the expected split owners `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.step-session-config`, unless a justified naming variation is recorded
+- [x] Move materialization-oriented helpers to their new owner with minimal semantic change
+- [x] Move session-config shaping helpers to their new owner with minimal semantic change
+- [x] Apply the borderline-helper tie-break rule, and if a tiny third helper owner is introduced, record why that shape is better than forcing ownership into one of the two main roles
+- [x] Rewire runtime/context/tool/test consumers to the new owners
+- [x] Rewire callback/backfill wiring directly to the split owners when no façade is justified; if a façade remains, record why direct wiring was not the better shape
+- [x] Repoint materialization proofs to the materialization owner and session-config shaping proofs to the session-config owner, keeping higher integration tests with higher/runtime consumers as appropriate
+- [x] Move or rename tests when needed so proof ownership reflects the new role topology rather than preserving the old mixed topology by inertia
+- [x] Remove `psi.workflow-runtime.step-prep` as the mixed owner if direct use of the split owners is the cleaner shape, or leave only a tiny explicit façade if justified
+- [x] Verify behavior remains unchanged
+- [x] If `psi.workflow-runtime.step-prep` remains as a façade, record why that was better than direct use of the split owners
+- [x] Record the final remaining public vars of `psi.workflow-runtime.step-materialization` and `psi.workflow-runtime.step-session-config` in `implementation.md`, justifying any non-obvious public
+- [x] Record the final split rationale and any residual ambiguity in `implementation.md`
+- [x] Remove or replace duplicated lower-level materialization proofs that still remain under `components/agent-session/test/psi/agent_session/workflow_step_materialization_test.clj` so proof ownership lives authoritatively under `workflow-runtime`
+- [x] Decide whether `psi.workflow-runtime.step-materialization/render-template-contribution` should remain public; either privatize it or tighten the implementation rationale with a concrete intended consumer
+- [x] Decide whether the private `render-template-contribution` wrapper in `components/workflow-runtime/src/psi/workflow_runtime/step_materialization.clj` improves local readability enough to keep, or whether it should be inlined for simpler local shape
+- [x] Add a focused `step-materialization` proof for the `split-step-session-conversation` branch where the final message is not a user text message, proving the whole conversation is preloaded and the prompt becomes `""`
+- [x] Add a focused `step-session-config` proof for nil `parent-session-id` fallback selection onto the first context session, if that fallback is intended to remain part of the lower contract
+- [x] Reshape `resolve-step-session-config-falls-back-to-first-context-session-when-parent-session-id-is-nil-test` so it arranges the extra context session through a canonical test seam or helper instead of mutating low-level root-state/session-order structure inline
+- [ ] Update open task `077-deterministic-workflow-steps` to replace stale `workflow_step_prep.clj` references with the split lower owners where the note is about materialization or session-config shaping
+- [ ] Replace stale `workflow_step_prep_test.clj` / `step_prep_*` proof-name references in open task `077` with the current `step_materialization_test.clj`, `step_session_config_test.clj`, or `step_test_support.clj` owners as appropriate
+- [ ] Re-evaluate the existing unchecked `077` follow-up phrased against `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`, and rewrite it against the current authoritative owner(s) without changing the intended normalization work

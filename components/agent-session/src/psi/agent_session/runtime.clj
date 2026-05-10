@@ -9,10 +9,10 @@
    [clojure.string :as str]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.provider-auth :as provider-auth]
+   [psi.session-persistence.core :as persist]
+   [psi.provider-auth.core :as provider-auth]
    [psi.recursion.core :as recursion]
    [taoensso.timbre :as timbre]))
 
@@ -40,7 +40,10 @@
   [ctx session-id text images]
   (require-session-id! session-id)
   (let [user-msg (make-user-message text images)]
-    (ss/journal-append-in! ctx session-id (persist/message-entry user-msg))
+    (dispatch/dispatch! ctx :session/append-journal-entry
+                        {:session-id session-id
+                         :entry (persist/message-entry user-msg)}
+                        {:origin :core})
     user-msg))
 
 (defn resolve-api-key-in

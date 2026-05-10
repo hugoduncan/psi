@@ -3,29 +3,54 @@ name: gh-bug-triage-modular
 description: Discover a triage bug, reproduce it in an issue worktree, then classify it for either reporter follow-up or a later fix handoff
 ---
 {:steps [{:name "discover"
-          :workflow "gh-bug-discover-and-read"
-          :session {:input {:from :workflow-input}}
-          :prompt "$INPUT"}
+          :type :delegate
+          :target "gh-bug-discover-and-read"
+          :outputs {:handoff {:source :delegate/handoff}}
+          :prompt-string {:type :template
+                          :text "{{input}}"
+                          :vars {"input" {:from :workflow-input}}}
+          :context [{:type :source
+                     :from :workflow-original}]}
          {:name "worktree"
-          :workflow "gh-issue-create-worktree"
-          :session {:input {:from {:step "discover" :kind :accepted-result}}
-                    :reference {:from :workflow-original}}
-          :prompt "$INPUT"}
+          :type :delegate
+          :target "gh-issue-create-worktree"
+          :outputs {:handoff {:source :delegate/handoff}}
+          :prompt-string {:type :template
+                          :text "{{discover_report}}"
+                          :vars {"discover_report" {:from {:step "discover" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "discover" :output :handoff}}]}
          {:name "reproduce"
-          :workflow "gh-bug-reproduce"
-          :session {:input {:from {:step "worktree" :kind :accepted-result}}
-                    :reference {:from :workflow-original}}
-          :prompt "$INPUT"}
+          :type :delegate
+          :target "gh-bug-reproduce"
+          :outputs {:handoff {:source :delegate/handoff}}
+          :prompt-string {:type :template
+                          :text "{{discover_report}}\n\n{{worktree_report}}"
+                          :vars {"discover_report" {:from {:step "discover" :yield :text}}
+                                 "worktree_report" {:from {:step "worktree" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "discover" :output :handoff}}
+                    {:type :source
+                     :from {:step "worktree" :output :handoff}}]}
          {:name "post-repro"
-          :workflow "gh-bug-post-repro"
-          :session {:input {:from {:step "reproduce" :kind :accepted-result}}
-                    :reference {:from :workflow-original}
-                    :preload [{:from :workflow-original}
-                              {:from {:step "discover" :kind :accepted-result}}
-                              {:from {:step "worktree" :kind :accepted-result}}
-                              {:from {:step "reproduce" :kind :session-transcript}
-                               :projection {:type :tail :turns 4 :tool-output false}}]}
-          :prompt "$INPUT"}]}
+          :type :delegate
+          :target "gh-bug-post-repro"
+          :outputs {:handoff {:source :delegate/handoff}}
+          :prompt-string {:type :template
+                          :text "{{report}}"
+                          :vars {"report" {:from {:step "reproduce" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "discover" :output :handoff}}
+                    {:type :source
+                     :from {:step "worktree" :output :handoff}}
+                    {:type :source
+                     :from {:step "reproduce" :output :handoff}}]}]}
 
 Coordinate a modular GitHub bug-triage workflow.
 
@@ -40,7 +65,8 @@ Flow:
 
 Notes:
 - This workflow remains intentionally linear at the orchestration layer.
-- Current dogfood update uses explicit `:session :input` source selection and `:session :preload` reference context rather than relying on implicit file-order-only wiring.
-- `post-repro` now receives the reproduction report as `$INPUT` and also preloads original request, upstream accepted results, and a tail of the reproduction transcript for constrained context.
+- It is now the authoritative executable richer target-authored bug-triage example.
+- It uses delegated yielded text for the immediate next ask and delegated structured `:handoff` outputs for stable machine-facing cross-workflow data.
+- `post-repro` receives the reproduction report as its immediate ask and also receives original request context, upstream delegated handoffs, and a constrained reproduction transcript tail as support context.
 - Use the issue worktree as authoritative for all reproduction activity after creation.
 - This workflow classifies and hands off; it does not create a Munera task, implement a fix, or create a PR.

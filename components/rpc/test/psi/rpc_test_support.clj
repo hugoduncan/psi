@@ -3,7 +3,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.rpc :as rpc]
    [psi.agent-session.test-support :as test-support]))
 

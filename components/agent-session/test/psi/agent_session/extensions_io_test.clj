@@ -6,6 +6,7 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]))
 
@@ -68,7 +69,7 @@
           (is (= [(.getAbsolutePath ext-file)] (ext/extensions-in reg)))
           (is (= 1 (ext/extension-count-in reg))
               (pr-str @(:state reg)))
-          (is (contains? (ext/tool-names-in reg) "runtime-tool")
+          (is (contains? (tool-registry/tool-names-in reg) "runtime-tool")
               (pr-str @(:state reg))))
         (finally
           (.delete ext-file)
@@ -186,7 +187,6 @@
       (is (= ["/ext/a"] (vec (ext/extensions-in reg))))
       (is (= 1 (ext/handler-count-in reg)))
       (is (= ["tool_call"] (vec (ext/handler-event-names-in reg))))
-      (is (= 1 (count (ext/all-tools-in reg))))
       (is (= 1 (count (ext/all-commands-in reg))))
       (is (= 1 (count (ext/all-flags-in reg))))
       (is (= false (:current-value (first (ext/all-flags-in reg)))))

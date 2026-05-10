@@ -1,0 +1,36 @@
+- [x] Review `psi.agent-session.workflow-execution` and list which publics are true higher façade entrypoints versus lower helper forwards
+  - confirmed with `clj-surgeon :op :ls` that only `execute-run!` and `resume-and-execute-run!` are true façade entrypoints; `execution-result` stays private and six helper forwards were lower-owner leakage
+- [x] Use code search to identify all current references to the forwarded helper vars across ordinary callers, callback wiring sites, dynamic lookup/backfill sites, and tests
+  - found affected test consumers; production callback wiring and dynamic lookup/backfill were already direct to `psi.workflow-runtime.step-prep`
+- [x] Decide which lower helper publics should be removed from `workflow-execution` and whether any tiny temporary compatibility seam is truly necessary
+  - removed all lower helper forwards; no compatibility seam needed
+- [x] Rewire ordinary callers, callback wiring sites, and dynamic lookup/backfill consumers to use the current lower authoritative workflow-runtime helper namespaces instead of `workflow-execution`
+  - no production rewiring required beyond confirming existing direct lower-owner targets
+- [x] Rewire lower helper tests/proofs to point at the lower owners rather than the higher façade
+  - updated affected binding/config/prompt/conversation proof sites to use `psi.workflow-runtime.step-prep`
+- [x] Keep or add higher façade proofs for run/resume behavior under `agent-session` while keeping lower helper proofs with the lower owners
+  - kept `workflow_execution_test` focused on execution façade behavior while helper assertions now use the lower namespace directly
+- [x] Keep `execute-run!` and `resume-and-execute-run!` as the clear higher façade surface, with only directly adjacent façade-local result-shaping helpers remaining, unless implementation proves a simpler explicit shape
+  - final public surface is exactly those two entrypoints
+- [x] Verify workflow behavior is unchanged
+  - `clj-kondo` clean on touched files; focused Kaocha run passed for `psi.agent-session.workflow-execution-test`, `psi.agent-session.workflow-ir-runtime-adoption-test`, `psi.workflow-runtime.ir-runtime-adoption-test`, and `psi.workflow-runtime.step-prep-test`
+- [x] If any temporary compatibility seam is kept, ensure it is minimal and record the justification explicitly in `implementation.md`
+  - none kept
+- [x] Record the final remaining public vars of `psi.agent-session.workflow-execution` in `implementation.md`, justifying any public other than `execute-run!` and `resume-and-execute-run!`
+- [x] Record the final façade ownership decision and any follow-on cleanup notes in `implementation.md`
+- [x] Move lower helper proof cases out of `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` into `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` or adjacent lower-owner workflow-runtime test namespaces
+- [x] Re-focus `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` on higher façade behavior only: `execute-run!`, `resume-and-execute-run!`, and returned execution summary/result shaping
+- [x] Review the duplicated IR adoption binding-source proof across `components/agent-session/test/psi/agent_session/workflow_ir_runtime_adoption_test.clj` and `components/workflow-runtime/test/psi/workflow_runtime/ir_runtime_adoption_test.clj`, keep only the intentionally owned coverage, and remove any unnecessary duplicate test surface
+  - removed the duplicate `agent-session` proof and kept the `workflow-runtime` proof as the lower-owner surface
+- [x] Re-run top-level Kaocha focused coverage for the affected `agent-session` and `workflow-runtime` test namespaces after the proof-ownership cleanup
+  - `clojure -M:test --focus unit --focus psi.agent-session.workflow-execution-test --focus psi.workflow-runtime.step-prep-test --focus psi.workflow-runtime.ir-runtime-adoption-test` passed via top-level `tests.edn`
+- [x] If more lower-owner workflow step-prep proofs accrue, split shared test fixtures or extract them to keep `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` locally comprehensible
+  - extracted shared setup into `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test_support.clj`
+- [x] If `step_prep_test.clj` continues to grow, split config-resolution proofs from prompt/materialization proofs so the lower-owner proof surface stays simple and role-focused
+  - split proofs into `step_prep_config_test.clj` and `step_prep_prompt_test.clj`, leaving `step_prep_test.clj` as a minimal umbrella loader
+- [x] If `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` grows materially, extract façade-specific fixtures or helpers so the higher-owner proof surface stays locally comprehensible
+  - extracted façade-specific support into `components/agent-session/test/psi/agent_session/workflow_execution_test_support.clj`
+- [x] Re-evaluate whether `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test.clj` should remain as a minimal umbrella loader or be removed once direct focused namespace invocation is the clearer project convention
+  - removed the umbrella loader and rely on direct focused lower-owner namespaces
+- [x] If duplicated support fixture evolution between `components/agent-session/test/psi/agent_session/workflow_execution_test_support.clj` and `components/workflow-runtime/test/psi/workflow_runtime/step_prep_test_support.clj` starts to create churn, extract the truly shared subset while preserving boundary-specific fixtures locally
+  - extracted shared workflow fixture subset into `bases/main/test/psi/test_support/workflow_test_fixtures.clj` and kept boundary-specific fixtures in the component-local support namespaces

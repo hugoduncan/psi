@@ -1,0 +1,60 @@
+- [x] Create `components/project-nrepl/src/psi/project_nrepl/` and `components/project-nrepl/test/psi/project_nrepl/`
+- [x] Update project/test configuration for the new component paths
+  - [x] add local component dep and source/test paths in `deps.edn`
+  - [x] add source/test paths in `tests.edn`
+  - [x] add `psi/project-nrepl` dep in consuming component deps for at least `components/agent-session`
+  - [x] update any explicit test alias path lists only where needed
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_config.clj` to `components/project-nrepl/src/psi/project_nrepl/config.clj`
+- [x] Rename moved namespace `psi.project-nrepl.config` to `psi.project-nrepl.config`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_runtime.clj` to `components/project-nrepl/src/psi/project_nrepl/runtime.clj`
+- [x] Rename moved namespace `psi.project-nrepl.runtime` to `psi.project-nrepl.runtime`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_client.clj` to `components/project-nrepl/src/psi/project_nrepl/client.clj`
+- [x] Rename moved namespace `psi.project-nrepl.client` to `psi.project-nrepl.client`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_attach.clj` to `components/project-nrepl/src/psi/project_nrepl/attach.clj`
+- [x] Rename moved namespace `psi.project-nrepl.attach` to `psi.project-nrepl.attach`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_started.clj` to `components/project-nrepl/src/psi/project_nrepl/started.clj`
+- [x] Rename moved namespace `psi.project-nrepl.started` to `psi.project-nrepl.started`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_eval.clj` to `components/project-nrepl/src/psi/project_nrepl/eval.clj`
+- [x] Rename moved namespace `psi.project-nrepl.eval` to `psi.project-nrepl.eval`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_ops.clj` to `components/project-nrepl/src/psi/project_nrepl/ops.clj`
+- [x] Rename moved namespace `psi.project-nrepl.ops` to `psi.project-nrepl.ops`
+- [x] Move `components/agent-session/src/psi/agent_session/project_nrepl_commands.clj` to `components/project-nrepl/src/psi/project_nrepl/commands.clj`
+- [x] Rename moved namespace `psi.project-nrepl.commands` to `psi.project-nrepl.commands`
+- [x] Update all direct production consumers to require the extracted namespaces where appropriate
+- [x] Update all direct test consumers/test helpers to require the extracted namespaces where appropriate
+- [x] Move clearly component-owned focused tests into `components/project-nrepl/test/psi/project_nrepl/` where that improves ownership clarity without widening scope
+  - [x] rename moved tests to `psi.project-nrepl.*-test` namespaces
+  - [x] move focused config/runtime/client/attach/started/eval tests
+  - [x] move `commands` tests only if they primarily exercise project-nREPL-specific op parsing/dispatch independent of broader agent-session command registry/session command integration
+  - [x] keep higher-level observability/resolvers/context/extension-install/tools integration tests in place and update requires/usages only
+- [x] Record in `implementation.md` which focused tests moved into `components/project-nrepl/test/psi/project_nrepl/` and which intentionally remained under higher-level component tests, with a brief reason
+- [x] Prefer no compatibility shim; introduce one only if needed during migration to keep the tree compiling
+- [x] Remove any temporary compatibility shims before completion
+- [x] If no shim is used for the old project-nrepl namespaces, remove the old source files in this slice rather than leaving inert duplicates
+- [x] Run focused tests from the new component boundary
+- [x] Run focused higher-level consuming-path verification
+- [x] Confirm no remaining authoritative old project-nrepl requires/usages remain in the repo
+- [x] Confirm extracted authoritative `psi.project-nrepl.*` namespaces do not require `psi.agent-session.*` implementation namespaces directly
+- [x] Record final ownership and migration notes in `implementation.md`
+- [x] Restore config behavior parity for malformed user/project config files
+  - [x] remove extraction-local divergence in `psi.project-nrepl.config` best-effort readers
+  - [x] reuse or extract the existing warning/fallback config-reading semantics so malformed config behavior matches pre-extraction behavior
+  - [x] add/restore tests that prove malformed shared/local config handling parity
+- [x] Tighten moved command-test ownership to match the intended boundary
+  - [x] make `components/project-nrepl/test/psi/project_nrepl/commands_test.clj` prove `psi.project-nrepl.commands` directly without routing through `psi.agent-session.commands`, or move the routing proof back under `agent-session`
+  - [x] keep one explicit higher-level `/project-repl` routing proof under `agent-session` if the component-local test is narrowed
+- [x] Re-run focused extracted-component and higher-level consuming-path verification after the follow-up fixes
+- [x] Move missing-start-command decision fully into `psi.project-nrepl.ops/start`
+  - [x] return a structured non-exceptional result for missing start-command config that preserves existing user-facing messaging needs
+  - [x] make `psi.project-nrepl.commands` shape that structured result instead of re-resolving start config locally
+  - [x] keep higher-level `/project-repl start` behavior unchanged at the user-visible boundary
+- [x] Dedupe repeated public eval result shaping in `psi.project-nrepl.ops/eval-op`
+  - [x] extract one helper for the shared public eval payload fields
+  - [x] preserve current status mapping and output shape exactly
+- [x] Tighten interrupt availability handling in `psi.project-nrepl.eval/interrupt-instance-in!`
+  - [x] either remove the unused `client-session` binding or validate client-session presence explicitly before interrupt
+  - [x] keep the unavailable/active-op behavior locally comprehensible and explicit
+- [x] Add or update focused tests for the shaping follow-up
+  - [x] prove missing-start-command handling through `psi.project-nrepl.ops` and `psi.project-nrepl.commands`
+  - [x] preserve existing eval-op and interrupt result contracts
+- [x] Re-run focused extracted-component and higher-level consuming-path verification after the code-shaper follow-up

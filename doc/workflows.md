@@ -3,25 +3,20 @@
 Psi can delegate reusable tasks to named workflows.
 
 A workflow is a named prompt or orchestration loaded from `.psi/workflows/*.md`
-by the `psi/workflow-loader` extension. Some workflows are single focused agents;
+as a built-in core capability. Some workflows are single focused agents;
 others are multi-step flows that pass results from one step to the next.
 
-This document covers the user-facing workflow surface: how to enable workflows,
-list them, run them, reload them during development, and understand the basic
-shape of workflow definitions.
+This document is the primary example-led guide for workflow authoring. It
+covers the user-facing workflow surface, how to enable and run workflows, and
+the supported target-authored grammar.
 
-## Prerequisite: enable workflow loading
+## Prerequisite
 
-Workflows are provided by the `psi/workflow-loader` extension.
+Workflow loading is built in.
 
-Project-local example:
+No extension manifest entry is required to enable `/delegate` or `.psi/workflows/*.md` discovery.
 
-```clojure
-{:deps {psi/workflow-loader {}
-        psi/mementum {}}}
-```
-
-Put that in one of the supported extension manifest locations, then start psi.
+Optional workflow-adjacent extensions such as `psi/mementum` still use normal extension install manifests.
 For manifest details and install options, see [`doc/extensions-install.md`](extensions-install.md).
 
 ## Where workflows live
@@ -34,17 +29,24 @@ Workflow definitions are discovered from:
 
 This repository includes many examples there, including:
 
+- `plan-build`
 - `plan-build-review`
+- `delegate-build-review`
+- `gh-bug-triage-modular`
 - `planner`
 - `builder`
 - `reviewer`
-- `gh-bug-triage`
-- `gh-issue-ingest`
-- `gh-pr-heal-check-loop`
+
+The authoritative example set is:
+
+- `plan-build` — compact inline-session authoring example
+- `plan-build-review` — compact multi-step inline-session example
+- `delegate-build-review` — executable delegate-heavy target-authored example proving canonical downstream delegated yielded-text consumption
+- `gh-bug-triage-modular` — richer target-authored orchestration example proving delegated yielded text plus structured delegated handoff consumption
 
 ## User-facing workflow commands
 
-When `psi/workflow-loader` is active, psi exposes:
+Psi exposes:
 
 - `/delegate <workflow> <prompt>`
 - `/delegate-reload`
@@ -54,8 +56,7 @@ Typical usage:
 ```text
 /delegate planner analyze the scope of the current refactor
 /delegate plan-build-review add user-facing workflow docs
-/delegate gh-bug-triage
-/delegate gh-bug-triage issue 123
+/delegate gh-bug-triage-modular issue 123
 ```
 
 What happens:
@@ -67,18 +68,6 @@ What happens:
 
 If you want a workflow to continue from a narrow request, put that request after
 the workflow name as the prompt text.
-
-## Listing workflows and runs
-
-The workflow system also has a `delegate` tool with a `list` action. In normal
-interactive use, the simplest path is usually to:
-
-- inspect the `.psi/workflows/` directory
-- read project prompts under `.psi/prompts/` for example invocations
-- use `/delegate <workflow> <prompt>` directly when you already know the name
-
-For extension/runtime-oriented details on the `delegate` tool surface, see
-[`doc/extensions.md`](extensions.md).
 
 ## Reloading workflow definitions
 
@@ -96,62 +85,67 @@ Reloading:
 
 Use this during workflow authoring or prompt iteration.
 
-## Two common ways to invoke workflows
+## Preferred authoring model
 
-### 1. Direct command invocation
+Prefer the converged target workflow grammar for new examples and new workflow
+files.
 
-Use `/delegate` when you know the workflow name.
+That grammar has three explicit step forms:
 
-Examples:
+- `:type :invoke` — deterministic operation call
+- `:type :session` — inline child-session construction
+- `:type :delegate` — call another named workflow through an explicit boundary
 
-```text
-/delegate reviewer review the current branch changes
-/delegate lambda-build derive a concise lambda from this prompt
-```
+At a high level:
 
-### 2. Natural-language invocation
+- use `:invoke` when code should do deterministic work and return structured data
+- use `:session` when you want to assemble a child conversation inline
+- use `:delegate` when you want to call a reusable named workflow
 
-This repository also contains prompt examples under `.psi/prompts/` such as:
+For the formal grammar, see [`doc/workflow-grammar.md`](workflow-grammar.md).
+For the conceptual explanation, see
+[`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md).
 
-- `.psi/prompts/gh-bug-triage.md`
-- `.psi/prompts/gh-issue-ingest.md`
+## Example 1: compact inline session workflow
 
-These document phrases like:
-
-- `Run workflow gh-bug-triage`
-- `Run workflow gh-bug-triage for issue 123`
-- `Run workflow gh-issue-ingest`
-
-Use those as operator examples and as reusable prompt patterns.
-
-## Workflow kinds
-
-### Single-step workflows
-
-A single-step workflow is a named focused agent profile. For example, a workflow
-can describe tools, skills, and instructions for one bounded job.
-
-Example shape:
+`plan-build` is the smallest authoritative example of the preferred inline
+session style.
 
 ```markdown
 ---
-name: gh-bug-triage
-description: Find labeled GitHub bug-triage issues...
+name: plan-build
+description: Plan and build without review
 ---
-{:tools ["read" "bash" "edit" "write" "work-on"]
- :skills ["issue-bug-triage"]
- :thinking-level :high}
-
-You are executing a focused GitHub bug-triage workflow in this repository.
+{:steps [{:name "plan"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :template
+                           :text "{{input}}"
+                           :vars {"input" {:from :workflow-input
+                                            :path [:input]}}}]}
+         {:name "build"
+          :type :session
+          :tools ["read" "bash" "edit" "write"]
+          :contributions [{:type :source
+                           :from :workflow-original}
+                          {:type :template
+                           :text "Execute this plan:\n\n{{plan}}\n\nOriginal request: {{original}}"
+                           :vars {"plan" {:from {:step "plan" :yield :text}}
+                                  "original" {:from :workflow-original
+                                              :path [:original]}}}]}]}
 ```
 
-This kind of workflow behaves like a reusable specialist session configuration.
+What this teaches:
 
-### Multi-step workflows
+- explicit `:type :session`
+- ordered `:contributions`
+- template rendering through `:text` + `:vars`
+- prior-step reuse through `{:from {:step "plan" :yield :text}}`
+- separate carried reference context through `:workflow-original`
 
-A multi-step workflow orchestrates several named workflows in sequence.
+## Example 2: multi-step inline session workflow
 
-Example shape:
+`plan-build-review` extends the same style with one more downstream step.
 
 ```markdown
 ---
@@ -159,42 +153,190 @@ name: plan-build-review
 description: Plan, build, and review code changes
 ---
 {:steps [{:name "plan"
-          :workflow "planner"
-          :session {:input {:from :workflow-input}
-                    :reference {:from :workflow-original}}
-          :prompt "$INPUT"}
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :template
+                           :text "{{input}}"
+                           :vars {"input" {:from :workflow-input
+                                            :path [:input]}}}]}
          {:name "build"
-          :workflow "builder"
-          :session {:input {:from {:step "plan" :kind :accepted-result}}
-                    :reference {:from :workflow-original}}
-          :prompt "Execute this plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"}]}
+          :type :session
+          :tools ["read" "bash" "edit" "write"]
+          :contributions [{:type :source
+                           :from :workflow-original}
+                          {:type :template
+                           :text "Execute this plan:\n\n{{plan}}\n\nOriginal request: {{original}}"
+                           :vars {"plan" {:from {:step "plan" :yield :text}}
+                                  "original" {:from :workflow-original
+                                              :path [:original]}}}]}
+         {:name "review"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :source
+                           :from :workflow-original}
+                          {:type :template
+                           :text "Review the following implementation:\n\n{{implementation}}\n\nOriginal request: {{original}}"
+                           :vars {"implementation" {:from {:step "build" :yield :text}}
+                                  "original" {:from :workflow-original
+                                              :path [:original]}}}]}]}
 ```
 
-This kind of workflow passes outputs from earlier steps into later ones.
+What this adds:
+
+- a readable multi-step chain without old `$INPUT` / `$ORIGINAL` shortcuts
+- repeated use of prior-step text yields for downstream authoring
+- a clear separation between sourced context and newly authored task text
+
+## Example 3: executable delegate-heavy workflow
+
+`delegate-build-review` is the authoritative checked-in target-authored example
+for delegate-heavy downstream authoring.
+
+```markdown
+---
+name: delegate-build-review
+description: Delegate planning and building, then review the delegated build result
+---
+{:steps [{:name "plan"
+          :type :delegate
+          :target "planner"
+          :prompt-string {:type :template
+                          :text "{{input}}"
+                          :vars {"input" {:from :workflow-input
+                                           :path [:input]}}}
+          :context [{:type :source
+                     :from :workflow-original}]}
+         {:name "build"
+          :type :delegate
+          :target "builder"
+          :prompt-string {:type :template
+                          :text "Execute this plan:\n\n{{plan}}\n\nOriginal request: {{original}}"
+                          :vars {"plan" {:from {:step "plan" :yield :text}}
+                                 "original" {:from :workflow-original
+                                             :path [:original]}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "plan" :yield :text}}]}
+         {:name "review"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :source
+                           :from :workflow-original}
+                          {:type :template
+                           :text "Review the following delegated implementation:\n\n{{implementation}}\n\nOriginal request: {{original}}"
+                           :vars {"implementation" {:from {:step "build" :yield :text}}
+                                  "original" {:from :workflow-original
+                                              :path [:original]}}}]}]}
+```
+
+What this teaches:
+
+- explicit `:type :delegate` boundaries for reusable named workflows
+- canonical downstream delegate-result consumption through `{:from {:step "..." :yield :text}}`
+- delegate `:prompt-string` as the new immediate ask for the callee
+- ordered delegate `:context` as forwarded reference material
+- later inline-session steps consuming delegated results with the same `:yield :text` ref shape used for prior session results
+
+Minimum canonical delegated result model:
+
+- downstream steps should read the delegated step's yielded text through
+  `{:from {:step "..." :yield :text}}`
+- workflows that want to export stable machine-facing handoff data should declare
+  `:terminal-contract {:handoff {:type :markdown-handoff-data}}`
+- callers should read that structured delegated handoff through
+  `{:from {:step "..." :output :handoff}}`
+- delegate diagnostics and other callee-internal detail remain runtime/debug
+  surfaces, not the primary authoring contract for normal downstream flow
+- first-cut fallback is explicit: if a workflow does not declare a terminal
+  handoff contract, callers should not rely on `:output :handoff`
+
+## Example 4: richer orchestration and executable bug triage
+
+`gh-bug-triage-modular` is now the richer orchestration/context/reference
+example for realistic bug triage.
+
+It proves the dual-plane delegated model directly:
+
+- each named bug-triage phase is an explicit delegated workflow boundary
+- the next phase receives its immediate ask from prior delegated yielded text
+- stable machine-facing bug-triage data flows through delegated `:output :handoff`
+- original request context and constrained transcript context are carried
+  explicitly rather than assumed implicitly
+
+Representative target-style classification step:
+
+```clojure
+{:name "post-repro"
+ :type :delegate
+ :target "gh-bug-post-repro"
+ :outputs {:handoff {:source :delegate/handoff}}
+ :prompt-string {:type :template
+                 :text "{{report}}"
+                 :vars {"report" {:from {:step "reproduce" :yield :text}}}}
+ :context [{:type :source
+            :from :workflow-original}
+           {:type :source
+            :from {:step "discover" :output :handoff}}
+           {:type :source
+            :from {:step "worktree" :output :handoff}}
+           {:type :source
+            :from {:step "reproduce" :output :handoff}}]}
+```
+
+What this teaches:
+
+- yielded text and structured handoff are distinct delegated contracts
+- `:yield :text` is the human-facing chaining surface
+- `:output :handoff` is the machine-facing orchestration surface
+- downstream orchestration should prefer declared handoff data over assuming delegated transcript export
 
 ## Input and context flow
 
-In multi-step workflows, child sessions use explicit `:session` data flow.
+The most important authoring references in this guide are:
 
-The most important pieces are:
-
-- `:session :input` — what becomes `$INPUT`
-- `:session :reference` — what becomes `$ORIGINAL`
-- `:session :preload` — extra context loaded into the child session without
-  changing `$INPUT` or `$ORIGINAL`
+- `:workflow-input` — the current workflow's input value
+- `:workflow-original` — carried original request/reference context
+- `{:from {:step "..." :yield :text}}` — prior step result used as the next ask, including delegate-step yielded text
+- `{:from {:step "..." :output :handoff}}` — prior delegated workflow's structured terminal handoff
+- `{:from {:step "..." :output :transcript}}` with `:projection` — projected
+  transcript/reference context
 
 Interpretation:
 
-- `$INPUT` is the immediate task for the current step
-- `$ORIGINAL` is the original workflow request/reference context
-- `:preload` is supporting context
+- `:workflow-input` is the immediate ask for the current workflow invocation
+- `:workflow-original` is the carried reference context
+- prior-step `:yield` refs are the simplest way to feed one step's result into
+  the next step's authored text
+- delegated `:output :handoff` refs are the stable way to consume machine-facing
+  exported workflow data without parsing markdown heuristically downstream
+- `:context` on a delegate step carries forwarded material without changing the
+  delegated workflow's prompt string
 
-When a step references a previous step, it uses that step's author-facing name,
-for example:
+## Authoring choices
 
-```clojure
-{:step "plan" :kind :accepted-result}
-```
+Keep the authoring choices practical:
+
+- if you are assembling a child conversation inline, use `:session`
+- if you are calling another workflow by name, use `:delegate`
+- if you need deterministic code-backed work, use `:invoke`
+
+## Current boundary of this guide
+
+This guide intentionally teaches the currently migrated example-led surfaces:
+
+- target-grammar step authoring shape
+- inline `:session` authoring
+- delegated `:prompt-string` and `:context`
+- canonical downstream delegated yielded-text consumption
+- canonical downstream delegated structured-handoff consumption through `:output :handoff`
+- shared reference syntax for `:workflow-input`, `:workflow-original`, prior
+  step yields, delegated handoffs, and projected transcript context
+
+It does not try to turn arbitrary delegate-local runtime envelopes or diagnostics
+into a broad author-facing output menu. This slice standardizes one structured
+export key, `:handoff`, and keeps other delegated internal details non-contractual.
+When you need the full formal surface, use the grammar/reference docs.
 
 ## Authoring guidelines
 
@@ -202,21 +344,24 @@ Prefer:
 
 - one clear workflow purpose per file
 - descriptive `name` and `description`
-- small prompts with explicit goals and stopping conditions
-- explicit `:session` wiring in multi-step workflows
-- reusing focused workflows as building blocks for larger orchestrations
+- small, explicit step graphs
+- explicit `:type` on every authored step
+- explicit reference wiring rather than implicit positional flow
+- reusable focused workflows as delegate targets
 
 Good first workflow authoring loop:
 
 1. create or edit `.psi/workflows/<name>.md`
 2. run `/delegate-reload`
 3. invoke it with `/delegate <name> <prompt>`
-4. tighten the prompt or step wiring
+4. tighten the authoring shape or reference wiring
 5. reload and repeat
 
 ## Related docs
 
-- [`doc/extensions-install.md`](extensions-install.md) — enable `psi/workflow-loader`
-- [`doc/extensions.md`](extensions.md) — extension/tool details for `workflow-loader`
+- [`doc/workflow-grammar.md`](workflow-grammar.md) — workflow grammar
+- [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md) — workflow concepts and semantics
+- [`doc/extensions-install.md`](extensions-install.md) — install optional extensions that may complement workflow usage
+- [`doc/extensions.md`](extensions.md) — extension/tool details for workflow-adjacent extensions and shared workflow display conventions
 - [`doc/tui.md`](tui.md) — general in-session command usage
 - [`README.md`](../README.md) — top-level project overview

@@ -2,7 +2,7 @@
   "Projection helpers from scheduler state into public/query/UI surfaces."
   (:require
    [psi.agent-session.scheduler :as scheduler]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (def scheduler-eql-attrs
   [:psi.scheduler/schedule-id

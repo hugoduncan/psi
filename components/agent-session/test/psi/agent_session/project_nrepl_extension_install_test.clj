@@ -5,9 +5,9 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.extension-installs :as installs]
-   [psi.agent-session.project-nrepl-config]
-   [psi.agent-session.project-nrepl-ops :as project-nrepl-ops]
-   [psi.agent-session.project-nrepl-started]
+   [psi.project-nrepl.config]
+   [psi.project-nrepl.ops :as project-nrepl-ops]
+   [psi.project-nrepl.started]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- manifest-file [root rel]
@@ -38,14 +38,14 @@
           [ctx sid] (test-support/create-test-session {:persist? false :cwd cwd})]
       (with-redefs [installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
                     installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))
-                    psi.agent-session.project-nrepl-config/resolve-config (fn [_]
-                                                                            {:project-nrepl {:start-command ["bb" "nrepl-server"]}})
-                    psi.agent-session.project-nrepl-started/start-instance-in!
+                    psi.project-nrepl.config/resolve-config (fn [_]
+                                                              {:project-nrepl {:start-command ["bb" "nrepl-server"]}})
+                    psi.project-nrepl.started/start-instance-in!
                     (fn [ctx worktree-path command-vector]
-                      (require 'psi.agent-session.project-nrepl-runtime)
-                      (let [ensure-instance! (resolve 'psi.agent-session.project-nrepl-runtime/ensure-instance-in!)
-                            update-instance! (resolve 'psi.agent-session.project-nrepl-runtime/update-instance-in!)
-                            instance-in      (resolve 'psi.agent-session.project-nrepl-runtime/instance-in)
+                      (require 'psi.project-nrepl.runtime)
+                      (let [ensure-instance! (resolve 'psi.project-nrepl.runtime/ensure-instance-in!)
+                            update-instance! (resolve 'psi.project-nrepl.runtime/update-instance-in!)
+                            instance-in      (resolve 'psi.project-nrepl.runtime/instance-in)
                             client-session   (fn [req]
                                                (let [code (or (:code req) (get req :code) (get req "code"))]
                                                  (cond

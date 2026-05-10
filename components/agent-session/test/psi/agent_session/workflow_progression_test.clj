@@ -1,26 +1,30 @@
 (ns psi.agent-session.workflow-progression-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]
-   [psi.agent-session.workflow-model :as workflow-model]
-   [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.workflow-runtime.attempts :as workflow-attempts]
+   [psi.workflow-runtime.model :as workflow-model]
+   [psi.workflow-runtime.progression-recording :as workflow-recording]
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (def definition
   {:definition-id "plan-build-review"
    :name "Plan Build Review"
-   :step-order ["plan" "build"]
-   :steps {"plan" {:executor {:type :agent :profile "planner" :mode :sync}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}}
-           "build" {:executor {:type :agent :profile "builder" :mode :async}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :contributions [{:type :template
+                             :text "Plan {{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}
+           {:name "build"
+            :type :session
+            :contributions [{:type :template
+                             :text "Build {{plan}}"
+                             :vars {"plan" {:from {:step "plan" :yield :text}}}}]}]})
 
 (defn- base-state-with-run
   []
-  (let [[state1 _ _] (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                           definition)
+  (let [[state1 _ _] (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                            definition)
         [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "plan-build-review"
                                                                :run-id "run-1"
                                                                :workflow-input {:task "ship it"}})
@@ -97,25 +101,33 @@
 (def judged-definition
   {:definition-id "plan-build-review"
    :name "Plan Build Review"
-   :step-order ["plan" "build" "review"]
-   :steps {"plan"   {:executor {:type :agent :profile "planner" :mode :sync}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-           "build"  {:executor {:type :agent :profile "builder" :mode :sync}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}
-           "review" {:executor {:type :agent :profile "reviewer" :mode :sync}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}
-                     :judge {:prompt "APPROVED or REVISE?"}
-                     :on {"APPROVED" {:goto :next}
-                          "REVISE"   {:goto "build" :max-iterations 3}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :contributions [{:type :template
+                             :text "Plan {{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}
+           {:name "build"
+            :type :session
+            :contributions [{:type :template
+                             :text "Build {{plan}}"
+                             :vars {"plan" {:from {:step "plan" :yield :text}}}}]}
+           {:name "review"
+            :type :session
+            :contributions [{:type :template
+                             :text "Review {{build}}"
+                             :vars {"build" {:from {:step "build" :yield :text}}}}]
+            :judge {:type :llm
+                    :contributions [{:type :template
+                                     :text "APPROVED or REVISE?"
+                                     :vars {}}]}
+            :on {"APPROVED" {:goto :next}
+                 "REVISE" {:goto "build" :max-iterations 3}}}]})
 
 (defn- judged-state-at-review
   "Set up a workflow run that has reached the review step with accepted results for plan and build."
   []
-  (let [[state1 _ _] (workflow-runtime/register-definition {:workflows (workflow-model/initial-workflow-state)}
-                                                           judged-definition)
+  (let [[state1 _ _] (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                            judged-definition)
         [state2 run-id _] (workflow-runtime/create-run state1 {:definition-id "plan-build-review"
                                                                :run-id "run-j1"
                                                                :workflow-input {:task "ship it"}})

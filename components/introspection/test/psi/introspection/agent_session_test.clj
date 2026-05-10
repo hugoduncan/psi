@@ -9,7 +9,6 @@
    [psi.introspection.core :as introspection]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.engine.core :as engine]))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
@@ -134,7 +133,7 @@
           session-ctx (:agent-session-ctx ctx)
           session-id  (:session-id ctx)
           model       {:provider "x" :id "test-model" :reasoning false}]
-      (dispatch/dispatch! session-ctx :session/set-model {:session-id session-id :model model} {:origin :core})
+      (session/dispatch-in! session-ctx :session/set-model {:session-id session-id :model model} {:origin :core})
       (let [result (introspection/query-agent-session-in
                     ctx [:psi.agent-session/model])]
         (is (= model (:psi.agent-session/model result))))))
@@ -169,16 +168,15 @@
           session-id       (:session-id (session/new-session-in! session-ctx nil {}))
           _               (bootstrap/bootstrap-in!
                            session-ctx session-id
-                           {:register-global-query? false
-                            :base-tools             []
-                            :system-prompt          "sys"
-                            :templates              [{:name "greet"
-                                                      :description "desc"
-                                                      :content "body"
-                                                      :source :project
-                                                      :file-path "/tmp/greet.md"}]
-                            :skills                 []
-                            :extension-paths        []})
+                           {:base-tools      []
+                            :system-prompt   "sys"
+                            :templates       [{:name "greet"
+                                               :description "desc"
+                                               :content "body"
+                                               :source :project
+                                               :file-path "/tmp/greet.md"}]
+                            :skills          []
+                            :extension-paths []})
           ctx         (introspection/create-context {:agent-session-ctx session-ctx})]
       (engine/bootstrap-system-in! (:engine-ctx ctx))
       (introspection/register-resolvers-in! ctx)

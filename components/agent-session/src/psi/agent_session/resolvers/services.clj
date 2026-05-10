@@ -2,8 +2,8 @@
   "Pathom3 resolvers for managed services, post-tool processors, and telemetry."
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.post-tool :as post-tool]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.services :as services]))
 
 (def ^:private service-notification-output
@@ -171,7 +171,7 @@
   {::pco/input  [:psi/agent-session-ctx]
    ::pco/output [:psi.dispatch-trace/count
                  {:psi.dispatch-trace/recent dispatch-trace-output}]}
-  (let [entries (dispatch/dispatch-trace-entries)]
+  (let [entries (kernel/dispatch-trace-entries)]
     {:psi.dispatch-trace/count  (count entries)
      :psi.dispatch-trace/recent (mapv dispatch-trace->eql entries)}))
 
@@ -180,7 +180,7 @@
   {::pco/input  [:psi/agent-session-ctx :psi.dispatch-trace/dispatch-id]
    ::pco/output [{:psi.dispatch-trace/by-id dispatch-trace-output}]}
   (let [dispatch-id (:psi.dispatch-trace/dispatch-id entity)
-        entries     (->> (dispatch/dispatch-trace-entries)
+        entries     (->> (kernel/dispatch-trace-entries)
                          (filter #(= dispatch-id (:dispatch-id %)))
                          vec)]
     {:psi.dispatch-trace/by-id (mapv dispatch-trace->eql entries)}))

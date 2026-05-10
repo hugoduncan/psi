@@ -12,7 +12,7 @@
    [psi.agent-session.dispatch-handlers.session-mutations :as mutations]
    [psi.agent-session.dispatch-handlers.statechart-actions :as sc-actions]
    [psi.agent-session.dispatch-handlers.ui-handlers :as ui-handlers]
-   [psi.agent-session.session-state :as session]
+   [psi.session-state.state :as session]
    [psi.agent-session.statechart :as sc]))
 
 ;;; Re-exports expected by core.clj

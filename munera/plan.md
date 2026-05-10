@@ -4,6 +4,11 @@ Open tasks in suggested execution order:
 
 Queue:
 
+Backlog:
+
+`munera/open/108-project-nrepl-testing-without-mocks/`
+`munera/open/105-agent-session-component-extraction-map/`
+`munera/open/136-built-in-registration-path-for-workflow/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
@@ -11,10 +16,6 @@ Queue:
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
-`munera/open/067-add-anthropic-4-7-and-openai-5-5-models/`
-`munera/open/070-delegate-command-posts-workflow-result-into-chat/`
-`munera/open/073-workflow-child-session-prompt-composition/`
-`munera/open/076-auto-session-name-helper-model-fallback/`
 
 Notes:
 - `munera/plan.md` is the active project-wide orchestration surface.
@@ -23,4 +24,5 @@ Notes:
 - The previous TUI parity umbrella (`047`) and discoverable navigation slice (`049`) are complete and should live under `munera/closed/`.
 - `003` is the broader prompt-lifecycle convergence umbrella; `006` is the concrete remaining skill-prelude/cache-breakpoint slice that currently drives its unfinished acceptance.
 - `070` tracks the `/delegate` slash-command UX gap so delegated workflow completion comes back into the originating conversation transcript.
+- Tasks `089`, `091`, `092`, `093`, and `094` are now complete and live under `munera/closed/`.
 - Close or replace tasks as scope sharpens; do not merge task contents.

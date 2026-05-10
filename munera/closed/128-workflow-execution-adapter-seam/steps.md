@@ -1,0 +1,50 @@
+- [x] Inventory the workflow-specific callback keys currently consumed by `psi.workflow-runtime.*`, preferably against the post-`127` workflow-runtime shape when available
+  - found main higher/session-bound raw ctx reads in `attempts`, `turn-execution-contract`, `step-session-config`, and `statechart-runtime`
+- [x] Decide the smallest cohesive higher/session-bound workflow execution adapter surface they imply
+  - child-session creation, bounded prompt execution, judge execution, session data reads, context-session listing, skill lookup
+- [x] Choose one explicit representation for the seam and record why it was better than the main rejected alternatives, including the most plausible alternatives named in the design
+  - chose named adapter value/map plus lower wrapper namespace
+- [x] Choose and record the adapter seam name (`execution-adapter` versus `session-adapter`, or justified equivalent) using the naming decision rule
+  - chose `psi.workflow-runtime.execution-adapter`
+- [x] Record why any operation from the expected initial responsibility inventory is intentionally left outside the seam
+  - excluded lower-owned step-session-config/materialization collaborators because they are not runtime → session crossings
+- [x] Define the named seam and route workflow-runtime call sites through it
+- [x] Provide the canonical implementation from `agent-session`, allowing `agent-session.context` to remain the assembly site for that implementation
+- [x] Rewire any workflow-specific backfill/compatibility wiring in `psi_tool_workflow` to prefer the named seam over raw callback-key provisioning where applicable
+- [x] Ensure workflow-runtime no longer directly depends on raw workflow-specific callback keys for its main higher/session-bound operations
+- [x] Rework tests that currently stub workflow-specific callback keys consumed by workflow-runtime so they stub the named seam instead, unless a specific lower-layer exception is recorded because the test is intentionally proving the adapter implementation/assembly layer rather than workflow-runtime consumption
+- [x] Verify behavior remains unchanged
+  - focused tests: `12 tests, 66 assertions, 0 failures, 0 errors`
+  - focused lint: clean
+- [x] Record any residual raw-key plumbing left behind the seam and any remaining direct raw-key dependence as explicit debt in `implementation.md`
+- [x] Record the final seam name, representation, responsibilities, excluded concerns, and follow-on notes in `implementation.md`
+- [x] Rework shared test support to reuse the canonical `psi.agent-session.context/workflow-execution-adapter` assembly helper instead of rebuilding the adapter map inline
+  - `components/agent-session/test/psi/agent_session/test_support.clj` now calls `session-context/workflow-execution-adapter` instead of rebuilding the adapter map inline
+- [x] Verify the refactored test wiring still keeps workflow execution adapter responsibilities aligned between production and test support
+  - lint: `clj-kondo --lint components/agent-session/test/psi/agent_session/test_support.clj`
+  - focused tests: `clojure -A:test-paths -e "(require 'clojure.test 'psi.agent-session.workflow-attempts-test 'psi.agent-session.workflow-judge-test) ..."`
+- [x] Replace the literal `:workflow-execution-adapter` key in shared test support with `psi.workflow-runtime.execution-adapter/adapter-key`
+  - `components/agent-session/test/psi/agent_session/test_support.clj` now uses `workflow-execution-adapter/adapter-key` when installing the canonical adapter
+- [x] Verify the shared test support still assembles and injects the adapter correctly after switching to the adapter-owned key constant
+  - lint: `clj-kondo --lint components/agent-session/test/psi/agent_session/test_support.clj`
+  - focused tests: `clojure -A:test-paths -e "(require 'clojure.test 'psi.agent-session.workflow-attempts-test 'psi.agent-session.workflow-judge-test) ..."`
+- [x] Rework `components/agent-session/test/psi/agent_session/workflow_attempts_test.clj` so it replaces the workflow execution adapter as one boundary value instead of patching nested adapter internals with `assoc-in`
+  - added `with-workflow-execution-adapter-overrides` helper so the test replaces the seam value coherently instead of patching adapter internals inline
+- [x] Add a focused test proving workflow execution adapter consumers fail clearly when the named adapter is absent, including assertion on `:adapter-key` in `ex-data`
+  - added `create-step-attempt-session-requires-workflow-execution-adapter-test`
+  - verification: `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_attempts_test.clj`
+  - verification: `clojure -A:test-paths -e "(require 'clojure.test 'psi.agent-session.workflow-attempts-test 'psi.agent-session.workflow-judge-test) ..."`
+- [x] If workflow execution adapter consumer tests expand further, extract `with-workflow-execution-adapter-overrides` into shared test support so seam-aware adapter override setup stays consistent across tests
+  - moved `with-workflow-execution-adapter-overrides` into `components/agent-session/test/psi/agent_session/test_support.clj`
+  - updated `workflow_attempts_test` to reuse the shared seam-aware helper
+  - verification: `clj-kondo --lint components/agent-session/test/psi/agent_session/test_support.clj components/agent-session/test/psi/agent_session/workflow_attempts_test.clj`
+  - verification: `clojure -A:test-paths -e "(require 'clojure.test 'psi.agent-session.workflow-attempts-test 'psi.agent-session.workflow-judge-test) ..."`
+- [x] Add explicit validation for required workflow execution adapter operations so a present-but-miswired adapter fails with seam-specific `ex-info` instead of opaque nil invocation
+- [x] Choose and implement the validation shape in `psi.workflow-runtime.execution-adapter`:
+  - chose per-operation accessors via `required-op`
+  - missing operation failures now throw `ex-info` with `:adapter-key` and `:operation`
+- [x] Add focused tests proving each required adapter operation fails clearly when absent from an installed adapter value
+  - added `components/workflow-runtime/test/psi/workflow_runtime/execution_adapter_test.clj`
+- [x] Assert missing-operation failures include both `:adapter-key` and the missing operation identifier in `ex-data`
+- [x] Verify adapter validation changes preserve current canonical assembly behavior in `psi.agent-session.context`
+- [x] Verify focused workflow adapter consumer tests still pass after the missing-operation validation change

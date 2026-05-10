@@ -1,0 +1,22 @@
+- [x] Inspect current workflow attempt/result/history/introspection surfaces for session-oriented assumptions
+  - Reviewed runtime and IR seams in `workflow_statechart_runtime.clj`, `workflow_progression_recording.clj`, `workflow_ir.clj`, and focused invoke/runtime tests.
+- [x] Define the canonical runtime recording shape for invoke attempts
+  - Attempt-local execution remains the canonical recording surface; invoke failures now converge explicitly onto attempt `:execution-error`.
+- [x] Define the canonical runtime recording shape for invoke accepted/terminal results
+  - Successful invoke accepted-result envelopes remain canonical on `[:step-runs step-id :accepted-result]`; failures do not synthesize accepted results.
+- [x] Record effective invoke args in an inspectable runtime surface
+  - Invoke attempts now record canonical `:effective-args` on the latest attempt for both success and failure paths.
+- [x] Record canonical invoke outputs (`:data`, `:summary`, optional `:result`) coherently
+  - Success path continues to record canonical invoke outputs through accepted-result `:outputs`.
+- [x] Record invoke yielded values coherently for downstream `:yield` consumers
+  - Success yielded-value visibility remains derived from accepted-result outputs plus normalized `:yields`; failure-side yielded-value projection is intentionally absent.
+- [x] Preserve structured diagnostics/failure details for unsuccessful invoke steps
+  - Invoke operation errors now record structured attempt `:execution-error` including the canonical tagged `:operation-result` and optional `:operation-details`.
+- [x] Expose invoke result data through workflow introspection/query surfaces
+  - `psi-tool workflow read-run` / `list-runs` summaries now expose canonical step-run, attempt, accepted-result, history, and invoke `:effective-args` surfaces from the same workflow run model.
+- [x] Add focused success recording/introspection tests
+  - Focused invoke success/runtime proof remains covered in `workflow_invoke_runtime_test.clj`.
+- [x] Add focused failure recording/introspection tests
+  - Added focused failure assertions proving attempt `:execution-error` recording and absence of synthetic accepted-result failure envelopes in `workflow_invoke_runtime_test.clj`.
+- [x] Reconcile recorded/introspection surfaces with task `077`, task `083`, and `doc/workflow-ir.md`
+  - Aligned task artifacts and runtime helper semantics around one inspectable invoke failure source of truth.

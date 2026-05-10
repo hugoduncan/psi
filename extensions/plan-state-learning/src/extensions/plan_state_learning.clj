@@ -20,7 +20,7 @@
    [clojure.string :as str]
    [com.fulcrologic.statecharts.chart :as chart]
    [com.fulcrologic.statecharts.elements :as ele]
-   [extensions.workflow-display :as workflow-display]))
+   [psi.agent-session.workflow.display :as workflow-display]))
 
 (def ^:private marker "[psi:psl-auto]")
 (def ^:private custom-type "plan-state-learning")

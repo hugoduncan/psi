@@ -1,0 +1,3 @@
+{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        psi/session-state   {:local/root "../session-state"}
+        psi/shared-config   {:local/root "../shared-config"}}}

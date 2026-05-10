@@ -2,8 +2,8 @@
   "Adapter-neutral session summary projection shared across interactive UIs."
   (:require
    [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-persistence.core :as persist]
+   [psi.session-state.state :as ss]))
 
 (def ^:private thinking-level->reasoning-effort
   {:off nil

@@ -1,0 +1,23 @@
+- [x] Inspect current registration call sites in `agent-session.context`, `agent-session.bootstrap`, `system-bootstrap`, launcher/app-runtime startup, and relevant tests
+- [x] Record the chosen composition-root namespace/path explicitly in implementation notes (`psi.system-bootstrap.core` unless implementation changes it)
+- [x] Classify each current registration helper as domain-local vs global-assembly and note any mixed surfaces that need splitting
+- [x] Decide and record whether current `agent-session` local registration helpers remain a session-facing local surface that includes history, or should be split further in this task
+- [x] Refine or preserve local registration helpers so their meaning is strictly domain-local or session-facing-local, never whole-system assembly
+- [x] Remove `psi.agent-session.core/register-resolvers!` and `psi.agent-session.core/register-mutations!`, or explicitly record any temporary compatibility shim plus follow-on debt if removal is blocked by unrelated broad startup/runtime churn outside this task’s scope
+- [x] Create/update an explicit composition-root assembly function that owns whole-system registration
+- [x] Ensure the composition root also owns any canonical fully assembled isolated-query-context registration helper
+- [x] Update startup/bootstrap/composition call paths so production startup registers all domains only through composition-root-owned entrypoint(s)
+- [x] Remove `requiring-resolve` global registration discovery from `agent-session.context`
+- [x] Check that `components/agent-session/src/**` no longer mentions `psi.system-bootstrap` for registration ownership
+- [x] Add/update focused tests for local/isolated registration
+- [x] Add/update focused tests for globally assembled registration
+- [x] Migrate any tests that actually need assembled multi-domain registration to a composition-owned helper instead of a domain-owned global wrapper
+- [x] Record final ownership split and any remaining edge cases in implementation notes
+- [x] Run focused verification
+- [x] Add a small follow-up shaping pass in `psi.system-bootstrap.core` that extracts the registration domain catalog as data while preserving the explicit distinction between global registration and assembled isolated registration
+- [x] Re-run focused registration tests after that shaping pass
+- [x] Add `register-domains-in!` coverage for the no-`session-ctx` branch, asserting base-domain presence and session-domain absence
+- [x] Add idempotence tests for both `register-all-domains!` and `register-domains-in!`
+- [x] Add one global queryability proof after `register-all-domains!`, not just symbol-presence assertions
+- [x] Tighten system-bootstrap test naming so branch and idempotence guarantees are explicit from the test var names
+- [x] Run broader verification as needed

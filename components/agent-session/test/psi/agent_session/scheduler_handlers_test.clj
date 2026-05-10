@@ -3,18 +3,19 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-handlers.prompt-handlers :as prompt-handlers]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.dispatch-handlers.prompt-lifecycle :as prompt-lifecycle]
    [psi.agent-session.dispatch-handlers.scheduler :as scheduler-handlers]
    [psi.agent-session.dispatch-handlers.session-lifecycle :as session-lifecycle-handlers]
    [psi.agent-session.dispatch-handlers.session-mutations :as session-mutations]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-persistence.core :as persist]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- invoke-handler
   [ctx event-type data]
-  (let [handler-fn (get-in (dispatch/handler-entry event-type) [:fn])]
+  (let [handler-fn (get-in (kernel/handler-entry event-type) [:fn])]
     (handler-fn ctx data)))
 
 (defn- apply-root-state-update!
@@ -29,7 +30,7 @@
 
 (defn- with-registered-handlers
   [ctx f]
-  (dispatch/clear-handlers!)
+  (kernel/clear-handlers!)
   (try
     (scheduler-handlers/register! ctx)
     (prompt-handlers/register! ctx)
@@ -39,7 +40,7 @@
     (statechart-actions/register! ctx)
     (f)
     (finally
-      (dispatch/clear-handlers!))))
+      (kernel/clear-handlers!))))
 
 (deftest scheduler-create-cancel-fire-deliver-handlers-test
   (let [[ctx session-id] (test-support/make-session-ctx {})]
@@ -199,8 +200,8 @@
   (let [[ctx session-id] (test-support/make-session-ctx {:persist? false})]
     (with-registered-handlers
       ctx
-      #(with-redefs [psi.agent-session.dispatch/dispatch!
-                     (let [real-dispatch psi.agent-session.dispatch/dispatch!]
+      #(with-redefs [dispatch/dispatch!
+                     (let [real-dispatch dispatch/dispatch!]
                        (fn [ctx* event-type event-data opts]
                          (if (= :session/submit-synthetic-user-prompt event-type)
                            (throw (ex-info "boom" {:created-session-id (:session-id event-data)

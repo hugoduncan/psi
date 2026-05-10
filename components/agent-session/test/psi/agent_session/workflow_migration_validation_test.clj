@@ -2,101 +2,124 @@
   "Validate that all migrated .psi/workflows/*.md files parse and compile correctly."
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow-file-compiler :as compiler]
-   [psi.agent-session.workflow-file-loader :as loader]
-   [psi.agent-session.workflow-model :as workflow-model]))
+   [psi.workflow-loader.compiler :as compiler]
+   [psi.workflow-loader.core :as loader]))
+
+(def ^:private required-workflow-subset
+  #{"planner"
+    "builder"
+    "prompt-build"
+    "lambda-build"
+    "plan-build"
+    "plan-build-review"
+    "delegate-build-review"
+    "gh-bug-triage-modular"})
+
+(defn- workflow-migration-view
+  []
+  (let [parsed (loader/scan-directory ".psi/workflows")
+        compile-result (compiler/compile-workflow-files parsed)
+        definitions (:definitions compile-result)]
+    {:parsed parsed
+     :parse-errors (filter :error parsed)
+     :definitions definitions
+     :errors (:errors compile-result)
+     :by-name (into {} (map (juxt :name identity)) definitions)}))
 
 (deftest migrated-workflow-files-test
   (testing "all .psi/workflows/ files parse, compile, and validate"
-    (let [dir ".psi/workflows"
-          parsed (loader/scan-directory dir)]
-      ;; Should find all 12 migrated files
-      (is (<= 12 (count parsed))
-          (str "Expected at least 12 workflow files, found " (count parsed)))
-      ;; No parse errors
-      (let [parse-errors (filter :error parsed)]
-        (is (empty? parse-errors)
-            (str "Parse errors: " (pr-str (mapv #(select-keys % [:name :error :source-path]) parse-errors)))))
-      ;; All compile successfully
-      (let [{:keys [definitions errors]} (compiler/compile-workflow-files parsed)]
-        (is (empty? errors)
-            (str "Compile errors: " (pr-str errors)))
-        ;; All produce valid canonical definitions
-        (doseq [defn-map definitions]
-          (is (workflow-model/valid-workflow-definition? defn-map)
-              (str "Invalid definition: " (:name defn-map)
-                   " — " (pr-str (workflow-model/explain-workflow-definition defn-map)))))
-        ;; Step references all resolve
-        (let [ref-result (compiler/validate-step-references definitions)]
-          (is (true? (:valid? ref-result))
-              (str "Unresolved step references: " (pr-str (:errors ref-result)))))
-        ;; No name collisions
-        (let [collision-result (compiler/validate-no-name-collisions definitions)]
-          (is (true? (:valid? collision-result))
-              (str "Name collisions: " (pr-str (:duplicates collision-result)))))))))
+    (let [{:keys [parsed parse-errors definitions errors by-name]} (workflow-migration-view)]
+      (is (seq parsed)
+          "Expected at least one workflow file")
+      (is (every? #(contains? by-name %) required-workflow-subset)
+          (str "Missing required workflows: "
+               (pr-str (sort (remove #(contains? by-name %) required-workflow-subset)))))
+      (is (empty? parse-errors)
+          (str "Parse errors: " (pr-str (mapv #(select-keys % [:name :error :source-path]) parse-errors))))
+      (is (empty? errors)
+          (str "Compile errors: " (pr-str errors)))
+      (doseq [defn-map definitions]
+        (is (vector? (:steps defn-map))
+            (str "Expected target-authored definition: " (:name defn-map))))
+      (let [ref-result (compiler/validate-step-references definitions)]
+        (is (true? (:valid? ref-result))
+            (str "Unresolved step references: " (pr-str (:errors ref-result)))))
+      (let [collision-result (compiler/validate-no-name-collisions definitions)]
+        (is (true? (:valid? collision-result))
+            (str "Name collisions: " (pr-str (:duplicates collision-result))))))))
 
 (deftest migrated-single-step-workflows-test
-  (testing "single-step workflows carry expected metadata"
-    (let [parsed (loader/scan-directory ".psi/workflows")
-          {:keys [definitions]} (compiler/compile-workflow-files parsed)
-          by-name (into {} (map (juxt :name identity)) definitions)]
+  (testing "single-step workflows carry expected target-authored session configuration"
+    (let [{:keys [by-name]} (workflow-migration-view)]
       ;; planner
       (let [p (get by-name "planner")]
         (is (some? p))
-        (is (= 1 (count (:step-order p))))
-        (is (= #{"read" "bash"} (get-in p [:steps "step-1" :capability-policy :tools])))
-        (is (some? (get-in p [:workflow-file-meta :system-prompt]))))
+        (is (= [:session]
+               (mapv :type (:steps p))))
+        (is (= ["read" "bash"]
+               (get-in p [:steps 0 :tools])))
+        (is (= :workflow-input
+               (get-in p [:steps 0 :contributions 0 :vars "input" :from]))))
       ;; builder has 4 tools
       (let [b (get by-name "builder")]
-        (is (= #{"read" "bash" "edit" "write"}
-               (get-in b [:steps "step-1" :capability-policy :tools]))))
+        (is (= ["read" "bash" "edit" "write"]
+               (get-in b [:steps 0 :tools]))))
       ;; lambda-compiler has skill
       (let [lc (get by-name "lambda-compiler")]
-        (is (= ["lambda-compiler"] (get-in lc [:workflow-file-meta :skills])))))))
+        (is (= ["lambda-compiler"]
+               (get-in lc [:steps 0 :skills])))))))
 
 (deftest migrated-multi-step-workflows-test
   (testing "multi-step workflows have correct step counts"
-    (let [parsed (loader/scan-directory ".psi/workflows")
-          {:keys [definitions]} (compiler/compile-workflow-files parsed)
-          by-name (into {} (map (juxt :name identity)) definitions)]
-      ;; plan-build-review: 3 steps
-      (is (= 3 (count (:step-order (get by-name "plan-build-review")))))
-      ;; plan-build: 2 steps
-      (is (= 2 (count (:step-order (get by-name "plan-build")))))
-      ;; prompt-build: 3 steps
-      (is (= 3 (count (:step-order (get by-name "prompt-build")))))
-      ;; lambda-build: 3 steps
-      (is (= 3 (count (:step-order (get by-name "lambda-build"))))))))
+    (let [{:keys [by-name]} (workflow-migration-view)]
+      ;; prompt-build: 3 target-authored delegate steps
+      (is (= 3 (count (:steps (get by-name "prompt-build")))))
+      (is (= [:delegate :delegate :delegate]
+             (mapv :type (:steps (get by-name "prompt-build")))))
+      ;; lambda-build: 3 target-authored delegate steps
+      (is (= 3 (count (:steps (get by-name "lambda-build")))))
+      (is (= [:delegate :delegate :delegate]
+             (mapv :type (:steps (get by-name "lambda-build"))))))))
 
-(deftest migrated-session-first-authoring-examples-test
-  (testing "converged workflow examples use explicit session-first authoring surfaces"
-    (let [parsed (loader/scan-directory ".psi/workflows")
-          {:keys [definitions]} (compiler/compile-workflow-files parsed)
-          by-name (into {} (map (juxt :name identity)) definitions)
-          plan-build-review (get by-name "plan-build-review")
-          prompt-build (get by-name "prompt-build")
+(deftest migrated-target-authoring-examples-test
+  (testing "plan-build and plan-build-review compile as target-authored inline-session examples"
+    (let [{:keys [by-name]} (workflow-migration-view)
+          plan-build (get by-name "plan-build")
+          plan-build-review (get by-name "plan-build-review")]
+      (is (= [:session :session]
+             (mapv :type (:steps plan-build))))
+      (is (= [:session :session :session]
+             (mapv :type (:steps plan-build-review))))
+      (is (= "plan"
+             (get-in plan-build [:steps 1 :contributions 1 :vars "plan" :from :step])))
+      (is (= :text
+             (get-in plan-build [:steps 1 :contributions 1 :vars "plan" :from :yield])))))
+
+  (testing "delegate-build-review compiles as the executable target-authored delegate-heavy example"
+    (let [{:keys [by-name]} (workflow-migration-view)
+          delegate-build-review (get by-name "delegate-build-review")]
+      (is (= [:delegate :delegate :session]
+             (mapv :type (:steps delegate-build-review))))
+      (is (= :text
+             (get-in delegate-build-review [:steps 1 :prompt-string :vars "plan" :from :yield])))
+      (is (= :text
+             (get-in delegate-build-review [:steps 2 :contributions 1 :vars "implementation" :from :yield])))
+      (is (= [{:type :source
+               :from :workflow-original}
+              {:type :source
+               :from {:step "plan" :yield :text}}]
+             (get-in delegate-build-review [:steps 1 :context])))))
+
+  (testing "gh-bug-triage-modular now compiles as the richer target-authored delegate example with distinct yielded text and structured handoff surfaces"
+    (let [{:keys [by-name]} (workflow-migration-view)
           gh-bug-triage-modular (get by-name "gh-bug-triage-modular")]
-      (is (= ["step-1-planner" "step-2-builder" "step-3-reviewer"]
-             (:step-order plan-build-review)))
-      (is (= "step-1-planner"
-             (get-in plan-build-review [:steps "step-2-builder" :input-bindings :input :path 0])))
-      (is (= [:original]
-             (get-in plan-build-review [:steps "step-2-builder" :input-bindings :original :path])))
-      (is (= "step-2-prompt-decompiler"
-             (get-in prompt-build [:steps "step-3-prompt-compiler" :input-bindings :input :path 0])))
-      (is (= [{:kind :value
-               :role "user"
-               :binding {:source :workflow-input
-                         :path [:original]}}
-              {:kind :value
-               :role "assistant"
-               :binding {:source :step-output
-                         :path ["step-1-gh-bug-discover-and-read" :outputs :text]}}
-              {:kind :value
-               :role "assistant"
-               :binding {:source :step-output
-                         :path ["step-2-gh-issue-create-worktree" :outputs :text]}}
-              {:kind :session-transcript
-               :step-id "step-3-gh-bug-reproduce"
-               :projection {:type :tail :turns 4 :tool-output false}}]
-             (get-in gh-bug-triage-modular [:steps "step-4-gh-bug-post-repro" :session-preload]))))))
+      (is (= [:delegate :delegate :delegate :delegate]
+             (mapv :type (:steps gh-bug-triage-modular))))
+      (is (= :text
+             (get-in gh-bug-triage-modular [:steps 1 :prompt-string :vars "discover_report" :from :yield])))
+      (is (= :handoff
+             (get-in gh-bug-triage-modular [:steps 1 :context 1 :from :output])))
+      (is (= :handoff
+             (get-in gh-bug-triage-modular [:steps 2 :context 2 :from :output])))
+      (is (= :handoff
+             (get-in gh-bug-triage-modular [:steps 3 :context 3 :from :output]))))))

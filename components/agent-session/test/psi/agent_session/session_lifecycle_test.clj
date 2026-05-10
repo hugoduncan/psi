@@ -5,11 +5,12 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.prompt-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-persistence.core :as persist]
+   [psi.turn-runtime.core]
+   [psi.session-journal.store :as journal-store]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support])
   (:import
    (java.io File)))
@@ -31,7 +32,7 @@
   (testing "two contexts are independent"
     (let [[ctx-a sid-a] (create-session-context)
           [ctx-b sid-b] (create-session-context)]
-      (dispatch/dispatch! ctx-a :session/set-session-name {:session-id sid-a :name "alpha"} {:origin :core})
+      (session/dispatch-in! ctx-a :session/set-session-name {:session-id sid-a :name "alpha"} {:origin :core})
       (is (= "alpha" (:session-name (ss/get-session-data-in ctx-a sid-a))))
       (is (nil? (:session-name (ss/get-session-data-in ctx-b sid-b))))))
 
@@ -42,12 +43,12 @@
 
   (testing "session lifecycle events can be routed through dispatch statechart boundary"
     (let [[ctx _session-id] (create-session-context {:persist? false})
-          _                 (dispatch/clear-event-log!)
+          _                 (kernel/clear-event-log!)
           sd                (session/new-session-in! ctx nil {})
           session-id        (:session-id sd)
           ctx               (retarget ctx sd)]
       (is (= :idle (ss/sc-phase-in ctx session-id)))
-      (with-redefs [psi.agent-session.prompt-runtime/execute-prepared-request!
+      (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                     (fn [_ai-ctx _ctx sid prepared _progress-queue]
                       {:execution-result/turn-id (:prepared-request/id prepared)
                        :execution-result/session-id sid
@@ -60,7 +61,7 @@
                        :execution-result/stop-reason :stop})]
         (session/prompt-in! ctx session-id "hello"))
       (is (= :idle (ss/sc-phase-in ctx session-id)))
-      (let [entries   (dispatch/event-log-entries)
+      (let [entries   (kernel/event-log-entries)
             submit-e  (first (filter #(= :session/prompt-submit (:event-type %)) entries))
             prompt-e  (first (filter #(= :session/prompt (:event-type %)) entries))
             prepare-e (first (filter #(= :session/prompt-prepare-request (:event-type %)) entries))
@@ -76,14 +77,14 @@
 
   (testing "statechart action handlers use pure session-update results"
     (let [[ctx _session-id] (create-session-context {:persist? false})
-          _                 (dispatch/clear-event-log!)
+          _                 (kernel/clear-event-log!)
           sd                (session/new-session-in! ctx nil {})
           session-id        (:session-id sd)
           ctx               (retarget ctx sd)]
       (is (false? (:is-streaming (ss/get-session-data-in ctx session-id))))
-      (dispatch/dispatch! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+      (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
       (let [sd    (ss/get-session-data-in ctx session-id)
-            entry (last (dispatch/event-log-entries))]
+            entry (last (kernel/event-log-entries))]
         (is (true? (:is-streaming sd)))
         (is (= :root-state-update (:pure-result-kind entry)))))))
 
@@ -113,12 +114,12 @@
           sd1                (session/new-session-in! ctx nil {})
           sid1               (:session-id sd1)
           path1              (:session-file sd1)
-          _                  (persist/flush-journal! (java.io.File. path1)
-                                                     sid1
-                                                     cwd
-                                                     nil
-                                                     nil
-                                                     [(persist/thinking-level-entry :off)])
+          _                  (journal-store/flush-journal! (java.io.File. path1)
+                                                           sid1
+                                                           cwd
+                                                           nil
+                                                           nil
+                                                           [(persist/thinking-level-entry :off)])
           sd2                (session/new-session-in! (retarget ctx sd1) sid1 {})
           sid2               (:session-id sd2)
           sd1*               (session/ensure-session-loaded-in! (retarget ctx sd2) sid2 sid1)
@@ -146,10 +147,10 @@
 
   (testing "list-context-sessions-in carries canonical inferred display-name"
     (let [[ctx session-id] (create-session-context)]
-      (ss/journal-append-in! ctx session-id
-                             (persist/message-entry {:role "user"
-                                                     :content [{:type :text :text "Investigate failing tests"}]
-                                                     :timestamp (java.time.Instant/parse "2026-03-16T10:47:00Z")}))
+      (ss/append-journal-entry-in! ctx session-id
+                                   (persist/message-entry {:role "user"
+                                                           :content [{:type :text :text "Investigate failing tests"}]
+                                                           :timestamp (java.time.Instant/parse "2026-03-16T10:47:00Z")}))
       (let [listed (ss/list-context-sessions-in ctx)
             slot   (first (filter #(= session-id (:session-id %)) listed))]
         (is (= "Investigate failing tests" (:display-name slot))))))
@@ -278,18 +279,18 @@
         parent-id          (:session-id parent-sd)
         ctx                (retarget ctx parent-sd)
         parent-file        (:session-file parent-sd)
-        entry-id           (:id (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "user"
-                                                                                             :content [{:type :text :text "branch-here"}]
-                                                                                             :timestamp (java.time.Instant/now)})))
-        _                  (ss/journal-append-in! ctx parent-id (persist/message-entry {:role "assistant"
-                                                                                        :content [{:type :text :text "reply-here"}]
-                                                                                        :timestamp (java.time.Instant/now)}))
+        entry-id           (:id (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "user"
+                                                                                                   :content [{:type :text :text "branch-here"}]
+                                                                                                   :timestamp (java.time.Instant/now)})))
+        _                  (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "assistant"
+                                                                                              :content [{:type :text :text "reply-here"}]
+                                                                                              :timestamp (java.time.Instant/now)}))
         child-sd           (session/fork-session-in! ctx parent-id entry-id)
         child-id           (:session-id child-sd)
         ctx                (retarget ctx child-sd)
         child-sd           (ss/get-session-data-in ctx child-id)
         child-file         (:session-file child-sd)
-        loaded-child       (persist/load-session-file child-file)]
+        loaded-child       (journal-store/load-session-file child-file)]
     (is (string? child-file))
     (is (.exists (java.io.File. child-file)))
     (is (= parent-file (get-in loaded-child [:header :parent-session])))
@@ -305,20 +306,20 @@
   (let [[ctx _session-id] (test-support/make-session-ctx {})
         parent-sd        (session/new-session-in! ctx nil {})
         parent-id        (:session-id parent-sd)
-        _                (dispatch/dispatch! ctx :session/update-context-usage {:session-id parent-id :tokens 22000 :window 200000} {:origin :core})
+        _                (session/dispatch-in! ctx :session/update-context-usage {:session-id parent-id :tokens 22000 :window 200000} {:origin :core})
         ctx              (retarget ctx parent-sd)
         user-entry       (persist/message-entry {:role "user"
                                                  :content [{:type :text :text "branch-here"}]
                                                  :timestamp (java.time.Instant/now)})
-        _                (ss/journal-append-in! ctx parent-id user-entry)
-        _                (ss/journal-append-in! ctx parent-id
-                                                (persist/message-entry {:role "assistant"
-                                                                        :content [{:type :text :text "reply-here"}]
-                                                                        :timestamp (java.time.Instant/now)}))
-        _                (ss/journal-append-in! ctx parent-id
-                                                (persist/message-entry {:role "user"
-                                                                        :content [{:type :text :text "later-turn"}]
-                                                                        :timestamp (java.time.Instant/now)}))
+        _                (ss/append-journal-entry-in! ctx parent-id user-entry)
+        _                (ss/append-journal-entry-in! ctx parent-id
+                                                      (persist/message-entry {:role "assistant"
+                                                                              :content [{:type :text :text "reply-here"}]
+                                                                              :timestamp (java.time.Instant/now)}))
+        _                (ss/append-journal-entry-in! ctx parent-id
+                                                      (persist/message-entry {:role "user"
+                                                                              :content [{:type :text :text "later-turn"}]
+                                                                              :timestamp (java.time.Instant/now)}))
         child-sd         (session/fork-session-in! ctx parent-id (:id user-entry))
         child-id         (:session-id child-sd)
         ctx              (retarget ctx child-sd)
@@ -348,7 +349,7 @@
                                                  :content [{:type :text :text "hello"}]
                                                  :timestamp (java.time.Instant/now)})]]
       (.deleteOnExit f)
-      (persist/flush-journal! f "sess-no-model" "/tmp/project" nil entries)
+      (journal-store/flush-journal! f "sess-no-model" "/tmp/project" nil entries)
       (let [sd                 (session/resume-session-in! ctx session-id (.getAbsolutePath f))
             resumed-id         (:session-id sd)
             ctx                (retarget ctx sd)
@@ -365,10 +366,10 @@
   (testing "resume-session-in! preserves context usage baseline for footer/query projections"
     (let [initial-model {:provider "openai" :id "gpt-5.4" :reasoning false}
           [ctx session-id] (create-session-context {:session-defaults {:model initial-model}})
-          _                (dispatch/dispatch! ctx :session/update-context-usage {:session-id session-id :tokens 22000 :window 200000} {:origin :core})
+          _                (session/dispatch-in! ctx :session/update-context-usage {:session-id session-id :tokens 22000 :window 200000} {:origin :core})
           f                (File/createTempFile "psi-resume-context" ".ndedn")]
       (.deleteOnExit f)
-      (persist/flush-journal! f "sess-resume-context" "/tmp/project" nil [])
+      (journal-store/flush-journal! f "sess-resume-context" "/tmp/project" nil [])
       (let [sd         (session/resume-session-in! ctx session-id (.getAbsolutePath f))
             resumed-id (:session-id sd)
             ctx        (retarget ctx sd)
@@ -413,12 +414,12 @@
   (testing "resume-session-in! missing-file fallback is logged through dispatch"
     (let [f          (str (System/getProperty "java.io.tmpdir") "/psi-missing-" (java.util.UUID/randomUUID) ".ndedn")
           [ctx session-id] (create-session-context {:persist? false})
-          _          (dispatch/clear-event-log!)
+          _          (kernel/clear-event-log!)
           sd         (session/resume-session-in! ctx session-id f)
           session-id (:session-id sd)
           ctx        (retarget ctx sd)
           entry      (first (filter #(= :session/resume-missing-initialize (:event-type %))
-                                    (dispatch/event-log-entries)))]
+                                    (kernel/event-log-entries)))]
       (is (= f (:session-file sd)))
       (is (= [] (persist/all-entries-in ctx session-id)))
       (is (= :core (:origin entry)))

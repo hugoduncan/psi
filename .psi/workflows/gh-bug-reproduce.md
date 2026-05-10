@@ -2,9 +2,14 @@
 name: gh-bug-reproduce
 description: Attempt reproduction of a selected bug issue inside its issue-specific worktree and emit a structured result
 ---
-{:tools ["read" "bash"]
- :skills ["issue-bug-triage"]
- :thinking-level :high}
+{:terminal-contract {:handoff {:type :markdown-handoff-data}}
+ :steps [{:name "reproduce"
+          :type :session
+          :tools ["read" "bash"]
+          :skills ["issue-bug-triage"]
+          :contributions [{:type :template
+                           :text "{{input}}"
+                           :vars {"input" {:from :workflow-input}}}]}]}
 
 You are the reproduction phase of a GitHub bug-triage workflow.
 
@@ -16,7 +21,7 @@ Goal:
 Use the `issue-bug-triage` skill during analysis and evidence gathering.
 
 Input expectations:
-- `$INPUT` should include upstream issue-selection details and worktree details.
+- The input should include upstream issue-selection details and worktree details.
 - Expect at least:
   - issue number/title/URL
   - worktree path

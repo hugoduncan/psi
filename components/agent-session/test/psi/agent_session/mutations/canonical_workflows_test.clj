@@ -3,9 +3,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
-   [psi.agent-session.workflow-model :as workflow-model]))
-
-;;; Test helpers
+   [psi.workflow-runtime.model :as workflow-model]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- make-test-ctx
   "Create a minimal ctx with a state atom for testing pure mutations."
@@ -13,7 +12,6 @@
   ([initial-state]
    (let [state* (atom (merge {:workflows (workflow-model/initial-workflow-state)} initial-state))]
      {:state* state*
-      ;; Stub execution fns (not needed for pure state mutations)
       :execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})
       :resume-and-execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})})))
 
@@ -22,16 +20,12 @@
    :name "test-workflow"
    :summary "A test workflow"
    :description "For testing"
-   :step-order ["step-1"]
-   :steps {"step-1" {:label "step-1"
-                     :executor {:type :agent :profile "test"}
-                     :prompt-template "$INPUT"
-                     :input-bindings {:input {:source :workflow-input :path [:input]}
-                                      :original {:source :workflow-input :path [:original]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs [:map [:text :string]]]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:execution-failed :validation-failed}}}}})
-
-;;; Tests
+   :steps [{:name "step-1"
+            :type :session
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}
+                                    "original" {:from :workflow-input :path [:original]}}}]}]})
 
 (deftest register-workflow-definition-test
   (testing "registers a valid definition"
@@ -41,8 +35,7 @@
       (is (true? (:psi.workflow/registered? result)))
       (is (= "test-workflow" (:psi.workflow/definition-id result)))
       (is (nil? (:psi.workflow/error result)))
-      ;; Verify in state
-      (is (some? (get-in @(:state* ctx) [:workflows :definitions "test-workflow"])))))
+      (is (some? (workflow-registry/workflow-definition @(:state* ctx) "test-workflow")))))
 
   (testing "returns error for invalid definition"
     (let [ctx (make-test-ctx)
@@ -63,7 +56,6 @@
       (is (= "run-1" (:psi.workflow/run-id result)))
       (is (= :pending (:psi.workflow/status result)))
       (is (nil? (:psi.workflow/error result)))
-      ;; Verify run exists in state
       (is (some? (get-in @(:state* ctx) [:workflows :runs "run-1"])))))
 
   (testing "returns error for unknown definition"

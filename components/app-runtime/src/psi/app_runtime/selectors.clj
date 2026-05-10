@@ -3,8 +3,8 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-persistence.core :as persist]
+   [psi.session-state.state :as ss]))
 
 (defn- session-item-id
   [session-id]

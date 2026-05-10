@@ -5,8 +5,7 @@
         taoensso/timbre             {:mvn/version "6.5.0"}
         psi/ai                      {:local/root "../../components/ai"}
         psi/agent-core              {:local/root "../../components/agent-core"}
-        psi/agent-session           {:local/root "../../components/agent-session"}
-        psi/workflow-display        {:local/root "../workflow-display"}}
+        psi/agent-session           {:local/root "../../components/agent-session"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}

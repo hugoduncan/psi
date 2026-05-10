@@ -4,7 +4,7 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
-   [psi.agent-session.workflow-statechart :as workflow-sc]))
+   [psi.workflow-runtime.statechart :as workflow-sc]))
 
 (def sample-definition
   {:definition-id "plan-build-review"

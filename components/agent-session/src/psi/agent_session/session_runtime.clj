@@ -7,7 +7,8 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.statechart :as sc]
-   [psi.agent-session.tool-defs :as tool-defs]))
+   [psi.session-persistence.core :as persistence]
+   [psi.tool-registry.defs :as tool-defs]))
 
 (defn telemetry-state []
   {:tool-output-stats {:calls []
@@ -20,11 +21,11 @@
    :provider-replies []})
 
 (defn persistence-state
-  ([] (persistence-state nil false))
+  ([]
+   (persistence-state nil false))
   ([session-file flushed?]
-   {:journal []
-    :flush-state {:flushed? flushed?
-                  :session-file session-file}}))
+   (persistence/persistence-state {:session-file session-file
+                                   :flushed? flushed?})))
 
 (defn turn-state [] {:ctx nil})
 

@@ -9,9 +9,9 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.workflows :as wf]))
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]))
 
 (defn background-jobs-state-in
   "Return canonical background-jobs state."
@@ -83,9 +83,9 @@
         (when (and (= :workflow (:job-kind job))
                    (not (bg-jobs/terminal-status? (:status job))))
           (let [wf (when (and (:workflow-ext-path job) (:workflow-id job))
-                     (wf/workflow-in (:workflow-registry ctx)
-                                     (:workflow-ext-path job)
-                                     (:workflow-id job)))]
+                     (extension-workflow-runtime/workflow-in (:workflow-registry ctx)
+                                                             (:workflow-ext-path job)
+                                                             (:workflow-id job)))]
             (when wf
               (cond
                 (:error? wf)
@@ -131,7 +131,7 @@
               (let [wf-ext-path (:workflow-ext-path job)
                     wf-id       (:workflow-id job)
                     wf          (when (and wf-ext-path wf-id)
-                                  (wf/workflow-in (:workflow-registry ctx) wf-ext-path wf-id))
+                                  (extension-workflow-runtime/workflow-in (:workflow-registry ctx) wf-ext-path wf-id))
                     payload     (or (:terminal-payload job)
                                     {:job-id        (:job-id job)
                                      :status        (:status job)
@@ -257,10 +257,10 @@
         (when (= :workflow (:job-kind job))
           (try
             (when (and (:workflow-ext-path job) (:workflow-id job))
-              (wf/abort-workflow-in! (:workflow-registry ctx)
-                                     (:workflow-ext-path job)
-                                     (:workflow-id job)
-                                     "cancel requested"))
+              (extension-workflow-runtime/abort-workflow-in! (:workflow-registry ctx)
+                                                             (:workflow-ext-path job)
+                                                             (:workflow-id job)
+                                                             "cancel requested"))
             (catch Exception _
               nil)))
         (maybe-refresh-background-job-ui! ctx thread-id)

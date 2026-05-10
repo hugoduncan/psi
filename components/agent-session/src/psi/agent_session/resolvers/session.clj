@@ -6,8 +6,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.resolvers.support :as support]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.model :as session]
+   [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as accessors]
    [psi.agent-session.statechart :as sc]
    [psi.ai.model-registry :as model-registry]
@@ -260,7 +260,7 @@
                (update :cost + (usage-cost-total u))))
          acc)))
    {:input 0 :output 0 :cache-read 0 :cache-write 0 :cost 0.0}
-   (session/get-state-value-in agent-session-ctx (session/state-path :journal session-id))))
+   (ss/get-state-value-in agent-session-ctx (ss/state-path :journal session-id))))
 
 (defn- find-git-head-path
   [cwd]

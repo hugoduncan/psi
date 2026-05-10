@@ -4,9 +4,8 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.rpc.events :as events]
    [psi.rpc.session.commands :as rpc.commands]
    [psi.rpc.session.emit :as emit]
@@ -88,11 +87,11 @@
                                                        :reasoning (boolean (:supports-reasoning ai-model))}
                                         _           (emit/emit-session-snapshots! emit! ctx state session-id)
                                         ;; Ensure session has the resolved model before prompt lifecycle
-                                        _           (dispatch/dispatch! ctx :session/set-model
-                                                                        {:session-id session-id
-                                                                         :model session-model
-                                                                         :scope :session}
-                                                                        {:origin :core})
+                                        _           (session/dispatch-in! ctx :session/set-model
+                                                                          {:session-id session-id
+                                                                           :model session-model
+                                                                           :scope :session}
+                                                                          {:origin :core})
                                         api-key     (runtime/resolve-api-key-in ctx session-id ai-model)
                                         _           (session/prompt-in! ctx session-id message images
                                                                         {:progress-queue progress-q

@@ -2,7 +2,7 @@
   (:require
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn deliver-extension-prompt!
   "Deliver extension prompt text via the best available channel.

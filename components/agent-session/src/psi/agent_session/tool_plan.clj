@@ -8,7 +8,8 @@
    [clojure.walk :as walk]
    [psi.agent-core.core :as agent]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.tools :as tools]
    [psi.query.core :as query]))
 
@@ -26,7 +27,7 @@
                             (:tools (agent/get-data-in agent-ctx))))
         from-ext    (when-let [reg (:extension-registry ctx)]
                       (some #(when (= tool-name (:name %)) %)
-                            (ext/all-tools-in reg)))]
+                            (tool-registry/all-tools-in reg)))]
     ;; Agent runtime tool defs intentionally project provider-safe metadata and
     ;; may omit executable fns. Prefer an executable agent tool when present,
     ;; otherwise fall back to the extension registry's canonical tool def.
@@ -200,6 +201,7 @@
       (let [opts     {:cwd          (ss/session-worktree-path-in ctx session-id)
                       :overrides    (:tool-output-overrides (ss/get-session-data-in ctx session-id))
                       :tool-call-id tool-call-id}
+            opts     (assoc opts :session-id session-id)
             result   (try
                        (execute-tool-runtime-in! ctx session-id tool-name args opts)
                        (catch Exception e

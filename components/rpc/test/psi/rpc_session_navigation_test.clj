@@ -6,8 +6,9 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-persistence.core :as persist]
+   [psi.session-journal.store :as journal-store]
+   [psi.session-state.state :as ss]
    [psi.rpc-test-support :as support]))
 
 (deftest rpc-extension-command-after-new-emits-assistant-message-for-new-session-test
@@ -97,13 +98,13 @@
           sd1                 (session/new-session-in! ctx nil {})
           session-id          (:session-id sd1)
           path1               (:session-file sd1)
-          _                   (persist/flush-journal! (java.io.File. path1)
-                                                      session-id
-                                                      cwd
-                                                      nil
-                                                      nil
-                                                      [(persist/message-entry {:role "user" :content "hi"})
-                                                       (persist/message-entry {:role "assistant" :content [{:type :text :text "there"}]})])
+          _                   (journal-store/flush-journal! (java.io.File. path1)
+                                                            session-id
+                                                            cwd
+                                                            nil
+                                                            nil
+                                                            [(persist/message-entry {:role "user" :content "hi"})
+                                                             (persist/message-entry {:role "assistant" :content [{:type :text :text "there"}]})])
           state               (atom {:transport {:ready? true :pending {}}
                                      :connection {:subscribed-topics #{"session/resumed" "session/rehydrated" "command-result"}}})
           handler             (support/make-handler ctx state)
@@ -129,12 +130,12 @@
           sd1                 (session/new-session-in! ctx nil {})
           sid1                (:session-id sd1)
           path1               (:session-file sd1)
-          _                   (persist/flush-journal! (java.io.File. path1)
-                                                      sid1
-                                                      cwd
-                                                      nil
-                                                      nil
-                                                      [(persist/message-entry {:role "assistant" :content [{:type :text :text "root"}]})])
+          _                   (journal-store/flush-journal! (java.io.File. path1)
+                                                            sid1
+                                                            cwd
+                                                            nil
+                                                            nil
+                                                            [(persist/message-entry {:role "assistant" :content [{:type :text :text "root"}]})])
           _                   (session/new-session-in! ctx sid1 {})
           state               (atom {:transport {:ready? true :pending {}}
                                      :connection {:subscribed-topics #{"session/resumed" "session/rehydrated" "command-result" "context/updated"}}})
@@ -169,7 +170,7 @@
           _                   (session/set-session-name-in! ctx child-id "child")
           entry               (persist/message-entry {:role    "user"
                                                       :content [{:type :text :text "Branch from this prompt"}]})
-          _                   (ss/journal-append-in! ctx session-id entry)
+          _                   (ss/append-journal-entry-in! ctx session-id entry)
           state               (atom {:transport {:ready? true :pending {}}
                                      :connection {:focus-session-id session-id
                                                   :subscribed-topics #{"ui/frontend-action-requested"}}})
@@ -209,7 +210,7 @@
           canonical-messages  [{:role "user" :content "who are you?"}
                                {:role "assistant" :content [{:type :text :text "I am psi."}]}]
           _                   (doseq [m canonical-messages]
-                                (ss/journal-append-in! ctx sid1 (persist/message-entry m)))
+                                (ss/append-journal-entry-in! ctx sid1 (persist/message-entry m)))
           _                   (agent/replace-messages-in! (ss/agent-ctx-in ctx sid1)
                                                           [{:role    "assistant"
                                                             :content [{:type :text :text "stale in-memory tail"}]}])

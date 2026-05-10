@@ -11,7 +11,7 @@
    [clojure.java.io :as io]
    [clojure.set :as set]
    [clojure.string :as str]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn user-manifest-file
   []
@@ -93,9 +93,7 @@
    'psi/plan-state-learning {:psi/init 'extensions.plan-state-learning/init
                              :source-policies {:installed {:local/root "extensions/plan-state-learning"}}}
    'psi/work-on {:psi/init 'extensions.work-on/init
-                 :source-policies {:installed {:local/root "extensions/work-on"}}}
-   'psi/workflow-loader {:psi/init 'extensions.workflow-loader/init
-                         :source-policies {:installed {:local/root "extensions/workflow-loader"}}}})
+                 :source-policies {:installed {:local/root "extensions/work-on"}}}})
 
 (defn- catalog-entry
   [lib]

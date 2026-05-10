@@ -1,0 +1,6 @@
+- [x] Decide whether registered deterministic operations return the full canonical invoke-step output envelope, a lower-level operation result that runtime wraps, or an explicit tagged success/failure contract; document the authoritative boundary and add focused tests for malformed return handling.
+  - Decision: operations return a tagged success/failure operation result, not the full invoke-step envelope.
+  - Canonical first-cut contract: success -> `{:status :ok :data ... :summary? string :details? map}`; failure -> `{:status :error :reason keyword :message string :details? map}`.
+  - Runtime-owned invoke execution wraps successful results into invoke-step outputs (`:data`, optional `:summary`, full `:result`) and treats failure results as invoke-step failure/yield recording inputs.
+  - Malformed returned values should be rejected at the operation boundary rather than normalized by guessing missing semantics.
+- [x] Align `steps.md` with the resolved boundary decision already captured in `implementation.md`/`design-steps.md`, so task-local execution tracking no longer implies the return-boundary question is still wholly unresolved; keep malformed-return proof work as future implementation steps rather than reopening the design ambiguity.

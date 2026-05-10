@@ -4,7 +4,6 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.rpc.events :as rpc.events]
    [psi.rpc.transport :as rpc.transport]
    [psi.rpc-test-support :as support]))
@@ -107,15 +106,15 @@
 
   (testing "background job list/inspect/cancel ops route through session job store"
     (let [[ctx thread-id] (support/create-session-context)
-          _               (dispatch/dispatch! ctx :session/update-background-jobs-state
-                                              {:update-fn (fn [store]
-                                                            (:state (bg-jobs/start-background-job
-                                                                     store
-                                                                     {:tool-call-id "tc-rpc-bg-1"
-                                                                      :thread-id thread-id
-                                                                      :tool-name "agent-chain"
-                                                                      :job-id "job-rpc-1"})))}
-                                              {:origin :core})
+          _               (session/dispatch-in! ctx :session/update-background-jobs-state
+                                                {:update-fn (fn [store]
+                                                              (:state (bg-jobs/start-background-job
+                                                                       store
+                                                                       {:tool-call-id "tc-rpc-bg-1"
+                                                                        :thread-id thread-id
+                                                                        :tool-name "agent-chain"
+                                                                        :job-id "job-rpc-1"})))}
+                                                {:origin :core})
           state           (atom {:transport {:ready? true :pending {}}})
           handler         (support/make-handler ctx state)
           {:keys [out-lines]}
@@ -143,15 +142,15 @@
 (deftest rpc-cancel-background-job-routes-scheduled-prompts-to-scheduler-test
   (testing "cancel_background_job accepts scheduler-backed ids"
     (let [[ctx session-id] (support/create-session-context)
-          _ (dispatch/dispatch! ctx :scheduler/create
-                                {:session-id session-id
-                                 :schedule-id "sch-rpc-1"
-                                 :label "rpc-cancel"
-                                 :message "cancel over rpc"
-                                 :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                                 :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
-                                 :delay-ms 1000}
-                                {:origin :core})
+          _ (session/dispatch-in! ctx :scheduler/create
+                                  {:session-id session-id
+                                   :schedule-id "sch-rpc-1"
+                                   :label "rpc-cancel"
+                                   :message "cancel over rpc"
+                                   :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
+                                   :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                                   :delay-ms 1000}
+                                  {:origin :core})
           state   (atom {:transport {:ready? true :pending {}}})
           handler (support/make-handler ctx state)
           {:keys [out-lines]}
@@ -172,10 +171,10 @@
 (deftest rpc-subscribe-ui-topics-emits-initial-widget-snapshot-test
   (testing "subscribe ui/widgets-updated emits current widget projection immediately"
     (let [[ctx _] (support/create-session-context)
-          _       (dispatch/dispatch! ctx :session/ui-set-widget
-                                      {:extension-id "ext.demo" :widget-id "w-1"
-                                       :placement :above-editor :content ["hello widget"]}
-                                      {:origin :test})
+          _       (session/dispatch-in! ctx :session/ui-set-widget
+                                        {:extension-id "ext.demo" :widget-id "w-1"
+                                         :placement :above-editor :content ["hello widget"]}
+                                        {:origin :test})
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
@@ -199,24 +198,24 @@
 (deftest rpc-subscribe-ui-topics-emits-canonical-widget-and-status-order-test
   (testing "subscribe emits backend-owned widget/status order from canonical projection"
     (let [[ctx _] (support/create-session-context)
-          _       (dispatch/dispatch! ctx :session/ui-set-widget
-                                      {:extension-id "ext.b" :widget-id "w-2"
-                                       :placement :below-editor :content ["B2"]}
-                                      {:origin :test})
-          _       (dispatch/dispatch! ctx :session/ui-set-widget
-                                      {:extension-id "ext.a" :widget-id "w-3"
-                                       :placement :above-editor :content ["A3"]}
-                                      {:origin :test})
-          _       (dispatch/dispatch! ctx :session/ui-set-widget
-                                      {:extension-id "ext.b" :widget-id "w-1"
-                                       :placement :above-editor :content ["B1"]}
-                                      {:origin :test})
-          _       (dispatch/dispatch! ctx :session/ui-set-status
-                                      {:extension-id "ext-z" :text "Zeta"}
-                                      {:origin :test})
-          _       (dispatch/dispatch! ctx :session/ui-set-status
-                                      {:extension-id "ext-a" :text "Alpha"}
-                                      {:origin :test})
+          _       (session/dispatch-in! ctx :session/ui-set-widget
+                                        {:extension-id "ext.b" :widget-id "w-2"
+                                         :placement :below-editor :content ["B2"]}
+                                        {:origin :test})
+          _       (session/dispatch-in! ctx :session/ui-set-widget
+                                        {:extension-id "ext.a" :widget-id "w-3"
+                                         :placement :above-editor :content ["A3"]}
+                                        {:origin :test})
+          _       (session/dispatch-in! ctx :session/ui-set-widget
+                                        {:extension-id "ext.b" :widget-id "w-1"
+                                         :placement :above-editor :content ["B1"]}
+                                        {:origin :test})
+          _       (session/dispatch-in! ctx :session/ui-set-status
+                                        {:extension-id "ext-z" :text "Zeta"}
+                                        {:origin :test})
+          _       (session/dispatch-in! ctx :session/ui-set-status
+                                        {:extension-id "ext-a" :text "Alpha"}
+                                        {:origin :test})
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
@@ -240,11 +239,11 @@
 (deftest rpc-subscribe-ui-topics-emits-initial-notification-snapshot-test
   (testing "subscribe ui/notification emits current visible notifications immediately"
     (let [[ctx _] (support/create-session-context)
-          _       (dispatch/dispatch! ctx :session/ui-notify
-                                      {:extension-id "ext.demo"
-                                       :message "hello notification"
-                                       :level :info}
-                                      {:origin :test})
+          _       (session/dispatch-in! ctx :session/ui-notify
+                                        {:extension-id "ext.demo"
+                                         :message "hello notification"
+                                         :level :info}
+                                        {:origin :test})
           state   (atom {:transport {:ready? true :pending {}}
                          :connection {:subscribed-topics #{}}})
           handler (support/make-handler ctx state)
@@ -283,10 +282,10 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/widgets-updated\"]}}")
-        (dispatch/dispatch! ctx :session/ui-set-widget
-                            {:extension-id "ext.demo" :widget-id "w-2"
-                             :placement :above-editor :content ["live update"]}
-                            {:origin :test})
+        (session/dispatch-in! ctx :session/ui-set-widget
+                              {:extension-id "ext.demo" :widget-id "w-2"
+                               :placement :above-editor :content ["live update"]}
+                              {:origin :test})
         (let [latest (support/await-frames!
                       out-writer
                       (fn [frames]
@@ -326,11 +325,11 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/notification\"]}}")
-        (dispatch/dispatch! ctx :session/ui-notify
-                            {:extension-id "ext.demo"
-                             :message "live note"
-                             :level :warning}
-                            {:origin :test})
+        (session/dispatch-in! ctx :session/ui-notify
+                              {:extension-id "ext.demo"
+                               :message "live note"
+                               :level :warning}
+                              {:origin :test})
         (let [latest (support/await-frames!
                       out-writer
                       (fn [frames]
@@ -371,18 +370,18 @@
       (try
         (write-line! "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
         (write-line! "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"ui/status-updated\" \"ui/dialog-requested\"]}}")
-        (dispatch/dispatch! ctx :session/ui-set-status
-                            {:session-id session-id
-                             :extension-id "ext.demo"
-                             :text "Live status"}
-                            {:origin :test})
-        (dispatch/dispatch! ctx :session/ui-request-dialog
-                            {:session-id session-id
-                             :kind :confirm
-                             :ext-id "ext.demo"
-                             :title "Live dialog"
-                             :message "Proceed?"}
-                            {:origin :test})
+        (session/dispatch-in! ctx :session/ui-set-status
+                              {:session-id session-id
+                               :extension-id "ext.demo"
+                               :text "Live status"}
+                              {:origin :test})
+        (session/dispatch-in! ctx :session/ui-request-dialog
+                              {:session-id session-id
+                               :kind :confirm
+                               :ext-id "ext.demo"
+                               :title "Live dialog"
+                               :message "Proceed?"}
+                              {:origin :test})
         (let [frames* (support/await-frames!
                        out-writer
                        (fn [frames]

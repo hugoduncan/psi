@@ -5,9 +5,9 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.session-state.state :as ss]
    [psi.agent-session.extensions :as ext]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
    [psi.agent-session.mutations :as mutations]
    [psi.query.core :as query]))
@@ -82,14 +82,12 @@
    session branch.
 
    Steps:
-   1) optionally register global query resolvers/mutations
-   2) register base tools and set system prompt
-   3) load prompts/skills/tools/extensions via EQL mutations
-   4) merge extension tools into active tools
-   5) persist startup summary to :startup-bootstrap in session data
+   1) register base tools and set system prompt
+   2) load prompts/skills/tools/extensions via EQL mutations
+   3) merge extension tools into active tools
+   4) persist startup summary to :startup-bootstrap in session data
 
    opts keys:
-   :register-global-query? — register agent-session resolvers/mutations globally (default true)
    :base-tools             — base tool schema vector (default [])
    :system-prompt          — prompt string (default empty string)
    :developer-prompt       — optional developer instruction string (default nil)
@@ -101,9 +99,8 @@
    :extension-targets      — activation targets (default [])
 
    Returns startup summary map stored at :startup-bootstrap."
-  [ctx session-id {:keys [register-global-query? base-tools system-prompt developer-prompt developer-prompt-source templates skills tools extension-paths extension-targets]
-                   :or   {register-global-query? true
-                          base-tools             []
+  [ctx session-id {:keys [base-tools system-prompt developer-prompt developer-prompt-source templates skills tools extension-paths extension-targets]
+                   :or   {base-tools             []
                           system-prompt          ""
                           developer-prompt       ::unset
                           developer-prompt-source :fallback
@@ -112,22 +109,19 @@
                           tools                  []
                           extension-paths        []
                           extension-targets      []}}]
-  (when register-global-query?
-    (session/register-resolvers!)
-    (session/register-mutations! mutations/all-mutations))
   (let [resolved-developer-prompt (if (= developer-prompt ::unset)
                                     nil
                                     developer-prompt)
         resolved-source (when-not (= developer-prompt ::unset)
                           developer-prompt-source)]
-    (dispatch/dispatch! ctx
-                        :session/bootstrap-prompt-state
-                        {:session-id              session-id
-                         :system-prompt           system-prompt
-                         :developer-prompt        resolved-developer-prompt
-                         :developer-prompt-source resolved-source}
-                        {:origin :core})
-    (dispatch/dispatch! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core}))
+    (session/dispatch-in! ctx
+                          :session/bootstrap-prompt-state
+                          {:session-id              session-id
+                           :system-prompt           system-prompt
+                           :developer-prompt        resolved-developer-prompt
+                           :developer-prompt-source resolved-source}
+                          {:origin :core})
+    (session/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core}))
   (let [startup-tools (into (vec base-tools) (vec tools))
         {:keys [prompt-count skill-count tool-count extension-results]}
         (load-startup-resources-via-mutations-in!
@@ -141,9 +135,9 @@
                              {:path  (:psi.extension/path r)
                               :error e}))
                          extension-results)
-        ext-tools (ext/all-tools-in (:extension-registry ctx))
+        ext-tools (tool-registry/all-tools-in (:extension-registry ctx))
         active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
-        _         (dispatch/dispatch! ctx :session/set-active-tools {:session-id session-id :tool-maps (into (vec active-tools) ext-tools)} {:origin :core})
+        _         (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps (into (vec active-tools) ext-tools)} {:origin :core})
         summary   {:timestamp              (java.time.Instant/now)
                    :prompt-count           prompt-count
                    :skill-count            skill-count
@@ -155,5 +149,5 @@
                                             'psi.extension/add-skill
                                             'psi.extension/add-tool
                                             'psi.extension/add-extension]}]
-    (dispatch/dispatch! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
+    (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
     summary))

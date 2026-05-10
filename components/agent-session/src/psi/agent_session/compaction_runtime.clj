@@ -3,9 +3,9 @@
    [psi.agent-session.compaction :as compaction]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.prompt-control :as prompt-control]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-persistence.core :as persist]
+   [psi.agent-session.turn :as turn]
+   [psi.session-state.state :as ss]))
 
 (defn execute-compaction-in!
   "Execute a compaction cycle: prepare → dispatch before-compact → run
@@ -29,7 +29,10 @@
                                   ((:compaction-fn ctx) sd preparation custom-instructions))
                 entry           (persist/compaction-entry result from-extension?)
                 new-msgs        (compaction/rebuild-messages-from-entries result sd)]
-            (ss/journal-append-in! ctx session-id entry)
+            (dispatch/dispatch! ctx :session/append-journal-entry
+                                {:session-id session-id
+                                 :entry entry}
+                                {:origin :core})
             (dispatch/dispatch! ctx :session/compaction-finished
                                 {:session-id session-id :messages new-msgs} {:origin :core})
             (ext/dispatch-in reg "session_compact"
@@ -46,7 +49,7 @@
    caller can still receive the compaction result directly."
   [ctx session-id custom-instructions]
   (when-not (ss/idle-in? ctx session-id)
-    (prompt-control/abort-in! ctx session-id))
+    (turn/abort-in! ctx session-id))
   (dispatch/dispatch! ctx :session/compact-start {:session-id session-id} {:origin :core})
   (let [result (dispatch/dispatch! ctx
                                    :session/manual-compaction-execute

@@ -6,20 +6,21 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.service-protocol]
    [psi.agent-session.services]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]
+   [psi.state-kernel.dispatch :as kernel]))
 
 ;; ── Fixture: clean handler registry and event log between tests ─
 
 (defn- clean-state [f]
-  (dispatch/clear-handlers!)
-  (dispatch/clear-event-log!)
-  (dispatch/clear-dispatch-trace!)
+  (kernel/clear-handlers!)
+  (kernel/clear-event-log!)
+  (kernel/clear-dispatch-trace!)
   (dispatch/set-interceptors! nil)
   (try (f)
        (finally
-         (dispatch/clear-handlers!)
-         (dispatch/clear-event-log!)
-         (dispatch/clear-dispatch-trace!)
+         (kernel/clear-handlers!)
+         (kernel/clear-event-log!)
+         (kernel/clear-dispatch-trace!)
          (dispatch/set-interceptors! nil))))
 
 (use-fixtures :each clean-state)
@@ -35,38 +36,38 @@
 
 (deftest register-handler-test
   (testing "register-handler! adds handler to registry"
-    (dispatch/register-handler! :test-event (fn [_ctx _data] :handled))
-    (is (contains? (dispatch/registered-event-types) :test-event)))
+    (kernel/register-handler! :test-event (fn [_ctx _data] :handled))
+    (is (contains? (kernel/registered-event-types) :test-event)))
 
   (testing "register-handler! replaces existing handler"
-    (dispatch/register-handler! :test-event (fn [_ctx _data] :first))
-    (dispatch/register-handler! :test-event (fn [_ctx _data] :second))
+    (kernel/register-handler! :test-event (fn [_ctx _data] :first))
+    (kernel/register-handler! :test-event (fn [_ctx _data] :second))
     (is (= :second (dispatch/dispatch! {} :test-event))))
 
   (testing "register-handler! stores handler entries"
-    (dispatch/register-handler! :classified (fn [_ctx _data] :ok))
+    (kernel/register-handler! :classified (fn [_ctx _data] :ok))
     (is (= {:fn :present}
-           (some-> (dispatch/handler-entry :classified)
+           (some-> (kernel/handler-entry :classified)
                    (update :fn (constantly :present)))))))
 
 (deftest registered-event-types-test
   (testing "returns empty set when no handlers registered"
-    (is (= #{} (dispatch/registered-event-types))))
+    (is (= #{} (kernel/registered-event-types))))
 
   (testing "returns all registered event types"
-    (dispatch/register-handler! :a (fn [_ _] nil))
-    (dispatch/register-handler! :b (fn [_ _] nil))
-    (is (= #{:a :b} (dispatch/registered-event-types)))))
+    (kernel/register-handler! :a (fn [_ _] nil))
+    (kernel/register-handler! :b (fn [_ _] nil))
+    (is (= #{:a :b} (kernel/registered-event-types)))))
 
 ;; ── Dispatch ────────────────────────────────────────────────
 
 (deftest dispatch-test
   (testing "dispatch! calls registered handler with ctx and event-data"
     (let [calls (atom [])]
-      (dispatch/register-handler! :test-event
-                                  (fn [ctx data]
-                                    (swap! calls conj {:ctx ctx :data data})
-                                    :result))
+      (kernel/register-handler! :test-event
+                                (fn [ctx data]
+                                  (swap! calls conj {:ctx ctx :data data})
+                                  :result))
       (let [ctx {:some "context"}
             result (dispatch/dispatch! ctx :test-event {:foo "bar"})]
         (is (= :result result))
@@ -78,7 +79,7 @@
 
   (testing "dispatch normalizes a canonical internal event value while preserving compat projections"
     (let [seen (atom nil)
-          probe (dispatch/->interceptor
+          probe (kernel/->interceptor
                  {:id :probe
                   :before (fn [ictx]
                             (reset! seen {:event (:event ictx)
@@ -88,8 +89,8 @@
                                           :ext-id (:ext-id ictx)
                                           :replaying? (:replaying? ictx)})
                             ictx)})]
-      (dispatch/set-interceptors! [probe dispatch/handler-interceptor dispatch/apply-interceptor])
-      (dispatch/register-handler! :normalized (fn [_ _] :ok))
+      (dispatch/set-interceptors! [probe kernel/handler-interceptor dispatch/apply-interceptor])
+      (kernel/register-handler! :normalized (fn [_ _] :ok))
       (is (= :ok (dispatch/dispatch! {} :normalized {:x 1}
                                      {:origin :extension
                                       :ext-id "/ext/test.clj"
@@ -113,18 +114,18 @@
 
   (testing "dispatch! with no event-data passes only injected dispatch metadata"
     (let [received-data (atom :not-called)]
-      (dispatch/register-handler! :no-data
-                                  (fn [_ctx data]
-                                    (reset! received-data data)))
+      (kernel/register-handler! :no-data
+                                (fn [_ctx data]
+                                  (reset! received-data data)))
       (dispatch/dispatch! {} :no-data)
       (is (string? (:dispatch-id @received-data)))
       (is (= [:dispatch-id] (keys @received-data)))))
 
   (testing "dispatch! with 2-arity call passes only injected dispatch metadata"
     (let [received-data (atom :not-called)]
-      (dispatch/register-handler! :two-arity
-                                  (fn [_ctx data]
-                                    (reset! received-data data)))
+      (kernel/register-handler! :two-arity
+                                (fn [_ctx data]
+                                  (reset! received-data data)))
       (dispatch/dispatch! {} :two-arity)
       (is (string? (:dispatch-id @received-data)))
       (is (= [:dispatch-id] (keys @received-data))))))
@@ -135,10 +136,10 @@
   (testing "handler receives the ctx passed to dispatch!"
     (let [state* (atom {:agent-session {:data {:is-streaming false}}})
           ctx {:state* state*}]
-      (dispatch/register-handler! :mark-streaming
-                                  (fn [ctx _data]
-                                    (swap! (:state* ctx) assoc-in
-                                           [:agent-session :data :is-streaming] true)))
+      (kernel/register-handler! :mark-streaming
+                                (fn [ctx _data]
+                                  (swap! (:state* ctx) assoc-in
+                                         [:agent-session :data :is-streaming] true)))
       (dispatch/dispatch! ctx :mark-streaming)
       (is (true? (get-in @state* [:agent-session :data :is-streaming]))))))
 
@@ -148,15 +149,15 @@
   (testing "before fns run in order, after fns in reverse"
     (let [order (atom [])]
       (dispatch/set-interceptors!
-       [(dispatch/->interceptor
+       [(kernel/->interceptor
          {:id :a
           :before (fn [ictx] (swap! order conj :a-before) ictx)
           :after  (fn [ictx] (swap! order conj :a-after) ictx)})
-        (dispatch/->interceptor
+        (kernel/->interceptor
          {:id :b
           :before (fn [ictx] (swap! order conj :b-before) ictx)
           :after  (fn [ictx] (swap! order conj :b-after) ictx)})])
-      (dispatch/register-handler! :test (fn [_ _] nil))
+      (kernel/register-handler! :test (fn [_ _] nil))
       (dispatch/dispatch! {} :test)
       (is (= [:a-before :b-before :b-after :a-after] @order))))
 
@@ -171,17 +172,17 @@
           validate-fn (fn [_ctx ictx]
                         (swap! order conj [:validate (:applied-effects ictx) @session-data])
                         {:valid? true})
-          trim-probe (dispatch/->interceptor
+          trim-probe (kernel/->interceptor
                       {:id :trim-probe
                        :after (fn [ictx]
                                 (swap! order conj [:trim (boolean (:replaying? ictx)) (:applied-effects ictx)])
                                 ictx)})
-          effects-probe (dispatch/->interceptor
+          effects-probe (kernel/->interceptor
                          {:id :effects-probe
                           :after (fn [ictx]
                                    (swap! order conj [:effects-stage (:applied-effects ictx)])
                                    ictx)})
-          apply-probe (dispatch/->interceptor
+          apply-probe (kernel/->interceptor
                        {:id :apply-probe
                         :after (fn [ictx]
                                  (swap! order conj [:apply-stage (:applied-effects ictx) @session-data])
@@ -191,16 +192,16 @@
                :validate-dispatch-result-fn validate-fn}]
       (dispatch/set-interceptors!
        [dispatch/permission-interceptor
-        dispatch/log-interceptor
-        dispatch/handler-interceptor
-        dispatch/effect-interceptor
+        kernel/log-interceptor
+        kernel/handler-interceptor
+        kernel/effect-interceptor
         effects-probe
-        dispatch/trim-effects-on-replay
+        kernel/trim-effects-on-replay
         trim-probe
-        dispatch/validate-interceptor
+        kernel/validate-interceptor
         apply-probe
         dispatch/apply-interceptor])
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :ordered-pure
        (fn [_ctx _data]
          {:root-state-update #(update % :retry-attempt inc)
@@ -226,17 +227,17 @@
           validate-fn (fn [_ctx ictx]
                         (swap! order conj [:validate (:applied-effects ictx) @root-state])
                         {:valid? true})
-          trim-probe (dispatch/->interceptor
+          trim-probe (kernel/->interceptor
                       {:id :trim-probe
                        :after (fn [ictx]
                                 (swap! order conj [:trim (boolean (:replaying? ictx)) (:applied-effects ictx)])
                                 ictx)})
-          effects-probe (dispatch/->interceptor
+          effects-probe (kernel/->interceptor
                          {:id :effects-probe
                           :after (fn [ictx]
                                    (swap! order conj [:effects-stage (:applied-effects ictx)])
                                    ictx)})
-          apply-probe (dispatch/->interceptor
+          apply-probe (kernel/->interceptor
                        {:id :apply-probe
                         :after (fn [ictx]
                                  (swap! order conj [:apply-stage (:applied-effects ictx) @root-state])
@@ -246,17 +247,17 @@
                :validate-dispatch-result-fn validate-fn}]
       (dispatch/set-interceptors!
        [dispatch/permission-interceptor
-        dispatch/log-interceptor
+        kernel/log-interceptor
         dispatch/statechart-interceptor
-        dispatch/handler-interceptor
-        dispatch/effect-interceptor
+        kernel/handler-interceptor
+        kernel/effect-interceptor
         effects-probe
-        dispatch/trim-effects-on-replay
+        kernel/trim-effects-on-replay
         trim-probe
-        dispatch/validate-interceptor
+        kernel/validate-interceptor
         apply-probe
         dispatch/apply-interceptor])
-      (dispatch/register-handler!
+      (kernel/register-handler!
        :ordered-root-update
        (fn [_ctx _data]
          {:root-state-update #(assoc-in % [:agent-session :data :session-name] "after")
@@ -278,24 +279,24 @@
                (fn [_ctx event-type event-data _ictx]
                  (swap! calls conj [:statechart event-type event-data])
                  {:claimed? true :result :claimed})}]
-      (dispatch/register-handler! :claimed-event (fn [_ _] (swap! calls conj [:handler]) :handler-result))
+      (kernel/register-handler! :claimed-event (fn [_ _] (swap! calls conj [:handler]) :handler-result))
       (is (= :claimed (dispatch/dispatch! ctx :claimed-event {:x 1})))
       (is (= [[:statechart :claimed-event {:x 1}]] @calls))))
 
   (testing "blocked context skips subsequent before fns"
     (let [order (atom [])]
       (dispatch/set-interceptors!
-       [(dispatch/->interceptor
+       [(kernel/->interceptor
          {:id :blocker
           :before (fn [ictx]
                     (swap! order conj :blocker)
                     (assoc ictx :blocked? true :block-reason :test-block))})
-        (dispatch/->interceptor
+        (kernel/->interceptor
          {:id :skipped
           :before (fn [ictx]
                     (swap! order conj :skipped)
                     ictx)})])
-      (dispatch/register-handler! :test (fn [_ _] :should-not-run))
+      (kernel/register-handler! :test (fn [_ _] :should-not-run))
       (let [result (dispatch/dispatch! {} :test)]
         (is (nil? result))
         (is (= [:blocker] @order)))))
@@ -303,13 +304,13 @@
   (testing "after fns still run when blocked"
     (let [after-ran? (atom false)]
       (dispatch/set-interceptors!
-       [(dispatch/->interceptor
+       [(kernel/->interceptor
          {:id :with-after
           :after (fn [ictx] (reset! after-ran? true) ictx)})
-        (dispatch/->interceptor
+        (kernel/->interceptor
          {:id :blocker
           :before (fn [ictx] (assoc ictx :blocked? true))})])
-      (dispatch/register-handler! :test (fn [_ _] nil))
+      (kernel/register-handler! :test (fn [_ _] nil))
       (dispatch/dispatch! {} :test)
       (is (true? @after-ran?)))))
 
@@ -317,9 +318,9 @@
 
 (deftest canonical-dispatch-trace-test
   (testing "dispatch assigns one stable dispatch-id and records received/completed"
-    (dispatch/register-handler! :trace-event (fn [_ _] :ok))
+    (kernel/register-handler! :trace-event (fn [_ _] :ok))
     (is (= :ok (dispatch/dispatch! {} :trace-event {:x 1})))
-    (let [entries (dispatch/dispatch-trace-entries)
+    (let [entries (kernel/dispatch-trace-entries)
           received (first entries)
           completed (last entries)]
       (is (= :dispatch/received (:trace/kind received)))
@@ -329,18 +330,18 @@
       (is (= :trace-event (:event-type completed)))))
 
   (testing "dispatch records interceptor, handler, effect, and completion stages under one dispatch-id"
-    (dispatch/clear-dispatch-trace!)
+    (kernel/clear-dispatch-trace!)
     (let [effect-calls (atom [])
           ctx {:execute-dispatch-effect-fn (fn [_ effect]
                                              (swap! effect-calls conj effect)
                                              {:ok true})}]
-      (dispatch/register-handler! :trace-rich
-                                  (fn [_ _]
-                                    {:effects [{:effect/type :effect/demo
-                                                :value 1}]
-                                     :return :done}))
+      (kernel/register-handler! :trace-rich
+                                (fn [_ _]
+                                  {:effects [{:effect/type :effect/demo
+                                              :value 1}]
+                                   :return :done}))
       (is (= :done (dispatch/dispatch! ctx :trace-rich {:x 1})))
-      (let [entries (dispatch/dispatch-trace-entries)
+      (let [entries (kernel/dispatch-trace-entries)
             dispatch-id (:dispatch-id (first entries))
             by-id (filter #(= dispatch-id (:dispatch-id %)) entries)]
         (is (seq @effect-calls))
@@ -375,7 +376,7 @@
 
   (testing "service request/response/notify entries inherit an explicit dispatch-id"
     (let [calls (atom [])
-          dispatch-id (dispatch/next-dispatch-id)
+          dispatch-id (kernel/next-dispatch-id)
           request-fn-var (resolve 'psi.agent-session.service-protocol/send-service-request!)
           notify-fn-var (resolve 'psi.agent-session.service-protocol/send-service-notification!)]
       (with-redefs [psi.agent-session.services/service-in
@@ -394,7 +395,7 @@
          {} [:svc :one]
          {"jsonrpc" "2.0" "method" "initialized"}
          {:dispatch-id dispatch-id})
-        (let [entries (dispatch/dispatch-trace-entries)]
+        (let [entries (kernel/dispatch-trace-entries)]
           (is (some #(and (= :dispatch/service-request (:trace/kind %))
                           (= dispatch-id (:dispatch-id %))
                           (= "initialize" (:method %)))
@@ -410,9 +411,9 @@
 
 (deftest event-log-test
   (testing "dispatch writes event log entries"
-    (dispatch/register-handler! :logged-event (fn [_ _] :ok))
+    (kernel/register-handler! :logged-event (fn [_ _] :ok))
     (dispatch/dispatch! {} :logged-event {:x 1})
-    (let [entries (dispatch/event-log-entries)]
+    (let [entries (kernel/event-log-entries)]
       (is (= 1 (count entries)))
       (let [entry (first entries)]
         (is (= :logged-event (:event-type entry)))
@@ -424,34 +425,34 @@
         (is (number? (:duration-ms entry))))))
 
   (testing "unregistered events are still logged"
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (dispatch/dispatch! {} :no-handler {:y 2})
-    (let [entries (dispatch/event-log-entries)]
+    (let [entries (kernel/event-log-entries)]
       (is (= 1 (count entries)))
       (is (= :no-handler (:event-type (first entries))))))
 
   (testing "blocked events are logged with blocked? true"
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (dispatch/set-interceptors!
-     [(dispatch/->interceptor
+     [(kernel/->interceptor
        {:id :blocker
         :before (fn [ictx] (assoc ictx :blocked? true))})
-      dispatch/log-interceptor
-      dispatch/handler-interceptor])
-    (dispatch/register-handler! :blocked (fn [_ _] nil))
+      kernel/log-interceptor
+      kernel/handler-interceptor])
+    (kernel/register-handler! :blocked (fn [_ _] nil))
     (dispatch/dispatch! {} :blocked)
-    (let [entries (dispatch/event-log-entries)]
+    (let [entries (kernel/event-log-entries)]
       (is (= 1 (count entries)))
       (is (true? (:blocked? (first entries))))))
 
   (testing "event log is bounded"
     ;; Use a chain with only handler (skip log) then log manually
     ;; to avoid testing the bound indirectly. Instead, test directly.
-    (dispatch/clear-event-log!)
-    (dispatch/register-handler! :bulk (fn [_ _] nil))
+    (kernel/clear-event-log!)
+    (kernel/register-handler! :bulk (fn [_ _] nil))
     (dotimes [i 1005]
       (dispatch/dispatch! {} :bulk {:i i}))
-    (is (<= (count (dispatch/event-log-entries)) 1000))))
+    (is (<= (count (kernel/event-log-entries)) 1000))))
 
 ;; ── Default interceptors ────────────────────────────────────
 
@@ -464,12 +465,12 @@
     (is (= dispatch/default-interceptors (dispatch/current-interceptors))))
 
   (testing "set-interceptors! overrides the chain"
-    (let [custom [(dispatch/->interceptor {:id :custom})]]
+    (let [custom [(kernel/->interceptor {:id :custom})]]
       (dispatch/set-interceptors! custom)
       (is (= custom (dispatch/current-interceptors)))))
 
   (testing "set-interceptors! nil restores defaults"
-    (dispatch/set-interceptors! [(dispatch/->interceptor {:id :temp})])
+    (dispatch/set-interceptors! [(kernel/->interceptor {:id :temp})])
     (dispatch/set-interceptors! nil)
     (is (= dispatch/default-interceptors (dispatch/current-interceptors)))))
 
@@ -490,26 +491,26 @@
 
 (deftest permission-interceptor-test
   (testing "core origin bypasses permission check"
-    (dispatch/register-handler! :core-event (fn [_ _] :ok))
+    (kernel/register-handler! :core-event (fn [_ _] :ok))
     (is (= :ok (dispatch/dispatch! {} :core-event nil {:origin :core}))))
 
   (testing "statechart origin bypasses permission check"
-    (dispatch/register-handler! :sc-event (fn [_ _] :ok))
+    (kernel/register-handler! :sc-event (fn [_ _] :ok))
     (is (= :ok (dispatch/dispatch! {} :sc-event nil {:origin :statechart}))))
 
   (testing "adapter origin bypasses permission check"
-    (dispatch/register-handler! :adapter-event (fn [_ _] :ok))
+    (kernel/register-handler! :adapter-event (fn [_ _] :ok))
     (is (= :ok (dispatch/dispatch! {} :adapter-event nil {:origin :adapter}))))
 
   (testing "extension origin with registered ext-id and no manifest allowed-events is blocked"
     (let [reg (make-test-registry [["/ext/a.clj" {:path "/ext/a.clj"}]])
           ctx {:extension-registry reg}]
-      (dispatch/register-handler! :ext-event (fn [_ _] :allowed))
-      (dispatch/clear-event-log!)
+      (kernel/register-handler! :ext-event (fn [_ _] :allowed))
+      (kernel/clear-event-log!)
       (is (nil? (dispatch/dispatch! ctx :ext-event nil
                                     {:origin :extension
                                      :ext-id "/ext/a.clj"})))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (true? (:blocked? entry)))
         (is (= {:reason :permission-denied
                 :event-type :ext-event
@@ -520,7 +521,7 @@
     (let [reg (make-test-registry [["/ext/a.clj" {:path "/ext/a.clj"
                                                   :allowed-events #{:ext-event}}]])
           ctx {:extension-registry reg}]
-      (dispatch/register-handler! :ext-event (fn [_ _] :allowed))
+      (kernel/register-handler! :ext-event (fn [_ _] :allowed))
       (is (= :allowed (dispatch/dispatch! ctx :ext-event nil
                                           {:origin :extension
                                            :ext-id "/ext/a.clj"})))))
@@ -529,12 +530,12 @@
     (let [reg (make-test-registry [["/ext/a.clj" {:path "/ext/a.clj"
                                                   :allowed-events #{:other-event}}]])
           ctx {:extension-registry reg}]
-      (dispatch/register-handler! :ext-event (fn [_ _] :should-not-run))
-      (dispatch/clear-event-log!)
+      (kernel/register-handler! :ext-event (fn [_ _] :should-not-run))
+      (kernel/clear-event-log!)
       (is (nil? (dispatch/dispatch! ctx :ext-event nil
                                     {:origin :extension
                                      :ext-id "/ext/a.clj"})))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (true? (:blocked? entry)))
         (is (= {:reason :permission-denied
                 :event-type :ext-event
@@ -544,23 +545,23 @@
   (testing "extension origin with unknown ext-id is blocked"
     (let [reg (make-test-registry ["/ext/a.clj"])
           ctx {:extension-registry reg}]
-      (dispatch/register-handler! :ext-event (fn [_ _] :should-not-run))
-      (dispatch/clear-event-log!)
+      (kernel/register-handler! :ext-event (fn [_ _] :should-not-run))
+      (kernel/clear-event-log!)
       (is (nil? (dispatch/dispatch! ctx :ext-event nil
                                     {:origin :extension
                                      :ext-id "/ext/unknown.clj"})))
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (true? (:blocked? entry)))
         (is (= :unknown-extension (:block-reason entry))))))
 
   (testing "extension origin with nil ext-id is blocked"
-    (dispatch/register-handler! :ext-event (fn [_ _] :should-not-run))
+    (kernel/register-handler! :ext-event (fn [_ _] :should-not-run))
     (is (nil? (dispatch/dispatch! {} :ext-event nil
                                   {:origin :extension
                                    :ext-id nil}))))
 
   (testing "extension origin with no registry on ctx is blocked"
-    (dispatch/register-handler! :ext-event (fn [_ _] :should-not-run))
+    (kernel/register-handler! :ext-event (fn [_ _] :should-not-run))
     (is (nil? (dispatch/dispatch! {} :ext-event nil
                                   {:origin :extension
                                    :ext-id "/ext/a.clj"})))))
@@ -569,7 +570,7 @@
 
 (deftest startup-bootstrap-summary-dispatch-test
   (let [[ctx _]            (create-session-context {:persist? false})
-        _                  (dispatch/clear-event-log!)
+        _                  (kernel/clear-event-log!)
         sd                 (session/new-session-in! ctx nil {})
         session-id         (:session-id sd)
         completed-at       (java.time.Instant/now)
@@ -577,29 +578,30 @@
     (testing "startup summary writes through dispatch handlers"
       (dispatch/dispatch! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
       (let [sd         (ss/get-session-data-in ctx session-id)
-            entries     (dispatch/event-log-entries)
+            entries     (kernel/event-log-entries)
             event-types (mapv :event-type entries)]
         (is (= summary (:startup-bootstrap sd)))
         (is (= [:session/new-initialize
                 :session/ensure-base-system-prompt
                 :session/retarget-runtime-prompt-metadata
+                :session/append-journal-entry
                 :session/set-startup-bootstrap-summary]
                event-types))))))
 
 (deftest origin-logged-test
   (testing "log entry captures origin"
-    (dispatch/register-handler! :origin-test (fn [_ _] nil))
+    (kernel/register-handler! :origin-test (fn [_ _] nil))
     (dispatch/dispatch! {} :origin-test nil {:origin :statechart})
-    (let [entry (last (dispatch/event-log-entries))]
+    (let [entry (last (kernel/event-log-entries))]
       (is (= :statechart (:origin entry)))))
 
   (testing "log entry captures ext-id for extension origin"
-    (dispatch/clear-event-log!)
+    (kernel/clear-event-log!)
     (let [reg (make-test-registry ["/ext/a.clj"])
           ctx {:extension-registry reg}]
-      (dispatch/register-handler! :ext-log (fn [_ _] nil))
+      (kernel/register-handler! :ext-log (fn [_ _] nil))
       (dispatch/dispatch! ctx :ext-log nil {:origin :extension :ext-id "/ext/a.clj"})
-      (let [entry (last (dispatch/event-log-entries))]
+      (let [entry (last (kernel/event-log-entries))]
         (is (= :extension (:origin entry)))
         (is (= "/ext/a.clj" (:ext-id entry)))))))
 

@@ -3,10 +3,10 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-core.core :as agent-core]
-   [psi.agent-session.conversation :as conversation]
    [psi.agent-session.core :as session]
+   [psi.turn-runtime.conversation :as conversation]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.query.core :as query]))
 

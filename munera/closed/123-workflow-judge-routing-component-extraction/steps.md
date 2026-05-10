@@ -1,0 +1,27 @@
+- [x] Review current `psi.agent-session.workflow-judge` responsibilities and separate pure judge/routing logic from impure execution/orchestration logic
+- [x] Confirm the exact pure extraction surface to preserve: `project-messages`, `match-signal`, `resolve-goto-target`, `check-iteration-limit`, and `evaluate-routing`, plus adjacent pure helpers discovered during implementation
+- [x] Create a lower workflow judge/routing component with authoritative `psi.workflow-judge.*` namespace(s)
+- [x] Move canonical pure judge projection logic into the new component
+- [x] Move verdict normalization and routing evaluation into the new component
+- [x] Preserve the current projection semantics and record any explicitly chosen step-id contract decision in `implementation.md` if implementation reveals ambiguity
+- [x] Keep `execute-judge!`, persistence reads, prompt submission, and retry orchestration outside the extracted component and rewire any consumers accordingly
+- [x] Update workflow runtime consumers to depend downward on the extracted component
+- [x] Update focused tests, moving pure judge/routing proofs with the new component while keeping impure judge-execution and higher workflow integration proofs above the boundary
+- [x] Remove mixed authoritative ownership of the pure judge/routing logic from `psi.agent-session.*`
+- [x] Record final boundary decisions, the final namespace split, and any residual follow-ons in `implementation.md`
+- [x] Reorder forms in `components/workflow-judge/src/psi/workflow_judge.clj` so projection helpers/functions and routing helpers/functions are grouped contiguously
+- [x] Re-run focused workflow-judge tests after the namespace-order cleanup
+- [x] Re-run lint after the namespace-order cleanup
+- [x] Append the namespace-order cleanup result to `implementation.md`
+- [x] Add a pure-component regression test proving that `:tool-output false` drops messages whose content becomes empty after tool-block stripping
+- [x] Re-run focused workflow-judge tests after adding the empty-content drop regression
+- [x] Re-run lint after adding the empty-content drop regression
+- [x] Add an optional consumer-level proof for `workflow-source-resolution` applying `:projection` through the new lower owner
+- [x] Re-run focused consuming-path tests if the optional consumer-level proof is added
+- [x] Append the test-follow-up result to `implementation.md`
+- [x] Split `project-messages-tail-tool-output-false-test` into narrower behavior-focused tests
+- [x] Re-run focused workflow-judge tests after splitting the dense projection test
+- [x] Re-run lint after splitting the dense projection test
+- [x] Optionally extract a tiny transcript-run helper in `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj` if it reduces repeated setup without hiding intent
+- [x] Re-run focused consuming-path tests if the transcript helper is introduced
+- [x] Append the test-shaper follow-up result to `implementation.md`

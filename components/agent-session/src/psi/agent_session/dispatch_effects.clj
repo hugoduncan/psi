@@ -8,18 +8,18 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extensions :as ext]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.ai.model-registry :as model-registry]
    [psi.memory.core :as memory]
    [psi.memory.runtime :as memory-runtime]
-   [psi.agent-session.persistence :as persist]
-   [psi.agent-session.project-preferences :as project-prefs]
-   [psi.agent-session.session :as session-data]
-   [psi.agent-session.user-config :as user-cfg]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-persistence.core :as persist]
+   [psi.shared-config.project :as project-prefs]
+   [psi.session-state.model :as session-data]
+   [psi.shared-config.user :as user-cfg]
+   [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
-   [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.turn-statechart :as turn-sc]))
+   [psi.tool-registry.defs :as tool-defs]
+   [psi.turn-statechart.core :as turn-sc]))
 
 (defonce ^:private scheduler-timer-handles* (atom {}))
 
@@ -128,9 +128,23 @@
   (let [session-id (effect-session-id ctx effect)
         prepared-request (:prepared-request effect)
         progress-queue (:progress-queue effect)
-        execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)]
-    (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
-    execution-result))
+        execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)
+        _ (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
+        latest-summary (:last-execution-result-summary (ss/get-session-data-in ctx session-id))]
+    (if (= (:execution-result/turn-id execution-result)
+           (:turn-id latest-summary))
+      execution-result
+      {:execution-result/turn-id (:turn-id latest-summary)
+       :execution-result/session-id session-id
+       :execution-result/assistant-message (or (some (fn [entry]
+                                                       (let [message (get-in entry [:data :message])]
+                                                         (when (= "assistant" (:role message))
+                                                           message)))
+                                                     (rseq (vec (persist/all-entries-in ctx session-id))))
+                                               (:execution-result/assistant-message execution-result))
+       :execution-result/turn-outcome (:turn-outcome latest-summary)
+       :execution-result/tool-calls []
+       :execution-result/stop-reason (:stop-reason latest-summary)})))
 
 (defmethod execute-effect! :runtime/recover-query-prompt-execute-and-record [ctx effect]
   (when-let [query-text (:query-text effect)]
@@ -219,14 +233,27 @@
 (defmethod execute-effect! :statechart/send-event [ctx effect]
   (sc/send-event! (:sc-env ctx) (effect-sc-session-id ctx effect) (:event effect)))
 
-(defmethod execute-effect! :persist/journal-append-model-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/model-entry (:provider effect) (:model-id effect))))
-(defmethod execute-effect! :persist/journal-append-message-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/message-entry (:message effect))))
-(defmethod execute-effect! :persist/journal-append-thinking-level-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/thinking-level-entry (:level effect))))
-(defmethod execute-effect! :persist/journal-append-session-info-entry [ctx effect]
-  ((:journal-append-fn ctx) ctx (effect-session-id ctx effect) (persist/session-info-entry (:name effect))))
+(defn- execute-session-journal-io!
+  [_ctx {:keys [request]}]
+  (let [{:keys [op session-file session-id worktree-path parent-session-id parent-session-path entry entries]} request
+        session-file (if (instance? java.io.File session-file)
+                       session-file
+                       (java.io.File. (str session-file)))]
+    (case op
+      :append-entry
+      (persist/append-entry-to-disk! session-file entry)
+
+      :flush-journal
+      (persist/flush-journal! session-file session-id worktree-path parent-session-id parent-session-path entries)
+
+      nil)))
+
+(defmethod execute-effect! :persist/session-journal-io [ctx effect]
+  (let [request (:request effect)
+        result  (execute-session-journal-io! ctx effect)]
+    (when (= :flush-journal (:op request))
+      (ss/apply-root-state-update-in! ctx (persist/mark-flushed-root-update (effect-session-id ctx effect))))
+    result))
 
 (defmethod execute-effect! :persist/project-prefs-update [ctx effect]
   (try
@@ -262,7 +289,7 @@
         (when (and (:workflow-ext-path job) (:workflow-id job))
           (let [wf-reg (:workflow-registry ctx)]
             (when wf-reg
-              ((requiring-resolve 'psi.agent-session.workflows/abort-workflow-in!) wf-reg (:workflow-ext-path job) (:workflow-id job) "cancel requested"))))
+              ((requiring-resolve 'psi.agent-session.extension-workflow-runtime/abort-workflow-in!) wf-reg (:workflow-ext-path job) (:workflow-id job) "cancel requested"))))
         (catch Exception _ nil)))
     (when-let [refresh-fn (some-> ctx :background-job-ui-refresh-fn deref)]
       (refresh-fn ctx (:session-id effect)))

@@ -1,0 +1,72 @@
+# 135 — Higher-order workflow references
+
+Implemented notes:
+
+- Chosen external workflow-reference shape: `{:type :workflow-ref :name "..."}` in `psi.workflow-runtime.model/workflow-ref-schema`.
+- Chosen IR target shape: `:delegate {:target (string | source-spec) ...}` via `psi.workflow-runtime.ir/delegate-target-schema`.
+- Dynamic `:target` reuses canonical `source-spec` exactly, including `:from` plus optional `:path` or `:projection`; no parallel target mini-language was added.
+- Grammar/compiler validation boundary:
+  - `psi.workflow-runtime.target-ir-compiler/compile-delegate-target` rejects authored `:target` values that are neither workflow-name strings nor source-spec maps.
+- Runtime workflow-reference validation boundary:
+  - `psi.workflow-step-materialization.source-resolution/resolve-workflow-ref-source-spec` resolves dynamic targets and requires the resolved value to satisfy `workflow-ref-schema`.
+- Canonical lookup boundary:
+  - `psi.workflow-runtime.statechart-runtime.delegate/resolve-delegate-target-definition` resolves the final workflow name and uses the existing canonical registry lookup path.
+- Plain strings remain valid only as static authored `:target` values.
+- Plain strings do not participate in the dynamic path; resolved dynamic values must be explicit workflow refs. No coercion rule was added.
+- Structured data outputs are the canonical transport for workflow refs between steps; no yielded-text workflow-ref path was introduced.
+- Workflow refs are treated as ordinary structured data values, not a new output type system.
+- Static delegation behavior remained compatible; tests were updated to assert the added `:resolved-target` diagnostic breadcrumb.
+- Implemented proof covers:
+  - IR schema support for dynamic delegate targets
+  - compiler acceptance of dynamic target source-specs
+  - compiler rejection of malformed authored target maps
+  - runtime rejection when dynamic target resolves to plain string data
+  - runtime success when dynamic target resolves to explicit workflow ref
+  - end-to-end higher-order choose-then-delegate execution
+- Availability-vs-lookup semantic split is only partially implemented in this slice:
+  - explicit lookup failure exists when the referenced workflow is not registered at delegation time
+  - no distinct session-availability gating path was found in the current canonical workflow runtime, so no new availability-only branch was invented here
+- Deferred follow-on:
+  - add explicit workflow availability/capability gating for dynamic/static delegation if/when the canonical runtime grows a distinct available-vs-known workflow model
+  - consider a dedicated lower namespace for workflow-reference helpers if the concept broadens beyond delegate targeting
+- Review 2026-05-10:
+  - No new actionable feedback. Re-read task artifacts plus referenced code/tests/docs; implementation matches the recorded scope and current runtime boundaries.
+- Follow-up execution 2026-05-10:
+  - Marked removed-target lookup-failure proof complete based on existing explicit coverage:
+    - `psi.workflow-runtime.statechart-runtime.delegate/resolve-delegate-target-definition` resolves the workflow-ref at delegation time and then performs canonical registry lookup.
+    - `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` already proves explicit failure when a dynamic workflow-ref resolves to an unknown target at delegation time.
+    - Because lookup happens at delegation time rather than at selection time, a previously selected workflow ref whose definition is removed before delegation follows the same lookup-failure path.
+  - Marked unknown/unavailable explicit-failure proof complete only for the currently implemented/runtime-supported portion:
+    - unknown referenced workflows are explicitly covered
+    - availability-only failure remains blocked because the current canonical runtime has no distinct available-vs-known workflow gating path beyond registry presence, and this task intentionally did not invent one
+  - Remaining unchecked item stays open for the same boundary reason: authored-shape failure, runtime-type failure, and lookup failure are explicit today, but availability failure is not separately representable in the current runtime model.
+- Follow-up execution 2026-05-10 (preloaded code-shape-review result):
+  - Re-read `steps.md`, `implementation.md`, `design.md`, `plan.md`, workflow grammar docs, and the canonical delegate/source-resolution owners.
+  - Confirmed no newer unchecked follow-up steps were added beyond the existing availability-failure distinction item.
+  - Reconfirmed the blocker in code rather than by task prose alone:
+    - authored-shape failure is explicit in `psi.workflow-runtime.target-ir-compiler/compile-delegate-target`
+    - runtime-type failure is explicit in `psi.workflow-step-materialization.source-resolution/resolve-workflow-ref-source-spec`
+    - lookup failure is explicit in `psi.workflow-runtime.statechart-runtime.delegate/resolve-delegate-target-definition`
+    - availability-only failure remains unrepresentable because canonical delegate resolution currently reads only registry presence and has no separate session-available workflow gate
+  - Left the remaining unchecked step open; no additional executable follow-up was possible within this task's recorded scope and current runtime model.
+- Review 2026-05-10 (tests):
+  - Good coverage for IR shape, compiler behavior, runtime-type failure, dynamic success, and downstream delegated behavior preservation.
+  - Missing explicit executable proof for valid-shaped dynamic workflow refs whose `:name` is unknown at delegation time.
+  - “Removed before delegation” is argued correctly from delegation-time lookup semantics, but still benefits from direct executable proof rather than note-only reasoning.
+  - Availability-only failure remains a real runtime-model gap and should stay separately marked from lookup failure.
+- Follow-up execution 2026-05-10 (test gap closure):
+  - Added explicit execution proof that valid-shaped dynamic workflow refs whose `:name` is unknown fail as lookup failures at delegation time.
+  - Added explicit execution proof that a previously selected workflow ref whose target is removed before delegation fails through the same lookup-failure path.
+  - Reconfirmed that availability-only failure remains open because the current canonical runtime still has no distinct session-available workflow gate separate from registry presence.
+  - Kept lookup failure and availability-only failure distinct in task notes rather than conflating them.
+- Review 2026-05-10 (test-shaper):
+  - Coverage is good, but the main dynamic execution test carries too many behaviors in one `deftest`.
+  - Unknown-target and removed-target tests duplicate setup that should be compressed with a shallow helper.
+  - Dynamic workflow-ref resolution tests would be clearer split into one success test and one rejection test.
+  - Compiler malformed-dynamic-target proof should live in its own dedicated test instead of sharing a broader compiler test body.
+- Follow-up execution 2026-05-10 (test shaping):
+  - Split the prior multi-behavior dynamic execution test into four focused tests: success, wrong-type failure, unknown-target lookup failure, and removed-before-delegation lookup failure.
+  - Added a shallow `create-dynamic-delegate-run!` helper to compress repeated execution setup while keeping the chooser result and registry conditions explicit at call sites.
+  - Split workflow-ref source-resolution proof into separate success and rejection tests with a small `run-with-chosen-workflow` helper.
+  - Moved malformed dynamic delegate-target compiler proof into its own dedicated compiler test.
+  - Re-ran unit tests and lint after shaping changes; behavior remained green while failure localization and local comprehensibility improved.

@@ -1,0 +1,278 @@
+Task created.
+
+Initial framing:
+- this task exists because a true `components/turn/` extraction is blocked by lower-level generic dispatch/state substrate still living under `agent-session`
+- the primary goal is not new behavior, but a clarified architectural boundary below session/turn/workflow/tool domains
+- the expected first extraction candidates are `dispatch.clj` and `dispatch_schema.clj`; mixed files such as `dispatch_effects.clj` and `context.clj` should only be split as needed to preserve a clean kernel boundary
+
+Working hypothesis:
+- the abstract kernel will likely become `components/state-kernel/`, but implementation may choose a better name if the rationale is recorded explicitly
+- the kernel should contain only machinery reusable unchanged in a different application domain
+- domain effect handlers, session semantics, prompt/turn/workflow/tool logic, and app composition should remain above the boundary
+
+Refinement added after task creation:
+- the broad global `ctx` map is now treated as a central ambiguity, not an incidental detail
+- this task must define a narrowed kernel environment contract explicitly rather than letting generic code continue to depend on arbitrary `agent-session` context keys
+- the existing `agent-session.bootstrap` and `system-bootstrap.core` split is now part of the refinement surface because it exposes unresolved ownership around isolated query contexts, global registration, and bootstrap coordination
+- one intended outcome is to make it possible to remove the current `agent-session` ↔ `system-bootstrap` component cycle; if that cannot be completed here, the remaining blocker must be stated precisely
+
+Questions already settled at task-design level:
+- this is a prerequisite task for later `turn` and likely `session-state` extraction
+- this task must not itself become a `turn` extraction
+- component-level dependency direction is a first-class acceptance criterion
+
+Settled refinement answers:
+- Component name/path: use `components/state-kernel/` for this task. The name emphasizes application-independent state/effects/dispatch substrate rather than a session- or turn-shaped runtime.
+- Kernel API shape: the kernel should not own or receive the full current `agent-session` global `ctx` map. It should consume a narrowed environment map passed explicitly by higher layers.
+- Kernel environment contract: first-cut kernel dispatch should depend only on a small environment with:
+  - `:state*` — root state atom
+  - `:execute-effect-fn` — effect execution callback used after pure dispatch results are applied
+  - `:validate-result-fn` — optional validation callback for pure results / interceptor context
+  - `:publish-change-fn` — optional projection/listener publication callback
+  - `:dispatch-trace-fn` — optional trace sink callback, if retained separately from in-kernel bounded logs
+  - any replay/test flags expressed as event/options data rather than hidden application context keys
+- Kernel environment growth rule: new environment keys are allowed only when they are demonstrably domain-independent. Keys naming sessions, prompts, workflows, tools, extensions, adapters, or query/bootstrap concerns violate the boundary.
+- Kernel contract exclusion: session lookup helpers, agent-core access, workflow runtime callbacks, query registration, scheduler registries, extension registries, and adapter handles stay out of the kernel environment and remain higher-layer concerns.
+- Pure-result contract decision: the kernel owns the pure dispatch contract and schema (`:root-state-update`, `:effects`, `:return`, `:return-key`, `:return-effect-result?`) because those are domain-independent orchestration semantics.
+- Apply-path decision: the kernel owns the concrete apply path for pure dispatch results over `:state*`; applying state updates is part of the generic dispatch runtime, not just a contract owned elsewhere.
+- Event-log/trace decision: the kernel owns the bounded event-log and dispatch-trace substrate. External trace sinks remain optional add-ons, not the primary ownership location.
+- Effect execution decision: the kernel may own effect execution registration/dispatch substrate only if it can be expressed without embedding app effect types. App-specific `defmethod` bodies remain outside the kernel. This extraction is optional in this slice if the generic kernel boundary is otherwise cleanly established and documented.
+- Listener/publication decision: the kernel may own generic listener registration/publication helpers, but not application-specific projection payload shapes. This move is optional unless generic dispatch code would otherwise still depend on `agent-session/context.clj`.
+- Global-vs-isolated query/bootstrap decision: query-context creation and resolver/mutation registration are not part of the state kernel. They remain above it.
+- `system-bootstrap` cycle decision: the preferred fix is to remove `agent-session -> system-bootstrap`, not to pull bootstrap/query registration into the kernel. `system-bootstrap` should remain a higher-level registration/composition component, while `agent-session` should stop depending on it for generic infrastructure.
+- Bootstrap ownership decision: `agent-session.bootstrap` should own session bootstrap behavior only. Global resolver/mutation registration should move behind higher-level bootstrap/composition entrypoints instead of being callable as an `agent-session` core dependency.
+- Cycle interpretation: the `agent-session` ↔ `system-bootstrap` cycle is not fundamentally a state-kernel responsibility; it is a neighboring ownership problem exposed by the same blurred boundaries. This task should remove the `agent-session` dependency on `system-bootstrap` if that can be done cleanly while extracting the kernel, but should not distort the kernel boundary just to absorb bootstrap responsibilities.
+
+Implementation notes — 2026-05-06
+- Added a real lower component boundary at `components/state-kernel/`.
+- Moved the authoritative generic dispatch pipeline into `psi.state-kernel.dispatch`.
+- Moved the generic pure-result schema/contract into `psi.state-kernel.dispatch-schema`.
+- Kept `psi.agent-session.dispatch` as a compatibility wrapper that re-exports the established public surface while adapting agent-session contexts onto the narrowed kernel environment contract.
+  - This wrapper should be treated as a temporary migration seam rather than a final architectural endpoint.
+  - Intended future direction: downstream consumers should depend directly on `psi.state-kernel.dispatch` for generic dispatch concerns, leaving agent-session to own only domain composition surfaces that genuinely remain above the kernel.
+- Kept `psi.agent-session.dispatch-schema` as domain-owned schema authority for concrete effect payload validation. This was necessary because effect catalog validation is application-specific, while the kernel owns only the generic pure dispatch contract.
+- Preserved bounded dispatch event-log / dispatch-trace ownership in the kernel, including db-summary capture for consuming introspection/tests.
+- Preserved `:return-key` semantics by letting the kernel prefer injected higher-layer read callbacks when present; this keeps session-shaped reads above the kernel while retaining the generic apply orchestration below it.
+- Effect execution remains above the kernel in this slice:
+  - kernel owns only the generic `:execute-effect-fn` callback seam
+  - `psi.agent-session.dispatch-effects` remains application-specific and was not moved because its effect handlers encode session/prompt/workflow/tool/extension semantics
+  - this does not violate the boundary because kernel dispatch no longer depends on app-specific effect implementation details
+- Listener/publication helpers remain above the kernel in this slice:
+  - kernel supports optional `:publish-change-fn`
+  - agent-session retains projection-listener registration/publication helpers in `context.clj`
+  - generic kernel dispatch no longer depends on `agent-session/context.clj`
+- Removed the direct component dependency from `agent-session` to `system-bootstrap`:
+  - dropped `psi/system-bootstrap` from `components/agent-session/deps.edn`
+  - changed global registration entrypoints in `context.clj` to use `requiring-resolve` on `psi.system-bootstrap.core/register-all-domains!`
+  - this preserves the higher-level ownership of global registration while removing the static component edge
+  - this `requiring-resolve` indirection should be treated as a temporary cycle-breaking seam rather than a final architectural endpoint
+  - intended future direction: global domain registration should move fully into an explicit higher-level composition/bootstrap root so `agent-session.context` no longer discovers bootstrap ownership dynamically at runtime
+  - that relocation is substantial enough to warrant a separate follow-on task rather than remaining as unfinished scope inside task 095
+- Added focused kernel tests in `components/state-kernel/test/psi/state_kernel/dispatch_test.clj` covering:
+  - pure root-state update apply path
+  - bounded event-log / dispatch-trace retention
+  - effect execution through the narrowed kernel environment contract
+- Verification run:
+  - `bb clojure:test:unit --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.scheduler-dispatch-test --focus psi.state-kernel.dispatch-test`
+  - result: green (`1514 tests, 11103 assertions, 0 failures`)
+- One stale test expectation surfaced during extraction and was corrected:
+  - scheduler drain-queue should leave other queued ids intact, so preserving `"sch-1"` alongside `"missing"` matches the current pure scheduler model and existing handler behavior.
+
+Review notes — 2026-05-06
+- terse review: extraction is structurally good and green, but two boundary leaks remain.
+- Actionable follow-up completed: moved `permission-interceptor` and `statechart-interceptor` out of `psi.state-kernel.dispatch` and back into the `psi.agent-session.dispatch` compatibility/composition layer, so kernel defaults are now domain-independent.
+- Actionable follow-up completed: removed the kernel compatibility fallbacks to `:apply-root-state-update-fn` and `:read-session-state-fn`. Those semantics now live only in the `psi.agent-session.dispatch` compatibility layer, which is the correct place for the migration seam.
+- Follow-up verification run:
+  - `bb clojure:test:unit --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.dispatch-test --focus psi.state-kernel.dispatch-test`
+  - result: green (`1514 tests, 11103 assertions, 0 failures`)
+  - `bb clojure:test:unit`
+  - result: green (`1514 tests, 11103 assertions, 0 failures`)
+- Additional review notes — 2026-05-06
+  - review verdict: extraction direction is strong, but task 095 should not close unchanged because the kernel still contains two composition/domain leaks.
+  - remaining leak 1: `components/state-kernel/src/psi/state_kernel/dispatch.clj` still contains `summarize-dispatch-db`, which inspects agent-session-shaped root-state paths such as `[:agent-session :sessions]`, `[:background-jobs :store]`, and `[:turn :ctx]`.
+  - why leak 1 matters: the task boundary requires the kernel to be reusable unchanged in a different domain; embedding agent-session-shaped db knowledge in kernel-owned event-log/trace summarization violates that boundary even if it is only for diagnostics.
+  - intended follow-up for leak 1: either reduce kernel db summaries to truly generic state facts or move summary shaping behind a higher-layer injected callback so agent-session-specific diagnostics remain above the kernel.
+  - remaining leak 2: kernel-owned event-log entries still record `:statechart-claimed?`, which reflects a higher-layer composition concern rather than domain-independent kernel semantics.
+  - why leak 2 matters: statechart claiming is not part of the narrowed kernel environment contract, so carrying that field in kernel-owned log semantics keeps composition-layer assumptions embedded below the boundary.
+  - intended follow-up for leak 2: remove `:statechart-claimed?` from kernel-owned logging, or replace it only if a clearly domain-independent claimed/intercepted concept is justified.
+  - recommended closure posture: do one more small boundary-tightening pass, update focused proofs around kernel trace/log behavior, rerun focused plus full verification, then reassess task closure readiness.
+- Follow-up implementation notes — 2026-05-06
+  - tightened `psi.state-kernel.dispatch` db summarization so the kernel now records only generic root-state facts: sorted top-level `:root-keys` plus `:root-key-count`.
+  - removed kernel-owned `:statechart-claimed?` logging from dispatch event-log entries so composition-layer statechart semantics no longer leak into the kernel trace/log surface.
+  - updated agent-session telemetry projection to stop exposing `:psi.dispatch-event/statechart-claimed?` from the dispatch event log surface.
+  - strengthened focused proof in `components/state-kernel/test/psi/state_kernel/dispatch_test.clj` so kernel event-log summaries are asserted as domain-independent and event-log entries are asserted not to carry `:statechart-claimed?`.
+  - updated `components/agent-session/test/psi/agent_session/model_dispatch_test.clj` to assert the narrowed generic db summary shape on the public dispatch-event log query surface.
+  - focused verification green:
+    - `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.model-dispatch-test` → `8 tests, 96 assertions, 0 failures`
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test` → `17 tests, 151 assertions, 0 failures`
+  - full unit verification attempt via `bb clojure:test:unit` is currently blocked by an unrelated pre-existing failure in `psi.app-runtime-test/submit-prompt-in-runs-git-head-sync-after-successful-turn-test`; this failure reproduces while the task-focused proof surface remains green and does not point at the state-kernel boundary cleanup itself.
+- Code-shaper review notes — 2026-05-06
+  - shaping verdict: the extraction is architecturally strong and materially simpler than the pre-extraction state, but one notable code-shape issue remains in the compatibility layer.
+  - main shaping issue: `components/agent-session/src/psi/agent_session/dispatch.clj` duplicates the generic apply-interceptor orchestration already present in `components/state-kernel/src/psi/state_kernel/dispatch.clj`.
+  - why that matters: both layers currently implement nearly the same apply flow — apply root update, emit effects trace, retain applied effects, handle `:return`, handle `:return-key`, and honor `:return-effect-result?` — which creates a drift seam where future apply-path fixes may land in one place but not the other.
+  - recommended shaping direction: centralize the generic apply algorithm in the state kernel and let the compatibility layer provide only the injected read/apply hooks needed for its migration semantics.
+  - secondary shaping issue: `->kernel-env` in `psi.agent-session.dispatch` still forwards compatibility-only keys such as `:apply-root-state-update-fn` and `:read-session-state-fn`, which weakens local clarity because the function name suggests a pure kernel-contract projection.
+  - recommended shaping direction for env prep: either rename that helper to reflect broader dispatch-env shaping or split kernel-env preparation from wrapper-only env augmentation.
+  - minor shaping note: `statechart-interceptor` still writes `:statechart-claimed?` into interceptor context even though kernel-owned logging no longer consumes it; if that flag no longer serves a clear local control-flow role, remove or generalize it.
+  - closure posture from code-shaper review: task 095 is in good architectural shape, but a final shaping pass that removes duplicated apply orchestration would reduce future maintenance burden and make the lower boundary more robust.
+- Code-shaper follow-up implementation notes — 2026-05-06
+  - centralized the generic apply-path algorithm in new `psi.state-kernel.dispatch/apply-pure-result` so the kernel remains the sole owner of apply-flow orchestration.
+  - simplified kernel `apply-interceptor` to delegate directly to `apply-pure-result` with kernel-default hooks.
+  - rewired `psi.agent-session.dispatch/apply-interceptor` to reuse `kernel/apply-pure-result` while injecting only the compatibility-layer read/apply hooks plus local event/session id accessors.
+  - clarified environment shaping in `psi.agent-session.dispatch` by splitting the old `->kernel-env` into:
+    - `->kernel-contract-env` for true kernel-contract projection
+    - `->dispatch-env` for wrapper-local augmentation with compatibility-only keys
+  - removed residual compatibility-layer `:statechart-claimed?` ictx writing from `statechart-interceptor`; claimed events now only block and optionally return structured result/block metadata.
+  - focused verification green after the shaping pass:
+    - `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.model-dispatch-test` → `25 tests, 247 assertions, 0 failures`.
+  - verification re-run after the shaping follow-up:
+    - repeated focused proof stayed green: `clojure -M:test --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.model-dispatch-test` → `25 tests, 247 assertions, 0 failures`
+    - full unit suite is now green again: `bb clojure:test:unit` → `1514 tests, 11098 assertions, 0 failures`.
+- Dispatch compat namespace review — 2026-05-06
+  - reviewed `components/agent-session/src/psi/agent_session/dispatch.clj` specifically as the temporary compatibility seam introduced by task 095.
+  - review verdict: the namespace is now well-shaped enough to remain as a temporary migration seam; no new immediate shaping defects were found after the apply-path consolidation and env-shape cleanup.
+  - positive result: apply-path duplication is gone, env projection is clearer via `->kernel-contract-env` and `->dispatch-env`, and residual `:statechart-claimed?` compatibility-layer ictx state has been removed.
+  - current limitation: the namespace still re-exports a broad generic dispatch surface from `psi.state-kernel.dispatch`, so many consumers can still treat `psi.agent-session.dispatch` as the canonical generic dispatch API.
+  - implication for the remaining unchecked step: the next work is not further reshaping of this namespace first, but migration of remaining generic consumers onto `psi.state-kernel.dispatch` directly.
+  - target end-state for this namespace: either disappear entirely or shrink to a small domain-composition surface containing only agent-session-specific composition concerns such as permission/statechart interception and wrapper-local dispatch adaptation.
+  - closure note for this review pass: task 095 can treat `psi.agent-session.dispatch` as an acceptable temporary compatibility seam, but should keep the final unchecked step focused on consumer migration rather than local namespace cleanup.
+- Consumer migration follow-up — 2026-05-06
+  - completed the remaining unchecked compat-seam step by moving generic non-composition consumers off `psi.agent-session.dispatch` and onto `psi.state-kernel.dispatch` directly where they only needed kernel-owned facilities.
+  - migrated `psi.agent-session.post-tool` to use kernel-owned `assoc-dispatch-id` and `handler-entry`, keeping only actual dispatch invocation on the agent-session wrapper.
+  - migrated `psi.agent-session.introspection` replay/event-log usage to kernel-owned event-log replay substrate while still invoking replay through the agent-session dispatch entrypoint.
+  - migrated `psi.agent-session.service-protocol` trace appends to `psi.state-kernel.dispatch/append-trace-entry!` so service telemetry now depends directly on the kernel trace substrate.
+  - migrated telemetry/query surfaces in `psi.agent-session.resolvers.telemetry-basics` and `psi.agent-session.resolvers.services` to read dispatch registry, event-log, and trace data directly from the kernel.
+  - result: the remaining wrapper usage is now concentrated around actual domain dispatch composition surfaces (`dispatch!`, handler registration, interceptors, validation wiring) rather than generic log/trace/replay helpers.
+  - wrapper status after this pass: `psi.agent-session.dispatch` still exists because agent-session-owned composition concerns remain there, but it is no longer the canonical home for the migrated generic telemetry/replay helper consumers.
+  - focused verification green after the compat-seam consumer migration:
+    - `clojure -M:test --focus psi.agent-session.post-tool-test --focus psi.introspection.agent-session-test --focus psi.agent-session.eql-introspection-test --focus psi.agent-session.resolvers-test --focus psi.agent-session.dispatch-test --focus psi.state-kernel.dispatch-test` → `46 tests, 404 assertions, 0 failures`.
+- Higher-layer dispatch entrypoint follow-up — 2026-05-06
+  - introduced `psi.agent-session.core/dispatch-in!` as the public higher-layer dispatch entrypoint so app-runtime, rpc, bootstrap, and higher-layer tests no longer require `psi.agent-session.dispatch` directly just to send agent-session events.
+  - migrated higher-layer runtime callers in `app_runtime.clj`, `background_job_ui.clj`, `rpc/runtime.clj`, `rpc/session.clj`, `rpc/session/prompt.clj`, and `agent_session/bootstrap.clj` to call `session/dispatch-in!`.
+  - migrated higher-layer tests in app-runtime, rpc, and introspection to use `session/dispatch-in!`, and moved app-runtime event-log assertions to the kernel-owned event-log surface where they only needed generic dispatch telemetry.
+  - result: `psi.agent-session.dispatch` is now absent from the app-runtime/rpc/introspection higher layers and remains concentrated in agent-session-owned composition code plus dispatch-focused tests.
+  - focused verification green for the higher-layer migration pass:
+    - `clojure -M:test --focus psi.app-runtime-test --focus psi.app-runtime.context-test --focus psi.app-runtime.background-job-ui-test --focus psi.app-runtime.session-summary-test --focus psi.rpc-ops-test --focus psi.rpc-prompt-test --focus psi.rpc-events-test --focus psi.rpc-test --focus psi.introspection.agent-session-test` → `71 tests, 386 assertions, 0 failures`.
+- Dispatch-handler registration reduction follow-up — 2026-05-06
+  - migrated dispatch handler registration namespaces to use `psi.state-kernel.dispatch/register-handler!` directly where they only needed registry access.
+  - updated `ui-handlers`, `session-lifecycle`, `prompt-handlers`, `statechart-actions`, `prompt-lifecycle`, `session-mutations`, and `scheduler` so registration ownership now points straight at the kernel-owned handler registry instead of the compat wrapper.
+  - kept direct compat-wrapper dispatch usage only where handlers synchronously dispatch nested domain events during execution (`session-mutations`, `scheduler`), because those calls need the agent-session-owned composition/interceptor path rather than raw kernel dispatch.
+  - also moved context validation wiring to `psi.agent-session.dispatch-schema/validate-dispatch-schemas` directly, so schema authority no longer has to travel through the compat wrapper.
+  - attempted a broader replacement of nested handler dispatch through a newly injected higher-layer entrypoint, but focused scheduler/handler tests showed that those nested calls are semantically part of the compat-wrapper-owned composition path rather than a generic callback seam.
+  - settled boundary after that check: handler registration belongs directly to the kernel; nested synchronous domain redispatch inside handlers remains on `psi.agent-session.dispatch/dispatch!` for now.
+  - result: within agent-session source, `psi.agent-session.dispatch` is now narrowed further toward true composition/runtime-dispatch responsibilities, while pure registry/schema consumers point directly at their authoritative owners.
+  - focused verification green for the handler-registration reduction pass:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.statechart-actions-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.post-tool-test` → `49 tests, 324 assertions, 0 failures`.
+- Compat wrapper surface reduction follow-up — 2026-05-06
+  - removed a final batch of unused kernel re-exports from `psi.agent-session.dispatch` so the compat wrapper no longer republishes schema helpers and kernel helpers that had no remaining non-test consumers.
+  - kept the wrapper exports that still back dispatch-focused tests and composition-layer behavior: registry access used by agent-session tests, interceptors/default-interceptors/current-interceptors, event-log/trace helpers, replay helpers, trace append, dispatch ids, schema validation, and the agent-session-owned `dispatch!` path.
+  - this leaves the namespace materially smaller without forcing broad test churn or premature removal of helpers still intentionally exercised by dispatch compatibility proofs.
+  - focused verification green for the compat wrapper surface reduction:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.post-tool-test` → `21 tests, 168 assertions, 0 failures`.
+- Test entrypoint narrowing follow-up — 2026-05-06
+  - migrated a focused batch of agent-session tests off the compat dispatch entrypoint and onto the higher-layer public entrypoint `psi.agent-session.core/dispatch-in!` where the tests were only using dispatch to seed domain events, not to exercise compat-wrapper-local behavior.
+  - updated `scheduler_background_jobs_test.clj`, `scheduler_resolvers_test.clj`, `commands_test.clj`, and `background_jobs_test.clj` to stop requiring `psi.agent-session.dispatch`.
+  - this keeps `psi.agent-session.dispatch` more narrowly aligned with true compat/composition testing while preserving existing production ownership; no deeper production changes were needed for this slice.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.commands-test --focus psi.agent-session.background-jobs-test` → `83 tests, 292 assertions, 0 failures`.
+- Additional test entrypoint narrowing follow-up — 2026-05-06
+  - migrated another batch of agent-session tests from `psi.agent-session.dispatch/dispatch!` to `psi.agent-session.core/dispatch-in!` where they used dispatch only to seed domain events and then asserted scheduler/session/child-session behavior above the compat layer.
+  - updated `scheduler_lifecycle_test.clj`, `scheduler_cancel_job_test.clj`, `scheduler_end_to_end_test.clj`, `extension_schedule_event_test.clj`, `scheduler_timer_seam_test.clj`, `scheduler_context_shutdown_test.clj`, `session_close_test.clj`, and `child_session_mutation_test.clj` to stop requiring `psi.agent-session.dispatch`.
+  - retained direct `psi.state-kernel.dispatch` usage in `scheduler_lifecycle_test.clj` only for authoritative kernel-owned event-log assertions.
+  - this further concentrates `psi.agent-session.dispatch` in compat/composition-specific tests without forcing production ownership changes or disturbing dispatch-focused proof surfaces.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.extension-schedule-event-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.session-close-test --focus psi.agent-session.child-session-mutation-test` → `20 tests, 99 assertions, 0 failures`.
+- Config/resolver test entrypoint narrowing follow-up — 2026-05-06
+  - migrated `config_compaction_test.clj` and `resolvers_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` where they were using dispatch only to drive session/domain events before asserting config, diagnostics, scheduler, and resolver behavior.
+  - kept direct `psi.state-kernel.dispatch` usage in `config_compaction_test.clj` for authoritative kernel-owned event-log assertions.
+  - this leaves those tests aligned with the same ownership split already used elsewhere: public domain event entry via `session/dispatch-in!`, generic dispatch telemetry read from `psi.state-kernel.dispatch` when needed.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.resolvers-test` → `27 tests, 191 assertions, 0 failures`.
+- Prompt lifecycle test ownership narrowing follow-up — 2026-05-06
+  - migrated `prompt_lifecycle_test.clj` off `psi.agent-session.dispatch` by splitting its usage along ownership boundaries:
+    - public domain event submission now goes through `psi.agent-session.core/dispatch-in!`
+    - generic event-log and handler-registry reads now go through `psi.state-kernel.dispatch`
+  - specifically moved `clear-event-log!`, `event-log-entries`, and `handler-entry` references to the kernel, while replacing routine event submission calls with `session/dispatch-in!`.
+  - this preserved the one dispatch-focused proof in the file (`:session/submit-synthetic-user-prompt` handler effect shaping) without keeping the compat wrapper as the authority for generic registry or telemetry helpers.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test` → `17 tests, 82 assertions, 0 failures`.
+- Session lifecycle/model/test-support ownership narrowing follow-up — 2026-05-06
+  - migrated `session_lifecycle_test.clj` and `model_dispatch_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` where they were using dispatch as the public domain event entrypoint rather than testing compat-wrapper-specific semantics.
+  - kept their generic event-log assertions on `psi.state-kernel.dispatch`, which remains the authoritative owner for dispatch telemetry.
+  - updated `test_support.clj` so helper-owned public event submission now goes through `psi.agent-session.core/dispatch-in!`, and so test validation wiring points directly at `psi.agent-session.dispatch-schema/validate-dispatch-schemas` instead of routing schema authority through the compat wrapper.
+  - this reduces incidental compat-wrapper coupling in both the tests and the shared session test harness while preserving the same runtime behavior and focused proof surface.
+  - focused verification green for this migration batch:
+    - `clojure -M:test --focus psi.agent-session.session-lifecycle-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.prompt-lifecycle-test` → `39 tests, 346 assertions, 0 failures`.
+- EQL/post-tool test ownership narrowing follow-up — 2026-05-06
+  - migrated `eql_introspection_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` where the file was using dispatch only as the public domain event submission path for session model, prompt, usage, prompt-contribution, and worktree updates.
+  - migrated `post_tool_test.clj` off the compat wrapper for handler-registry access by switching its local test registration from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`, which is the authoritative owner for the dispatch registry.
+  - classified the remaining `psi.agent-session.dispatch` use in `tool_execution_test.clj` as currently legitimate compat/composition coverage because those tests intentionally observe nested domain redispatch through the wrapper-owned `dispatch!` path during `:session/tool-run` orchestration.
+  - this narrows two more test namespaces without forcing production changes, while preserving the remaining wrapper dependency only where the test is explicitly about wrapper-mediated dispatch composition.
+- Scheduler effects test ownership narrowing follow-up — 2026-05-06
+  - migrated `scheduler_effects_test.clj` off `psi.agent-session.dispatch` for its public scheduler create setup calls.
+  - those setup events now enter through `psi.agent-session.core/dispatch-in!`, while the file keeps its legitimate direct compat-wrapper redefs of `psi.agent-session.dispatch/dispatch!` for timer-fired effect interception.
+  - this keeps the production boundary unchanged and narrows the file so its remaining wrapper dependence is only the intentional dispatch-effect seam under test.
+- Scheduler dispatch test ownership narrowing follow-up — 2026-05-06
+  - migrated `scheduler_dispatch_test.clj` off `psi.agent-session.dispatch/dispatch!` and onto `psi.agent-session.core/dispatch-in!` for public scheduler event submission.
+  - the file only exercises public scheduler domain behavior and session state outcomes, so compat-wrapper entrypoint ownership was unnecessary there.
+  - this further concentrates the remaining compat-wrapper test usage on explicit dispatch composition seams and direct wrapper behavior.
+- Scheduler handlers test ownership narrowing follow-up — 2026-05-06
+  - reviewed `scheduler_handlers_test.clj` and confirmed it is already correctly split for ownership in most places: kernel-owned handler lookup/registration surfaces are used directly, while compat-wrapper dispatch is only needed for the intentional nested redispatch interception path.
+  - kept a minimal `psi.agent-session.dispatch` alias in the file because `with-redefs` on wrapper `dispatch!` is still the legitimate seam for the failed prompt-submit delivery scenario.
+  - tightened that remaining usage so the wrapper dependency is explicit and local to the single compat-oriented scenario rather than implying broader wrapper ownership elsewhere in the file.
+- Tool execution test entrypoint narrowing follow-up — 2026-05-06
+  - narrowed `tool_execution_test.clj` slightly further by moving its direct public `:session/tool-run` submission from `psi.agent-session.dispatch/dispatch!` to `psi.agent-session.core/dispatch-in!`.
+  - kept the file's compat-wrapper dependency because the test still intentionally spies on nested wrapper-mediated redispatch through `with-redefs` on `psi.agent-session.dispatch/dispatch!`, and `tool_batch.clj` still canonically enters via that wrapper-owned composition path.
+  - result: the remaining wrapper use in this file is now more clearly about compat-layer orchestration observation rather than treating the wrapper as the preferred public submission entrypoint.
+- Dispatch pure-result schema authority narrowing follow-up — 2026-05-06
+  - narrowed `dispatch_pure_result_test.clj` so schema authority comes from `psi.agent-session.dispatch-schema/validate-dispatch-schemas` rather than routing that helper through the compat wrapper.
+  - kept the file on `psi.agent-session.dispatch` for the actual compat dispatch/runtime behavior it is intentionally proving, including replay through the wrapper-owned dispatch entrypoint and interceptor/application semantics.
+  - this aligns the test with the same ownership split already used elsewhere: schema authority from `dispatch-schema`, dispatch behavior from the compat wrapper where that is the subject under test.
+- Dispatch test registry ownership narrowing follow-up — 2026-05-06
+  - inspected `dispatch_test.clj` and classified it as mostly legitimate compat/wrapper coverage because it explicitly proves wrapper-owned interceptor composition, compat dispatch entry semantics, permission/statechart interception, and wrapper-mediated dispatch tracing/event logging.
+  - tightened the file's remaining non-behavioral registry setup by moving its handler registration calls from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`, which is the authoritative kernel-owned registry surface.
+  - kept the file on `psi.agent-session.dispatch` for actual dispatch execution, interceptor override/default assertions, and other wrapper-local behavior that remains the intended subject under test.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test` → `11 tests, 81 assertions, 0 failures`
+- Dispatch pure-result test registry/schema ownership narrowing follow-up — 2026-05-06
+  - inspected `dispatch_pure_result_test.clj` and confirmed its remaining direct `psi.agent-session.dispatch` dependency is still legitimate for compat-wrapper dispatch behavior, apply semantics, and replay through the wrapper-owned dispatch entrypoint.
+  - tightened the file's non-behavioral ownership seams by moving all handler registration calls from `psi.agent-session.dispatch/register-handler!` to `psi.state-kernel.dispatch/register-handler!`.
+  - also removed the final two schema-authority calls that still routed through the compat wrapper, so all validation wiring in the file now points directly at `psi.agent-session.dispatch-schema/validate-dispatch-schemas`.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-pure-result-test` → `6 tests, 70 assertions, 0 failures`
+- Remaining compat test seam review — 2026-05-06
+  - reviewed the last compat-dependent non-dispatch test namespaces: `tool_execution_test.clj`, `scheduler_handlers_test.clj`, and `scheduler_effects_test.clj`.
+  - settled classification: each file now uses `psi.agent-session.dispatch` only for local `with-redefs` interception of wrapper `dispatch!`.
+  - ownership rationale:
+    - `tool_execution_test.clj` intentionally observes nested wrapper-mediated redispatch during `:session/tool-run` orchestration.
+    - `scheduler_handlers_test.clj` intentionally intercepts wrapper `dispatch!` for the failed synthetic prompt-submit delivery path.
+    - `scheduler_effects_test.clj` intentionally intercepts wrapper `dispatch!` for timer-fired `:scheduler/fired` submission.
+  - no further safe narrowing change was applied in this pass because replacing those seams would require deeper production indirection without improving ownership clarity.
+  - `clj-surgeon` assist note: follow-up inspection of `/Users/duncan/bin/clj-surgeon` plus `clj_surgeon/core.clj` showed the actual CLI contract is key/value args like `clj-surgeon :op :deps :file path`, not the op-only invocations tried initially.
+  - current task posture after this review: remaining test-time wrapper dependency is concentrated in explicit compat/composition observation seams rather than incidental registry/schema/public-entrypoint access.
+- Compat wrapper dead re-export reduction follow-up — 2026-05-06
+  - used corrected `clj-surgeon` inspection plus exact-string repo searches to reassess `psi.agent-session.dispatch` export usage before making deeper production changes.
+  - confirmed a batch of wrapper re-exports had no remaining in-repo consumers after the earlier migration passes: schema helper aliases, registry/log/trace helper aliases, dispatch-id helpers, replay helper aliases, `pure-result?`, and the wrapper-local `append-trace-entry!` shim.
+  - removed those dead re-exports from `components/agent-session/src/psi/agent_session/dispatch.clj`.
+  - the first focused verification attempt surfaced two local compat-namespace self-dependencies that had been relying on the removed aliases:
+    - compat interceptor definitions still called `->interceptor`
+    - `apply-interceptor` still passed the removed wrapper-local `append-trace-entry!` shim into `kernel/apply-pure-result`
+  - fixed those by pointing the compat namespace directly at kernel authority internally:
+    - `permission-interceptor`, `statechart-interceptor`, and `apply-interceptor` now use `kernel/->interceptor`
+    - compat `apply-interceptor` now passes `kernel/append-trace-entry!`
+  - kept only the wrapper surfaces still justified by live consumers or dispatch-focused compat proofs: `dispatch!`, interceptor override/default/current surfaces, permission/statechart/apply composition, and the kernel interceptor aliases still referenced directly by dispatch-focused tests.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test --focus psi.agent-session.tool-execution-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.scheduler-effects-test` → `33 tests, 260 assertions, 0 failures`
+- Compat wrapper kernel-interceptor alias reduction follow-up — 2026-05-06
+  - used the explicit `clj-surgeon` skill to inspect remaining candidate production callsites before changing them.
+  - `clj-surgeon :op :deps` on `session_settings.clj`, `compaction_runtime.clj`, and `session_lifecycle.clj`, plus `:ls` on `core.clj`, confirmed those namespaces are leaf modules loaded by `psi.agent-session.core`; routing them back through `core/dispatch-in!` would risk inverting or cycling the current layering.
+  - instead of forcing that deeper change, tightened the compat namespace itself again by removing the remaining dead kernel interceptor aliases (`log-interceptor`, `handler-interceptor`, `effect-interceptor`, `validate-interceptor`, `trim-effects-on-replay`).
+  - `default-interceptors` in `psi.agent-session.dispatch` now names the kernel authorities directly while preserving the same compat wrapper behavior and ordering.
+  - focused verification green:
+    - `clojure -M:test --focus psi.agent-session.dispatch-test --focus psi.agent-session.dispatch-pure-result-test` → `17 tests, 151 assertions, 0 failures`
+- State-kernel dispatch coverage strengthening — 2026-05-06
+  - expanded `components/state-kernel/test/psi/state_kernel/dispatch_test.clj` so the kernel now owns direct proofs for more of its dispatch contract instead of relying mainly on higher-layer `agent-session` consumer tests.
+  - added focused kernel tests for event normalization, interceptor ordering/blocking, replay suppression of effects with preserved state updates, validation-failure blocking semantics, validator exception shaping, handler/effect exception trace behavior, non-fatal publish/trace callback failures, `:return-key` post-update reads, and in-order event-log replay.
+  - verification note: repo-local `clojure -M:test --focus psi.state-kernel.dispatch-test` skipped under the current runner configuration, so authoritative verification used `bb clojure:test:unit --focus psi.state-kernel.dispatch-test`.
+  - focused verification green: `bb clojure:test:unit --focus psi.state-kernel.dispatch-test`.
+  - full unit verification green after the coverage pass: `bb clojure:test:unit` → `1514 tests, 11098 assertions, 0 failures`.

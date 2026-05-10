@@ -1,0 +1,20 @@
+- [x] Inspect current `journal-append-in!` ownership and call graph
+- [x] Add the authoritative generic dispatch-owned journal-append effect carrying a canonical journal entry
+- [x] Define the lower pure state-update responsibility in `session-state`
+- [x] Wire the canonical effect executor to perform pure in-memory append plus existing higher-level persistence when enabled
+- [x] Reduce or route existing typed journal-append effects through the authoritative generic append path
+- [x] Refactor the canonical append path away from primary `ctx :journal-append-fn` ownership
+- [x] Migrate session-lifecycle initial journal writes to the canonical append path
+- [x] Migrate prompt-runtime assistant journal append to the canonical append path
+- [x] Migrate runtime raw user journal append helper to the canonical append path
+- [x] Migrate extension `append-entry` mutation to the canonical append path
+- [x] Keep or introduce only the minimum temporary migration seam needed during refactor
+- [x] Remove the `psi.session-state.state/journal-append-in!` compatibility seam before task completion
+- [x] Add or update one focused test for pure in-memory append behavior
+- [x] Add or update one focused test for canonical effect append into in-memory session state
+- [x] Add or update one focused test proving the canonical append effect reaches the persistence boundary when persistence is enabled
+- [x] Add or update one focused test covering at least one migrated representative production path
+- [x] Run focused verification
+- [x] Run full unit verification
+- [x] Record final ownership and any remaining compatibility in `implementation.md`
+- [x] Add one explicit focused proof around a concrete migrated production helper so the representative production-path evidence matches the task acceptance text more directly

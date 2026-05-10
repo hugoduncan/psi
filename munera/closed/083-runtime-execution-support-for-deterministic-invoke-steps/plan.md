@@ -1,0 +1,25 @@
+Approach:
+- build invoke execution as a first-class runtime path on top of the canonical normalized IR execution substrate rather than as a side-channel helper
+- treat nested IR invoke payloads (`:type :invoke` with `:invoke {:operation ... :args ...}`) as the runtime execution contract; any authored examples that hoist `:operation`/`:args` are compiler- or design-level illustrations rather than the runtime boundary itself
+- keep invoke-step semantics parallel to other step forms where possible: attempts, results, progression, routing, and observability should stay structurally coherent across forms
+- use minimal concrete operations or test doubles to prove the execution model before broadening real integrations
+- prefer explicit resolution of invoke arg source specs before calling the registry implementation
+
+Likely steps:
+1. identify the IR execution seam where step type dispatch should add `:invoke`
+2. resolve invoke args from workflow input, workflow original, prior step outputs, and prior step yields
+3. call the deterministic operation registry with the resolved arg map
+4. normalize/validate the returned result against the canonical invoke result contract
+5. record invoke attempt/result data so downstream refs can read `:output` and `:yield` surfaces
+6. integrate invoke success/failure into progression, terminal status, and routing
+7. prove invoke-step routing behavior with both direct transitions and judge-driven transitions where appropriate
+8. add focused regression tests for invoke-only and mixed-form workflows, using invoke→session execution as the cross-form runtime proof and relying on existing IR/source-resolution delegate proofs unless delegate execution support lands in the same slice
+
+Proof target:
+- a workflow with `:type :invoke` steps executes through the canonical runtime path and its outputs/yields are consumable by downstream workflow steps
+
+Risks:
+- current step-attempt/result recording may assume session-oriented execution too deeply
+- invoke failure semantics may need careful shaping so they align with existing workflow terminal/error behavior
+- this task's intended error contract is immediate step/run failure after recording canonical error-yield/result surfaces for `{:status :error ...}` operation results, so any later desire for judge-before-fail error routing would be a follow-on design change rather than implicit scope here
+- mixed-form workflows may reveal gaps in shared output/yield reference resolution

@@ -27,12 +27,12 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
    [psi.app-runtime.background-job-view :as app-bg-view]
-   [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as ext-runtime-fns]
-   [psi.agent-session.session-state :as ss]
-   [psi.agent-session.prompt-templates :as pt]
-   [psi.agent-session.oauth.core :as oauth]
-   [psi.agent-session.project-nrepl-commands :as project-nrepl-commands]
+   [psi.command-registry.registry :as command-registry]
+   [psi.session-state.state :as ss]
+   [psi.prompt-assets.prompt-templates :as pt]
+   [psi.provider-auth.oauth.core :as oauth]
+   [psi.project-nrepl.commands :as project-nrepl-commands]
    [psi.ai.models :as ai-models]
    [psi.ai.model-registry :as model-registry]))
 
@@ -601,7 +601,7 @@
   (let [parts    (str/split (subs trimmed 1) #"\s" 2)
         cmd-name (first parts)
         args-str (or (second parts) "")
-        cmd      (ext/get-command-in (:extension-registry ctx) cmd-name)
+        cmd      (command-registry/get-command-in (:extension-registry ctx) cmd-name)
         handler   (:handler cmd)]
     {:type :extension-cmd
      :name cmd-name
@@ -741,7 +741,7 @@
      (dispatch-prefixed-command ctx session-id trimmed opts)
      (when (str/starts-with? trimmed "/")
        (let [cmd-name (first (str/split (subs trimmed 1) #"\s" 2))]
-         (when (ext/get-command-in (:extension-registry ctx) cmd-name)
+         (when (command-registry/get-command-in (:extension-registry ctx) cmd-name)
            (dispatch-extension-command ctx session-id trimmed)))))))
 
 (defn dispatch-in

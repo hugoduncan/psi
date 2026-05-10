@@ -2,7 +2,7 @@
   "Tests for pure session data model, schemas, and derived predicates."
   (:require
    [clojure.test :refer [deftest testing is]]
-   [psi.agent-session.session :as session]))
+   [psi.session-state.model :as session]))
 
 ;; ── Schema validation ───────────────────────────────────────────────────────
 

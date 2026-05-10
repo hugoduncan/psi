@@ -1,0 +1,14 @@
+- [x] Review the current workflow-related higher surfaces and classify each reviewed namespace as keep, reshape, rename, merge, extract, or delete using the design rubrics
+- [x] Review `psi.agent-session.psi-tool-workflow` and decide whether compatibility backfill remains necessary, should move to a transitional owner, or should be removed entirely; if it remains, record the concrete supported lifecycle that still requires it
+- [x] Review naming of extension workflow runtime surfaces under `agent-session`, especially `workflows` and `workflow-mutations`, and decide whether renaming is required for clarity; if not renamed, record why the current names are not materially misleading
+- [x] Review workflow-specific assembly still embedded in `psi.agent-session.context` and decide whether it should stay there or move to a dedicated workflow assembly owner
+- [x] Review workflow run/definition summary and report shaping across psi-tool, Pathom, and execution surfaces; classify which duplication is intentional versus accidental; and choose an explicit owner for any shared extracted logic
+- [x] Review `psi.agent-session.workflow-execution` and decide whether it remains a justified session-facing owner or a thin historical wrapper using the façade rubric
+- [x] Review `psi.agent-session.workflow-judge` primarily to confirm whether it remains a coherent higher impure orchestration owner or whether review finds a more specific cleanup need
+- [x] Review workflow-related tests under `components/agent-session/test/psi/agent_session/` against lower component proof surfaces and classify them as lower proof, higher integration proof, or historical duplication
+- [x] Review the explicitly preserved workflow contract surfaces named in `design.md` and record whether each remained unchanged or required a justified refinement
+- [x] Record the cleanup map decisions in `implementation.md`, including kept coherent lower owners, removed/isolated compatibility, naming decisions, projection ownership decisions, contract-preservation decisions, test ownership decisions, and any explicit residual debt
+- [x] Record why the selected implementation slices were chosen as the highest-value clear moves, and which reviewed items were intentionally deferred
+- [x] If review reveals several independent cleanup slices too broad for one implementation task, record the split and create follow-on tasks rather than forcing all cleanup into `132`
+- [x] If implementation proceeds within this task, execute the chosen cleanup steps in small coherent slices and keep `implementation.md` append-only with decisions and discoveries
+- [x] Verify workflow behavior and affected focused tests after any code changes

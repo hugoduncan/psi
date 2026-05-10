@@ -3,7 +3,6 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-session-context
@@ -17,23 +16,23 @@
 (deftest scheduler-background-job-projection-test
   (testing "pending and queued schedules project into background jobs"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          _                (dispatch/dispatch! ctx :scheduler/create
-                                               {:session-id session-id
-                                                :schedule-id "sch-1"
-                                                :kind :message
-                                                :label "check-build"
-                                                :message "check build"
-                                                :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
-                                               {:origin :core})
-          _                (dispatch/dispatch! ctx :scheduler/create
-                                               {:session-id session-id
-                                                :schedule-id "sch-2"
-                                                :kind :session
-                                                :label "review"
-                                                :message "review"
-                                                :session-config {:session-name "review later"}
-                                                :fire-at (java.time.Instant/parse "2099-04-21T19:00:00Z")}
-                                               {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/create
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-1"
+                                                  :kind :message
+                                                  :label "check-build"
+                                                  :message "check build"
+                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
+                                                 {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/create
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-2"
+                                                  :kind :session
+                                                  :label "review"
+                                                  :message "review"
+                                                  :session-config {:session-name "review later"}
+                                                  :fire-at (java.time.Instant/parse "2099-04-21T19:00:00Z")}
+                                                 {:origin :core})
           _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :schedules "sch-2" :status] :queued)
           _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :queue] ["sch-2"])
           jobs             (bg-rt/list-background-jobs-in! ctx session-id [:pending :queued])]
@@ -44,14 +43,14 @@
 
   (testing "scheduler-projected background job cancel routes to scheduler cancel"
     (let [[ctx session-id] (create-session-context {:persist? false})
-          _                (dispatch/dispatch! ctx :scheduler/create
-                                               {:session-id session-id
-                                                :schedule-id "sch-1"
-                                                :kind :message
-                                                :label "check-build"
-                                                :message "check build"
-                                                :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
-                                               {:origin :core})
+          _                (session/dispatch-in! ctx :scheduler/create
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-1"
+                                                  :kind :message
+                                                  :label "check-build"
+                                                  :message "check build"
+                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
+                                                 {:origin :core})
           cancelled        (bg-rt/cancel-background-job-in! ctx session-id "schedule/sch-1" :user)]
       (is (= :cancelled (:status cancelled)))
       (is (= :cancelled (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))

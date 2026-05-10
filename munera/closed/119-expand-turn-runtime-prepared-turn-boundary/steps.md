@@ -1,0 +1,43 @@
+- [x] Review landed `101`, `103`, and the current `turn-runtime` namespace surface against the broader prepared-turn boundary
+- [x] Classify current lower turn code into:
+  - [x] lower prepared-turn assembly/runtime/recording ownership
+  - [x] higher dispatch/session-owned orchestration ownership
+  - [x] ambiguous helpers needing extraction-time review
+- [x] Define the normalized prepared-turn input map consumed by the lower request builder
+- [x] Design the expanded `turn-runtime` namespace map
+- [x] Record the keep/move/split map for `psi.turn`, `psi.turn.handlers`, `prompt_request`, and `prompt_recording`
+  - [x] identify which current `prompt_request` responsibilities stay above the boundary as session-owned projection/policy
+  - [x] identify which current `prompt_request` responsibilities move down as lower request assembly
+  - [x] identify which current `psi.turn.handlers` helpers move down versus remain as dispatch/effect choreography
+- [x] Record direct-consumer exceptions, if any, for namespaces that should use `psi.turn-runtime.request` or `psi.turn-runtime.recording` directly
+- [x] Identify verification surfaces and test ownership decisions:
+  - [x] which focused tests should move under `components/turn-runtime/test/`
+  - [x] which mixed higher-level tests should remain under `agent-session`
+  - [x] whether any small new component-owned focused tests should be added instead of moving mixed files
+- [x] Confirm the task stays aligned with umbrella task `105`
+- [x] Use this task as the framing reference for implementation once queued
+- [x] Add lower authoritative namespaces under `components/turn-runtime/` for conversation, request assembly, and recording
+- [x] Refactor `prompt_request` into session-owned normalization over lower `turn-runtime.request`
+- [x] Refactor `prompt_recording` into higher orchestration over lower `turn-runtime.recording`
+- [x] Move prepared-turn helper usage in `psi.turn.handlers` down to `turn-runtime` where appropriate
+- [x] Add focused lower component tests for request assembly and recording classification/decision shaping
+- [x] Verify higher consuming path remains green (`prompt_lifecycle_test`)
+- [x] Record compatibility-wrapper status and boundary notes in `implementation.md`
+- [x] Update `implementation.md` so its narrative matches the final landed shape after shim removal
+  - [x] remove or rewrite the stale note that says `psi.agent-session.conversation` remains as a compatibility wrapper
+- [x] Resolve the remaining `psi.agent-session.prompt-request` helper-wrapper surface
+  - [x] decide whether `effective-system-prompt`, `build-provider-conversation`, and `build-prompt-layers` are intentional boundary API or temporary compatibility/test helpers
+  - [x] if temporary, re-point the remaining tests/callers to `psi.turn-runtime.request` or remove the wrappers
+  - [x] if intentional, document that explicitly in `implementation.md` so the final ownership story is unambiguous
+- [x] Re-run focused verification after the follow-up cleanup/documentation pass
+  - [x] `bb clojure:test:unit --focus psi.turn-runtime.request-test --focus psi.turn-runtime.recording-test --focus psi.agent-session.prompt-lifecycle-test`
+- [x] Optional code-shaping polish from review
+  - [x] extract a private helper in `psi.agent-session.prompt-request` for normalized turn input assembly
+  - [x] consider splitting prepared-turn message shaping from normalized map assembly in `build-prepared-request`
+  - [x] tighten `psi.turn-runtime.request` docstrings to state the normalized `:turn/*` input invariant explicitly
+  - [x] rerun focused verification if any code-shaping changes are made
+- [x] Focused test follow-ups from review
+  - [x] add `psi.turn-runtime.request` cases covering no developer prompt / no contributions
+  - [x] add `psi.turn-runtime.request` cases covering tools/cache variants with already-normalized lower inputs
+  - [x] add `psi.turn-runtime.recording` assertions proving stop/error outcomes route to `:session/prompt-finish`
+  - [x] rerun focused verification after the added lower-boundary tests

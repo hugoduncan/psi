@@ -1,0 +1,10 @@
+- [x] Inspect current output/result/yield surfaces across workflow execution paths
+- [x] Define canonical output key sets for `:invoke`, `:session`, and `:delegate`
+- [x] Define the canonical runtime representation for normalized step outputs
+- [x] Validate `:output` refs against referenced step type and exposed outputs
+- [x] Keep `:yield` ref validation distinct from `:output` ref validation
+- [x] Add focused valid-reference tests across invoke/session/delegate workflows
+- [x] Add focused invalid-reference tests across invoke/session/delegate workflows
+- [x] Reconcile implementation with task `077` and `doc/workflow-ir.md`
+- [x] Update workflow runtime-adoption and step-prep tests to author/assert canonical session output keys (`:final-llm-reply`) by default; keep legacy `:outputs :text` only in fixtures that explicitly prove compatibility fallback behavior.
+- [x] Remove default prior-step session `[:outputs :text]` assumptions from legacy workflow authoring/session helpers and broad workflow execution/compiler proofs; use canonical `:final-llm-reply` by default and keep `:text` only in fixtures that explicitly prove compatibility fallback behavior.

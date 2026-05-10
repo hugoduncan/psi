@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [malli.core :as m]
-   [psi.agent-session.workflow-model :as workflow-model]))
+   [psi.workflow-runtime.model :as workflow-model]))
 
 (def valid-definition
   {:definition-id "plan-build-review"

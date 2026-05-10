@@ -7,7 +7,9 @@
   (:require
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (pco/defmutation register-workflow-definition
   "Register a canonical workflow definition into root state."
@@ -19,7 +21,7 @@
                   :psi.workflow/error]}
   (try
     (let [[new-state definition-id _stored]
-          (workflow-runtime/register-definition @(:state* agent-session-ctx) definition)]
+          (workflow-registry/register-definition @(:state* agent-session-ctx) definition)]
       (reset! (:state* agent-session-ctx) new-state)
       {:psi.workflow/definition-id definition-id
        :psi.workflow/registered? true
@@ -39,7 +41,7 @@
                   :psi.workflow/error]}
   (try
     (let [[new-state _removed-definition]
-          (workflow-runtime/remove-definition @(:state* agent-session-ctx) definition-id)]
+          (workflow-registry/remove-definition @(:state* agent-session-ctx) definition-id)]
       (reset! (:state* agent-session-ctx) new-state)
       {:psi.workflow/definition-id definition-id
        :psi.workflow/removed? true
@@ -89,14 +91,24 @@
     (let [execute-fn (:execute-workflow-run-fn agent-session-ctx)
           exec-result (execute-fn agent-session-ctx session-id run-id)
           final-run (workflow-runtime/workflow-run-in @(:state* agent-session-ctx) run-id)
-          ;; Extract terminal result text from last completed step, but treat
-          ;; blank accepted-result text as missing so callers can suppress empty
-          ;; transcript injection and still distinguish a real final reply.
+          ;; Extract terminal yielded text from the last completed step's
+          ;; canonical output surface, but treat blank text as missing so callers
+          ;; can suppress empty transcript injection and still distinguish a real
+          ;; final reply.
           result-text (when (= :completed (:status final-run))
-                        (let [last-step-id (last (:step-order (:effective-definition final-run)))]
-                          (some-> (get-in final-run [:step-runs last-step-id :accepted-result :outputs :text])
-                                  str/trim
-                                  not-empty)))]
+                        (let [last-step-id (last (:step-order (:effective-definition final-run)))
+                              step-def (some #(when (= last-step-id (:name %)) %)
+                                             (get-in final-run [:effective-definition :canonical-ir :steps]))
+                              accepted-result (get-in final-run [:step-runs last-step-id :accepted-result])
+                              text-yield (workflow-ir/step-yield-field-value step-def accepted-result :text)]
+                          (cond
+                            (string? text-yield)
+                            (some-> text-yield str/trim not-empty)
+
+                            (some? text-yield)
+                            (pr-str text-yield)
+
+                            :else nil)))]
       {:psi.workflow/run-id run-id
        :psi.workflow/status (:status exec-result)
        :psi.workflow/steps-executed (:steps-executed exec-result)
@@ -202,10 +214,7 @@
    ::pco/params  [:psi/agent-session-ctx]
    ::pco/output  [:psi.workflow/definitions
                   :psi.workflow/definition-count]}
-  (let [definitions (->> (get-in @(:state* agent-session-ctx) [:workflows :definitions])
-                         vals
-                         (sort-by :definition-id)
-                         vec)]
+  (let [definitions (workflow-registry/list-definitions @(:state* agent-session-ctx))]
     {:psi.workflow/definitions (mapv (fn [d]
                                        {:definition-id (:definition-id d)
                                         :name (:name d)

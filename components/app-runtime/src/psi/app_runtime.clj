@@ -57,12 +57,12 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
 
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as extension-runtime]
-   [psi.agent-session.session-state :as ss]
+   [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
+   [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.runtime :as runtime]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
    [psi.app-runtime.context :as app-context]
    [psi.app-runtime.context-summary :as context-summary]
@@ -74,11 +74,11 @@
    [psi.app-runtime.transcript :as transcript]
    [psi.app-runtime.tui-frontend-actions :as tui-frontend-actions]
    [psi.app-runtime.ui-actions :as ui-actions]
-   [psi.agent-session.prompt-templates :as pt]
-   [psi.agent-session.config-resolution :as config-res]
-   [psi.agent-session.skills :as skills]
-   [psi.agent-session.session :as session-data]
-   [psi.agent-session.system-prompt :as sys-prompt]
+   [psi.prompt-assets.prompt-templates :as pt]
+   [psi.shared-config.resolution :as config-res]
+   [psi.prompt-assets.skills :as skills]
+   [psi.session-state.model :as session-data]
+   [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.agent-session.tools :as tools]
    [psi.agent-core.core :as agent]
    [psi.ai.models :as models]
@@ -184,13 +184,13 @@ Available: " (str/join ", " (map name (keys all))))
   [ctx session-id fallback-ai-model text images {:keys [progress-queue]}]
   (let [ai-model (current-ai-model-in ctx session-id fallback-ai-model)
         _        (when ai-model
-                   (dispatch/dispatch! ctx :session/set-model
-                                       {:session-id session-id
-                                        :model {:provider  (some-> (:provider ai-model) name)
-                                                :id        (:id ai-model)
-                                                :reasoning (boolean (:supports-reasoning ai-model))}
-                                        :scope :session}
-                                       {:origin :core}))
+                   (session/dispatch-in! ctx :session/set-model
+                                         {:session-id session-id
+                                          :model {:provider  (some-> (:provider ai-model) name)
+                                                  :id        (:id ai-model)
+                                                  :reasoning (boolean (:supports-reasoning ai-model))}
+                                          :scope :session}
+                                         {:origin :core}))
         prepared  (session/prompt-in! ctx session-id text images
                                       (cond-> {}
                                         progress-queue
@@ -353,6 +353,7 @@ Available: " (str/join ", " (map name (keys all))))
                             (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))
          cwd              (or cwd (System/getProperty "user.dir"))
          _                (background-job-ui/install-background-job-ui-refresh! ctx)
+         _                (workflow-bootstrap/init-built-in! ctx session-id)
          ctx-files        (sys-prompt/discover-context-files cwd)
          sd               (ss/get-session-data-in ctx session-id)
          prompt-mode      (or (:prompt-mode sd) :lambda)
@@ -365,7 +366,7 @@ Available: " (str/join ", " (map name (keys all))))
                            :skills                   skills}
          base-prompt      (sys-prompt/build-system-prompt base-prompt-opts)
          developer-prompt (developer-prompt-from-env)
-         _                (dispatch/dispatch! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
+         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
          psi-tool         (tools/make-psi-tool (fn
                                                  ([q] (session/query-in ctx session-id q))
                                                  ([q entity] (session/query-in ctx q entity)))
@@ -386,15 +387,15 @@ Available: " (str/join ", " (map name (keys all))))
          {:keys [summary-updates]}
          (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
          summary          (merge-startup-summary summary-base summary-updates)
-         _                (dispatch/dispatch! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
+         _                (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
          _                (bootstrap/register-all-domains!)
          graph-caps       (graph-capabilities-in ctx session-id)
          build-opts       (assoc base-prompt-opts :graph-capabilities graph-caps)
          system-prompt    (sys-prompt/build-system-prompt build-opts)
-         _                (dispatch/dispatch! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
-         _                (dispatch/dispatch! ctx :session/set-system-prompt-build-opts
-                                              {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
-                                              {:origin :core})
+         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
+         _                (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                                                {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
+                                                {:origin :core})
          _                (memory-runtime/sync-memory-layer! (merge {:cwd cwd}
                                                                     (or memory-runtime-opts {})))
          _                (runtime/register-extension-run-fn-in! ctx session-id nil ai-model)
@@ -770,7 +771,7 @@ Available: " (str/join ", " (map name (keys all))))
                      :initial-context-session-tree-widget (current-context-widget @tui-focus*)
                      :ui-read-fn       (fn [] (projections/extension-ui-snapshot ctx))
                      :ui-dispatch-fn   (fn [event-type payload]
-                                         (dispatch/dispatch! ctx event-type payload {:origin :tui}))
+                                         (session/dispatch-in! ctx event-type payload {:origin :tui}))
                      :frontend-action-handler-fn! frontend-action-handler-fn!
                      :dispatch-fn          dispatch-fn
                      :on-interrupt-fn!     on-interrupt-fn!
@@ -796,5 +797,4 @@ Available: " (str/join ", " (map name (keys all))))
                      :fork-session-fn!     fork-session-fn!
                      :event-queue          event-queue
                      :alt-screen           false}))))
-
 ;; RPC runtime moved to psi.rpc.

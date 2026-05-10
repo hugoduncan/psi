@@ -7,15 +7,19 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.dispatch-handlers.session-state :as ss]
+   [psi.agent-session.journal-append-effect :as journal-append-effect]
+   [psi.session-persistence.core :as persist]
+   [psi.session-state.init :as ss]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.post-tool :as post-tool]
-   [psi.agent-session.session :as session-data]
-   [psi.agent-session.session-state :as session]
-   [psi.agent-session.tool-defs :as tool-defs]
-   [psi.agent-session.tool-execution :as tool-exec]))
+   [psi.session-state.model :as session-data]
+   [psi.session-state.state :as session]
+   [psi.skill-registry.registry :as skill-registry]
+   [psi.tool-registry.defs :as tool-defs]
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
 
 (defn- register-core-handler! [event handler]
-  (dispatch/register-handler! event handler))
+  (kernel/register-handler! event handler))
 
 (defn- schedule-record
   [session-data schedule-id]
@@ -61,9 +65,7 @@
         :return {:model model :thinking-level clamped-level}
         :effects (cond-> [{:effect/type :runtime/agent-set-model
                            :model model}
-                          {:effect/type :persist/journal-append-model-entry
-                           :provider (:provider model)
-                           :model-id (:id model)}
+                          (journal-append-effect/append-model-effect session-id (:provider model) (:id model))
                           {:effect/type :notify/extension-dispatch
                            :event-name "model_select"
                            :payload {:model model :source :set}}]
@@ -85,8 +87,7 @@
         :return {:thinking-level clamped}
         :effects (cond-> [{:effect/type :runtime/agent-set-thinking-level
                            :level clamped}
-                          {:effect/type :persist/journal-append-thinking-level-entry
-                           :level clamped}]
+                          (journal-append-effect/append-thinking-level-effect session-id clamped)]
                    persist-effect (conj persist-effect))})))
 
   (register-core-handler!
@@ -118,8 +119,7 @@
    :session/set-session-name
    (fn [_ctx {:keys [session-id name]}]
      {:root-state-update (session/session-update session-id #(assoc % :session-name name))
-      :effects [{:effect/type :persist/journal-append-session-info-entry
-                 :name name}
+      :effects [(journal-append-effect/append-session-info-effect session-id name)
                 {:effect/type :projection/context-changed
                  :session-id session-id
                  :reason :session/set-session-name}]
@@ -278,14 +278,14 @@
    :session/set-turn-context
    (fn [_ctx {:keys [session-id turn-ctx]}]
      {:root-state-update (fn [state]
-                           (assoc-in state (ss/session-turn-ctx-path session-id) turn-ctx))})))
+                           (assoc-in state (session/session-turn-ctx-path session-id) turn-ctx))})))
 
 (defn- register-telemetry-handlers! []
   (register-core-handler!
    :session/append-tool-call-attempt
    (fn [_ctx {:keys [session-id attempt]}]
      {:root-state-update (fn [state]
-                           (update-in state (ss/session-telemetry-path session-id :tool-call-attempts)
+                           (update-in state (session/session-telemetry-path session-id :tool-call-attempts)
                                       (fnil conj [])
                                       (assoc attempt :timestamp (java.time.Instant/now))))}))
 
@@ -295,7 +295,7 @@
      (let [entry (assoc capture :timestamp (java.time.Instant/now))]
        {:root-state-update
         (fn [state]
-          (update-in state (ss/session-telemetry-path session-id :provider-requests)
+          (update-in state (session/session-telemetry-path session-id :provider-requests)
                      #(ss/bounded-append 100 % entry)))})))
 
   (register-core-handler!
@@ -304,7 +304,7 @@
      (let [entry (assoc capture :timestamp (java.time.Instant/now))]
        {:root-state-update
         (fn [state]
-          (update-in state (ss/session-telemetry-path session-id :provider-replies)
+          (update-in state (session/session-telemetry-path session-id :provider-replies)
                      #(ss/bounded-append 1000 % entry)))})))
 
   (register-core-handler!
@@ -312,7 +312,7 @@
    (fn [_ctx {:keys [session-id stat context-bytes-added limit-hit?]}]
      {:root-state-update
       (fn [state]
-        (update-in state (ss/session-telemetry-path session-id :tool-output-stats)
+        (update-in state (session/session-telemetry-path session-id :tool-output-stats)
                    (fn [ts]
                      (-> ts
                          (update :calls (fnil conj []) stat)
@@ -326,7 +326,7 @@
    :session/tool-lifecycle-event
    (fn [_ctx {:keys [session-id entry]}]
      {:root-state-update (fn [state]
-                           (update-in state (ss/session-telemetry-path session-id :tool-lifecycle-events)
+                           (update-in state (session/session-telemetry-path session-id :tool-lifecycle-events)
                                       (fnil conj [])
                                       (assoc entry :timestamp (java.time.Instant/now))))})))
 
@@ -347,11 +347,10 @@
 
   (register-core-handler!
    :session/tool-agent-record-result
-   (fn [_ctx {:keys [tool-result-msg]}]
+   (fn [_ctx {:keys [session-id tool-result-msg]}]
      {:effects [{:effect/type :runtime/agent-record-tool-result
                  :tool-result-msg tool-result-msg}
-                {:effect/type :persist/journal-append-message-entry
-                 :message tool-result-msg}]}))
+                (journal-append-effect/append-message-effect session-id tool-result-msg)]}))
 
   (register-core-handler!
    :session/tool-execute
@@ -380,12 +379,12 @@
   (register-core-handler!
    :session/tool-execute-prepared
    (fn [ctx {:keys [session-id tool-call parsed-args progress-queue]}]
-     {:return (tool-exec/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue)}))
+     {:return (tool-runtime-adapter/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue)}))
 
   (register-core-handler!
    :session/tool-record-result
    (fn [ctx {:keys [session-id shaped-result progress-queue]}]
-     {:return (tool-exec/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue)}))
+     {:return (tool-runtime-adapter/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue)}))
 
   (register-core-handler!
    :session/tool-run
@@ -439,12 +438,12 @@
   (register-core-handler!
    :session/register-skill
    (fn [ctx {:keys [session-id skill]}]
-     (let [skills     (vec (:skills (session/get-session-data-in ctx session-id)))
-           existing?  (some #(= (:name %) (:name skill)) skills)
-           next-count (if existing? (count skills) (inc (count skills)))]
-       (cond-> {:return {:added? (not existing?) :count next-count}}
-         (not existing?)
-         (assoc :root-state-update (session/session-update session-id #(update % :skills (fnil conj []) skill))
+     (let [skills  (:skills (session/get-session-data-in ctx session-id))
+           result  (skill-registry/register-skill skills skill)
+           changed? (:changed? result)]
+       (cond-> {:return (select-keys result [:added? :changed? :count])}
+         changed?
+         (assoc :root-state-update (session/session-update session-id #(assoc % :skills (:skills result)))
                 :effects [{:effect/type :runtime/refresh-system-prompt
                            :session-id session-id}])))))
 
@@ -467,8 +466,7 @@
    (fn [_ctx {:keys [session-id message]}]
      {:effects [{:effect/type :runtime/agent-append-message
                  :message message}
-                {:effect/type :persist/journal-append-message-entry
-                 :message message}
+                (journal-append-effect/append-message-effect session-id message)
                 {:effect/type :runtime/agent-emit
                  :event {:type :message-start :message message}}
                 {:effect/type :runtime/agent-emit
@@ -483,8 +481,11 @@
    (fn [_ctx {:keys [session-id message]}]
      {:effects [{:effect/type :runtime/agent-append-message
                  :message message}
-                {:effect/type :persist/journal-append-message-entry
-                 :message message}
+                {:effect/type :runtime/dispatch-event
+                 :event-type :session/append-journal-entry
+                 :event-data {:session-id session-id
+                              :entry (persist/message-entry message)}
+                 :origin :core}
                 {:effect/type :runtime/agent-emit
                  :event {:type :message-start :message message}}
                 {:effect/type :runtime/agent-emit

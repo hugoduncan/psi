@@ -3,8 +3,8 @@
    [clojure.string :as str]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as extension-runtime]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.model :as session]
+   [psi.session-state.state :as ss]))
 
 (defn set-model-in!
   "Set the session model for `session-id`."

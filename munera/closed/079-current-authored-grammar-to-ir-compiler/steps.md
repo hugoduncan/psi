@@ -1,0 +1,22 @@
+- [x] Identify the existing workflow loader/compiler seam for current-grammar normalization
+  - implemented as a dedicated compatibility compiler namespace: `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
+  - kept separate from `workflow_file_compiler.clj` so current authored file compilation and current-authored-definition -> IR normalization remain distinct phases
+- [x] Compile current workflow definition shape into ordered IR steps
+- [x] Compile current `:executor` to IR `:type :session`
+- [x] Compile current `:prompt-template` + `:input-bindings` into template contributions
+- [x] Compile current `:session-preload` into ordered contribution items
+- [x] Compile current `:session-overrides` into the IR session payload
+- [x] Compile current judge shape into typed IR judge forms
+- [x] Compile current routing tables and loop bounds into IR control-flow forms
+- [x] Add golden tests for representative current-authored workflow -> IR compilation
+  - proof lives in `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
+- [x] Add focused edge-case tests for preload/binding/override compatibility behavior
+  - focused proof currently covers accepted-result envelope reads, transcript preload, result-schema compat retention, and the present `:workflow-runtime` structural-boundary mismatch
+- [x] Reconcile compiler behavior with `doc/workflow-grammar-migration.md`
+  - updated `doc/workflow-ir.md` and `doc/workflow-grammar-migration.md` to reflect the implemented current-grammar compatibility compiler contract, including the current `:workflow-runtime` seam
+- [x] Reject unsupported current `:step-output` accepted-result-envelope surfaces during current->IR compilation
+  - allow only whole-envelope, `:diagnostics`, and `:blocked` non-`:outputs` compatibility reads per task design
+  - add focused tests proving supported surfaces compile and unsupported surfaces fail at compile time
+  - tightened `compile-step-output-ref` in `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
+  - proof added in `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
+  - focused verification green: `clojure -M:test --focus psi.agent-session.workflow-current-ir-compiler-test` (`4 tests, 21 assertions, 0 failures`)

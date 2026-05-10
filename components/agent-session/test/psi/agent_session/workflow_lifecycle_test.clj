@@ -2,12 +2,13 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.prompt-control]
+   [psi.agent-session.turn]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow-attempts :as workflow-attempts]
+   [psi.workflow-runtime.attempts :as workflow-attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
-   [psi.agent-session.workflow-progression-recording :as workflow-recording]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.workflow-runtime.progression-recording :as workflow-recording]
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- create-session-context
   ([]
@@ -21,30 +22,29 @@
   {:definition-id "plan-build-review"
    :name "Plan Build Review"
    :summary "Representative chain-like workflow proof"
-   :step-order ["plan" "build" "review"]
-   :steps {"plan" {:label "Plan"
-                   :executor {:type :agent :profile "planner" :mode :sync}
-                   :input-bindings {:task {:source :workflow-input :path [:task]}}
-                   :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                   :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                   :capability-policy {:tools #{"read" "bash"}}}
-           "build" {:label "Build"
-                    :executor {:type :agent :profile "builder" :mode :async}
-                    :input-bindings {:plan {:source :step-output :path ["plan" :outputs :plan]}}
-                    :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                    :retry-policy {:max-attempts 2 :retry-on #{:execution-failed :validation-failed}}
-                    :capability-policy {:tools #{"read" "edit" "write"}}}
-           "review" {:label "Review"
-                     :executor {:type :agent :profile "reviewer" :mode :sync}
-                     :input-bindings {:build {:source :step-output :path ["build" :outputs :build]}}
-                     :result-schema [:map [:outcome [:= :ok]] [:outputs :map]]
-                     :retry-policy {:max-attempts 1 :retry-on #{:validation-failed}}
-                     :capability-policy {:tools #{"read"}}}}})
+   :steps [{:name "plan"
+            :type :session
+            :tools ["read" "bash"]
+            :contributions [{:type :template
+                             :text "Plan {{task}}"
+                             :vars {"task" {:from :workflow-input :path [:task]}}}]}
+           {:name "build"
+            :type :session
+            :tools ["read" "edit" "write"]
+            :contributions [{:type :template
+                             :text "Build {{plan}}"
+                             :vars {"plan" {:from {:step "plan" :yield :text}}}}]}
+           {:name "review"
+            :type :session
+            :tools ["read"]
+            :contributions [{:type :template
+                             :text "Review {{build}}"
+                             :vars {"build" {:from {:step "build" :yield :text}}}}]}]})
 
 (defn- install-definition-and-run!
   [ctx]
   (let [[state1 definition-id _]
-        (workflow-runtime/register-definition @(:state* ctx) plan-build-review-definition)
+        (workflow-registry/register-definition @(:state* ctx) plan-build-review-definition)
         [state2 run-id _]
         (workflow-runtime/create-run state1 {:definition-id definition-id
                                              :run-id "run-1"
@@ -78,7 +78,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           run-id          (install-definition-and-run! ctx)
           child-sessions* (atom [])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-" (:attempt-id opts) "-session")
                             attempt {:attempt-id (:attempt-id opts)
@@ -101,7 +101,7 @@
                         (swap! child-sessions* conj sid)
                         {:attempt attempt
                          :execution-session execution-session}))
-                    psi.agent-session.prompt-control/prompt-execution-result-in!
+                    psi.agent-session.turn/prompt-execution-result-in!
                     (let [responses* (atom ["plan-output" "build-output" "review-output"])]
                       (fn [_ctx _sid _prompt]
                         {:execution-result/assistant-message
@@ -123,12 +123,12 @@
           (is (true? (:terminal? result)))
           (is (= :completed (:status run)))
           (is (nil? (:current-step-id run)))
-          (is (= {:outcome :ok :outputs {:text "plan-output"}}
-                 (get-in run [:step-runs "plan" :accepted-result])))
-          (is (= {:outcome :ok :outputs {:text "build-output"}}
-                 (get-in run [:step-runs "build" :accepted-result])))
-          (is (= {:outcome :ok :outputs {:text "review-output"}}
-                 (get-in run [:step-runs "review" :accepted-result])))
+          (is (= "plan-output"
+                 (get-in run [:step-runs "plan" :accepted-result :outputs :final-llm-reply])))
+          (is (= "build-output"
+                 (get-in run [:step-runs "build" :accepted-result :outputs :final-llm-reply])))
+          (is (= "review-output"
+                 (get-in run [:step-runs "review" :accepted-result :outputs :final-llm-reply])))
           (is (= 3 (count actual-session-ids)))
           (is (= (set @child-sessions*)
                  (set actual-session-ids)))
@@ -155,7 +155,7 @@
     (let [[ctx session-id] (create-session-context {:persist? false})
           run-id            (install-definition-and-run! ctx)
           created-sessions* (atom [])]
-      (with-redefs [psi.agent-session.workflow-attempts/create-step-attempt-session!
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
                     (fn [_ctx _parent-session-id opts]
                       (let [sid (str (:workflow-step-id opts) "-" (:attempt-id opts) "-session")
                             attempt {:attempt-id (:attempt-id opts)
@@ -202,10 +202,10 @@
                        (fn [state]
                          (-> state
                              (assoc-in [:workflows :runs run-id :step-runs "plan" :accepted-result]
-                                       {:outcome :ok :outputs {:text "approved plan"}})
+                                       {:outcome :ok :outputs {:final-llm-reply "approved plan"}})
                              (assoc-in [:workflows :runs run-id :step-runs "plan" :attempts 1 :status] :succeeded)
                              (assoc-in [:workflows :runs run-id :step-runs "plan" :attempts 1 :result-envelope]
-                                       {:outcome :ok :outputs {:text "approved plan"}})
+                                       {:outcome :ok :outputs {:final-llm-reply "approved plan"}})
                              (assoc-in [:workflows :runs run-id :current-step-id] "build")
                              (assoc-in [:workflows :runs run-id :status] :running)
                              (assoc-in [:workflows :runs run-id :blocked] nil)

@@ -3,16 +3,36 @@ name: lambda-build
 description: Build a lambda expression
 ---
 {:steps [{:name "compile-1"
-          :workflow "lambda-compiler"
-          :session {:input {:from :workflow-input}}
-          :prompt "compile a lambda for: $INPUT"}
+          :type :delegate
+          :target "lambda-compiler"
+		  :skills ["lambda-compiler"]
+          :prompt-string {:type :template
+                          :text "compile a lambda for: {{input}}"
+                          :vars {"input" {:from :workflow-input
+                                           :path [:input]}}}
+          :context [{:type :source
+                     :from :workflow-original}]}
          {:name "decompile"
-          :workflow "lambda-decompiler"
-          :session {:input {:from {:step "compile-1" :kind :accepted-result}}}
-          :prompt "decompile the lambda expression: $INPUT"}
+          :type :delegate
+          :target "lambda-decompiler"
+		  :skills ["lambda-compiler"]
+          :prompt-string {:type :template
+                          :text "decompile the lambda expression: {{input}}"
+                          :vars {"input" {:from {:step "compile-1" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "compile-1" :yield :text}}]}
          {:name "compile-2"
-          :workflow "lambda-compiler"
-          :session {:input {:from {:step "decompile" :kind :accepted-result}}}
-          :prompt "compile a lambda for: $INPUT"}]}
+          :type :delegate
+          :target "lambda-compiler"
+		  :skills ["lambda-compiler"]
+          :prompt-string {:type :template
+                          :text "compile a lambda for: {{input}}"
+                          :vars {"input" {:from {:step "decompile" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "decompile" :yield :text}}]}]}
 
-Iteratively compile and refine a lambda expression through compilation/decompilation cycles using explicit session-first step wiring.
+Iteratively compile and refine a lambda expression through target-authored delegate steps that preserve the original request as carried context while chaining each prior yielded text result into the next ask.

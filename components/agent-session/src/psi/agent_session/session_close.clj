@@ -9,7 +9,7 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (defn- next-active-session-id
   [ctx closing-session-id]

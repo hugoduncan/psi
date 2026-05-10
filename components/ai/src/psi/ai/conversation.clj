@@ -1,7 +1,7 @@
 (ns psi.ai.conversation
   "Conversation entity and lifecycle management"
   (:require [psi.ai.schemas :as schemas]
-            [psi.agent-session.tool-defs :as tool-defs])
+            [psi.tool-registry.defs :as tool-defs])
   (:import [java.time Instant]
            [java.util UUID]))
 

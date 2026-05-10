@@ -4,8 +4,10 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extension-installs :as installs]
    [psi.agent-session.extensions :as ext]
+   [psi.command-registry.registry :as command-registry]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.resolvers.support :as support]
-   [psi.agent-session.workflows :as wf]
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.ui.state :as ui-state]))
 
 ;; ── Projection helpers ──────────────────────────────────
@@ -123,9 +125,9 @@
    ::pco/output [:psi.extension/tools
                  :psi.extension/tool-names]}
   (let [reg   (:extension-registry agent-session-ctx)
-        tools (ext/all-tools-in reg)]
+        tools (tool-registry/all-tools-in reg)]
     {:psi.extension/tools      (mapv #(dissoc % :execute) tools)
-     :psi.extension/tool-names (vec (ext/tool-names-in reg))}))
+     :psi.extension/tool-names (vec (tool-registry/tool-names-in reg))}))
 
 (pco/defresolver extension-commands-resolver
   [{:keys [psi/agent-session-ctx]}]
@@ -133,9 +135,9 @@
    ::pco/output [:psi.extension/commands
                  :psi.extension/command-names]}
   (let [reg  (:extension-registry agent-session-ctx)
-        cmds (ext/all-commands-in reg)]
+        cmds (command-registry/all-commands-in reg)]
     {:psi.extension/commands      (mapv #(dissoc % :handler) cmds)
-     :psi.extension/command-names (vec (ext/command-names-in reg))}))
+     :psi.extension/command-names (vec (command-registry/command-names-in reg))}))
 
 (pco/defresolver extension-flags-resolver
   [{:keys [psi/agent-session-ctx]}]
@@ -189,9 +191,9 @@
                  :psi.extension.workflow/running-count
                  :psi.extension.workflow/type-names]}
   (let [reg (:workflow-registry agent-session-ctx)]
-    {:psi.extension.workflow/count         (wf/workflow-count-in reg)
-     :psi.extension.workflow/running-count (wf/running-count-in reg)
-     :psi.extension.workflow/type-names    (wf/type-names-in reg)}))
+    {:psi.extension.workflow/count         (extension-workflow-runtime/workflow-count-in reg)
+     :psi.extension.workflow/running-count (extension-workflow-runtime/running-count-in reg)
+     :psi.extension.workflow/type-names    (extension-workflow-runtime/type-names-in reg)}))
 
 (pco/defresolver extension-workflows-resolver
   [entity]
@@ -201,7 +203,7 @@
         path              (:psi.extension/path entity)
         reg               (:workflow-registry agent-session-ctx)]
     {:psi.extension/workflows
-     (mapv workflow->eql (wf/workflows-in reg path))}))
+     (mapv workflow->eql (extension-workflow-runtime/workflows-in reg path))}))
 
 (pco/defresolver extension-workflow-detail-resolver
   [{:keys [psi/agent-session-ctx psi.extension/path psi.extension.workflow/id]}]
@@ -209,7 +211,7 @@
    ::pco/output [:psi.extension.workflow/detail]}
   (let [reg (:workflow-registry agent-session-ctx)]
     {:psi.extension.workflow/detail
-     (some-> (wf/workflow-in reg path id) workflow->eql)}))
+     (some-> (extension-workflow-runtime/workflow-in reg path id) workflow->eql)}))
 
 ;; ── Extension UI state ──────────────────────────────────
 

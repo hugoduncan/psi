@@ -1,0 +1,94 @@
+- [x] Compare candidate deterministic-step authoring syntaxes and choose one preferred direction
+  - current recommendation: prefer a general `:invoke` block over `:deterministic` or `:executor`/`:kind`
+- [x] Define the deterministic operation contract for extension/runtime implementers
+  - current recommendation: author-facing canonical operation id resolved through a runtime-owned registry, not direct var/function references from workflow files
+- [x] Define the argument-passing model, including projected and literal values
+  - current recommendation: one explicit map-shaped `:args` surface with mixed literal and projected values, reusing the existing source/path projection family
+- [x] Define the canonical deterministic result shape and downstream reference semantics
+  - current recommendation: structured result envelope with `:data` as canonical output, explicit downstream result kinds (`:data`, `:summary`, optional `:full-result`), and shared source/path projection across deterministic and LLM-backed consumers
+- [x] Define runtime/observability expectations for deterministic steps
+  - deterministic steps do not create child sessions by default
+  - deterministic execution remains visible in workflow progression, attempts/history, and debugging/introspection surfaces
+  - runtime should make effective step boundary/input surfaces inspectable across invoke/session/delegate execution forms
+  - runtime execution should consume normalized workflow IR rather than either authored grammar directly
+- [x] Validate the design against the GitHub label-search anchor use case
+  - design now includes a consolidated end-state summary and anchor examples covering deterministic invocation plus deterministic and LLM-backed downstream consumers
+- [x] Split accepted design into follow-on implementation child tasks
+  - normalized workflow IR schema and validation
+  - current authored grammar -> IR compiler
+  - runtime execution adoption of IR
+  - target authored grammar -> IR compiler
+  - deterministic operation registry / extension contract
+  - runtime execution support for deterministic invoke steps
+  - deterministic result recording and introspection surfaces
+  - inline-session contribution compilation into child-session conversations
+  - delegated boundary model and workflow invocation plumbing
+  - step-output surface normalization and validation across `:invoke`, `:session`, and `:delegate`
+  - shared source/reference/projection support across deterministic args, inline-session contributions, and delegated context
+  - example workflow migration and documentation
+  - eventual compatibility retirement for the current authored grammar
+- [x] Materialize the workflow grammar as project docs
+  - added `doc/workflow-grammar.md` as the target grammar artifact
+  - added `doc/workflow-grammar-concepts.md` as the conceptual explanation artifact
+  - added `doc/workflow-grammar-current.md` as the current implemented grammar artifact
+  - added `doc/workflow-ir.md` as the normalized runtime model artifact
+  - added `doc/workflow-grammar-migration.md` as the convergence/migration artifact
+  - extracted broader model selection into `doc/model-selection-grammar.md` and `doc/model-selection-concepts.md`
+- [x] Tighten ambiguity around per-type field validity, delegated boundary semantics, and step output surfaces
+  - added first-cut field matrix
+  - clarified delegated `:prompt-string` / `:workflow-input` relationship
+  - added first-cut output surfaces per step type
+  - clarified that output names and yielded values are distinct concepts
+  - added `:yields` as the step-level resulting value mapping
+  - made control flow explicit across `:invoke`, `:session`, and `:delegate`
+  - clarified that `:judge` itself can be either LLM-backed or deterministic in the first cut
+- [x] Resolve follow-on ambiguities found during document review
+  - allowed authored `:yields` on all three step types in the grammar and design
+  - made delegated `:context` optional and defined omission as equivalent to `[]`
+  - added explicit workflow final-result composition rules for transitions to `:done`
+  - added explicit yielded-value references via `{:step ... :yield ...}` alongside `{:step ... :output ...}`
+  - clarified that a first-cut source spec may contain either `:path` or `:projection`, but not both
+  - tightened the judge outcome contract: string/keyword outcomes, no auto-coercion, unmatched outcomes are routing errors
+  - corrected the grammar/docs so transition-local routing directives may include optional `:max-iterations`
+  - clarified that the prior `:max-iterations?` spelling was only imprecise optionality notation, not a real authored field name
+  - preserved the existing implemented distinction between step-level `:max-iterations` and transition-local routing-directive `:max-iterations`
+  - normalized first-cut session output naming on `:final-llm-reply`
+  - restricted template variable names in the grammar to strings so `{{var}}` binding is unambiguous
+  - clarified that successful `:yields` forms point at step-local output surfaces by keyword
+  - clarified that the grammar artifact is EBNF-like documentation rather than a complete executable parser spec
+- [x] Allow both explicit model choice and model selection queries for inline session steps
+  - `:type :session` uses a single `:model` field
+  - `:model` may be either a concrete model id or a query specification
+- [x] Make yielded values structurally exclusive
+  - `:yields` is now a tagged union with hoisted type-specific fields (`:data`, `:text`, `:details`) and `:reason` for failures
+- [x] Narrow delegated boundary first cut
+  - `:target` names existing workflows only
+  - `:prompt-string` renders to a string in the first cut and may be authored literally or via template shape
+  - delegated workflow session overrides are disallowed for now
+- [x] Replace the older prompt/input/reference framing with the newer session-conversation contribution model
+  - canonical inline-session shape is now `:session {:contributions [...]}` with `:type :source` and `:type :template`
+- [x] Expand the model from 2 execution forms to the explicit 3-form model
+  - canonical step execution forms are now `:type :invoke`, `:type :session`, and `:type :delegate`, and they are intended to be mutually exclusive
+- [x] Add explicit step `:type`
+  - step type now models exclusivity directly in the authored data instead of relying only on field presence
+- [x] Hoist type-specific fields into the step map
+  - removed redundant per-type submaps now that `:type` determines which fields are valid
+- [x] Rename delegated execution vocabulary to match `/delegate`
+  - `:type :delegate` + `:target` + `:prompt-string` + `:context`
+- [x] Align `doc/workflow-ir.md` session output naming with the target grammar's `:final-llm-reply` surface
+  - made the IR output map, default `:yields`, and surrounding prose use one canonical session output key so the authoring-to-IR boundary stays simple and explicit
+  - aligned the current-grammar compatibility compiler and its focused proof to the same canonical session output key
+- [x] Remove legacy `[:outputs :text]` lookups from `components/workflow-runtime/src/psi/workflow_runtime/source_resolution.clj` when resolving canonical IR session refs
+  - tightened `resolve-binding-ref` / `resolve-accepted-result-path` so `:output :final-llm-reply` and `:yield :text` no longer share a local compatibility translation branch
+  - kept workflow-runtime source resolution aligned with `workflow_runtime/ir.clj`, `workflow_current_ir_compiler.clj`, and `doc/workflow-ir.md`
+  - reshaped focused proof coverage in `source_resolution_test.clj` so canonical `:final-llm-reply` resolution remains explicit and legacy stored `:outputs :text` is no longer treated as the same logical output surface
+- [x] After the workflow-runtime source-resolution cleanup lands, re-evaluate the older `[:outputs :text]` compatibility branch in `components/agent-session/src/psi/agent_session/workflow_file_authoring_session.clj`
+  - rewrote the still-live authoring/compiler branch to compile `:projection :text` for prior step accepted-result references onto the canonical `:outputs :final-llm-reply` surface
+  - added focused proof coverage in `workflow_file_authoring_session_test.clj`
+  - avoided duplicating the runtime normalization fix; this remained a distinct current-authoring compatibility seam
+- [x] Re-evaluate the duplicated source-resolution regression proof across `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj` and `components/agent-session/test/psi/agent_session/workflow_source_resolution_test.clj`
+  - kept the authoritative proof with the lower workflow-runtime owner
+  - removed the higher duplicate because it only mirrored lower behavior and added no boundary-specific signal
+- [x] Re-evaluate repeated run-construction setup in `components/workflow-runtime/test/psi/workflow_runtime/source_resolution_test.clj`
+  - extracted tiny local helpers for report accepted-result and delegate-step accepted-result setup
+  - kept proof ownership and behavioral focus unchanged; this remained a readability cleanup rather than a coverage expansion

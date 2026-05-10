@@ -1,6 +1,5 @@
 {:deps
- {psi/workflow-loader   {}
-  psi/auto-session-name {}
+ {psi/auto-session-name {}
   psi/commit-checks     {}
   psi/mementum          {}
   psi/munera            {}

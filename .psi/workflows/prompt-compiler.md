@@ -2,14 +2,10 @@
 name: prompt-compiler
 description: Compiles a prompt to EDN
 ---
-{:tools ["read" "bash"]
- :skills ["prompt-compiler"]}
-
-Use the prompt-compiler skill.
-Compile the specified prompt to EDN.
-
-Requirements:
-- Return EDN
-- No prose
-- No markdown code fences
-- Keep output minimal and structurally valid
+{:steps [{:name "compile"
+          :type :session
+          :tools ["read" "bash"]
+          :skills ["prompt-compiler"]
+          :contributions [{:type :template
+                           :text "Use the prompt-compiler skill.\nCompile the specified prompt to EDN.\n\nRequirements:\n- Return EDN\n- No prose\n- No markdown code fences\n- Keep output minimal and structurally valid\n\nInput:\n{{input}}"
+                           :vars {"input" {:from :workflow-input}}}]}]}

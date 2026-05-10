@@ -1,7 +1,7 @@
 (ns psi.app-runtime.projections
   "Adapter-neutral public projections shared across interactive UIs."
   (:require
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.ui.state :as ui-state]))
 
 (def ^:private preserve-fn-keys

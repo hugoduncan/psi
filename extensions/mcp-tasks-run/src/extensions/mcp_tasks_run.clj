@@ -24,7 +24,7 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [com.fulcrologic.statecharts.chart :as chart]
-   [extensions.workflow-display :as workflow-display]
+   [psi.agent-session.workflow.display :as workflow-display]
    [com.fulcrologic.statecharts.elements :as ele]
    [psi.agent-core.core :as agent]
    [psi.agent-session.prompt-loop :as prompt-loop]

@@ -2,9 +2,9 @@
   "RPC event topics and payload projection helpers."
   (:require
    [clojure.string :as str]
-   [psi.agent-session.extensions :as ext]
+   [psi.command-registry.registry :as command-registry]
    [psi.agent-session.message-text :as message-text]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.app-runtime.context :as app-context]
    [psi.app-runtime.context-summary :as context-summary]
    [psi.app-runtime.footer :as footer]
@@ -115,7 +115,7 @@
    (session-updated-payload ctx (default-session-id-in ctx)))
   ([ctx session-id]
    (let [summary (session-summary/session-summary ctx session-id)
-         command-names (ext/command-names-in (:extension-registry ctx))
+         command-names (command-registry/command-names-in (:extension-registry ctx))
          prompt-templates (:prompt-templates (ss/get-session-data-in ctx session-id))]
      (assoc (select-keys summary [:session-id
                                   :session-file

@@ -4,7 +4,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [psi.agent-session.core :as session]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.app-runtime.messages :as app-messages]
    [psi.rpc.events :as events]
    [psi.rpc.session.projections :as projections]

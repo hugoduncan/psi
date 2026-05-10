@@ -5,8 +5,9 @@
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.session-state :as ss]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-plan :as tool-plan]
    [psi.query.core :as query])
@@ -56,10 +57,10 @@
                              {:content (str "EXT:" (get args "text" ""))
                               :is-error false})]
       (ext/register-extension-in! reg "/ext/a")
-      (ext/register-tool-in! reg "/ext/a" {:name "ext-tool"
-                                           :description "extension tool"
-                                           :parameters {:type "object"}
-                                           :execute exec-fn})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "ext-tool"
+                                                     :description "extension tool"
+                                                     :parameters {:type "object"}
+                                                     :execute exec-fn})
       ;; Simulate the agent-core runtime projection stripping :execute while the
       ;; canonical extension registry still retains the executable fn.
       (agent-core/set-tools-in!

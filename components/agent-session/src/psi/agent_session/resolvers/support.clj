@@ -5,8 +5,7 @@
    that domain-specific resolver namespaces depend on."
   (:require
    [psi.agent-core.core :as agent]
-   [psi.agent-session.session :as session]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as session]))
 
 (defn session-data
   "Get session data for an explicit session-id.
@@ -34,7 +33,7 @@
 (defn agent-data
   "Get agent-core data for an explicit session-id."
   [agent-session-ctx session-id]
-  (agent/get-data-in (ss/agent-ctx-in agent-session-ctx session-id)))
+  (agent/get-data-in (session/agent-ctx-in agent-session-ctx session-id)))
 
 (defn agent-core-messages
   "Extract the message vec from agent-core inside a session context."

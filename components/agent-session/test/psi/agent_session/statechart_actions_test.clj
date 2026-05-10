@@ -2,15 +2,15 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
-   [psi.agent-session.dispatch :as dispatch]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
-   [psi.agent-session.session-state :as session-state]
+   [psi.session-state.state :as session-state]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- invoke-handler
   [ctx event-type data]
-  (let [handler-fn (get-in (dispatch/handler-entry event-type) [:fn])]
+  (let [handler-fn (get-in (kernel/handler-entry event-type) [:fn])]
     (handler-fn ctx data)))
 
 (defn- apply-root-state-update!
@@ -21,12 +21,12 @@
 
 (defn- with-registered-handlers
   [ctx f]
-  (dispatch/clear-handlers!)
+  (kernel/clear-handlers!)
   (try
     (statechart-actions/register! ctx)
     (f)
     (finally
-      (dispatch/clear-handlers!))))
+      (kernel/clear-handlers!))))
 
 (deftest daemon-thread-test
   ;; Tests daemon thread creation and execution.

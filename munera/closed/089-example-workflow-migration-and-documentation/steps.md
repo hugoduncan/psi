@@ -1,0 +1,10 @@
+- [x] Choose representative workflows or workflow slices for migration/example use
+- [x] Ensure the example set covers invoke/session/delegate and shared data-flow semantics where practical
+- [x] Migrate or add target-grammar variants for the chosen examples
+- [x] Add or update docs showing the preferred target authoring style
+- [x] Add concise current->target mapping notes where they reduce author confusion
+- [x] Run focused verification for migrated examples
+- [x] Tighten examples/docs if migration reveals readability or ergonomics issues
+- [x] Reconcile examples/docs with task `077` and executable runtime behavior
+  - [x] Bound task/design-plan documentation claims to the currently taught `:session` input/reference/preload and shared-reference surfaces; do not imply concrete example-led `outputs`/`yields` coverage until the guide teaches them explicitly
+- [x] Align `implementation.md` with the final checked-in workflow state: remove the stale note that `gh-bug-triage-modular.md` now uses target-authored `:delegate` steps, and record clearly that the file remains current-authored while `doc/workflows.md` teaches the delegate-oriented target mapping plus the implementation boundary.

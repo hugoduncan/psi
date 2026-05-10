@@ -1,0 +1,88 @@
+2026-05-08
+- Implemented the first production persistence-IO boundary extraction slice.
+- In `components/session-persistence/src/psi/session_persistence/core.clj`:
+  - promoted `append-journal-entry-root-update` to an explicit lower-owned pure helper
+  - added lower-owned `mark-flushed-root-update`
+  - added pure `persistence-io-request` shaping append-vs-flush-or-noop from entries + flush-state + session metadata
+  - refactored legacy compatibility persistence helpers (`persist-state-entry!`, `persist-entry!`, `persist-journal-in!`) to reuse the pure request helper instead of carrying separate policy branches
+- In `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`:
+  - moved production append memory mutation into handler `:root-state-update`
+  - shaped canonical `:persist/session-journal-io` effect requests from locally derived post-append entries
+  - preserved `:session/append-journal-entry` as the stable caller-facing event
+- In `components/agent-session/src/psi/agent_session/dispatch_effects.clj`:
+  - added canonical `:persist/session-journal-io` execution for `:append-entry` and `:flush-journal`
+  - normalized `:session-file` to `java.io.File` at the effect boundary before store calls
+  - made successful `:flush-journal` execution apply `mark-flushed-root-update`
+  - changed retained `:persist/journal-append-*` effects into compatibility/convenience shims that dispatch back through `:session/append-journal-entry` instead of performing combined memory+IO directly
+- In `components/agent-session/src/psi/agent_session/dispatch_handlers/session_lifecycle.clj` and `session_lifecycle.clj`:
+  - moved fork child-file persistence off direct `journal-store/flush-journal!`
+  - fork initialization now declares canonical `:persist/session-journal-io` flush effects when persistence is enabled
+  - removed direct lifecycle-side write calls so fork persistence crosses the same explicit boundary as append flows
+- In `components/agent-session/src/psi/agent_session/dispatch_schema.clj`:
+  - added the canonical `:persist/session-journal-io` effect schema
+- Focused tests updated/added:
+  - journal append convergence tests now prove handler-owned memory append, canonical IO execution that does not mutate memory, flush-state advancement only on successful flush, and failed flush non-advancement
+  - fork dispatch test kept focused on dispatch logging without brittle declared-effect indexing
+- Regression encountered and fixed during implementation:
+  - switching retained append effects to nested dispatch initially exposed a replay-order regression due to full-suite interaction; focused replay proofs now pass after the boundary shape settled
+  - initial IO executor passed string session-file paths directly into store flush helpers; fixed by normalizing to `java.io.File` at execution
+- Verification:
+  - `clj-kondo --lint` on touched source/test files: green
+  - `bb clojure:test:unit --focus psi.state-kernel.dispatch-test --focus psi.agent-session.dispatch-pure-result-test`: green
+  - `bb clojure:test:unit --focus psi.session-persistence.core-test --focus psi.agent-session.journal-append-convergence-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.session-lifecycle-test`: green
+- Follow-on proof slice landed after the first implementation commit:
+  - added direct lower-component unit proofs in `components/session-persistence/test/psi/session_persistence/core_test.clj` for:
+    - `persistence-io-request` no-op before first assistant message
+    - `persistence-io-request` flush shaping for first assistant-visible persistence
+    - `persistence-io-request` append shaping after initial flush
+    - `mark-flushed-root-update` root-state transition semantics
+  - kept compatibility helper presence unchanged; this slice focused on proving lower-owned semantics directly rather than changing surface area
+- Final cleanup slice removed the obsolete compatibility wrappers entirely:
+  - removed `append-entry-in!`, `persist-entry-in!`, `persist-journal-in!`, `persist-entry!`, and `persist-state-entry!` from `components/session-persistence/src/psi/session_persistence/core.clj`
+  - rewrote remaining lower-component tests to use canonical lower helpers plus direct execution of shaped IO requests instead of wrapper APIs
+  - updated compatibility-surface tests to assert those obsolete names are now absent from the canonical namespace
+- Task 118 now has its intended architectural boundary, lower-level proof coverage, and a simplified canonical persistence surface
+- Final follow-on cleanup removed the retained `:persist/journal-append-*` shim effects too:
+  - migrated remaining production callers onto the canonical `:session/append-journal-entry` seam via `:runtime/dispatch-event`
+  - removed shim effect methods from `components/agent-session/src/psi/agent_session/dispatch_effects.clj`
+  - removed shim effect schema entries from `components/agent-session/src/psi/agent_session/dispatch_schema.clj`
+  - updated focused tests to assert the canonical dispatch-event-to-append path instead of the removed shim names
+
+2026-05-08 — Task implementation review
+- Review verdict: implementation matches the task design and is acceptable for closure from a behavior/architecture standpoint.
+- Confirmed strengths:
+  - canonical file-write seam is now `:persist/session-journal-io`
+  - lower component owns pure persistence policy through `persistence-io-request`
+  - handler owns in-memory append while executor owns file IO
+  - fork persistence crosses the same explicit effect boundary as append flows
+  - obsolete compatibility wrappers have now been removed entirely
+  - lower-level proofs exist in addition to higher-level integration/convergence tests
+- Review follow-up items identified:
+  1. `psi.session-persistence.core` namespace docstring was slightly stale; it described broader ctx-based append/persist semantics than the post-task surface now owns.
+  2. `psi.session-persistence.core` contained an empty `;;; Flush + persist semantics` section stub after wrapper removal.
+  3. Compatibility effect surfaces `:persist/journal-append-*` still existed as shims above the canonical IO seam; this was acceptable, but a later cleanup could migrate callers onto the canonical seam directly and remove the shims.
+- These follow-up items were non-blocking review cleanups, not correctness defects.
+- Final polish slice completed the remaining non-shim review follow-ups:
+  - refreshed the `psi.session-persistence.core` namespace docstring to match the current post-task ownership
+  - removed the empty section stub left behind after wrapper removal
+
+2026-05-08 — Code-shaper review
+- Verdict: implementation is in good shape for simplicity, consistency, and robustness.
+- Main non-blocking shaping follow-up:
+  - repeated `:runtime/dispatch-event` -> `:session/append-journal-entry` effect construction now appears in multiple handlers (`prompt_lifecycle`, `session_mutations`, `prompt_recording`)
+  - recommend extracting one small helper for this canonical effect envelope to reduce repetition and future drift risk
+- Follow-up executed:
+  - added `components/agent-session/src/psi/agent_session/journal_append_effect.clj` as the small owning helper for the canonical append-journal dispatch-effect envelope
+  - migrated prompt lifecycle, session mutations, and prompt recording call sites to use the shared helper
+  - kept the helper intentionally narrow: effect-envelope construction only, with small entry-specific convenience wrappers
+
+2026-05-08 — Test review
+- Verdict: test coverage is good and sufficient for closure.
+- Main non-blocking test follow-ups:
+  - some higher-level agent-session tests still assert exact append-effect envelope structure more often than necessary
+  - replay-focused tests use reduced handcrafted entry shapes instead of canonical constructors, which is acceptable but mildly inconsistent
+  - lower pure persistence tests are the strongest/highest-signal part of the suite and should remain authoritative
+- Follow-up executed:
+  - relaxed selected higher-level agent-session tests toward stable semantic checks instead of repeated full nested effect-envelope equality
+  - migrated reviewed replay-focused tests to the shared canonical append-effect helper instead of reduced handcrafted effect shapes
+  - preserved the lower pure persistence tests unchanged as the authoritative seam proofs

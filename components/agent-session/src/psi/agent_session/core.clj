@@ -7,8 +7,9 @@
   (:require
    [psi.agent-session.compaction-runtime :as compaction-runtime]
    [psi.agent-session.context :as context]
+   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.introspection :as introspection]
-   [psi.agent-session.prompt-control :as prompt-control]
+   [psi.agent-session.turn :as turn]
    [psi.agent-session.session-lifecycle :as lifecycle]
    [psi.agent-session.session-settings :as settings]))
 
@@ -19,14 +20,6 @@
 (defn register-mutations-in!
   ([qctx mutations] (context/register-mutations-in! qctx mutations))
   ([qctx mutations rebuild?] (context/register-mutations-in! qctx mutations rebuild?)))
-
-(defn register-resolvers!
-  []
-  (context/register-resolvers!))
-
-(defn register-mutations!
-  [mutations]
-  (context/register-mutations! mutations))
 
 (defn create-context
   ([] (context/create-context))
@@ -64,41 +57,53 @@
   [ctx root-id]
   (lifecycle/close-session-tree-in! ctx root-id))
 
+(defn dispatch-in!
+  "Public agent-session dispatch entrypoint.
+
+   Keeps higher layers off the compatibility dispatch namespace while the
+   domain-owned dispatch composition remains internal."
+  ([ctx event-type]
+   (dispatch/dispatch! ctx event-type))
+  ([ctx event-type event-data]
+   (dispatch/dispatch! ctx event-type event-data))
+  ([ctx event-type event-data opts]
+   (dispatch/dispatch! ctx event-type event-data opts)))
+
 (defn prompt-in!
   ([ctx session-id text]
-   (prompt-control/prompt-in! ctx session-id text))
+   (turn/prompt-in! ctx session-id text))
   ([ctx session-id text images]
-   (prompt-control/prompt-in! ctx session-id text images))
+   (turn/prompt-in! ctx session-id text images))
   ([ctx session-id text images opts]
-   (prompt-control/prompt-in! ctx session-id text images opts)))
+   (turn/prompt-in! ctx session-id text images opts)))
 
 (defn last-assistant-message-in
   [ctx session-id]
-  (prompt-control/last-assistant-message-in ctx session-id))
+  (turn/last-assistant-message-in ctx session-id))
 
 (defn steer-in!
   [ctx session-id text]
-  (prompt-control/steer-in! ctx session-id text))
+  (turn/steer-in! ctx session-id text))
 
 (defn follow-up-in!
   [ctx session-id text]
-  (prompt-control/follow-up-in! ctx session-id text))
+  (turn/follow-up-in! ctx session-id text))
 
 (defn queue-while-streaming-in!
   [ctx session-id text behavior]
-  (prompt-control/queue-while-streaming-in! ctx session-id text behavior))
+  (turn/queue-while-streaming-in! ctx session-id text behavior))
 
 (defn request-interrupt-in!
   [ctx session-id]
-  (prompt-control/request-interrupt-in! ctx session-id))
+  (turn/request-interrupt-in! ctx session-id))
 
 (defn abort-in!
   [ctx session-id]
-  (prompt-control/abort-in! ctx session-id))
+  (turn/abort-in! ctx session-id))
 
 (defn consume-queued-input-text-in!
   [ctx session-id]
-  (prompt-control/consume-queued-input-text-in! ctx session-id))
+  (turn/consume-queued-input-text-in! ctx session-id))
 
 (defn set-model-in!
   [ctx session-id model]

@@ -1,0 +1,8 @@
+- [x] Trace current session-output normalization responsibility across step prep, source resolution, and statechart runtime
+- [x] Choose and implement one authoritative normalization boundary for canonical session outputs/yields
+- [x] Remove redundant local session-output translation logic from runtime callers
+- [x] Add or update focused tests for `:output :final-llm-reply` and `:yield :text`
+- [x] Add or update focused tests for canonical session contributions vs compat preload interaction where still supported
+- [x] Run focused verification and reconcile any drift exposed by the refactor
+- [x] Add one focused mixed-session-step proof that exercises canonical `:session :contributions` and legacy `:session-preload` in the same runtime path, making the intended precedence/combination behavior explicit.
+- [x] Add the same mixed canonical-contributions + compat-preload proof on the Phase A statechart runtime path so both runtime execution paths make the combination behavior explicit.

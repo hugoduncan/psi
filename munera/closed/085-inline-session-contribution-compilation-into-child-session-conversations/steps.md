@@ -1,0 +1,13 @@
+- [x] Clarify the task's review/output surface in `design.md` and `plan.md`; keep `implementation.md` and `design-steps.md` as the canonical review/follow-up files
+- [x] Reconcile the cited proof-surface claim for `workflow_source_resolution_test.clj`: keep target-authored session fixtures in authored shape and prove canonical nested `:session :contributions` at the compiled IR/assertion seam
+- [x] Identify the child-session creation seam for IR `:session` contribution materialization
+- [x] Define any needed internal compiled contribution representation
+- [x] Resolve `:source` contributions from workflow and prior-step sources
+- [x] Render `:template` contributions from explicit vars and resolved source specs
+- [x] Preserve authored contribution order during materialization
+- [x] Thread compiled contributions into canonical child-session conversation state
+- [x] Ensure the canonical prompt/session preparation path consumes that conversation state
+- [x] Add focused source-only contribution tests
+- [x] Add focused template-only contribution tests
+- [x] Add focused mixed contribution compilation/execution-coherence tests
+- [x] Reconcile implementation with task `077`, `doc/workflow-ir.md`, and converged child-session prompt composition behavior

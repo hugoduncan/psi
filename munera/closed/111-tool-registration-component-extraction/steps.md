@@ -1,0 +1,31 @@
+- [x] Re-read `105-agent-session-component-extraction-map` guidance for the tool-domain child boundary
+- [x] Confirm `components/tool-registry/` and `psi.tool-registry.*` as the extracted component directory and namespace family
+- [x] Inspect `components/agent-session/src/psi/agent_session/tool_defs.clj` for hidden dependency or split pressure
+- [x] Inspect the tool-specific parts of `components/agent-session/src/psi/agent_session/extensions.clj` for hidden dependency or split pressure
+- [x] Confirm the direct-registry-shape approach for tool-specific operations so the extracted component does not depend on `psi.agent-session.extensions` helper internals
+- [x] Create the new tool-registry component directory and authoritative namespace locations
+- [x] Move or split canonical tool-definition normalization/projection into the extracted component
+- [x] Move tool-name validation with extension tool-registration ownership into the extracted component
+- [x] Move or split extension tool-registration and tool-listing/query helpers into the extracted component
+- [x] Update all direct production consumers of canonical tool defs to depend on the extracted component, including `bootstrap.clj`, `psi_tool.clj`, `tool_plan.clj`, `resolvers/extensions.clj`, and `components/ai/src/psi/ai/conversation.clj`
+- [x] Update `mutations/extensions.clj` tool registration to call downward into the extracted component
+- [x] Update `extensions/api.clj` tool registration to call downward into the extracted component
+- [x] Move or add focused extracted-component tests under `components/tool-registry/test/`
+- [x] Add `components/tool-registry/test` explicitly to the top-level `tests.edn` component test-path lists used by the standard root test runner
+- [x] Preserve registered-tool query semantics explicitly: `tool-names-in` as cross-extension name set and `all-tools-in` as first-registration-wins by tool name
+- [x] Preserve rich canonical tool-def maps, including runtime-only internal fields, while keeping projection helpers as the external boundary
+- [x] Keep canonical tool-name validation scoped to extension registration in this slice unless implementation proves an existing broader invariant
+- [x] Keep `tool-runtime` execution ownership separate; do not pull execution helpers into this component
+- [x] Keep session tool-selection policy outside this extraction
+- [x] Use compatibility forwarding shims only if strictly needed during migration
+- [x] Remove any temporary compatibility shims before task completion
+- [x] Run focused extracted-component verification
+- [x] Run at least one focused higher-level registration/consumer verification path
+- [x] Record the final ownership split, migrated consumers, and verification commands/results in `implementation.md`
+- [x] Add a lower-level registry test fixture or neutral helper so `components/tool-registry/test/psi/tool_registry/registry_test.clj` no longer depends on `psi.agent-session.extensions`
+- [x] Re-run focused `tool-registry` tests after the test-fixture decoupling cleanup
+- [x] Append the cleanup outcome to `implementation.md`
+- [x] Make `psi.tool-registry.registry/register-tool-in!` fail fast or otherwise explicitly enforce the precondition that `ext-path` is already registered before writing tool data
+- [x] Add a focused regression proving unregistered `ext-path` tool registration is rejected or otherwise handled canonically
+- [x] Re-run focused `tool-registry` verification after the robustness fix
+- [x] Append the robustness-fix outcome to `implementation.md`

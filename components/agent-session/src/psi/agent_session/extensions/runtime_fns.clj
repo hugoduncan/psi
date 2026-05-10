@@ -1,10 +1,12 @@
 (ns psi.agent-session.extensions.runtime-fns
   (:require
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
+   [psi.agent-session.extensions :as extensions]
    [psi.agent-session.extensions.runtime-eql :as runtime-eql]
    [psi.agent-session.extensions.runtime-ui :as runtime-ui]
-   [psi.agent-session.oauth.core :as oauth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.services :as services]
-   [psi.agent-session.session-state :as ss]))
+   [psi.session-state.state :as ss]))
 
 (def ^:dynamic *active-extension-session-id*
   nil)
@@ -54,4 +56,15 @@
      :log-fn
      (fn [text]
        (binding [*out* *err*]
-         (println text)))}))
+         (println text)))
+
+     :register-deterministic-operation-fn
+     (fn [ext-path* operation]
+       (let [op-reg (:deterministic-operation-registry ctx)]
+         (extensions/register-operation-in! (:extension-registry ctx) ext-path* operation)
+         (deterministic-op-registry/register-operation-in! op-reg
+                                                           (assoc operation :ext-path ext-path* :source :extension))
+         {:id (:id operation)}))
+
+     :deterministic-operation-registry
+     (:deterministic-operation-registry ctx)}))

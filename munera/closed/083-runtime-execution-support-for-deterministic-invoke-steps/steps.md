@@ -1,0 +1,16 @@
+- [x] Identify the IR step-dispatch seam and add `:type :invoke` execution
+- [x] Resolve invoke args from normalized source refs/projections
+- [x] Invoke registered deterministic operations through the runtime-owned registry
+- [x] Validate or normalize returned invoke results against the canonical contract
+- [x] Record invoke attempts/results in runtime history surfaces
+- [x] Expose invoke outputs for downstream `:output` references
+- [x] Expose invoke yielded values for downstream `:yield` references
+- [x] Integrate invoke success/failure with workflow progression and terminal outcomes
+- [x] Prove invoke-step participation in shared judge/routing behavior
+- [x] Add focused invoke-only workflow execution tests
+- [x] Add focused mixed invoke/session workflow execution tests
+- [x] Record that delegate-path coverage for this slice remains IR/source-resolution proof rather than runtime execution proof unless delegate execution support lands concurrently
+- [x] Reconcile runtime behavior with task `077`, `doc/workflow-ir.md`, and task `082`
+- [x] Clarify and align task artifacts on invoke-operation error control flow and canonical nested IR invoke execution boundary
+- [x] Reconcile invoke-judge claims with runtime/proof surfaces: either implement `:judge {:type :invoke ...}` through the deterministic operation registry with focused tests, or narrow task/documentation claims so shared judge/routing proof does not overstate current prompt-only judge execution
+- [x] Reconcile remaining repo documentation/runtime contract drift for invoke-typed judges: either implement `:judge {:type :invoke ...}` execution in `workflow_judge.clj` with focused proof, or narrow `doc/workflow-ir.md` so canonical/current runtime docs do not present invoke-judge as an available executed path before it exists.

@@ -1,0 +1,81 @@
+2026-05-07
+- Implemented task 101 as a no-shim extraction into the new component `components/turn-runtime/`.
+- Used `clj-surgeon` before editing to confirm the extraction split:
+  - `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/prompt_stream.clj`
+  - `clj-surgeon -op :deps -file components/agent-session/src/psi/agent_session/prompt_runtime.clj`
+  - `clj-surgeon -op :ls -file components/agent-session/src/psi/agent_session/turn_accumulator.clj`
+- Created the new component and authoritative namespaces:
+  - `components/turn-runtime/src/psi/turn_runtime/stream.clj` -> `psi.turn-runtime.stream`
+  - `components/turn-runtime/src/psi/turn_runtime/accumulator.clj` -> `psi.turn-runtime.accumulator`
+  - `components/turn-runtime/src/psi/turn_runtime/core.clj` -> `psi.turn-runtime.core`
+- Added component/config wiring:
+  - root `deps.edn` now includes local dep `psi/turn-runtime`
+  - root `deps.edn` run/psi/tui-demo/test/test-paths aliases now include `components/turn-runtime/src` and test aliases include `components/turn-runtime/test`
+  - `tests.edn` unit/integration source/test paths now include `components/turn-runtime/src` and `components/turn-runtime/test`
+  - `components/agent-session/deps.edn` now depends on `../turn-runtime`
+  - `tests-component-isolated.edn` was not changed in this slice
+- Moved the authoritative lower-level implementations off `agent-session`:
+  - removed `components/agent-session/src/psi/agent_session/prompt_stream.clj`
+  - removed `components/agent-session/src/psi/agent_session/turn_accumulator.clj`
+  - removed `components/agent-session/src/psi/agent_session/prompt_runtime.clj`
+- Preserved the intended ownership split:
+  - `psi.turn-runtime.core/execute-prepared-request!` is now the authoritative prepared-turn execution entrypoint
+  - `psi.turn/execute-prepared-request-and-journal!` is now the canonical session-owned wrapper that appends the assistant message to the journal after execution
+  - journal append semantics did not move into `turn-runtime`
+- Updated production consumers:
+  - `components/agent-session/src/psi/turn.clj`
+    - now requires `psi.turn-runtime.core`
+    - now owns `execute-prepared-request-and-journal!`
+    - now delegates abort to `psi.turn-runtime.core/abort-active-turn-in!`
+  - `components/agent-session/src/psi/agent_session/prompt_turn.clj`
+    - now uses `psi.turn/execute-prepared-request-and-journal!`
+  - `components/agent-session/src/psi/agent_session/tool_execution.clj`
+    - now requires `psi.turn-runtime.accumulator` for canonical progress emission
+  - `components/agent-session/src/psi/agent_session/context.clj`
+    - no callback-boundary redesign was needed; it already stayed bound to `psi.turn`, which remains the public callback surface as required
+- Test movement / ownership result:
+  - moved into `components/turn-runtime/test/psi/turn_runtime/`
+    - `core_test.clj` / namespace `psi.turn-runtime.core-test`
+      - reason: these tests primarily exercise live turn execution, prepared request execution, and prompt-loop consumers whose subject is the extracted execution runtime
+    - `accumulator_test.clj` / namespace `psi.turn-runtime.accumulator-test`
+      - reason: these tests primarily exercise stream accumulation, timeout/wait sentinel behavior, and accumulator-owned event/content assembly semantics
+  - intentionally remained under `components/agent-session/test`
+    - `prompt_lifecycle_test.clj`
+      - reason: prompt lifecycle orchestration and dispatch/statechart behavior remain agent-session owned
+    - `scheduler_lifecycle_test.clj`
+      - reason: scheduler ownership remains agent-session owned; it only stubs the extracted executor seam
+    - `runtime_test.clj`
+      - reason: app/runtime integration ownership remains above the extracted component
+    - `session_lifecycle_test.clj`
+      - reason: session creation/resume/fork lifecycle remains agent-session owned
+    - `child_session_mutation_test.clj`
+      - reason: child-session dispatch/mutation behavior remains agent-session owned
+    - `tool_execution_test.clj`
+      - reason: tool execution lifecycle and telemetry remain agent-session owned, even though progress emission now depends on `psi.turn-runtime.accumulator`
+    - `app_runtime_test.clj`, `rpc_prompt_command_test.clj`, `rpc_invariants_test.clj`
+      - reason: higher-level consumers remain adapter/runtime owned and only stub the extracted execution seam
+- Verification and fixes:
+  - initial focused run exposed one syntax error in the newly extracted `psi.turn-runtime.core` (missing closing paren in `execute-prepared-request!`)
+  - re-ran `clj-surgeon -op :ls -file components/turn-runtime/src/psi/turn_runtime/core.clj` successfully after the fix
+  - focused verification command used:
+    - `clojure -M:test --focus psi.turn-runtime.core-test --focus psi.turn-runtime.accumulator-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.runtime-test --focus psi.agent-session.session-lifecycle-test --focus psi.rpc-prompt-command-test --focus psi.rpc-invariants-test --focus psi.app-runtime-test`
+  - result: `91 tests, 506 assertions, 0 failures`
+- Final ownership search result:
+  - no remaining authoritative requires/usages of `psi.agent-session.prompt-runtime`, `psi.agent-session.prompt-stream`, or `psi.agent-session.turn-accumulator`
+  - production ownership now follows the intended slope:
+    - `context.clj` -> `psi.turn`
+    - `psi.turn` -> `psi.turn-runtime.core`
+    - `psi.turn-runtime.core` -> `psi.turn-runtime.stream`
+    - `psi.turn-runtime.core` -> `psi.turn-runtime.accumulator`
+- Follow-up status:
+  - the ownership/cycle defect found in post-extraction review was resolved by closed task `103-turn-runtime-ownership-boundary-repair`
+  - follow-on cleanup `3628a9f0` then removed the now-obsolete migrated turn-runtime state accessors from `psi.agent-session.state-accessors`
+  - `turn-runtime` no longer depends on `psi.agent-session.*`, and the direct `agent-session <-> turn-runtime` component cycle is gone
+- Deferred note:
+  - `record-tool-output-stat` remains above the boundary as explicit tool-domain follow-on work; this was intentionally not required to complete the extraction itself
+- Closure note:
+  - the extraction work for task `101` is complete; the only remaining related work is the explicitly deferred tool-accounting ownership follow-on tracked outside this task's closure
+- Notes:
+  - no compatibility shim was introduced
+  - old source files were removed in the same slice
+  - `munera/plan.md` already had unrelated local drift (`102-turn-preparation-component-extraction`) before finalization of this task; left untouched

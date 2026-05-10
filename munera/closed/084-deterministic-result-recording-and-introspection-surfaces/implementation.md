@@ -1,0 +1,35 @@
+- Review 2026-05-04: actionable ambiguities found. Created missing `implementation.md` and `design-steps.md` review surfaces. Follow-ups added for invoke introspection contract shape, effective-args recording location, yielded-value visibility contract, and failure-surface contract.
+- 2026-05-04 follow-up execution: resolved the four review-added design ambiguities in task artifacts.
+  - `design.md` now names the canonical public contract as the existing workflow run / step-run / attempt / accepted-result / history model, explicitly rejecting a parallel invoke-only query family.
+  - `design.md` now fixes effective invoke args to the attempt-local execution record, with history as supplementary only.
+  - `design.md` now fixes invoke yielded-value visibility as derived from accepted-result outputs plus normalized `:yields`, with any direct yield projection treated as convenience-only.
+  - `design.md` now fixes invoke failure introspection on canonical attempt `:execution-error`, with read/history projections derived from that record.
+  - `plan.md` was aligned to those contract decisions.
+  - `design-steps.md` review follow-ups were marked done after the task artifacts became explicit enough for implementation.
+- Review 2026-05-04: actionable inconsistency found. `design.md`/`plan.md` now center invoke failure on attempt-local `:execution-error` and reject synthetic accepted results, but the shared runtime contract still has an invoke `:error-yield` path (`deterministic_operations.clj`) while `workflow_ir.clj` resolves `:type :error` yields from accepted-result `[:blocked ...]`. The task artifacts do not yet say which failure/yield contract 084 will converge or whether invoke failures should bypass yielded-value projection entirely.
+- 2026-05-04 follow-up execution: resolved the remaining invoke failure/yield contract inconsistency in task artifacts.
+  - `design.md` now states that task 084 converges invoke failure onto attempt-local `:execution-error` only.
+  - invoke operation `{:status :error ...}` results explicitly do not produce accepted-result envelopes or separately recorded yielded values.
+  - any runtime helper tagging used to branch success vs failure is implementation-local rather than a public introspection surface.
+  - `plan.md` was aligned so implementation now targets one failure source of truth.
+- 2026-05-04 implementation: converged the shared invoke runtime seam to the attempt-only failure contract.
+  - Updated `components/agent-session/src/psi/agent_session/deterministic_operations.clj` so `operation-result->invoke-step-result` now returns `{:kind :execution-error ...}` for operation `{:status :error ...}` results instead of the previous synthetic `:error-yield` shape.
+  - Updated `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` so invoke failure recording consumes that execution-error payload directly as attempt failure data.
+  - Updated focused registry/runtime proofs so failure assertions now target attempt `:execution-error` and explicitly prove that invoke failures do not create `:accepted-result` envelopes.
+- 2026-05-04 verification: focused invoke/runtime checks green via `clojure -M:test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.workflow-invoke-runtime-test` (`10 tests, 27 assertions, 0 failures`).
+- 2026-05-04 implementation: completed the remaining recording/introspection slice for invoke steps.
+  - Added canonical attempt-local `:effective-args` to `workflow-step-attempt-schema` and `workflow-attempts/new-attempt`.
+  - Added `workflow_progression_recording/merge-latest-attempt-data` so attempt-local runtime details can be recorded after attempt start without mutating control-flow status/history.
+  - Updated `workflow_statechart_runtime.clj` so invoke execution resolves effective args once, passes them to the operation invocation, and records them on the latest attempt for both success and failure paths.
+  - Expanded `psi_tool_workflow.clj` run summaries so canonical `read-run` / `list-runs` surfaces include `:step-runs`, attempt summaries, accepted-result data, execution errors, and workflow history instead of a narrow run header only.
+  - Added focused proof in `workflow_invoke_runtime_test.clj` that successful and failing invoke attempts both expose canonical `:effective-args`.
+  - Added focused proof in `tools_test.clj` that `psi-tool workflow read-run` exposes the canonical step-run/attempt/accepted-result introspection surface, including invoke `:effective-args`.
+- 2026-05-04 verification: focused workflow/introspection/tool checks green via `clojure -M:test --focus psi.agent-session.workflow-invoke-runtime-test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.tools-test` (`27 tests, 220 assertions, 0 failures`).
+- Review 2026-05-04: no new actionable feedback found after rereading task artifacts plus the referenced runtime/model/tool/test surfaces (`deterministic_operations.clj`, `workflow_statechart_runtime.clj`, `workflow_progression_recording.clj`, `workflow_attempts.clj`, `workflow_model.clj`, `psi_tool_workflow.clj`, `workflow_invoke_runtime_test.clj`, `deterministic_operation_registry_test.clj`, `tools_test.clj`) and rerunning the focused proof set (`27 tests, 220 assertions, 0 failures`); current implementation and task artifacts remain aligned, so no new follow-up steps were added.
+- 2026-05-04 follow-up execution: reread `steps.md`, `implementation.md`, `design.md`, `plan.md`, and `design-steps.md`; no unchecked actionable follow-up items remained for task 084.
+  - Verified the preloaded review result already converged the invoke attempt/result/introspection work and left `steps.md` fully checked.
+  - Re-ran the focused proof set: `clojure -M:test --focus psi.agent-session.workflow-invoke-runtime-test --focus psi.agent-session.deterministic-operation-registry-test --focus psi.agent-session.tools-test` (`27 tests, 220 assertions, 0 failures`).
+  - No additional task-artifact updates were needed beyond recording this verification pass.
+- 2026-05-04 autonomous follow-up execution: reread `steps.md`, `implementation.md`, `design.md`, and `plan.md` against the preloaded code-shape review result.
+  - Confirmed there are still no unchecked actionable follow-up items in `steps.md` and no new task-local blockers to record.
+  - No code or task-artifact changes were required in this pass because the preceding review already converged task 084 to a fully checked state.

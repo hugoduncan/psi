@@ -1,9 +1,12 @@
 (ns psi.agent-session.extensions
   "Extension registry, loading, dispatch, tool wrapping, and introspection."
   (:require
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
+   [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.agent-session.extensions.api :as api]
    [psi.agent-session.extensions.loader :as loader]
-   [psi.agent-session.tool-defs :as tool-defs]
+   [psi.command-registry.registry :as command-registry]
+   [psi.tool-registry.registry :as tool-registry]
    [taoensso.timbre :as timbre]))
 
 (defrecord ExtensionRegistry [state])
@@ -26,7 +29,10 @@
   State is {:extensions          {path ExtensionRecord}
             :registration-order  [path ...]
             :flag-values         {name value}
-            :event-bus           {channel [handler-fn ...]}}"
+            :event-bus           {channel [handler-fn ...]}}
+
+  Extension records may also carry deterministic operations under
+  `:operations` keyed by stable author-facing operation ids."
   []
   (->ExtensionRegistry
    (atom {:extensions         {}
@@ -55,6 +61,7 @@
                            :commands       {}
                            :flags          {}
                            :shortcuts      {}
+                           :operations     {}
                            :allowed-events default-allowed-events}))
                (not registered?)
                (update :registration-order conj path)))))
@@ -78,42 +85,45 @@
          {:extension-path ext-path :handler handler-fn})
   reg)
 
-(def ^:private tool-name-pattern
-  "Canonical tool names are kebab-case ASCII.
-   This keeps names portable across model providers and transports."
-  #"^[a-z0-9][a-z0-9-]*$")
-
-(defn valid-tool-name?
-  "Return true when `tool-name` is canonical kebab-case ASCII.
-   Examples: read, psi-tool, delegate."
-  [tool-name]
-  (and (string? tool-name)
-       (boolean (re-matches tool-name-pattern tool-name))))
-
 (defn register-tool-in!
-  "Register `tool` (a map with :name key) for the extension at `ext-path`.
-   Tool maps may include :lambda-description for lambda-mode prompt rendering.
-   Stores canonical normalized tool defs in the registry.
-   Throws when tool name is missing or not canonical kebab-case."
+  "Thin upper seam delegating tool registration to the extracted tool-registry owner."
   [reg ext-path tool]
-  (let [tool-name (:name tool)]
-    (when-not (valid-tool-name? tool-name)
-      (throw (ex-info (str "Invalid tool name: " (pr-str tool-name)
-                           ". Expected kebab-case matching " tool-name-pattern)
-                      {:ext-path  ext-path
-                       :tool-name tool-name
-                       :pattern   (str tool-name-pattern)})))
-    (let [tool* (tool-defs/normalize-tool-def (assoc tool :source :extension :ext-path ext-path))]
-      (swap! (:state reg)
-             assoc-in [:extensions ext-path :tools tool-name] tool*)
-      reg)))
+  (tool-registry/register-tool-in! reg ext-path tool))
+
+(defn tool-names-in
+  "Thin upper seam delegating tool-name queries to the extracted tool-registry owner."
+  [reg]
+  (tool-registry/tool-names-in reg))
+
+(defn all-tools-in
+  "Thin upper seam delegating registered-tool listing to the extracted tool-registry owner."
+  [reg]
+  (tool-registry/all-tools-in reg))
+
+(defn get-tool-in
+  "Thin upper seam delegating tool lookup to the extracted tool-registry owner."
+  [reg tool-name]
+  (tool-registry/get-tool-in reg tool-name))
 
 (defn register-command-in!
-  "Register `cmd` (a map with :name key) for the extension at `ext-path`."
+  "Thin upper seam delegating command registration to the extracted command-registry owner."
   [reg ext-path cmd]
-  (swap! (:state reg)
-         assoc-in [:extensions ext-path :commands (:name cmd)] cmd)
-  reg)
+  (command-registry/register-command-in! reg ext-path cmd))
+
+(defn register-operation-in!
+  "Register a deterministic operation for the extension at `ext-path`.
+   Operation ids are stable author-facing ids such as
+   `github/search-issues-by-label`.
+
+   This records extension ownership in the extension registry. The runtime-owned
+   deterministic operation registry remains authoritative for invoke-time
+   resolution and duplicate detection."
+  [reg ext-path operation]
+  (let [operation* (deterministic-op-defs/normalize-operation-def
+                    (assoc operation :ext-path ext-path :source :extension))]
+    (swap! (:state reg)
+           assoc-in [:extensions ext-path :operations (:id operation*)] operation*)
+    reg))
 
 (defn register-flag-in!
   "Register `flag` (a map with :name key) for the extension at `ext-path`.
@@ -137,22 +147,43 @@
 
 (defn unregister-extension-in!
   "Remove one registered extension from `reg`.
-   Preserves other extension state, flag-values, and event-bus."
-  [reg path]
-  (swap! (:state reg)
-         (fn [s]
-           (-> s
-               (update :extensions dissoc path)
-               (update :registration-order (fn [order]
-                                             (vec (remove #(= path %) order)))))))
-  reg)
+   Preserves other extension state, flag-values, and event-bus.
+
+   When `deterministic-operation-registry` is provided, also removes any
+   runtime-owned deterministic operations registered by the extension so invoke
+   resolution cannot outlive extension ownership."
+  ([reg path]
+   (unregister-extension-in! reg path nil))
+  ([reg path deterministic-operation-registry]
+   (when deterministic-operation-registry
+     (deterministic-op-registry/unregister-operations-by-extension-in!
+      deterministic-operation-registry
+      path))
+   (swap! (:state reg)
+          (fn [s]
+            (-> s
+                (update :extensions dissoc path)
+                (update :registration-order (fn [order]
+                                              (vec (remove #(= path %) order)))))))
+   reg))
 
 (defn unregister-all-in!
   "Remove all registered extensions from `reg`. Used during reload.
-   Preserves flag-values and event-bus."
-  [reg]
-  (swap! (:state reg) assoc :extensions {} :registration-order [])
-  reg)
+   Preserves flag-values and event-bus.
+
+   When `deterministic-operation-registry` is provided, clears all extension-
+   owned deterministic operations from the runtime registry before removing the
+   extension records."
+  ([reg]
+   (unregister-all-in! reg nil))
+  ([reg deterministic-operation-registry]
+   (when deterministic-operation-registry
+     (doseq [path (:registration-order @(:state reg))]
+       (deterministic-op-registry/unregister-operations-by-extension-in!
+        deterministic-operation-registry
+        path)))
+   (swap! (:state reg) assoc :extensions {} :registration-order [])
+   reg))
 
 (defn get-flag-in
   "Get the current value of flag `name` from `reg`."
@@ -185,30 +216,6 @@
     (into #{}
           (mapcat keys)
           (extension-item-maps state item-key))))
-
-(defn- all-first-registered-items-in
-  [reg item-key]
-  (let [state (state-in reg)
-        seen  (volatile! #{})]
-    (reduce
-     (fn [items path]
-       (reduce-kv
-        (fn [items name item]
-          (if (contains? @seen name)
-            items
-            (do
-              (vswap! seen conj name)
-              (conj items (assoc item :extension-path path)))))
-        items
-        (or (get-in state [:extensions path item-key]) {})))
-     []
-     (:registration-order state))))
-
-(defn- get-extension-item-in
-  [reg item-key item-name]
-  (let [state (state-in reg)]
-    (some #(get-in state [:extensions % item-key item-name])
-          (:registration-order state))))
 
 (defn bus-emit-in!
   "Emit `data` on `channel` to all event bus subscribers in `reg`."
@@ -350,32 +357,25 @@
   [reg]
   (into (sorted-set) (extension-item-names-in reg :handlers)))
 
-(defn tool-names-in
-  "Return set of all registered tool names across all extensions in `reg`."
+(defn operation-ids-in
+  "Return set of all deterministic operation ids registered across all extensions in `reg`."
   [reg]
-  (extension-item-names-in reg :tools))
+  (extension-item-names-in reg :operations))
 
 (defn command-names-in
-  "Return set of all registered command names across all extensions in `reg`."
+  "Thin upper seam delegating command-name queries to the extracted command-registry owner."
   [reg]
-  (extension-item-names-in reg :commands))
+  (command-registry/command-names-in reg))
 
 (defn flag-names-in
   "Return set of all registered flag names across all extensions in `reg`."
   [reg]
   (extension-item-names-in reg :flags))
 
-(defn all-tools-in
-  "Return vector of all registered tool definition maps across all extensions.
-   First registration per name wins."
-  [reg]
-  (all-first-registered-items-in reg :tools))
-
 (defn all-commands-in
-  "Return vector of all registered command maps across all extensions.
-   First registration per name wins."
+  "Thin upper seam delegating registered-command listing to the extracted command-registry owner."
   [reg]
-  (all-first-registered-items-in reg :commands))
+  (command-registry/all-commands-in reg))
 
 (defn all-flags-in
   "Return vector of all registered flag maps across all extensions."
@@ -394,14 +394,9 @@
      []
      (:registration-order state))))
 (defn get-command-in
-  "Return the command map for `cmd-name`, or nil."
+  "Thin upper seam delegating command lookup to the extracted command-registry owner."
   [reg cmd-name]
-  (get-extension-item-in reg :commands cmd-name))
-
-(defn get-tool-in
-  "Return the tool map for `tool-name`, or nil."
-  [reg tool-name]
-  (get-extension-item-in reg :tools tool-name))
+  (command-registry/get-command-in reg cmd-name))
 
 (defn extension-detail-in
   "Return detail map for a single extension at `ext-path`, or nil."
@@ -409,17 +404,19 @@
   (let [state @(:state reg)
         ext   (get-in state [:extensions ext-path])]
     (when ext
-      {:path           ext-path
-       :handler-names  (into (sorted-set) (keys (:handlers ext)))
-       :handler-count  (reduce + 0 (map count (vals (:handlers ext))))
-       :tool-names     (into (sorted-set) (keys (:tools ext)))
-       :tool-count     (count (:tools ext))
-       :command-names  (into (sorted-set) (keys (:commands ext)))
-       :command-count  (count (:commands ext))
-       :flag-names     (into (sorted-set) (keys (:flags ext)))
-       :flag-count     (count (:flags ext))
-       :shortcut-count (count (:shortcuts ext))
-       :allowed-events (:allowed-events ext)})))
+      {:path            ext-path
+       :handler-names   (into (sorted-set) (keys (:handlers ext)))
+       :handler-count   (reduce + 0 (map count (vals (:handlers ext))))
+       :tool-names      (into (sorted-set) (keys (:tools ext)))
+       :tool-count      (count (:tools ext))
+       :operation-ids   (into (sorted-set) (keys (:operations ext)))
+       :operation-count (count (:operations ext))
+       :command-names   (into (sorted-set) (keys (:commands ext)))
+       :command-count   (count (:commands ext))
+       :flag-names      (into (sorted-set) (keys (:flags ext)))
+       :flag-count      (count (:flags ext))
+       :shortcut-count  (count (:shortcuts ext))
+       :allowed-events  (:allowed-events ext)})))
 
 (defn extension-details-in
   "Return vector of detail maps for all registered extensions."
@@ -433,7 +430,8 @@
    :extensions      (extensions-in reg)
    :handler-count   (handler-count-in reg)
    :handler-events  (handler-event-names-in reg)
-   :tool-names      (tool-names-in reg)
+   :tool-names      (tool-registry/tool-names-in reg)
+   :operation-ids   (operation-ids-in reg)
    :command-names   (command-names-in reg)
    :flag-names      (flag-names-in reg)})
 
@@ -453,6 +451,7 @@
    {:register-handler-in!     register-handler-in!
     :register-tool-in!        register-tool-in!
     :register-command-in!     register-command-in!
+    :register-operation-in!   register-operation-in!
     :register-shortcut-in!    register-shortcut-in!
     :register-flag-in!        register-flag-in!
     :set-allowed-events-in!   set-allowed-events-in!
@@ -480,13 +479,23 @@
    `runtime-fns` is passed through to `create-extension-api`.
    Returns {:extension ext-path :error nil} or {:extension nil :error msg}."
   [reg ext-path runtime-fns]
-  (loader/load-extension-in! reg ext-path runtime-fns register-extension-in! unregister-extension-in! create-extension-api))
+  (let [unregister-extension* (fn [reg* ext-path*]
+                                (unregister-extension-in!
+                                 reg*
+                                 ext-path*
+                                 (:deterministic-operation-registry runtime-fns)))]
+    (loader/load-extension-in! reg ext-path runtime-fns register-extension-in! unregister-extension* create-extension-api)))
 
 (defn load-init-var-extension-in!
   "Load a manifest-installed extension by stable id + init var.
    Returns {:extension ext-id :error nil} or {:extension nil :error msg}."
   [reg ext-id init-var runtime-fns]
-  (loader/load-init-var-extension-in! reg ext-id init-var runtime-fns register-extension-in! unregister-extension-in! create-extension-api))
+  (let [unregister-extension* (fn [reg* ext-id*]
+                                (unregister-extension-in!
+                                 reg*
+                                 ext-id*
+                                 (:deterministic-operation-registry runtime-fns)))]
+    (loader/load-init-var-extension-in! reg ext-id init-var runtime-fns register-extension-in! unregister-extension* create-extension-api)))
 
 (defn load-extension-init-in!
   "Compatibility alias for init-var-backed manifest activation."
@@ -498,7 +507,12 @@
    See `psi.agent-session.extensions.loader/activate-extensions-in!` for the
    supported entry shapes."
   [reg runtime-fns activation-entries]
-  (loader/activate-extensions-in! reg runtime-fns activation-entries register-extension-in! unregister-extension-in! create-extension-api))
+  (let [unregister-extension* (fn [reg* ext-id*]
+                                (unregister-extension-in!
+                                 reg*
+                                 ext-id*
+                                 (:deterministic-operation-registry runtime-fns)))]
+    (loader/activate-extensions-in! reg runtime-fns activation-entries register-extension-in! unregister-extension* create-extension-api)))
 
 (defn load-extensions-in!
   "Discover and load all extensions into `reg`.
@@ -517,4 +531,8 @@
   ([reg runtime-fns configured-paths]
    (reload-extensions-in! reg runtime-fns configured-paths nil))
   ([reg runtime-fns configured-paths cwd]
-   (loader/reload-extensions-in! reg runtime-fns configured-paths cwd unregister-all-in! load-extensions-in!)))
+   (let [unregister-all* (fn [reg*]
+                           (unregister-all-in!
+                            reg*
+                            (:deterministic-operation-registry runtime-fns)))]
+     (loader/reload-extensions-in! reg runtime-fns configured-paths cwd unregister-all* load-extensions-in!))))

@@ -1,0 +1,48 @@
+- [x] Inventory remaining current-authored workflow definitions, tests, loaders, and docs
+- [x] Define explicit retirement gates
+- [x] Resolve review ambiguities before execution:
+  - [x] define repository scope explicitly as this repo's checked-in `.psi/workflows/*.md`
+  - [x] choose one documentation end state for `doc/workflow-grammar-current.md` and `doc/workflow-grammar-migration.md`
+  - [x] inventory the exact compatibility code paths/seams to delete versus retain
+  - [x] name the authoritative focused and broader verification command sets
+  - [x] choose one final retirement end state: disable temporarily or remove outright
+- [x] Migrate remaining compact current-authored checked-in workflows:
+  - [x] `lambda-build.md`
+  - [x] `prompt-build.md`
+- [x] Migrate remaining review-loop current-authored workflows:
+  - [x] `review-implementation.md`
+  - [x] `review-task-until-clear.md`
+- [x] Migrate remaining PR/issue orchestration current-authored workflows:
+  - [x] `gh-issue-refine.md`
+  - [x] `gh-issue-implement.md`
+  - [x] `gh-pr-heal-check-loop.md`
+  - [x] `gh-pr-fix-current-checks.md`
+  - [x] `gh-pr-fix-checks.md`
+- [x] Tighten migration validation so checked-in workflow examples are target-authored only
+- [x] Remove current-authored grammar loading/compilation support
+  - [x] remove `components/agent-session/src/psi/agent_session/workflow_current_ir_compiler.clj`
+  - [x] remove current-grammar branch from `components/agent-session/src/psi/agent_session/workflow_runtime.clj`
+  - [x] remove current-authored file-compilation/validation paths from `components/agent-session/src/psi/agent_session/workflow_file_compiler.clj`
+  - [x] remove compat binding / prompt-template / executor-profile fallbacks from `components/agent-session/src/psi/agent_session/workflow_step_prep.clj`
+  - [x] remove compat session-preload shaping from `components/agent-session/src/psi/agent_session/workflow_statechart_runtime.clj` when no longer needed by any checked-in workflow
+- [x] Delete compatibility-only workflow tests/helpers no longer needed
+  - [x] remove `components/agent-session/test/psi/agent_session/workflow_current_ir_compiler_test.clj`
+  - [x] remove current-vs-target equivalence assertions from `workflow_target_ir_compiler_test.clj` that only defend retirement-ready compatibility
+  - [x] replace compat-oriented mixed-path tests with target-only proofs before deleting them
+  - [x] rewrite `workflow_file_compiler_test.clj` to assert target-authored-only file compilation behavior
+  - [x] rewrite `workflow_tools_test.clj` workflow fixtures to register/create target-authored definitions only
+  - [x] rewrite `mutations/canonical_workflows_test.clj` to register/create/execute target-authored definitions only
+  - [x] rewrite `workflow_session_integration_test.clj` to store target-authored definitions under canonical workflow root state
+  - [x] rewrite `workflow_progression_test.clj` to build target-authored run fixtures only
+  - [x] rewrite `workflow_execution_resume_test.clj` to resume target-authored run fixtures only
+  - [x] rewrite `workflow_lifecycle_test.clj` to drive target-authored lifecycle fixtures only
+  - [x] rewrite `workflow_resolvers_test.clj` to query target-authored registrations and current resolver projections only
+- [x] Update project guidance so the target grammar is the only supported authored workflow surface
+  - [x] delete `doc/workflow-grammar-current.md`
+  - [x] delete `doc/workflow-grammar-migration.md`
+  - [x] rewrite references in `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, and `doc/workflow-ir.md`
+- [x] Run focused verification after compatibility removal
+  - [x] `clojure -M:test --focus psi.agent-session.workflow-file-loader-test --focus psi.agent-session.workflow-migration-validation-test --focus psi.agent-session.workflow-target-ir-compiler-test --focus psi.agent-session.workflow-execution-test`
+- [x] Run broader verification after compatibility removal
+  - [x] `bb clojure:test:unit`
+- [x] Reconcile final cleanup with task `077` migration intent

@@ -2,7 +2,9 @@
   "Workflow action handler for psi-tool: parse, summarise, and execute workflow ops."
   (:require
    [clojure.edn :as edn]
-   [psi.agent-session.workflow-runtime :as workflow-runtime]))
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 ;; ── Helpers (local copies of private psi_tool utilities) ────────────────────
 
@@ -40,6 +42,31 @@
 
 ;; ── Summary projection ───────────────────────────────────────────────────────
 
+(defn- workflow-attempt-summary
+  [attempt]
+  (cond-> {:attempt-id (:attempt-id attempt)
+           :status (:status attempt)
+           :execution-session-id (:execution-session-id attempt)
+           :effective-args (:effective-args attempt)
+           :result-envelope (:result-envelope attempt)
+           :validation-outcome (:validation-outcome attempt)
+           :execution-error (:execution-error attempt)
+           :blocked (:blocked attempt)
+           :judge-session-id (:judge-session-id attempt)
+           :judge-output (:judge-output attempt)
+           :judge-event (:judge-event attempt)
+           :created-at (:created-at attempt)
+           :updated-at (:updated-at attempt)}
+    (:finished-at attempt)
+    (assoc :finished-at (:finished-at attempt))))
+
+(defn- workflow-step-run-summary
+  [step-run]
+  {:step-id (:step-id step-run)
+   :iteration-count (:iteration-count step-run)
+   :accepted-result (:accepted-result step-run)
+   :attempts (mapv workflow-attempt-summary (:attempts step-run))})
+
 (defn workflow-run-summary
   [workflow-run]
   {:run-id               (:run-id workflow-run)
@@ -51,15 +78,12 @@
    :updated-at           (:updated-at workflow-run)
    :finished-at          (:finished-at workflow-run)
    :blocked              (:blocked workflow-run)
-   :terminal-outcome     (:terminal-outcome workflow-run)})
-
-(defn- find-required-fn
-  [ns-name var-name]
-  (or (some-> (find-var (symbol ns-name var-name)) var-get)
-      (throw (ex-info "Required workflow runtime function is not loaded"
-                      {:phase :workflow
-                       :ns ns-name
-                       :var var-name}))))
+   :terminal-outcome     (:terminal-outcome workflow-run)
+   :step-runs            (into {}
+                               (map (fn [[step-id step-run]]
+                                      [step-id (workflow-step-run-summary step-run)]))
+                               (:step-runs workflow-run))
+   :history              (:history workflow-run)})
 
 (defn- require-session-id!
   [session-id op]
@@ -67,25 +91,25 @@
       (throw (ex-info "psi-tool workflow action requires invoking or explicit `session-id`"
                       {:phase :validate :action "workflow" :op op}))))
 
-(defn- ensure-workflow-callbacks
-  "Patch older live ctx maps on demand so workflow execution controls can run
-   without requiring a full runtime/context rebuild.
+(def ^:private required-workflow-ctx-keys
+  [:state*
+   :apply-root-state-update-fn
+   :execute-workflow-run-fn
+   :resume-and-execute-workflow-run-fn
+   workflow-execution-adapter/adapter-key])
 
-   Presence is authoritative: explicit nil means intentionally disabled and must
-   not be backfilled. Only absent keys are auto-wired for compatibility."
-  [ctx]
-  (cond-> ctx
-    (not (contains? ctx :create-workflow-child-session-fn))
-    (assoc :create-workflow-child-session-fn
-           (find-required-fn "psi.agent-session.context" "create-workflow-child-session!"))
-
-    (not (contains? ctx :execute-workflow-run-fn))
-    (assoc :execute-workflow-run-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "execute-run!"))
-
-    (not (contains? ctx :resume-and-execute-workflow-run-fn))
-    (assoc :resume-and-execute-workflow-run-fn
-           (find-required-fn "psi.agent-session.workflow-execution" "resume-and-execute-run!"))))
+(defn- require-workflow-runtime-ctx!
+  [ctx op]
+  (let [missing (->> required-workflow-ctx-keys
+                     (remove #(contains? ctx %))
+                     vec)]
+    (when (seq missing)
+      (throw (ex-info "psi-tool workflow action requires an assembled workflow runtime ctx"
+                      {:phase :validate
+                       :action "workflow"
+                       :op op
+                       :missing-keys missing}))))
+  ctx)
 
 ;; ── Workflow op handler ──────────────────────────────────────────────────────
 
@@ -96,15 +120,12 @@
       (when-not ctx
         (throw (ex-info "psi-tool workflow action requires live runtime ctx"
                         {:phase :validate :action "workflow" :op op})))
-      (let [ctx (ensure-workflow-callbacks ctx)
+      (let [ctx (require-workflow-runtime-ctx! ctx op)
             session-id (require-session-id! session-id op)
             result
             (case op
               "list-definitions"
-              (let [definitions (->> (get-in @(:state* ctx) [:workflows :definitions])
-                                     vals
-                                     (sort-by :definition-id)
-                                     vec)]
+              (let [definitions (workflow-registry/list-definitions @(:state* ctx))]
                 {:psi-tool/action         :workflow
                  :psi-tool/workflow-op    :list-definitions
                  :psi-tool/overall-status :ok

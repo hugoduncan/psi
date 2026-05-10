@@ -1,0 +1,20 @@
+- [x] Review the current workflow-adjacent namespace cluster and confirm the exact below-public-entrypoint runtime-core ownership surface to preserve
+- [x] Decide and record which adjacent namespaces are true runtime-core owners versus sibling lower workflow helpers or above-boundary shaping owners
+- [x] Create a lower workflow runtime-core component with authoritative `psi.workflow-runtime.*` namespace(s)
+- [x] Move workflow execution/progression/statechart runtime ownership out of `psi.agent-session.*`
+- [x] Decide and record whether `workflow_runtime.clj`, `workflow_step_prep.clj`, and `workflow_terminal_contract.clj` belong inside runtime core, in sibling lower workflow ownership, or above the boundary for justified reasons
+- [x] Rewire the extracted runtime core to depend downward on lower seams for judge/routing, bounded step execution, and deterministic operation runtime where available
+- [x] If the lower seams from tasks `123` and `124` are not yet landed, record any temporary direct dependency on higher mixed judge or turn/session orchestration surfaces as residual debt in `implementation.md`
+- [x] Decompose `workflow_statechart_runtime.clj` if needed so the extracted runtime core reflects ownership cleanly rather than forcing a whole-file move
+- [x] Keep mutations/resolvers/`psi-tool` and other public entrypoints above the extracted runtime-core boundary
+- [x] Update focused tests, moving lower runtime-core proofs with the new component while keeping higher integration proofs with the remaining adapter/orchestration owners
+- [x] Remove misplaced authoritative runtime-core ownership from `psi.agent-session.*`
+- [x] Record final runtime-core membership, lower-seam consumption status, statechart-runtime decomposition decisions, residual above-boundary workflow logic, and follow-on cleanup candidates in `implementation.md`
+- [x] Add the missing component dependency path for `psi.agent-session.turn-execution-contract`, or lower that contract further so `components/workflow-runtime/deps.edn` is self-consistent
+- [x] Rewire `agent-session.context` step-prep callbacks directly to `psi.workflow-runtime.step-prep/*` instead of routing through `psi.agent-session.workflow-execution` wrapper vars
+- [x] Decompose `psi.workflow-runtime.statechart-runtime` by role so working-memory/projection helpers, step execution actions, delegate execution, and statechart lifecycle/drain logic are no longer concentrated in one large namespace
+- [x] Remove or narrowly repurpose overlapping runtime test surfaces so `statechart_runtime_test.clj`, `statechart_runtime/public_test.clj`, and lower role tests have one clear proof owner each
+- [x] Narrow `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/public_test.clj` to façade-specific behavior only, or delete it if the lower role tests plus higher integration tests fully cover the public surface
+- [x] Strengthen `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/lifecycle_test.clj` with owned-behavior proofs for queued-event drain order, terminal tail discard, and `max-drain-events` overflow failure
+- [x] Trim incidental integration setup in `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/state_test.clj` so the working-memory seed proof uses only the necessary fixture surface
+- [x] Re-evaluate `send-and-drain-delegates-through-lifecycle-test` in `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/lifecycle_test.clj`; delete it if higher façade coverage already makes the delegation proof redundant
