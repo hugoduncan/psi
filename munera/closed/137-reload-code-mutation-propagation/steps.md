@@ -17,4 +17,5 @@
 - [x] 6. Run existing reload tests; verify no regressions
       - 15 integration tests, 4 pre-existing TUI-tmux failures (require tmux), 0 new failures
 - [x] 7. Lint: `clj-kondo --lint src` — 0 errors, 0 warnings
-- [ ] 8. Commit and push
+- [x] 8. Commit and push
+      - Pushed directly to origin/master (tracking branch); fix label removed; issue closed
