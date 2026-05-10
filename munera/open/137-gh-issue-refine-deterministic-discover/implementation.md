@@ -1,5 +1,15 @@
 # Implementation notes
 
+## 2026-05-10 — Code-shaping pass
+
+**JJ. `build-gh-args` + `invoke-shell` split is needless indirection.** Both private fns are called only from `invoke`. `build-gh-args` produces a vector only to be immediately `apply`-spread in `invoke-shell`. Inline into a single `let` binding in `invoke`. Also: `(apply vector ...)` is non-idiomatic — `into []` or `vec` is standard.
+
+**KK. Integration test handler wraps real `find-issue/invoke` — couples integration proof to unit-level logic.** The reference pattern (`workflow_invoke_runtime_test.clj`) uses a pure stub (no real fn call). The integration test should use a pure stub that returns a fixed `:ok` result, removing the nested `assoc invocation :ctx (assoc (:ctx invocation) ...)` and the dependency on the real shell seam inside the integration test. The `stub-issues-json` helper is a one-liner used only from `stub-shell-fn`; both become unnecessary with a pure stub.
+
+**LL. Nested `assoc` in integration test handler should use `update`.** `(assoc invocation :ctx (assoc (:ctx invocation) :github-shell-fn ...))` → `(update invocation :ctx assoc :github-shell-fn ...)`. Applies regardless of KK resolution.
+
+**MM. Empty-title slug produces `""` — not validated or tested.** `derive-slug` with a nil/empty title returns `""`. An empty `worktree-description` is silently passed through to downstream steps. No test covers this edge case. Either guard in `derive-slug` (return a fallback like `"issue"`) or add a test that documents the behavior explicitly.
+
 ## 2026-05-10 — Follow-up execution: II resolved
 
 **II resolved**: Added `(is (= "run-github-find-issue" (:workflow-run-id invocation)))` to the CC block in `find_issue_integration_test.clj`. The stub already captured the full invocation map; the assertion now checks all three fields (`:args`, `:step-id`, `:workflow-run-id`) matching the reference pattern in `workflow_invoke_runtime_test.clj`. Test: 1 test, 13 assertions, 0 failures. Lint clean.
