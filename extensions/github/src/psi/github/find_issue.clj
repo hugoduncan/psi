@@ -10,20 +10,8 @@
   (:require
    [cheshire.core :as json]
    [clojure.java.shell :as shell]
-   [clojure.string :as str]))
-
-;;; ---------------------------------------------------------------------------
-;;; Slug derivation
-
-(defn- derive-slug
-  "Lower-case title → extract [a-z0-9]+ words → join with - →
-   hard-truncate at 40 chars → strip trailing -.
-   Result: [a-z0-9-], ≤ 40 chars, never ends with -."
-  [title]
-  (let [words   (re-seq #"[a-z0-9]+" (str/lower-case (or title "")))
-        joined  (str/join "-" words)
-        trimmed (subs joined 0 (min 40 (count joined)))]
-    (str/replace trimmed #"-+$" "")))
+   [clojure.string :as str]
+   [psi.github.slug :as slug]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Narrowing
@@ -116,7 +104,7 @@
               (let [data {:issue-number        (get selected "number")
                           :issue-title         (get selected "title")
                           :issue-url           (get selected "url")
-                          :worktree-description (derive-slug (get selected "title"))}]
+                          :worktree-description (slug/derive-slug (get selected "title"))}]
                 {:status  :ok
                  :data    data
                  :summary (result->handoff-md data)}))))))))
