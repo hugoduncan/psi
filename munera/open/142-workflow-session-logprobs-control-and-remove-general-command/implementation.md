@@ -134,3 +134,11 @@ The task should not leave both names as parallel canonical state.
 ## 2026-05-11 code-shaper review
 
 - Review result: no new actionable feedback. Re-read the workflow-only logprob control path and removal boundary with a simplicity/consistency/robustness lens: `resolve-step-session-config` centralizes the authored `:logprobs` default/drop semantics, workflow propagation preserves `contains?`-based false handling through `statechart_runtime.clj` and `context.clj`, child-session persistence keeps one canonical lower key shape (`:logprobs-enabled` / `:top-logprobs`), request projection still applies the single lower default of top-N 3, and the public non-workflow `psi.extension/create-child-session` mutation remains closed to logprob authorship. Re-ran the focused proof set; no new actionable shaping issues found.
+
+## 2026-05-11 follow-up execution
+
+- Re-read the preloaded review result plus `steps.md`, `implementation.md`, `design.md`, and `plan.md` for task `142-workflow-session-logprobs-control-and-remove-general-command`.
+- Confirmed there are still no unchecked task-local follow-up items in `steps.md`; the preceding review pass added no actionable checklist work to execute.
+- Left `steps.md` unchanged because there was no newly added unchecked work to complete.
+- No blocker was encountered; this follow-up execution pass was task-local no-op work only.
+- Before commit, the working tree still contained unrelated pre-existing changes outside task `142`: modified `munera/plan.md` and untracked `munera/open/143-workflow-session-inherit-delegating-session-preferences/`.
