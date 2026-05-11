@@ -4,9 +4,8 @@ Open tasks in suggested execution order:
 
 Backlog:
 
-`munera/open/141-add-magit-support/`
-`munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/140-logprobs-openai-completions-flag/`
+`munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/136-built-in-registration-path-for-workflow/`
@@ -29,6 +28,5 @@ Notes:
 - `003` is the broader prompt-lifecycle convergence umbrella; `006` is the concrete remaining skill-prelude/cache-breakpoint slice that currently drives its unfinished acceptance.
 - `070` tracks the `/delegate` slash-command UX gap so delegated workflow completion comes back into the originating conversation transcript.
 - Tasks `089`, `091`, `092`, `093`, and `094` are now complete and live under `munera/closed/`.
-- `141` is the umbrella for magit-section adoption across the Emacs UI; `021` is the session-tree slice that depends on the infrastructure `141` lays down.
 - `140` adds a runtime behavioural flag for logprob collection on the OpenAI chat-completions endpoint: session flag → options projection → request builder → `:logprobs-delta` stream event.
 - Close or replace tasks as scope sharpens; do not merge task contents.
