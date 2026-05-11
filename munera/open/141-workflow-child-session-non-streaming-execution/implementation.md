@@ -41,3 +41,12 @@ Found three actionable design ambiguities:
 - workflow runtime IR `session-spec-schema` currently accepts only `:model`, `:tools`, `:skills`, and `:contributions`, so the artifacts do not yet say whether `:response-mode` must be added there for workflow-authored config to parse/validate
 - default persistence semantics are underspecified: design says resolved workflow child-session config defaults to `:streaming`, but also says ordinary sessions may leave `:response-mode` absent, so task artifacts should choose whether workflow-owned child sessions persist explicit `:streaming` or only persist `:non-streaming`
 - the lower non-streaming seam is still not concrete enough: turn-runtime is named as the branch point, but the new `psi.ai.core` / provider contract needed to execute non-streaming requests is not yet specified
+
+## Design follow-up execution 2026-05-11
+
+Resolved the three preloaded ambiguities in task artifacts only:
+- chose that workflow IR `session-spec-schema` must explicitly accept optional `:response-mode`, because workflow-authored child-session config must validate before `resolve-step-session-config` can carry it coherently
+- chose canonical persistence semantics: ordinary sessions may still omit `:response-mode`, but workflow-owned child sessions persist an explicit resolved value, including default `:streaming`, so turn-runtime branches on one stored field instead of absence heuristics
+- chose the exact lower seam: branch in `psi.turn-runtime.core/execute-prepared-request!`; keep streaming on `psi.ai.core/stream-response{,-in}`; add sibling non-streaming `psi.ai.core/execute-response{,-in}` and a matching provider `:execute` contract, with OpenAI chat-completions implemented first
+
+No code or `steps.md` execution performed in this pass; only design/plan clarification per request.

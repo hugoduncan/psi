@@ -40,9 +40,14 @@ Accepted values for this task:
 - `:streaming`
 - `:non-streaming`
 
+Validation surface:
+- workflow IR `session-spec-schema` must explicitly accept optional `:response-mode`
+- child session state/schema must explicitly accept optional `:response-mode`
+
 Default:
 - absent in ordinary sessions
 - workflow child-session resolution defaults to `:streaming`
+- workflow-owned child sessions persist explicit `:response-mode`, even when that resolved value is the default `:streaming`, so execution branching and proofs read one canonical field instead of inferring from absence
 
 ## Data flow
 
@@ -85,6 +90,13 @@ So the workflow-specific part is:
 
 And the lower execution part is:
 - prompt/turn execution can branch to streaming or non-streaming transport while preserving canonical result shape
+
+Concrete lower seam for this task:
+- `psi.turn-runtime.core/execute-prepared-request!` branches on session `:response-mode`
+- streaming path remains on the existing `psi.ai.core/stream-response{,-in}` API
+- non-streaming path calls a new lower `psi.ai.core/execute-response{,-in}` API that resolves the provider and performs one non-streaming request
+- the OpenAI provider grows a matching non-streaming provider operation for chat-completions first; the non-streaming result is normalized below turn-runtime into the same assistant-message / execution-result contract already returned by the streaming path
+- workflow runtime and higher agent-session workflow code stay transport-agnostic above that seam
 
 ## Non-streaming execution contract
 
