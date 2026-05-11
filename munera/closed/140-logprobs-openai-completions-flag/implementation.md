@@ -1,5 +1,24 @@
 # Implementation Notes
 
+## Follow-up execution pass 6 (2026-05-11)
+
+Executed the remaining unchecked task-artifact follow-up items in `steps.md` after
+verifying the implementation already lands them in code/tests:
+
+1. Marked steps 1–9 done in `steps.md` after confirming the feature is present in the
+   authoritative owners:
+   - schema/session state in `components/session-state/src/psi/session_state/model.clj`
+   - request building + SSE extraction in
+     `components/ai/src/psi/ai/providers/openai/chat_completions.clj`
+   - turn-runtime accumulation in `components/turn-runtime/src/psi/turn_runtime/{core,accumulator}.clj`
+   - journal append/projection + `/logprobs` command + resolver in
+     `components/agent-session/src/psi/agent_session/{prompt_recording,prompt_request,commands,session_settings,resolvers/session}.clj`
+   - focused proofs in `components/ai/test/`, `components/turn-runtime/test/`, and
+     `components/agent-session/test/`
+
+2. No further executable code follow-up remained from the preloaded code-shape review;
+   the remaining work was task-artifact synchronization only.
+
 ## Review pass 5 follow-up execution (2026-05-11)
 
 Executed all three unchecked items from review pass 5:
