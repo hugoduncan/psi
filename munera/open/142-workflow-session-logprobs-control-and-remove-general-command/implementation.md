@@ -95,3 +95,11 @@ The task should not leave both names as parallel canonical state.
 ## 2026-05-11 code-shaper review
 
 - Review result: no new actionable simplicity/consistency/robustness issues found beyond the already recorded and resolved combined-control proof gap. The workflow-only logprob path remains coherent, the public non-workflow child-session mutation boundary is still closed, and the persisted `:logprobs-enabled` / authored `:logprobs` split is applied consistently across resolution, propagation, persistence, request shaping, and command-surface removal proofs.
+
+## 2026-05-11 follow-up execution
+
+- Re-read the preloaded code-shaper review result and task artifacts; no newly added unchecked follow-up items remained in `steps.md`.
+- Re-verified the combined motivating proof set with:
+  - `bb clojure:test:unit --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-attempts-test --focus psi.workflow-step-session-config.core-test --focus psi.turn-runtime.response-mode-test`
+- Verification remains green: `1716 tests, 11956 assertions, 0 failures`.
+- No additional code or task-artifact changes were required for task `142`; the only unrelated working-tree change present before commit was `munera/plan.md`.
