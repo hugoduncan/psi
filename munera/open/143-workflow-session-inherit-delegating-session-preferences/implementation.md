@@ -74,3 +74,10 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 - Read the preloaded review result and re-checked task artifacts. `steps.md` already had all actionable items marked done; no newly added unchecked follow-up items remained to execute.
 - Re-verified the task with the focused workflow test command from the prior review and `bb lint`; both passed.
 - Also observed that the broad `bb clojure:test:unit` suite currently has an unrelated existing failure in `psi.agent-session.workflow-execution-test/execute-run-with-judge-loop-test`, so only the task-focused verification was used for this follow-up pass.
+
+## 2026-05-11 test-shaper review
+
+- Reviewed the focused proofs against `test-shaper` for clarity, signal, and robustness across `workflow-step-session-config`, workflow-run creation, workflow-context reconstruction, canonical mutation, psi-tool create-run, and resume-path seams.
+- Re-read the two-session inheritance proof, nil-parent compatibility fallback proof, persisted `:parent-session-id` proof, and resume-path proof; each remains narrow, deterministic, behavior-focused, and locally comprehensible, with assertions on observable preference-resolution outcomes rather than implementation-only internals.
+- Re-ran `bb clojure:test:unit --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.core-test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-execution-resume-test` and `bb lint`; both passed.
+- No new actionable feedback found. Explicitly: no new actionable feedback.
