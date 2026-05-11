@@ -89,17 +89,12 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
                      :from {:step "implement" :yield :text}}
                     {:type :source
                      :from {:step "review" :yield :text}}]}
-         {:name      "remove-implement"
+         {:name      "edit-labels"
           :type      :invoke
-          :operation "github/remove-label"
+          :operation "github/edit-labels"
           :args      {:number {:from {:step "search" :output :data} :path [:pr-number]}
-                      :labels ["implement"]
-                      :target "pr"}}
-         {:name      "add-review"
-          :type      :invoke
-          :operation "github/add-label"
-          :args      {:number {:from {:step "search" :output :data} :path [:pr-number]}
-                      :labels ["review"]
+                      :remove ["implement"]
+                      :add    ["review"]
                       :target "pr"}}]}
 
 Coordinate implementation work for an existing GitHub PR labeled `implement`: select the PR deterministically, prepare or reuse its branch-specific worktree, rebase the PR branch onto `origin/master`, create and refine a Munera task design with explicit implementation approach detail, implement the task, review and improve the task implementation through the `review-implementation` workflow, then push back to the PR branch, summarize any meaningful deviations from the initial design on the PR, remove the PR's `implement` label, and add the `review` label. All stages use the `work-independently` skill.

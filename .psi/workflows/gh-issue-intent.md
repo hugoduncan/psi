@@ -46,17 +46,12 @@ description: Find an enhancement issue labeled refine, create a worktree, produc
                      :from {:step "worktree" :yield :text}}
                     {:type :source
                      :from {:step "intent" :yield :text}}]}
-         {:name      "remove-refine"
+         {:name      "edit-labels"
           :type      :invoke
-          :operation "github/remove-label"
+          :operation "github/edit-labels"
           :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
-                      :labels ["refine"]
-                      :target "issue"}}
-         {:name      "add-waiting"
-          :type      :invoke
-          :operation "github/add-label"
-          :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
-                      :labels ["waiting"]
+                      :remove ["refine"]
+                      :add    ["waiting"]
                       :target "issue"}}]}
 
 Coordinate intent-capture for a GitHub enhancement issue labeled `refine`: select the issue, create an issue-specific worktree, apply the task-intent skill to produce a clear and concise problem statement with constraints and success criteria, commit the intent, push the branch, post an issue comment with the refined intent, then remove the `refine` label and add `waiting` to the issue.

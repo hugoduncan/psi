@@ -11,11 +11,11 @@ description: Classify a bug after reproduction: either request more information 
                            :vars {"input" {:from :workflow-input :path [:report]}}}
                           {:type :source
                            :from :workflow-original}]}
-         {:name      "remove-triage"
+         {:name      "edit-labels"
           :type      :invoke
-          :operation "github/remove-label"
+          :operation "github/edit-labels"
           :args      {:number {:from :workflow-input :path [:issue_number]}
-                      :labels ["triage"]
+                      :remove ["triage"]
                       :target "issue"}}]}
 
 You are the post-reproduction classification phase of a GitHub bug-triage workflow.

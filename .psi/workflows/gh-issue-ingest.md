@@ -20,15 +20,10 @@ description: Find labeled GitHub enhancement-ingest requests, triage them, reply
                           {:type :template
                            :text "You are executing a focused GitHub enhancement-triage workflow in this repository. The upstream discovery step has already selected the issue — its details appear in the context above.\n\nGoal:\n- Analyze the selected request with the `issue-feature-triage` skill.\n- Post a structured triage reply to the GitHub issue.\n\nUse the `issue-feature-triage` skill when shaping the analysis.\n\nRequired procedure:\n1. Read the selected issue.\n2. Analyze the request into intent, problem statement, scope, and acceptance criteria.\n3. Compose and post a concise structured GitHub reply.\n\nExecution constraints:\n- Do not create a Munera task.\n- Do not edit repository files as part of the issue-processing flow.\n- Do not invent requirements beyond what the issue supports.\n- Prefer one issue per run unless the input explicitly asks for batch processing.\n\nFinal response requirements:\n- Report the issue that was processed.\n- Summarize the posted triage briefly.\n- State whether the GitHub comment was posted."
                            :vars {}}]}
-         {:name      "remove-triage"
+         {:name      "edit-labels"
           :type      :invoke
-          :operation "github/remove-label"
+          :operation "github/edit-labels"
           :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
-                      :labels ["triage"]
-                      :target "issue"}}
-         {:name      "add-waiting"
-          :type      :invoke
-          :operation "github/add-label"
-          :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
-                      :labels ["waiting"]
+                      :remove ["triage"]
+                      :add    ["waiting"]
                       :target "issue"}}]}
