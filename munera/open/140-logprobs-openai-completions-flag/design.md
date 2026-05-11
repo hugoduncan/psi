@@ -42,12 +42,16 @@ Toggle path:
   → slash-command handler in commands.clj
   → session-settings/set-logprobs-in! (session_settings.clj)
   → dispatch/dispatch! :session/set-logprobs
-  → session_mutations handler:
-      {:root-state-update (assoc % :logprobs-enabled enabled?
-                                   :top-logprobs top-n)}
+  → session_mutations handler registered via register-core-handler! :session/set-logprobs:
+      {:root-state-update (session/session-update session-id
+                            #(assoc % :logprobs-enabled enabled?
+                                      :top-logprobs (or top-n 3)))}
       (no journal-append effect, no persist effect)
   → session->request-options propagates :logprobs-enabled and :top-logprobs
 ```
+
+When `top-n` is nil (e.g. `/logprobs on` without N), the handler uses `(or top-n 3)` to
+preserve the invariant "absent = 3 when enabled". `:top-logprobs` is never written as nil.
 
 `set-logprobs-in!` in `session_settings.clj` matches the `set-thinking-level-in!`
 pattern: `(defn set-logprobs-in! [ctx session-id enabled? top-n] ...)`. `commands.clj`

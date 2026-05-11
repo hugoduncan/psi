@@ -207,27 +207,38 @@ Clarification and resolution items surfaced during design review.
 
 ## Inconsistencies (review pass 4)
 
-- [ ] **`:session/set-logprobs` handler registration absent from plan.md and steps.md** —
+- [x] **`:session/set-logprobs` handler registration absent from plan.md and steps.md** —
   design.md §Control describes the `session_mutations` handler body but plan.md step 8
   and steps.md step 8 do not include a `register-core-handler!` call in
   `session_mutations.clj`. Add an explicit sub-bullet to steps.md step 8 and plan.md
   step 8: "Register `:session/set-logprobs` handler in `session_mutations.clj` using
   `(session/session-update session-id #(assoc % :logprobs-enabled enabled? :top-logprobs (or top-n 3)))`".
+  > **Resolved**: Sub-bullet added to steps.md step 8 and plan.md step 8 with the exact
+  > `register-core-handler!` call and `(or top-n 3)` nil-guard.
 
-- [ ] **`root-state-update` syntax in design.md is wrong** — design.md §Control shows
+- [x] **`root-state-update` syntax in design.md is wrong** — design.md §Control shows
   `{:root-state-update (assoc % :logprobs-enabled enabled? :top-logprobs top-n)}` but
   the real handler pattern wraps this in `(session/session-update session-id #(...))`.
   Correct design.md to show:
   `{:root-state-update (session/session-update session-id #(assoc % :logprobs-enabled enabled? :top-logprobs (or top-n 3)))}`.
+  > **Resolved**: design.md §Control toggle path updated to use
+  > `(session/session-update session-id #(assoc % ...))` and `(or top-n 3)`. Added
+  > explanatory note that `:top-logprobs` is never written as nil.
 
-- [ ] **`builtin-slash-commands` "alongside /model and /thinking" is misleading** —
+- [x] **`builtin-slash-commands` "alongside /model and /thinking" is misleading** —
   steps.md step 8 says add `/logprobs` "alongside `/model` and `/thinking`" to
   `builtin-slash-commands`, but those commands are in `prefixed-command-prefixes`, not
   `builtin-slash-commands`. Update steps.md to remove the misleading qualifier; just say
   "Add `\"/logprobs\"` to `builtin-slash-commands` in `tui/app/shared.clj`".
+  > **Resolved**: Misleading qualifier removed from steps.md step 8; bullet now reads
+  > "Add `\"/logprobs\"` to `builtin-slash-commands` in `tui/app/shared.clj`" without
+  > referencing `/model` or `/thinking`.
 
-- [ ] **nil `top-n` writes nil to `:top-logprobs`** — when `/logprobs on` is issued
+- [x] **nil `top-n` writes nil to `:top-logprobs`** — when `/logprobs on` is issued
   without N, `set-logprobs-in!` passes `top-n=nil`. The handler body must guard with
   `(or top-n 3)` (or only assoc `:top-logprobs` when non-nil) to preserve the design
   invariant "absent = 3 when enabled". Update design.md §Control handler body and
   steps.md step 8 to specify this nil-guard explicitly.
+  > **Resolved**: `(or top-n 3)` nil-guard added to design.md §Control handler body and
+  > steps.md step 8. Explanatory note added to design.md. Plan.md step 8 also updated
+  > to name the nil-guard explicitly.

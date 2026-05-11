@@ -39,10 +39,14 @@ testable.
 7. **EQL resolver** — add `:psi.agent-session/last-turn-logprobs` resolver.
 
 8. **`/logprobs` command** — add `set-logprobs-in!` to `session_settings.clj` (matching
-   `set-thinking-level-in!` pattern). Implement `dispatch-logprobs-command` in
-   `commands.clj` calling `session-settings/set-logprobs-in!`. Add `/logprobs` to
-   `prefixed-command-prefixes`. Add `"/logprobs"` to `builtin-slash-commands` in
-   `tui/app/shared.clj`. Add help text to `format-help`.
+   `set-thinking-level-in!` pattern). Register `:session/set-logprobs` handler in
+   `session_mutations.clj` via `register-core-handler!` using
+   `(session/session-update session-id #(assoc % :logprobs-enabled enabled? :top-logprobs (or top-n 3)))`
+   (nil-guard ensures `:top-logprobs` is never written as nil). Implement
+   `dispatch-logprobs-command` in `commands.clj` calling
+   `session-settings/set-logprobs-in!`. Add `/logprobs` to `prefixed-command-prefixes`.
+   Add `"/logprobs"` to `builtin-slash-commands` in `tui/app/shared.clj`. Add help text
+   to `format-help`.
 
 9. **Tests** — unit tests for: request building, options projection, SSE extraction
    (OpenAI + llama.cpp paths), accumulation, journal append, message projection.

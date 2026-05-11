@@ -44,10 +44,14 @@
 - [ ] **8. `/logprobs` command**:
   - Add `set-logprobs-in!` to `session_settings.clj` (pattern: `set-thinking-level-in!`):
     `(defn set-logprobs-in! [ctx session-id enabled? top-n] (dispatch/dispatch! ctx :session/set-logprobs ...))`
+  - Register `:session/set-logprobs` handler in `session_mutations.clj` via
+    `register-core-handler!` using
+    `(session/session-update session-id #(assoc % :logprobs-enabled enabled? :top-logprobs (or top-n 3)))`
+    (nil-guard on `top-n` preserves "absent = 3 when enabled" invariant)
   - Implement `dispatch-logprobs-command` in `commands.clj` (on/off/N/report)
     calling `session-settings/set-logprobs-in!`
   - Add `/logprobs` to `prefixed-command-prefixes` in `commands.clj`
-  - Add `/logprobs` help line to `format-help` alongside `/model` and `/thinking`:
+  - Add `/logprobs` help line to `format-help`:
     `"  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"`
   - Add `"/logprobs"` to `builtin-slash-commands` in `tui/app/shared.clj`
 

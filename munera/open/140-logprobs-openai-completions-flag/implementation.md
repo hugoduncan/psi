@@ -1,5 +1,27 @@
 # Implementation Notes
 
+## Review pass 4 follow-up execution (2026-05-11)
+
+Executed all four unchecked items from review pass 4:
+
+1. **Handler registration sub-bullet** — added explicit `register-core-handler!` bullet
+   to steps.md step 8 and plan.md step 8, with the full
+   `(session/session-update session-id #(assoc % :logprobs-enabled enabled? :top-logprobs (or top-n 3)))`
+   call and nil-guard rationale.
+
+2. **`root-state-update` syntax** — corrected design.md §Control toggle path: replaced
+   bare `(assoc % ...)` with `(session/session-update session-id #(assoc % ...))` and
+   `(or top-n 3)`. Added explanatory note that `:top-logprobs` is never written as nil.
+
+3. **Misleading `builtin-slash-commands` qualifier** — removed "alongside `/model` and
+   `/thinking`" from the `builtin-slash-commands` bullet in steps.md step 8. Those
+   commands live in `prefixed-command-prefixes`, not `builtin-slash-commands`.
+
+4. **nil `top-n` nil-guard** — `(or top-n 3)` now explicit in design.md §Control
+   handler body, steps.md step 8, and plan.md step 8.
+
+All four items marked `[x]` in design-steps.md.
+
 ## Review pass 4 — cross-file inconsistency scan (2026-05-11)
 
 Four actionable inconsistencies found by reading design.md, plan.md, steps.md, and
