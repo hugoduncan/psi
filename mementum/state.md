@@ -77,5 +77,15 @@ Bootstrapped on 2026-04-02.
   - retained direct dependency on `psi.workflow-judge/project-messages` inside the new lower source-resolution owner as legitimate shared lower workflow projection semantics
   - focused verification green: `16 tests, 35 assertions, 0 failures`; broader workflow/session verification green: `24 tests, 79 assertions, 0 failures`; lint green `0 errors, 0 warnings`
 
+- Task 138 github extension label ops and workflow adoption is now complete and closed:
+  - extracted `psi.github.slug` shared ns; `find-issue` rewired
+  - added `psi.github.find-pr` (deterministic PR selection, parallel to `find-issue`; URL regex `#"/pull/(\d+)"`)
+  - added `psi.github.label-ops` with `add-label` and `remove-label` handlers (`:target` dispatch; shared `label-csv`)
+  - `psi.github.extension/init` now registers all four ops; `extension-test` asserts all four ids
+  - 36 unit tests, 117 assertions, lint clean
+  - migrated 10 workflows: `gh-bug-discover-and-read`, `gh-bug-triage`, `gh-issue-ingest`, `gh-issue-implement`, `gh-pr-fix-checks`, `gh-bug-post-repro`, `gh-bug-triage-modular`, `gh-bug-request-more-info`, `gh-issue-refine`, `gh-bug-fix-and-pr`
+  - `gh-pr-fix-checks` uses `:labels []` (no label filter) for find-pr
+  - `gh-bug-triage-modular` post-repro prompt-string is now `:type :map` (structured, not rendered text) per §P
+
 ## Suggested next step
-- Review `105-agent-session-component-extraction-map` against the now-complete workflow-runtime extraction, workflow execution seam cleanup, and workflow step materialization extraction to identify the next smallest boundary cleanup.
+- Work on `137-gh-issue-refine-deterministic-discover` (next in queue per munera/plan.md).
