@@ -81,3 +81,10 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 - Re-read the two-session inheritance proof, nil-parent compatibility fallback proof, persisted `:parent-session-id` proof, and resume-path proof; each remains narrow, deterministic, behavior-focused, and locally comprehensible, with assertions on observable preference-resolution outcomes rather than implementation-only internals.
 - Re-ran `bb clojure:test:unit --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.core-test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-execution-resume-test` and `bb lint`; both passed.
 - No new actionable feedback found. Explicitly: no new actionable feedback.
+
+## 2026-05-11 follow-up execution (requested pass)
+
+- Read the preloaded review result plus `steps.md`, `implementation.md`, `design.md`, and `plan.md` to identify any newly added actionable follow-up items.
+- Confirmed `steps.md` already contains no unchecked follow-up items, so there was no remaining task-local implementation work to execute in this pass.
+- Re-ran the task-focused verification command: `bb clojure:test:unit --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.core-test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-execution-resume-test` and `bb lint`.
+- Result: `1722 tests, 12662 assertions, 0 failures`; lint clean; no blocking follow-up remained.
