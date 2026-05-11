@@ -2,26 +2,29 @@
 
 ## Design clarifications (pre-plan)
 
-- [ ] Decide resolver namespace placement: extend `resolvers/session.clj` or new file?
-      Record decision in design.md under Constraints or a new Decisions section.
+- [x] Decide resolver namespace placement: extend `resolvers/session.clj` or new file?
+      → `resolvers/session.clj`; append to `resolvers` def. Recorded in design.md Decisions.
 
-- [ ] Confirm `::pco/input [:psi.agent-session/session-id]` (single-seed) is correct
+- [x] Confirm `::pco/input [:psi.agent-session/session-id]` (single-seed) is correct
       and that Pathom3 resolves it when `agent-session-ctx` is also present in the
-      entity map. If both inputs are needed, update the design's Constraints section.
+      entity map. → Confirmed correct; extra seeds are ignored by Pathom3 for resolver
+      matching. Recorded in design.md Decisions.
 
-- [ ] Clarify nil-when-absent semantics: is nil only returned when session-id is
+- [x] Clarify nil-when-absent semantics: is nil only returned when session-id is
       present-but-nil in the query context, or must the resolver also cover the
-      absent-input case? Update the API / Test contract section accordingly.
+      absent-input case? → nil only when present-but-nil; absent-input → Pathom3
+      :not-found (expected). Updated API, Test contract, and Acceptance in design.md.
 
-- [ ] Add a sentence to design.md explaining why `:psi.agent-session/active-session-id`
-      is a distinct attr rather than re-using `:psi.agent-session/session-id` (which
-      is already root-reachable via `agent-session-identity`).
+- [x] Add a sentence to design.md explaining why `:psi.agent-session/active-session-id`
+      is a distinct attr rather than re-using `:psi.agent-session/session-id`.
+      → Added to design.md Decisions.
 
-- [ ] Add "register new resolver in `resolvers` def" to the In scope / Acceptance
-      section so the wiring step is explicit.
+- [x] Add "register new resolver in `resolvers` def" to the In scope / Acceptance
+      section so the wiring step is explicit. → Added to both sections in design.md.
 
-- [ ] Identify the target test file for the root-queryable-attrs assertion
+- [x] Identify the target test file for the root-queryable-attrs assertion
       (`graph_surface_test.clj`) and add it to the Test contract section.
+      → `graph_surface_test.clj` identified; Test contract updated in design.md.
 
 ## Execution (after design is unambiguous)
 

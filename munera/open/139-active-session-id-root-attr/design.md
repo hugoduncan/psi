@@ -64,6 +64,45 @@ This task should not:
   - root seeds: `#{:psi/agent-session-ctx :psi.agent-session/session-id :psi/memory-ctx :psi/recursion-ctx :psi/engine-ctx}`
   - resolver input must be `[:psi.agent-session/session-id]` — already a root seed — so the fixed-point reachability pass in `derive-root-queryable-attrs` includes this attr
 
+## Decisions
+
+### Resolver namespace placement
+
+Place the new resolver in `resolvers/session.clj` — the natural home alongside
+all existing session-identity resolvers. Append to the `resolvers` def at the
+bottom of that file.
+
+### `::pco/input [:psi.agent-session/session-id]` (single-seed) is correct
+
+All psi-tool queries seed `{:psi/agent-session-ctx ctx :psi.agent-session/session-id session-id}`
+into the entity map (see `tool_plan.clj`). `:psi.agent-session/session-id` is
+always present in the root entity when invoked from psi-tool. A resolver with
+only `[:psi.agent-session/session-id]` as input satisfies the fixed-point
+reachability pass and is correctly resolved by Pathom3 when `agent-session-ctx`
+is also present in the entity map (extra seeds are ignored by Pathom3 for
+resolver matching).
+
+### `nil`-when-absent semantics
+
+The `nil` return case is only reachable when `:psi.agent-session/session-id` is
+present in the entity map but its value is `nil`. If `:psi.agent-session/session-id`
+is entirely absent from the entity map, Pathom3 will not run the resolver and
+will return `:com.wsscode.pathom3.core/not-found` — this is expected Pathom3
+behaviour for an unresolvable attr, not a case the resolver itself handles.
+The test contract covers: (a) session-id present and non-nil → returns it;
+(b) session-id present but nil → returns nil.
+
+### Why `:psi.agent-session/active-session-id` is distinct from `:psi.agent-session/session-id`
+
+`:psi.agent-session/session-id` is an entity key used for entity-seeded queries
+— it identifies which session to read data from. It is already root-reachable via
+`agent-session-identity`, but only as an output that echoes back the input seed.
+`:psi.agent-session/active-session-id` answers the semantic question "which session
+invoked this psi-tool call?" as a self-contained root query, without requiring
+the caller to already hold the session-id out-of-band. The distinction matters
+because agents need a trustworthy, explicit, root-queryable identity attr — not a
+reflected seed value.
+
 ## Invariants
 
 - the resolved value is the session that invoked the tool call — always unambiguous
@@ -71,7 +110,8 @@ This task should not:
 
 ## In scope
 
-- root resolver for `:psi.agent-session/active-session-id`
+- root resolver for `:psi.agent-session/active-session-id` in `resolvers/session.clj`
+- register new resolver in the `resolvers` def in `resolvers/session.clj`
 - documentation of the source of truth (query-context `session-id`)
 - focused tests
 
@@ -104,10 +144,19 @@ Returns `nil` when no session id is present in the query context:
 
 ## Test contract
 
+Target test files:
+- `components/agent-session/test/psi/agent_session/graph_surface_test.clj` — add a
+  new `deftest active-session-id-root-attr-test` asserting the attr appears in
+  `:psi.graph/root-queryable-attrs`
+- `components/agent-session/test/psi/agent_session/resolvers_test.clj` (or nearest
+  session resolver test file) — unit tests for the resolver itself
+
 Cover at least:
 
-- returns the invoking session id when a session id is present in the query context
-- returns `nil` when no session id is present
+- returns the invoking session id when `:psi.agent-session/session-id` is present
+  and non-nil in the query context
+- returns `nil` when `:psi.agent-session/session-id` is present-but-nil in the
+  query context
 - queryable from root without entity seeding
 - does not reflect adapter focus or list ordering
 - `:psi.agent-session/active-session-id` appears in `:psi.graph/root-queryable-attrs`
@@ -116,8 +165,9 @@ Cover at least:
 
 - `:psi.agent-session/active-session-id` is queryable from root without entity seeding
 - resolves to the session id present in the psi-tool query context
-- returns `nil` when no session id is present
+- returns `nil` when `:psi.agent-session/session-id` is present-but-nil in the entity map
 - appears in `:psi.graph/root-queryable-attrs`
+- new resolver is registered in the `resolvers` def in `resolvers/session.clj`
 - source of truth is documented: query-context-bound `session-id` from `tool_plan.clj`
 - ¬adapter focus, ¬list ordering, ¬context-index wiring
 

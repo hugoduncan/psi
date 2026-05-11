@@ -1,6 +1,6 @@
 # Implementation notes
 
-## Review pass — 2026-05-10
+## Design clarification pass — 2026-05-10
 
 ### Ambiguities found
 
@@ -46,3 +46,20 @@
 
 7. **plan.md and steps.md absent.** The task directory contains only design.md.
    Execution cannot begin until plan.md and steps.md exist per Munera protocol.
+
+## Design-step execution — 2026-05-10
+
+All six pre-plan design clarification steps resolved and recorded in design.md.
+
+- Resolver namespace: `resolvers/session.clj`, append to `resolvers` def.
+- Single-seed input `[:psi.agent-session/session-id]` confirmed correct; Pathom3
+  ignores extra seeds for resolver matching; psi-tool always seeds `session-id`.
+- nil semantics: nil only when session-id present-but-nil; absent-input → Pathom3
+  `:not-found` (not a resolver concern).
+- Semantic distinction documented: `active-session-id` answers "who am I?" from
+  root; `session-id` is an entity key for seeded queries.
+- Registration wiring (`resolvers` def) made explicit in In scope and Acceptance.
+- Test file identified: `graph_surface_test.clj` for root-queryable-attrs assertion;
+  resolver unit tests in nearest session resolver test file.
+
+Design is now unambiguous. plan.md can be written and execution can begin.
