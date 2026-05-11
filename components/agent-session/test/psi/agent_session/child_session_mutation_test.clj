@@ -86,6 +86,29 @@
         (is (= #{:system :tools} (:cache-breakpoints child-sd)))
         (is (= messages agent-msgs))))))
 
+(deftest create-child-session-can-store-response-mode-test
+  (testing "create-child-session can persist child response-mode controls"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          qctx   (query/create-query-context)
+          mutate (fn [op params]
+                   (get (query/query-in qctx
+                                        {:psi/agent-session-ctx ctx}
+                                        [(list op (cond-> (assoc params :psi/agent-session-ctx ctx)
+                                                    (not (contains? params :session-id))
+                                                    (assoc :session-id session-id)))])
+                        op))]
+      (session/register-resolvers-in! qctx false)
+      (session/register-mutations-in! qctx mutations/all-mutations true)
+
+      (let [result   (mutate 'psi.extension/create-child-session
+                             {:session-name "child"
+                              :system-prompt "helper"
+                              :tool-defs []
+                              :response-mode :non-streaming})
+            child-id (:psi.agent-session/session-id result)
+            child-sd (ss/get-session-data-in ctx child-id)]
+        (is (= :non-streaming (:response-mode child-sd)))))))
+
 (deftest create-child-session-can-store-prompt-component-selection-test
   (testing "create-child-session can persist child prompt component controls"
     (let [[ctx session-id] (create-session-context {:persist? false})

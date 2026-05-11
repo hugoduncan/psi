@@ -84,6 +84,9 @@
                    (:prompt-mode step-config)
                    (assoc :prompt-mode (:prompt-mode step-config))
 
+                   (:response-mode step-config)
+                   (assoc :response-mode (:response-mode step-config))
+
                    (:skills step-config)
                    (assoc :skills (:skills step-config))
 

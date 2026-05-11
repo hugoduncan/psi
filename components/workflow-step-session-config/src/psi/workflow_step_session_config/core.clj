@@ -106,6 +106,7 @@
                              (:system-prompt base-meta))]
     {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
      :prompt-mode parent-session-prompt-mode
+     :response-mode (or (:response-mode session-spec) :streaming)
      :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
      :thinking-level (or (:thinking-level session-spec)
                          (:thinking-level base-meta)

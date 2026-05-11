@@ -64,3 +64,58 @@ Resolved the propagation-surface inconsistency in task artifacts only:
 - expanded `steps.md` under the child-session propagation step so implementation work can close the surfaces one by one without ambiguity
 
 Per request, did not execute `steps.md` implementation items in this pass; only completed the newly added `design-steps.md` artifact-clarification item.
+
+## Implementation execution 2026-05-11d
+
+Implemented the full workflow-scoped vertical slice.
+
+### Workflow/session propagation landed
+- added workflow IR `:response-mode` validation via `psi.workflow-runtime.ir/session-spec-schema`
+- updated target-IR compilation to preserve `:response-mode` on session steps and llm-judge session configs
+- `psi.workflow-step-session-config.core/resolve-step-session-config` now resolves `:response-mode` and defaults workflow child-session configs to `:streaming`
+- widened workflow child-session propagation surfaces so workflow-owned child sessions persist explicit resolved `:response-mode`:
+  - `psi.workflow-runtime.attempts/create-step-attempt-session!`
+  - `psi.workflow-runtime.statechart-runtime`
+  - `psi.agent-session.context/create-workflow-child-session!`
+  - `psi.agent-session.dispatch-handlers.session-lifecycle/:session/create-child`
+  - `psi.agent-session.mutations.session/create-child-session`
+  - `psi.agent-session.child-session-state/child-session-base-state`
+- added session-state schema support in `psi.session-state.model` and carried the value into prepared-request session snapshots for lower branching
+
+### Lower non-streaming execution seam landed
+- implemented branch point in `psi.turn-runtime.core/execute-prepared-request!`
+- branch source is prepared-request/session snapshot `:response-mode`, falling back to persisted session data, default `:streaming`
+- retained existing streaming path unchanged through `execute-live-turn!`
+- added sibling non-streaming AI API:
+  - `psi.ai.core/execute-response-in`
+  - `psi.ai.core/execute-response`
+  - provider contract key `:execute`
+- added OpenAI chat-completions non-streaming transport and normalization:
+  - `psi.ai.providers.openai.transport/execute-response`
+  - `psi.ai.providers.openai.chat-completions/execute-openai`
+  - provider dispatch wiring in `psi.ai.providers.openai`
+- non-streaming OpenAI requests reuse the existing request builder, then rewrite the request body to `:stream false` and remove streaming-only `:stream_options`
+- non-streaming normalization now returns the canonical higher result ingredients:
+  - assistant text blocks
+  - tool-call blocks
+  - usage
+  - stop reason
+  - logprobs when available
+  - error maps on provider/runtime failure
+
+### Proof added
+Focused tests added/updated for:
+- workflow step session-config response-mode default + explicit propagation
+- workflow/agent-session attempt child-session persistence
+- child-session mutation persistence
+- lower turn-runtime execution branching on `:response-mode`
+- AI core non-streaming provider execution API
+
+Focused verification run green:
+- `bb clojure:test:unit -- --focus psi.ai.core-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-attempts-test --focus psi.agent-session.child-session-state-test --focus psi.agent-session.child-session-mutation-test --focus psi.turn-runtime.response-mode-test`
+- result: `1705 tests, 11926 assertions, 0 failures`
+
+### Remaining cleanup note
+- `bb lint` currently reports only warnings after the implementation pass:
+  - one missing require in the new turn-runtime response-mode test
+  - several pre-existing/shape-driven `inline def` warnings in `workflow-step-session-config.core-test`

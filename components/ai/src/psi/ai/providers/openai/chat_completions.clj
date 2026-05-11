@@ -373,6 +373,61 @@
       (emit-chat-chunk! stream-state consume-fn choice delta)
       (finish-chat-chunk! stream-state consume-fn model chunk choice))))
 
+(defn- non-streaming-request
+  [conversation model options]
+  (let [request (build-request conversation model options)
+        body    (-> (:body request)
+                    (json/parse-string true)
+                    (assoc :stream false)
+                    (dissoc :stream_options))]
+    (assoc request :body (json/generate-string body))))
+
+(defn- tool-call-block
+  [tool-call]
+  {:type :tool-call
+   :id (or (:id tool-call) (content/new-call-id))
+   :name (get-in tool-call [:function :name])
+   :arguments (content/normalize-tool-arguments
+               (get-in tool-call [:function :arguments]))})
+
+(defn- completion-message->content
+  [message]
+  (let [text (content/string-fragment (:content message))
+        tool-calls (mapv tool-call-block (or (:tool_calls message) []))]
+    (cond-> []
+      (seq text) (conj {:type :text :text text})
+      (seq tool-calls) (into tool-calls))))
+
+(defn- completion-response->assistant-message
+  [model body]
+  (let [choice (first (:choices body))
+        message (:message choice)
+        stop-reason (keyword (or (:finish_reason choice) "stop"))
+        usage (some-> (:usage body) (completions-usage-map model))
+        logprobs (or (extract-openai-logprob-delta choice)
+                     (extract-llama-logprob-delta body))]
+    {:assistant-message (cond-> {:role "assistant"
+                                 :content (completion-message->content message)
+                                 :stop-reason stop-reason
+                                 :timestamp (java.time.Instant/now)}
+                          (map? usage) (assoc :usage usage))
+     :logprobs logprobs}))
+
+(defn execute-openai
+  [conversation model options]
+  (let [url     (str (:base-url model) "/chat/completions")
+        request (non-streaming-request conversation model options)]
+    (try
+      (transport/capture-request! model options :openai-completions url request)
+      (let [response (transport/execute-response url request)]
+        (if (transport/error-status? (:status response))
+          (transport/response->error response)
+          (let [body (json/parse-string (:body response) true)
+                _    (transport/capture-response! model options :openai-completions url body)]
+            (completion-response->assistant-message model body))))
+      (catch Exception e
+        (transport/exception->error e)))))
+
 (defn stream-openai
   [conversation model options consume-fn]
   (let [url          (str (:base-url model) "/chat/completions")

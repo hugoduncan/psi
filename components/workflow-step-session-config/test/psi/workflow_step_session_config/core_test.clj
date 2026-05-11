@@ -108,6 +108,26 @@
       (is (= [] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config)))))))
 
+(deftest resolve-step-session-config-defaults-response-mode-to-streaming-test
+  (testing "workflow child sessions resolve explicit default :streaming response mode when absent"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          workflow-run (do
+                         (swap! (:state* ctx)
+                                (fn [state]
+                                  (let [state (reduce (fn [s definition]
+                                                        (let [[s' _ _] (workflow-registry/register-definition s definition)]
+                                                          s'))
+                                                      state
+                                                      [support/single-step-definition-with-meta])
+                                        [state' _ _] (workflow-runtime/create-run state
+                                                                                  {:definition-id "planner"
+                                                                                   :run-id "run-response-mode-1"
+                                                                                   :workflow-input {:input "plan it"}})]
+                                    (assoc-in state' [:agent-session :sessions session-id :data :prompt-mode] :prose))))
+                         (workflow-runtime/workflow-run-in @(:state* ctx) "run-response-mode-1"))
+          config (workflow-step-session-config/resolve-step-session-config ctx session-id workflow-run "step-1")]
+      (is (= :streaming (:response-mode config))))))
+
 (deftest resolve-step-session-config-inherits-parent-prompt-mode-test
   (testing "workflow child sessions inherit parent prompt mode into step session config"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
@@ -182,6 +202,26 @@
                :source :project
                :disable-model-invocation false}]
              (:skills config))))))
+
+(deftest resolve-step-session-config-explicit-response-mode-test
+  (testing "workflow child sessions carry explicit :response-mode from authored step session config"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          response-mode-definition {:definition-id "planner-non-streaming"
+                                    :name "planner-non-streaming"
+                                    :steps [{:name "step-1"
+                                             :type :session
+                                             :response-mode :non-streaming
+                                             :contributions [{:type :template
+                                                              :text "{{input}}"
+                                                              :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                                    :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [response-mode-definition]
+                                         {:definition-id "planner-non-streaming"
+                                          :run-id "run-non-streaming"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= :non-streaming (:response-mode config))))))
 
 (deftest resolve-step-session-config-missing-tool-falls-back-to-normalized-tool-shape-test
   (testing "missing tool references fall back to normalized tool definition shape at the public boundary"

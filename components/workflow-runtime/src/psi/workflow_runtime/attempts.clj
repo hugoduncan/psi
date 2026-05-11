@@ -50,7 +50,7 @@
    Returns {:attempt attempt-map :execution-session session-data}.
 
    The created session is marked as workflow-owned and linked by run/step/attempt ids."
-  [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection]}]
+  [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt prompt-mode response-mode tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection]}]
   (let [attempt-id'      (normalize-attempt-id attempt-id)
         child-session-id (str (java.util.UUID/randomUUID))
         result           (execution-adapter/create-child-session!
@@ -59,6 +59,8 @@
                           {:child-session-id           child-session-id
                            :session-name               session-name
                            :system-prompt              system-prompt
+                           :prompt-mode                prompt-mode
+                           :response-mode              response-mode
                            :tool-defs                  tool-defs
                            :thinking-level             thinking-level
                            :model                      model

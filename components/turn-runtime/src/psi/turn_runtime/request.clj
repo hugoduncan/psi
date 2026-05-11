@@ -87,6 +87,7 @@
      :prepared-request/session-snapshot         {:model                   (:turn/session-model normalized-turn)
                                                  :thinking-level          (:turn/thinking-level normalized-turn)
                                                  :prompt-mode             (:turn/prompt-mode normalized-turn)
+                                                 :response-mode           (:turn/response-mode normalized-turn)
                                                  :cache-breakpoints       cache-bps
                                                  :active-tools            (:turn/active-tools normalized-turn)
                                                  :developer-prompt        (:turn/developer-prompt normalized-turn)

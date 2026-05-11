@@ -134,11 +134,15 @@
    [:operation operation-id-schema]
    [:args {:optional true} [:map-of :keyword [:or literal-schema source-spec-schema]]]])
 
+(def response-mode-schema
+  [:enum :streaming :non-streaming])
+
 (def session-spec-schema
   [:map
    [:model {:optional true} [:maybe model-id-schema]]
    [:tools {:optional true} [:vector tool-id-schema]]
    [:skills {:optional true} [:vector skill-id-schema]]
+   [:response-mode {:optional true} [:maybe response-mode-schema]]
    [:contributions [:vector contribution-schema]]])
 
 (def map-prompt-string-schema

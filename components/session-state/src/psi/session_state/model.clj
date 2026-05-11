@@ -79,6 +79,9 @@
 (def prompt-mode-schema
   [:enum :lambda :prose])
 
+(def response-mode-schema
+  [:enum :streaming :non-streaming])
+
 (def prompt-component-schema
   [:enum :preamble :context-files :skills :runtime-metadata])
 
@@ -138,6 +141,7 @@
    [:workflow-step-id {:optional true} [:maybe :string]]
    [:workflow-attempt-id {:optional true} [:maybe :string]]
    [:workflow-owned? {:optional true} :boolean]
+   [:response-mode {:optional true} [:maybe response-mode-schema]]
    [:model {:optional true} [:maybe model-schema]]
    [:thinking-level thinking-level-schema]
    [:is-streaming :boolean]

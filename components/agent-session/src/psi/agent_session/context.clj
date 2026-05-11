@@ -109,7 +109,7 @@
   nil)
 
 (defn- create-workflow-child-session!
-  [ctx parent-session-id {:keys [child-session-id session-name system-prompt prompt-mode tool-defs thinking-level model skills
+  [ctx parent-session-id {:keys [child-session-id session-name system-prompt prompt-mode response-mode tool-defs thinking-level model skills
                                  developer-prompt developer-prompt-source preloaded-messages
                                  cache-breakpoints prompt-component-selection
                                  workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
@@ -126,6 +126,7 @@
                                :tool-defs tool-defs
                                :thinking-level thinking-level}
                         (some? prompt-mode) (assoc :prompt-mode prompt-mode)
+                        (some? response-mode) (assoc :response-mode response-mode)
                         (some? model) (assoc :model model)
                         (some? skills) (assoc :skills skills)
                         (some? preloaded-messages) (assoc :preloaded-messages preloaded-messages)

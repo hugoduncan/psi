@@ -5,6 +5,7 @@
    construction, wait/timeout/abort handling, and canonical execution-result
    shaping for one prepared turn."
   (:require
+   [psi.ai.core :as ai]
    [psi.ai.models :as models]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.accumulator :as accum]
@@ -192,6 +193,35 @@
      :assistant-message assistant-msg
      :logprobs          logprobs}))
 
+(defn- response-mode-for
+  [ctx session-id prepared-request]
+  (or (get-in prepared-request [:prepared-request/session-snapshot :response-mode])
+      (:response-mode (ss/get-session-data-in ctx session-id))
+      :streaming))
+
+(defn- execute-non-streaming-turn!
+  [ai-ctx ctx session-id {:keys [ai-conv ai-model base-ai-options turn-id]}]
+  (let [ai-options (capture-aware-ai-options ctx session-id turn-id base-ai-options)
+        result     (if ai-ctx
+                     (ai/execute-response-in ai-ctx ai-conv ai-model ai-options)
+                     (ai/execute-response ai-conv ai-model ai-options))]
+    (if (= :error (:type result))
+      {:turn-id turn-id
+       :model ai-model
+       :ai-options ai-options
+       :assistant-message (cond-> {:role "assistant"
+                                   :content [{:type :error :text (:error-message result)}]
+                                   :stop-reason :error
+                                   :error-message (:error-message result)
+                                   :timestamp (java.time.Instant/now)}
+                            (:http-status result) (assoc :http-status (:http-status result)))
+       :logprobs nil}
+      {:turn-id turn-id
+       :model ai-model
+       :ai-options ai-options
+       :assistant-message (:assistant-message result)
+       :logprobs (:logprobs result)})))
+
 (defn execute-prepared-request!
   "Execute one prepared request through the live turn runtime.
    Returns a shaped execution-result map."
@@ -202,13 +232,20 @@
                             (:model (ss/get-session-data-in ctx session-id))
                             (models/get-model :sonnet-4.6))
         base-ai-options (or (:prepared-request/ai-options prepared-request) {})
+        response-mode   (response-mode-for ctx session-id prepared-request)
         {:keys [assistant-message logprobs]}
-        (execute-live-turn! ai-ctx ctx session-id
-                            {:ai-conv         ai-conv
-                             :ai-model        ai-model
-                             :base-ai-options base-ai-options
-                             :progress-queue  progress-queue
-                             :turn-id         turn-id})
+        (if (= :non-streaming response-mode)
+          (execute-non-streaming-turn! ai-ctx ctx session-id
+                                       {:ai-conv ai-conv
+                                        :ai-model ai-model
+                                        :base-ai-options base-ai-options
+                                        :turn-id turn-id})
+          (execute-live-turn! ai-ctx ctx session-id
+                              {:ai-conv         ai-conv
+                               :ai-model        ai-model
+                               :base-ai-options base-ai-options
+                               :progress-queue  progress-queue
+                               :turn-id         turn-id}))
         outcome         (classify-assistant-message assistant-message)]
     {:execution-result/turn-id             turn-id
      :execution-result/session-id          session-id

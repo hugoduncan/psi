@@ -26,6 +26,7 @@
   [:enum :start :text-start :text-delta :text-end
    :thinking-start :thinking-delta :thinking-signature-delta :thinking-end
    :toolcall-start :toolcall-delta :toolcall-end
+   :logprob-delta
    :done :error])
 
 (def ContentBlockKind

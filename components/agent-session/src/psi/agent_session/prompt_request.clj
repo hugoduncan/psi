@@ -235,6 +235,7 @@
      :turn/session-model                (:model session-data)
      :turn/thinking-level               (:thinking-level session-data)
      :turn/prompt-mode                  (:prompt-mode session-data)
+     :turn/response-mode                (:response-mode session-data)
      :turn/active-tools                 (:active-tools session-data)
      :turn/developer-prompt             (:developer-prompt session-data)
      :turn/developer-prompt-source      (:developer-prompt-source session-data)

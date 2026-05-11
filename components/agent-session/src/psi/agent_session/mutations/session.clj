@@ -75,7 +75,7 @@
   "Create a child session for agent execution without switching active session.
   Returns the child session-id. The child shares the parent's context but has
   its own journal, telemetry, and session data."
-  [_ {:keys [psi/agent-session-ctx session-id session-name system-prompt tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
+  [_ {:keys [psi/agent-session-ctx session-id session-name system-prompt response-mode tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
   {::pco/op-name 'psi.extension/create-child-session
    ::pco/params  [:psi/agent-session-ctx :session-id]
    ::pco/output  [:psi.agent-session/session-id]}
@@ -88,6 +88,9 @@
                                  :system-prompt    system-prompt
                                  :tool-defs        tool-defs
                                  :thinking-level   thinking-level}
+                          (some? response-mode)
+                          (assoc :response-mode response-mode)
+
                           (some? model)
                           (assoc :model model)
 

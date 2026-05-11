@@ -23,7 +23,14 @@
              (consume-fn {:type :text-delta :content-index 0 :delta text})
              (consume-fn {:type :done :reason :stop
                           :usage {:input-tokens 1 :output-tokens 1
-                                  :total-tokens 2 :cost {:total 0.0}}}))})
+                                  :total-tokens 2 :cost {:total 0.0}}}))
+   :execute (fn [_conversation _model _options]
+              {:assistant-message {:role "assistant"
+                                   :content [{:type :text :text text}]
+                                   :stop-reason :stop
+                                   :usage {:input-tokens 1 :output-tokens 1
+                                           :total-tokens 2 :cost {:total 0.0}}
+                                   :timestamp (java.time.Instant/now)}})})
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; Model tests — pure logic
@@ -132,6 +139,29 @@
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; Streaming — lazy-seq API (isolated context, stub provider)
 ;; ─────────────────────────────────────────────────────────────────────────────
+
+(deftest test-execute-response
+  (testing "execute-response-in returns a canonical assistant message from provider :execute"
+    (let [conversation (-> (core/create-conversation "assistant")
+                           (core/send-message "hi"))
+          model        (models/get-model :claude-3-5-sonnet)
+          options      {:temperature 0.5}
+          provider     (stub-provider "executed")
+          ctx          (core/create-context {:providers {:anthropic provider}})
+          result       (core/execute-response-in ctx conversation model options)]
+      (is (= "assistant" (get-in result [:assistant-message :role])))
+      (is (= :stop (get-in result [:assistant-message :stop-reason])))
+      (is (= [{:type :text :text "executed"}]
+             (get-in result [:assistant-message :content])))))
+
+  (testing "execute-response-in throws clearly when provider lacks :execute"
+    (let [conversation (-> (core/create-conversation "assistant")
+                           (core/send-message "hi"))
+          model        (models/get-model :claude-3-5-sonnet)
+          ctx          (core/create-context {:providers {:anthropic {:name :stub :stream (fn [_ _ _ _])}}})]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"Provider does not support non-streaming execution"
+                            (core/execute-response-in ctx conversation model {}))))))
 
 (deftest test-stream-response-seq
   (testing "stream-response-seq-in returns a lazy sequence of events"

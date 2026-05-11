@@ -54,7 +54,7 @@
      :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}))
 
 (defn child-session-base-state
-  [parent-sd {:keys [child-session-id session-name thinking-level model prompt-mode developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
+  [parent-sd {:keys [child-session-id session-name thinking-level model prompt-mode response-mode developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
   (let [{:keys [prompt-component-selection tool-defs skills system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state parent-sd child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
@@ -71,6 +71,7 @@
             :workflow-step-id           workflow-step-id
             :workflow-attempt-id        workflow-attempt-id
             :workflow-owned?            (boolean workflow-owned?)
+            :response-mode              response-mode
             :system-prompt              system-prompt
             :base-system-prompt         base-system-prompt
             :prompt-mode                (or prompt-mode (:prompt-mode parent-sd))
