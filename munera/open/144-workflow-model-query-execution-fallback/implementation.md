@@ -15,3 +15,10 @@ Implementation notes:
   - no `steps.md` execution performed; this pass only completed ambiguity follow-up in task design artifacts.
 - 2026-05-11 inconsistency review:
   - actionable inconsistency: `design.md`, `plan.md`, and `steps.md` all require the fallback-worthy execution failure predicate to be chosen and recorded in `implementation.md` before code changes, but `implementation.md` still leaves that predicate undecided; record the canonical predicate (and where it is applied) before implementation/proof so task intent and execution guidance match.
+- 2026-05-11 inconsistency follow-up execution:
+  - canonical fallback-worthy execution failure predicate chosen: only bounded workflow child-session turn failures whose terminal payload indicates execution-time provider availability/transport failure are eligible for ranked-candidate fallback.
+  - authoritative first classification seam: `psi.workflow-runtime.turn-execution-contract/execute-session-turn!`, because it is the lower bounded execution owner that converts provider/session turn outcomes into canonical workflow failure payloads.
+  - implementation intent at that seam: enrich the canonical `:failure` payload from `execution-failure-payload` with stable machine-readable classification (for example a dedicated reason/category) when the underlying execution result or assistant error message shows transport/unreachable/provider-execution failure such as connection refused.
+  - runtime application seam: workflow candidate iteration should consume only that canonical classified failure payload from `psi.workflow-runtime.statechart-runtime.step-execution/execute-session-step!`; it must not re-inspect provider-specific raw exception shapes throughout workflow runtime.
+  - terminal/non-fallback cases: workflow/judge result failures, invalid workflow definitions, deterministic local shaping/validation failures, and ordinary semantic model responses remain terminal for the ranked candidate sequence.
+  - no `steps.md` execution performed; this pass only resolved the pre-code inconsistency by recording the predicate and application seam.
