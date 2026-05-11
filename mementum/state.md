@@ -95,5 +95,16 @@ Bootstrapped on 2026-04-02.
   - 3 focused unit tests in `resolvers_test.clj`; `root-queryable-attrs-contract-test` auto-covers the new attr
   - 1678 tests, 12513 assertions, 0 failures; lint clean; live query verified
 
+- Task 140 logprobs-openai-completions-flag is now complete and closed:
+  - added `:logprobs-enabled` / `:top-logprobs` / `:last-turn-logprobs` to `agent-session-schema`; `:logprobs` to `session-entry-kind-schema`
+  - `build-request` injects `"logprobs": true` / `"top_logprobs": N` when enabled; `session->request-options` propagates the flags
+  - `extract-openai-logprob-delta` (per-chunk) and `extract-llama-logprob-delta` (final chunk) emit `:logprob-delta` events; routed in `make-provider-event-consumer`
+  - `handle-logprob-delta!` accumulates token vectors into `:logprob-buffer`; `handle-done!` flattens to `:logprobs` on turn-data; `execute-live-turn!` returns `:logprobs`; `execute-prepared-request!` includes `:execution-result/logprobs`
+  - `build-record-response` writes `:last-turn-logprobs` to session-data and appends `:logprobs` journal entry when non-empty
+  - `journal->provider-messages` projects `:logprobs` entries as synthetic user messages (uncertain-token table, threshold 0.90); orphaned entries dropped
+  - `:psi.agent-session/last-turn-logprobs` EQL resolver added
+  - `/logprobs [on|off|N]` command: `set-logprobs-in!` in session_settings + core; `:session/set-logprobs` handler with `(or top-n 3)` nil-guard; `prefixed-command-prefixes` + `builtin-slash-commands` + `format-help` updated
+  - 3 new test namespaces; 1702 tests, 0 failures
+
 ## Suggested next step
 - Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `134-psi-tool-mutation-surface-and-active-session-introspection`.

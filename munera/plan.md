@@ -4,7 +4,6 @@ Open tasks in suggested execution order:
 
 Backlog:
 
-`munera/open/140-logprobs-openai-completions-flag/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
@@ -18,6 +17,9 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 
 Notes:
+- `140` is complete and closed: logprob collection flag for OpenAI chat-completions endpoint;
+  schema + request building + SSE extraction (OpenAI + llama.cpp) + turn accumulation +
+  journal append/projection + EQL resolver + /logprobs command; 1702 tests, 0 failures.
 - `139` is complete and closed: `:psi.agent-session/active-session-id` root resolver in `resolvers/session.clj`; single-seed input `[:psi.agent-session/session-id]`; appears in `root-queryable-attrs`; nil passthrough for present-but-nil; 3 focused tests; live query verified.
 - `138` is complete and closed: github extension has `find-pr`, `add-label`, `remove-label`; all nine listed workflows migrated to deterministic discover and label-ops `:invoke` steps.
 - `137` is complete and closed: `psi/github` extension with deterministic `github/find-issue` operation; `gh-issue-refine` discover step replaced with `:invoke`; blocked smoke tests deferred (require real labeled GH issues).
