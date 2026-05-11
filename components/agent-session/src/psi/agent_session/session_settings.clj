@@ -16,6 +16,12 @@
   [ctx session-id level]
   (dispatch/dispatch! ctx :session/set-thinking-level {:session-id session-id :level level} {:origin :core}))
 
+(defn set-logprobs-in!
+  "Enable or disable logprob collection for `session-id`.
+   `enabled?` — true/false. `top-n` — integer 1–20 or nil (defaults to 3)."
+  [ctx session-id enabled? top-n]
+  (dispatch/dispatch! ctx :session/set-logprobs {:session-id session-id :enabled? enabled? :top-n top-n} {:origin :core}))
+
 (defn cycle-model-in!
   "Cycle to the next available scoped model for `session-id`."
   [ctx session-id direction]

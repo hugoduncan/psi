@@ -129,6 +129,7 @@
          "  /logout  — logout from an OAuth provider\n"
          "  /model [provider model-id] — show current model or set model\n"
          "  /thinking [level] — show current thinking level or set level\n"
+         "  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"
          "  /remember [text] — capture a memory note for future ψ\n"
          "  /worktree — show git worktree context\n"
          "  /reload-models — reload custom model definitions from ~/.psi/agent/models.edn and .psi/models.edn\n"
@@ -561,6 +562,35 @@
                  :message (str "✓ Thinking level set to "
                                (name (:thinking-level result)))}))))))))
 
+(defn- dispatch-logprobs-command
+  [ctx session-id trimmed]
+  (let [args (-> (str/replace trimmed #"^/logprobs\s*" "") str/trim)]
+    (if (str/blank? args)
+      ;; Report current state
+      (let [raw (ss/get-session-data-in ctx session-id)]
+        {:type :text
+         :message (str "logprobs: " (if (:logprobs-enabled raw) "on" "off")
+                       "  top-N: " (or (:top-logprobs raw) 3))})
+      (let [token (str/lower-case args)]
+        (cond
+          (= token "off")
+          (do (session/set-logprobs-in! ctx session-id false nil)
+              {:type :text :message "✓ Logprob collection disabled"})
+
+          (= token "on")
+          (let [result (session/set-logprobs-in! ctx session-id true nil)]
+            {:type :text
+             :message (str "✓ Logprob collection enabled (top-N: " (or (:top-logprobs result) 3) ")")})
+
+          :else
+          (let [n (try (Integer/parseInt token) (catch Exception _ nil))]
+            (if (and n (>= n 1) (<= n 20))
+              (let [result (session/set-logprobs-in! ctx session-id true n)]
+                {:type :text
+                 :message (str "✓ Logprob collection enabled (top-N: " (or (:top-logprobs result) n) ")")})
+              {:type :text
+               :message "Usage: /logprobs [on|off|N]  where N is 1–20"})))))))
+
 (defn- dispatch-login-command
   [ctx session-id oauth-ctx ai-model trimmed]
   (if-not oauth-ctx
@@ -640,7 +670,7 @@
    "/project-repl" :project-repl})
 
 (def ^:private prefixed-command-prefixes
-  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/login" "/project-repl"])
+  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/logprobs" "/login" "/project-repl"])
 
 (defn- exact-command-handler
   [trimmed]
@@ -664,6 +694,7 @@
     "/remember" (dispatch-remember-command ctx session-id trimmed)
     "/model" (dispatch-model-command ctx session-id trimmed)
     "/thinking" (dispatch-thinking-command ctx session-id trimmed)
+    "/logprobs" (dispatch-logprobs-command ctx session-id trimmed)
     "/login" (dispatch-login-command ctx session-id oauth-ctx ai-model trimmed)
     "/project-repl" (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
     nil))

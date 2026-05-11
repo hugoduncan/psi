@@ -41,6 +41,16 @@
         :return {:auto-retry-enabled v}})))
 
   (register-core-handler!
+   :session/set-logprobs
+   (fn [_ctx {:keys [session-id enabled? top-n]}]
+     (let [v (boolean enabled?)]
+       {:root-state-update (session/session-update session-id
+                                                   #(assoc %
+                                                           :logprobs-enabled v
+                                                           :top-logprobs (or top-n 3)))
+        :return {:logprobs-enabled v :top-logprobs (or top-n 3)}})))
+
+  (register-core-handler!
    :session/set-ui-type
    (fn [_ctx {:keys [session-id ui-type]}]
      {:root-state-update (session/session-update session-id #(assoc % :ui-type ui-type))}))

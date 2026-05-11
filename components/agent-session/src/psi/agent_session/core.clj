@@ -113,6 +113,10 @@
   [ctx session-id level]
   (settings/set-thinking-level-in! ctx session-id level))
 
+(defn set-logprobs-in!
+  [ctx session-id enabled? top-n]
+  (settings/set-logprobs-in! ctx session-id enabled? top-n))
+
 (defn cycle-model-in!
   [ctx session-id direction]
   (settings/cycle-model-in! ctx session-id direction))

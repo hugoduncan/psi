@@ -52,7 +52,7 @@
 
 (def session-entry-kind-schema
   [:enum :message :thinking-level :model :compaction :branch-summary
-   :custom :custom-message :label :session-info])
+   :custom :custom-message :label :session-info :logprobs])
 
 (def session-entry-schema
   [:map
@@ -185,7 +185,10 @@
    [:tool-output-overrides {:optional true} [:map-of :string [:map
                                                               [:max-lines {:optional true} [:maybe :int]]
                                                               [:max-bytes {:optional true} [:maybe :int]]]]]
-   [:scheduler {:optional true} scheduler-state-schema]])
+   [:scheduler {:optional true} scheduler-state-schema]
+   [:logprobs-enabled {:optional true} :boolean]
+   [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
+   [:last-turn-logprobs {:optional true} [:maybe [:vector :map]]]])
 
 (defn valid-session? [s] (m/validate agent-session-schema s))
 (defn explain-session [s] (m/explain agent-session-schema s))

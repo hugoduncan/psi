@@ -248,6 +248,9 @@
 (defn message-entry [message]
   (session-model/make-entry :message {:message message}))
 
+(defn logprobs-entry [turn-id tokens]
+  (session-model/make-entry :logprobs {:turn-id turn-id :tokens tokens}))
+
 (defn thinking-level-entry [level]
   (session-model/make-entry :thinking-level {:thinking-level level}))
 

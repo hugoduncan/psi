@@ -139,9 +139,11 @@
                                :stream         true
                                :stream_options {:include_usage true}
                                :temperature    temperature}
-                        (:max-tokens options)  (assoc :max_tokens  (:max-tokens options))
-                        (seq tool-defs)        (assoc :tools tool-defs)
-                        effort                 (assoc :reasoning_effort effort))]
+                        (:max-tokens options)    (assoc :max_tokens  (:max-tokens options))
+                        (seq tool-defs)          (assoc :tools tool-defs)
+                        effort                   (assoc :reasoning_effort effort)
+                        (:logprobs-enabled options) (assoc :logprobs true
+                                                           :top_logprobs (or (:top-logprobs options) 3)))]
     {:headers (cond-> {"Content-Type" "application/json"}
                 ;; Skip Authorization when :no-auth-header is set
                 ;; (e.g. local servers that reject auth headers)
@@ -283,6 +285,34 @@
                    :content-index idx})))
   (reset! tool-state {}))
 
+(defn- normalize-openai-logprob-token
+  [item]
+  {:token   (:token item)
+   :logprob (:logprob item)
+   :top     (mapv (fn [t] {:token (:token t) :logprob (:logprob t)})
+                  (or (:top_logprobs item) []))})
+
+(defn- normalize-llama-logprob-token
+  [item]
+  {:token   (:content item)
+   :logprob (when-let [p (some-> (:probs item) first :prob)]
+              (when (pos? p) (Math/log p)))
+   :top     (mapv (fn [t] {:token (:tok_str t) :logprob (when (and (:prob t) (pos? (:prob t)))
+                                                          (Math/log (:prob t)))})
+                  (or (:probs item) []))})
+
+(defn- extract-openai-logprob-delta
+  "Extract per-chunk logprob data from OpenAI SSE delta (choices[0].logprobs.content)."
+  [choice]
+  (when-let [tokens (seq (get-in choice [:logprobs :content]))]
+    (mapv normalize-openai-logprob-token tokens)))
+
+(defn- extract-llama-logprob-delta
+  "Extract logprob data from llama.cpp final SSE chunk (completion_probabilities)."
+  [chunk]
+  (when-let [tokens (seq (:completion_probabilities chunk))]
+    (mapv normalize-llama-logprob-token tokens)))
+
 (defn- emit-chat-chunk!
   [stream-state consume-fn choice delta]
   (let [{:keys [stream-started?]} stream-state
@@ -300,6 +330,8 @@
                            {:type :thinking-delta
                             :content-index 0
                             :delta reasoning-delta}))
+    (when-let [logprob-tokens (extract-openai-logprob-delta choice)]
+      (consume-fn {:type :logprob-delta :tokens logprob-tokens}))
     (doseq [[fallback-idx tool-call]
             (map-indexed vector (extract-tool-call-fragments choice delta))]
       (process-chat-tool-call! stream-state consume-fn
@@ -324,6 +356,8 @@
       (do
         (force-start-pending-chat-tools! stream-state consume-fn)
         (emit-chat-tool-ends! stream-state consume-fn)
+        (when-let [logprob-tokens (extract-llama-logprob-delta chunk)]
+          (consume-fn {:type :logprob-delta :tokens logprob-tokens}))
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
                                       done?

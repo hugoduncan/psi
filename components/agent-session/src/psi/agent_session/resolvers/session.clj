@@ -542,6 +542,15 @@
    ::pco/output [:psi.agent-session/active-session-id]}
   {:psi.agent-session/active-session-id session-id})
 
+(pco/defresolver last-turn-logprobs-resolver
+  "Resolve the logprob token vector from the most recent logprob-enabled turn.
+   Returns nil when logprobs are disabled or no logprob turn has completed yet."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.agent-session/last-turn-logprobs]}
+  (let [sd (support/session-data agent-session-ctx session-id)]
+    {:psi.agent-session/last-turn-logprobs (:last-turn-logprobs sd)}))
+
 (def resolvers
   [agent-session-identity
    agent-session-phase
@@ -572,4 +581,5 @@
    agent-session-authenticated-providers
    agent-session-rpc-trace
    startup-bootstrap-resolver
-   active-session-id-resolver])
+   active-session-id-resolver
+   last-turn-logprobs-resolver])

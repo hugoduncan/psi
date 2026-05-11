@@ -128,6 +128,8 @@
                                                           :delta         (:delta event)})
           :toolcall-end             (turn-sc/send-event! turn-ctx :turn/toolcall-end
                                                          {:content-index (:content-index event)})
+          :logprob-delta            (call-action! :on-logprob-delta
+                                                  {:tokens (:tokens event)})
           :done                     (turn-sc/send-event! turn-ctx :turn/done
                                                          {:reason (:reason event)
                                                           :usage  (:usage event)})
@@ -181,12 +183,14 @@
                          {:idle-timeout-ms (:llm-stream-idle-timeout-ms ai-options)
                           :wait-poll-ms    (:llm-stream-wait-poll-ms ai-options)
                           :abort-pred      cancelled-pred})
-        _               (swap! (:turn-data turn-ctx) dissoc :stream-handle)]
+        _               (swap! (:turn-data turn-ctx) dissoc :stream-handle)
+        logprobs        (get @(:turn-data turn-ctx) :logprobs)]
     {:turn-id           turn-id
      :model             ai-model
      :ai-options        ai-options
      :turn-ctx          turn-ctx
-     :assistant-message assistant-msg}))
+     :assistant-message assistant-msg
+     :logprobs          logprobs}))
 
 (defn execute-prepared-request!
   "Execute one prepared request through the live turn runtime.
@@ -198,7 +202,7 @@
                             (:model (ss/get-session-data-in ctx session-id))
                             (models/get-model :sonnet-4.6))
         base-ai-options (or (:prepared-request/ai-options prepared-request) {})
-        {:keys [assistant-message]}
+        {:keys [assistant-message logprobs]}
         (execute-live-turn! ai-ctx ctx session-id
                             {:ai-conv         ai-conv
                              :ai-model        ai-model
@@ -218,4 +222,5 @@
      :execution-result/tool-calls          (:tool-calls outcome)
      :execution-result/error-message       (:error-message assistant-message)
      :execution-result/http-status         (:http-status assistant-message)
-     :execution-result/stop-reason         (:stop-reason assistant-message)}))
+     :execution-result/stop-reason         (:stop-reason assistant-message)
+     :execution-result/logprobs            logprobs}))
