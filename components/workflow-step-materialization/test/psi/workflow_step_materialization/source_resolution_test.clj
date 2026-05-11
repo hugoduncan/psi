@@ -93,6 +93,18 @@
              (or (:workflow-original callee-run)
                  (workflow-source-resolution/resolve-source-ref callee-run :workflow-original)))))))
 
+(deftest render-map-prompt-string-resolves-fields-to-map-test
+  (let [run (workflow-run-with-results)
+        map-prompt-string {:type :map
+                           :fields {:issue_number {:from {:step "discover" :output :data}
+                                                   :path [:issues 0]}
+                                    :summary {:from {:step "discover" :output :data}
+                                              :path [:summary]}}}
+        rendered (workflow-source-resolution/render-delegate-prompt-string run map-prompt-string)]
+    (is (= {:issue_number "i-1"
+            :summary "2 issues found"}
+           rendered))))
+
 (defn- run-with-report-accepted-result
   [run-id accepted-result]
   (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}

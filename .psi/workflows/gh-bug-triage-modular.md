@@ -7,7 +7,8 @@ description: Discover a triage bug, reproduce it in an issue worktree, then clas
           :operation "github/find-issue"
           :args      {:labels ["bug" "triage"]
                       :input  nil}
-          :outputs   {:summary {:source :invoke/summary}}
+          :outputs   {:summary {:source :invoke/summary}
+                      :data    {:source :invoke/data}}
           :yields    {:type :text :text :summary}}
          {:name "worktree"
           :type :delegate
@@ -38,9 +39,10 @@ description: Discover a triage bug, reproduce it in an issue worktree, then clas
           :type :delegate
           :target "gh-bug-post-repro"
           :outputs {:handoff {:source :delegate/handoff}}
-          :prompt-string {:type :template
-                          :text "{{report}}"
-                          :vars {"report" {:from {:step "reproduce" :yield :text}}}}
+          :prompt-string {:type :map
+                          :fields {:issue_number {:from {:step "discover" :output :data}
+                                                  :path [:issue-number]}
+                                   :report       {:from {:step "reproduce" :yield :text}}}}
           :context [{:type :source
                      :from :workflow-original}
                     {:type :source

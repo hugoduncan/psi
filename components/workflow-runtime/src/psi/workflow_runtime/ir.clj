@@ -141,8 +141,13 @@
    [:skills {:optional true} [:vector skill-id-schema]]
    [:contributions [:vector contribution-schema]]])
 
+(def map-prompt-string-schema
+  [:map
+   [:type [:= :map]]
+   [:fields [:map-of :keyword source-spec-schema]]])
+
 (def delegate-prompt-string-schema
-  [:or :string template-contribution-schema])
+  [:or :string template-contribution-schema map-prompt-string-schema])
 
 (def delegate-target-schema
   [:or workflow-name-schema source-spec-schema])
@@ -327,9 +332,10 @@
      :delegate (concat
                 (source-refs-in-source-spec (get-in step [:delegate :target]))
                 (when-let [prompt-string (get-in step [:delegate :prompt-string])]
-                  (if (and (map? prompt-string)
-                           (= :template (:type prompt-string)))
-                    (source-refs-in-template-contribution prompt-string)
+                  (case (when (map? prompt-string) (:type prompt-string))
+                    :template (source-refs-in-template-contribution prompt-string)
+                    :map      (mapcat source-refs-in-source-spec
+                                      (vals (:fields prompt-string)))
                     []))
                 (mapcat source-refs-in-contribution
                         (get-in step [:delegate :context])))

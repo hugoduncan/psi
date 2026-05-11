@@ -8,9 +8,15 @@ description: Classify a bug after reproduction: either request more information 
           :tools ["read" "bash"]
           :contributions [{:type :template
                            :text "{{input}}"
-                           :vars {"input" {:from :workflow-input}}}
+                           :vars {"input" {:from :workflow-input :path [:report]}}}
                           {:type :source
-                           :from :workflow-original}]}]}
+                           :from :workflow-original}]}
+         {:name      "remove-triage"
+          :type      :invoke
+          :operation "github/remove-label"
+          :args      {:number {:from :workflow-input :path [:issue_number]}
+                      :labels ["triage"]
+                      :target "issue"}}]}
 
 You are the post-reproduction classification phase of a GitHub bug-triage workflow.
 
@@ -18,13 +24,11 @@ Goal:
 - Read the structured reproduction report.
 - If the bug is not yet reproducible:
   - post a concise GitHub follow-up requesting only the minimum information likely to unblock reproduction
-  - remove the `triage` label
   - add the `waiting` label
   - stop
 - If the bug is reproducible:
   - ensure the reproduction branch is committed and pushed to GitHub
   - post a concise GitHub comment linking to the pushed branch and summarizing the reproduction outcome
-  - remove the `triage` label
   - add the `fix` label
   - stop
 
@@ -49,7 +53,7 @@ Required procedure:
    - draft a concise GitHub reply that says reproduction was not yet possible
    - request only the most useful additional information likely to unblock reproduction
    - post the reply with `gh issue comment`
-   - update labels with `gh issue edit` to remove `triage` and add `waiting`
+   - add the `waiting` label with `gh issue edit`
    - report the waiting outcome clearly
 4. If the status is `REPRODUCIBLE`:
    - use the issue worktree as authoritative
@@ -62,7 +66,7 @@ Required procedure:
      - says the issue was reproduced
      - links to the branch containing the reproduction work
      - briefly summarizes the strongest reproduction evidence
-   - update labels with `gh issue edit` to remove `triage` and add `fix`
+   - add the `fix` label with `gh issue edit`
    - stop after reporting the classification outcome
 
 Execution constraints:

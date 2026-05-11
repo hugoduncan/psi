@@ -2,8 +2,8 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [cheshire.core :as json]
-   [psi.github.find-issue :as sut]))
+   [psi.github.find-issue :as sut]
+   [psi.github.test-support :as ts]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Test helpers
@@ -11,33 +11,6 @@
 (defn- issue
   [number title url]
   {"number" number "title" title "url" url "state" "open" "labels" []})
-
-(defn- stub-shell
-  "Returns a shell-fn stub that always returns a successful response with `issues`."
-  [issues]
-  (fn [& _args]
-    {:exit 0
-     :out  (json/generate-string issues)
-     :err  ""}))
-
-(defn- error-shell
-  "Returns a shell-fn stub that simulates a non-zero exit."
-  [err-msg]
-  (fn [& _args]
-    {:exit 1
-     :out  ""
-     :err  err-msg}))
-
-(defn- capturing-shell
-  "Returns [shell-fn calls*] where calls* captures each invocation's arg list."
-  [issues]
-  (let [calls* (atom [])]
-    [(fn [& args]
-       (swap! calls* conj (vec args))
-       {:exit 0
-        :out  (json/generate-string issues)
-        :err  ""})
-     calls*]))
 
 (defn- invoke
   "Call sut/invoke with a stub ctx and args map."
@@ -50,7 +23,7 @@
 
 (deftest gh-cli-args-are-constructed-correctly-test
   (testing "gh issue list receives exact --state, --json, and --label args"
-    (let [[shell-fn calls*] (capturing-shell [(issue 1 "x" "https://github.com/org/repo/issues/1")])]
+    (let [[shell-fn calls*] (ts/capturing-shell [(issue 1 "x" "https://github.com/org/repo/issues/1")])]
       (invoke shell-fn {:labels ["enhancement" "refine"]})
       (is (= 1 (count @calls*)))
       (is (= ["gh" "issue" "list"
@@ -65,7 +38,7 @@
 
 (deftest no-candidates-returns-error-test
   (testing "no matching issues → :psi.github/no-matching-issue error"
-    (let [result (invoke (stub-shell [])
+    (let [result (invoke (ts/stub-shell [])
                          {:labels ["enhancement" "refine"]})]
       (is (= :error (:status result)))
       (is (= :psi.github/no-matching-issue (:reason result)))
@@ -76,7 +49,7 @@
 
 (deftest single-candidate-returns-correct-map-test
   (testing "single candidate → :ok with correct data map and Markdown summary"
-    (let [result (invoke (stub-shell [(issue 42 "Add foo bar" "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 42 "Add foo bar" "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement" "refine"]})]
       (is (= :ok (:status result)))
       (is (= {:issue-number 42
@@ -96,9 +69,9 @@
 
 (deftest multiple-candidates-no-narrowing-selects-lowest-test
   (testing "multiple candidates → lowest issue number selected"
-    (let [result (invoke (stub-shell [(issue 99 "Issue 99" "https://github.com/org/repo/issues/99")
-                                      (issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")
-                                      (issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 99 "Issue 99" "https://github.com/org/repo/issues/99")
+                                         (issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")
+                                         (issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement" "refine"]})]
       (is (= :ok (:status result)))
       (is (= 7 (get-in result [:data :issue-number]))))))
@@ -108,15 +81,15 @@
 
 (deftest narrowing-by-integer-test
   (testing "integer input → exact number match"
-    (let [result (invoke (stub-shell [(issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")
-                                      (issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")
+                                         (issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement" "refine"]
                           :input "42"})]
       (is (= :ok (:status result)))
       (is (= 42 (get-in result [:data :issue-number])))))
 
   (testing "integer input with leading zeros → parsed as decimal"
-    (let [result (invoke (stub-shell [(issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")])
+    (let [result (invoke (ts/stub-shell [(issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")])
                          {:labels ["enhancement"]
                           :input "007"})]
       (is (= :ok (:status result)))
@@ -127,8 +100,8 @@
 
 (deftest narrowing-by-url-test
   (testing "URL input → issue number extracted and matched"
-    (let [result (invoke (stub-shell [(issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")
-                                      (issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 7  "Issue 7"  "https://github.com/org/repo/issues/7")
+                                         (issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement" "refine"]
                           :input "https://github.com/org/repo/issues/42"})]
       (is (= :ok (:status result)))
@@ -139,7 +112,7 @@
 
 (deftest invalid-url-returns-error-test
   (testing "URL without /issues/NNN → :psi.github/invalid-url-input error"
-    (let [result (invoke (stub-shell [(issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 42 "Issue 42" "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement"]
                           :input "https://github.com/org/repo/pull/5"})]
       (is (= :error (:status result)))
@@ -151,7 +124,7 @@
 
 (deftest narrowing-by-text-no-match-returns-error-test
   (testing "text narrowing that filters to zero candidates → :psi.github/no-matching-issue"
-    (let [result (invoke (stub-shell [(issue 42 "Add dark mode" "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 42 "Add dark mode" "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement"]
                           :input "login bug"})]
       (is (= :error (:status result)))
@@ -162,16 +135,16 @@
 
 (deftest narrowing-by-text-substring-test
   (testing "text substring match selects matching issue"
-    (let [result (invoke (stub-shell [(issue 7  "Fix the login bug"  "https://github.com/org/repo/issues/7")
-                                      (issue 42 "Add dark mode"      "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 7  "Fix the login bug"  "https://github.com/org/repo/issues/7")
+                                         (issue 42 "Add dark mode"      "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement"]
                           :input "dark mode"})]
       (is (= :ok (:status result)))
       (is (= 42 (get-in result [:data :issue-number])))))
 
   (testing "text substring match is case-insensitive (case-folding assertion)"
-    (let [result (invoke (stub-shell [(issue 7  "Fix the LOGIN bug"  "https://github.com/org/repo/issues/7")
-                                      (issue 42 "Add Dark Mode"      "https://github.com/org/repo/issues/42")])
+    (let [result (invoke (ts/stub-shell [(issue 7  "Fix the LOGIN bug"  "https://github.com/org/repo/issues/7")
+                                         (issue 42 "Add Dark Mode"      "https://github.com/org/repo/issues/42")])
                          {:labels ["enhancement"]
                           :input "dark MODE"})]
       (is (= :ok (:status result)))
@@ -182,7 +155,7 @@
 
 (deftest non-zero-exit-returns-shell-error-test
   (testing "non-zero gh exit → :psi.github/shell-error with :err message"
-    (let [result (invoke (error-shell "gh: not authenticated")
+    (let [result (invoke (ts/error-shell "gh: not authenticated")
                          {:labels ["enhancement"]})]
       (is (= :error (:status result)))
       (is (= :psi.github/shell-error (:reason result)))
@@ -193,8 +166,8 @@
 
 (deftest nil-input-treated-as-no-narrowing-test
   (testing "nil :input → no narrowing applied, lowest candidate selected"
-    (let [result (invoke (stub-shell [(issue 99 "Issue 99" "https://github.com/org/repo/issues/99")
-                                      (issue 5  "Issue 5"  "https://github.com/org/repo/issues/5")])
+    (let [result (invoke (ts/stub-shell [(issue 99 "Issue 99" "https://github.com/org/repo/issues/99")
+                                         (issue 5  "Issue 5"  "https://github.com/org/repo/issues/5")])
                          {:labels ["enhancement" "refine"]
                           :input nil})]
       (is (= :ok (:status result)))
@@ -205,23 +178,23 @@
 
 (deftest slug-derivation-test
   (testing "slug is derived from title: lower-case, extract words, join, truncate at 40"
-    (let [result (invoke (stub-shell [(issue 1 "Add foo-bar baz" "https://github.com/org/repo/issues/1")])
+    (let [result (invoke (ts/stub-shell [(issue 1 "Add foo-bar baz" "https://github.com/org/repo/issues/1")])
                          {:labels ["enhancement"]})]
       (is (= "add-foo-bar-baz" (get-in result [:data :worktree-description])))))
 
   (testing "slug is hard-truncated at 40 chars and never ends with -"
     (let [long-title "This is a very long issue title that exceeds forty characters easily"
-          result (invoke (stub-shell [(issue 1 long-title "https://github.com/org/repo/issues/1")])
+          result (invoke (ts/stub-shell [(issue 1 long-title "https://github.com/org/repo/issues/1")])
                          {:labels ["enhancement"]})]
       (is (= "this-is-a-very-long-issue-title-that-exc"
              (get-in result [:data :worktree-description])))))
 
   (testing "nil title produces empty slug (documents behavior)"
-    (let [result (invoke (stub-shell [(issue 1 nil "https://github.com/org/repo/issues/1")])
+    (let [result (invoke (ts/stub-shell [(issue 1 nil "https://github.com/org/repo/issues/1")])
                          {:labels ["enhancement"]})]
       (is (= "" (get-in result [:data :worktree-description])))))
 
   (testing "empty string title produces empty slug (documents behavior)"
-    (let [result (invoke (stub-shell [(issue 1 "" "https://github.com/org/repo/issues/1")])
+    (let [result (invoke (ts/stub-shell [(issue 1 "" "https://github.com/org/repo/issues/1")])
                          {:labels ["enhancement"]})]
       (is (= "" (get-in result [:data :worktree-description]))))))

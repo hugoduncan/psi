@@ -7,7 +7,8 @@ description: Find an enhancement issue labeled refine, create an issue worktree,
           :operation "github/find-issue"
           :args      {:labels ["enhancement" "refine"]
                       :input  {:from :workflow-input :path [:input]}}
-          :outputs   {:summary {:source :invoke/summary}}
+          :outputs   {:summary {:source :invoke/summary}
+                      :data    {:source :invoke/data}}
           :yields    {:type :text :text :summary}}
          {:name "worktree"
           :type :delegate
@@ -55,8 +56,9 @@ description: Find an enhancement issue labeled refine, create an issue worktree,
          {:name "publish"
           :type :delegate
           :target "builder"
+          :outputs {:data {:source :delegate/handoff}}
           :prompt-string {:type :template
-                          :text "Publish the refined issue design described by {{refine_report}}. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the issue number, branch name, worktree path, and Munera task path.\n2. In the issue worktree, review the final `design.md` and use it as the primary PR description body.\n3. Commit any remaining uncommitted task-design changes if needed.\n4. Before pushing, verify the local branch and target explicitly:\n   - confirm `git branch --show-current` equals the handed-off branch name\n   - confirm `git status --short --branch` shows you are not on `master`\n   - confirm the branch contains commits not already on `origin/master`, for example with `git log --oneline origin/master..HEAD`\n   - if these checks fail, stop and report the failure instead of pushing\n5. Push only the current HEAD to the named feature branch on origin using an explicit refspec such as `git push -u origin HEAD:refs/heads/<branch-name>`.\n   - Do not push to `origin/master`.\n   - Do not rely on an ambiguous default push target.\n6. Create a **draft PR** against `master` whose description is the issue design content, and include a reference to the original issue such as `Refs #<issue-number>`.\n   - Use GitHub's draft PR mechanism explicitly, for example `gh pr create --draft ...`.\n7. Only after PR creation succeeds, remove the `refine` label from the issue.\n8. Add the `waiting` label to the PR.\n9. If any publication step fails after earlier steps succeeded, report the partial-success state clearly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Publish Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `issue_number:`\n  - `worktree_path:`\n  - `branch_name:`\n  - `munera_task_path:`\n  - `pr_url:`\n  - `issue_label_update:`\n  - `pr_label_update:`"
+                          :text "Publish the refined issue design described by {{refine_report}}. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the issue number, branch name, worktree path, and Munera task path.\n2. In the issue worktree, review the final `design.md` and use it as the primary PR description body.\n3. Commit any remaining uncommitted task-design changes if needed.\n4. Before pushing, verify the local branch and target explicitly:\n   - confirm `git branch --show-current` equals the handed-off branch name\n   - confirm `git status --short --branch` shows you are not on `master`\n   - confirm the branch contains commits not already on `origin/master`, for example with `git log --oneline origin/master..HEAD`\n   - if these checks fail, stop and report the failure instead of pushing\n5. Push only the current HEAD to the named feature branch on origin using an explicit refspec such as `git push -u origin HEAD:refs/heads/<branch-name>`.\n   - Do not push to `origin/master`.\n   - Do not rely on an ambiguous default push target.\n6. Create a **draft PR** against `master` whose description is the issue design content, and include a reference to the original issue such as `Refs #<issue-number>`.\n   - Use GitHub's draft PR mechanism explicitly, for example `gh pr create --draft ...`.\n7. If any publication step fails after earlier steps succeeded, report the partial-success state clearly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Publish Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `issue_number:`\n  - `worktree_path:`\n  - `branch_name:`\n  - `munera_task_path:`\n  - `pr_number:`\n  - `pr_url:`"
                           :vars {"refine_report" {:from {:step "refine-design" :yield :text}}}}
           :context [{:type :source
                      :from :workflow-original}
@@ -65,6 +67,18 @@ description: Find an enhancement issue labeled refine, create an issue worktree,
                     {:type :source
                      :from {:step "worktree" :yield :text}}
                     {:type :source
-                     :from {:step "refine-design" :yield :text}}]}]}
+                     :from {:step "refine-design" :yield :text}}]}
+         {:name      "remove-refine"
+          :type      :invoke
+          :operation "github/remove-label"
+          :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
+                      :labels ["refine"]
+                      :target "issue"}}
+         {:name      "add-waiting-pr"
+          :type      :invoke
+          :operation "github/add-label"
+          :args      {:number {:from {:step "publish" :output :data} :path [:pr_number]}
+                      :labels ["waiting"]
+                      :target "pr"}}]}
 
 Coordinate refinement of a GitHub enhancement issue labeled `refine`: select the issue, create an issue-specific worktree, refine it into a complete and unambiguous Munera task design, iterate until ambiguities are resolved, then push the branch, create a PR using the design as the PR description, remove the issue's `refine` label, and add a `waiting` label to the PR.

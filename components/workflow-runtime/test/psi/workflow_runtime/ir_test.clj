@@ -85,6 +85,18 @@
     (is (m/validate workflow-ir/delegate-target-schema {:from {:step "discover" :output :data}
                                                         :path [:selected-workflow]})))
 
+  (testing "delegate-prompt-string-schema accepts :map type with :fields"
+    (is (m/validate workflow-ir/delegate-prompt-string-schema
+                    {:type :map
+                     :fields {:issue_number {:from {:step "discover" :output :data}
+                                             :path [:issue-number]}
+                              :report       {:from {:step "reproduce" :yield :text}}}}))
+    (is (not (m/validate workflow-ir/delegate-prompt-string-schema
+                         {:type :map})))
+    (is (not (m/validate workflow-ir/delegate-prompt-string-schema
+                         {:type :map
+                          :fields "not-a-map"}))))
+
   (testing "contribution schemas accept source and template variants"
     (is (m/validate workflow-ir/source-contribution-schema
                     {:type :source :from :workflow-original}))
