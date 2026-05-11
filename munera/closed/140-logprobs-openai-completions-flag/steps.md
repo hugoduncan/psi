@@ -60,3 +60,24 @@
     llama.cpp); data normalization
   - `agent-session` component: options projection; journal append; message projection
     with `:logprobs` entries; compaction skips `:logprobs` entries
+
+- [ ] **10. Fix `:last-turn-logprobs` stale-data bug** — `build-record-response` in
+  `prompt_recording.clj` must unconditionally update `:last-turn-logprobs` in the
+  session-data update fn (write `nil` when `logprobs` is nil, not skip the assoc).
+  Change `(some? logprobs) (assoc :last-turn-logprobs logprobs)` to always
+  `(assoc % :last-turn-logprobs logprobs)` (removing the `cond->` guard for this key).
+  Add a test: run `build-record-response` with nil logprobs on a session-state that
+  already has a stale `:last-turn-logprobs` value; assert the value is cleared to nil.
+
+- [ ] **11. Add compaction test for `:logprobs` entries** — add a test to
+  `compaction_test.clj` verifying that `:logprobs` entries are not treated as message-like
+  and not valid cut-points (i.e., compaction skips them). This satisfies the stated
+  acceptance criterion "compaction skips `:logprobs` entries".
+
+- [ ] **12. Remove `:logprobs` from assistant final message** — `handle-done!` in
+  `accumulator.clj` adds `:logprobs` to the `final` message map via
+  `(seq logprob-buffer) (assoc :logprobs logprobs)`. This embeds duplicate logprob data
+  in the journal `:message` entry. Remove the `(seq logprob-buffer) (assoc :logprobs logprobs)`
+  cond branch from the `final` map construction; logprobs are already stored on `@td`
+  and extracted by `execute-live-turn!`. The separate `:logprobs` journal entry is the
+  canonical store.

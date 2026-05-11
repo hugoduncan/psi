@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## Implementation review pass 5 (2026-05-11)
+
+1702 unit tests pass; lint clean (0 errors, 0 warnings). All nine plan steps are implemented and match the design. Three issues found:
+
+1. **`:last-turn-logprobs` not cleared when logprobs=nil** — `build-record-response` uses `(some? logprobs) (assoc :last-turn-logprobs logprobs)`, so `:last-turn-logprobs` is never written when logprobs is nil. After enabling logprobs, running a turn, then disabling, the EQL resolver returns stale data from the previous logprob turn. Design acceptance says "nil when disabled or before any logprob turn". Fix: unconditionally update `:last-turn-logprobs` (write nil when no logprobs collected).
+
+2. **Compaction test missing** — design acceptance criteria require "compaction skips `:logprobs` entries". `compaction.clj` is correct (`:logprobs` not in `message-like-entry?` or `valid-cut-point?`), but `compaction_test.clj` has no test for this. The acceptance criterion is unverified.
+
+3. **`:logprobs` embedded in assistant final message** — `handle-done!` adds `:logprobs` to the `final` message map (line 322 of accumulator.clj) which is then stored in the journal `:message` entry via `persist/message-entry`. This duplicates logprob data in the journal (also in the separate `:logprobs` entry). `transform-messages` ignores it, so no functional harm, but the journal is bloated. Not mentioned in design.
+
 ## Review pass 4 follow-up execution (2026-05-11)
 
 Executed all four unchecked items from review pass 4:
