@@ -111,3 +111,11 @@ The task should not leave both names as parallel canonical state.
 ## 2026-05-11 task-test-review
 
 - Review result: no new actionable feedback. Re-read the task-test-review skill and verified the proof set covers workflow logprob defaults/explicit/drop semantics (`workflow_step_session_config/core_test.clj`), same-path combined `:response-mode` + logprob child-session propagation (`workflow_runtime/attempts_test.clj`, `agent_session/workflow_attempts_test.clj`), command/help/autocomplete removal of `/logprobs` (`agent_session/commands_test.clj`, `tui/app_input_selector_test.clj`), preservation of the closed public non-workflow mutation surface (`agent_session/mutations/session.clj`, `agent_session/child_session_mutation_test.clj`), and runtime non-streaming execution behaviour (`turn_runtime/response_mode_test.clj`). Focused verification remains green: `bb clojure:test:unit --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-attempts-test --focus psi.agent-session.commands-test --focus psi.tui.app-input-selector-test --focus psi.agent-session.child-session-mutation-test --focus psi.turn-runtime.response-mode-test` → `1719 tests, 12651 assertions, 0 failures`.
+
+## 2026-05-11 follow-up execution
+
+- Re-read the preloaded review result and task artifacts; there were no newly added unchecked follow-up items left in `steps.md`.
+- Re-ran the focused acceptance proof set:
+  - `bb clojure:test:unit --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-attempts-test --focus psi.agent-session.commands-test --focus psi.tui.app-input-selector-test --focus psi.agent-session.child-session-mutation-test --focus psi.turn-runtime.response-mode-test`
+- Verification remains green: `1719 tests, 11978 assertions, 0 failures`.
+- No task-local code or checklist updates were required; the only unrelated working-tree changes remain `munera/plan.md` and the new open task directory `munera/open/143-workflow-session-inherit-delegating-session-preferences/`.
