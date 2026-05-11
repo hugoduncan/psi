@@ -60,6 +60,9 @@ This task should not:
 - the attr must resolve from the query context's bound `session-id` — ¬adapter focus, ¬list ordering, ¬context-index
 - `nil` when no session id is present in the query context — ¬throw, ¬guess
 - must not re-introduce the previously-removed `:context-active-session-id` semantics
+- the resolver's input must be a subset of root seeds so the attr appears in `:psi.graph/root-queryable-attrs`
+  - root seeds: `#{:psi/agent-session-ctx :psi.agent-session/session-id :psi/memory-ctx :psi/recursion-ctx :psi/engine-ctx}`
+  - resolver input must be `[:psi.agent-session/session-id]` — already a root seed — so the fixed-point reachability pass in `derive-root-queryable-attrs` includes this attr
 
 ## Invariants
 
@@ -107,12 +110,14 @@ Cover at least:
 - returns `nil` when no session id is present
 - queryable from root without entity seeding
 - does not reflect adapter focus or list ordering
+- `:psi.agent-session/active-session-id` appears in `:psi.graph/root-queryable-attrs`
 
 ## Acceptance
 
 - `:psi.agent-session/active-session-id` is queryable from root without entity seeding
 - resolves to the session id present in the psi-tool query context
 - returns `nil` when no session id is present
+- appears in `:psi.graph/root-queryable-attrs`
 - source of truth is documented: query-context-bound `session-id` from `tool_plan.clj`
 - ¬adapter focus, ¬list ordering, ¬context-index wiring
 
