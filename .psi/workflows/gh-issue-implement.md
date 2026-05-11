@@ -2,15 +2,14 @@
 name: gh-issue-implement
 description: Find an implement-labeled PR, prepare its branch worktree, design and implement the task, then push back to the PR branch and advance PR labels
 ---
-{:steps [{:name "search"
-          :type :delegate
-          :target "builder"
-          :prompt-string {:type :template
-                          :text "Find exactly one open GitHub PR in this repository carrying the `implement` label. Work independently. Use `{{input}}` only as an optional narrowing hint such as a PR number, URL, branch name, or short selector.\n\nRequired procedure:\n1. Use `gh pr list --state open --label implement --json number,title,labels,url,headRefName,baseRefName` to discover candidates.\n2. If none match, stop and report that there is nothing to process.\n3. If multiple match and `{{input}}` does not narrow to one, pick the lowest PR number.\n4. Read the selected PR with `gh pr view <pr> --json number,title,body,labels,url,headRefName,baseRefName,headRepositoryOwner,author`.\n5. Emit a compact Markdown handoff with these headings exactly:\n   - `## PR Selection`\n   - `## Handoff Data`\n6. Under `## Handoff Data`, include machine-friendly bullet lines for:\n   - `pr_number:`\n   - `pr_title:`\n   - `pr_url:`\n   - `pr_branch:`\n   - `pr_base_branch:`\n   - `worktree_description:`\n\nThe worktree description should be a short branch-derived slug suitable for a branch-specific worktree."
-                          :vars {"input" {:from :workflow-input
-                                           :path [:input]}}}
-          :context [{:type :source
-                     :from :workflow-original}]}
+{:steps [{:name      "search"
+          :type      :invoke
+          :operation "github/find-pr"
+          :args      {:labels ["implement"]
+                      :input  {:from :workflow-input :path [:input]}}
+          :outputs   {:summary {:source :invoke/summary}
+                      :data    {:source :invoke/data}}
+          :yields    {:type :text :text :summary}}
          {:name "prep"
           :type :delegate
           :target "builder"
@@ -80,7 +79,7 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
           :type :delegate
           :target "builder"
           :prompt-string {:type :template
-                          :text "Push the reviewed implementation back to the existing PR branch and advance PR labels. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR URL, PR branch, worktree path, Munera task path, and any deviation summary.\n2. In the worktree, verify the local branch matches the PR branch and review the current git status.\n3. Commit any remaining implementation or review follow-up changes if needed.\n4. Push the work back to the PR branch.\n5. Post a PR comment summarizing any meaningful deviations from the initial design that were recorded during implementation or review. If there were no meaningful deviations, say so explicitly.\n6. Remove the `implement` label from the PR.\n7. Add the `review` label to the PR.\n8. If any push or labeling step fails after earlier steps succeeded, report the partial-success state clearly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Push Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`\n  - `pr_label_update:`"
+                          :text "Push the reviewed implementation back to the existing PR branch. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR URL, PR branch, worktree path, Munera task path, and any deviation summary.\n2. In the worktree, verify the local branch matches the PR branch and review the current git status.\n3. Commit any remaining implementation or review follow-up changes if needed.\n4. Push the work back to the PR branch.\n5. Post a PR comment summarizing any meaningful deviations from the initial design that were recorded during implementation or review. If there were no meaningful deviations, say so explicitly.\n6. If the push fails, report the failure clearly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Push Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`"
                           :vars {"review_report" {:from {:step "review" :yield :text}}}}
           :context [{:type :source
                      :from :workflow-original}
@@ -89,6 +88,18 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
                     {:type :source
                      :from {:step "implement" :yield :text}}
                     {:type :source
-                     :from {:step "review" :yield :text}}]}]}
+                     :from {:step "review" :yield :text}}]}
+         {:name      "remove-implement"
+          :type      :invoke
+          :operation "github/remove-label"
+          :args      {:number {:from {:step "search" :output :data} :path [:pr-number]}
+                      :labels ["implement"]
+                      :target "pr"}}
+         {:name      "add-review"
+          :type      :invoke
+          :operation "github/add-label"
+          :args      {:number {:from {:step "search" :output :data} :path [:pr-number]}
+                      :labels ["review"]
+                      :target "pr"}}]}
 
-Coordinate implementation work for an existing GitHub PR labeled `implement`: select the PR, prepare or reuse its branch-specific worktree, rebase the PR branch onto `origin/master`, create and refine a Munera task design with explicit implementation approach detail, implement the task, review and improve the task implementation through the `review-implementation` workflow, then push back to the PR branch, summarize any meaningful deviations from the initial design on the PR, remove the PR's `implement` label, and add the `review` label. All stages use the `work-independently` skill.
+Coordinate implementation work for an existing GitHub PR labeled `implement`: select the PR deterministically, prepare or reuse its branch-specific worktree, rebase the PR branch onto `origin/master`, create and refine a Munera task design with explicit implementation approach detail, implement the task, review and improve the task implementation through the `review-implementation` workflow, then push back to the PR branch, summarize any meaningful deviations from the initial design on the PR, remove the PR's `implement` label, and add the `review` label. All stages use the `work-independently` skill.

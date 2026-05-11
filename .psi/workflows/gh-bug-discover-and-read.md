@@ -3,32 +3,29 @@ name: gh-bug-discover-and-read
 description: Discover and read one GitHub bug-triage issue, then emit a structured handoff brief
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
- :steps [{:name "discover"
+ :steps [{:name      "discover"
+          :type      :invoke
+          :operation "github/find-issue"
+          :args      {:labels ["bug" "triage"]
+                      :input  {:from :workflow-input :path [:input]}}
+          :outputs   {:summary {:source :invoke/summary}}
+          :yields    {:type :text :text :summary}}
+         {:name "read"
           :type :session
           :tools ["read" "bash"]
-          :contributions [{:type :template
-                           :text "{{input}}"
-                           :vars {"input" {:from :workflow-input}}}]}]}
+          :contributions [{:type :source
+                           :from {:step "discover" :yield :text}}]}]}
 
-You are the discovery and issue-reading phase of a GitHub bug-triage workflow.
+You are the issue-reading phase of a GitHub bug-triage workflow. The upstream discovery step has already selected the issue — its details appear in the context above.
 
 Goal:
-- Select exactly one open GitHub issue carrying both `bug` and `triage` labels.
-- Read it carefully.
+- Read the selected issue carefully.
 - Emit a structured handoff brief for downstream workflow steps.
 
-Selection rules:
-- If the input is empty, list open issues labeled `bug` and `triage` and choose the lowest issue number.
-- If the input narrows the target, use it to select exactly one matching issue. The narrowing hint may be an issue number, URL, repo-qualified reference, or short textual hint.
-- Treat the current repository as authoritative unless the input explicitly points elsewhere.
-- If no matching issue exists, stop and say that no matching issue was found.
-
 Required procedure:
-1. Run `gh issue list --state open --label triage --label bug --json number,title,labels,state,url`.
-2. Select exactly one issue according to the rules above.
-3. Run `gh issue view` for the selected issue with JSON output including at least: `number,title,body,labels,author,assignees,state,url`.
-4. Read enough repo-local context to interpret the request if useful, but do not over-explore.
-5. If issue selection or reading fails, report the failure clearly instead of inventing details.
+1. Run `gh issue view` for the selected issue with JSON output including at least: `number,title,body,labels,author,assignees,state,url`.
+2. Read enough repo-local context to interpret the request if useful, but do not over-explore.
+3. If reading fails, report the failure clearly instead of inventing details.
 
 Output requirements:
 - Output a compact structured brief in Markdown.
