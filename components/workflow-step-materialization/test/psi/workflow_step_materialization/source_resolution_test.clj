@@ -105,6 +105,32 @@
             :summary "2 issues found"}
            rendered))))
 
+(deftest apply-source-spec-returns-value-literal-test
+  (let [run (workflow-run-with-results)]
+    (is (= "task-implementation-review"
+           (workflow-source-resolution/apply-source-spec run {:value "task-implementation-review"})))
+    (is (nil?
+         (workflow-source-resolution/apply-source-spec run {:value nil})))
+    (is (= {:nested :map}
+           (workflow-source-resolution/apply-source-spec run {:value {:nested :map}})))))
+
+(deftest render-map-prompt-string-supports-value-literal-fields-test
+  (let [run (workflow-run-with-results)
+        map-prompt-string {:type :map
+                           :fields {:input {:from :workflow-input :path [:repo]}
+                                    :skill {:value "task-implementation-review"}}}
+        rendered (workflow-source-resolution/render-delegate-prompt-string run map-prompt-string)]
+    (is (= {:input "org/repo"
+            :skill "task-implementation-review"}
+           rendered))))
+
+(deftest source-spec-predicate-recognizes-value-literal-test
+  (is (true? (workflow-source-resolution/source-spec? {:value "literal"})))
+  (is (true? (workflow-source-resolution/source-spec? {:value nil})))
+  (is (true? (workflow-source-resolution/source-spec? {:from :workflow-input})))
+  (is (false? (workflow-source-resolution/source-spec? "not-a-map")))
+  (is (false? (workflow-source-resolution/source-spec? {:other :key}))))
+
 (defn- run-with-report-accepted-result
   [run-id accepted-result]
   (let [[state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}

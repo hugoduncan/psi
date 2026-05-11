@@ -27,7 +27,8 @@
 (defn source-spec?
   [x]
   (and (map? x)
-       (contains? x :from)))
+       (or (contains? x :from)
+           (contains? x :value))))
 
 (defn resolve-source-ref
   [workflow-run source-ref]
@@ -57,21 +58,23 @@
 
 (defn apply-source-spec
   [workflow-run {:keys [from path projection] :as source-spec}]
-  (let [base (resolve-source-ref workflow-run from)]
-    (cond
-      (and (contains? source-spec :path)
-           (contains? source-spec :projection))
-      (throw (ex-info "Workflow source-spec cannot contain both `:path` and `:projection`"
-                      {:source-spec source-spec}))
+  (if (contains? source-spec :value)
+    (:value source-spec)
+    (let [base (resolve-source-ref workflow-run from)]
+      (cond
+        (and (contains? source-spec :path)
+             (contains? source-spec :projection))
+        (throw (ex-info "Workflow source-spec cannot contain both `:path` and `:projection`"
+                        {:source-spec source-spec}))
 
-      (seq path)
-      (get-path* base path)
+        (seq path)
+        (get-path* base path)
 
-      (some? projection)
-      (semantics/project-source-value base projection)
+        (some? projection)
+        (semantics/project-source-value base projection)
 
-      :else
-      base)))
+        :else
+        base))))
 
 (defn workflow-ref?
   [x]
