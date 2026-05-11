@@ -60,14 +60,17 @@
    step-yield-ref-schema])
 
 (def source-spec-schema
-  [:and
+  [:or
    [:map
-    [:from source-ref-schema]
-    [:path {:optional true} path-schema]
-    [:projection {:optional true} projection-schema]]
-   [:fn {:error/message "source-spec cannot contain both :path and :projection"}
-    (fn [{:keys [path projection]}]
-      (not (and path projection)))]])
+    [:value :any]]
+   [:and
+    [:map
+     [:from source-ref-schema]
+     [:path {:optional true} path-schema]
+     [:projection {:optional true} projection-schema]]
+    [:fn {:error/message "source-spec cannot contain both :path and :projection"}
+     (fn [{:keys [path projection]}]
+       (not (and path projection)))]]])
 
 (def output-spec-schema
   [:map
