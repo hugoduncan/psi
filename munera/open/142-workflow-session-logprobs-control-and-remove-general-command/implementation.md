@@ -77,3 +77,7 @@ The task should not leave both names as parallel canonical state.
   - child-session base-state persistence of logprob controls
   - request-option projection when persisted enabled-state is false
   - `/logprobs` command removal from backend resolution/help and TUI autocomplete surfaces
+
+## 2026-05-11 implementation review
+
+- Actionable: acceptance proof is still incomplete for the motivating combined-control case. Existing tests cover `:response-mode` propagation and logprob propagation independently, but no focused proof exercises a workflow-authored session step or attempt carrying both `:response-mode :non-streaming` and enabled logprobs through the same path. This leaves the final unchecked verification step unproven in code.
