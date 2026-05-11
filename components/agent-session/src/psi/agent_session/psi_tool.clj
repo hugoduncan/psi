@@ -119,11 +119,7 @@
         {:action effective-action :ns ns :form form})
 
       (= effective-action "reload-code")
-      (do
-        (when (and (some? namespaces) (some? worktree-path))
-          (throw (ex-info "psi-tool reload-code accepts exactly one targeting mode"
-                          {:phase :validate :action effective-action})))
-        {:action effective-action :namespaces namespaces :worktree-path worktree-path})
+      {:action effective-action :namespaces namespaces :worktree-path worktree-path}
 
       (= effective-action "project-repl")
       (do
@@ -231,6 +227,8 @@
   (or (some-> ns-name symbol find-ns)
       (throw (ex-info (str "Eval namespace is not loaded: " ns-name) {:phase :validate :ns ns-name}))))
 
+(declare absolute-directory-path! path-under-root?)
+
 (defn- canonical-file [path]
   (when (seq (str path))
     (try (.getCanonicalFile (io/file path))
@@ -254,6 +252,24 @@
     (when-not (loaded-namespace? ns-name)
       (throw (ex-info (str "Reload namespace is not loaded: " ns-name) {:phase :validate :action "reload-code" :namespace ns-name}))))
   namespaces)
+
+(defn- validate-reload-namespace-targeting! [namespaces worktree-path]
+  (when (some? worktree-path)
+    (absolute-directory-path! worktree-path))
+  (when (and (some? namespaces) (some? worktree-path))
+    (doseq [ns-name namespaces]
+      (let [ns-obj      (some-> ns-name symbol find-ns)
+            source-path (canonical-source-path-for-ns ns-obj)]
+        (when-not source-path
+          (throw (ex-info (str "Reload namespace has no canonical source path: " ns-name)
+                          {:phase :validate :action "reload-code" :namespace ns-name :worktree-path worktree-path})))
+        (when-not (path-under-root? worktree-path source-path)
+          (throw (ex-info (str "Reload namespace source path is outside target worktree: " ns-name)
+                          {:phase :validate
+                           :action "reload-code"
+                           :namespace ns-name
+                           :worktree-path worktree-path
+                           :source-path source-path})))))))
 
 (defn- absolute-directory-path! [worktree-path]
   (when-not (and (string? worktree-path) (not (str/blank? worktree-path)))
@@ -377,12 +393,16 @@
                                (some? cwd) (absolute-directory-path! cwd)
                                :else nil)
         effective-path (if namespace-mode?
-                         session-derived-path
+                         (cond
+                           (some? worktree-path) (absolute-directory-path! worktree-path)
+                           (some? session-derived-path) session-derived-path
+                           :else (throw (ex-info "psi-tool reload-code namespace mode requires explicit worktree-path or invoking session worktree-path" {:phase :validate :action "reload-code"})))
                          (cond
                            (some? worktree-path) (absolute-directory-path! worktree-path)
                            (some? session-derived-path) session-derived-path
                            :else (throw (ex-info "psi-tool reload-code worktree mode requires explicit worktree-path or invoking session worktree-path" {:phase :validate :action "reload-code"}))))
-        worktree-source (when-not namespace-mode? (if (some? worktree-path) :explicit :session))
+        _ (validate-reload-namespace-targeting! requested-nses effective-path)
+        worktree-source (if (some? worktree-path) :explicit :session)
         candidates (if namespace-mode?
                      (mapv (fn [ns-name] {:ns-name ns-name}) requested-nses)
                      (let [matches (worktree-reload-candidates effective-path)]
@@ -414,9 +434,10 @@
              :psi-tool/code-reload reload-result
              :psi-tool/graph-refresh graph-refresh
              :psi-tool/duration-ms duration-ms
-             :psi-tool/overall-status (if (and (= :ok (:status reload-result)) (= :ok (:status graph-refresh))) :ok :error)}
-      namespace-mode? (assoc :psi-tool/namespaces-requested requested-nses)
-      (not namespace-mode?) (assoc :psi-tool/worktree-path effective-path :psi-tool/worktree-source worktree-source))))
+             :psi-tool/overall-status (if (and (= :ok (:status reload-result)) (= :ok (:status graph-refresh))) :ok :error)
+             :psi-tool/worktree-path effective-path
+             :psi-tool/worktree-source worktree-source}
+      namespace-mode? (assoc :psi-tool/namespaces-requested requested-nses))))
 
 (defn truncation-visible-prefix [{:keys [action ns form namespaces worktree-path op code definition-id run-id schedule-id label kind]}]
   (case action
@@ -507,7 +528,27 @@
                 (let [action (psi-tool-action args)]
                   (case action
                     "eval" {:content (pr-str {:psi-tool/action :eval :psi-tool/ns (get args "ns") :psi-tool/duration-ms 0 :psi-tool/error (psi-tool-error-summary :eval e)}) :is-error true}
-                    "reload-code" {:content (pr-str {:psi-tool/action :reload-code :psi-tool/duration-ms 0 :psi-tool/overall-status :error :psi-tool/error (psi-tool-error-summary :reload-code e)}) :is-error true}
+                    "reload-code" (let [worktree-path (or (try
+                                                            (some-> (get args "worktree-path") absolute-directory-path!)
+                                                            (catch Exception _ nil))
+                                                          (when-let [sid (:session-id opts)]
+                                                            (try
+                                                              (some-> (:ctx opts) (session-state/session-worktree-path-in sid) absolute-directory-path!)
+                                                              (catch Exception _ nil)))
+                                                          (try
+                                                            (some-> (:cwd opts) absolute-directory-path!)
+                                                            (catch Exception _ nil)))
+                                        worktree-source (cond
+                                                          (get args "worktree-path") :explicit
+                                                          (or (:session-id opts) (:cwd opts)) :session
+                                                          :else nil)]
+                                    {:content (pr-str (cond-> {:psi-tool/action :reload-code
+                                                               :psi-tool/duration-ms 0
+                                                               :psi-tool/overall-status :error
+                                                               :psi-tool/error (psi-tool-error-summary :reload-code e)}
+                                                        worktree-path (assoc :psi-tool/worktree-path worktree-path)
+                                                        worktree-source (assoc :psi-tool/worktree-source worktree-source)))
+                                     :is-error true})
                     "project-repl" {:content (pr-str {:psi-tool/action :project-repl :psi-tool/project-repl-op (some-> (get args "op") keyword) :psi-tool/duration-ms 0 :psi-tool/overall-status :error :psi-tool/error (psi-tool-error-summary :project-repl e)}) :is-error true}
                     "workflow" {:content (pr-str {:psi-tool/action :workflow :psi-tool/workflow-op (some-> (get args "op") keyword) :psi-tool/duration-ms 0 :psi-tool/overall-status :error :psi-tool/error (psi-tool-error-summary :workflow e)}) :is-error true}
                     "scheduler" {:content (pr-str {:psi-tool/action :scheduler :psi-tool/scheduler-op (some-> (get args "op") keyword) :psi-tool/duration-ms 0 :psi-tool/overall-status :error :psi-tool/error (psi-tool-error-summary :scheduler e)}) :is-error true}
