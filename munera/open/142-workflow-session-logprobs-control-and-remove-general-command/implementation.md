@@ -47,3 +47,7 @@ The task should not leave both names as parallel canonical state.
   - workflow child-session seam `components/agent-session/src/psi/agent_session/context.clj` currently carries workflow-owned creation opts separately
   - command-only general toggle owners still live in `commands.clj`, `session_settings.clj`, `core.clj`, and `dispatch_handlers/session_mutations.clj`
 - Result: the newly added design follow-up items are now resolved in task artifacts; no blocking ambiguity remains for implementation planning.
+
+## 2026-05-11 consistency review
+
+- Review result: no new actionable inconsistency found across `design.md`, `plan.md`, `steps.md`, and `design-steps.md`; previously identified ambiguities are already resolved and tracked without missing follow-up work.
