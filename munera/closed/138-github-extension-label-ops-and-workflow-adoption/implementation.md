@@ -1,5 +1,16 @@
 # Implementation Notes
 
+## 2026-05-10 — Code-shaping pass 2
+
+**One actionable finding.**
+
+`label-ops.clj` `add-label` and `remove-label` are structurally identical (~25 lines duplicated).
+Only the flag (`"--add-label"` / `"--remove-label"`) and output key (`:added-labels` / `:removed-labels`) differ.
+Extract a private `invoke-edit` that takes `flag` and `result-key`; both public handlers become 2-line wrappers.
+Alignment inconsistency in the `:data` maps disappears as a side-effect.
+
+Everything else is clean.
+
 ## 2026-05-10 — Review pass 2
 
 **One critical bug found.**

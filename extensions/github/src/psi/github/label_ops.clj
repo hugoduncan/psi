@@ -19,6 +19,28 @@
   (str/join "," labels))
 
 ;;; ---------------------------------------------------------------------------
+;;; Private shell dispatch
+
+(defn- invoke-edit
+  "Run `gh <target> edit <number> <flag> <csv>` via `shell-fn`.
+   Returns `{:status :ok/:error ...}` with `result-key` holding `labels` on success."
+  [shell-fn number target flag result-key labels]
+  (let [csv    (label-csv labels)
+        result (shell-fn "gh" target "edit" (str number) flag csv)]
+    (if (not= 0 (:exit result))
+      {:status  :error
+       :reason  :psi.github/shell-error
+       :message (:err result)}
+      {:status  :ok
+       :data    {:number     number
+                 :target     target
+                 result-key  labels}
+       :summary (str (if (= flag "--add-label") "Added" "Removed")
+                     " label(s) [" csv "]"
+                     (if (= flag "--add-label") " to " " from ")
+                     target " #" number)})))
+
+;;; ---------------------------------------------------------------------------
 ;;; Public operation handlers
 
 (defn add-label
@@ -31,21 +53,12 @@
      :labels  - vector of label strings to add
      :target  - \"issue\" (default) or \"pr\""
   [{:keys [ctx args]}]
-  (let [shell-fn (or (:github-shell-fn ctx) shell/sh)
-        number   (:number args)
-        labels   (:labels args)
-        target   (or (:target args) "issue")
-        csv      (label-csv labels)
-        result   (shell-fn "gh" target "edit" (str number) "--add-label" csv)]
-    (if (not= 0 (:exit result))
-      {:status  :error
-       :reason  :psi.github/shell-error
-       :message (:err result)}
-      {:status  :ok
-       :data    {:number        number
-                 :target        target
-                 :added-labels  labels}
-       :summary (str "Added label(s) [" csv "] to " target " #" number)})))
+  (invoke-edit (or (:github-shell-fn ctx) shell/sh)
+               (:number args)
+               (or (:target args) "issue")
+               "--add-label"
+               :added-labels
+               (:labels args)))
 
 (defn remove-label
   "Deterministic operation handler for `github/remove-label`.
@@ -57,18 +70,9 @@
      :labels  - vector of label strings to remove
      :target  - \"issue\" (default) or \"pr\""
   [{:keys [ctx args]}]
-  (let [shell-fn (or (:github-shell-fn ctx) shell/sh)
-        number   (:number args)
-        labels   (:labels args)
-        target   (or (:target args) "issue")
-        csv      (label-csv labels)
-        result   (shell-fn "gh" target "edit" (str number) "--remove-label" csv)]
-    (if (not= 0 (:exit result))
-      {:status  :error
-       :reason  :psi.github/shell-error
-       :message (:err result)}
-      {:status  :ok
-       :data    {:number          number
-                 :target          target
-                 :removed-labels  labels}
-       :summary (str "Removed label(s) [" csv "] from " target " #" number)})))
+  (invoke-edit (or (:github-shell-fn ctx) shell/sh)
+               (:number args)
+               (or (:target args) "issue")
+               "--remove-label"
+               :removed-labels
+               (:labels args)))

@@ -140,6 +140,13 @@
 
 ## Review pass 2 follow-up
 
+## Code-shaping pass 2 follow-up
+
+- [x] Extract `invoke-edit` from `label-ops.clj`
+  - Private fn: `[shell-fn number target flag result-key labels]` → runs shell call, returns `{:status :ok/:error ...}`
+  - `add-label` and `remove-label` become 2-line wrappers passing `"--add-label"`/`:added-labels` and `"--remove-label"`/`:removed-labels`
+  - lint clean (0 errors, 0 warnings); 139 tests, 529 assertions, 0 failures
+
 - [x] Fix missing `"edit"` subcommand in `label_ops.clj`
   - `add-label`: `(shell-fn "gh" target "edit" (str number) "--add-label" csv)`
   - `remove-label`: `(shell-fn "gh" target "edit" (str number) "--remove-label" csv)`
