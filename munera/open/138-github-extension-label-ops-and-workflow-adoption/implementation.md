@@ -1,5 +1,35 @@
 # Implementation Notes
 
+## 2026-05-10 — Design review pass 4 follow-up execution (design-steps O–R)
+
+All four design-steps resolved:
+
+- **O** — acceptance criteria updated in design.md to read "…no longer instruct the AI
+  to perform *unconditional* label changes or shell-based discovery; conditional
+  label-add in `gh-bug-triage` and `gh-bug-post-repro` remains AI-driven per §Out of
+  scope."
+- **P** — decided: option (b) — update `gh-bug-triage-modular` to pass structured input
+  `{:issue_number N :report "..."}` to the `post-repro` delegate step.  The `discover`
+  step gains `:data {:source :invoke/data}`; the `post-repro` `prompt-string` becomes a
+  `:map` type with `:issue_number` wired from discover `:data` and `:report` from
+  reproduce yield text.  `gh-bug-post-repro` classify session changes to
+  `{:from :workflow-input :path [:report]}`; label-ops `:number` wires from
+  `{:from :workflow-input :path [:issue_number]}` — correct for both standalone and
+  delegate-call cases.  `gh-bug-request-more-info` unchanged (no delegate-call case).
+  design.md §P added; steps.md `gh-bug-post-repro` and `gh-bug-triage-modular` blocks
+  updated.
+- **Q** — tightened prompt-stripping spec for `gh-bug-triage` and `gh-issue-ingest`.
+  Steps now say: strip "Primary selection rule:" paragraph, "Input expectations:"
+  paragraph, and step 1 of "Required procedure:" (named explicitly for each workflow).
+  Also added stripping of label-change instructions in "Required procedure:" steps 4–5
+  and "Goal" bullet for `gh-issue-ingest`.  design.md §Q added; steps.md migration
+  blocks for both workflows updated.
+- **R** — decided: keep `"discover"` for the new `:invoke` step; rename existing session
+  step from `"discover"` to `"read"`.  `gh-bug-discover-and-read` is not called as a
+  delegate by any workflow that wires from its step names — zero downstream references
+  break.  design.md §R added; steps.md `gh-bug-discover-and-read` block updated with
+  both step names and the session prompt stripping scope.
+
 ## 2026-05-10 — Design review pass 4
 
 **Inconsistencies found:**

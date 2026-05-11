@@ -211,6 +211,49 @@ The publish step's `:outputs` must include:
 And the publish prompt must include `pr_number:` under `## Handoff Data` (alongside
 the existing `pr_url:` bullet).
 
+### :number wiring for gh-bug-post-repro and gh-bug-request-more-info — delegate-call case (item P)
+
+**Problem:** §K wires `:number` as `{:from :workflow-input :path [:issue_number]}`.
+When `gh-bug-post-repro` is called standalone, `:workflow-input` is the structured
+handoff map from `gh-bug-reproduce` (contains `issue_number:`).  When called as a
+delegate from `gh-bug-triage-modular`, `:workflow-input` is the rendered `prompt-string`
+(plain text); `get-path*` on a string returns nil.
+
+**Decision (P):** Use option (b) — update `gh-bug-triage-modular` to pass structured
+input to the `post-repro` delegate step, so both call sites supply a consistent map.
+
+Changes required:
+
+1. **`gh-bug-triage-modular`:** Add `:data {:source :invoke/data}` to the `discover`
+   step `:outputs`.  Change the `post-repro` delegate step's `prompt-string` from a
+   plain rendered text to a structured map:
+
+   ```edn
+   :prompt-string {:type :map
+                   :fields {:issue_number {:from {:step "discover" :output :data}
+                                           :path [:issue-number]}
+                            :report       {:from {:step "reproduce" :yield :text}}}}
+   ```
+
+2. **`gh-bug-post-repro`:** Change the classify session's `{{input}}` template var to
+   wire from `:workflow-input :path [:report]` (the report field of the structured map):
+
+   ```edn
+   :vars {"input" {:from :workflow-input :path [:report]}}
+   ```
+
+   Label-ops `:number` wiring remains `{:from :workflow-input :path [:issue_number]}`
+   — now correct for both standalone and delegate-call cases.
+
+3. **`gh-bug-request-more-info`:** No delegate-call case exists for this workflow
+   (it is only called standalone or from `gh-bug-post-repro` AI output).  The
+   `{:from :workflow-input :path [:issue_number]}` wiring from §K is sufficient.
+   No change required.
+
+This approach keeps `gh-bug-post-repro` self-contained and avoids adding a discover
+step.  The `discover` step in `gh-bug-triage-modular` already has the issue number;
+exposing it via `:data` is a one-line addition.
+
 ### `github/find-pr` slug derivation
 
 **Decision (B):** Extract `derive-slug` into `psi.github.slug` shared ns — eliminates
@@ -232,6 +275,42 @@ The `find-pr` unit tests must include a narrow-by-url case using a `/pull/NNN` U
 github/find-pr` step wires `:input` as `{:from :workflow-input :path [:input]}` —
 matching the `find-issue` pattern used in `gh-bug-discover-and-read`.  This passes the
 optional narrowing hint through from the workflow caller.
+
+### Prompt-stripping scope for gh-bug-triage and gh-issue-ingest (item Q)
+
+After the `:invoke github/find-issue` discover step takes over selection, the AI
+session no longer needs to discover or select.  The following sections must be stripped
+from each workflow's AI prompt:
+
+- **"Primary selection rule:" paragraph** — describes how the AI should pick an issue.
+- **"Input expectations:" paragraph** — describes how the AI should interpret `{{input}}`
+  as a narrowing hint.
+- **Step 1 of "Required procedure:"** — the AI discovery/selection step (e.g.
+  "Discover and select the issue", "Discover candidate issues").
+
+After stripping, the AI session receives the selected issue via the discover step's
+`:summary` output (wired into the session context or prompt) and starts from reading,
+not discovering.  The `{{input}}` template var is replaced by the discover step's
+`:summary` yield text wired into the session contributions.
+
+Both `gh-bug-triage` and `gh-issue-ingest` have all three sections and must have all
+three stripped.
+
+### Step names for gh-bug-discover-and-read migration (item R)
+
+`gh-bug-discover-and-read` currently has one step named `"discover"` (a session step).
+After migration it will have two steps:
+
+- **`:invoke` step** — keep name `"discover"`.  The deterministic find-issue operation
+  takes the `"discover"` identity; this is the natural owner of that name.
+- **Session step** — rename to `"read"`.  The session's sole responsibility after
+  migration is reading the selected issue and emitting the handoff brief; `"read"`
+  accurately names that role.
+
+`gh-bug-discover-and-read` is not called as a delegate by any other workflow (it is
+called standalone or via `gh-bug-triage-modular` — but `gh-bug-triage-modular` wires
+from its own `discover` step, not from `gh-bug-discover-and-read` step names).
+Renaming the session step to `"read"` breaks zero downstream references.
 
 ## Implementation Approach
 
@@ -266,8 +345,10 @@ optional narrowing hint through from the workflow caller.
 - `github/find-pr`, `github/add-label`, `github/remove-label` are registered by
   `psi.github.extension/init` and exercised by focused unit tests with a stub shell-fn.
 - `extension-test` asserts four registrations (not one).
-- All nine listed workflows no longer instruct the AI to perform label changes or
-  shell-based issue/PR discovery; these are done via `:invoke` steps.
+- All nine listed workflows no longer instruct the AI to perform *unconditional* label
+  changes or shell-based issue/PR discovery; these are done via `:invoke` steps.
+  Conditional label-add (`waiting` vs `fix`) in `gh-bug-triage` and `gh-bug-post-repro`
+  remains AI-driven per §Out of scope.
 - `clj-kondo --lint` reports zero errors and zero warnings.
 - All existing focused github extension tests pass.
 

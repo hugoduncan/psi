@@ -41,23 +41,24 @@
 ### Discovery migrations
 
 - [ ] `gh-bug-discover-and-read.md`
-  - [ ] Add leading `:invoke github/find-issue` step
-  - [ ] AI session step reads issue only; strip `gh issue list` instruction from prompt
-  - [ ] Wire discover `:data` into AI session context
+  - [ ] Add leading `:invoke github/find-issue` step; name it `"discover"`
+  - [ ] Rename existing `"discover"` session step to `"read"` (reads issue only; no downstream wiring references to break)
+  - [ ] Strip from `"read"` session prompt: the entire "Selection rules:" section, the `gh issue list` command in "Required procedure:" step 1, and step 1 itself; wire discover `:summary` yield text into the session contributions as context
+  - [ ] Add `:outputs {:summary {:source :invoke/summary}}` to the new `"discover"` `:invoke` step
 
 - [ ] `gh-bug-triage.md`
   - [ ] Add leading `:invoke github/find-issue` discover step with `:outputs {:summary {:source :invoke/summary} :data {:source :invoke/data}}`
   - [ ] Wire discover output into existing AI triage session
   - [ ] Add unconditional trailing `:invoke github/remove-label` (remove `triage`) step; wire `:number` as `{:from {:step "discover" :output :data} :path [:issue-number]}`
   - [ ] NOTE: conditional add (`waiting` vs `fix`) stays AI-driven — no `:invoke` step for it here
-  - [ ] Strip `gh issue list` instruction from AI prompt; leave conditional label-add instruction in AI prompt
+  - [ ] Strip from AI prompt: "Primary selection rule:" paragraph, "Input expectations:" paragraph, and step 1 of "Required procedure:" ("Discover and select the issue"); leave conditional label-add instruction in AI prompt
 
 - [ ] `gh-issue-ingest.md`
   - [ ] Add leading `:invoke github/find-issue` discover step with `:outputs {:summary {:source :invoke/summary} :data {:source :invoke/data}}`
   - [ ] Wire discover output into AI triage session
   - [ ] Add trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from {:step "discover" :output :data} :path [:issue-number]}`
   - [ ] Add trailing `:invoke github/add-label` (add `waiting`); wire `:number` as `{:from {:step "discover" :output :data} :path [:issue-number]}`
-  - [ ] Strip `gh issue list` and label instructions from AI prompt
+  - [ ] Strip from AI prompt: "Primary selection rule:" paragraph, "Input expectations:" paragraph, and step 1 of "Required procedure:" ("Discover candidate issues"); strip label-change instructions (steps 4–5 of "Required procedure:" and "Goal" bullet for label changes)
 
 - [ ] `gh-issue-implement.md`
   - [ ] Replace inline `gh pr list` AI `search` delegate → `:invoke github/find-pr` step (keep step name `search`); add `:outputs {:summary {:source :invoke/summary} :data {:source :invoke/data}}`
@@ -76,9 +77,13 @@
 ### Label-mutation-only migrations
 
 - [ ] `gh-bug-post-repro.md`
-  - [ ] Add unconditional trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from :workflow-input :path [:issue_number]}` (no discover step; issue number comes from upstream handoff in workflow input)
+  - [ ] Change classify session `{{input}}` template var to wire from `{:from :workflow-input :path [:report]}` (structured map field — see §P)
+  - [ ] Add unconditional trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from :workflow-input :path [:issue_number]}` (works for both standalone and delegate-call cases after §P update to `gh-bug-triage-modular`)
   - [ ] NOTE: conditional add (`waiting` vs `fix`) stays AI-driven — no `:invoke` step for it here
   - [ ] Strip unconditional `gh issue edit` label instructions from AI prompt; leave conditional add instruction in AI prompt
+- [ ] `gh-bug-triage-modular.md` (§P prerequisite — enables structured input to `gh-bug-post-repro`)
+  - [ ] Add `:data {:source :invoke/data}` to the `discover` step `:outputs`
+  - [ ] Change `post-repro` delegate step `prompt-string` from rendered text to structured map: `{:type :map :fields {:issue_number {:from {:step "discover" :output :data} :path [:issue-number]} :report {:from {:step "reproduce" :yield :text}}}}`
 
 - [ ] `gh-bug-request-more-info.md`
   - [ ] Add trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from :workflow-input :path [:issue_number]}` (no discover step; issue number comes from upstream handoff in workflow input)

@@ -36,14 +36,14 @@ Unchecked items added by design review pass 3 (2026-05-10).
 
 Unchecked items added by design review pass 4 (2026-05-10).
 
-- [ ] **O. Qualify acceptance criteria for conditional label-add.** The acceptance criteria states
+- [x] **O. Qualify acceptance criteria for conditional label-add.** The acceptance criteria states
   "All nine listed workflows no longer instruct the AI to perform label changes" but design §Out of
   scope explicitly keeps conditional label add (`waiting` vs `fix`) AI-driven in `gh-bug-triage`
   and `gh-bug-post-repro`. Update the acceptance criteria to read "…no longer instruct the AI to
   perform *unconditional* label changes or shell-based discovery; conditional label-add in
   `gh-bug-triage` and `gh-bug-post-repro` remains AI-driven per §Out of scope."
 
-- [ ] **P. Resolve §K :number wiring for gh-bug-post-repro and gh-bug-request-more-info delegate case.**
+- [x] **P. Resolve §K :number wiring for gh-bug-post-repro and gh-bug-request-more-info delegate case.**
   Design §K wires `:number` as `{:from :workflow-input :path [:issue_number]}`. When
   `gh-bug-post-repro` is called as a delegate from `gh-bug-triage-modular`, its `:workflow-input`
   is the rendered `prompt-string` (a plain text string). `get-path*` on a string returns nil, so
@@ -56,7 +56,7 @@ Unchecked items added by design review pass 4 (2026-05-10).
   as `:output :handoff`). Pick one approach, update design.md §K, and update steps.md migration
   blocks for both workflows.
 
-- [ ] **Q. Tighten steps.md prompt-stripping spec for gh-bug-triage and gh-issue-ingest.** Steps
+- [x] **Q. Tighten steps.md prompt-stripping spec for gh-bug-triage and gh-issue-ingest.** Steps
   currently say "Strip `gh issue list` instruction from AI prompt" but the prompts contain entire
   discovery sections that must also be removed: "Primary selection rule:", "Input expectations:",
   and the discovery step in "Required procedure:" (step 1 "Discover and select the issue" /
@@ -65,7 +65,7 @@ Unchecked items added by design review pass 4 (2026-05-10).
   procedure" (the AI session receives the selected issue from the upstream `:invoke` step and
   should start from reading, not discovering).
 
-- [ ] **R. Specify step names for gh-bug-discover-and-read migration.** The workflow currently has
+- [x] **R. Specify step names for gh-bug-discover-and-read migration.** The workflow currently has
   one step named `"discover"` (a session). After migration it will have two steps: a leading
   `:invoke` step and a session step. Steps.md must name both steps explicitly (e.g. keep `"discover"`
   for the `:invoke` step and rename the session to `"read"`, or vice versa) and confirm no other
