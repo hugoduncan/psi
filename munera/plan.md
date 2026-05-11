@@ -8,7 +8,6 @@ Backlog:
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/136-built-in-registration-path-for-workflow/`
 `munera/open/134-psi-tool-mutation-surface-and-active-session-introspection/`
-`munera/open/139-active-session-id-root-attr/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
@@ -18,6 +17,7 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 
 Notes:
+- `139` is complete and closed: `:psi.agent-session/active-session-id` root resolver in `resolvers/session.clj`; single-seed input `[:psi.agent-session/session-id]`; appears in `root-queryable-attrs`; nil passthrough for present-but-nil; 3 focused tests; live query verified.
 - `138` is complete and closed: github extension has `find-pr`, `add-label`, `remove-label`; all nine listed workflows migrated to deterministic discover and label-ops `:invoke` steps.
 - `137` is complete and closed: `psi/github` extension with deterministic `github/find-issue` operation; `gh-issue-refine` discover step replaced with `:invoke`; blocked smoke tests deferred (require real labeled GH issues).
 - `munera/plan.md` is the active project-wide orchestration surface.

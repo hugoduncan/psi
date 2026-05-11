@@ -43,7 +43,7 @@
 
 ## Execution (after design is unambiguous)
 
-- [ ] Write plan.md
-- [ ] Implement resolver
-- [ ] Add/extend tests per test contract
-- [ ] Verify `bb test` green, lint clean
+- [x] Write plan.md
+- [x] Implement resolver
+- [x] Add/extend tests per test contract
+- [x] Verify `bb test` green, lint clean
