@@ -7,14 +7,17 @@ the conversation so the LLM can see and reason about its own token-level uncerta
 
 - The OpenAI chat-completions API accepts `"logprobs": true` and `"top_logprobs": N`
   (max 20) in the request body. The response includes per-token logprob data under
-  `choices[0].logprobs.content`.
-- llama.cpp's HTTP server accepts the same fields and returns
-  `completion_probabilities` — an array of `{content, probs: [{prob, tok_str}]}` where
-  `prob` is a plain probability (not a log-probability).
+  `choices[0].logprobs.content` in each SSE delta chunk.
+- llama.cpp's HTTP server accepts the same fields but returns `completion_probabilities`
+  only in the **final non-streaming response body** (not in SSE delta chunks). It is an
+  array of `{content, probs: [{prob, tok_str}]}` where `prob` is a plain probability
+  (not a log-probability). Psi does NOT issue a separate non-streaming request for
+  llama.cpp; logprob data is extracted from the final SSE chunk only.
 - Psi builds the completions request in
   `psi.ai.providers.openai.chat-completions/build-request`; provider-shaping options
-  flow through `StreamOptions` (open schema) and the per-session
-  `session->request-options` projection.
+  flow through `StreamOptions` (open schema, `{:closed false}`) and the per-session
+  `session->request-options` projection. `:logprobs-enabled` and `:top-logprobs` pass
+  through as opaque extra keys — no explicit `StreamOptions` schema entries needed.
 - `journal->provider-messages` projects `:message` journal entries into the
   provider-visible conversation. Logprob context is projected by adding a `:logprobs`
   entry kind that `journal->provider-messages` converts to a synthetic user message.
@@ -25,9 +28,12 @@ the conversation so the LLM can see and reason about its own token-level uncerta
 
 `:logprobs-enabled` is a **transient session-state boolean** — it lives on the session
 data map, is togglable within a session, and is NOT journalled as a session-entry (no
-persistence across session restarts, no config file write).
+persistence across session restarts, no config file write). Schema:
+`[:logprobs-enabled {:optional true} :boolean]` — absent = disabled; `initial-session`
+does not set it explicitly.
 
-`:top-logprobs` is a **transient session-state integer** (1–20). Default: **3**.
+`:top-logprobs` is a **transient session-state integer** (1–20). Default: **3**. Schema:
+`[:top-logprobs {:optional true} [:int {:min 1 :max 20}]]` — absent = 3 when enabled.
 
 Toggle path:
 
@@ -70,19 +76,43 @@ Provider-specific mapping:
 - **llama.cpp**: `completion_probabilities[i]` →
   `{:token .content :logprob (Math/log prob) :top (map #({:token (:tok_str %) :logprob (Math/log (:prob %))}) probs)}`
 
+## SSE extraction pipeline
+
+A new private fn `extract-logprob-delta` is added to `chat_completions.clj`:
+- Called from `emit-chat-chunk!` for per-chunk OpenAI logprobs:
+  `choices[0].logprobs.content` (present when `"logprobs": true` in request).
+- Called from `finish-chat-chunk!` for the final-chunk llama.cpp field:
+  `completion_probabilities` (present only on the final object with usage/finish_reason).
+
+When non-nil, emits `{:type :logprob-delta :tokens [...normalized...]}` via `consume-fn`.
+The turn-runtime accumulator collects `:logprob-delta` events into a transient buffer.
+On `:done`, the buffer is finalized into `:execution-result/logprobs`.
+
+## Command registration
+
+`/logprobs` is added to `prefixed-command-prefixes` in `commands.clj` (alongside
+`/model`, `/thinking`). `builtin-slash-commands` in `tui/app/shared.clj` gains
+`"/logprobs"` for TUI autocomplete. Help text:
+`"  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"`.
+
 ## Surfacing
 
 ### 1 — Per-turn telemetry accumulation
 
-During a turn, logprob chunks are accumulated into a transient buffer and, on turn
-completion, written to the session telemetry slot `:last-turn-logprobs` (replaces
-previous value). Queryable via a new EQL resolver
+During a turn, `:logprob-delta` events emitted by `consume-fn` are accumulated into a
+transient buffer in the turn-runtime accumulator. On `:done`, the buffer is finalized
+into `:execution-result/logprobs` on the execution result. `build-record-response`
+reads this key and writes the normalized token vector to the session telemetry slot
+`:last-turn-logprobs` (replaces previous value). Queryable via a new EQL resolver
 `:psi.agent-session/last-turn-logprobs`.
 
 ### 2 — Session journal entry + LLM projection
 
-On turn completion, when logprobs are enabled, a `:logprobs` session-entry is appended
-to the journal immediately after the `:message` entry for the assistant turn:
+On turn completion, when logprobs are enabled and `(:execution-result/logprobs
+execution-result)` is non-empty, a `:logprobs` session-entry is appended to the journal
+immediately after the `:message` entry for the assistant turn. The append is added to
+the `:effects` vector in `build-record-response` alongside `append-message-effect`,
+using `turn-id` from the same `build-recording-decision` binding:
 
 ```clojure
 {:kind :logprobs
@@ -92,10 +122,14 @@ to the journal immediately after the `:message` entry for the assistant turn:
 
 `session-entry-kind-schema` gains `:logprobs`.
 
-`journal->provider-messages` converts `:logprobs` entries to **synthetic user
-messages** injected into the provider-visible conversation immediately after the
-corresponding assistant message. The LLM therefore sees its own per-token uncertainty
-at every subsequent turn.
+`journal->provider-messages` in `prompt_request.clj` is extended: in addition to
+`:message` entries, it converts `:logprobs` entries to **synthetic user messages**
+injected immediately after the corresponding assistant message. Orphaned `:logprobs`
+entries (whose paired `:message` was compacted away) are silently dropped — the
+compaction summary already captures that context. `:logprobs` entries are not
+message-like for compaction purposes: `message-like-entry?` and `valid-cut-point?` in
+`compaction.clj` require no change. Entries before the compaction cut-point are
+excluded; entries after are preserved and projected normally.
 
 Synthetic message format (compact text block):
 
@@ -113,6 +147,11 @@ abbreviated: `[logprob context — previous response]\nAll tokens p ≥ 0.90`.
 Probabilities shown as plain values (`exp(logprob)`), not log-probabilities, for LLM
 readability. The `:token` is formatted with surrounding quotes; whitespace-only tokens
 use visible escape form (e.g. `" "`, `"\n"`).
+
+The threshold 0.90 is a **fixed display constant** named `logprob-uncertain-threshold`
+in the projection namespace. Rationale: tokens above 0.90 are near-certain and add
+noise; tokens below represent meaningful uncertainty. Configurable threshold is deferred
+to a follow-on task.
 
 ## Acceptance
 

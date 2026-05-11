@@ -4,51 +4,109 @@ Clarification and resolution items surfaced during design review.
 
 ## Ambiguities
 
-- [ ] **llama.cpp streaming vs non-streaming logprobs**: `completion_probabilities` is
+- [x] **llama.cpp streaming vs non-streaming logprobs**: `completion_probabilities` is
   documented as a non-streaming field in llama.cpp. Clarify whether logprob data
   arrives in SSE chunks (and if so, in which chunk field) or only in a final
   non-streaming response body. If non-streaming, specify whether psi should issue a
   separate non-streaming request or disable llama.cpp logprob support.
+  > **Resolved**: llama.cpp returns `completion_probabilities` only in the final
+  > non-streaming response body; it is absent from individual SSE delta chunks. Psi
+  > does NOT issue a separate non-streaming request. Instead, llama.cpp logprob support
+  > is limited to the final chunk: `process-chat-sse-line!` extracts
+  > `completion_probabilities` from the last SSE object (the one containing usage or
+  > `finish_reason`). If that field is absent (i.e. the server is OpenAI proper), the
+  > OpenAI per-chunk path is used instead. Design updated accordingly.
 
-- [ ] **SSE chunk logprob extraction path**: `process-chat-sse-line!` / `emit-chat-chunk!`
+- [x] **SSE chunk logprob extraction path**: `process-chat-sse-line!` / `emit-chat-chunk!`
   currently only extract text, reasoning, and tool-call deltas. Specify where in the
   chunk processing pipeline logprob data is extracted (e.g. new branch in
   `emit-chat-chunk!`), what event type is emitted to the consumer (new `:logprob-data`
   event or inline accumulation), and how the accumulator receives and buffers per-chunk
   logprob arrays across the stream.
+  > **Resolved**: A new private fn `extract-logprob-delta` is added to
+  > `chat_completions.clj`. It is called from `emit-chat-chunk!` (for per-chunk OpenAI
+  > logprobs from `choices[0].logprobs.content`) and from `finish-chat-chunk!` (for the
+  > final-chunk llama.cpp `completion_probabilities` field). When non-nil, a
+  > `{:type :logprob-delta :tokens [...normalized...]}` event is emitted via
+  > `consume-fn`. The turn-runtime accumulator collects these events into a transient
+  > buffer; on `:done`, the buffer is finalized into `:last-turn-logprobs`. No
+  > per-chunk inline accumulation inside `chat_completions.clj`; accumulation is owned
+  > by the turn-runtime layer.
 
-- [ ] **`session->request-options` vs `StreamOptions` schema**: The design says
+- [x] **`session->request-options` vs `StreamOptions` schema**: The design says
   `:logprobs-enabled` and `:top-logprobs` are propagated via `session->request-options`
   into the `options` map consumed by `build-request`. Specify whether these keys are
   added to `StreamOptions` (which is `{:closed false}` so technically allowed) or kept
   opaque. If added, provide the malli schema entries.
+  > **Resolved**: `:logprobs-enabled` and `:top-logprobs` are kept **opaque** — they
+  > pass through `StreamOptions` as extra keys (the schema is `{:closed false}`) without
+  > adding explicit schema entries. This matches the existing pattern for
+  > `:thinking-level`, `:no-auth-header`, etc. No schema change to `StreamOptions`.
 
-- [ ] **`agent-session-schema` update**: `:logprobs-enabled` (boolean, optional) and
+- [x] **`agent-session-schema` update**: `:logprobs-enabled` (boolean, optional) and
   `:top-logprobs` (int 1–20, optional) must be added to `agent-session-schema` in
   `session_state/model.clj`. Confirm the schema entries and whether `initial-session`
   should explicitly set them (currently design says "absent = disabled").
+  > **Resolved**: Add to `agent-session-schema`:
+  > ```clojure
+  > [:logprobs-enabled {:optional true} :boolean]
+  > [:top-logprobs     {:optional true} [:int {:min 1 :max 20}]]
+  > ```
+  > `initial-session` does NOT set them explicitly; absent = disabled, consistent with
+  > the design. No default value in `initial-session`.
 
-- [ ] **Compaction interaction with `:logprobs` journal entries**: `compaction.clj`
+- [x] **Compaction interaction with `:logprobs` journal entries**: `compaction.clj`
   hardcodes `#{:message :custom-message :branch-summary}` in `message-like-entry?` and
   `valid-cut-point?`. Specify whether `:logprobs` entries should be: (a) silently
   skipped by compaction (treated like `:label`/`:session-info`), (b) stripped from the
   compacted journal, or (c) preserved as-is after the compaction boundary. Also clarify
   whether `journal->provider-messages` (in `prompt_request.clj`) needs to handle
   `:logprobs` entries after compaction removes the corresponding `:message` entry.
+  > **Resolved**: (a) `:logprobs` entries are silently skipped by compaction — they are
+  > not message-like and not valid cut-points. `message-like-entry?` and
+  > `valid-cut-point?` in `compaction.clj` require no change. `:logprobs` entries that
+  > fall before the compaction cut-point are simply excluded from the kept suffix (same
+  > as `:label`/`:session-info`). Entries after the cut-point are preserved as-is.
+  > `journal->provider-messages` in `prompt_request.clj` must handle `:logprobs`
+  > entries: it converts them to synthetic user messages (the same format as the
+  > synthetic LLM message defined in the design). The existing `keep` filter on
+  > `:message` kind is extended with a new branch for `:logprobs`. Orphaned `:logprobs`
+  > entries (whose corresponding `:message` was compacted away) are silently dropped by
+  > `journal->provider-messages` — no special handling needed since the compacted
+  > summary already captures the prior context.
 
-- [ ] **`turn-id` sourcing at journal-append time**: The `:logprobs` entry data
+- [x] **`turn-id` sourcing at journal-append time**: The `:logprobs` entry data
   includes `{:turn-id "..."}`. At the point of post-turn recording
   (`prompt_recording.clj` / `build-record-response`), `turn-id` is available in
   `execution-result`. Confirm that the logprobs journal-append effect is added
   alongside the existing `append-message-effect` in `build-record-response`, and that
   it receives `turn-id` from the same `execution-result`.
+  > **Resolved**: Confirmed. `build-record-response` already destructures `turn-id`
+  > from `(turn-recording/build-recording-decision execution-result)`. The logprobs
+  > journal-append effect is added to the `:effects` vector alongside
+  > `append-message-effect`, receiving `turn-id` from the same binding. The logprob
+  > token vector comes from `(:execution-result/logprobs execution-result)` (a new key
+  > populated by the turn-runtime accumulator). When that key is nil or empty (logprobs
+  > disabled), no `:logprobs` journal entry is appended.
 
-- [ ] **`/logprobs` TUI autocomplete registration**: `builtin-slash-commands` in
+- [x] **`/logprobs` TUI autocomplete registration**: `builtin-slash-commands` in
   `components/tui/src/psi/tui/app/shared.clj` and the canonical list in
   `commands.clj` (line 643) must both be updated. Confirm this is in scope and specify
   the display string / description for autocomplete.
+  > **Resolved**: In scope. `/logprobs` is added to `prefixed-command-prefixes` in
+  > `commands.clj` (alongside `/model`, `/thinking`, etc.) so it handles bare
+  > `/logprobs` and `/logprobs <arg>` forms. `builtin-slash-commands` in
+  > `tui/app/shared.clj` gains `"/logprobs"` for TUI autocomplete. Display string:
+  > `"/logprobs"`. Help text (used in `/help` output):
+  > `"  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"`.
 
-- [ ] **Hard-coded 0.90 probability threshold**: The synthetic LLM message uses
+- [x] **Hard-coded 0.90 probability threshold**: The synthetic LLM message uses
   `p < 0.90` as the "uncertain token" threshold. Clarify whether this is a fixed
   display constant or a configurable session/command parameter (e.g. `/logprobs
   threshold 0.85`). If fixed, document the rationale.
+  > **Resolved**: Fixed display constant. Rationale: 0.90 is a practical signal
+  > boundary — tokens above it are near-certain and add noise to the LLM context;
+  > tokens below it represent meaningful uncertainty. Keeping it fixed avoids
+  > command-surface complexity for an initial implementation. It can be made
+  > configurable in a follow-on task if needed. The constant is named
+  > `logprob-uncertain-threshold` and lives in the projection namespace.
