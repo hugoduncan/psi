@@ -234,6 +234,22 @@
     (is (seq @pending-snapshots*))
     (is (every? #(not (contains? % :execution-result)) @pending-snapshots*))))
 
+(deftest child-session-creation-failure-records-execution-failure-test
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx linear-definition "run-child-session-failure")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-child-session-failure")]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [& _]
+                    (throw (ex-info "Invalid initial agent state"
+                                    {:errors {:model "bad-model"}})))]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-child-session-failure")
+          attempt (get-in run [:step-runs "plan" :attempts 0])]
+      (is (= :failed (:status run)))
+      (is (= :execution-failed (:status attempt)))
+      (is (= "Invalid initial agent state"
+             (get-in attempt [:execution-error :message]))))))
+
 (deftest cancel-from-blocked-state-test
   (let [[ctx session-id] (create-session-context)
         _ (install-run! ctx linear-definition "run-4")

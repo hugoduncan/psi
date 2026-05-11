@@ -6,6 +6,8 @@
    inherited tool/skill/model shaping, workflow meta merge rules, and final
    child-session prompt/config derivation."
   (:require
+   [psi.ai.model-registry :as model-registry]
+   [psi.ai.model-selection :as model-selection]
    [psi.tool-registry.defs :as tool-defs]
    [psi.workflow-registry.registry :as registry]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
@@ -86,6 +88,44 @@
       (and enabled? (contains? session-spec :top-logprobs))
       (assoc :top-logprobs (:top-logprobs session-spec)))))
 
+(defn- explicit-model-id->session-model
+  [model-id]
+  (when-let [model (some (fn [candidate]
+                           (when (= model-id (:id candidate))
+                             candidate))
+                         (model-registry/all-models-seq))]
+    {:provider (name (:provider model))
+     :id (:id model)}))
+
+(defn- model-query->selection-request
+  [model-spec parent-session-model]
+  {:mode :resolve
+   :required (vec (or (:require model-spec) []))
+   :strong-preferences (vec (or (:prefer model-spec) []))
+   :weak-preferences (vec (or (:weak-preferences model-spec) []))
+   :context {:session-model {:provider (some-> (:provider parent-session-model) keyword)
+                             :id (:id parent-session-model)}}})
+
+(defn- resolved-step-model
+  [model-spec parent-session-model]
+  (cond
+    (nil? model-spec)
+    nil
+
+    (and (map? model-spec) (= :model-query (:type model-spec)))
+    (let [result (model-selection/resolve-selection
+                  {:request (model-query->selection-request model-spec parent-session-model)})]
+      (when (= :ok (:outcome result))
+        {:provider (name (get-in result [:candidate :provider]))
+         :id (get-in result [:candidate :id])}))
+
+    (string? model-spec)
+    (or (explicit-model-id->session-model model-spec)
+        model-spec)
+
+    :else
+    model-spec))
+
 (defn resolve-step-session-config
   "Resolve child session configuration for a workflow step.
 
@@ -111,7 +151,11 @@
         session-tool-defs (vec (or (:tool-defs parent-session) []))
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
-                             (:system-prompt base-meta))]
+                             (:system-prompt base-meta))
+        resolved-model (or (resolved-step-model (:model session-spec) parent-session-model)
+                           parent-session-model
+                           (resolved-step-model (:model base-meta) parent-session-model)
+                           (:model base-meta))]
     (merge
      {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
       :prompt-mode parent-session-prompt-mode
@@ -121,8 +165,6 @@
                           (:thinking-level base-meta)
                           :off)
       :skills (resolve-step-skills ctx session-skills (:skills session-spec))
-      :model (or (:model session-spec)
-                 parent-session-model
-                 (:model base-meta))
+      :model resolved-model
       :prompt-component-selection (:prompt-component-selection session-spec)}
      (resolved-logprob-config session-spec))))

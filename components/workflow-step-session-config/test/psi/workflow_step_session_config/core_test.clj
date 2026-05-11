@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.ai.model-registry :as model-registry]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter]
    [psi.workflow-runtime.step-test-support :as support]
@@ -104,7 +105,7 @@
       (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
 
       (is (= :high (:thinking-level builder-config)))
-      (is (= "gpt-5" (:model builder-config)))
+      (is (= {:provider "openai" :id "gpt-5"} (:model builder-config)))
 
       (is (= [] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config)))))))
@@ -289,6 +290,60 @@
       (is (= :non-streaming (:response-mode config)))
       (is (true? (:logprobs config)))
       (is (= 5 (:top-logprobs config))))))
+
+(deftest resolve-step-session-config-resolves-model-query-to-concrete-model-test
+  (testing "workflow child sessions resolve authored model-query specs to a concrete model before runtime use"
+    (let [models-path (doto (java.io.File/createTempFile "psi-workflow-step-models" ".edn")
+                        (spit (pr-str {:version 1
+                                       :providers {"local-helper"
+                                                   {:base-url "http://localhost:11434/v1"
+                                                    :api :openai-completions
+                                                    :auth {:auth-header? false}
+                                                    :models [{:id "fast-free"
+                                                              :name "Fast Free Local"
+                                                              :supports-text true
+                                                              :locality :local
+                                                              :latency-tier :low
+                                                              :cost-tier :zero
+                                                              :input-cost 0.0
+                                                              :output-cost 0.0}]}}})))
+          _ (model-registry/init! {:user-models-path (.getAbsolutePath models-path)})
+          [ctx session-id] (support/create-session-context {:persist? false})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
+                   {:provider "anthropic" :id "claude-sonnet-4-6"})
+          definition {:definition-id "planner-model-query"
+                      :name "planner-model-query"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text
+                                                  :match :true}
+                                                 {:criterion :latency-tier
+                                                  :equals :low}
+                                                 {:criterion :cost-tier
+                                                  :one-of [:zero :low]}]
+                                       :prefer [{:criterion :locality
+                                                 :equals :local}
+                                                {:criterion :input-cost
+                                                 :prefer :lower}
+                                                {:criterion :output-cost
+                                                 :prefer :lower}]}
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-model-query"
+                                          :run-id "run-model-query"
+                                          :parent-session-id session-id
+                                          :workflow-input {:input "plan it"}})
+          config (try
+                   (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")
+                   (finally
+                     (model-registry/init! {})))]
+      (is (= {:provider "local-helper" :id "fast-free"}
+             (:model config))))))
 
 (deftest resolve-step-session-config-drops-top-logprobs-when-logprobs-disabled-test
   (testing "workflow child sessions drop authored top-logprobs when logprobs are false"
