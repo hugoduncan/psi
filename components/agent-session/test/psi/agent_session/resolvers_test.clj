@@ -150,7 +150,8 @@
                      :psi.agent-session/executed-tool-count
                      :psi.agent-session/ui-type
                      :psi.agent-session/start-time
-                     :psi.agent-session/current-time])]
+                     :psi.agent-session/current-time
+                     :psi.agent-session/active-session-id])]
       (is (integer? (:psi.agent-session/messages-count result)))
       (is (integer? (:psi.agent-session/ai-call-count result)))
       (is (integer? (:psi.agent-session/tool-call-count result)))
@@ -158,7 +159,9 @@
       (is (integer? (:psi.agent-session/executed-tool-count result)))
       (is (contains? #{:console :tui :emacs} (:psi.agent-session/ui-type result)))
       (is (instance? java.time.Instant (:psi.agent-session/start-time result)))
-      (is (instance? java.time.Instant (:psi.agent-session/current-time result))))))
+      (is (instance? java.time.Instant (:psi.agent-session/current-time result)))
+      (is (string? (:psi.agent-session/active-session-id result))
+          "active-session-id composes with telemetry attrs without Pathom3 conflict"))))
 
 ;; ── Mixed with existing attrs (regression) ──────────────
 
@@ -502,12 +505,36 @@
       (is (nil? (:psi.agent-session/active-session-id
                  (session/query-in ctx nil [:psi.agent-session/active-session-id]))))))
 
-  (testing "queryable from root without extra entity seeding — q helper uses psi-tool pattern"
-    (let [[ctx session-id] (create-session-context)]
-      (is (= session-id
-             (:psi.agent-session/active-session-id
-              (session/query-in ctx session-id [:psi.agent-session/active-session-id])))
-          "active-session-id resolves from root seeds alone — no explicit entity seed required"))))
+  (testing "resolves via psi-tool root-seed pattern — q helper mirrors live query path"
+    ;; The q helper uses test-support/create-test-session and passes session-id as
+    ;; the second arg to query-in, matching the psi-tool root-seed pattern exactly.
+    ;; This is distinct from test 1: it uses a fresh isolated context (no shared
+    ;; ctx/session-id binding) and exercises the same code path that psi-tool uses
+    ;; in production — confirming the attr is reachable from standard root seeds alone.
+    (let [result (q [:psi.agent-session/active-session-id])]
+      (is (string? (:psi.agent-session/active-session-id result))
+          "active-session-id is a non-nil string via psi-tool root-seed pattern")))
+
+  (testing "resolved value is independent of session ordering — each session returns its own id"
+    ;; Covers the design contract case: "does not reflect adapter focus or list ordering".
+    ;; Creates two sessions in one context, queries each independently, asserts each
+    ;; returns its own session-id and not the other's.
+    (let [cwd     (str (System/getProperty "java.io.tmpdir") "/psi-active-sid-" (java.util.UUID/randomUUID))
+          _       (.mkdirs (java.io.File. cwd))
+          [ctx _] (create-session-context {:cwd cwd})
+          sd-a    (session/new-session-in! ctx nil {})
+          sid-a   (:session-id sd-a)
+          sd-b    (session/new-session-in! ctx sid-a {})
+          sid-b   (:session-id sd-b)
+          res-a   (session/query-in ctx sid-a [:psi.agent-session/active-session-id])
+          res-b   (session/query-in ctx sid-b [:psi.agent-session/active-session-id])]
+      (is (= sid-a (:psi.agent-session/active-session-id res-a))
+          "querying session A returns A's own id")
+      (is (= sid-b (:psi.agent-session/active-session-id res-b))
+          "querying session B returns B's own id")
+      (is (not= (:psi.agent-session/active-session-id res-a)
+                (:psi.agent-session/active-session-id res-b))
+          "each session returns a distinct active-session-id"))))
 
 (deftest register-resolvers-in-includes-history-resolvers-test
   (testing "register-resolvers-in! includes history resolvers so worktree attrs are resolvable
