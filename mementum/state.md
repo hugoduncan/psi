@@ -88,4 +88,4 @@ Bootstrapped on 2026-04-02.
   - `gh-bug-triage-modular` post-repro prompt-string is now `:type :map` (structured, not rendered text) per §P
 
 ## Suggested next step
-- Work on `137-gh-issue-refine-deterministic-discover` (next in queue per munera/plan.md).
+- Queue is empty. Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `105-agent-session-component-extraction-map`.
