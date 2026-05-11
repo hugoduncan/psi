@@ -120,3 +120,26 @@ attr resolves, so accidental removal of the resolver would stop the attr from
 being advertised and the resolution loop would catch it — but only indirectly.
 Adding the attr to `canonical-graph-root-attrs` would make the regression
 explicit and symmetric with how other stable root attrs are pinned.
+
+## Tests review — 2026-05-10
+
+Resolver implementation and `canonical-graph-root-attrs` pinning are correct.
+Three issues found in `resolvers_test.clj`:
+
+1. **Test 3 is a near-duplicate of test 1.** Both `"returns invoking session id…"`
+   and `"queryable from root without extra entity seeding…"` call
+   `(session/query-in ctx session-id [...])` with identical setup and assertion.
+   Test 3 does not distinguish "root-queryable" from "entity-seeded" — it uses the
+   same mechanism as test 1. The design intent was to show the attr resolves via
+   root seeds alone (the `q` helper or an explicit root-only query path would be a
+   better vehicle). As written, test 3 adds no new signal.
+
+2. **Design test contract requires "does not reflect adapter focus or list ordering"
+   but no test covers it.** The design's Test contract section explicitly lists this
+   case. The resolver implementation has no adapter focus wiring, so this is a
+   documentation/contract gap rather than a bug risk — but the required case is absent.
+
+3. **`:psi.agent-session/active-session-id` absent from `combined-telemetry-query-test`
+   and `mixed-attrs-query-test`.** These composite regression tests confirm attrs
+   compose without interference. Adding `active-session-id` to at least one of them
+   would confirm no Pathom3 conflict with the larger session resolver set.

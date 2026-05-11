@@ -53,3 +53,20 @@
 - [x] Add `:psi.agent-session/active-session-id` to `canonical-graph-root-attrs` in
       `graph_surface_test.clj` so accidental resolver removal is caught by the
       explicit canonical-set assertion, not only by the dynamic resolution loop.
+
+## Tests review follow-up
+
+- [ ] Replace test 3 in `active-session-id-resolver-test` (`"queryable from root
+      without extra entity seeding…"`) with a genuinely distinct assertion: use the
+      `q` helper (which mirrors the psi-tool root-seed pattern via
+      `test-support/create-test-session`) instead of `session/query-in ctx session-id`
+      so the test actually exercises root-only resolution rather than duplicating test 1.
+- [ ] Add a test case to `active-session-id-resolver-test` asserting that the resolved
+      value is independent of adapter focus / list ordering — e.g. create two sessions,
+      query each independently, and assert each returns its own session-id (not the
+      other's). This covers the design contract case "does not reflect adapter focus or
+      list ordering" that is currently absent.
+- [ ] Add `:psi.agent-session/active-session-id` to the query in
+      `combined-telemetry-query-test` (or `mixed-attrs-query-test`) in `resolvers_test.clj`
+      and assert it returns a non-nil string, confirming the attr composes with the
+      broader session resolver set without Pathom3 conflict.
