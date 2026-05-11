@@ -17,14 +17,14 @@
     {:root-state-update
      (session/session-update
       session-id
-      #(cond-> (assoc %
-                      :last-execution-result-summary
-                      {:turn-id         turn-id
-                       :turn-outcome    turn-outcome
-                       :stop-reason     (:execution-result/stop-reason execution-result)
-                       :tool-call-count (count tool-calls)
-                       :recorded-at     (java.time.Instant/now)})
-         (some? logprobs) (assoc :last-turn-logprobs logprobs)))
+      #(assoc %
+              :last-execution-result-summary
+              {:turn-id         turn-id
+               :turn-outcome    turn-outcome
+               :stop-reason     (:execution-result/stop-reason execution-result)
+               :tool-call-count (count tool-calls)
+               :recorded-at     (java.time.Instant/now)}
+              :last-turn-logprobs logprobs))
      :effects (cond-> [(journal-append-effect/append-message-effect session-id assistant-message)]
                 (seq logprobs) (conj (journal-append-effect/append-logprobs-effect session-id turn-id logprobs)))
      :return {:recorded? true

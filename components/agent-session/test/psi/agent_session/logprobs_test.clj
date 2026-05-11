@@ -138,6 +138,29 @@
           effects (:effects result)]
       (is (= 1 (count effects))))))
 
+(deftest build-record-response-clears-last-turn-logprobs-when-nil-test
+  (testing ":last-turn-logprobs cleared to nil when logprobs is nil (stale-data fix)"
+    (let [execution-result
+          {:execution-result/turn-id      "turn-2"
+           :execution-result/session-id   "sess-1"
+           :execution-result/stop-reason  :stop
+           :execution-result/logprobs     nil
+           :execution-result/assistant-message
+           {:role "assistant" :content [{:type :text :text "hi"}]
+            :stop-reason :stop :timestamp (java.time.Instant/now)}
+           :execution-result/turn-outcome :response
+           :execution-result/tool-calls   []}
+          result (recording/build-record-response "sess-1" execution-result nil)
+          update-fn (:root-state-update result)
+          ;; Simulate a session-state that already has stale logprob data from a prior turn
+          stale-state {:agent-session
+                       {:sessions {"sess-1" {:data {:thinking-level :off
+                                                    :last-turn-logprobs sample-logprob-tokens}}}}}
+          updated-state (update-fn stale-state)
+          session-data  (get-in updated-state [:agent-session :sessions "sess-1" :data])]
+      (is (nil? (:last-turn-logprobs session-data))
+          "stale :last-turn-logprobs must be cleared to nil when current turn has no logprobs"))))
+
 (deftest build-record-response-writes-last-turn-logprobs-test
   (testing ":last-turn-logprobs written to session-data when logprobs present"
     (let [logprobs sample-logprob-tokens

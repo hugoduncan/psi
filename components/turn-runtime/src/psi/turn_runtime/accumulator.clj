@@ -318,8 +318,7 @@
                            :content     content
                            :stop-reason stop-reason
                            :timestamp   (java.time.Instant/now)}
-                    (map? usage)       (assoc :usage usage)
-                    (seq logprob-buffer) (assoc :logprobs logprobs))]
+                    (map? usage) (assoc :usage usage))]
     (note-last-provider-event! td :done data)
     (emit-tool-assembly-errors! progress-queue completed)
     (swap! td assoc :final-message final :stop-reason stop-reason :logprobs logprobs)

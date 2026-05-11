@@ -1,5 +1,30 @@
 # Implementation Notes
 
+## Review pass 5 follow-up execution (2026-05-11)
+
+Executed all three unchecked items from review pass 5:
+
+1. **`:last-turn-logprobs` stale-data fix** — replaced `cond->` guard
+   `(some? logprobs) (assoc :last-turn-logprobs logprobs)` with unconditional
+   `(assoc % ... :last-turn-logprobs logprobs)` in `prompt_recording.clj`.
+   Added `build-record-response-clears-last-turn-logprobs-when-nil-test` to
+   `logprobs_test.clj`: applies nil-logprobs execution-result to a state already
+   holding stale `:last-turn-logprobs`; asserts value is nil after update.
+
+2. **Compaction test for `:logprobs` entries** — added
+   `logprobs-entries-skipped-by-compaction-test` to `compaction_test.clj`.
+   Verifies (a) `rebuild-messages-from-journal-entries` skips `:logprobs` entries
+   (4 messages from 5 entries), (b) `prepare-compaction` does not select the
+   `:logprobs` entry as a valid cut-point.
+
+3. **`:logprobs` removed from assistant final message** — removed
+   `(seq logprob-buffer) (assoc :logprobs logprobs)` cond branch from `final`
+   map construction in `handle-done!` in `accumulator.clj`. Logprobs are stored
+   on `@td` and extracted by `execute-live-turn!`; the `:logprobs` journal entry
+   is the canonical store.
+
+Verification: 1704 tests, 0 failures; lint 0 errors, 0 warnings.
+
 ## Implementation review pass 5 (2026-05-11)
 
 1702 unit tests pass; lint clean (0 errors, 0 warnings). All nine plan steps are implemented and match the design. Three issues found:
