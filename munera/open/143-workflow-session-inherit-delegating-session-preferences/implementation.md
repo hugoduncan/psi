@@ -29,3 +29,4 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 ## 2026-05-11 design/plan/steps consistency review
 
 - Actionable inconsistency: `design.md` and `plan.md` both frame the fix as covering workflow create/execute/resume paths, but `steps.md` only asks for a generic create/execute/resume inventory and never adds an explicit follow-through step to verify or test resume-path preservation separately. Added a `design-steps.md` follow-up to make that missing task-file obligation explicit without broadening scope beyond the already-stated intent.
+- Completed the resume-path follow-up by updating `steps.md` to require a distinct resume-path verification/proof step and to include resume-path preservation in the focused test obligation, aligning task execution with the already-stated create/execute/resume intent.
