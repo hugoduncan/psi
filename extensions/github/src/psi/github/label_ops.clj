@@ -18,14 +18,6 @@
   [labels]
   (str/join "," labels))
 
-(defn- gh-edit-cmd
-  "Resolve 'gh issue edit' or 'gh pr edit' based on :target."
-  [target]
-  (case target
-    "pr"    "pr"
-    "issue" "issue"
-    "issue"))
-
 ;;; ---------------------------------------------------------------------------
 ;;; Public operation handlers
 
@@ -44,7 +36,7 @@
         labels   (:labels args)
         target   (or (:target args) "issue")
         csv      (label-csv labels)
-        result   (shell-fn "gh" (gh-edit-cmd target) (str number) "--add-label" csv)]
+        result   (shell-fn "gh" target (str number) "--add-label" csv)]
     (if (not= 0 (:exit result))
       {:status  :error
        :reason  :psi.github/shell-error
@@ -70,7 +62,7 @@
         labels   (:labels args)
         target   (or (:target args) "issue")
         csv      (label-csv labels)
-        result   (shell-fn "gh" (gh-edit-cmd target) (str number) "--remove-label" csv)]
+        result   (shell-fn "gh" target (str number) "--remove-label" csv)]
     (if (not= 0 (:exit result))
       {:status  :error
        :reason  :psi.github/shell-error

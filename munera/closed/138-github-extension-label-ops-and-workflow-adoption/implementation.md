@@ -1,5 +1,32 @@
 # Implementation Notes
 
+## 2026-05-10 — Code-shaping pass 1
+
+**Three actionable findings:**
+
+1. **Duplicate narrowing logic** — `find-issue` and `find-pr` both define `extract-url-number` and `narrow-candidates`. The logic is structurally identical; only the URL regex differs (`#"/issues/(\d+)"` vs `#"/pull/(\d+)"`). Extract to `psi.github.narrowing` with a parameterised `extract-url-number` and a shared `narrow-candidates`. Both callers require the new ns.
+
+2. **Duplicate test helpers** — `find-issue-test` and `find-pr-test` each define `stub-shell`, `error-shell`, `capturing-shell`. `label-ops-test` has a parallel set. Extract common stubs to `psi.github.test-support`; each test ns keeps its own `invoke` wrapper.
+
+3. **`gh-edit-cmd` is an identity function** — In `label_ops.clj`, `gh-edit-cmd` maps `"pr"→"pr"` and `"issue"→"issue"`. The default branch is unreachable because `target` is already defaulted to `"issue"` before the call. The function adds indirection with zero value; inline `target` directly and delete the function.
+
+**No other actionable shaping issues.** Naming, formatting, argument order, and data shapes are consistent throughout.
+
+## 2026-05-10 — Code-shaping pass 1 follow-up execution
+
+**All three items executed.**
+
+**Item 1 — `psi.github.narrowing` extraction:**
+Created `extensions/github/src/psi/github/narrowing.clj` with `extract-url-number` (takes url-pattern arg) and `narrow-candidates` (takes url-pattern + url-error-msg args). Deleted the private `extract-url-number` and `narrow-candidates` from `find-issue` and `find-pr`; rewired both to `narrowing/narrow-candidates`. Added `psi.github.narrowing-test` with 10 focused unit tests covering both URL patterns, integer, text, and nil cases.
+
+**Item 2 — `psi.github.test-support` extraction:**
+Created `extensions/github/test/psi/github/test_support.clj` with six stubs: `stub-shell` (JSON), `error-shell` (JSON), `stub-shell-ok`, `stub-shell-error`, `capturing-shell` (JSON), `capturing-shell-ok`. Updated `find-issue-test`, `find-pr-test`, and `label-ops-test` to require `[psi.github.test-support :as ts]` and use `ts/` prefixed stubs. Each test ns retains its own `invoke` wrapper.
+
+**Item 3 — `gh-edit-cmd` removal:**
+Deleted `gh-edit-cmd` from `label_ops.clj`. Replaced `(gh-edit-cmd target)` with `target` directly in both `add-label` and `remove-label` handlers.
+
+**Verification:** lint clean (0 errors, 0 warnings); 44 tests, 137 assertions, 0 failures.
+
 ## 2026-05-10 — Review pass 1 follow-up execution
 
 **Both critical bugs fixed.**

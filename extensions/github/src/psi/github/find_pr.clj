@@ -10,45 +10,8 @@
   (:require
    [cheshire.core :as json]
    [clojure.java.shell :as shell]
-   [clojure.string :as str]
+   [psi.github.narrowing :as narrowing]
    [psi.github.slug :as slug]))
-
-;;; ---------------------------------------------------------------------------
-;;; Narrowing
-
-(defn- extract-url-number
-  "Returns a Long from a GitHub PR URL, or nil if no /pull/NNN segment."
-  [input]
-  (when-let [[_ n] (re-find #"/pull/(\d+)" input)]
-    (Long/parseLong n)))
-
-(defn- narrow-candidates
-  "Apply narrowing rules to `candidates` based on `input` string.
-   Returns {:status :ok :candidates [...]} or {:status :error ...}."
-  [candidates input]
-  (cond
-    (nil? input)
-    {:status :ok :candidates candidates}
-
-    (re-matches #"^\d+$" input)
-    (let [n (Long/parseLong input)]
-      {:status :ok
-       :candidates (filter #(= (get % "number") n) candidates)})
-
-    (str/starts-with? input "https://")
-    (if-let [n (extract-url-number input)]
-      {:status :ok
-       :candidates (filter #(= (get % "number") n) candidates)}
-      {:status :error
-       :reason :psi.github/invalid-url-input
-       :message (str "Cannot extract PR number from URL: " input)})
-
-    :else
-    {:status :ok
-     :candidates (filter #(str/includes?
-                           (str/lower-case (get % "title" ""))
-                           (str/lower-case input))
-                         candidates)}))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Handoff Markdown serialization
@@ -93,7 +56,10 @@
        :reason  :psi.github/shell-error
        :message (:err result)}
       (let [prs        (json/parse-string (:out result))
-            narrow-res (narrow-candidates prs input)]
+            narrow-res (narrowing/narrow-candidates
+                        prs input
+                        #"/pull/(\d+)"
+                        (str "Cannot extract PR number from URL: " input))]
         (if (= :error (:status narrow-res))
           narrow-res
           (let [candidates (:candidates narrow-res)

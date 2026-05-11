@@ -2,8 +2,8 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [cheshire.core :as json]
-   [psi.github.find-pr :as sut]))
+   [psi.github.find-pr :as sut]
+   [psi.github.test-support :as ts]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Test helpers
@@ -18,33 +18,6 @@
    "headRefName" head-ref
    "baseRefName" base-ref})
 
-(defn- stub-shell
-  "Returns a shell-fn stub that always returns a successful response with `prs`."
-  [prs]
-  (fn [& _args]
-    {:exit 0
-     :out  (json/generate-string prs)
-     :err  ""}))
-
-(defn- error-shell
-  "Returns a shell-fn stub that simulates a non-zero exit."
-  [err-msg]
-  (fn [& _args]
-    {:exit 1
-     :out  ""
-     :err  err-msg}))
-
-(defn- capturing-shell
-  "Returns [shell-fn calls*] where calls* captures each invocation's arg list."
-  [prs]
-  (let [calls* (atom [])]
-    [(fn [& args]
-       (swap! calls* conj (vec args))
-       {:exit 0
-        :out  (json/generate-string prs)
-        :err  ""})
-     calls*]))
-
 (defn- invoke
   "Call sut/invoke with a stub ctx and args map."
   [shell-fn args]
@@ -56,8 +29,8 @@
 
 (deftest gh-cli-args-are-constructed-correctly-test
   (testing "gh pr list receives exact --state, --json, and --label args"
-    (let [[shell-fn calls*] (capturing-shell [(pr-item 1 "x" "https://github.com/org/repo/pull/1"
-                                                       "feature/x" "master")])]
+    (let [[shell-fn calls*] (ts/capturing-shell [(pr-item 1 "x" "https://github.com/org/repo/pull/1"
+                                                          "feature/x" "master")])]
       (invoke shell-fn {:labels ["implement"]})
       (is (= 1 (count @calls*)))
       (is (= ["gh" "pr" "list"
@@ -71,7 +44,7 @@
 
 (deftest no-candidates-returns-error-test
   (testing "no matching PRs → :psi.github/no-matching-pr error"
-    (let [result (invoke (stub-shell [])
+    (let [result (invoke (ts/stub-shell [])
                          {:labels ["implement"]})]
       (is (= :error (:status result)))
       (is (= :psi.github/no-matching-pr (:reason result)))
@@ -82,9 +55,9 @@
 
 (deftest single-candidate-returns-correct-map-test
   (testing "single candidate → :ok with correct data map and Markdown summary"
-    (let [result (invoke (stub-shell [(pr-item 42 "Add dark mode"
-                                               "https://github.com/org/repo/pull/42"
-                                               "feature/add-dark-mode" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 42 "Add dark mode"
+                                                  "https://github.com/org/repo/pull/42"
+                                                  "feature/add-dark-mode" "master")])
                          {:labels ["implement"]})]
       (is (= :ok (:status result)))
       (is (= {:pr-number           42
@@ -108,12 +81,12 @@
 
 (deftest multiple-candidates-no-narrowing-selects-lowest-test
   (testing "multiple candidates → lowest PR number selected"
-    (let [result (invoke (stub-shell [(pr-item 99 "PR 99" "https://github.com/org/repo/pull/99"
-                                               "feature/pr-99" "master")
-                                      (pr-item 7  "PR 7"  "https://github.com/org/repo/pull/7"
-                                               "feature/pr-7" "master")
-                                      (pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
-                                               "feature/pr-42" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 99 "PR 99" "https://github.com/org/repo/pull/99"
+                                                  "feature/pr-99" "master")
+                                         (pr-item 7  "PR 7"  "https://github.com/org/repo/pull/7"
+                                                  "feature/pr-7" "master")
+                                         (pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
+                                                  "feature/pr-42" "master")])
                          {:labels ["implement"]})]
       (is (= :ok (:status result)))
       (is (= 7 (get-in result [:data :pr-number]))))))
@@ -123,10 +96,10 @@
 
 (deftest narrowing-by-integer-test
   (testing "integer input → exact number match"
-    (let [result (invoke (stub-shell [(pr-item 7  "PR 7"  "https://github.com/org/repo/pull/7"
-                                               "feature/pr-7" "master")
-                                      (pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
-                                               "feature/pr-42" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 7  "PR 7"  "https://github.com/org/repo/pull/7"
+                                                  "feature/pr-7" "master")
+                                         (pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
+                                                  "feature/pr-42" "master")])
                          {:labels ["implement"]
                           :input "42"})]
       (is (= :ok (:status result)))
@@ -137,18 +110,18 @@
 
 (deftest narrowing-by-pull-url-test
   (testing "PR URL input → PR number extracted via /pull/NNN regex and matched"
-    (let [result (invoke (stub-shell [(pr-item 7  "PR 7"  "https://github.com/org/repo/pull/7"
-                                               "feature/pr-7" "master")
-                                      (pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
-                                               "feature/pr-42" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 7  "PR 7"  "https://github.com/org/repo/pull/7"
+                                                  "feature/pr-7" "master")
+                                         (pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
+                                                  "feature/pr-42" "master")])
                          {:labels ["implement"]
                           :input "https://github.com/org/repo/pull/42"})]
       (is (= :ok (:status result)))
       (is (= 42 (get-in result [:data :pr-number])))))
 
   (testing "issue URL (with /issues/NNN) is rejected — regex does not match /issues/"
-    (let [result (invoke (stub-shell [(pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
-                                               "feature/pr-42" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
+                                                  "feature/pr-42" "master")])
                          {:labels ["implement"]
                           :input "https://github.com/org/repo/issues/42"})]
       (is (= :error (:status result)))
@@ -160,10 +133,10 @@
 
 (deftest narrowing-by-title-substring-test
   (testing "text substring match selects matching PR"
-    (let [result (invoke (stub-shell [(pr-item 7  "Fix the login bug"  "https://github.com/org/repo/pull/7"
-                                               "fix/login-bug" "master")
-                                      (pr-item 42 "Add dark mode"      "https://github.com/org/repo/pull/42"
-                                               "feature/dark-mode" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 7  "Fix the login bug"  "https://github.com/org/repo/pull/7"
+                                                  "fix/login-bug" "master")
+                                         (pr-item 42 "Add dark mode"      "https://github.com/org/repo/pull/42"
+                                                  "feature/dark-mode" "master")])
                          {:labels ["implement"]
                           :input "dark mode"})]
       (is (= :ok (:status result)))
@@ -174,7 +147,7 @@
 
 (deftest non-zero-exit-returns-shell-error-test
   (testing "non-zero gh exit → :psi.github/shell-error with :err message"
-    (let [result (invoke (error-shell "gh: not authenticated")
+    (let [result (invoke (ts/error-shell "gh: not authenticated")
                          {:labels ["implement"]})]
       (is (= :error (:status result)))
       (is (= :psi.github/shell-error (:reason result)))
@@ -185,10 +158,10 @@
 
 (deftest nil-input-treated-as-no-narrowing-test
   (testing "nil :input → no narrowing applied, lowest candidate selected"
-    (let [result (invoke (stub-shell [(pr-item 99 "PR 99" "https://github.com/org/repo/pull/99"
-                                               "feature/pr-99" "master")
-                                      (pr-item 5  "PR 5"  "https://github.com/org/repo/pull/5"
-                                               "feature/pr-5" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 99 "PR 99" "https://github.com/org/repo/pull/99"
+                                                  "feature/pr-99" "master")
+                                         (pr-item 5  "PR 5"  "https://github.com/org/repo/pull/5"
+                                                  "feature/pr-5" "master")])
                          {:labels ["implement"]
                           :input nil})]
       (is (= :ok (:status result)))
@@ -199,15 +172,15 @@
 
 (deftest slug-derivation-from-branch-name-test
   (testing "slug is derived from headRefName: lower-case, extract words, join, truncate at 40"
-    (let [result (invoke (stub-shell [(pr-item 1 "Some PR" "https://github.com/org/repo/pull/1"
-                                               "feature/add-foo-bar" "master")])
+    (let [result (invoke (ts/stub-shell [(pr-item 1 "Some PR" "https://github.com/org/repo/pull/1"
+                                                  "feature/add-foo-bar" "master")])
                          {:labels ["implement"]})]
       (is (= "feature-add-foo-bar" (get-in result [:data :worktree-description])))))
 
   (testing "slug is hard-truncated at 40 chars and never ends with -"
     (let [long-branch "feature/this-is-a-very-long-branch-name-that-exceeds-forty-chars"
-          result (invoke (stub-shell [(pr-item 1 "PR" "https://github.com/org/repo/pull/1"
-                                               long-branch "master")])
+          result (invoke (ts/stub-shell [(pr-item 1 "PR" "https://github.com/org/repo/pull/1"
+                                                  long-branch "master")])
                          {:labels ["implement"]})]
       (is (<= (count (get-in result [:data :worktree-description])) 40))
       (is (not (str/ends-with? (get-in result [:data :worktree-description]) "-"))))))

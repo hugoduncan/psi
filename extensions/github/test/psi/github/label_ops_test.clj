@@ -2,31 +2,11 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [psi.github.label-ops :as sut]))
+   [psi.github.label-ops :as sut]
+   [psi.github.test-support :as ts]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Test helpers
-
-(defn- stub-shell-ok
-  "Returns a shell-fn stub that always returns a successful (exit 0) response."
-  []
-  (fn [& _args]
-    {:exit 0 :out "" :err ""}))
-
-(defn- stub-shell-error
-  "Returns a shell-fn stub that simulates a non-zero exit with `err-msg`."
-  [err-msg]
-  (fn [& _args]
-    {:exit 1 :out "" :err err-msg}))
-
-(defn- capturing-shell-ok
-  "Returns [shell-fn calls*] where calls* captures each invocation."
-  []
-  (let [calls* (atom [])]
-    [(fn [& args]
-       (swap! calls* conj (vec args))
-       {:exit 0 :out "" :err ""})
-     calls*]))
 
 (defn- invoke-add
   [shell-fn args]
@@ -41,14 +21,14 @@
 
 (deftest add-label-to-issue-invokes-correct-gh-command-test
   (testing "add-label to an issue calls `gh issue edit <N> --add-label <csv>`"
-    (let [[shell-fn calls*] (capturing-shell-ok)]
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 42 :labels ["waiting"] :target "issue"})
       (is (= 1 (count @calls*)))
       (is (= ["gh" "issue" "42" "--add-label" "waiting"] (first @calls*))))))
 
 (deftest add-label-to-issue-returns-ok-test
   (testing "add-label to issue → :ok with correct :data"
-    (let [result (invoke-add (stub-shell-ok) {:number 42 :labels ["waiting"] :target "issue"})]
+    (let [result (invoke-add (ts/stub-shell-ok) {:number 42 :labels ["waiting"] :target "issue"})]
       (is (= :ok (:status result)))
       (is (= {:number 42 :target "issue" :added-labels ["waiting"]} (:data result)))
       (is (string? (:summary result)))
@@ -56,7 +36,7 @@
 
 (deftest add-multiple-labels-to-issue-test
   (testing "multiple labels are joined as CSV"
-    (let [[shell-fn calls*] (capturing-shell-ok)]
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 7 :labels ["fix" "ready"] :target "issue"})
       (is (= ["gh" "issue" "7" "--add-label" "fix,ready"] (first @calls*))))))
 
@@ -65,13 +45,13 @@
 
 (deftest add-label-to-pr-invokes-correct-gh-command-test
   (testing "add-label to a PR calls `gh pr edit <N> --add-label <csv>`"
-    (let [[shell-fn calls*] (capturing-shell-ok)]
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 5 :labels ["review"] :target "pr"})
       (is (= ["gh" "pr" "5" "--add-label" "review"] (first @calls*))))))
 
 (deftest add-label-to-pr-returns-ok-test
   (testing "add-label to PR → :ok with target pr in :data"
-    (let [result (invoke-add (stub-shell-ok) {:number 5 :labels ["review"] :target "pr"})]
+    (let [result (invoke-add (ts/stub-shell-ok) {:number 5 :labels ["review"] :target "pr"})]
       (is (= :ok (:status result)))
       (is (= {:number 5 :target "pr" :added-labels ["review"]} (:data result))))))
 
@@ -80,7 +60,7 @@
 
 (deftest add-label-defaults-to-issue-target-test
   (testing "add-label with no :target defaults to issue"
-    (let [[shell-fn calls*] (capturing-shell-ok)]
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 10 :labels ["waiting"]})
       (is (= ["gh" "issue" "10" "--add-label" "waiting"] (first @calls*))))))
 
@@ -89,7 +69,7 @@
 
 (deftest add-label-shell-error-test
   (testing "non-zero gh exit → :psi.github/shell-error"
-    (let [result (invoke-add (stub-shell-error "gh: not found")
+    (let [result (invoke-add (ts/stub-shell-error "gh: not found")
                              {:number 42 :labels ["waiting"] :target "issue"})]
       (is (= :error (:status result)))
       (is (= :psi.github/shell-error (:reason result)))
@@ -100,14 +80,14 @@
 
 (deftest remove-label-from-issue-invokes-correct-gh-command-test
   (testing "remove-label from an issue calls `gh issue edit <N> --remove-label <csv>`"
-    (let [[shell-fn calls*] (capturing-shell-ok)]
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-remove shell-fn {:number 42 :labels ["triage"] :target "issue"})
       (is (= 1 (count @calls*)))
       (is (= ["gh" "issue" "42" "--remove-label" "triage"] (first @calls*))))))
 
 (deftest remove-label-from-issue-returns-ok-test
   (testing "remove-label from issue → :ok with correct :data"
-    (let [result (invoke-remove (stub-shell-ok) {:number 42 :labels ["triage"] :target "issue"})]
+    (let [result (invoke-remove (ts/stub-shell-ok) {:number 42 :labels ["triage"] :target "issue"})]
       (is (= :ok (:status result)))
       (is (= {:number 42 :target "issue" :removed-labels ["triage"]} (:data result)))
       (is (string? (:summary result)))
@@ -118,13 +98,13 @@
 
 (deftest remove-label-from-pr-invokes-correct-gh-command-test
   (testing "remove-label from a PR calls `gh pr edit <N> --remove-label <csv>`"
-    (let [[shell-fn calls*] (capturing-shell-ok)]
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-remove shell-fn {:number 5 :labels ["implement"] :target "pr"})
       (is (= ["gh" "pr" "5" "--remove-label" "implement"] (first @calls*))))))
 
 (deftest remove-label-from-pr-returns-ok-test
   (testing "remove-label from PR → :ok with target pr in :data"
-    (let [result (invoke-remove (stub-shell-ok) {:number 5 :labels ["implement"] :target "pr"})]
+    (let [result (invoke-remove (ts/stub-shell-ok) {:number 5 :labels ["implement"] :target "pr"})]
       (is (= :ok (:status result)))
       (is (= {:number 5 :target "pr" :removed-labels ["implement"]} (:data result))))))
 
@@ -133,7 +113,7 @@
 
 (deftest remove-label-defaults-to-issue-target-test
   (testing "remove-label with no :target defaults to issue"
-    (let [[shell-fn calls*] (capturing-shell-ok)]
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-remove shell-fn {:number 10 :labels ["triage"]})
       (is (= ["gh" "issue" "10" "--remove-label" "triage"] (first @calls*))))))
 
@@ -142,7 +122,7 @@
 
 (deftest remove-label-shell-error-test
   (testing "non-zero gh exit → :psi.github/shell-error"
-    (let [result (invoke-remove (stub-shell-error "gh: not authenticated")
+    (let [result (invoke-remove (ts/stub-shell-error "gh: not authenticated")
                                 {:number 42 :labels ["triage"] :target "issue"})]
       (is (= :error (:status result)))
       (is (= :psi.github/shell-error (:reason result)))

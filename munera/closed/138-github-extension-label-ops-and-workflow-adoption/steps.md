@@ -107,6 +107,22 @@
 - [x] Commit: `⚒ 138: github extension label ops and workflow adoption`
 - [x] Update `munera/plan.md`
 
+## Code-shaping pass 1 follow-up
+
+- [x] Extract shared `narrow-candidates` + `extract-url-number` from `find-issue` and `find-pr` into `psi.github.narrowing`
+  - Both files have structurally identical narrowing logic; only the URL regex differs (`/issues/` vs `/pull/`)
+  - Parameterise `extract-url-number` with the regex; move both into a new `psi.github.narrowing` ns
+  - Rewire `find-issue` and `find-pr` to require and use `psi.github.narrowing`
+  - Added `psi.github.narrowing-test` with 10 focused narrowing unit tests
+- [x] Extract shared test helpers (`stub-shell`, `error-shell`, `capturing-shell`, `invoke`) into `psi.github.test-support`
+  - `find-issue-test` and `find-pr-test` define identical stubs; `label-ops-test` has its own parallel set
+  - Moved `stub-shell`, `error-shell`, `capturing-shell` (JSON variant), `stub-shell-ok`, `stub-shell-error`, `capturing-shell-ok` to `psi.github.test-support`
+  - Each test ns now requires `[psi.github.test-support :as ts]` and uses `ts/` prefixed stubs; each keeps its own `invoke` wrapper
+- [x] Remove `gh-edit-cmd` indirection in `label_ops.clj` — inline `target` directly
+  - `gh-edit-cmd` maps `"pr"→"pr"` and `"issue"→"issue"` (identity); the default branch is unreachable
+  - Deleted `gh-edit-cmd`; replaced `(gh-edit-cmd target)` with `target` in both handlers
+  - Lint clean; 44 tests, 137 assertions, 0 failures
+
 ## Review pass 1 follow-up
 
 - [x] Fix `gh-bug-triage-modular` broken `:map` type prompt-string in `post-repro` delegate step
