@@ -51,3 +51,29 @@ The task should not leave both names as parallel canonical state.
 ## 2026-05-11 consistency review
 
 - Review result: no new actionable inconsistency found across `design.md`, `plan.md`, `steps.md`, and `design-steps.md`; previously identified ambiguities are already resolved and tracked without missing follow-up work.
+
+## 2026-05-11 implementation
+
+- Kept the existing persisted session-state keys as the canonical lower shape:
+  - `:logprobs-enabled`
+  - `:top-logprobs`
+- Workflow-authored config now accepts `:logprobs` / `:top-logprobs`, and workflow session-config resolution maps that authored surface onto the persisted child-session keys. This keeps the workflow surface aligned with `:response-mode` while avoiding a broader rename across request building, provider integrations, telemetry, and journal projection.
+- Implemented workflow-only propagation across the full authored step path:
+  - `psi.workflow-runtime.ir/session-spec-schema` now accepts optional `:logprobs` and `:top-logprobs`
+  - `psi.workflow-runtime.target-ir-compiler` preserves those fields in compiled session steps / judges
+  - `psi.workflow-step-session-config.core/resolve-step-session-config` now returns `:logprobs` with explicit disabled default and only retains `:top-logprobs` when enabled
+  - `psi.workflow-runtime.statechart-runtime` and `psi.workflow-runtime.attempts` now pass the resolved controls into workflow child-session creation
+  - `psi.agent-session.context`, `dispatch_handlers/session_lifecycle`, and `child_session_state` persist them onto workflow-owned child sessions as `:logprobs-enabled` / `:top-logprobs`
+- Removal scope landed as designed:
+  - removed `/logprobs` from command help, dispatch, prefix resolution, and TUI builtin slash autocomplete
+  - removed the command-only helper / wrapper path in `session_settings.clj` and `core.clj`
+  - removed the command-only mutation handler `:session/set-logprobs`
+- Boundary preserved:
+  - public `psi.extension/create-child-session` remains unchanged as the non-workflow surface; it still does not accept logprob params
+  - workflow propagation is widened only on the internal workflow-owned child-session path
+- Added focused proofs for:
+  - workflow session-config default/explicit/drop semantics
+  - workflow attempt propagation into persisted child-session state
+  - child-session base-state persistence of logprob controls
+  - request-option projection when persisted enabled-state is false
+  - `/logprobs` command removal from backend resolution/help and TUI autocomplete surfaces

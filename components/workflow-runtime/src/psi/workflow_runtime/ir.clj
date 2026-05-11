@@ -143,6 +143,8 @@
    [:tools {:optional true} [:vector tool-id-schema]]
    [:skills {:optional true} [:vector skill-id-schema]]
    [:response-mode {:optional true} [:maybe response-mode-schema]]
+   [:logprobs {:optional true} :boolean]
+   [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
    [:contributions [:vector contribution-schema]]])
 
 (def map-prompt-string-schema

@@ -105,7 +105,7 @@
   (when judge
     (case type
       :llm
-      (let [session-config (select-keys judge [:model :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode])]
+      (let [session-config (select-keys judge [:model :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :logprobs :top-logprobs])]
         (cond-> {:type :llm
                  :session (assoc session-config
                                  :contributions (mapv compile-contribution (:contributions judge)))}
@@ -176,7 +176,7 @@
 
     :session
     (assoc (compile-common-step-fields step)
-           :session (cond-> (select-keys step [:model :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode])
+           :session (cond-> (select-keys step [:model :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :logprobs :top-logprobs])
                       true (assoc :contributions (mapv compile-contribution (:contributions step)))))
 
     :delegate

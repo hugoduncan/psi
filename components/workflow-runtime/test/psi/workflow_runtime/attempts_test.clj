@@ -26,6 +26,8 @@
             :attempt-id "attempt-1"
             :session-name "workflow plan attempt"
             :response-mode :non-streaming
+            :logprobs true
+            :top-logprobs 4
             :tool-defs []
             :thinking-level :off})]
       (is (= "attempt-1" (:attempt-id attempt)))
@@ -37,6 +39,8 @@
       (is (= "plan" (:workflow-step-id execution-session)))
       (is (= "attempt-1" (:workflow-attempt-id execution-session)))
       (is (= :non-streaming (:response-mode execution-session)))
+      (is (true? (:logprobs-enabled execution-session)))
+      (is (= 4 (:top-logprobs execution-session)))
       (is (= parent-session-id (:parent-session-id execution-session)))
       (is (instance? java.time.Instant (:created-at execution-session)))
       (is (instance? java.time.Instant (:updated-at execution-session)))

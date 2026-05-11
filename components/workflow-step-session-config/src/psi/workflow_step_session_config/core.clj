@@ -79,6 +79,13 @@
      :base-meta base-meta
      :framing-prompt framing-prompt}))
 
+(defn- resolved-logprob-config
+  [session-spec]
+  (let [enabled? (true? (:logprobs session-spec))]
+    (cond-> {:logprobs enabled?}
+      (and enabled? (contains? session-spec :top-logprobs))
+      (assoc :top-logprobs (:top-logprobs session-spec)))))
+
 (defn resolve-step-session-config
   "Resolve child session configuration for a workflow step.
 
@@ -104,15 +111,17 @@
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))]
-    {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
-     :prompt-mode parent-session-prompt-mode
-     :response-mode (or (:response-mode session-spec) :streaming)
-     :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
-     :thinking-level (or (:thinking-level session-spec)
-                         (:thinking-level base-meta)
-                         :off)
-     :skills (resolve-step-skills ctx session-skills (:skills session-spec))
-     :model (or (:model session-spec)
-                (:model base-meta)
-                parent-session-model)
-     :prompt-component-selection (:prompt-component-selection session-spec)}))
+    (merge
+     {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
+      :prompt-mode parent-session-prompt-mode
+      :response-mode (or (:response-mode session-spec) :streaming)
+      :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
+      :thinking-level (or (:thinking-level session-spec)
+                          (:thinking-level base-meta)
+                          :off)
+      :skills (resolve-step-skills ctx session-skills (:skills session-spec))
+      :model (or (:model session-spec)
+                 (:model base-meta)
+                 parent-session-model)
+      :prompt-component-selection (:prompt-component-selection session-spec)}
+     (resolved-logprob-config session-spec))))

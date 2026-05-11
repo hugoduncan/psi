@@ -223,6 +223,64 @@
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= :non-streaming (:response-mode config))))))
 
+(deftest resolve-step-session-config-defaults-logprobs-to-disabled-test
+  (testing "workflow child sessions default logprobs to disabled and omit top-logprobs when absent"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta]
+                                         {:definition-id "planner"
+                                          :run-id "run-logprobs-default"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (false? (:logprobs config)))
+      (is (not (contains? config :top-logprobs))))))
+
+(deftest resolve-step-session-config-explicit-logprobs-test
+  (testing "workflow child sessions carry explicit logprob controls from authored step session config"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          definition {:definition-id "planner-logprobs"
+                      :name "planner-logprobs"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :response-mode :non-streaming
+                               :logprobs true
+                               :top-logprobs 5
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-logprobs"
+                                          :run-id "run-logprobs-explicit"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= :non-streaming (:response-mode config)))
+      (is (true? (:logprobs config)))
+      (is (= 5 (:top-logprobs config))))))
+
+(deftest resolve-step-session-config-drops-top-logprobs-when-logprobs-disabled-test
+  (testing "workflow child sessions drop authored top-logprobs when logprobs are false"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          definition {:definition-id "planner-logprobs-disabled"
+                      :name "planner-logprobs-disabled"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :logprobs false
+                               :top-logprobs 9
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-logprobs-disabled"
+                                          :run-id "run-logprobs-disabled"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (false? (:logprobs config)))
+      (is (not (contains? config :top-logprobs))))))
+
 (deftest resolve-step-session-config-missing-tool-falls-back-to-normalized-tool-shape-test
   (testing "missing tool references fall back to normalized tool definition shape at the public boundary"
     (let [[ctx _] (support/create-session-context {:persist? false})

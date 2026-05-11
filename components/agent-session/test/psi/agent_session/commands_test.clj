@@ -382,6 +382,12 @@
     (is (= :text (:type result)))
     (is (= "Usage: /thinking OR /thinking <level>" (:message result)))))
 
+(deftest dispatch-logprobs-command-removed-test
+  (let [[ctx session-id] (make-test-ctx)]
+    (is (nil? (commands/dispatch-in ctx session-id "/logprobs" cmd-opts)))
+    (is (= {:kind :unknown}
+           (commands/slash-resolution-in ctx session-id "/logprobs" cmd-opts)))))
+
 (deftest dispatch-remember-without-memory-ctx-test
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/remember" cmd-opts)]
@@ -575,7 +581,8 @@
                  "/help" "/prompts" "/skills"]]
       (is (str/includes? s cmd) (str "help should mention " cmd)))
     (is (str/includes? s "~/.psi/agent/models.edn"))
-    (is (str/includes? s ".psi/models.edn"))))
+    (is (str/includes? s ".psi/models.edn"))
+    (is (not (str/includes? s "/logprobs")))))
 
 (deftest format-prompts-none-test
   (let [[ctx session-id] (make-test-ctx)

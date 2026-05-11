@@ -90,6 +90,12 @@
                    (:skills step-config)
                    (assoc :skills (:skills step-config))
 
+                   (contains? step-config :logprobs)
+                   (assoc :logprobs (:logprobs step-config))
+
+                   (contains? step-config :top-logprobs)
+                   (assoc :top-logprobs (:top-logprobs step-config))
+
                    (:model step-config)
                    (assoc :model (:model step-config))
 

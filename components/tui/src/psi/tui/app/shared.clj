@@ -21,7 +21,7 @@
 
 (def builtin-slash-commands
   ["/quit" "/exit" "/resume" "/new" "/tree" "/status" "/help" "/remember"
-   "/worktree" "/jobs" "/job" "/cancel-job" "/logprobs"])
+   "/worktree" "/jobs" "/job" "/cancel-job"])
 
 (defn initial-prompt-input-state
   []

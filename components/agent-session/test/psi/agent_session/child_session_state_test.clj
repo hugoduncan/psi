@@ -42,6 +42,8 @@
                    :workflow-attempt-id "attempt-1"
                    :workflow-owned? true
                    :response-mode :non-streaming
+                   :logprobs true
+                   :top-logprobs 7
                    :developer-prompt-source :fallback})]
     (testing "identity and workflow linkage are set"
       (is (= "child-1" (:session-id child-sd)))
@@ -51,7 +53,9 @@
       (is (= "plan" (:workflow-step-id child-sd)))
       (is (= "attempt-1" (:workflow-attempt-id child-sd)))
       (is (true? (:workflow-owned? child-sd)))
-      (is (= :non-streaming (:response-mode child-sd))))
+      (is (= :non-streaming (:response-mode child-sd)))
+      (is (true? (:logprobs-enabled child-sd)))
+      (is (= 7 (:top-logprobs child-sd))))
 
     (testing "fallback developer prompt source is normalized away"
       (is (= "parent-dev" (:developer-prompt child-sd)))

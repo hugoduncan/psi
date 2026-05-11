@@ -15,6 +15,15 @@
       (is (not (contains? opts :logprobs-enabled)))
       (is (not (contains? opts :top-logprobs))))))
 
+(deftest session->request-options-workflow-logprobs-disabled-test
+  (testing "workflow child sessions with persisted disabled logprobs do not project request logprob keys"
+    (let [sd   {:model {:provider "openai" :id "gpt-4.1"}
+                :thinking-level :off
+                :logprobs-enabled false}
+          opts (prompt-request/session->request-options {} sd {})]
+      (is (not (contains? opts :logprobs-enabled)))
+      (is (not (contains? opts :top-logprobs))))))
+
 (deftest session->request-options-logprobs-enabled-test
   (testing "logprob keys present when :logprobs-enabled true"
     (let [sd   {:model {:provider "openai" :id "gpt-4.1"}
