@@ -119,3 +119,7 @@ The task should not leave both names as parallel canonical state.
   - `bb clojure:test:unit --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-attempts-test --focus psi.agent-session.commands-test --focus psi.tui.app-input-selector-test --focus psi.agent-session.child-session-mutation-test --focus psi.turn-runtime.response-mode-test`
 - Verification remains green: `1719 tests, 11978 assertions, 0 failures`.
 - No task-local code or checklist updates were required; the only unrelated working-tree changes remain `munera/plan.md` and the new open task directory `munera/open/143-workflow-session-inherit-delegating-session-preferences/`.
+
+## 2026-05-11 test-shaper review
+
+- Review result: no new actionable feedback. The proof set stays behavior-focused and deterministic: workflow session-config tests cover disabled/explicit/drop partitions, same-path combined `:response-mode` + logprob propagation is exercised in focused attempt tests, `/logprobs` removal is asserted at command/help/autocomplete boundaries, and request-option projection keeps the enabled/disabled/default-top-N cases narrow and explicit without case explosion.
