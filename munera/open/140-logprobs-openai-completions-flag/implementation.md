@@ -1,5 +1,33 @@
 # Implementation Notes
 
+## Review pass 4 — cross-file inconsistency scan (2026-05-11)
+
+Four actionable inconsistencies found by reading design.md, plan.md, steps.md, and
+codebase source files.
+
+1. **`:session/set-logprobs` handler registration missing from plan.md and steps.md** —
+   design.md §Control describes the `session_mutations` handler body but neither plan.md
+   step 8 nor steps.md step 8 include a `register-core-handler!` call in
+   `session_mutations.clj`. Without this handler the dispatch event is unrouted.
+
+2. **`root-state-update` syntax in design.md is wrong** — design.md shows
+   `{:root-state-update (assoc % :logprobs-enabled enabled? :top-logprobs top-n)}`.
+   The actual pattern in `session_mutations.clj` is
+   `{:root-state-update (session/session-update session-id #(assoc % ...))}`.
+   Bare `(assoc % ...)` is not a valid `root-state-update` value.
+
+3. **`builtin-slash-commands` "alongside /model and /thinking" is misleading** —
+   steps.md step 8 says to add `/logprobs` "alongside `/model` and `/thinking`" to
+   `builtin-slash-commands` in `shared.clj`, but `/model` and `/thinking` are NOT in
+   `builtin-slash-commands` — they are in `prefixed-command-prefixes`. The step should
+   not reference those commands as co-residents of `builtin-slash-commands`.
+
+4. **nil `top-n` in handler body writes nil to `:top-logprobs`** — when `/logprobs on`
+   is called without N, `set-logprobs-in!` passes `top-n=nil`. The handler body
+   `(assoc % :top-logprobs top-n)` would store nil, violating the design invariant
+   "absent = 3 when enabled". The handler must use `(or top-n 3)` or only assoc when
+   top-n is non-nil. Neither design.md nor steps.md specifies this nil-guard.
+
 ## Review pass 1 — ambiguity scan (2026-05-11)
 
 Reviewed design.md against codebase. No plan.md / steps.md / implementation.md existed
