@@ -130,9 +130,17 @@
 
 (defn render-delegate-prompt-string
   [workflow-run prompt-string]
-  (if (and (map? prompt-string)
-           (= :template (:type prompt-string)))
+  (cond
+    (and (map? prompt-string) (= :template (:type prompt-string)))
     (render-template-contribution workflow-run prompt-string)
+
+    (and (map? prompt-string) (= :map (:type prompt-string)))
+    (into {}
+          (map (fn [[field-k source-spec]]
+                 [field-k (apply-source-spec workflow-run source-spec)]))
+          (:fields prompt-string))
+
+    :else
     prompt-string))
 
 (defn- resolve-accepted-result-path

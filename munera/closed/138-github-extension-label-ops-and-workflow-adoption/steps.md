@@ -109,12 +109,15 @@
 
 ## Review pass 1 follow-up
 
-- [ ] Fix `gh-bug-triage-modular` broken `:map` type prompt-string in `post-repro` delegate step
-  - Decide approach: (a) implement `:map` type in `delegate-spec-schema` + `render-delegate-prompt-string`; or (b) replace with alternative wiring that the runtime already supports
-  - Update `gh-bug-triage-modular.md` so `post-repro` step passes structured issue number via a supported mechanism
-  - Add or update test coverage for the chosen approach
-  - Verify `compile-and-validate-workflow-definition` passes for `gh-bug-triage-modular`
+- [x] Fix `gh-bug-triage-modular` broken `:map` type prompt-string in `post-repro` delegate step
+  - Chose approach (a): implement `:map` type in `delegate-spec-schema` + `render-delegate-prompt-string`
+  - Added `map-prompt-string-schema` to `ir.clj`; extended `delegate-prompt-string-schema` to `[:or :string template-contribution-schema map-prompt-string-schema]`
+  - Updated `step-source-refs` in `ir.clj` to extract source refs from `:map` `:fields` values
+  - Implemented `:map` branch in `render-delegate-prompt-string` in `source_resolution.clj`
+  - Added `render-map-prompt-string-resolves-fields-to-map-test` in `source_resolution_test.clj`
+  - Added `delegate-prompt-string-schema accepts :map type` assertions in `ir_test.clj`
+  - 1677 unit tests, 11827 assertions, 0 failures; 131 extension tests, 509 assertions, 0 failures; lint clean
 
-- [ ] Fix `gh-issue-refine` `add-waiting-pr` key mismatch: `:path [:pr-number]` vs parsed `:pr_number`
-  - Either change wiring to `:path [:pr_number]` in `gh-issue-refine.md`, or change publish prompt bullet from `pr_number:` to `pr-number:`
-  - Verify end-to-end: `parse-markdown-handoff-data` → `get-path*` → `github/add-label :number` is non-nil
+- [x] Fix `gh-issue-refine` `add-waiting-pr` key mismatch: `:path [:pr-number]` vs parsed `:pr_number`
+  - Changed wiring to `:path [:pr_number]` in `gh-issue-refine.md` (`parse-markdown-handoff-data` converts `pr_number:` bullet to `:pr_number` keyword)
+  - Verified: `parse-markdown-handoff-data` → `get-path*` → `github/add-label :number` is now non-nil

@@ -1,5 +1,21 @@
 # Implementation Notes
 
+## 2026-05-10 — Review pass 1 follow-up execution
+
+**Both critical bugs fixed.**
+
+**Bug 1 — `:map` type prompt-string (gh-bug-triage-modular):**
+Chose option (a): implement `:map` type natively in the IR schema and resolution layer.
+- `ir.clj`: added `map-prompt-string-schema` (`[:map [:type [:= :map]] [:fields [:map-of :keyword source-spec-schema]]]`); extended `delegate-prompt-string-schema` to `[:or :string template-contribution-schema map-prompt-string-schema]`; updated `step-source-refs` delegate branch with `case` dispatch that handles `:map` by extracting source refs from `(:fields prompt-string)` vals.
+- `source_resolution.clj`: added `:map` branch to `render-delegate-prompt-string` — resolves each field via `apply-source-spec` and returns a plain map. Delegate runtime passes this map as `:workflow-input` to the child workflow; `gh-bug-post-repro` wires `{:from :workflow-input :path [:issue_number]}` and `{:from :workflow-input :path [:report]}` which correctly traverse the map.
+- Tests: `render-map-prompt-string-resolves-fields-to-map-test` (source_resolution_test); `:map` schema assertions in `ir_test`.
+- `gh-bug-triage-modular.md` unchanged — the `:map` type wiring was already correct.
+
+**Bug 2 — `:path [:pr-number]` key mismatch (gh-issue-refine):**
+`parse-markdown-handoff-data` uses `(-> raw-key str/trim keyword)` which preserves underscores: `"pr_number"` → `:pr_number`. Changed `add-waiting-pr` step in `gh-issue-refine.md` from `:path [:pr-number]` to `:path [:pr_number]`.
+
+**Verification:** 1677 unit tests, 11827 assertions, 0 failures; 131 extension tests, 509 assertions, 0 failures; lint clean (0 errors, 0 warnings).
+
 ## 2026-05-10 — Implementation review pass 1
 
 **Two critical runtime bugs found:**

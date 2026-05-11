@@ -77,7 +77,7 @@ description: Find an enhancement issue labeled refine, create an issue worktree,
          {:name      "add-waiting-pr"
           :type      :invoke
           :operation "github/add-label"
-          :args      {:number {:from {:step "publish" :output :data} :path [:pr-number]}
+          :args      {:number {:from {:step "publish" :output :data} :path [:pr_number]}
                       :labels ["waiting"]
                       :target "pr"}}]}
 
