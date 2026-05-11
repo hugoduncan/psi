@@ -304,12 +304,14 @@
    (create-workflow-context ctx nil run-id))
   ([ctx parent-session-id run-id]
    (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
+         authoritative-parent-session-id (or parent-session-id
+                                             (:parent-session-id workflow-run))
          chart (workflow-statechart/compile-hierarchical-chart (:effective-definition workflow-run))
          env (simple/simple-env)
          sc-session-id (java.util.UUID/randomUUID)
-         working-memory* (atom (create-working-memory ctx parent-session-id run-id))
+         working-memory* (atom (create-working-memory ctx authoritative-parent-session-id run-id))
          event-queue* (atom [])
-         actions-fn (make-workflow-actions ctx parent-session-id run-id working-memory* event-queue*)]
+         actions-fn (make-workflow-actions ctx authoritative-parent-session-id run-id working-memory* event-queue*)]
      (simple/register! env :workflow-run chart)
      (let [wm0 (sp/start! (::sc/processor env) env :workflow-run
                           {::sc/session-id sc-session-id
@@ -317,7 +319,7 @@
        (sp/save-working-memory! (::sc/working-memory-store env) env sc-session-id wm0)
        {:ctx ctx
         :run-id run-id
-        :parent-session-id parent-session-id
+        :parent-session-id authoritative-parent-session-id
         :env env
         :sc-session-id sc-session-id
         :wm wm0

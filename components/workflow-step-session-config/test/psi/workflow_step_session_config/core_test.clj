@@ -98,6 +98,7 @@
                                           override-definition]
                                          {:definition-id "plan-build-overrides"
                                           :run-id "run-overrides"
+                                          :parent-session-id session-id
                                           :workflow-input {:input "build it"}})
           builder-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
@@ -107,6 +108,36 @@
 
       (is (= [] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config)))))))
+
+(deftest resolve-step-session-config-prefers-delegating-session-over-context-defaults-test
+  (testing "workflow child sessions inherit model and prompt-mode from the authoritative delegating session rather than the first context session"
+    (let [[ctx first-session-id] (support/create-session-context {:persist? false})
+          second-session-id (:session-id (session/new-session-in! ctx nil {:session-name "delegator"}))
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (-> state
+                         (assoc-in [:agent-session :sessions first-session-id :data :prompt-mode] :first-mode)
+                         (assoc-in [:agent-session :sessions first-session-id :data :model]
+                                   {:provider "openai" :id "first-model"})
+                         (assoc-in [:agent-session :sessions first-session-id :data :updated-at]
+                                   (java.time.Instant/parse "2026-05-07T10:00:00Z"))
+                         (assoc-in [:agent-session :sessions second-session-id :data :prompt-mode] :delegating-mode)
+                         (assoc-in [:agent-session :sessions second-session-id :data :model]
+                                   {:provider "openai" :id "delegating-model"})
+                         (assoc-in [:agent-session :sessions second-session-id :data :updated-at]
+                                   (java.time.Instant/parse "2026-05-07T11:00:00Z")))))
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta]
+                                         {:definition-id "planner"
+                                          :run-id "run-delegating-parent"
+                                          :parent-session-id second-session-id
+                                          :workflow-input {:input "plan it"}})
+          listed-session-ids (mapv :session-id (psi.workflow-runtime.execution-adapter/list-context-sessions ctx))
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= [first-session-id second-session-id] listed-session-ids))
+      (is (= second-session-id (:parent-session-id workflow-run)))
+      (is (= :delegating-mode (:prompt-mode config)))
+      (is (= {:provider "openai" :id "delegating-model"} (:model config))))))
 
 (deftest resolve-step-session-config-defaults-response-mode-to-streaming-test
   (testing "workflow child sessions resolve explicit default :streaming response mode when absent"

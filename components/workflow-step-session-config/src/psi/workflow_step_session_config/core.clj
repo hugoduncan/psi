@@ -101,9 +101,10 @@
      downstream during child-session initialization"
   [ctx parent-session-id workflow-run step-id]
   (let [{:keys [step-def base-meta framing-prompt]} (step-meta-for ctx workflow-run step-id)
-        parent-session-id (or parent-session-id
-                              (some->> (execution-adapter/list-context-sessions ctx) first :session-id))
-        parent-session (execution-adapter/get-session-data ctx parent-session-id)
+        authoritative-parent-session-id (or parent-session-id
+                                            (:parent-session-id workflow-run)
+                                            (some->> (execution-adapter/list-context-sessions ctx) first :session-id))
+        parent-session (execution-adapter/get-session-data ctx authoritative-parent-session-id)
         parent-session-model (:model parent-session)
         parent-session-prompt-mode (:prompt-mode parent-session)
         session-skills (vec (or (:skills parent-session) []))
@@ -121,7 +122,7 @@
                           :off)
       :skills (resolve-step-skills ctx session-skills (:skills session-spec))
       :model (or (:model session-spec)
-                 (:model base-meta)
-                 parent-session-model)
+                 parent-session-model
+                 (:model base-meta))
       :prompt-component-selection (:prompt-component-selection session-spec)}
      (resolved-logprob-config session-spec))))

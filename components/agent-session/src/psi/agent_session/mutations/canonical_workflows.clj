@@ -53,7 +53,7 @@
 
 (pco/defmutation create-workflow-run
   "Create a canonical workflow run from a registered definition."
-  [_ {:keys [psi/agent-session-ctx definition-id workflow-input run-id]}]
+  [_ {:keys [psi/agent-session-ctx session-id definition-id workflow-input run-id]}]
   {::pco/op-name 'psi.workflow/create-run
    ::pco/params  [:psi/agent-session-ctx :definition-id]
    ::pco/output  [:psi.workflow/run-id
@@ -63,6 +63,7 @@
     (let [[new-state created-run-id workflow-run]
           (workflow-runtime/create-run @(:state* agent-session-ctx)
                                        (cond-> {:definition-id definition-id}
+                                         session-id (assoc :parent-session-id session-id)
                                          workflow-input (assoc :workflow-input workflow-input)
                                          run-id (assoc :run-id run-id)))]
       (reset! (:state* agent-session-ctx) new-state)

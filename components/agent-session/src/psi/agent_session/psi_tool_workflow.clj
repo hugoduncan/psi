@@ -72,6 +72,7 @@
   {:run-id               (:run-id workflow-run)
    :status               (:status workflow-run)
    :source-definition-id (:source-definition-id workflow-run)
+   :parent-session-id    (:parent-session-id workflow-run)
    :workflow-input       (:workflow-input workflow-run)
    :current-step-id      (:current-step-id workflow-run)
    :created-at           (:created-at workflow-run)
@@ -139,7 +140,7 @@
                                                                    definitions)}})
 
               "create-run"
-              (let [create-opts (cond-> {}
+              (let [create-opts (cond-> {:parent-session-id session-id}
                                   definition-id (assoc :definition-id definition-id)
                                   definition    (assoc :definition (parse-workflow-definition-string definition))
                                   true          (assoc :workflow-input (or (parse-workflow-input-string workflow-input) {})))
