@@ -1,5 +1,16 @@
 # Implementation Notes
 
+## 2026-05-10 — Review pass 2
+
+**One critical bug found.**
+
+`label_ops.clj` `add-label` and `remove-label` are both missing the `"edit"` subcommand.
+The shell call is `gh issue 42 --add-label waiting` but must be `gh issue edit 42 --add-label waiting`.
+`label-ops-test` asserts the wrong command shape (without `"edit"`) so the bug survived test review.
+All label mutations in all nine migrated workflows fail at runtime.
+
+Fix: insert `"edit"` between `target` and `(str number)` in both handlers; update test assertions to match.
+
 ## 2026-05-10 — Code-shaping pass 1
 
 **Three actionable findings:**

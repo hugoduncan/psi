@@ -24,7 +24,7 @@
     (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 42 :labels ["waiting"] :target "issue"})
       (is (= 1 (count @calls*)))
-      (is (= ["gh" "issue" "42" "--add-label" "waiting"] (first @calls*))))))
+      (is (= ["gh" "issue" "edit" "42" "--add-label" "waiting"] (first @calls*))))))
 
 (deftest add-label-to-issue-returns-ok-test
   (testing "add-label to issue → :ok with correct :data"
@@ -38,7 +38,7 @@
   (testing "multiple labels are joined as CSV"
     (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 7 :labels ["fix" "ready"] :target "issue"})
-      (is (= ["gh" "issue" "7" "--add-label" "fix,ready"] (first @calls*))))))
+      (is (= ["gh" "issue" "edit" "7" "--add-label" "fix,ready"] (first @calls*))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; add-label: pr target
@@ -47,7 +47,7 @@
   (testing "add-label to a PR calls `gh pr edit <N> --add-label <csv>`"
     (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 5 :labels ["review"] :target "pr"})
-      (is (= ["gh" "pr" "5" "--add-label" "review"] (first @calls*))))))
+      (is (= ["gh" "pr" "edit" "5" "--add-label" "review"] (first @calls*))))))
 
 (deftest add-label-to-pr-returns-ok-test
   (testing "add-label to PR → :ok with target pr in :data"
@@ -62,7 +62,7 @@
   (testing "add-label with no :target defaults to issue"
     (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-add shell-fn {:number 10 :labels ["waiting"]})
-      (is (= ["gh" "issue" "10" "--add-label" "waiting"] (first @calls*))))))
+      (is (= ["gh" "issue" "edit" "10" "--add-label" "waiting"] (first @calls*))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; add-label: shell error
@@ -83,7 +83,7 @@
     (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-remove shell-fn {:number 42 :labels ["triage"] :target "issue"})
       (is (= 1 (count @calls*)))
-      (is (= ["gh" "issue" "42" "--remove-label" "triage"] (first @calls*))))))
+      (is (= ["gh" "issue" "edit" "42" "--remove-label" "triage"] (first @calls*))))))
 
 (deftest remove-label-from-issue-returns-ok-test
   (testing "remove-label from issue → :ok with correct :data"
@@ -100,7 +100,7 @@
   (testing "remove-label from a PR calls `gh pr edit <N> --remove-label <csv>`"
     (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-remove shell-fn {:number 5 :labels ["implement"] :target "pr"})
-      (is (= ["gh" "pr" "5" "--remove-label" "implement"] (first @calls*))))))
+      (is (= ["gh" "pr" "edit" "5" "--remove-label" "implement"] (first @calls*))))))
 
 (deftest remove-label-from-pr-returns-ok-test
   (testing "remove-label from PR → :ok with target pr in :data"
@@ -115,7 +115,7 @@
   (testing "remove-label with no :target defaults to issue"
     (let [[shell-fn calls*] (ts/capturing-shell-ok)]
       (invoke-remove shell-fn {:number 10 :labels ["triage"]})
-      (is (= ["gh" "issue" "10" "--remove-label" "triage"] (first @calls*))))))
+      (is (= ["gh" "issue" "edit" "10" "--remove-label" "triage"] (first @calls*))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; remove-label: shell error

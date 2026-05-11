@@ -137,3 +137,11 @@
 - [x] Fix `gh-issue-refine` `add-waiting-pr` key mismatch: `:path [:pr-number]` vs parsed `:pr_number`
   - Changed wiring to `:path [:pr_number]` in `gh-issue-refine.md` (`parse-markdown-handoff-data` converts `pr_number:` bullet to `:pr_number` keyword)
   - Verified: `parse-markdown-handoff-data` → `get-path*` → `github/add-label :number` is now non-nil
+
+## Review pass 2 follow-up
+
+- [x] Fix missing `"edit"` subcommand in `label_ops.clj`
+  - `add-label`: `(shell-fn "gh" target "edit" (str number) "--add-label" csv)`
+  - `remove-label`: `(shell-fn "gh" target "edit" (str number) "--remove-label" csv)`
+  - Updated all 7 `label-ops-test` capturing assertions to include `"edit"` in expected command vectors
+  - lint clean (0 errors, 0 warnings); 139 extension tests, 529 assertions, 0 failures
