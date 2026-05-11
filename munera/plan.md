@@ -8,6 +8,7 @@ Backlog:
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/136-built-in-registration-path-for-workflow/`
+`munera/open/141-workflow-child-session-non-streaming-execution/`
 `munera/open/134-psi-tool-mutation-surface-and-active-session-introspection/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
@@ -17,6 +18,7 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 
 Notes:
+- `141` is open: workflow-scoped child-session execution-mode support so workflow-owned child sessions can request `:response-mode :non-streaming`; intentionally narrower than a full session-wide streaming toggle.
 - `140` is complete and closed: logprob collection flag for OpenAI chat-completions endpoint;
   schema + request building + SSE extraction (OpenAI + llama.cpp) + turn accumulation +
   journal append/projection + EQL resolver + /logprobs command; 1702 tests, 0 failures.
