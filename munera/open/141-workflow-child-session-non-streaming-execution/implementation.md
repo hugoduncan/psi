@@ -134,3 +134,7 @@ Closed the remaining provider-capture gap for task 141:
 
 Code-shaper pass found no new actionable simplicity, consistency, or robustness issues beyond the already recorded and addressed response-mode capture follow-up; current propagation, branching, and proof surfaces are aligned.
 
+## Review note 2026-05-11h
+
+Test-review pass found no new actionable test gaps after reading the task artifacts plus the focused response-mode, workflow session-config, workflow attempt, child-session state/mutation, and AI core proofs; current tests cover explicit propagation, default streaming fallback, non-streaming branch selection, child-session persistence, and provider-capture shaping without duplicating prior follow-up items.
+
