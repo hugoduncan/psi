@@ -116,6 +116,9 @@ Focused verification run green:
 - result: `1705 tests, 11926 assertions, 0 failures`
 
 ### Remaining cleanup note
-- `bb lint` currently reports only warnings after the implementation pass:
-  - one missing require in the new turn-runtime response-mode test
-  - several pre-existing/shape-driven `inline def` warnings in `workflow-step-session-config.core-test`
+- resolved: lint is now clean (`0 errors, 0 warnings`)
+
+## Review note 2026-05-11e
+
+Found one actionable implementation gap:
+- non-streaming execution records provider request/response captures via `capture-aware-ai-options`, but `psi.turn-runtime.core/execute-prepared-request!` still returns hard-coded empty `:execution-result/provider-captures`, so the non-streaming path does not preserve the canonical execution-result capture surface expected from the streaming path
