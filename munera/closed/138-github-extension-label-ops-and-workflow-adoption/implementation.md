@@ -1,5 +1,19 @@
 # Implementation Notes
 
+## 2026-05-10 — Test-shaping pass 1
+
+**Four actionable findings.**
+
+`find-pr-test`:
+1. `narrowing-by-pull-url-test` combines success and error cases in one `deftest`; `find-issue-test` separates them. Split into `narrowing-by-pull-url-test` (success) + `invalid-url-returns-error-test` (error).
+2. Missing `narrowing-by-text-no-match-returns-error-test` — text narrowing to zero candidates should return `:psi.github/no-matching-pr`; `find-issue-test` has the equivalent.
+
+`label-ops-test`:
+3. PR-target `returns-ok` tests assert `:data` but not `:summary`; issue-target tests assert both. Add summary assertions to the PR-target variants.
+4. Missing `remove-multiple-labels-test` — `add-multiple-labels-to-issue-test` covers CSV joining on add; no equivalent for remove.
+
+`find-issue-test`, `narrowing-test`, `extension-test` are clean.
+
 ## 2026-05-10 — Code-shaping pass 2
 
 **One actionable finding.**

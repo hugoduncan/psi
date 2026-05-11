@@ -41,6 +41,15 @@
       (is (= ["gh" "issue" "edit" "7" "--add-label" "fix,ready"] (first @calls*))))))
 
 ;;; ---------------------------------------------------------------------------
+;;; remove-label: multiple labels
+
+(deftest remove-multiple-labels-test
+  (testing "multiple labels are joined as CSV for remove"
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
+      (invoke-remove shell-fn {:number 42 :labels ["fix" "triage"] :target "issue"})
+      (is (= ["gh" "issue" "edit" "42" "--remove-label" "fix,triage"] (first @calls*))))))
+
+;;; ---------------------------------------------------------------------------
 ;;; add-label: pr target
 
 (deftest add-label-to-pr-invokes-correct-gh-command-test
@@ -50,10 +59,12 @@
       (is (= ["gh" "pr" "edit" "5" "--add-label" "review"] (first @calls*))))))
 
 (deftest add-label-to-pr-returns-ok-test
-  (testing "add-label to PR → :ok with target pr in :data"
+  (testing "add-label to PR → :ok with target pr in :data and summary"
     (let [result (invoke-add (ts/stub-shell-ok) {:number 5 :labels ["review"] :target "pr"})]
       (is (= :ok (:status result)))
-      (is (= {:number 5 :target "pr" :added-labels ["review"]} (:data result))))))
+      (is (= {:number 5 :target "pr" :added-labels ["review"]} (:data result)))
+      (is (string? (:summary result)))
+      (is (str/includes? (:summary result) "pr #5")))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; add-label: default target is "issue"
@@ -103,10 +114,12 @@
       (is (= ["gh" "pr" "edit" "5" "--remove-label" "implement"] (first @calls*))))))
 
 (deftest remove-label-from-pr-returns-ok-test
-  (testing "remove-label from PR → :ok with target pr in :data"
+  (testing "remove-label from PR → :ok with target pr in :data and summary"
     (let [result (invoke-remove (ts/stub-shell-ok) {:number 5 :labels ["implement"] :target "pr"})]
       (is (= :ok (:status result)))
-      (is (= {:number 5 :target "pr" :removed-labels ["implement"]} (:data result))))))
+      (is (= {:number 5 :target "pr" :removed-labels ["implement"]} (:data result)))
+      (is (string? (:summary result)))
+      (is (str/includes? (:summary result) "pr #5")))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; remove-label: default target is "issue"

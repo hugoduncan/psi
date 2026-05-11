@@ -140,6 +140,14 @@
 
 ## Review pass 2 follow-up
 
+## Test-shaping pass 1 follow-up
+
+- [x] `find-pr-test`: split `narrowing-by-pull-url-test` into success (`narrowing-by-pull-url-test`) and error (`invalid-url-returns-error-test`) `deftest`s
+- [x] `find-pr-test`: add `narrowing-by-text-no-match-returns-error-test` — text narrows to zero → `:psi.github/no-matching-pr`
+- [x] `label-ops-test`: add summary assertions to `add-label-to-pr-returns-ok-test` and `remove-label-from-pr-returns-ok-test`
+- [x] `label-ops-test`: add `remove-multiple-labels-test` asserting `["gh" "issue" "edit" "42" "--remove-label" "fix,triage"]`
+- [x] lint clean (0 errors, 0 warnings); 142 tests, 536 assertions, 0 failures
+
 ## Code-shaping pass 2 follow-up
 
 - [x] Extract `invoke-edit` from `label-ops.clj`

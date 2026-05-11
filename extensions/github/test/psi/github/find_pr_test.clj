@@ -117,8 +117,9 @@
                          {:labels ["implement"]
                           :input "https://github.com/org/repo/pull/42"})]
       (is (= :ok (:status result)))
-      (is (= 42 (get-in result [:data :pr-number])))))
+      (is (= 42 (get-in result [:data :pr-number]))))))
 
+(deftest invalid-url-returns-error-test
   (testing "issue URL (with /issues/NNN) is rejected — regex does not match /issues/"
     (let [result (invoke (ts/stub-shell [(pr-item 42 "PR 42" "https://github.com/org/repo/pull/42"
                                                   "feature/pr-42" "master")])
@@ -141,6 +142,19 @@
                           :input "dark mode"})]
       (is (= :ok (:status result)))
       (is (= 42 (get-in result [:data :pr-number]))))))
+
+;;; ---------------------------------------------------------------------------
+;;; Text narrowing → zero candidates → error
+
+(deftest narrowing-by-text-no-match-returns-error-test
+  (testing "text narrowing that filters to zero candidates → :psi.github/no-matching-pr"
+    (let [result (invoke (ts/stub-shell [(pr-item 42 "Add dark mode"
+                                                  "https://github.com/org/repo/pull/42"
+                                                  "feature/dark-mode" "master")])
+                         {:labels ["implement"]
+                          :input "login bug"})]
+      (is (= :error (:status result)))
+      (is (= :psi.github/no-matching-pr (:reason result))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Non-zero gh CLI exit → :psi.github/shell-error
