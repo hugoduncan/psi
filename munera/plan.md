@@ -4,7 +4,6 @@ Open tasks in suggested execution order:
 
 Queue:
 
-`munera/open/138-github-extension-label-ops-and-workflow-adoption/`
 `munera/open/137-gh-issue-refine-deterministic-discover/`
 
 Backlog:
@@ -21,6 +20,7 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 
 Notes:
+- `138` is complete and closed: github extension has `find-pr`, `add-label`, `remove-label`; all nine listed workflows migrated to deterministic discover and label-ops `:invoke` steps.
 - `munera/plan.md` is the active project-wide orchestration surface.
 - These munera tasks split the active work into executable task directories.
 - Completed tasks should live under `munera/closed/`; open-task ordering should reflect only directories still active under `munera/open/`.

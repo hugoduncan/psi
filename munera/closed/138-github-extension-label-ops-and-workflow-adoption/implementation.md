@@ -225,3 +225,26 @@ PR discovery is the only change here; no label mutation occurs in this workflow.
 **`gh-issue-refine` note:**
 Two label targets: remove `refine` from the *issue*, add `waiting` to the *PR*.  Both
 are now deterministic `:invoke` steps with explicit `:target` args.
+
+## 2026-05-10 — Implementation complete
+
+All six phases executed:
+
+- **Phase 1** — `psi.github.slug` extracted; `find-issue` rewired. Tests green.
+- **Phase 2** — `psi.github.find-pr` implemented; 10 tests; registered.
+- **Phase 3** — `psi.github.label-ops` implemented; 14 tests; registered; `extension-test` updated to assert all four ids explicitly.
+- **Phase 4** — `clj-kondo` clean (0 errors, 0 warnings); 36 extension unit tests, 117 assertions, 0 failures.
+- **Phase 5** — 10 workflows migrated:
+  - `gh-bug-discover-and-read`: split into discover (invoke) + read (session)
+  - `gh-bug-triage`: leading find-issue + unconditional remove-triage; conditional add stays AI
+  - `gh-issue-ingest`: leading find-issue + remove-triage + add-waiting
+  - `gh-issue-implement`: search delegate → find-pr invoke + remove-implement + add-review
+  - `gh-pr-fix-checks`: select delegate → find-pr invoke (labels: []); no label-ops
+  - `gh-bug-post-repro`: input rewired from :report path; remove-triage invoke added; §P
+  - `gh-bug-triage-modular`: discover gets :data output; post-repro prompt → :map type; §P
+  - `gh-bug-request-more-info`: remove-triage + add-waiting invokes; labels stripped from prompt
+  - `gh-issue-refine`: discover gets :data; publish gets :data output + pr_number; remove-refine + add-waiting-pr
+  - `gh-bug-fix-and-pr`: discover gets :data; remove-fix invoke; fix-label instructions stripped
+- **Phase 6** — Final verification clean; committed.
+
+Notable: `gh-pr-fix-checks` uses `:labels []` (empty) to find all open PRs — no label filter — matching the previous AI step's behavior of selecting any PR needing check healing.
