@@ -60,28 +60,29 @@
   - [ ] Strip `gh issue list` and label instructions from AI prompt
 
 - [ ] `gh-issue-implement.md`
-  - [ ] Replace inline `gh pr list` AI discover session → `:invoke github/find-pr` step with `:outputs {:summary {:source :invoke/summary} :data {:source :invoke/data}}`
+  - [ ] Replace inline `gh pr list` AI `search` delegate → `:invoke github/find-pr` step (keep step name `search`); add `:outputs {:summary {:source :invoke/summary} :data {:source :invoke/data}}`
   - [ ] Wire `:input` as `{:from :workflow-input :path [:input]}` in the `find-pr` step
-  - [ ] Wire PR data into prep and implement sessions
-  - [ ] Add trailing `:invoke github/remove-label` (remove `implement`); wire `:number` as `{:from {:step "discover" :output :data} :path [:pr-number]}`
-  - [ ] Add trailing `:invoke github/add-label` (add `review`); wire `:number` as `{:from {:step "discover" :output :data} :path [:pr-number]}`
+  - [ ] Wire PR data into prep and implement sessions (existing `{:step "search" :yield :text}` wiring unchanged)
+  - [ ] Add trailing `:invoke github/remove-label` (remove `implement`); wire `:number` as `{:from {:step "search" :output :data} :path [:pr-number]}`
+  - [ ] Add trailing `:invoke github/add-label` (add `review`); wire `:number` as `{:from {:step "search" :output :data} :path [:pr-number]}`
   - [ ] Strip label instructions from AI push/label session prompt
 
 - [ ] `gh-pr-fix-checks.md`
-  - [ ] Replace inline `gh pr list` AI discover session → `:invoke github/find-pr` step with `:outputs {:summary {:source :invoke/summary} :data {:source :invoke/data}}`
+  - [ ] Replace inline `gh pr list` AI `select` delegate → `:invoke github/find-pr` step (keep step name `select`); add `:outputs {:summary {:source :invoke/summary} :data {:source :invoke/data}}`
   - [ ] Wire `:input` as `{:from :workflow-input :path [:input]}` in the `find-pr` step
-  - [ ] Wire PR data into remaining sessions
+  - [ ] Wire PR data into `heal-checks` session (existing `{:step "select" :yield :text}` wiring unchanged)
+  - [ ] NOTE: no label-ops steps added to this workflow (PR discovery only)
 
 ### Label-mutation-only migrations
 
 - [ ] `gh-bug-post-repro.md`
-  - [ ] Add unconditional trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from {:step "discover" :output :data} :path [:issue-number]}`
+  - [ ] Add unconditional trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from :workflow-input :path [:issue_number]}` (no discover step; issue number comes from upstream handoff in workflow input)
   - [ ] NOTE: conditional add (`waiting` vs `fix`) stays AI-driven — no `:invoke` step for it here
   - [ ] Strip unconditional `gh issue edit` label instructions from AI prompt; leave conditional add instruction in AI prompt
 
 - [ ] `gh-bug-request-more-info.md`
-  - [ ] Add trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from {:step "discover" :output :data} :path [:issue-number]}`
-  - [ ] Add trailing `:invoke github/add-label` (add `waiting`); wire `:number` as `{:from {:step "discover" :output :data} :path [:issue-number]}`
+  - [ ] Add trailing `:invoke github/remove-label` (remove `triage`); wire `:number` as `{:from :workflow-input :path [:issue_number]}` (no discover step; issue number comes from upstream handoff in workflow input)
+  - [ ] Add trailing `:invoke github/add-label` (add `waiting`); wire `:number` as `{:from :workflow-input :path [:issue_number]}`
   - [ ] Strip `gh issue edit` label instructions from AI prompt
 
 - [ ] `gh-issue-refine.md`

@@ -130,6 +130,58 @@ The AI step narrows its responsibility to content: reading, analysing, composing
 replies, implementing changes.  Label mutation is a post-condition executed
 deterministically after the AI step succeeds.
 
+### `:number` wiring for gh-bug-post-repro and gh-bug-request-more-info (item K)
+
+Neither `gh-bug-post-repro` nor `gh-bug-request-more-info` has a discover step.  The
+issue number arrives through workflow input — the upstream repro/handoff text from
+`gh-bug-reproduce`.  That handoff includes `issue_number:` as a machine-friendly bullet
+under `## Handoff Data`.
+
+**Decision (K):** Wire `:number` from `:workflow-input :path [:issue_number]` in both
+workflows.  No new discover step is needed.
+
+```edn
+:args {:number {:from :workflow-input :path [:issue_number]}
+       :labels ["triage"]
+       :target "issue"}
+```
+
+This matches the structured handoff contract already emitted by `gh-bug-reproduce` and
+`gh-bug-post-repro` (the `issue_number:` bullet is present in both workflows' handoff
+output specs).
+
+### Step name decisions for migrated discovery steps (items L and M)
+
+**Decision (L) — `gh-issue-implement`:** Keep the existing step name `search` after
+replacing the AI delegate with `:invoke github/find-pr`.  The downstream `prep`,
+`design`, `implement`, `review`, and `push` steps all wire from
+`{:step "search" :yield :text}`.  Renaming would require updating all five downstream
+wiring references.  Keeping `search` means zero downstream changes.  The `:outputs`
+block must add `:data {:source :invoke/data}` so label-ops steps can wire `:number`
+from it.
+
+Label-ops steps wire `:number` as:
+
+```edn
+:args {:number {:from {:step "search" :output :data} :path [:pr-number]}
+       :labels [...]
+       :target "pr"}
+```
+
+**Decision (M) — `gh-pr-fix-checks`:** Keep the existing step name `select` after
+replacing the AI delegate with `:invoke github/find-pr`.  The downstream `heal-checks`
+delegate step wires from `{:step "select" :yield :text}`.  Keeping `select` means zero
+downstream changes.  No label-ops steps are added to `gh-pr-fix-checks` (PR discovery
+only; no label mutation in this workflow).
+
+### `gh-bug-fix-and-pr` discover `:input` (item N)
+
+**Decision (N):** `:input nil` is intentional for `gh-bug-fix-and-pr`.  The `fix`
+label already narrows the candidate set to a single issue in practice; no caller-supplied
+narrowing hint is needed.  Design §D's `:input {:from :workflow-input :path [:input]}`
+wiring applies only to `gh-issue-implement` and `gh-pr-fix-checks`, where multiple
+candidates may exist.
+
 ### PR number source for gh-issue-refine label-ops (item J)
 
 **Decision (J):** Use option (a) — update the `publish` delegate step prompt to

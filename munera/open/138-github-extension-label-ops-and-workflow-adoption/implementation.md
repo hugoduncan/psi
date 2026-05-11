@@ -1,5 +1,28 @@
 # Implementation Notes
 
+## 2026-05-10 — Design review pass 3 follow-up execution (design-steps K–N)
+
+All four design-steps resolved:
+
+- **K** — decided: wire `:number` from `:workflow-input :path [:issue_number]` in both
+  `gh-bug-post-repro` and `gh-bug-request-more-info`.  The upstream `gh-bug-reproduce`
+  handoff already emits `issue_number:` as a structured bullet, so no new discover step
+  is needed.  design.md §K added; steps.md migration blocks for both workflows updated
+  with corrected wiring.
+- **L** — decided: keep step name `search` in `gh-issue-implement` after replacing the
+  AI delegate with `:invoke github/find-pr`.  Five downstream steps wire from
+  `{:step "search" :yield :text}` — keeping the name means zero downstream changes.
+  Label-ops `:number` wires from `{:step "search" :output :data}`.  design.md §L added;
+  steps.md `gh-issue-implement` block updated.
+- **M** — decided: keep step name `select` in `gh-pr-fix-checks` after replacing the AI
+  delegate with `:invoke github/find-pr`.  `heal-checks` wires from
+  `{:step "select" :yield :text}` — keeping the name means zero downstream changes.  No
+  label-ops steps added (PR discovery only).  design.md §M added; steps.md
+  `gh-pr-fix-checks` block updated.
+- **N** — confirmed: `:input nil` is intentional for `gh-bug-fix-and-pr`.  The `fix`
+  label narrows to a single issue; no caller-supplied hint is needed.  design.md §N
+  added; no steps.md change required.
+
 ## 2026-05-10 — Design review pass 3
 
 **Ambiguities found:**
