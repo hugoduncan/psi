@@ -222,6 +222,15 @@
        :assistant-message (:assistant-message result)
        :logprobs (:logprobs result)})))
 
+(defn- provider-captures-for-turn
+  [ctx session-id turn-id]
+  {:request-captures  (->> (trs/provider-requests-in ctx session-id)
+                           (filter #(= turn-id (:turn-id %)))
+                           vec)
+   :response-captures (->> (trs/provider-replies-in ctx session-id)
+                           (filter #(= turn-id (:turn-id %)))
+                           vec)})
+
 (defn execute-prepared-request!
   "Execute one prepared request through the live turn runtime.
    Returns a shaped execution-result map."
@@ -253,8 +262,7 @@
      :execution-result/model               ai-model
      :execution-result/assistant-message   assistant-message
      :execution-result/usage               (:usage assistant-message)
-     :execution-result/provider-captures   {:request-captures []
-                                            :response-captures []}
+     :execution-result/provider-captures   (provider-captures-for-turn ctx session-id turn-id)
      :execution-result/turn-outcome        (:turn/outcome outcome)
      :execution-result/tool-calls          (:tool-calls outcome)
      :execution-result/error-message       (:error-message assistant-message)

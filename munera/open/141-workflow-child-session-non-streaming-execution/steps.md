@@ -13,4 +13,4 @@
 - [x] Branch prompt execution on session `:response-mode` while preserving the canonical execution-result shape.
 - [x] Add focused tests for workflow config propagation, child-session persistence, non-streaming execution selection, and streaming-default regression.
 - [x] Verify the motivating case: workflow child session can avoid `tools + stream + logprobs` provider rejection by selecting `:response-mode :non-streaming`.
-- [ ] Preserve provider request/response captures in `:execution-result/provider-captures` for the non-streaming `:response-mode` path, and add focused proof that canonical capture shaping matches streaming execution.
+- [x] Preserve provider request/response captures in `:execution-result/provider-captures` for the non-streaming `:response-mode` path, and add focused proof that canonical capture shaping matches streaming execution.

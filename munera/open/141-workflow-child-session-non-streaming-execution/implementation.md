@@ -122,3 +122,11 @@ Focused verification run green:
 
 Found one actionable implementation gap:
 - non-streaming execution records provider request/response captures via `capture-aware-ai-options`, but `psi.turn-runtime.core/execute-prepared-request!` still returns hard-coded empty `:execution-result/provider-captures`, so the non-streaming path does not preserve the canonical execution-result capture surface expected from the streaming path
+
+## Follow-up execution 2026-05-11f
+
+Closed the remaining provider-capture gap for task 141:
+- added lower `psi.turn-runtime.core/provider-captures-for-turn` to shape canonical per-turn captures from persisted turn-runtime telemetry
+- `execute-prepared-request!` now returns per-turn `:execution-result/provider-captures` for both streaming and non-streaming paths instead of hard-coded empties
+- extended `psi.turn-runtime.response-mode-test` so the non-streaming provider stub emits request/reply captures via the capture callbacks and proves the returned canonical capture surface includes both captures with the current `turn-id`
+

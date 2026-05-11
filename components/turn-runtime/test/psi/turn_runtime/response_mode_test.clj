@@ -34,7 +34,18 @@
           execute-calls* (atom [])
           stream-calls*  (atom [])]
       (with-redefs [psi.ai.core/execute-response-in
-                    (fn [_ai-ctx _conv _model _opts]
+                    (fn [_ai-ctx _conv _model opts]
+                      ((:on-provider-request opts)
+                       {:provider :openai
+                        :api :chat-completions
+                        :url "https://example.test/v1/chat/completions"
+                        :headers {"content-type" "application/json"}
+                        :body {:stream false}})
+                      ((:on-provider-response opts)
+                       {:provider :openai
+                        :api :chat-completions
+                        :url "https://example.test/v1/chat/completions"
+                        :event {:type :done :reason :stop}})
                       (swap! execute-calls* conj :called)
                       {:assistant-message {:role "assistant"
                                            :content [{:type :text :text "done"}]
@@ -55,7 +66,25 @@
           (is (= [{:type :text :text "done"}]
                  (get-in result [:execution-result/assistant-message :content])))
           (is (= [{:token "done" :logprob -0.1 :top []}]
-                 (:execution-result/logprobs result))))))))
+                 (:execution-result/logprobs result)))
+          (is (= {:request-captures [{:provider :openai
+                                      :api :chat-completions
+                                      :url "https://example.test/v1/chat/completions"
+                                      :headers {"content-type" "application/json"}
+                                      :body {:stream false}
+                                      :turn-id "turn-1"
+                                      :timestamp (-> result :execution-result/provider-captures :request-captures first :timestamp)}]
+                  :response-captures [{:provider :openai
+                                       :api :chat-completions
+                                       :url "https://example.test/v1/chat/completions"
+                                       :event {:type :done :reason :stop}
+                                       :turn-id "turn-1"
+                                       :timestamp (-> result :execution-result/provider-captures :response-captures first :timestamp)}]}
+                 (:execution-result/provider-captures result)))
+          (is (instance? java.time.Instant
+                         (-> result :execution-result/provider-captures :request-captures first :timestamp)))
+          (is (instance? java.time.Instant
+                         (-> result :execution-result/provider-captures :response-captures first :timestamp))))))))
 
 (deftest execute-prepared-request-defaults-to-streaming-test
   (testing "absent :response-mode preserves streaming execution path"
