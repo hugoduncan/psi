@@ -61,3 +61,10 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 - Re-read the workflow create/run/resume and step-session-config surfaces plus focused proof. Confirmed the authoritative parent precedence is implemented consistently across canonical mutation, psi-tool create-run, delegated sub-workflow creation, workflow-context reconstruction, and step session-config resolution.
 - Re-ran the focused workflow tests and lint; all passed.
 - No new actionable feedback found.
+
+## 2026-05-11 test review
+
+- Reviewed the task against `task-test-review`: focused proofs cover the motivating two-session inheritance case, explicit workflow override precedence, nil-parent compatibility fallback, persisted parent-session-id on workflow runs, and the distinct resume execution path.
+- Re-read the lower session-config proof plus canonical mutation, psi-tool, workflow-runtime state, attempt-child-session, and resume-path tests to verify the delegating-session authority is exercised at the intended seams without mocks/stubs of logic dependencies.
+- Re-ran `bb clojure:test:unit --focus psi.workflow-runtime.core-test --focus psi.workflow-step-session-config.core-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.workflow-runtime.statechart-runtime.state-test` and `bb lint`; both passed.
+- No new actionable feedback found.
