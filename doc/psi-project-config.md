@@ -93,8 +93,15 @@ Example:
 ```
 
 Rules:
-- exactly one mode must be selected
-- if `namespaces` and `worktree-path` are both supplied, the request errors
+- reload-code has two targeting axes:
+  - namespace selection via `namespaces`
+  - worktree constraint via effective target worktree-path
+- if `namespaces` are supplied, the effective target worktree-path defaults to:
+  1. explicit `worktree-path`
+  2. invoking session `:worktree-path`
+  3. otherwise error
+- each requested already loaded namespace must have a canonical source path under the effective target worktree-path or the request errors
+- when `namespaces` are omitted, reload-code operates in worktree mode
 - worktree precedence is:
   1. explicit `worktree-path`
   2. invoking session `:worktree-path`

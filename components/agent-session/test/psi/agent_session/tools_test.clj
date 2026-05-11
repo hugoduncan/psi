@@ -97,12 +97,12 @@
         (is (true? (:is-error result)))
         (is (re-find #"requires `form`" (:content result)))))
 
-    (testing "reload-code rejects simultaneous targeting modes"
-      (let [result ((:execute tool) {"action" "reload-code"
-                                     "namespaces" ["psi.agent-session.tools"]
-                                     "worktree-path" "/tmp"})]
-        (is (true? (:is-error result)))
-        (is (re-find #"exactly one targeting mode" (:content result)))))
+    (testing "reload-code allows namespace targeting with explicit worktree-path when the namespace source is inside that worktree"
+      (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/inside.clj"))]
+        (let [result ((:execute tool) {"action" "reload-code"
+                                       "namespaces" ["clojure.string"]
+                                       "worktree-path" (System/getProperty "user.dir")})]
+          (is (false? (:is-error result))))))
 
     (testing "project-repl requires valid op"
       (let [result ((:execute tool) {"action" "project-repl"})]
@@ -301,9 +301,10 @@
       (is (= :validate (get-in parsed [:psi-tool/error :phase])))))
 
   (testing "namespace mode reloads exactly requested namespaces in request order"
-    (let [tool   (tools/make-psi-tool (fn [_q] {}))
-          result ((:execute tool) {"action" "reload-code"
-                                   "namespaces" ["clojure.string" "clojure.edn"]})
+    (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
+          result (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/in-worktree.clj"))]
+                   ((:execute tool) {"action" "reload-code"
+                                     "namespaces" ["clojure.string" "clojure.edn"]}))
           parsed (read-string (:content result))]
       (is (false? (:is-error result)))
       (is (= :namespaces (:psi-tool/reload-mode parsed)))
@@ -312,6 +313,8 @@
       (is (= :ok (get-in parsed [:psi-tool/code-reload :status])))
       (is (= :ok (get-in parsed [:psi-tool/graph-refresh :status])))
       (is (= :ok (:psi-tool/overall-status parsed)))
+      (is (= (System/getProperty "user.dir") (:psi-tool/worktree-path parsed)))
+      (is (= :session (:psi-tool/worktree-source parsed)))
       (is (= "preserved current extension registry without rediscovery"
              (get-in parsed [:psi-tool/graph-refresh :steps 3 :summary])))))
 
@@ -333,8 +336,9 @@
           (delete-tree! dir)))))
 
   (testing "namespace mode stops at first namespace failure and reports successful prefix"
-    (let [tool   (tools/make-psi-tool (fn [_q] {}))
-          result (with-redefs [clojure.core/require (fn [ns-sym & _]
+    (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
+          result (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/in-worktree.clj"))
+                               clojure.core/require (fn [ns-sym & _]
                                                       (when (= 'clojure.edn ns-sym)
                                                         (throw (ex-info "boom" {:ns ns-sym}))))]
                    ((:execute tool) {"action" "reload-code"
@@ -344,7 +348,27 @@
       (is (= :error (get-in parsed [:psi-tool/code-reload :status])))
       (is (= ["clojure.string"] (get-in parsed [:psi-tool/code-reload :namespaces])))
       (is (= :ok (get-in parsed [:psi-tool/graph-refresh :status])))
+      (is (= (System/getProperty "user.dir") (:psi-tool/worktree-path parsed)))
+      (is (= :session (:psi-tool/worktree-source parsed)))
       (is (= :error (:psi-tool/overall-status parsed)))))
+
+  (testing "namespace mode rejects session-derived worktree-path when namespace source is outside that worktree"
+    (let [tmpdir (str (java.nio.file.Files/createTempDirectory "psi-tool-reload-outside-worktree-"
+                                                               (make-array java.nio.file.attribute.FileAttribute 0)))]
+      (try
+        (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/outside.clj"))]
+          (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd tmpdir})
+                result ((:execute tool) {"action" "reload-code"
+                                         "namespaces" ["clojure.string"]})
+                parsed (read-string (:content result))]
+            (is (true? (:is-error result)))
+            (is (= :validate (get-in parsed [:psi-tool/error :phase])))
+            (is (= (.getAbsolutePath (.getCanonicalFile (io/file tmpdir)))
+                   (:psi-tool/worktree-path parsed)))
+            (is (= :session (:psi-tool/worktree-source parsed)))
+            (is (re-find #"outside target worktree" (:content result)))))
+        (finally
+          (delete-tree! tmpdir)))))
 
   (testing "worktree mode uses session worktree-path when explicit target absent"
     (with-redefs [psi-tool/worktree-reload-candidates (fn [worktree-path]
@@ -449,12 +473,20 @@
         (is (= 1 (get-in parsed [:psi-tool/graph-refresh :steps 3 :install :diagnostic-count]))))))
 
   (testing "namespace mode may target loaded project namespaces"
-    (let [tool   (tools/make-psi-tool (fn [_q] {}))
-          result ((:execute tool) {"action" "reload-code"
-                                   "namespaces" ["psi.agent-session.tools"]})
-          parsed (read-string (:content result))]
-      (is (false? (:is-error result)))
-      (is (= ["psi.agent-session.tools"] (get-in parsed [:psi-tool/code-reload :namespaces]))))))
+    (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/in-worktree.clj"))]
+      (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
+            result ((:execute tool) {"action" "reload-code"
+                                     "namespaces" ["psi.agent-session.tools"]})
+            parsed (read-string (:content result))]
+        (is (false? (:is-error result)))
+        (is (= ["psi.agent-session.tools"] (get-in parsed [:psi-tool/code-reload :namespaces]))))))
+
+  (testing "canonical-source-path-for-ns falls back to namespace resource lookup when ns metadata lacks :file"
+    (require 'psi.agent-session.workflow.text)
+    (let [ns-obj  (find-ns 'psi.agent-session.workflow.text)
+          source  (#'psi.agent-session.psi-tool/canonical-source-path-for-ns ns-obj)]
+      (is (string? source))
+      (is (.endsWith source "components/agent-session/src/psi/agent_session/workflow/text.clj")))))
 
 (deftest make-psi-tool-project-repl-test
   (testing "project-repl status reports absent instance"
