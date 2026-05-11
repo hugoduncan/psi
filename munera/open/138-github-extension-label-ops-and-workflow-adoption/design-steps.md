@@ -33,3 +33,42 @@ Unchecked items added by design review pass 3 (2026-05-10).
 - [x] **M. Specify step name to use after migrating gh-pr-fix-checks discovery.** The current AI discovery step is named `select`. After replacing it with `:invoke github/find-pr`, the step name must be decided: keep `select` or rename to `discover`. The `heal-checks` delegate step wires from `{:step "select" :yield :text}` — if renamed, that reference must update. Steps.md must state the chosen step name and list the wiring references that need updating.
 
 - [x] **N. Clarify whether gh-bug-fix-and-pr discover :input should be wired from workflow input.** The existing discover step passes `:input nil`. Design §D specifies `:input {:from :workflow-input :path [:input]}` for `gh-issue-implement` and `gh-pr-fix-checks` but is silent on `gh-bug-fix-and-pr`. If narrowing hints are not needed for bug/fix issues (label already narrows to one), document that `:input nil` is intentional. If they are needed, add the wiring. Update design.md §D or add a note to the `gh-bug-fix-and-pr` migration block in steps.md.
+
+Unchecked items added by design review pass 4 (2026-05-10).
+
+- [ ] **O. Qualify acceptance criteria for conditional label-add.** The acceptance criteria states
+  "All nine listed workflows no longer instruct the AI to perform label changes" but design §Out of
+  scope explicitly keeps conditional label add (`waiting` vs `fix`) AI-driven in `gh-bug-triage`
+  and `gh-bug-post-repro`. Update the acceptance criteria to read "…no longer instruct the AI to
+  perform *unconditional* label changes or shell-based discovery; conditional label-add in
+  `gh-bug-triage` and `gh-bug-post-repro` remains AI-driven per §Out of scope."
+
+- [ ] **P. Resolve §K :number wiring for gh-bug-post-repro and gh-bug-request-more-info delegate case.**
+  Design §K wires `:number` as `{:from :workflow-input :path [:issue_number]}`. When
+  `gh-bug-post-repro` is called as a delegate from `gh-bug-triage-modular`, its `:workflow-input`
+  is the rendered `prompt-string` (a plain text string). `get-path*` on a string returns nil, so
+  the wiring silently produces nil. Options: (a) expose `:issue_number` from the `classify` session
+  step's output by adding `:outputs {:data {:source :session/handoff}}` (requires `classify` to emit
+  `issue_number:` in its handoff); (b) change `gh-bug-triage-modular`'s `post-repro` delegate step
+  to pass structured input `{:issue_number N :report "..."}` and update `gh-bug-post-repro`'s
+  session step to use `{:from :workflow-input :path [:report]}` for `{{input}}`; (c) wire from
+  `gh-bug-reproduce`'s parsed handoff data via `context` (already present in `gh-bug-triage-modular`
+  as `:output :handoff`). Pick one approach, update design.md §K, and update steps.md migration
+  blocks for both workflows.
+
+- [ ] **Q. Tighten steps.md prompt-stripping spec for gh-bug-triage and gh-issue-ingest.** Steps
+  currently say "Strip `gh issue list` instruction from AI prompt" but the prompts contain entire
+  discovery sections that must also be removed: "Primary selection rule:", "Input expectations:",
+  and the discovery step in "Required procedure:" (step 1 "Discover and select the issue" /
+  "Discover candidate issues"). Update both migration blocks in steps.md to say: strip the
+  "Primary selection rule" paragraph, the "Input expectations" paragraph, and step 1 of "Required
+  procedure" (the AI session receives the selected issue from the upstream `:invoke` step and
+  should start from reading, not discovering).
+
+- [ ] **R. Specify step names for gh-bug-discover-and-read migration.** The workflow currently has
+  one step named `"discover"` (a session). After migration it will have two steps: a leading
+  `:invoke` step and a session step. Steps.md must name both steps explicitly (e.g. keep `"discover"`
+  for the `:invoke` step and rename the session to `"read"`, or vice versa) and confirm no other
+  workflow wires from `gh-bug-discover-and-read` step names (it is not called as a delegate, so
+  there are no downstream references to break). Update the `gh-bug-discover-and-read` migration
+  block in steps.md.

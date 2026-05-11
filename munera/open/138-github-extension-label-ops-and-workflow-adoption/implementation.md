@@ -1,5 +1,34 @@
 # Implementation Notes
 
+## 2026-05-10 — Design review pass 4
+
+**Inconsistencies found:**
+
+1. **Acceptance criteria contradicts §Out of scope on conditional label-add.** The acceptance
+   criteria states "All nine listed workflows no longer instruct the AI to perform label changes"
+   but design §Out of scope explicitly keeps conditional label add (`waiting` vs `fix`) AI-driven
+   in `gh-bug-triage` and `gh-bug-post-repro`. The acceptance criteria must be qualified to
+   exclude the conditional label-add case.
+
+2. **Design §K wiring broken for delegate-call case.** `{:from :workflow-input :path [:issue_number]}`
+   returns nil when `gh-bug-post-repro` is called as a delegate from `gh-bug-triage-modular`
+   because `:workflow-input` is the rendered `prompt-string` (a plain text string, not a map).
+   `get-path*` on a string returns nil. The design assumes structured map input but both
+   `gh-bug-post-repro` and `gh-bug-request-more-info` receive plain text. The wiring source
+   for `:number` in these two workflows is unresolved for the delegate-call case.
+
+3. **Steps.md prompt-stripping underspecified for gh-bug-triage and gh-issue-ingest.** Steps say
+   "strip `gh issue list` instruction from AI prompt" but the prompts contain entire discovery
+   sections ("Primary selection rule:", "Input expectations:", step 1 "Discover and select/candidate
+   issues") that also need stripping after the `:invoke` discover step takes over. The acceptance
+   criteria requires stripping ALL shell-based discovery instructions, not just the literal
+   `gh issue list` command.
+
+4. **gh-bug-discover-and-read step names unspecified after migration.** The migration adds a
+   leading `:invoke` step to a workflow that currently has ONE step named `"discover"`. After
+   migration there will be two steps; neither step name is specified in steps.md (unlike §L and §M
+   which explicitly name the retained step and note zero downstream changes).
+
 ## 2026-05-10 — Design review pass 3 follow-up execution (design-steps K–N)
 
 All four design-steps resolved:
