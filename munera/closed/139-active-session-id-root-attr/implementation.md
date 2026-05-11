@@ -99,6 +99,14 @@ Design is now unambiguous. plan.md can be written and execution can begin.
    semantics, return value) belong in `resolvers_test.clj` and are already called
    out in the Test contract. design.md Test contract section updated accordingly.
 
+## Review follow-up execution — 2026-05-10
+
+Added `:psi.agent-session/active-session-id` to `canonical-graph-root-attrs` in
+`graph_surface_test.clj`. The attr now appears in the pinned set alongside
+`:psi.graph/*` introspection attrs; accidental resolver removal will fail
+`root-queryable-attrs-contract-test` explicitly rather than only via the
+dynamic resolution loop. 1678 tests, 11841 assertions, 0 failures; lint clean.
+
 ## Implementation review — 2026-05-10
 
 Resolver, docstring, nil passthrough, and registration in `resolvers` def are all
