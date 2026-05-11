@@ -100,6 +100,29 @@ Clarification and resolution items surfaced during design review.
   > `"/logprobs"`. Help text (used in `/help` output):
   > `"  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"`.
 
+## Inconsistencies (review pass 2)
+
+- [ ] **Accumulator key in design-steps.md** — design-steps.md item 2 resolution says
+  "finalized into `:last-turn-logprobs`" but design.md and plan.md both say
+  `:execution-result/logprobs` is the accumulator output key. Correct design-steps.md
+  to read "finalized into `:execution-result/logprobs`"; `:last-turn-logprobs` is the
+  downstream session-data slot written by `build-record-response`.
+
+- [ ] **"Session telemetry" wording in design.md** — design.md §Surfacing §1 and
+  §Acceptance describe `:last-turn-logprobs` as a "session telemetry slot". The actual
+  write path (`session-update` in `build-record-response`) targets session-data
+  (`[:agent-session :sessions sid :data]`), not the telemetry sub-map
+  (`[:agent-session :sessions sid :telemetry k]`). Update design.md to say
+  "session-data slot" (consistent with `:last-execution-result-summary`). If telemetry
+  placement is intentional, the implementation must use `session-telemetry-path` and a
+  direct `update-in` instead of `session-update`.
+
+- [ ] **`format-help` line missing from steps.md** — design.md specifies the help text
+  `"  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"` but
+  steps.md step 8 does not mention adding this line to `format-help` in `commands.clj`.
+  Add an explicit sub-bullet to step 8: "Add `/logprobs` help line to `format-help`
+  alongside `/model` and `/thinking`".
+
 - [x] **Hard-coded 0.90 probability threshold**: The synthetic LLM message uses
   `p < 0.90` as the "uncertain token" threshold. Clarify whether this is a fixed
   display constant or a configurable session/command parameter (e.g. `/logprobs
