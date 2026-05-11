@@ -25,3 +25,7 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 
 - Actionable ambiguity: the task did not include the `design-steps.md` follow-up surface that this review protocol writes to, so the canonical place for new design-review actions was implicit rather than task-local. Added `design-steps.md` with a follow-up to make that review/follow-up surface explicit in the task artifacts.
 - Completed the ambiguity follow-up by updating `design.md` and `plan.md` to define task-local roles for `design-steps.md`, `steps.md`, and `implementation.md`, making future design-review actions explicit without widening scope into implementation work.
+
+## 2026-05-11 design/plan/steps consistency review
+
+- Actionable inconsistency: `design.md` and `plan.md` both frame the fix as covering workflow create/execute/resume paths, but `steps.md` only asks for a generic create/execute/resume inventory and never adds an explicit follow-through step to verify or test resume-path preservation separately. Added a `design-steps.md` follow-up to make that missing task-file obligation explicit without broadening scope beyond the already-stated intent.
