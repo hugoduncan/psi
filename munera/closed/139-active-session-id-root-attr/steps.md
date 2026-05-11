@@ -47,3 +47,9 @@
 - [x] Implement resolver
 - [x] Add/extend tests per test contract
 - [x] Verify `bb test` green, lint clean
+
+## Review follow-up
+
+- [ ] Add `:psi.agent-session/active-session-id` to `canonical-graph-root-attrs` in
+      `graph_surface_test.clj` so accidental resolver removal is caught by the
+      explicit canonical-set assertion, not only by the dynamic resolution loop.

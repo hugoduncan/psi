@@ -98,3 +98,17 @@ Design is now unambiguous. plan.md can be written and execution can begin.
    deftest is needed in `graph_surface_test.clj`. The resolver unit tests (nil
    semantics, return value) belong in `resolvers_test.clj` and are already called
    out in the Test contract. design.md Test contract section updated accordingly.
+
+## Implementation review — 2026-05-10
+
+Resolver, docstring, nil passthrough, and registration in `resolvers` def are all
+correct and match the design. Tests cover the three required cases (non-nil, nil,
+root-access). Lint clean; 1678 tests green at commit e2388eea.
+
+**One gap:** `canonical-graph-root-attrs` in `graph_surface_test.clj` is a
+hardcoded set that does not include `:psi.agent-session/active-session-id`.
+The `root-queryable-attrs-contract-test` dynamically verifies every advertised
+attr resolves, so accidental removal of the resolver would stop the attr from
+being advertised and the resolution loop would catch it — but only indirectly.
+Adding the attr to `canonical-graph-root-attrs` would make the regression
+explicit and symmetric with how other stable root attrs are pinned.
