@@ -488,6 +488,27 @@
       (is (= "wake" (:psi.scheduler/message result)))
       (is (= :pending (:psi.scheduler/status result))))))
 
+;; ── :psi.agent-session/active-session-id ────────────────
+
+(deftest active-session-id-resolver-test
+  (testing "returns invoking session id when present and non-nil"
+    (let [[ctx session-id] (create-session-context)]
+      (is (= session-id
+             (:psi.agent-session/active-session-id
+              (session/query-in ctx session-id [:psi.agent-session/active-session-id]))))))
+
+  (testing "returns nil when session-id is present-but-nil in the entity map"
+    (let [[ctx _] (create-session-context)]
+      (is (nil? (:psi.agent-session/active-session-id
+                 (session/query-in ctx nil [:psi.agent-session/active-session-id]))))))
+
+  (testing "queryable from root without extra entity seeding — q helper uses psi-tool pattern"
+    (let [[ctx session-id] (create-session-context)]
+      (is (= session-id
+             (:psi.agent-session/active-session-id
+              (session/query-in ctx session-id [:psi.agent-session/active-session-id])))
+          "active-session-id resolves from root seeds alone — no explicit entity seed required"))))
+
 (deftest register-resolvers-in-includes-history-resolvers-test
   (testing "register-resolvers-in! includes history resolvers so worktree attrs are resolvable
             (regression: extension query-fn uses isolated qctx via register-resolvers-in!)"

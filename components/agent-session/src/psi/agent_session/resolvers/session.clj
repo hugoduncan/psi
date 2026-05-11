@@ -523,6 +523,25 @@
      :psi.startup/extension-errors       (:extension-errors summary [])
      :psi.startup/mutations              (:mutations summary [])}))
 
+;; ── Invoking session identity (root-queryable) ─────────
+
+(pco/defresolver active-session-id-resolver
+  "Resolve the invoking session's own identity from the psi-tool query context.
+   Returns the session-id present in the query context, or nil when present-but-nil.
+   Answers \"which session am I?\" from root without entity seeding.
+
+   Input is a single root seed [:psi.agent-session/session-id] so Pathom3 includes
+   :psi.agent-session/active-session-id in root-queryable-attrs. All psi-tool queries
+   seed :psi.agent-session/session-id into the entity map (see tool_plan.clj).
+
+   Returns nil when :psi.agent-session/session-id is present-but-nil in the entity map.
+   When the key is absent Pathom3 returns :com.wsscode.pathom3.core/not-found — that
+   is expected Pathom3 behaviour, not a case handled here."
+  [{:psi.agent-session/keys [session-id]}]
+  {::pco/input  [:psi.agent-session/session-id]
+   ::pco/output [:psi.agent-session/active-session-id]}
+  {:psi.agent-session/active-session-id session-id})
+
 (def resolvers
   [agent-session-identity
    agent-session-phase
@@ -552,4 +571,5 @@
    agent-session-model-catalog
    agent-session-authenticated-providers
    agent-session-rpc-trace
-   startup-bootstrap-resolver])
+   startup-bootstrap-resolver
+   active-session-id-resolver])
