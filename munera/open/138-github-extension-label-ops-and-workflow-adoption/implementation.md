@@ -1,5 +1,35 @@
 # Implementation Notes
 
+## 2026-05-10 — Design review pass 3
+
+**Ambiguities found:**
+
+1. **`gh-bug-post-repro` and `gh-bug-request-more-info` have no discover step** — Both
+   workflows have no `:invoke github/find-issue` discover step; the issue number arrives
+   only through workflow input (the upstream repro/handoff text). Steps.md wires
+   `remove-label :number` as `{:from {:step "discover" ...}}` but there is no `discover`
+   step in either workflow. The wiring source for `:number` is unspecified.
+
+2. **`gh-issue-implement` step name mismatch** — The existing AI discovery step is named
+   `search` (not `discover`). Steps.md wires label-ops from `{:step "discover" ...}`.
+   After migration to `:invoke github/find-pr`, the step name to use (keep `search` or
+   rename to `discover`) is unspecified; downstream context wiring in `prep` and
+   `implement` also references the old step name.
+
+3. **`gh-pr-fix-checks` step name mismatch** — Existing AI step is named `select`. Steps.md
+   wires from `{:step "discover" ...}`. Step name after migration is unspecified.
+
+4. **`gh-bug-fix-and-pr` discover `:input` not wired from workflow input** — The existing
+   `discover` step passes `:input nil` rather than `{:from :workflow-input :path [:input]}`.
+   Design §D specifies the wiring for `gh-issue-implement` and `gh-pr-fix-checks` but is
+   silent on `gh-bug-fix-and-pr`. Intentional (bug/fix issues need no narrowing hint) or
+   oversight?
+
+5. **`gh-issue-refine` publish prompt label-change instructions not precisely scoped** —
+   Steps.md says "strip label instructions from AI publish prompt" but the publish prompt
+   contains two distinct label instructions (remove `refine` from issue; add `waiting` to
+   PR) that must both be removed. No explicit call-out of which lines/sentences to strip.
+
 ## 2026-05-10 — Design review pass 1 follow-up execution (design-steps A–G)
 
 All seven design-steps resolved:
