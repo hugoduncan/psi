@@ -138,3 +138,18 @@ Code-shaper pass found no new actionable simplicity, consistency, or robustness 
 
 Test-review pass found no new actionable test gaps after reading the task artifacts plus the focused response-mode, workflow session-config, workflow attempt, child-session state/mutation, and AI core proofs; current tests cover explicit propagation, default streaming fallback, non-streaming branch selection, child-session persistence, and provider-capture shaping without duplicating prior follow-up items.
 
+## Follow-up execution 2026-05-11i
+
+Read the preloaded tests-review result and task artifacts, then executed the newly added follow-up pass.
+- `steps.md` had no remaining unchecked actionable items, so no code or test changes were needed.
+- Re-ran the focused proof set for the task to confirm the review conclusions still hold:
+  - `psi.ai.core-test`
+  - `psi.workflow-step-session-config.core-test`
+  - `psi.workflow-runtime.attempts-test`
+  - `psi.agent-session.workflow-attempts-test`
+  - `psi.agent-session.child-session-state-test`
+  - `psi.agent-session.child-session-mutation-test`
+  - `psi.turn-runtime.response-mode-test`
+- Verification remained green: `1710 tests, 12609 assertions, 0 failures`.
+- No new actionable follow-up was discovered, so task artifacts stayed otherwise unchanged in this execution pass.
+
