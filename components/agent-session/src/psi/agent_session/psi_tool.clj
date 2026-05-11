@@ -235,7 +235,20 @@
          (catch Exception _ nil))))
 
 (defn- canonical-path [path] (some-> path canonical-file .getAbsolutePath))
-(defn- canonical-source-path-for-ns [ns-obj] (or (some-> ns-obj meta :file canonical-path) (some-> ns-obj meta :file io/resource .getFile canonical-path)))
+
+(defn- namespace-resource-paths [ns-obj]
+  (let [base (some-> ns-obj ns-name str (str/replace "." "/") (str/replace "-" "_"))]
+    (when base
+      [(str base ".clj")
+       (str base ".cljc")
+       (str base ".cljs")])))
+
+(defn- canonical-source-path-for-ns [ns-obj]
+  (or (some-> ns-obj meta :file canonical-path)
+      (some->> (namespace-resource-paths ns-obj)
+               (keep #(some-> % io/resource .getFile canonical-path))
+               first)))
+
 (defn- loaded-namespace? [ns-name] (boolean (some-> ns-name symbol find-ns)))
 
 (defn- validate-reload-namespaces [namespaces]

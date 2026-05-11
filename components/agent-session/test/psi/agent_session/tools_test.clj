@@ -479,7 +479,14 @@
                                      "namespaces" ["psi.agent-session.tools"]})
             parsed (read-string (:content result))]
         (is (false? (:is-error result)))
-        (is (= ["psi.agent-session.tools"] (get-in parsed [:psi-tool/code-reload :namespaces])))))))
+        (is (= ["psi.agent-session.tools"] (get-in parsed [:psi-tool/code-reload :namespaces]))))))
+
+  (testing "canonical-source-path-for-ns falls back to namespace resource lookup when ns metadata lacks :file"
+    (require 'psi.agent-session.workflow.text)
+    (let [ns-obj  (find-ns 'psi.agent-session.workflow.text)
+          source  (#'psi.agent-session.psi-tool/canonical-source-path-for-ns ns-obj)]
+      (is (string? source))
+      (is (.endsWith source "components/agent-session/src/psi/agent_session/workflow/text.clj")))))
 
 (deftest make-psi-tool-project-repl-test
   (testing "project-repl status reports absent instance"
