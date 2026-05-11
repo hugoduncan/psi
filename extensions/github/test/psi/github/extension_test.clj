@@ -4,8 +4,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.github.extension :as sut]))
 
-(deftest init-registers-github-find-issue-operation-test
-  (testing "init delegates to :register-operation with correct id and handler"
+(deftest init-registers-all-four-operations-test
+  (testing "init registers exactly four operations with correct ids, handlers, and descriptions"
     (let [reg    (ext/create-registry)
           _      (ext/register-extension-in! reg "/ext/github")
           calls* (atom [])
@@ -16,9 +16,13 @@
                      (swap! calls* conj [ext-path op])
                      {:id (:id op)})})]
       (sut/init api)
-      (is (= 1 (count @calls*)))
-      (let [[ext-path op] (first @calls*)]
+      (is (= 4 (count @calls*)))
+      (let [registered-ids (set (map (fn [[_ op]] (:id op)) @calls*))]
+        (is (contains? registered-ids "github/find-issue"))
+        (is (contains? registered-ids "github/find-pr"))
+        (is (contains? registered-ids "github/add-label"))
+        (is (contains? registered-ids "github/remove-label")))
+      (doseq [[ext-path op] @calls*]
         (is (= "/ext/github" ext-path))
-        (is (= "github/find-issue" (:id op)))
         (is (fn? (:handler op)))
         (is (not-empty (:description op)))))))
