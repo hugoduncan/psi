@@ -36,6 +36,13 @@ When a workflow session step authors `:model {:type :model-query ...}`:
 - execution should stop at the first successful candidate and preserve the existing canonical step result shape
 - if all ranked candidates fail, the workflow step should fail with an error that reflects exhaustion of the ranked candidates rather than hiding the failures
 
+Authoritative shape for this task:
+- `resolve-step-session-config` becomes the single ranking seam for workflow session steps
+- for authored `:model-query`, it should return the existing concrete `:model` field as the first ranked candidate for compatibility with current child-session creation
+- it should also return ranked fallback metadata alongside that concrete model so execution does not need to re-run model selection later
+- execution consumes that preserved ranked sequence exactly once per step attempt and must not re-rank between candidate attempts
+- explicit concrete workflow models continue to return only the ordinary single-model shape and do not gain ranked metadata
+
 When a workflow session step authors an explicit concrete model id or concrete model map:
 - current single-model behaviour remains unchanged
 - no ranked fallback is introduced
@@ -68,6 +75,8 @@ The workflow path should:
 - preserve one authoritative ranked sequence for a given step attempt
 - execute the same workflow step contract against successive concrete candidates
 - keep higher workflow result semantics unchanged above the fallback seam
+
+Concretely, the narrow carrier is the workflow step session-config returned by `psi.workflow-step-session-config.core/resolve-step-session-config`, because that is the last lower workflow-owned seam before `psi.workflow-runtime.statechart-runtime` creates the canonical child attempt session. That carrier already feeds `create-step-attempt-session!`, so preserving ranked metadata there keeps ranking lower-owned while keeping fallback iteration owned by workflow runtime.
 
 ## Likely data/control flow
 
@@ -112,6 +121,8 @@ Preferred direction: keep the fallback sequence stable for a given step attempt 
 - Successful execution stops fallback immediately and preserves existing workflow step result semantics.
 - Explicit concrete workflow models continue to use current single-model behaviour without ranked fallback.
 - Exhausting all ranked candidates yields a coherent terminal workflow step failure.
+- That exhaustion failure is recorded on the single canonical workflow attempt as `:execution-error`, with a stable reason such as ranked-candidate exhaustion and an aggregate `:candidate-failures` vector in ranked order containing per-candidate concrete model identity plus the terminal failure payload observed for that candidate.
+- Workflow run/result bookkeeping remains unchanged above the attempt seam: no synthetic extra workflow attempts are created for individual fallback candidates, and the step still ends as one failed attempt whose error payload carries the aggregate candidate diagnostics.
 - Focused proof covers the motivating case: first-ranked local candidate fails with connection refused, second-ranked candidate succeeds, and the workflow step completes successfully.
 - Focused proof also covers that non-query concrete models do not gain fallback behaviour.
 
