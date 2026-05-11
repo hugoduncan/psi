@@ -87,5 +87,13 @@ Bootstrapped on 2026-04-02.
   - `gh-pr-fix-checks` uses `:labels []` (no label filter) for find-pr
   - `gh-bug-triage-modular` post-repro prompt-string is now `:type :map` (structured, not rendered text) per §P
 
+- Task 139 active-session-id root attr is now complete and closed:
+  - added `active-session-id-resolver` in `resolvers/session.clj`
+  - `::pco/input [:psi.agent-session/session-id]` (single root seed — passes fixed-point reachability)
+  - returns session-id from psi-tool query context; nil when present-but-nil; Pathom3 `:not-found` when absent
+  - appended to `resolvers` def; appears in `:psi.graph/root-queryable-attrs`
+  - 3 focused unit tests in `resolvers_test.clj`; `root-queryable-attrs-contract-test` auto-covers the new attr
+  - 1678 tests, 12513 assertions, 0 failures; lint clean; live query verified
+
 ## Suggested next step
-- Work on `137-gh-issue-refine-deterministic-discover` (next in queue per munera/plan.md).
+- Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `134-psi-tool-mutation-surface-and-active-session-introspection`.

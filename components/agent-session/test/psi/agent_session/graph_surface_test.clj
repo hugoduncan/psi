@@ -100,7 +100,8 @@
     :psi.graph/capabilities
     :psi.graph/domain-coverage
     :psi.graph/resolver-index
-    :psi.graph/attr-index})
+    :psi.graph/attr-index
+    :psi.agent-session/active-session-id})
 
 (defn- assert-canonical-graph-root-attrs
   [root-attrs]

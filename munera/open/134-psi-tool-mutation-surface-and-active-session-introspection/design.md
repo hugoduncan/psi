@@ -1,8 +1,8 @@
-# 134 — psi-tool mutation surface and active-session introspection
+# 134 — psi-tool mutation surface and session-summary introspection
 
 ## Goal
 
-Make `psi-tool` able to perform safe canonical runtime mutations and make session activeness/session inventory explicit enough that session-admin tasks can be completed through the tool surface without dropping to raw runtime `eval` or relying on ambiguous session ordering.
+Make `psi-tool` able to perform safe canonical runtime mutations and make compact session inventory queryable enough that session-admin tasks can be completed through the tool surface without dropping to raw runtime `eval`.
 
 ## Why
 
@@ -12,16 +12,14 @@ The runtime already has the needed underlying capabilities:
 
 - canonical session lifecycle mutations such as `psi.extension/close-session`
 - canonical session graph surfaces such as `:psi.agent-session/context-sessions`
-- a live runtime with explicit active-session behavior
 
 But `psi-tool` currently makes this workflow harder than it should be because:
 
 - there is no canonical mutation action, so imperative runtime work often falls back to raw `eval`
-- there is no explicit root attr for the active/current session id, so callers can infer the wrong thing from list ordering
 - existing session-list/query surfaces can be too large or too detailed for routine operational tasks
 - when session-targeted introspection is awkward, operators are pushed toward unsafe shortcuts or code inspection instead of the authoritative runtime surface
 
-The result is that a generic session lifecycle operation such as “close all non-current sessions” requires code-path discovery and ad hoc runtime evaluation even though the system already owns the necessary mutation and introspection primitives.
+The result is that a generic session lifecycle operation such as "close all non-current sessions" requires code-path discovery and ad hoc runtime evaluation even though the system already owns the necessary mutation and introspection primitives.
 
 ## Problem
 
@@ -31,11 +29,10 @@ The result is that a generic session lifecycle operation such as “close all no
 - some imperative domains are first-class through narrow actions like `reload-code`, `project-repl`, `workflow`, and `scheduler`
 - generic canonical graph mutations are not first-class
 
-That asymmetry causes three concrete problems:
+That asymmetry causes two concrete problems:
 
 1. Canonical imperative operations that already exist as mutations cannot be used directly from `psi-tool`.
-2. Callers cannot ask the runtime for an authoritative active session id and must infer “current” from incidental ordering or unrelated UI focus.
-3. Routine session inventory queries can over-return, making it harder to compose discovery → select targets → mutate safely.
+2. Routine session inventory queries can over-return, making it harder to compose discovery → select targets → mutate safely.
 
 ## Intent
 
@@ -44,7 +41,6 @@ Add the smallest coherent `psi-tool` surface needed to support safe generic sess
 This task should:
 
 - add a canonical `psi-tool` mutation action for invoking existing registered mutations
-- expose an authoritative root attr for the active/current session id
 - expose a compact session-summary root surface suitable for operational selection and follow-up mutation
 - preserve explicit session targeting and fail clearly on invalid mutation requests
 - keep `psi-tool` explicit and structured rather than turning it into an unbounded command proxy
@@ -59,13 +55,12 @@ This task should not:
 
 ## Decision
 
-Adopt a focused generic mutation surface plus explicit active-session/session-summary introspection.
+Adopt a focused generic mutation surface plus compact session-summary introspection.
 
 Specifically:
 
 1. add `psi-tool(action: "mutate", ...)`
-2. add a root attr for the active session id
-3. add a compact root attr for context session summaries
+2. add a compact root attr for context session summaries
 
 This is preferred over adding one-off lifecycle commands because it improves the general `psi-tool` contract while still keeping the surface explicit and bounded.
 
@@ -74,13 +69,13 @@ This is preferred over adding one-off lifecycle commands because it improves the
 - `psi-tool` support for a new `action: "mutate"`
 - validation and execution of registered canonical mutations through that action
 - stable structured mutation result reporting
-- root graph support for the authoritative active/current session id
 - root graph support for compact context session summaries
 - focused documentation and tests for the canonical query → choose targets → mutate workflow
 - session-admin use cases such as closing explicitly selected non-active sessions through canonical mutation calls
 
 ## Out of scope
 
+- authoritative active session id root attr — see task 139
 - bespoke convenience commands for deleting/cleaning old sessions
 - broad batching/looping DSLs inside `psi-tool`
 - generic arbitrary dispatch event submission
@@ -142,9 +137,9 @@ Rationale:
 4. return the mutation payload in structured tool-result form
 5. fail explicitly when the request is invalid or unsupported
 
-For this task, “canonical registered mutation path” means the same production-owned runtime mutation execution helper/path already used to invoke registered graph mutations with their normal capability, permission, and validation enforcement. Implementation must identify that concrete owner/helper before coding and route `action: "mutate"` through it rather than introducing a parallel execution path.
+For this task, "canonical registered mutation path" means the same production-owned runtime mutation execution helper/path already used to invoke registered graph mutations with their normal capability, permission, and validation enforcement. Implementation must identify that concrete owner/helper before coding and route `action: "mutate"` through it rather than introducing a parallel execution path.
 
-For this task, “registered mutation” means:
+For this task, "registered mutation" means:
 
 - a mutation available in the live runtime mutation registry used by psi-tool's canonical mutation execution path
 - including extension-provided mutations when they are already present in that same live runtime registry
@@ -274,40 +269,6 @@ Missing required mutation input example:
 - if the mutation requires explicit parameters, missing required inputs must fail clearly
 - mutation execution must preserve explicit targeting semantics rather than silently hitting the wrong session
 
-## Active session introspection
-
-Add an authoritative root attr for the active/current session id.
-
-Canonical name:
-
-- `:psi.agent-session/active-session-id`
-
-This attr means the session id that the current live runtime uses as the active conversation target for the invoking tool context.
-
-It is intentionally relative to the invoking tool context rather than a process-global UI focus concept. Implementation must identify and document the concrete runtime source of truth used to resolve this attr so adapter-specific or incidental ordering semantics do not leak into the contract.
-
-It must not mean:
-
-- oldest loaded session
-- newest loaded session
-- arbitrary session-list ordering
-
-When the invoking live runtime has no active conversation target, the attr should return `nil` rather than guessing.
-
-This attr exists to remove ambiguity around “current” and eliminate list-order inference.
-
-### Active session query example
-
-```edn
-[:psi.agent-session/active-session-id]
-```
-
-Example result:
-
-```clojure
-{:psi.agent-session/active-session-id "731274a7-55d0-4854-aa23-35df82c6abdd"}
-```
-
 ## Compact session summary introspection
 
 Add a compact root attr intended for operational selection.
@@ -350,7 +311,7 @@ Explicitly excluded from this summary surface:
    :psi.session-info/worktree-path]}]
 ```
 
-Example result:
+### Session summary result example
 
 ```clojure
 {:psi.agent-session/context-session-summaries
@@ -387,16 +348,15 @@ That earlier work established the need for trustworthy explicit targeting and fo
 This task extends that direction by:
 
 - giving `psi-tool` a canonical mutation surface
-- making activeness explicit
 - providing a compact discovery surface that composes naturally with explicit mutation calls
 
 If implementation touches existing session-targeting semantics, it must preserve the rule that unsupported targeting forms fail explicitly rather than degrading to plausible wrong-session results.
 
 ## Intended workflow after the change
 
-The canonical operator/agent workflow should be:
+The canonical operator/agent workflow (assuming task 139 delivers `:psi.agent-session/active-session-id`) should be:
 
-1. query `:psi.agent-session/active-session-id`
+1. query `:psi.agent-session/active-session-id` (task 139)
 2. query `:psi.agent-session/context-session-summaries`
 3. select explicit non-active session ids in caller logic
 4. call `psi-tool(action: "mutate", mutation: "psi.extension/close-session", params: {:session-id ...})` for each chosen session
@@ -405,7 +365,7 @@ This keeps policy in caller logic and capability in the tool/runtime surface.
 
 ### End-to-end example
 
-Step 1 — query the active session id:
+Step 1 — query the active session id (requires task 139):
 
 ```json
 {
@@ -438,7 +398,7 @@ Step 4 — verify the inventory again:
 ```json
 {
   "action": "query",
-  "query": "[:psi.agent-session/active-session-id {:psi.agent-session/context-session-summaries [:psi.session-info/id :psi.session-info/display-name]}]"
+  "query": "[{:psi.agent-session/context-session-summaries [:psi.session-info/id :psi.session-info/display-name]}]"
 }
 ```
 
@@ -448,14 +408,13 @@ Step 4 — verify the inventory again:
 - reuse canonical registered mutations rather than parallel imperative code paths
 - preserve current domain-specific `psi-tool` actions and their contracts
 - invalid mutation requests must fail explicitly
-- session activeness must be explicit and authoritative
 - compact session summaries must avoid large payload expansion
 - mutate must reuse the existing capability, permission, and validation enforcement of the canonical mutation path rather than bypassing it
 - the implementation should prefer the smallest coherent addition over a broad mutation-framework redesign
 
 ## Test contract
 
-Implementation should add focused proof at three levels.
+Implementation should add focused proof at two levels.
 
 ### 1. psi-tool mutation action tests
 
@@ -476,24 +435,20 @@ Cover at least:
 
 Cover at least:
 
-- `:psi.agent-session/active-session-id` returns the authoritative active session for the invoking live context
-- `:psi.agent-session/active-session-id` returns `nil` rather than guessing when no active conversation target exists
 - `:psi.agent-session/context-session-summaries` returns compact entries with the intended keys
 - the summary surface excludes `:psi.session-info/first-message`, `:psi.session-info/all-messages-text`, message-history joins, and other heavy transcript/message payloads
 - the summary surface preserves the canonical ordering of the existing context session inventory
-- the new attrs appear on the intended graph surface and are queryable from root
+- the attr appears on the intended graph surface and is queryable from root
 
 ### 3. composed workflow/integration test
 
-Add at least one proof of the intended operator workflow:
+Add at least one proof of the intended operator workflow (note: `:psi.agent-session/active-session-id` requires task 139; the integration test may use a known session id directly in place of that query step, or treat 139 as a prerequisite):
 
 - create or load more than one context session
-- query active session id
 - query compact session summaries
-- choose a non-active session id
+- choose an explicit non-active session id
 - invoke `psi-tool(action: "mutate", mutation: "psi.extension/close-session", ...)`
-- verify the chosen session is gone while the active session remains
-- verify `:psi.agent-session/active-session-id` remains unchanged when the closed session was not the active one
+- verify the chosen session is gone while the other session remains
 
 This integration proof exists to show that the new surface removes the need for raw runtime eval or bespoke cleanup commands.
 
@@ -503,12 +458,11 @@ This integration proof exists to show that the new surface removes the need for 
 - the API contract for request, success result, and error result is documented with examples
 - valid mutation requests return structured machine-oriented results without dropping to raw eval or command parsing
 - unknown mutation names and malformed mutation requests fail explicitly with structured errors
-- the graph exposes an authoritative root attr for the active/current session id
 - the graph exposes a compact root attr for context session summaries suitable for operational selection
-- the introspection query shapes and an end-to-end query → select → mutate example are documented
-- focused tests cover successful mutation execution, validation/error behavior, the two new introspection attrs, and the composed session-admin workflow
+- the compact session summary query shape and an end-to-end query → select → mutate example are documented
+- focused tests cover successful mutation execution, validation/error behavior, the compact session-summary attr, and the composed session-admin workflow
 - session lifecycle mutations such as `psi.extension/close-session` can be invoked through `psi-tool(action: "mutate", ...)`
-- the resulting workflow makes “close all non-current sessions” implementable in caller logic without any bespoke delete-old-sessions command
+- the resulting workflow makes "close a chosen session" implementable in caller logic without any bespoke delete-sessions command
 - implementation preserves explicit targeting semantics and does not silently route session-scoped work to the wrong session
 
 ## Related work
@@ -516,3 +470,4 @@ This integration proof exists to show that the new surface removes the need for 
 - `012-psi-tool-session-targeting-introspection` established the need for trustworthy explicit session targeting
 - `023-extend-psi-tool-for-project-repl` is a precedent for adding a focused imperative `psi-tool` capability without broadening into a generic command proxy
 - `033-psi-tool-scheduler-surface` is a precedent for explicit structured imperative tool actions
+- `139-active-session-id-root-attr` — authoritative active session id; composes with this task's compact summaries and mutate action for full session-admin workflows
