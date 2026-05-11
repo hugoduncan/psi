@@ -115,7 +115,8 @@
        :psi.workflow/terminal? (:terminal? exec-result)
        :psi.workflow/blocked? (:blocked? exec-result)
        :psi.workflow/result result-text
-       :psi.workflow/error nil})
+       :psi.workflow/error (when (= :failed (:status exec-result))
+                             (some :error (:steps-executed exec-result)))})
     (catch Exception e
       {:psi.workflow/run-id run-id
        :psi.workflow/status nil
@@ -152,7 +153,8 @@
        :psi.workflow/steps-executed (:steps-executed exec-result)
        :psi.workflow/terminal? (:terminal? exec-result)
        :psi.workflow/blocked? (:blocked? exec-result)
-       :psi.workflow/error nil})
+       :psi.workflow/error (when (= :failed (:status exec-result))
+                             (some :error (:steps-executed exec-result)))})
     (catch Exception e
       {:psi.workflow/run-id run-id
        :psi.workflow/status nil
