@@ -7,6 +7,8 @@ Backlog:
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/136-built-in-registration-path-for-workflow/`
+`munera/open/134-psi-tool-mutation-surface-and-active-session-introspection/`
+`munera/open/139-active-session-id-root-attr/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
