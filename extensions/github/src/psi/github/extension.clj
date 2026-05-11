@@ -4,8 +4,7 @@
    Registers deterministic operations via the extension API `:register-operation` key:
    - `github/find-issue`
    - `github/find-pr`
-   - `github/add-label`
-   - `github/remove-label`"
+   - `github/edit-labels`"
   (:require
    [psi.github.find-issue :as find-issue]
    [psi.github.find-pr :as find-pr]
@@ -20,9 +19,6 @@
     (reg {:id          "github/find-pr"
           :description "Find a GitHub PR matching labels and optional narrowing input"
           :handler     find-pr/invoke})
-    (reg {:id          "github/add-label"
-          :description "Add one or more labels to a GitHub issue or PR"
-          :handler     label-ops/add-label})
-    (reg {:id          "github/remove-label"
-          :description "Remove one or more labels from a GitHub issue or PR"
-          :handler     label-ops/remove-label})))
+    (reg {:id          "github/edit-labels"
+          :description "Add and/or remove labels on a GitHub issue or PR in a single operation"
+          :handler     label-ops/edit-labels})))

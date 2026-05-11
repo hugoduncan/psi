@@ -1,7 +1,7 @@
 (ns psi.github.label-ops
-  "Deterministic operations: add and remove labels on GitHub issues or PRs.
+  "Deterministic operation: edit labels on GitHub issues or PRs.
 
-   Operation ids: \"github/add-label\" and \"github/remove-label\"
+   Operation id: \"github/edit-labels\"
 
    Invoked via the workflow `:invoke` step type — never exposed to AI agents
    as a tool. Shell invocations are behind a `:github-shell-fn` ctx key so
@@ -19,60 +19,45 @@
   (str/join "," labels))
 
 ;;; ---------------------------------------------------------------------------
-;;; Private shell dispatch
+;;; Public operation handler
 
-(defn- invoke-edit
-  "Run `gh <target> edit <number> <flag> <csv>` via `shell-fn`.
-   Returns `{:status :ok/:error ...}` with `result-key` holding `labels` on success."
-  [shell-fn number target flag result-key labels]
-  (let [csv    (label-csv labels)
-        result (shell-fn "gh" target "edit" (str number) flag csv)]
-    (if (not= 0 (:exit result))
-      {:status  :error
-       :reason  :psi.github/shell-error
-       :message (:err result)}
+(defn edit-labels
+  "Deterministic operation handler for `github/edit-labels`.
+
+   Invocation map: {:ctx ctx :args args :workflow-run-id run-id :step-id step-id}
+
+   Args:
+     :number  - issue or PR number (integer)
+     :target  - \"issue\" (default) or \"pr\"
+     :add     - vector of label strings to add (optional)
+     :remove  - vector of label strings to remove (optional)
+
+   Issues a single `gh <target> edit <number>` call combining --add-label and
+   --remove-label flags as needed. Returns :ok when the gh command exits 0,
+   :error otherwise."
+  [{:keys [ctx args]}]
+  (let [shell-fn (or (:github-shell-fn ctx) shell/sh)
+        number   (:number args)
+        target   (or (:target args) "issue")
+        add      (seq (:add args))
+        remove   (seq (:remove args))]
+    (if (and (nil? add) (nil? remove))
       {:status  :ok
-       :data    {:number     number
-                 :target     target
-                 result-key  labels}
-       :summary (str (if (= flag "--add-label") "Added" "Removed")
-                     " label(s) [" csv "]"
-                     (if (= flag "--add-label") " to " " from ")
-                     target " #" number)})))
-
-;;; ---------------------------------------------------------------------------
-;;; Public operation handlers
-
-(defn add-label
-  "Deterministic operation handler for `github/add-label`.
-
-   Invocation map: {:ctx ctx :args args :workflow-run-id run-id :step-id step-id}
-
-   Args:
-     :number  - issue or PR number (integer)
-     :labels  - vector of label strings to add
-     :target  - \"issue\" (default) or \"pr\""
-  [{:keys [ctx args]}]
-  (invoke-edit (or (:github-shell-fn ctx) shell/sh)
-               (:number args)
-               (or (:target args) "issue")
-               "--add-label"
-               :added-labels
-               (:labels args)))
-
-(defn remove-label
-  "Deterministic operation handler for `github/remove-label`.
-
-   Invocation map: {:ctx ctx :args args :workflow-run-id run-id :step-id step-id}
-
-   Args:
-     :number  - issue or PR number (integer)
-     :labels  - vector of label strings to remove
-     :target  - \"issue\" (default) or \"pr\""
-  [{:keys [ctx args]}]
-  (invoke-edit (or (:github-shell-fn ctx) shell/sh)
-               (:number args)
-               (or (:target args) "issue")
-               "--remove-label"
-               :removed-labels
-               (:labels args)))
+       :data    {:number number :target target :added-labels [] :removed-labels []}
+       :summary (str "No label changes on " target " #" number)}
+      (let [cmd    (cond-> ["gh" target "edit" (str number)]
+                     add    (into ["--add-label"    (label-csv add)])
+                     remove (into ["--remove-label" (label-csv remove)]))
+            result (apply shell-fn cmd)]
+        (if (not= 0 (:exit result))
+          {:status  :error
+           :reason  :psi.github/shell-error
+           :message (:err result)}
+          {:status  :ok
+           :data    {:number         number
+                     :target         target
+                     :added-labels   (vec (or add []))
+                     :removed-labels (vec (or remove []))}
+           :summary (str "Edited labels on " target " #" number
+                         (when add    (str " +[" (label-csv add) "]"))
+                         (when remove (str " -[" (label-csv remove) "]")))})))))

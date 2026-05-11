@@ -68,17 +68,17 @@ description: Find an enhancement issue labeled refine, create an issue worktree,
                      :from {:step "worktree" :yield :text}}
                     {:type :source
                      :from {:step "refine-design" :yield :text}}]}
-         {:name      "remove-refine"
+         {:name      "edit-issue-labels"
           :type      :invoke
-          :operation "github/remove-label"
+          :operation "github/edit-labels"
           :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
-                      :labels ["refine"]
+                      :remove ["refine"]
                       :target "issue"}}
-         {:name      "add-waiting-pr"
+         {:name      "edit-pr-labels"
           :type      :invoke
-          :operation "github/add-label"
+          :operation "github/edit-labels"
           :args      {:number {:from {:step "publish" :output :data} :path [:pr_number]}
-                      :labels ["waiting"]
+                      :add    ["waiting"]
                       :target "pr"}}]}
 
 Coordinate refinement of a GitHub enhancement issue labeled `refine`: select the issue, create an issue-specific worktree, refine it into a complete and unambiguous Munera task design, iterate until ambiguities are resolved, then push the branch, create a PR using the design as the PR description, remove the issue's `refine` label, and add a `waiting` label to the PR.

@@ -119,19 +119,28 @@
            :prompt (str/trim (subs trimmed (inc space-idx)))}
           {:workflow trimmed})))))
 
-(defn completion-notification-text [workflow-name status run-id]
-  (str "Workflow '" workflow-name "' " (name (or status :unknown))
-       " (run " run-id ")"))
+(defn completion-notification-text
+  ([workflow-name status run-id] (completion-notification-text workflow-name status run-id nil))
+  ([workflow-name status run-id error]
+   (str "Workflow '" workflow-name "' " (name (or status :unknown))
+        (when error (str ": " error))
+        " (run " run-id ")")))
 
-(defn completion-entry-heading [workflow-name status run-id]
-  (str "Workflow '" workflow-name "' — " (name (or status :unknown))
-       " (run " run-id ")"))
+(defn completion-entry-heading
+  ([workflow-name status run-id] (completion-entry-heading workflow-name status run-id nil))
+  ([workflow-name status run-id error]
+   (str "Workflow '" workflow-name "' — " (name (or status :unknown))
+        (when error (str ": " error))
+        " (run " run-id ")")))
 
-(defn completion-entry-content [workflow-name status run-id result-text include-result?]
-  (let [heading (completion-entry-heading workflow-name status run-id)]
-    (if (and result-text (not include-result?))
-      (str heading "\n\nResult:\n"
-           (if (> (count result-text) 8000)
-             (str (subs result-text 0 8000) "\n\n... [truncated]")
-             result-text))
-      heading)))
+(defn completion-entry-content
+  ([workflow-name status run-id result-text include-result?]
+   (completion-entry-content workflow-name status run-id result-text include-result? nil))
+  ([workflow-name status run-id result-text include-result? error]
+   (let [heading (completion-entry-heading workflow-name status run-id error)]
+     (if (and result-text (not include-result?))
+       (str heading "\n\nResult:\n"
+            (if (> (count result-text) 8000)
+              (str (subs result-text 0 8000) "\n\n... [truncated]")
+              result-text))
+       heading))))

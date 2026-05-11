@@ -102,7 +102,8 @@
                       :run-id run-id
                       :result-text result-text}
      :notification {:enabled? (not chat-delivery?)
-                    :message (text/completion-notification-text workflow-name status run-id)
+                    :message (text/completion-notification-text workflow-name status run-id
+                                                                (:psi.workflow/error exec-result))
                     :level (if ok? :info :warn)}
      :append-entry {:enabled? (not include-result?)
                     :custom-type "delegate-result"
@@ -110,7 +111,8 @@
                                                          status
                                                          run-id
                                                          result-text
-                                                         include-result?)}}))
+                                                         include-result?
+                                                         (:psi.workflow/error exec-result))}}))
 
 (defn on-async-completion!
   "Handle async workflow completion — notify, inject results, update canonical job state, and clean up waits."
