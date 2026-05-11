@@ -157,3 +157,18 @@ Read the preloaded tests-review result and task artifacts, then executed the new
 
 Test-shaper pass found no new actionable clarity, signal, or robustness issues after reading the task artifacts, the focused response-mode proofs, and the preloaded tests-review result; current tests already cover explicit propagation, default streaming fallback, execution-path selection, child-session persistence, and provider-capture shaping without duplicating prior notes or steps.
 
+## Follow-up execution 2026-05-11k
+
+Read the preloaded test-shaper review result plus task artifacts, then executed the newly added actionable follow-up pass.
+- `steps.md` contains no remaining unchecked actionable items, so there was nothing new to implement or mark complete.
+- Re-ran the focused proof set for the task to confirm the preloaded review result still holds:
+  - `psi.ai.core-test`
+  - `psi.workflow-step-session-config.core-test`
+  - `psi.workflow-runtime.attempts-test`
+  - `psi.agent-session.workflow-attempts-test`
+  - `psi.agent-session.child-session-state-test`
+  - `psi.agent-session.child-session-mutation-test`
+  - `psi.turn-runtime.response-mode-test`
+- Verification remained green: `1710 tests, 12609 assertions, 0 failures`.
+- No new actionable follow-up was discovered, so task artifacts remained otherwise unchanged in this execution pass.
+
