@@ -2,49 +2,82 @@
 
 ## Problem
 
-No authoritative root attr exists for the active/current session id. Callers infer "current" from list ordering — an implicit, unreliable contract. The runtime already knows which session is the active conversation target for a given invoking context, but this is not surfaced through the graph.
+Agents using `psi-tool` cannot query "which session am I?" from root. No root
+attr exposes the invoking session id. The only workaround is entity-seeded
+queries — which require already knowing the session id, defeating the purpose.
 
-Without an explicit identity signal, any logic that must distinguish "current" from "other" sessions degrades to ordering heuristics. This is both fragile and misleading.
+This forces agents into either inferring identity from list ordering or
+hard-coding session ids that they obtained out-of-band.
+
+## Background
+
+The runtime does have an `active-session-id` concept in `context_index.clj`,
+but it is unused in production — nothing in non-test src requires it.
+There was previously a `:context-active-session-id` graph attr that was
+deliberately removed; the comment in `resolvers/session.clj` reads:
+
+> `:context-active-session-id` removed — adapters (RPC, TUI) own focus locally.
+
+Adapter-local focus (TUI `tui-focus*` atom, RPC session binding) is the right
+owner of "which session the user is looking at." That is a different question.
+
+The question this task answers is narrower and always has a definite answer:
+**which session invoked this psi-tool call?** In `tool_plan.clj`, the query-fn
+is already closed over that `session-id`:
+
+```clojure
+(fn ([eql-query]
+     (query/query-in qctx
+                     {:psi/agent-session-ctx        ctx
+                      :psi.agent-session/session-id session-id}
+                     eql-query)))
+```
+
+The invoking session id is always present in the query context. It is not
+exposed as a root attr, so it cannot be queried without an entity seed.
 
 ## Intent
 
-Expose the runtime's authoritative active-session identity through a single root attr, removing the need for list-order inference.
+Add a root resolver for `:psi.agent-session/active-session-id` that returns
+the `session-id` already present in the psi-tool query context — making the
+invoking session's own identity queryable from root without entity seeding.
 
 This task should:
 
-- add a root resolver for `:psi.agent-session/active-session-id`
-- anchor the attr to the invoking tool context, not a process-global UI focus concept
-- identify and document the concrete runtime source of truth so adapter semantics do not leak into the contract
-- return `nil` when no active conversation target exists rather than guessing
+- add a root resolver that returns the invoking session id from the query context
+- document the concrete source of truth (the query-context-bound `session-id`)
+- return `nil` when no session id is present in the context rather than throwing
 
 This task should not:
 
-- redesign session lifecycle or ordering semantics
+- re-introduce adapter-local UI focus onto the graph
+- wire up `context_index.clj` or any runtime-central focus tracking
 - add mutation capabilities
 - broaden into a session-summary or inventory surface
 
 ## Constraints
 
-- the attr must be relative to the invoking tool context — ¬process-global UI focus, ¬list-order inference
-- `nil` when no active target exists — ¬guess, ¬fall back to oldest/newest/first
-- implementation must identify and document the concrete runtime source of truth before writing the resolver
+- the attr must resolve from the query context's bound `session-id` — ¬adapter focus, ¬list ordering, ¬context-index
+- `nil` when no session id is present in the query context — ¬throw, ¬guess
+- must not re-introduce the previously-removed `:context-active-session-id` semantics
 
 ## Invariants
 
-- ¬oldest session, ¬newest session, ¬arbitrary list ordering
-- the attr must not change meaning based on adapter focus state
+- the resolved value is the session that invoked the tool call — always unambiguous
+- does not change meaning based on adapter state or UI focus
 
 ## In scope
 
 - root resolver for `:psi.agent-session/active-session-id`
-- documentation of the concrete runtime source of truth
+- documentation of the source of truth (query-context `session-id`)
 - focused tests
 
 ## Out of scope
 
+- adapter-local UI focus on the graph
+- `context_index.clj` wiring
 - compact session summary surface — see task 134
 - mutation surface — see task 134
-- session lifecycle or ordering redesign
 
 ## API
 
@@ -60,7 +93,7 @@ This task should not:
 {:psi.agent-session/active-session-id "731274a7-55d0-4854-aa23-35df82c6abdd"}
 ```
 
-Returns `nil` when no active target exists:
+Returns `nil` when no session id is present in the query context:
 
 ```clojure
 {:psi.agent-session/active-session-id nil}
@@ -70,18 +103,18 @@ Returns `nil` when no active target exists:
 
 Cover at least:
 
-- `:psi.agent-session/active-session-id` returns the authoritative active session id for the invoking live context
-- `:psi.agent-session/active-session-id` returns `nil` rather than guessing when no active conversation target exists
-- the attr is queryable from root without entity seeding
-- the resolved value does not reflect arbitrary session-list ordering
+- returns the invoking session id when a session id is present in the query context
+- returns `nil` when no session id is present
+- queryable from root without entity seeding
+- does not reflect adapter focus or list ordering
 
 ## Acceptance
 
-- `:psi.agent-session/active-session-id` is queryable as a root attr
-- returns the authoritative active session id relative to the invoking tool context
-- returns `nil` when no active conversation target exists
-- the concrete runtime source of truth is identified and documented in the implementation
-- ¬list-order inference, ¬process-global UI focus, ¬guessing
+- `:psi.agent-session/active-session-id` is queryable from root without entity seeding
+- resolves to the session id present in the psi-tool query context
+- returns `nil` when no session id is present
+- source of truth is documented: query-context-bound `session-id` from `tool_plan.clj`
+- ¬adapter focus, ¬list ordering, ¬context-index wiring
 
 ## Related work
 
