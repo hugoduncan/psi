@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## Test review pass 1 (2026-05-11)
+
+Reviewed task tests against design.md and the referenced test namespaces:
+`components/ai/test/psi/ai/providers/openai_completions_logprobs_test.clj`,
+`components/turn-runtime/test/psi/turn_runtime/accumulator_logprobs_test.clj`, and
+`components/agent-session/test/psi/agent_session/{logprobs,compaction}_test.clj`.
+No new actionable test feedback: request shaping, SSE extraction/normalization,
+turn accumulation, journal append/projection, and compaction transparency are covered.
+No new follow-up checklist items added.
+
 ## Follow-up execution pass 6 (2026-05-11)
 
 Executed the remaining unchecked task-artifact follow-up items in `steps.md` after
