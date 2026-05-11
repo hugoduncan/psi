@@ -40,13 +40,18 @@ Toggle path:
 ```
 /logprobs on|off|N
   → slash-command handler in commands.clj
-  → :session/set-logprobs dispatch event
+  → session-settings/set-logprobs-in! (session_settings.clj)
+  → dispatch/dispatch! :session/set-logprobs
   → session_mutations handler:
       {:root-state-update (assoc % :logprobs-enabled enabled?
                                    :top-logprobs top-n)}
       (no journal-append effect, no persist effect)
   → session->request-options propagates :logprobs-enabled and :top-logprobs
 ```
+
+`set-logprobs-in!` in `session_settings.clj` matches the `set-thinking-level-in!`
+pattern: `(defn set-logprobs-in! [ctx session-id enabled? top-n] ...)`. `commands.clj`
+calls `session-settings/set-logprobs-in!` directly (not `dispatch/dispatch!`).
 
 Command forms:
 - `/logprobs` — report current state (enabled/disabled, top-N)
@@ -85,8 +90,21 @@ A new private fn `extract-logprob-delta` is added to `chat_completions.clj`:
   `completion_probabilities` (present only on the final object with usage/finish_reason).
 
 When non-nil, emits `{:type :logprob-delta :tokens [...normalized...]}` via `consume-fn`.
-The turn-runtime accumulator collects `:logprob-delta` events into a transient buffer.
-On `:done`, the buffer is finalized into `:execution-result/logprobs`.
+
+**Event routing** (`core.clj` `make-provider-event-consumer`): `:logprob-delta` is added
+to the `case` dispatch calling `(call-action! :on-logprob-delta {:tokens (:tokens event)})`.
+
+**Accumulation** (`accumulator.clj` `make-turn-actions`): `:on-logprob-delta` handler
+calls `(swap! td update :logprob-buffer (fnil conj []) (:tokens data))`, appending the
+normalized token vector for each event into `:logprob-buffer` on `turn-data`. On
+`:on-done`, `handle-done!` flattens the buffer with `(into [] cat (:logprob-buffer @td))`
+and stores it as `:logprobs` on `turn-data` before delivering `done-p`.
+
+**Extraction to execution-result** (`core.clj` `execute-live-turn!`): after
+`await-assistant-message!` returns, reads `(get @(:turn-data turn-ctx) :logprobs)` and
+includes it in the return map as `:logprobs`. `execute-prepared-request!` destructures
+`:logprobs` from the `execute-live-turn!` return and includes it as
+`:execution-result/logprobs` in the result map (nil when logprobs were not collected).
 
 ## Command registration
 

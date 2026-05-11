@@ -17,10 +17,18 @@
   - Wire into `emit-chat-chunk!` for OpenAI per-chunk path
   - Wire into `finish-chat-chunk!` for llama.cpp final-chunk path
   - Emit `{:type :logprob-delta :tokens [...normalized...]}` via `consume-fn`
+  - Add `:logprob-delta` to `case` in `make-provider-event-consumer` (`core.clj`)
+    calling `(call-action! :on-logprob-delta {:tokens (:tokens event)})`
 
 - [ ] **4. Turn-runtime accumulation** — extend accumulator:
-  - Collect `:logprob-delta` events into transient buffer (inspect `accumulator.clj`)
-  - Finalize into `:execution-result/logprobs` on `:done`
+  - Add `handle-logprob-delta!` in `accumulator.clj`: `(swap! td update :logprob-buffer (fnil conj []) (:tokens data))`
+  - Add `:on-logprob-delta` dispatch to `make-turn-actions` calling `handle-logprob-delta!`
+  - Extend `handle-done!` to flatten `:logprob-buffer` into `:logprobs` on `turn-data`
+    before `(deliver done-p final)`
+  - Extend `execute-live-turn!` (`core.clj`) to read `:logprobs` from
+    `@(:turn-data turn-ctx)` after `await-assistant-message!` and include in return map
+  - Extend `execute-prepared-request!` to destructure `:logprobs` and include as
+    `:execution-result/logprobs` (nil when not collected)
 
 - [ ] **5. Journal append + telemetry** — `prompt_recording.clj` `build-record-response`:
   - Write `:last-turn-logprobs` to session via `root-state-update`
@@ -33,9 +41,12 @@
 
 - [ ] **7. EQL resolver** — add `:psi.agent-session/last-turn-logprobs` resolver
 
-- [ ] **8. `/logprobs` command** — `commands.clj`:
-  - Implement `dispatch-logprobs-command` (on/off/N/report)
-  - Add `/logprobs` to `prefixed-command-prefixes`
+- [ ] **8. `/logprobs` command**:
+  - Add `set-logprobs-in!` to `session_settings.clj` (pattern: `set-thinking-level-in!`):
+    `(defn set-logprobs-in! [ctx session-id enabled? top-n] (dispatch/dispatch! ctx :session/set-logprobs ...))`
+  - Implement `dispatch-logprobs-command` in `commands.clj` (on/off/N/report)
+    calling `session-settings/set-logprobs-in!`
+  - Add `/logprobs` to `prefixed-command-prefixes` in `commands.clj`
   - Add `/logprobs` help line to `format-help` alongside `/model` and `/thinking`:
     `"  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"`
   - Add `"/logprobs"` to `builtin-slash-commands` in `tui/app/shared.clj`

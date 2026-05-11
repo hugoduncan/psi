@@ -16,10 +16,17 @@ testable.
 
 3. **SSE extraction** — add `extract-logprob-delta` to `chat_completions.clj`. Wire
    into `emit-chat-chunk!` (OpenAI per-chunk path) and `finish-chat-chunk!`
-   (llama.cpp final-chunk path). Emit `:logprob-delta` events.
+   (llama.cpp final-chunk path). Emit `:logprob-delta` events via `consume-fn`.
+   Add `:logprob-delta` to the `case` in `make-provider-event-consumer` (`core.clj`)
+   calling `call-action! :on-logprob-delta`.
 
-4. **Turn-runtime accumulation** — extend the turn-runtime accumulator to collect
-   `:logprob-delta` events and finalize into `:execution-result/logprobs` on `:done`.
+4. **Turn-runtime accumulation** — extend `make-turn-actions` (`accumulator.clj`) with
+   `:on-logprob-delta` handler: appends tokens to `:logprob-buffer` in `turn-data`.
+   Extend `handle-done!` to flatten `:logprob-buffer` into `:logprobs` on `turn-data`
+   before delivering `done-p`. Extend `execute-live-turn!` (`core.clj`) to read
+   `:logprobs` from `@(:turn-data turn-ctx)` after the turn and return it in its map.
+   Extend `execute-prepared-request!` to destructure `:logprobs` and include it as
+   `:execution-result/logprobs` in the result (nil when not collected).
 
 5. **Journal append + telemetry** — extend `build-record-response` in
    `prompt_recording.clj` to: (a) write `:last-turn-logprobs` to session telemetry,
@@ -31,9 +38,11 @@ testable.
 
 7. **EQL resolver** — add `:psi.agent-session/last-turn-logprobs` resolver.
 
-8. **`/logprobs` command** — implement `dispatch-logprobs-command` in `commands.clj`,
-   add to `prefixed-command-prefixes`. Add `"/logprobs"` to `builtin-slash-commands`
-   in `tui/app/shared.clj`. Add help text.
+8. **`/logprobs` command** — add `set-logprobs-in!` to `session_settings.clj` (matching
+   `set-thinking-level-in!` pattern). Implement `dispatch-logprobs-command` in
+   `commands.clj` calling `session-settings/set-logprobs-in!`. Add `/logprobs` to
+   `prefixed-command-prefixes`. Add `"/logprobs"` to `builtin-slash-commands` in
+   `tui/app/shared.clj`. Add help text to `format-help`.
 
 9. **Tests** — unit tests for: request building, options projection, SSE extraction
    (OpenAI + llama.cpp paths), accumulation, journal append, message projection.

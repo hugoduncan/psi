@@ -109,3 +109,33 @@ Three actionable inconsistencies found across design.md / design-steps.md / plan
    steps.md step 8 and plan.md step 8 do not mention adding this line to `format-help`
    in `commands.clj`. The `/thinking` and `/model` commands both appear in `format-help`;
    `/logprobs` must too. Steps.md should explicitly call this out.
+
+## Structural gap resolution pass (2026-05-11)
+
+Executed all three unchecked structural gap items from review pass 3:
+
+1. **`:logprob-delta` event routing** — confirmed `make-provider-event-consumer` in
+   `core.clj` uses an explicit `case` with `nil` default; unknown events are silently
+   dropped. Resolved by specifying: add `:logprob-delta` to the `case` calling
+   `(call-action! :on-logprob-delta {:tokens (:tokens event)})`. Add private
+   `handle-logprob-delta!` to `accumulator.clj` that conjoins the token vector onto
+   `:logprob-buffer` in `turn-data`. Add `:on-logprob-delta` dispatch in
+   `make-turn-actions`. `handle-done!` flattens `:logprob-buffer` into `:logprobs`
+   before delivering `done-p`. Design.md §SSE extraction pipeline and plan.md step 3/4
+   updated.
+
+2. **turn-data → execution-result path** — confirmed `execute-live-turn!` returns only
+   `{:turn-id :model :ai-options :turn-ctx :assistant-message}`; `execute-prepared-request!`
+   destructures only `:assistant-message`. Resolved: `execute-live-turn!` reads
+   `(get @(:turn-data turn-ctx) :logprobs)` after `await-assistant-message!` and
+   includes `:logprobs` in its return map. `execute-prepared-request!` destructures
+   `:logprobs` and includes it as `:execution-result/logprobs` (nil when not collected).
+   Design.md §SSE extraction pipeline and plan.md step 4 updated.
+
+3. **`session_settings.clj` layer** — confirmed the established pattern:
+   `commands.clj` → `session-settings/set-X-in!` → `dispatch/dispatch!`. Resolved:
+   add `set-logprobs-in!` to `session_settings.clj` matching `set-thinking-level-in!`.
+   `commands.clj` calls `session-settings/set-logprobs-in!`. Design.md §Control toggle
+   path and steps.md step 8 updated to name `set-logprobs-in!` explicitly.
+
+All three items marked `[x]` in design-steps.md.

@@ -147,7 +147,7 @@ Clarification and resolution items surfaced during design review.
 
 ## Structural gaps (review pass 3)
 
-- [ ] **`:logprob-delta` event not routed in `make-provider-event-consumer`** —
+- [x] **`:logprob-delta` event not routed in `make-provider-event-consumer`** —
   `core.clj`'s `make-provider-event-consumer` has an explicit `case` on `:type`; events
   with unknown types hit `nil` and are silently dropped. A `:logprob-delta` event emitted
   by `consume-fn` will never reach the accumulator. Specify: (a) add `:logprob-delta` to
@@ -155,8 +155,18 @@ Clarification and resolution items surfaced during design review.
   `:on-logprob-delta` action key to `make-turn-actions` in `accumulator.clj` that
   appends tokens to a transient buffer in `turn-data`. Update design.md §SSE extraction
   pipeline and plan.md step 3/4 accordingly.
+  > **Resolved**: Add `:logprob-delta` to the `case` in `make-provider-event-consumer`
+  > (in `core.clj`) calling `(call-action! :on-logprob-delta {:tokens (:tokens event)})`.
+  > Add `:on-logprob-delta` to `make-turn-actions` in `accumulator.clj` as a private
+  > handler `handle-logprob-delta!` that does
+  > `(swap! td update :logprob-buffer (fnil conj []) (:tokens data))` — appending the
+  > normalized token vector for this chunk/event into a `:logprob-buffer` vector on
+  > `turn-data`. On `:on-done`, `handle-done!` flattens the buffer:
+  > `(into [] cat (:logprob-buffer @td))` and stores it under `:logprobs` on `turn-data`
+  > before delivering `done-p`. Design.md §SSE extraction pipeline and plan.md step 4
+  > updated to name these exact locations.
 
-- [ ] **No path for logprob data from turn-data → execution-result** — `execute-live-turn!`
+- [x] **No path for logprob data from turn-data → execution-result** — `execute-live-turn!`
   returns only `{:assistant-message ...}`; `execute-prepared-request!` builds
   `execution-result` from that and has no access to the turn-data atom's logprob buffer.
   Specify how `:execution-result/logprobs` is populated: either `execute-live-turn!`
@@ -164,10 +174,33 @@ Clarification and resolution items surfaced during design review.
   turn-ctx)` after the turn), or `execute-prepared-request!` reads it from `turn-ctx`
   directly. Update design.md §SSE extraction pipeline and plan.md step 4 to name the
   exact extraction point.
+  > **Resolved**: `execute-live-turn!` reads `:logprobs` from `@(:turn-data turn-ctx)`
+  > after `await-assistant-message!` returns and includes it in its return map:
+  > `{:turn-id ... :model ... :ai-options ... :turn-ctx ... :assistant-message ...
+  >   :logprobs (get @(:turn-data turn-ctx) :logprobs)}`.
+  > `execute-prepared-request!` destructures `:logprobs` from the `execute-live-turn!`
+  > return and includes it as `:execution-result/logprobs` in the result map (nil when
+  > logprobs were not collected). Design.md §SSE extraction pipeline and plan.md step 4
+  > updated accordingly.
 
-- [ ] **`session_settings.clj` layer for `/logprobs` toggle** — the established pattern
+- [x] **`session_settings.clj` layer for `/logprobs` toggle** — the established pattern
   for `/thinking` and `/model` commands routes through a dedicated `set-X-in!` fn in
   `session_settings.clj` before calling `dispatch/dispatch!`. The design's toggle path
   description skips this layer. Clarify: add `set-logprobs-in!` to `session_settings.clj`
   (matching the pattern), or call `dispatch/dispatch!` directly from `commands.clj`.
   Update design.md §Control toggle path and steps.md step 8 to reflect the chosen path.
+  > **Resolved**: Add `set-logprobs-in!` to `session_settings.clj` matching the
+  > `set-thinking-level-in!` pattern:
+  > ```clojure
+  > (defn set-logprobs-in!
+  >   "Set logprob collection state for `session-id`.
+  >    `enabled?` is boolean; `top-n` is int 1–20 or nil (keeps current/default)."
+  >   [ctx session-id enabled? top-n]
+  >   (dispatch/dispatch! ctx :session/set-logprobs
+  >                       (cond-> {:session-id session-id :enabled? enabled?}
+  >                         top-n (assoc :top-n top-n))
+  >                       {:origin :core}))
+  > ```
+  > `commands.clj` calls `session-settings/set-logprobs-in!` (not `dispatch/dispatch!`
+  > directly). Design.md §Control toggle path and steps.md step 8 updated to name
+  > `set-logprobs-in!` explicitly.
