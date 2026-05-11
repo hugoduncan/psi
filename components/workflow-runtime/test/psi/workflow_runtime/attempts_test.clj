@@ -49,6 +49,28 @@
       (is (some? (session-state/sc-session-id-in ctx (:session-id execution-session))))
       (session-core/shutdown-context! ctx))))
 
+(deftest create-step-attempt-session-preserves-combined-response-mode-and-logprobs-controls-test
+  (testing "workflow attempt child-session creation preserves non-streaming and logprob controls on the same path"
+    (let [[ctx parent-session-id] (create-session-context {:persist? false})
+          {:keys [execution-session]}
+          (workflow-attempts/create-step-attempt-session!
+           ctx
+           parent-session-id
+           {:workflow-run-id "run-1"
+            :workflow-step-id "plan"
+            :attempt-id "attempt-2"
+            :session-name "workflow plan attempt"
+            :response-mode :non-streaming
+            :logprobs true
+            :top-logprobs 6
+            :tool-defs []
+            :thinking-level :off})]
+      (is (= {:response-mode :non-streaming
+              :logprobs-enabled true
+              :top-logprobs 6}
+             (select-keys execution-session [:response-mode :logprobs-enabled :top-logprobs])))
+      (session-core/shutdown-context! ctx))))
+
 (deftest append-attempt-to-run-test
   (testing "append-attempt-to-run records attempt under the selected step"
     (let [run {:run-id "run-1"

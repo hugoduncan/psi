@@ -81,3 +81,13 @@ The task should not leave both names as parallel canonical state.
 ## 2026-05-11 implementation review
 
 - Actionable: acceptance proof is still incomplete for the motivating combined-control case. Existing tests cover `:response-mode` propagation and logprob propagation independently, but no focused proof exercises a workflow-authored session step or attempt carrying both `:response-mode :non-streaming` and enabled logprobs through the same path. This leaves the final unchecked verification step unproven in code.
+
+## 2026-05-11 follow-up execution
+
+- Added focused combined-control proof in `components/workflow-runtime/test/psi/workflow_runtime/attempts_test.clj` covering the same workflow-owned child-session creation path with `:response-mode :non-streaming`, `:logprobs true`, and explicit `:top-logprobs` on one attempt.
+- Verified the motivating provider-shaping case is now covered end-to-end by the focused proof set already present across:
+  - `psi.workflow-step-session-config.core-test` for resolved workflow config carrying both controls
+  - `psi.workflow-runtime.attempts-test` and `psi.agent-session.workflow-attempts-test` for child-session creation/persistence of both controls on the same execution path
+  - `psi.turn-runtime.response-mode-test` for non-streaming execution path selection
+  - existing logprob request-shaping proofs for provider request options/building
+- Verification green: `bb clojure:test:unit --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-attempts-test --focus psi.workflow-step-session-config.core-test --focus psi.turn-runtime.response-mode-test` → `1716 tests, 12629 assertions, 0 failures`.

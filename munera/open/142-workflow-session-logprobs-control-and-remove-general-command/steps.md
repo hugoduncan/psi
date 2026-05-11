@@ -7,5 +7,5 @@
 - [x] Ensure request-option projection and request building honor the persisted workflow-owned child-session logprob controls.
 - [x] Remove the general `/logprobs` slash command surface, including dispatch, help text, autocomplete, and any dead command-only mutation/helper path.
 - [x] Add focused tests for workflow config propagation, child-session persistence, request-option projection, and command-surface removal.
-- [ ] Verify the motivating workflow case: workflow child session can combine `:response-mode :non-streaming` with logprob collection without needing a general `/logprobs` command.
-- [ ] Add a focused proof that a workflow-authored session step/attempt carrying both `:response-mode :non-streaming` and enabled logprobs preserves both controls through child-session creation on the same execution path.
+- [x] Verify the motivating workflow case: workflow child session can combine `:response-mode :non-streaming` with logprob collection without needing a general `/logprobs` command.
+- [x] Add a focused proof that a workflow-authored session step/attempt carrying both `:response-mode :non-streaming` and enabled logprobs preserves both controls through child-session creation on the same execution path.
