@@ -24,3 +24,4 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 ## 2026-05-11 design review
 
 - Actionable ambiguity: the task did not include the `design-steps.md` follow-up surface that this review protocol writes to, so the canonical place for new design-review actions was implicit rather than task-local. Added `design-steps.md` with a follow-up to make that review/follow-up surface explicit in the task artifacts.
+- Completed the ambiguity follow-up by updating `design.md` and `plan.md` to define task-local roles for `design-steps.md`, `steps.md`, and `implementation.md`, making future design-review actions explicit without widening scope into implementation work.
