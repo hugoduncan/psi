@@ -130,3 +130,7 @@ Closed the remaining provider-capture gap for task 141:
 - `execute-prepared-request!` now returns per-turn `:execution-result/provider-captures` for both streaming and non-streaming paths instead of hard-coded empties
 - extended `psi.turn-runtime.response-mode-test` so the non-streaming provider stub emits request/reply captures via the capture callbacks and proves the returned canonical capture surface includes both captures with the current `turn-id`
 
+## Review note 2026-05-11g
+
+Code-shaper pass found no new actionable simplicity, consistency, or robustness issues beyond the already recorded and addressed response-mode capture follow-up; current propagation, branching, and proof surfaces are aligned.
+
