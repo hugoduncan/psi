@@ -26,6 +26,16 @@
       (`graph_surface_test.clj`) and add it to the Test contract section.
       → `graph_surface_test.clj` identified; Test contract updated in design.md.
 
+## Design follow-up (cross-file consistency)
+
+- [ ] Correct stale implementation.md item 7: update the "plan.md and steps.md absent"
+      note to reflect that steps.md now exists.
+- [ ] Resolve test-contract redundancy: decide whether to (a) drop the new
+      `active-session-id-root-attr-test` deftest requirement and rely on the existing
+      `root-queryable-attrs-contract-test` in `graph_surface_test.clj`, or (b) document
+      what distinct assertion the new deftest adds. Update design.md Test contract
+      section accordingly.
+
 ## Execution (after design is unambiguous)
 
 - [ ] Write plan.md

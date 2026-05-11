@@ -63,3 +63,24 @@ All six pre-plan design clarification steps resolved and recorded in design.md.
   resolver unit tests in nearest session resolver test file.
 
 Design is now unambiguous. plan.md can be written and execution can begin.
+
+## Cross-file consistency review — 2026-05-10
+
+### Inconsistencies found
+
+1. **implementation.md item 7 is stale.** It states "plan.md and steps.md absent" but
+   steps.md now exists (created during the design-clarification pass). The note is
+   factually incorrect and may confuse future readers.
+
+2. **Test contract specifies a new `active-session-id-root-attr-test` deftest in
+   `graph_surface_test.clj` for the root-queryable-attrs assertion — but
+   `root-queryable-attrs-contract-test` already covers every advertised
+   root-queryable attr.** Once the resolver is registered, the existing test
+   exercises it automatically. A separate deftest is redundant for this assertion.
+   The test contract should either (a) drop the new-deftest requirement and rely on
+   the existing contract test, or (b) clarify what additional assertion the new
+   deftest provides beyond what `root-queryable-attrs-contract-test` already covers.
+
+3. **No `plan.md` exists.** Munera protocol requires plan.md before execution steps
+   begin. The first unchecked step in steps.md is "Write plan.md" — consistent —
+   but plan.md must be written before any implementation step proceeds.
