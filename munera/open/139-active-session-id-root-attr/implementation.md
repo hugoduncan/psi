@@ -44,8 +44,9 @@
    there; the design's test contract mentions this but does not identify the file or
    whether it extends existing tests or adds a new deftest.
 
-7. **plan.md and steps.md absent.** The task directory contains only design.md.
-   Execution cannot begin until plan.md and steps.md exist per Munera protocol.
+7. ~~**plan.md and steps.md absent.**~~ steps.md now exists (created during the
+   design-clarification pass). plan.md is still absent; it must be written before
+   execution steps begin (first unchecked execution step in steps.md).
 
 ## Design-step execution — 2026-05-10
 
@@ -84,3 +85,16 @@ Design is now unambiguous. plan.md can be written and execution can begin.
 3. **No `plan.md` exists.** Munera protocol requires plan.md before execution steps
    begin. The first unchecked step in steps.md is "Write plan.md" — consistent —
    but plan.md must be written before any implementation step proceeds.
+
+## Cross-file consistency follow-up execution — 2026-05-10
+
+1. **implementation.md item 7 corrected.** Stale "plan.md and steps.md absent" note
+   updated: steps.md exists; plan.md still absent (first execution step covers this).
+
+2. **Test-contract redundancy resolved — option (a) chosen.** Inspected
+   `root-queryable-attrs-contract-test` in `graph_surface_test.clj`: it queries all
+   root-queryable attrs and asserts each resolves. Once the resolver is registered,
+   `:psi.agent-session/active-session-id` is automatically covered. No separate
+   deftest is needed in `graph_surface_test.clj`. The resolver unit tests (nil
+   semantics, return value) belong in `resolvers_test.clj` and are already called
+   out in the Test contract. design.md Test contract section updated accordingly.

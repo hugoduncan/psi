@@ -28,13 +28,18 @@
 
 ## Design follow-up (cross-file consistency)
 
-- [ ] Correct stale implementation.md item 7: update the "plan.md and steps.md absent"
+- [x] Correct stale implementation.md item 7: update the "plan.md and steps.md absent"
       note to reflect that steps.md now exists.
-- [ ] Resolve test-contract redundancy: decide whether to (a) drop the new
+      → Item 7 updated: steps.md exists; plan.md still absent (first execution step covers this).
+- [x] Resolve test-contract redundancy: decide whether to (a) drop the new
       `active-session-id-root-attr-test` deftest requirement and rely on the existing
       `root-queryable-attrs-contract-test` in `graph_surface_test.clj`, or (b) document
       what distinct assertion the new deftest adds. Update design.md Test contract
       section accordingly.
+      → Option (a) chosen: `root-queryable-attrs-contract-test` covers the attr automatically
+        once the resolver is registered. No separate deftest in `graph_surface_test.clj`.
+        Resolver unit tests (nil semantics, return value) stay in `resolvers_test.clj`.
+        design.md Test contract updated.
 
 ## Execution (after design is unambiguous)
 

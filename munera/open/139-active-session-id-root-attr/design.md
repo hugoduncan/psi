@@ -145,13 +145,14 @@ Returns `nil` when no session id is present in the query context:
 ## Test contract
 
 Target test files:
-- `components/agent-session/test/psi/agent_session/graph_surface_test.clj` — add a
-  new `deftest active-session-id-root-attr-test` asserting the attr appears in
-  `:psi.graph/root-queryable-attrs`
-- `components/agent-session/test/psi/agent_session/resolvers_test.clj` (or nearest
-  session resolver test file) — unit tests for the resolver itself
+- `components/agent-session/test/psi/agent_session/resolvers_test.clj` — unit tests
+  for the resolver itself (resolver behavior, nil semantics)
+- `components/agent-session/test/psi/agent_session/graph_surface_test.clj` — no new
+  deftest needed; the existing `root-queryable-attrs-contract-test` queries all
+  advertised root-queryable attrs and asserts each resolves, so once the resolver is
+  registered `:psi.agent-session/active-session-id` is automatically covered there
 
-Cover at least:
+Cover at least (in `resolvers_test.clj`):
 
 - returns the invoking session id when `:psi.agent-session/session-id` is present
   and non-nil in the query context
@@ -159,7 +160,11 @@ Cover at least:
   query context
 - queryable from root without entity seeding
 - does not reflect adapter focus or list ordering
-- `:psi.agent-session/active-session-id` appears in `:psi.graph/root-queryable-attrs`
+
+The root-queryable-attrs assertion (`:psi.agent-session/active-session-id` appears
+in `:psi.graph/root-queryable-attrs`) is covered by the existing
+`root-queryable-attrs-contract-test` in `graph_surface_test.clj` — no separate
+deftest is needed there.
 
 ## Acceptance
 
