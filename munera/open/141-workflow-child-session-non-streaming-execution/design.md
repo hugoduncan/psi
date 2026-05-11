@@ -68,8 +68,10 @@ Flow:
 workflow definition
 → workflow target IR / effective step session spec
 → resolve-step-session-config
-→ workflow attempt child-session creation opts
-→ :session/create-child
+→ workflow attempt child-session creation opts (`psi.workflow-runtime.attempts/create-step-attempt-session!`)
+→ workflow execution adapter handoff (`psi.workflow-runtime.execution-adapter/create-child-session!`)
+→ child-session creation mutation/dispatch params (`psi.agent-session.context/create-workflow-child-session!` → `:session/create-child`)
+→ child-session initializer (`psi.agent-session.child-session-state/child-session-base-state`)
 → child session data stores :response-mode
 → prompt execution seam reads :response-mode for that child session
 → choose streaming or non-streaming provider execution path

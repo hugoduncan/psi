@@ -7,6 +7,12 @@ Implement this as one vertical slice with a lower execution seam extension, whil
 1. **Propagate execution mode through workflow child-session config**
    - extend workflow IR `session-spec-schema` to accept optional `:response-mode`
    - extend workflow step/session shaping to carry `:response-mode`
+   - widen each existing child-session field-whitelist surface that sits between workflow config and persistence:
+     - `psi.workflow-runtime.attempts/create-step-attempt-session!`
+     - `psi.workflow-runtime.execution-adapter/create-child-session!` handoff opts
+     - `psi.agent-session.context/create-workflow-child-session!`
+     - `:session/create-child` params / handler payload
+     - `psi.agent-session.child-session-state/child-session-base-state`
    - extend child-session state/schema to store `:response-mode`
    - persist explicit resolved `:streaming` on workflow-owned child sessions while leaving ordinary sessions free to omit the field
 

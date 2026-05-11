@@ -55,3 +55,12 @@ No code or `steps.md` execution performed in this pass; only design/plan clarifi
 
 Found one new actionable task-artifact inconsistency:
 - design data flow says `:response-mode` travels through workflow attempt child-session creation opts into `:session/create-child`, but plan/steps only mention schema/state persistence generically and do not explicitly require widening the child-session creation control surface (`workflow-runtime` attempt opts, execution adapter handoff, mutation params, and child-session initializer) that currently whitelists fields before persistence
+
+## Design follow-up execution 2026-05-11c
+
+Resolved the propagation-surface inconsistency in task artifacts only:
+- made the design data-flow explicit at the concrete whitelist owners: `psi.workflow-runtime.attempts/create-step-attempt-session!` → `psi.workflow-runtime.execution-adapter/create-child-session!` → `psi.agent-session.context/create-workflow-child-session!` / `:session/create-child` → `psi.agent-session.child-session-state/child-session-base-state`
+- updated `plan.md` to name each surface that must widen for `:response-mode`
+- expanded `steps.md` under the child-session propagation step so implementation work can close the surfaces one by one without ambiguity
+
+Per request, did not execute `steps.md` implementation items in this pass; only completed the newly added `design-steps.md` artifact-clarification item.
