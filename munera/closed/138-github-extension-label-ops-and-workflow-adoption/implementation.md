@@ -1,5 +1,31 @@
 # Implementation Notes
 
+## 2026-05-10 — Implementation review pass 1
+
+**Two critical runtime bugs found:**
+
+1. **`gh-bug-triage-modular` post-repro `:map` type prompt-string not in IR schema.**
+   `delegate-spec-schema` allows `[:or :string template-contribution-schema]` only.
+   `:map` type is not in the schema and has no resolution path in
+   `render-delegate-prompt-string`. `compile-definition-to-ir!` will throw structural
+   validation error when `gh-bug-triage-modular` is invoked. The feature described in
+   design §P does not exist in the runtime.
+   Fix options: (a) add `:map` type to `delegate-spec-schema` and implement resolution
+   in `render-delegate-prompt-string`; (b) replace with a different wiring strategy
+   (e.g., wire `:issue_number` via a dedicated discover step in `gh-bug-post-repro`,
+   or encode the number into the rendered template text and parse it in the child).
+
+2. **`gh-issue-refine` `add-waiting-pr` `:path [:pr-number]` key mismatch.**
+   `parse-markdown-handoff-data` converts `"pr_number"` bullet key to `:pr_number`
+   (keyword preserves underscores). The wiring uses `:path [:pr-number]` (hyphen).
+   `get-path*` returns `nil` → `github/add-label` receives `:number nil` → `gh pr edit`
+   call fails.
+   Fix: change wiring to `:path [:pr_number]`, or change publish prompt bullet to
+   `pr-number:` so the parsed key matches `:pr-number`.
+
+**No other actionable issues.** Extension code, tests, lint, and all other workflow
+migrations are correct.
+
 ## 2026-05-10 — Design review pass 4 follow-up execution (design-steps O–R)
 
 All four design-steps resolved:

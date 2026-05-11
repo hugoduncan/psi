@@ -106,3 +106,15 @@
 - [x] Smoke-read each migrated workflow — all parse cleanly, wiring verified
 - [x] Commit: `⚒ 138: github extension label ops and workflow adoption`
 - [x] Update `munera/plan.md`
+
+## Review pass 1 follow-up
+
+- [ ] Fix `gh-bug-triage-modular` broken `:map` type prompt-string in `post-repro` delegate step
+  - Decide approach: (a) implement `:map` type in `delegate-spec-schema` + `render-delegate-prompt-string`; or (b) replace with alternative wiring that the runtime already supports
+  - Update `gh-bug-triage-modular.md` so `post-repro` step passes structured issue number via a supported mechanism
+  - Add or update test coverage for the chosen approach
+  - Verify `compile-and-validate-workflow-definition` passes for `gh-bug-triage-modular`
+
+- [ ] Fix `gh-issue-refine` `add-waiting-pr` key mismatch: `:path [:pr-number]` vs parsed `:pr_number`
+  - Either change wiring to `:path [:pr_number]` in `gh-issue-refine.md`, or change publish prompt bullet from `pr_number:` to `pr-number:`
+  - Verify end-to-end: `parse-markdown-handoff-data` → `get-path*` → `github/add-label :number` is non-nil
