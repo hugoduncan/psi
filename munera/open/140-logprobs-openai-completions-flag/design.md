@@ -1,31 +1,97 @@
-Goal: Add a runtime behavioural flag that enables log-probability collection on the OpenAI chat-completions endpoint (and compatible endpoints such as llama.cpp HTTP server).
+Goal: Add a per-session toggle that enables log-probability collection on the OpenAI
+chat-completions endpoint (and compatible endpoints such as llama.cpp), surfacing the
+collected data in both session telemetry and the session journal.
 
-Context:
-- The OpenAI chat-completions API supports `"logprobs": true` and `"top_logprobs": N` (max 20) in the request body.
-- llama.cpp's HTTP server surfaces the same fields, returning a `completion_probabilities` array with per-token log-probability data (natural log; exponentiate via `Math.exp` to get probability).
-- Psi builds the completions request body in `psi.ai.providers.openai.chat-completions/build-request`; all provider-shaping options flow through `StreamOptions` and the per-session `session->request-options` projection.
-- `StreamOptions` is open (`{:closed false}`), so additional provider-specific keys already pass through without schema breakage.
-- The session state carries `thinking-level` as a first-class behavioural field; logprobs should follow the same pattern — a named field on the session state, projected into `StreamOptions` by `session->request-options`, and consumed in `build-request`.
+## Context
 
-Required behaviour:
-- A boolean session-level flag `:logprobs-enabled` controls whether logprob fields are included in openai-completions requests.
-- When enabled, the request body includes `"logprobs": true`. Optionally, `:top-logprobs` (integer 1–20) controls the `"top_logprobs"` field; when absent and logprobs is enabled, `"top_logprobs"` is omitted (the endpoint returns only the chosen-token logprob).
-- The flag is off by default.
-- The flag is scoped to the session state model (`agent-session-schema`) and projected through `session->request-options` into the `StreamOptions` map.
-- `build-request` reads `:logprobs-enabled` and `:top-logprobs` from options and conditionally adds the fields to the request body.
-- The raw `logprobs` data returned in the response stream is surfaced as-is in a new `:logprobs-delta` stream event so consumers can receive it without schema loss.
-- No cost or usage computation is added for logprob tokens (they are not separately billed).
+- The OpenAI chat-completions API accepts `"logprobs": true` and `"top_logprobs": N`
+  (max 20) in the request body. The response includes per-token logprob data under
+  `choices[0].logprobs.content`.
+- llama.cpp's HTTP server accepts the same fields and returns
+  `completion_probabilities` — an array of `{content, probs: [{prob, tok_str}]}` where
+  `prob` is a plain probability (not a log-probability).
+- Psi builds the completions request in
+  `psi.ai.providers.openai.chat-completions/build-request`; provider-shaping options
+  flow through `StreamOptions` (open schema) and the per-session
+  `session->request-options` projection.
+- Session telemetry already carries `:provider-requests` and `:provider-replies`;
+  per-turn logprob accumulation fits naturally alongside these.
+- `session-entry-kind-schema` enumerates journalled entry kinds; a new `:logprobs` kind
+  will carry the per-turn normalized token data.
 
-Acceptance:
-- `session->request-options` propagates `:logprobs-enabled` and `:top-logprobs` from session state into the options map when set.
-- `build-request` adds `"logprobs": true` (and optionally `"top_logprobs": N`) to the body iff `:logprobs-enabled` is truthy.
+## Control
+
+`:logprobs-enabled` is a **transient session-state boolean** — it lives on the
+session data map, is togglable within a session, and is NOT journalled as a
+session-entry (no persistence across session restarts, no config file write).
+
+Toggle path:
+
+```
+/logprobs [on|off]
+  → slash-command handler in commands.clj
+  → :session/set-logprobs-enabled dispatch event
+  → session_mutations handler: {:root-state-update (assoc % :logprobs-enabled enabled?)}
+                                (no journal-append effect, no persist effect)
+  → session->request-options propagates :logprobs-enabled (and :top-logprobs when set)
+```
+
+`:top-logprobs` (optional int 1–20, default absent) is also a transient session field,
+set via `/logprobs N` where N is 1–20.
+
+Both fields default to absent in `initial-session`; absent `:logprobs-enabled` is
+treated as disabled.
+
+## Surfacing
+
+### 1 — Per-turn telemetry accumulation
+
+During a turn, logprob data arriving in stream chunks is accumulated into a transient
+buffer and, on turn completion, written to the session telemetry slot
+`:last-turn-logprobs`. This replaces the previous value each turn. Queryable via a new
+EQL resolver `:psi.agent-session/last-turn-logprobs`.
+
+Shape (normalized across providers):
+
+```clojure
+[{:token      "Hello"
+  :logprob    -0.500          ; natural log; nil if unavailable
+  :top        [{:token "Hello" :logprob -0.500}
+               {:token "Hi"    :logprob -1.200}]}
+ ...]
+```
+
+Normalization:
+- **OpenAI**: `choices[0].logprobs.content[i]` → `{:token .token :logprob .logprob :top .top_logprobs}`
+- **llama.cpp**: `completion_probabilities[i]` → `{:token .content :logprob (Math/log prob) :top (map #(hash-map :token (:tok_str %) :logprob (Math/log (:prob %))) probs)}`
+
+### 2 — Session journal entry
+
+On turn completion, when logprobs are enabled, a `:logprobs` session-entry is appended
+to the session journal immediately after the `:message` entry for the assistant turn.
+Entry data:
+
+```clojure
+{:turn-id   "..."
+ :tokens    [ ... normalized token vector (same shape as telemetry) ... ]}
+```
+
+`session-entry-kind-schema` gains `:logprobs`.
+
+## Acceptance
+
+- `/logprobs on` / `/logprobs off` toggles `:logprobs-enabled` on the session.
+- `/logprobs N` (1 ≤ N ≤ 20) sets `:top-logprobs` and implicitly enables.
+- `/logprobs` with no argument reports current state.
+- When enabled, `build-request` adds `"logprobs": true` (and `"top_logprobs": N` when
+  set) to the request body.
 - When disabled (default), no logprob fields appear in the request body.
-- `agent-session-schema` includes `:logprobs-enabled` (optional boolean) and `:top-logprobs` (optional int 1–20).
-- A `:logprobs-delta` stream event type is added to `StreamEventType` and emitted from the chunk processor when logprob data is present in the response.
-- Behaviour is covered by unit tests in the `ai` component (request building) and `agent-session` component (options projection).
-
-Constraints:
-- No changes to Anthropic or codex-responses providers; this flag is OpenAI-completions-specific.
-- `StreamOptions` remains open; no closed-schema breakage.
-- `initial-session` default leaves `:logprobs-enabled` absent (falsy); no opt-out required.
-- Keep the change localized: session model → options projection → request builder → stream event.
+- On turn completion with logprobs enabled, `:last-turn-logprobs` in session telemetry
+  contains the normalized token vector for that turn.
+- `:psi.agent-session/last-turn-logprobs` EQL resolver returns the current value (nil
+  when disabled or before any logprob turn).
+- A `:logprobs` session-entry is appended to the journal on each logprob-enabled turn.
+- Logprob collection is absent from the default session; no opt-out required.
+- No changes to Anthropic or codex-responses providers.
+- Behaviour is covered by unit tests: request building (ai component), options
+  projection (agent-session), and telemetry accumulation.
