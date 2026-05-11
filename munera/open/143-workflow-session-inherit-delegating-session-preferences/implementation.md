@@ -54,3 +54,10 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
   - `bb clojure:test:unit --focus psi.workflow-runtime.core-test --focus psi.workflow-step-session-config.core-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.workflow-runtime.statechart-runtime.state-test`
   - `bb lint`
   - Result: focused tests green, lint clean.
+
+## 2026-05-11 implementation review
+
+- Reviewed the task against `task-implementation-review`: code matches the task design, preserves the intended architecture of explicit delegating-session authority over context-order inference, and keeps the compatibility fallback narrow.
+- Re-read the workflow create/run/resume and step-session-config surfaces plus focused proof. Confirmed the authoritative parent precedence is implemented consistently across canonical mutation, psi-tool create-run, delegated sub-workflow creation, workflow-context reconstruction, and step session-config resolution.
+- Re-ran the focused workflow tests and lint; all passed.
+- No new actionable feedback found.
