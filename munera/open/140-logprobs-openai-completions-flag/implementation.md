@@ -56,6 +56,34 @@ Executed all three unchecked items from the review pass 2 inconsistency scan:
 
 All three inconsistency items are now marked `[x]` in design-steps.md.
 
+## Review pass 3 — codebase structural scan (2026-05-11)
+
+Read `turn_runtime/core.clj`, `accumulator.clj`, `session_settings.clj`, and
+`session_mutations.clj`. Three actionable gaps found.
+
+1. **`:logprob-delta` silently dropped by event consumer** — `make-provider-event-consumer`
+   in `core.clj` has an explicit `case` on `:type`; unknown types hit `nil` and are
+   dropped. A `:logprob-delta` event emitted by `consume-fn` will never reach the
+   accumulator. The design must specify adding `:logprob-delta` to the `case` dispatch
+   in `make-provider-event-consumer` (calling `call-action! :on-logprob-delta`), and
+   `make-turn-actions` must add a matching `:on-logprob-delta` action key.
+
+2. **Logprob data has no path from turn-data → execution-result** — `execute-live-turn!`
+   returns only `{:assistant-message ...}` (destructured from `turn-ctx` / `done-p`).
+   `execute-prepared-request!` constructs the execution-result map from that return value
+   and has no access to the turn-data atom's logprob buffer. The design says
+   `:execution-result/logprobs` is populated but does not specify how: either
+   `execute-live-turn!` must return `:logprobs` alongside `:assistant-message`, or
+   `execute-prepared-request!` must read it from `turn-ctx`/`turn-data` directly after
+   the turn completes.
+
+3. **`/logprobs` toggle path missing `session_settings.clj` layer** — the actual pattern
+   for `/thinking` and `/model` is: `commands.clj` → `session/set-X-in!` in
+   `session_settings.clj` → `dispatch/dispatch!` → handler in `session_mutations.clj`.
+   The design's toggle path description skips `session_settings.clj`. Clarify whether
+   `set-logprobs-in!` is added to `session_settings.clj` (matching the established
+   pattern) or whether `commands.clj` calls `dispatch/dispatch!` directly.
+
 ## Review pass 2 — cross-file inconsistency scan (2026-05-11)
 
 Three actionable inconsistencies found across design.md / design-steps.md / plan.md / steps.md:

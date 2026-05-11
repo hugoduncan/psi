@@ -144,3 +144,30 @@ Clarification and resolution items surfaced during design review.
   > command-surface complexity for an initial implementation. It can be made
   > configurable in a follow-on task if needed. The constant is named
   > `logprob-uncertain-threshold` and lives in the projection namespace.
+
+## Structural gaps (review pass 3)
+
+- [ ] **`:logprob-delta` event not routed in `make-provider-event-consumer`** —
+  `core.clj`'s `make-provider-event-consumer` has an explicit `case` on `:type`; events
+  with unknown types hit `nil` and are silently dropped. A `:logprob-delta` event emitted
+  by `consume-fn` will never reach the accumulator. Specify: (a) add `:logprob-delta` to
+  the `case` dispatch calling `call-action! :on-logprob-delta`, and (b) add a matching
+  `:on-logprob-delta` action key to `make-turn-actions` in `accumulator.clj` that
+  appends tokens to a transient buffer in `turn-data`. Update design.md §SSE extraction
+  pipeline and plan.md step 3/4 accordingly.
+
+- [ ] **No path for logprob data from turn-data → execution-result** — `execute-live-turn!`
+  returns only `{:assistant-message ...}`; `execute-prepared-request!` builds
+  `execution-result` from that and has no access to the turn-data atom's logprob buffer.
+  Specify how `:execution-result/logprobs` is populated: either `execute-live-turn!`
+  returns `:logprobs` alongside `:assistant-message` (reading from `@(:turn-data
+  turn-ctx)` after the turn), or `execute-prepared-request!` reads it from `turn-ctx`
+  directly. Update design.md §SSE extraction pipeline and plan.md step 4 to name the
+  exact extraction point.
+
+- [ ] **`session_settings.clj` layer for `/logprobs` toggle** — the established pattern
+  for `/thinking` and `/model` commands routes through a dedicated `set-X-in!` fn in
+  `session_settings.clj` before calling `dispatch/dispatch!`. The design's toggle path
+  description skips this layer. Clarify: add `set-logprobs-in!` to `session_settings.clj`
+  (matching the pattern), or call `dispatch/dispatch!` directly from `commands.clj`.
+  Update design.md §Control toggle path and steps.md step 8 to reflect the chosen path.
