@@ -68,3 +68,9 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 - Re-read the lower session-config proof plus canonical mutation, psi-tool, workflow-runtime state, attempt-child-session, and resume-path tests to verify the delegating-session authority is exercised at the intended seams without mocks/stubs of logic dependencies.
 - Re-ran `bb clojure:test:unit --focus psi.workflow-runtime.core-test --focus psi.workflow-step-session-config.core-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-execution-resume-test --focus psi.workflow-runtime.statechart-runtime.state-test` and `bb lint`; both passed.
 - No new actionable feedback found.
+
+## 2026-05-11 follow-up execution
+
+- Read the preloaded review result and re-checked task artifacts. `steps.md` already had all actionable items marked done; no newly added unchecked follow-up items remained to execute.
+- Re-verified the task with the focused workflow test command from the prior review and `bb lint`; both passed.
+- Also observed that the broad `bb clojure:test:unit` suite currently has an unrelated existing failure in `psi.agent-session.workflow-execution-test/execute-run-with-judge-loop-test`, so only the task-focused verification was used for this follow-up pass.
