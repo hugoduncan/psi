@@ -38,6 +38,24 @@ Resolved all 8 ambiguities in design-steps.md by reading codebase. Key decisions
 
 Created plan.md and steps.md.
 
+## Design-steps follow-up execution pass (2026-05-11)
+
+Executed all three unchecked items from the review pass 2 inconsistency scan:
+
+1. **Accumulator key** — corrected design-steps.md item 2 resolution text from
+   `:last-turn-logprobs` to `:execution-result/logprobs`; added parenthetical
+   clarifying that `:last-turn-logprobs` is the downstream session-data slot.
+
+2. **"Session telemetry" wording** — updated design.md §Surfacing §1 to "session-data
+   slot" with a note referencing `session-update` and `:last-execution-result-summary`
+   as the pattern. Updated §Acceptance to "session-data" accordingly. Session-data
+   placement confirmed correct; no code change needed.
+
+3. **`format-help` sub-bullet** — added explicit sub-bullet to steps.md step 8 calling
+   out the `format-help` addition with the exact help string from design.md.
+
+All three inconsistency items are now marked `[x]` in design-steps.md.
+
 ## Review pass 2 — cross-file inconsistency scan (2026-05-11)
 
 Three actionable inconsistencies found across design.md / design-steps.md / plan.md / steps.md:

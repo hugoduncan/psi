@@ -102,8 +102,9 @@ On `:done`, the buffer is finalized into `:execution-result/logprobs`.
 During a turn, `:logprob-delta` events emitted by `consume-fn` are accumulated into a
 transient buffer in the turn-runtime accumulator. On `:done`, the buffer is finalized
 into `:execution-result/logprobs` on the execution result. `build-record-response`
-reads this key and writes the normalized token vector to the session telemetry slot
-`:last-turn-logprobs` (replaces previous value). Queryable via a new EQL resolver
+reads this key and writes the normalized token vector to the session-data slot
+`:last-turn-logprobs` (replaces previous value; written via `session-update`, same path
+as `:last-execution-result-summary`). Queryable via a new EQL resolver
 `:psi.agent-session/last-turn-logprobs`.
 
 ### 2 — Session journal entry + LLM projection
@@ -162,7 +163,7 @@ to a follow-on task.
 - When enabled, `build-request` adds `"logprobs": true` and `"top_logprobs": N` to the
   request body.
 - When disabled (default), no logprob fields appear in the request body.
-- On turn completion with logprobs enabled, `:last-turn-logprobs` in session telemetry
+- On turn completion with logprobs enabled, `:last-turn-logprobs` in session-data
   contains the normalized token vector for that turn.
 - `:psi.agent-session/last-turn-logprobs` EQL resolver returns the current value (nil
   when disabled or before any logprob turn).

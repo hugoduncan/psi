@@ -36,7 +36,8 @@
 - [ ] **8. `/logprobs` command** — `commands.clj`:
   - Implement `dispatch-logprobs-command` (on/off/N/report)
   - Add `/logprobs` to `prefixed-command-prefixes`
-  - Add help text line
+  - Add `/logprobs` help line to `format-help` alongside `/model` and `/thinking`:
+    `"  /logprobs [on|off|N] — toggle logprob collection or set top-N (1–20)\n"`
   - Add `"/logprobs"` to `builtin-slash-commands` in `tui/app/shared.clj`
 
 - [ ] **9. Tests**:
