@@ -130,3 +130,7 @@ The task should not leave both names as parallel canonical state.
 - Confirmed task `142` remains complete from the task artifact state: all checklist items are already checked, and the latest review note (`test-shaper review`) added no follow-up actions.
 - Left `steps.md` unchanged because there were no new unchecked items to complete.
 - No blocker was encountered; the follow-up pass was a task-local no-op.
+
+## 2026-05-11 code-shaper review
+
+- Review result: no new actionable feedback. Re-read the workflow-only logprob control path and removal boundary with a simplicity/consistency/robustness lens: `resolve-step-session-config` centralizes the authored `:logprobs` default/drop semantics, workflow propagation preserves `contains?`-based false handling through `statechart_runtime.clj` and `context.clj`, child-session persistence keeps one canonical lower key shape (`:logprobs-enabled` / `:top-logprobs`), request projection still applies the single lower default of top-N 3, and the public non-workflow `psi.extension/create-child-session` mutation remains closed to logprob authorship. Re-ran the focused proof set; no new actionable shaping issues found.
