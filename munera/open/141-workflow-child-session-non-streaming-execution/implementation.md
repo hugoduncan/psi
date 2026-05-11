@@ -34,3 +34,10 @@ It is the smaller slice:
 - workflow-authored child session can request `:response-mode :non-streaming`
 - lower prompt execution honors that choice
 - ordinary top-level interactive sessions remain on the current streaming path
+
+## Review note 2026-05-11
+
+Found three actionable design ambiguities:
+- workflow runtime IR `session-spec-schema` currently accepts only `:model`, `:tools`, `:skills`, and `:contributions`, so the artifacts do not yet say whether `:response-mode` must be added there for workflow-authored config to parse/validate
+- default persistence semantics are underspecified: design says resolved workflow child-session config defaults to `:streaming`, but also says ordinary sessions may leave `:response-mode` absent, so task artifacts should choose whether workflow-owned child sessions persist explicit `:streaming` or only persist `:non-streaming`
+- the lower non-streaming seam is still not concrete enough: turn-runtime is named as the branch point, but the new `psi.ai.core` / provider contract needed to execute non-streaming requests is not yet specified
