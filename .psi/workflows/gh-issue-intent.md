@@ -1,11 +1,11 @@
 ---
 name: gh-issue-intent
-description: Find an enhancement issue labeled refine, create a worktree, produce a refined task intent using the task-intent skill, push the branch, post an issue comment, and advance labels
+description: Find an enhancement issue labeled intent, create a worktree, produce a refined task intent using the task-intent skill, push the branch, post an issue comment, and advance labels
 ---
 {:steps [{:name      "discover"
           :type      :invoke
           :operation "github/find-issue"
-          :args      {:labels ["enhancement" "refine"]
+          :args      {:labels ["enhancement" "intent"]
                       :input  {:from :workflow-input :path [:input]}}
           :outputs   {:summary {:source :invoke/summary}
                       :data    {:source :invoke/data}}
@@ -50,8 +50,8 @@ description: Find an enhancement issue labeled refine, create a worktree, produc
           :type      :invoke
           :operation "github/edit-labels"
           :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
-                      :remove ["refine"]
+                      :remove ["intent"]
                       :add    ["waiting"]
                       :target "issue"}}]}
 
-Coordinate intent-capture for a GitHub enhancement issue labeled `refine`: select the issue, create an issue-specific worktree, apply the task-intent skill to produce a clear and concise problem statement with constraints and success criteria, commit the intent, push the branch, post an issue comment with the refined intent, then remove the `refine` label and add `waiting` to the issue.
+Coordinate intent-capture for a GitHub enhancement issue labeled `intent`: select the issue, create an issue-specific worktree, apply the task-intent skill to produce a clear and concise problem statement with constraints and success criteria, commit the intent, push the branch, post an issue comment with the refined intent, then remove the `intent` label and add `waiting` to the issue.
