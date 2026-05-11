@@ -94,3 +94,10 @@ Current code in `psi.workflow-step-session-config.core/resolve-step-session-conf
 - Reviewed the workflow parent-authority path against `code-shaper` for simplicity, consistency, and robustness across run creation, workflow-context reconstruction, delegated sub-workflow creation, and step session-config resolution.
 - Re-read `workflow-runtime.core/create-run`, `workflow-runtime.statechart-runtime/create-workflow-context`, `workflow-runtime.statechart-runtime.delegate/delegate-step-runtime-result`, `workflow-step-session-config.core/resolve-step-session-config`, plus the focused proofs for delegating-session precedence and psi-tool/canonical mutation persistence.
 - No new actionable feedback found. Explicitly: no new actionable feedback.
+
+## 2026-05-11 follow-up execution (independent requested commit pass)
+
+- Read the preloaded review result plus `steps.md`, `implementation.md`, `design.md`, and `plan.md` to identify newly added actionable follow-up work.
+- Confirmed `steps.md` still has no unchecked items, so there was no remaining task-local implementation step to execute or mark done in this pass.
+- Re-ran task-focused verification: `bb clojure:test:unit --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.core-test --focus psi.workflow-runtime.statechart-runtime.state-test --focus psi.agent-session.mutations.canonical-workflows-test --focus psi.agent-session.workflow-tools-test --focus psi.agent-session.workflow-execution-resume-test` and `bb lint`.
+- Result: focused tests green (`1722 tests, 11988 assertions, 0 failures`); lint clean; no blocking follow-up remained.
