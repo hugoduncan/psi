@@ -103,3 +103,7 @@ The task should not leave both names as parallel canonical state.
   - `bb clojure:test:unit --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-attempts-test --focus psi.workflow-step-session-config.core-test --focus psi.turn-runtime.response-mode-test`
 - Verification remains green: `1716 tests, 11956 assertions, 0 failures`.
 - No additional code or task-artifact changes were required for task `142`; the only unrelated working-tree change present before commit was `munera/plan.md`.
+
+## 2026-05-11 task-implementation-review
+
+- Review result: no new actionable feedback. Re-checked workflow-only propagation (`context.clj`, `statechart_runtime.clj`, `session_lifecycle.clj`, `child_session_state.clj`, `prompt_request.clj`), confirmed `/logprobs` remains removed from command resolution/help/autocomplete (`commands.clj`, `shared.clj`, backend/TUI tests), and confirmed the public non-workflow `psi.extension/create-child-session` mutation still does not accept logprob controls.
