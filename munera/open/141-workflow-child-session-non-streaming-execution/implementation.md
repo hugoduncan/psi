@@ -50,3 +50,8 @@ Resolved the three preloaded ambiguities in task artifacts only:
 - chose the exact lower seam: branch in `psi.turn-runtime.core/execute-prepared-request!`; keep streaming on `psi.ai.core/stream-response{,-in}`; add sibling non-streaming `psi.ai.core/execute-response{,-in}` and a matching provider `:execute` contract, with OpenAI chat-completions implemented first
 
 No code or `steps.md` execution performed in this pass; only design/plan clarification per request.
+
+## Review note 2026-05-11b
+
+Found one new actionable task-artifact inconsistency:
+- design data flow says `:response-mode` travels through workflow attempt child-session creation opts into `:session/create-child`, but plan/steps only mention schema/state persistence generically and do not explicitly require widening the child-session creation control surface (`workflow-runtime` attempt opts, execution adapter handoff, mutation params, and child-session initializer) that currently whitelists fields before persistence
