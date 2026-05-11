@@ -140,6 +140,10 @@
 
 ## Review pass 2 follow-up
 
+## Test-shaping pass 2 follow-up
+
+- [x] `label-ops-test`: move `remove-multiple-labels-test` into the `remove-label` section (after `remove-label-from-issue-returns-ok-test`), removing the orphaned section header between the add-label blocks
+
 ## Test-shaping pass 1 follow-up
 
 - [x] `find-pr-test`: split `narrowing-by-pull-url-test` into success (`narrowing-by-pull-url-test`) and error (`invalid-url-returns-error-test`) `deftest`s

@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-05-10 — Test-shaping pass 2
+
+**One structural finding.**
+
+`label-ops-test`: `remove-multiple-labels-test` is placed between `;;; add-label: issue target` and `;;; add-label: pr target` under a `;;; remove-label: multiple labels` section header — a remove-label island inside the add-label block. Move it to the `remove-label` section alongside `remove-label-from-issue-*`.
+
+Everything else is clean.
+
 ## 2026-05-10 — Test-shaping pass 1
 
 **Four actionable findings.**

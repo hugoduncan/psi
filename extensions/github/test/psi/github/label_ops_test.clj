@@ -41,15 +41,6 @@
       (is (= ["gh" "issue" "edit" "7" "--add-label" "fix,ready"] (first @calls*))))))
 
 ;;; ---------------------------------------------------------------------------
-;;; remove-label: multiple labels
-
-(deftest remove-multiple-labels-test
-  (testing "multiple labels are joined as CSV for remove"
-    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
-      (invoke-remove shell-fn {:number 42 :labels ["fix" "triage"] :target "issue"})
-      (is (= ["gh" "issue" "edit" "42" "--remove-label" "fix,triage"] (first @calls*))))))
-
-;;; ---------------------------------------------------------------------------
 ;;; add-label: pr target
 
 (deftest add-label-to-pr-invokes-correct-gh-command-test
@@ -103,6 +94,12 @@
       (is (= {:number 42 :target "issue" :removed-labels ["triage"]} (:data result)))
       (is (string? (:summary result)))
       (is (str/includes? (:summary result) "issue #42")))))
+
+(deftest remove-multiple-labels-test
+  (testing "multiple labels are joined as CSV for remove"
+    (let [[shell-fn calls*] (ts/capturing-shell-ok)]
+      (invoke-remove shell-fn {:number 42 :labels ["fix" "triage"] :target "issue"})
+      (is (= ["gh" "issue" "edit" "42" "--remove-label" "fix,triage"] (first @calls*))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; remove-label: pr target
