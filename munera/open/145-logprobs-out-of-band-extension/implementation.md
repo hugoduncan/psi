@@ -20,4 +20,4 @@ Six ambiguities found and resolved:
 
 One inconsistency found:
 
-1. **`prompt_request.clj` removal list omits `format-token-str` and `format-prob`.** design.md "What is removed from core" and steps.md step 1 enumerate only `format-logprob-message`, `format-logprob-line`, and `logprob-uncertain-threshold` for `prompt_request.clj`. But `format-token-str` (line 18) and `format-prob` (line 27) are private helpers in `prompt_request.clj` exclusively called by the functions being removed — they become dead code. The parallel `step_execution.clj` enumeration correctly includes all six functions. design.md and steps.md should list `format-token-str` and `format-prob` for `prompt_request.clj` removal too.
+1. **`prompt_request.clj` removal list omits `format-token-str` and `format-prob`.** → **Resolved**: added both private helpers to design.md "What is removed from core" and steps.md step 1. Now matches the completeness of the `step_execution.clj` enumeration.

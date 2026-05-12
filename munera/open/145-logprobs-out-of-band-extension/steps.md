@@ -1,6 +1,6 @@
 # Steps
 
-- [ ] Remove logprob conversation projection from `prompt_request.clj`: delete `logprob-uncertain-threshold`, `format-logprob-line`, `format-logprob-message`, and the `:logprobs` branch in `journal->provider-messages`. Update or remove affected tests.
+- [ ] Remove logprob conversation projection from `prompt_request.clj`: delete `logprob-uncertain-threshold`, `format-logprob-line`, `format-logprob-message`, `format-token-str`, `format-prob`, and the `:logprobs` branch in `journal->provider-messages`. Update or remove affected tests.
 - [ ] Remove logprob formatting from `step_execution.clj`: delete `logprob-uncertain-threshold`, `format-logprob-line`, `format-logprob-message`, `format-token-str`, `format-prob`, and `transcript-with-logprobs`. Change `:transcript` raw output to `(when assistant-message [assistant-message])` (assistant message only, no synthetic logprob user message). Update affected tests.
 - [ ] Add `:session-id` to session-step raw outputs in `step_execution.clj`: include `(:session-id execution-session)` in the `raw-outputs` map of `execute-session-step!`.
 - [ ] Enrich `session_turn_finished` event payload: thread `:logprobs` and `:assistant-message` from `terminal-result` through `prompt-finish-base-result` into the `:notify/extension-dispatch` effect payload. Add focused test.

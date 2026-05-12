@@ -156,6 +156,8 @@ provider SSE chunks
 
 - `format-logprob-message` function in `prompt_request.clj`
 - `format-logprob-line` function in `prompt_request.clj`
+- `format-token-str` function in `prompt_request.clj`
+- `format-prob` function in `prompt_request.clj`
 - `logprob-uncertain-threshold` constant in `prompt_request.clj`
 - The `:logprobs` kind branch in `journal->provider-messages` that produces synthetic user messages
 - Any test coverage proving the synthetic-message projection
