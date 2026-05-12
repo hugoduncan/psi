@@ -2,6 +2,7 @@
  {psi/auto-session-name {}
   psi/commit-checks     {}
   psi/github            {}
+  psi/logprobs          {}
   psi/mementum          {}
   psi/munera            {}
   psi/work-on           {}}}

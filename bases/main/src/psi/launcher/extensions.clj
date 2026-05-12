@@ -72,6 +72,13 @@
     {:development {:local/root "extensions/github"}
      :installed   {:local/root "extensions/github"}}}
 
+   'psi/logprobs
+   {:psi/init 'extensions.logprobs/init
+    :source-policies
+    {:development {:local/root "extensions/logprobs"}
+     :installed   {:local/root "extensions/logprobs"}
+     :jar         {:mvn/version :psi/release-version}}}
+
    'psi/work-on
    {:psi/init 'extensions.work-on/init
     :source-policies
