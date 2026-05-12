@@ -63,3 +63,13 @@ Two broken tests and one accuracy issue found.
 2. **`invoke-to-session-workflow-executes-and-exposes-cross-form-results-test` broken by raw output changes.** `workflow_invoke_runtime_test.clj:186` asserts the session-step `report-accepted` outputs contain only `:text`, `:final-llm-reply`, and `:transcript nil`. The new raw outputs include `:logprobs`, `:session-id`, and `:transcript` as `[assistant-message]` instead of nil. This test was not updated for the expanded output surface. Also a regression from this task.
 
 3. **Steps.md verification step claims "9 pre-existing failures" but only 3 exist.** The verify step says "9 pre-existing failures (workflow-execution-test dynamic delegate), 0 new failures". Actual count: 3 `workflow-execution-test` dynamic-delegate failures (pre-existing) + 2 failures from this task = 5 total. The "0 new failures" claim is incorrect — the 2 failures above are directly caused by this task's changes.
+
+## Code-shaper review — pass 1 (2026-05-12)
+
+No actionable issues found. Assessed against simplicity, consistency, and robustness:
+
+- **Simplicity**: clean single-responsibility separation throughout. `extensions.logprobs` — storage, computation, operation handler, event handler, init are each distinct. `calculate-perplexity` is pure computation; `store-logprobs!` is pure side-effect; `on-turn-finished` is flow control. `journal->provider-messages` simplified from loop+cond to `into`+`keep`. `prompt-finish-base-result` uses idiomatic `cond->` for conditional payload enrichment.
+- **Consistency**: naming follows Clojure conventions (`!` for side-effects, `get-*` for reads). Extension follows established patterns (`defonce ^:private store`, `init` signature, `@#'` for test access to private atoms — matches `auto-session-name`, `work-on`, etc.). Data shapes are consistent: logprob token maps flow unchanged from turn-runtime through event payload into extension storage. `store` naming (vs `state` in other extensions) is more descriptive for a single-purpose store — acceptable deviation.
+- **Robustness**: guards at every boundary — `when-let` for nil session-id in event handler, `(seq logprobs)` in both `store-logprobs!` and `prompt-finish-base-result`, `(when (pos? n) ...)` for zero-division in `calculate-perplexity`, explicit error for missing session-id in `invoke-perplexity`. No nil propagation paths. `##Inf` possible for extreme logprob values (e.g. -1000) but domain-constrained — LLM logprobs are typically in [-10, 0].
+
+Verified: lint 0 errors/0 warnings, 1734 unit tests (3 pre-existing failures), 148 extension tests (0 failures).
