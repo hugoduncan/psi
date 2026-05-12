@@ -43,3 +43,13 @@ Four gaps found against design behaviours and test-review skill criteria:
 3. **No single-token perplexity test.** Only 2-token cases tested. Single token is a boundary: `perplexity = exp(-logprob)`. Verifies N=1 path.
 
 4. **No test for `:session-id` as session-step raw output.** Design adds `:session-id` to `execute-session-step!` raw outputs (line 151 of `step_execution.clj`). The workflow depends on this surface (`{:from {:step "run" :output :session-id}}`), but `step_execution_test.clj` has no assertion for it. This is integration-level — the function requires full runtime context — so a lightweight assertion in an existing integration test or a note acknowledging the gap is appropriate.
+
+## Test-shaper review — pass 1 (2026-05-12)
+
+Two broken tests and one accuracy issue found.
+
+1. **`prompt-finish-dispatches-extension-turn-finished-event-test` broken by event enrichment.** `prompt_lifecycle_test.clj:531` asserts the `session_turn_finished` payload is `{:session-id sid :turn-id "turn-1"}` but the enriched payload now includes `:assistant-message`. This test was not updated when `prompt-finish-base-result` was changed to carry `:assistant-message` in the event payload. The test fails on every run — this is a regression introduced by this task, not a pre-existing failure.
+
+2. **`invoke-to-session-workflow-executes-and-exposes-cross-form-results-test` broken by raw output changes.** `workflow_invoke_runtime_test.clj:186` asserts the session-step `report-accepted` outputs contain only `:text`, `:final-llm-reply`, and `:transcript nil`. The new raw outputs include `:logprobs`, `:session-id`, and `:transcript` as `[assistant-message]` instead of nil. This test was not updated for the expanded output surface. Also a regression from this task.
+
+3. **Steps.md verification step claims "9 pre-existing failures" but only 3 exist.** The verify step says "9 pre-existing failures (workflow-execution-test dynamic delegate), 0 new failures". Actual count: 3 `workflow-execution-test` dynamic-delegate failures (pre-existing) + 2 failures from this task = 5 total. The "0 new failures" claim is incorrect — the 2 failures above are directly caused by this task's changes.
