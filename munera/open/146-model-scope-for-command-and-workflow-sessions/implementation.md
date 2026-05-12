@@ -221,3 +221,9 @@ Verification:
 Notes:
 - `components/emacs-ui/test/psi-dispatch-test.el` already had direct setter omitted-scope and explicit-scope transport coverage, so this follow-up closed the remaining picker-path gap on the Clojure RPC and TUI sides only
 - left `munera/plan.md` unchecked; it remains an administrative backlog/open-state decision rather than a code/test follow-up required by this review pass
+
+## Code-shaper review — 2026-05-12
+
+One new actionable robustness issue found.
+
+- `:runtime/agent-set-model` still drops the optional scope carried by the rest of this task’s canonical helper/API surface. `components/agent-session/src/psi/agent_session/dispatch_effects.clj` currently calls `agent/set-model-in!` with only `:model`, and `components/agent-core/src/psi/agent_core/core.clj` only supports transient in-memory updates, so any future caller that reasonably assumes runtime effect parity with `:session/set-model` will silently bypass the explicit `session|project|user` persistence contract. This leaves model-setting semantics split across two entrypoints instead of one obvious path and makes the effect shape less robust under extension or refactoring.
