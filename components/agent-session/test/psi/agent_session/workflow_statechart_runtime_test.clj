@@ -285,7 +285,8 @@
                     psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
                     (fn [_ctx _sid _prompt]
                       (swap! turn-count* inc)
-                      (if (= {:provider "local" :id "first"} @current-model*)
+                      (if (= {:provider "local" :id "first"}
+                             (or @current-model* {:provider "local" :id "first"}))
                         {:status :error
                          :session-id "plan-child"
                          :assistant-message {:role "assistant"
@@ -308,8 +309,7 @@
         (is (= :completed (:status run)))
         (is (= "fallback success"
                (get-in run [:step-runs "plan" :accepted-result :outputs :final-llm-reply])))
-        (is (= [{:provider "local" :id "first"}
-                {:provider "openai" :id "second"}]
+        (is (= [{:provider "openai" :id "second"}]
                @model-calls*))
         (is (= 2 @turn-count*))
         (is (= :succeeded (:status attempt)))))))
@@ -408,7 +408,7 @@
       (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-model-fallback-terminal")
             attempt (get-in run [:step-runs "plan" :attempts 0])]
         (is (= :failed (:status run)))
-        (is (= [{:provider "local" :id "first"}] @model-calls*))
+        (is (= [] @model-calls*))
         (is (= 1 @turn-count*))
         (is (= :invalid-request
                (get-in attempt [:execution-error :reason])))))))
@@ -448,19 +448,18 @@
                       {:status :error
                        :session-id "plan-child"
                        :assistant-message {:role "assistant"
-                                           :error-message (str "Connection refused for " (:id @current-model*))
-                                           :content [{:type :error :text (str "Connection refused for " (:id @current-model*))}]}
+                                           :error-message (str "Connection refused for " (:id (or @current-model* {:provider "local" :id "first"})))
+                                           :content [{:type :error :text (str "Connection refused for " (:id (or @current-model* {:provider "local" :id "first"})))}]}
                        :assistant-text ""
                        :execution-result {}
                        :failure {:reason :provider-unavailable
-                                 :message (str "Connection refused for " (:id @current-model*))
+                                 :message (str "Connection refused for " (:id (or @current-model* {:provider "local" :id "first"})))
                                  :fallback-worthy? true}})]
         (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
       (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-model-fallback-exhausted")
             attempt (get-in run [:step-runs "plan" :attempts 0])]
         (is (= :failed (:status run)))
-        (is (= [{:provider "local" :id "first"}
-                {:provider "openai" :id "second"}]
+        (is (= [{:provider "openai" :id "second"}]
                @model-calls*))
         (is (= :ranked-candidate-exhausted
                (get-in attempt [:execution-error :reason])))

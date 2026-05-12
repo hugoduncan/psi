@@ -100,9 +100,12 @@
        :failure (exhaustion-failure [])}
       (loop [remaining initial-candidates
              candidate-failures []
-             current-session execution-session]
+             current-session execution-session
+             first-candidate? true]
         (let [model (first remaining)
-              current-session (attempts/set-execution-session-model! ctx current-session model)
+              current-session (if first-candidate?
+                                (assoc current-session :model model)
+                                (attempts/set-execution-session-model! ctx current-session model))
               result (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt)]
           (cond
             (= :ok (:status result))
@@ -112,7 +115,8 @@
                  (get-in result [:failure :fallback-worthy?]))
             (recur (next remaining)
                    (conj candidate-failures (candidate-failure model (:failure result)))
-                   current-session)
+                   current-session
+                   false)
 
             :else
             (let [all-failures (conj candidate-failures (candidate-failure model (:failure result)))]

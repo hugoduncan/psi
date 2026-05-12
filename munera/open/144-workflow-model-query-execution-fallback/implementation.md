@@ -77,3 +77,6 @@ Implementation notes:
 - 2026-05-11 code-shaper review:
   - actionable consistency issue: `psi.workflow-runtime.statechart-runtime.step-execution/execute-with-ranked-fallback!` always calls `attempts/set-execution-session-model!` for the first ranked candidate even though the child session is already created with that concrete `:model`; the concrete-model single-shot path executes without an extra model mutation.
   - shaping follow-up: make ranked fallback reuse the session’s initial model for the first candidate and only mutate the child session when advancing to later fallback candidates, so fallback and non-fallback execution paths have one obvious model-setting story with fewer unnecessary side effects.
+- 2026-05-11 follow-up execution:
+  - implemented the code-shaper follow-up in `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj`: ranked fallback now reuses the child session's initial concrete model for the first candidate and only calls `attempts/set-execution-session-model!` when advancing to later ranked candidates.
+  - updated focused workflow fallback proofs in `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj` so ranked fallback success/exhaustion assert only later-candidate model mutations while first-candidate terminal behavior remains mutation-free.
