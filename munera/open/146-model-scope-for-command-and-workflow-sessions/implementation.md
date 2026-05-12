@@ -39,3 +39,8 @@ Evidence used for the clarifications:
 - TUI submit handling calls `session/set-model-in!` directly: `components/app-runtime/src/psi/app_runtime/tui_frontend_actions.clj:19`
 - workflow judge creates workflow-owned child sessions: `components/agent-session/src/psi/agent_session/workflow_judge.clj`
 - existing workflow tests already name ranked fallback behaviour while initial concrete-model proof obligation was only implied: `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`, `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj`
+
+## Inconsistency review — 2026-05-12
+
+No new actionable inconsistency feedback found across `design.md`, `plan.md`, `steps.md`, and existing `implementation.md`. The current artifacts are aligned on scope threading, direct interactive setter alignment, workflow-owned execution/judge transient scoping, and explicit proof obligations for both initial child-session setup and ranked fallback switching.
+
