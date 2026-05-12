@@ -569,6 +569,23 @@ B output into A. Switching to B later then produced corrupted transcript state."
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-model-slash-direct-with-scope-dispatches-backend-command ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (let ((rpc-calls nil))
+          (insert "/model openai gpt-5.3-codex session")
+          (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker 1 nil))
+          (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                     (lambda (_state op params &optional _callback)
+                       (push (list op params) rpc-calls))))
+            (psi-emacs-send-from-buffer nil))
+          (setq rpc-calls (nreverse rpc-calls))
+          (should (equal '(("command" ((:text . "/model openai gpt-5.3-codex session")))) rpc-calls)))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-model-slash-invalid-arity-dispatches-backend-command ()
   (with-temp-buffer
     (psi-emacs-mode)

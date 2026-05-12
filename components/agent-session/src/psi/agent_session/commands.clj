@@ -127,7 +127,7 @@
          "  /tree [session-id] — open/switch live session tree (TUI)\n"
          "  /login [provider] — login with an OAuth provider\n"
          "  /logout  — logout from an OAuth provider\n"
-         "  /model [provider model-id] — show current model or set model\n"
+         "  /model [provider model-id [session|project|user]] — show current model or set model\n"
          "  /thinking [level] — show current thinking level or set level\n"
          "  /remember [text] — capture a memory note for future ψ\n"
          "  /worktree — show git worktree context\n"
@@ -330,6 +330,9 @@
        ". Allowed: "
        (str/join ", " (map name canonical-thinking-levels))))
 
+(def ^:private valid-model-scopes
+  #{:session :project :user})
+
 (defn- resolve-runtime-model
   [provider model-id]
   (let [provider* (some-> provider keyword)]
@@ -339,6 +342,18 @@
                            (= model-id (:id model)))
                   model))
               ai-models/all-models))))
+
+(defn- normalize-model-scope
+  [scope]
+  (some-> scope str/trim str/lower-case keyword))
+
+(defn- model-usage-message
+  []
+  "Usage: /model OR /model <provider> <model-id> [session|project|user]")
+
+(defn- unknown-model-scope-message
+  [scope]
+  (str "Unknown model scope: " scope ". Allowed: session, project, user"))
 
 ;; ============================================================
 ;; Login provider selection (pure — returns data)
@@ -520,23 +535,32 @@
                     (str "Current model: " (:provider m) " " (:id m))
                     "No model selected.")})
       (let [tokens (str/split args #"\s+")]
-        (if (not= 2 (count tokens))
+        (if-not (contains? #{2 3} (count tokens))
           {:type :text
-           :message "Usage: /model OR /model <provider> <model-id>"}
-          (let [[provider model-id] tokens
-                resolved (resolve-runtime-model provider model-id)]
-            (if-not resolved
+           :message (model-usage-message)}
+          (let [[provider model-id scope-token] tokens
+                scope (normalize-model-scope scope-token)]
+            (cond
+              (and scope-token (not (contains? valid-model-scopes scope)))
               {:type :text
-               :message (str "Unknown model: " provider " " model-id)}
-              (let [provider-str (name (:provider resolved))
-                    model {:provider provider-str
-                           :id (:id resolved)
-                           :reasoning (:supports-reasoning resolved)}
-                    result (session/set-model-in! ctx session-id model)]
-                {:type :text
-                 :message (str "✓ Model set to "
-                               (get-in result [:model :provider]) " "
-                               (get-in result [:model :id]))}))))))))
+               :message (unknown-model-scope-message scope-token)}
+
+              :else
+              (let [resolved (resolve-runtime-model provider model-id)]
+                (if-not resolved
+                  {:type :text
+                   :message (str "Unknown model: " provider " " model-id)}
+                  (let [provider-str (name (:provider resolved))
+                        model {:provider provider-str
+                               :id (:id resolved)
+                               :reasoning (:supports-reasoning resolved)}
+                        result (session/set-model-in! ctx session-id model scope)]
+                    {:type :text
+                     :message (str "✓ Model set to "
+                                   (get-in result [:model :provider]) " "
+                                   (get-in result [:model :id])
+                                   (when scope
+                                     (str " [" (name scope) "]")))}))))))))))
 
 (defn- dispatch-thinking-command
   [ctx session-id trimmed]

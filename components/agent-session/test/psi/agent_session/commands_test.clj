@@ -343,11 +343,25 @@
     (is (= "openai" (get-in (ss/get-session-data-in ctx session-id) [:model :provider])))
     (is (= "gpt-5.3-codex" (get-in (ss/get-session-data-in ctx session-id) [:model :id])))))
 
+(deftest dispatch-model-set-with-explicit-scope-test
+  (let [[ctx session-id] (make-test-ctx)
+        result     (commands/dispatch-in ctx session-id "/model openai gpt-5.3-codex session" cmd-opts)]
+    (is (= :text (:type result)))
+    (is (str/includes? (:message result) "[session]"))
+    (is (= "openai" (get-in (ss/get-session-data-in ctx session-id) [:model :provider])))
+    (is (= "gpt-5.3-codex" (get-in (ss/get-session-data-in ctx session-id) [:model :id])))))
+
 (deftest dispatch-model-invalid-arity-test
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/model openai" cmd-opts)]
     (is (= :text (:type result)))
-    (is (= "Usage: /model OR /model <provider> <model-id>" (:message result)))))
+    (is (= "Usage: /model OR /model <provider> <model-id> [session|project|user]" (:message result)))))
+
+(deftest dispatch-model-invalid-scope-test
+  (let [[ctx session-id] (make-test-ctx)
+        result     (commands/dispatch-in ctx session-id "/model openai gpt-5.3-codex bogus" cmd-opts)]
+    (is (= :text (:type result)))
+    (is (= "Unknown model scope: bogus. Allowed: session, project, user" (:message result)))))
 
 (deftest dispatch-model-unknown-test
   (let [[ctx session-id] (make-test-ctx)
@@ -580,6 +594,7 @@
                  "/jobs" "/job" "/cancel-job"
                  "/help" "/prompts" "/skills"]]
       (is (str/includes? s cmd) (str "help should mention " cmd)))
+    (is (str/includes? s "/model [provider model-id [session|project|user]]"))
     (is (str/includes? s "~/.psi/agent/models.edn"))
     (is (str/includes? s ".psi/models.edn"))
     (is (not (str/includes? s "/logprobs")))))
