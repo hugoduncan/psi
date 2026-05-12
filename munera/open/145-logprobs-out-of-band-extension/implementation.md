@@ -31,3 +31,15 @@ Three issues found:
 2. **Missing CHANGELOG entry.** This task has user-visible changes: removed synthetic logprob messages from conversation context, added `logprobs/perplexity` deterministic operation, updated `local-logprobs` workflow. Per project conventions (`λ changelog(δ)`), user-visible changes need a CHANGELOG entry under `[Unreleased]` before commit.
 
 3. **Stale `mementum/state.md` line 104.** Still says `journal->provider-messages` projects `:logprobs` entries as synthetic user messages. This is now incorrect — logprobs entries are no longer projected. Working memory should be updated to reflect current behavior.
+
+## Test review — pass 1 (2026-05-12)
+
+Four gaps found against design behaviours and test-review skill criteria:
+
+1. **No multi-session isolation test.** Extension stores per-session data in an atom keyed by session-id. No test verifies that storing/querying logprobs for session "s1" is independent of session "s2". Basic correctness property of the per-session storage design.
+
+2. **No `calculate-perplexity` test for all-nil-logprob tokens.** When every token has `:logprob nil`, `(keep :logprob tokens)` yields empty seq, `n=0`, returns nil. This boundary between "tokens present but unusable" and "no tokens" is untested.
+
+3. **No single-token perplexity test.** Only 2-token cases tested. Single token is a boundary: `perplexity = exp(-logprob)`. Verifies N=1 path.
+
+4. **No test for `:session-id` as session-step raw output.** Design adds `:session-id` to `execute-session-step!` raw outputs (line 151 of `step_execution.clj`). The workflow depends on this surface (`{:from {:step "run" :output :session-id}}`), but `step_execution_test.clj` has no assertion for it. This is integration-level — the function requires full runtime context — so a lightweight assertion in an existing integration test or a note acknowledging the gap is appropriate.
