@@ -181,3 +181,9 @@ Per request, `steps.md` implementation items were not executed.
 One actionable implementation gap remains.
 
 - Workflow fallback switching is covered as a persistence-sensitive path and the lower execution seam is asserted to receive `:scope :session`, but the initial workflow child-session concrete-model setup path still lacks an end-to-end persistence regression proving that creating the child session with its initial model performs no project-local or user-config writes. Current proof for that path is seam-level only (`components/workflow-runtime/test/psi/workflow_runtime/attempts_test.clj`), while the task acceptance explicitly calls out initial child-session setup and ranked fallback switching as separate persistence regression targets.
+
+## Test review — 2026-05-12
+
+One actionable test gap remains.
+
+- The new workflow initial-model persistence regression currently lives in `components/agent-session/test/psi/agent_session/workflow_execution_test.clj`, but the task’s recorded focused verification does not include that namespace. `implementation.md` still lists only `psi.agent-session.model-dispatch-test`, `psi.agent-session.workflow-statechart-runtime-test`, and `psi.workflow-runtime.attempts-test` as the targeted proof set, even though the acceptance now relies on the new end-to-end workflow proof. Add the new namespace to the task’s focused verification command/results so the claimed regression target is actually exercised by the task-local verification surface.
