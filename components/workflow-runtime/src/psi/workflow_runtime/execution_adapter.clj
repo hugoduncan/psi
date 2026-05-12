@@ -65,8 +65,10 @@
   ((required-op ctx :find-skill) skills skill-name))
 
 (defn set-session-model!
-  [ctx session-id model]
-  ((required-op ctx :set-session-model!) ctx session-id model))
+  ([ctx session-id model]
+   (set-session-model! ctx session-id model nil))
+  ([ctx session-id model scope]
+   ((required-op ctx :set-session-model!) ctx session-id model scope)))
 
 (defn execute-judge!
   [ctx parent-session-id actor-session-id judge-spec routing-table routing-context]

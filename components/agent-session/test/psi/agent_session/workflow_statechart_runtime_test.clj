@@ -278,8 +278,8 @@
                                                             :candidates [{:provider "local" :id "first"}
                                                                          {:provider "openai" :id "second"}]}}})
                     psi.workflow-runtime.execution-adapter/set-session-model!
-                    (fn [_ctx _sid model]
-                      (swap! model-calls* conj model)
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
                       (reset! current-model* model)
                       {:ok true})
                     psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
@@ -309,7 +309,8 @@
         (is (= :completed (:status run)))
         (is (= "fallback success"
                (get-in run [:step-runs "plan" :accepted-result :outputs :final-llm-reply])))
-        (is (= [{:provider "openai" :id "second"}]
+        (is (= [{:model {:provider "openai" :id "second"}
+                 :scope :session}]
                @model-calls*))
         (is (= 2 @turn-count*))
         (is (= :succeeded (:status attempt)))))))
@@ -336,8 +337,8 @@
                        :execution-session {:session-id "plan-child"
                                            :model (:model opts)}})
                     psi.workflow-runtime.execution-adapter/set-session-model!
-                    (fn [_ctx _sid model]
-                      (swap! model-calls* conj model)
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
                       {:ok true})
                     psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
                     (fn [_ctx _sid _prompt]
@@ -388,8 +389,8 @@
                                                             :candidates [{:provider "local" :id "first"}
                                                                          {:provider "openai" :id "second"}]}}})
                     psi.workflow-runtime.execution-adapter/set-session-model!
-                    (fn [_ctx _sid model]
-                      (swap! model-calls* conj model)
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
                       (reset! current-model* model)
                       {:ok true})
                     psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
@@ -439,8 +440,8 @@
                                                             :candidates [{:provider "local" :id "first"}
                                                                          {:provider "openai" :id "second"}]}}})
                     psi.workflow-runtime.execution-adapter/set-session-model!
-                    (fn [_ctx _sid model]
-                      (swap! model-calls* conj model)
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
                       (reset! current-model* model)
                       {:ok true})
                     psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
@@ -459,7 +460,8 @@
       (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-model-fallback-exhausted")
             attempt (get-in run [:step-runs "plan" :attempts 0])]
         (is (= :failed (:status run)))
-        (is (= [{:provider "openai" :id "second"}]
+        (is (= [{:model {:provider "openai" :id "second"}
+                 :scope :session}]
                @model-calls*))
         (is (= :ranked-candidate-exhausted
                (get-in attempt [:execution-error :reason])))

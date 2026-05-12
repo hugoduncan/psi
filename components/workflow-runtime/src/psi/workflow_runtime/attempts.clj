@@ -46,7 +46,7 @@
 
 (defn set-execution-session-model!
   [ctx execution-session model]
-  (execution-adapter/set-session-model! ctx (:session-id execution-session) model)
+  (execution-adapter/set-session-model! ctx (:session-id execution-session) model :session)
   (assoc execution-session :model model))
 
 (defn create-step-attempt-session!
