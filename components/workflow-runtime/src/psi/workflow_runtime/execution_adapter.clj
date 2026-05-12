@@ -13,12 +13,14 @@
            get-session-data
            list-context-sessions
            find-skill
+           set-session-model!
            execute-judge!]}]
   {:create-child-session! create-child-session!
    :prompt-execution-result! prompt-execution-result!
    :get-session-data get-session-data
    :list-context-sessions list-context-sessions
    :find-skill find-skill
+   :set-session-model! set-session-model!
    :execute-judge! execute-judge!})
 
 (defn adapter
@@ -61,6 +63,10 @@
 (defn find-skill
   [ctx skills skill-name]
   ((required-op ctx :find-skill) skills skill-name))
+
+(defn set-session-model!
+  [ctx session-id model]
+  ((required-op ctx :set-session-model!) ctx session-id model))
 
 (defn execute-judge!
   [ctx parent-session-id actor-session-id judge-spec routing-table routing-context]

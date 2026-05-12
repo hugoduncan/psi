@@ -4,6 +4,7 @@
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
+   [psi.workflow-runtime.attempts :as attempts]
    [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.statechart-runtime.queue :as queue]
    [psi.workflow-runtime.statechart-runtime.state :as state]
@@ -67,10 +68,69 @@
                         :pending-kind :failure
                         :payload execution-error})))
 
+(defn- fallback-candidates
+  [execution-session]
+  (get-in execution-session [:model-fallback :candidates]))
+
+(defn- fallback-enabled?
+  [execution-session]
+  (and (= :ranked-model-candidates (get-in execution-session [:model-fallback :type]))
+       (contains? execution-session :model-fallback)))
+
+(defn- candidate-failure
+  [model failure]
+  {:model model
+   :failure failure})
+
+(defn- exhaustion-failure
+  [candidate-failures]
+  {:reason :ranked-candidate-exhausted
+   :message "Workflow model-query candidates exhausted"
+   :candidate-failures candidate-failures})
+
+(defn- execute-with-ranked-fallback!
+  [ctx execution-session prompt]
+  (let [initial-candidates (vec (fallback-candidates execution-session))]
+    (if-not (seq initial-candidates)
+      {:status :error
+       :session-id (:session-id execution-session)
+       :assistant-message nil
+       :assistant-text ""
+       :execution-result nil
+       :failure (exhaustion-failure [])}
+      (loop [remaining initial-candidates
+             candidate-failures []
+             current-session execution-session]
+        (let [model (first remaining)
+              current-session (attempts/set-execution-session-model! ctx current-session model)
+              result (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt)]
+          (cond
+            (= :ok (:status result))
+            result
+
+            (and (next remaining)
+                 (get-in result [:failure :fallback-worthy?]))
+            (recur (next remaining)
+                   (conj candidate-failures (candidate-failure model (:failure result)))
+                   current-session)
+
+            :else
+            (let [all-failures (conj candidate-failures (candidate-failure model (:failure result)))]
+              {:status :error
+               :session-id (:session-id current-session)
+               :assistant-message (:assistant-message result)
+               :assistant-text (:assistant-text result)
+               :execution-result (:execution-result result)
+               :failure (if (get-in result [:failure :fallback-worthy?])
+                          (exhaustion-failure all-failures)
+                          (:failure result))})))))))
+
 (defn execute-session-step!
   [ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt]
   (let [{:keys [status assistant-text failure]}
-        (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)]
+        (if (fallback-enabled? execution-session)
+          (execute-with-ranked-fallback! ctx execution-session prompt)
+          (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt))]
     (if (= :error status)
       (do
         (swap! working-memory* assoc :pending-actor-result {:kind :failure

@@ -161,6 +161,8 @@
     :get-session-data (:get-session-data-fn ctx)
     :list-context-sessions (:list-context-sessions-fn ctx)
     :find-skill (:find-skill-fn ctx)
+    :set-session-model! (fn [ctx session-id model]
+                          (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core}))
     :execute-judge! (:execute-workflow-judge-fn ctx)}))
 
 (defn- callback-fns [mutations projection-listeners*]

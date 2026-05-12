@@ -343,7 +343,46 @@
                    (finally
                      (model-registry/init! {})))]
       (is (= {:provider "local-helper" :id "fast-free"}
-             (:model config))))))
+             (:model config)))
+      (is (= :ranked-model-candidates
+             (get-in config [:model-fallback :type])))
+      (is (= :ok
+             (get-in config [:model-fallback :selection-outcome])))
+      (is (nil? (get-in config [:model-fallback :selection-reason])))
+      (is (= {:provider "local-helper" :id "fast-free"}
+             (first (get-in config [:model-fallback :candidates])))))))
+
+(deftest resolve-step-session-config-model-query-no-winner-preserves-empty-ranked-metadata-test
+  (testing "workflow child sessions preserve no-winner ranked metadata for authored model-query specs"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
+                   {:provider "anthropic" :id "claude-sonnet-4-6"})
+          definition {:definition-id "planner-model-query-no-winner"
+                      :name "planner-model-query-no-winner"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text
+                                                  :match :true}
+                                                 {:criterion :context-window
+                                                  :at-least 999999999}]}
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-model-query-no-winner"
+                                          :run-id "run-model-query-no-winner"
+                                          :parent-session-id session-id
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (nil? (:model config)))
+      (is (= {:type :ranked-model-candidates
+              :selection-outcome :no-winner
+              :selection-reason :required-constraints-unsatisfied
+              :candidates []}
+             (:model-fallback config))))))
 
 (deftest resolve-step-session-config-drops-top-logprobs-when-logprobs-disabled-test
   (testing "workflow child sessions drop authored top-logprobs when logprobs are false"

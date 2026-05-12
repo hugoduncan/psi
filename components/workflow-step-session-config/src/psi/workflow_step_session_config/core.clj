@@ -106,25 +106,37 @@
    :context {:session-model {:provider (some-> (:provider parent-session-model) keyword)
                              :id (:id parent-session-model)}}})
 
-(defn- resolved-step-model
+(defn- candidate->session-model
+  [candidate]
+  {:provider (name (:provider candidate))
+   :id (:id candidate)})
+
+(defn- resolved-model-query
+  [model-spec parent-session-model]
+  (let [result (model-selection/resolve-selection
+                {:request (model-query->selection-request model-spec parent-session-model)})
+        ranked-candidates (mapv candidate->session-model (get-in result [:ranking :ranked]))]
+    {:model (first ranked-candidates)
+     :model-fallback {:type :ranked-model-candidates
+                      :selection-outcome (:outcome result)
+                      :selection-reason (:reason result)
+                      :candidates ranked-candidates}}))
+
+(defn- resolved-step-model-config
   [model-spec parent-session-model]
   (cond
     (nil? model-spec)
-    nil
+    {}
 
     (and (map? model-spec) (= :model-query (:type model-spec)))
-    (let [result (model-selection/resolve-selection
-                  {:request (model-query->selection-request model-spec parent-session-model)})]
-      (when (= :ok (:outcome result))
-        {:provider (name (get-in result [:candidate :provider]))
-         :id (get-in result [:candidate :id])}))
+    (resolved-model-query model-spec parent-session-model)
 
     (string? model-spec)
-    (or (explicit-model-id->session-model model-spec)
-        model-spec)
+    {:model (or (explicit-model-id->session-model model-spec)
+                model-spec)}
 
     :else
-    model-spec))
+    {:model model-spec}))
 
 (defn resolve-step-session-config
   "Resolve child session configuration for a workflow step.
@@ -152,19 +164,39 @@
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))
-        resolved-model (or (resolved-step-model (:model session-spec) parent-session-model)
-                           parent-session-model
-                           (resolved-step-model (:model base-meta) parent-session-model)
-                           (:model base-meta))]
-    (merge
-     {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
-      :prompt-mode parent-session-prompt-mode
-      :response-mode (or (:response-mode session-spec) :streaming)
-      :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
-      :thinking-level (or (:thinking-level session-spec)
-                          (:thinking-level base-meta)
-                          :off)
-      :skills (resolve-step-skills ctx session-skills (:skills session-spec))
-      :model resolved-model
-      :prompt-component-selection (:prompt-component-selection session-spec)}
-     (resolved-logprob-config session-spec))))
+        step-model-config (when (contains? session-spec :model)
+                            (resolved-step-model-config (:model session-spec) parent-session-model))
+        base-model-config (when (contains? base-meta :model)
+                            (resolved-step-model-config (:model base-meta) parent-session-model))
+        resolved-model (cond
+                         (contains? step-model-config :model)
+                         (:model step-model-config)
+
+                         (contains? session-spec :model)
+                         nil
+
+                         parent-session-model
+                         parent-session-model
+
+                         (contains? base-model-config :model)
+                         (:model base-model-config)
+
+                         :else
+                         (:model base-meta))
+        model-fallback (or (:model-fallback step-model-config)
+                           (:model-fallback base-model-config))]
+    (cond->
+     (merge
+      {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
+       :prompt-mode parent-session-prompt-mode
+       :response-mode (or (:response-mode session-spec) :streaming)
+       :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
+       :thinking-level (or (:thinking-level session-spec)
+                           (:thinking-level base-meta)
+                           :off)
+       :skills (resolve-step-skills ctx session-skills (:skills session-spec))
+       :model resolved-model
+       :prompt-component-selection (:prompt-component-selection session-spec)}
+      (resolved-logprob-config session-spec))
+      model-fallback
+      (assoc :model-fallback model-fallback))))

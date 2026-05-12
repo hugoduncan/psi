@@ -22,3 +22,15 @@ Implementation notes:
   - runtime application seam: workflow candidate iteration should consume only that canonical classified failure payload from `psi.workflow-runtime.statechart-runtime.step-execution/execute-session-step!`; it must not re-inspect provider-specific raw exception shapes throughout workflow runtime.
   - terminal/non-fallback cases: workflow/judge result failures, invalid workflow definitions, deterministic local shaping/validation failures, and ordinary semantic model responses remain terminal for the ranked candidate sequence.
   - no `steps.md` execution performed; this pass only resolved the pre-code inconsistency by recording the predicate and application seam.
+- 2026-05-11 implementation execution:
+  - extended `psi.workflow-step-session-config.core/resolve-step-session-config` so authored workflow `:model-query` specs preserve ranked fallback metadata under `:model-fallback` while retaining the compatibility concrete `:model` as the first ranked candidate.
+  - preserved explicit concrete workflow models on the existing single-model path with no ranked metadata added.
+  - added canonical fallback classification in `psi.workflow-runtime.turn-execution-contract`: transport/provider availability failures such as connection refused now surface `:reason :provider-unavailable` and `:fallback-worthy? true` on the bounded failure payload.
+  - added workflow-local ranked candidate iteration in `psi.workflow-runtime.statechart-runtime.step-execution/execute-session-step!`; iteration reuses the single canonical workflow attempt, sets successive concrete child-session models in ranked order, stops on the first success, and does not mint synthetic per-candidate workflow attempts.
+  - exhaustion now records one terminal `:execution-error` with `:reason :ranked-candidate-exhausted` and ranked `:candidate-failures`; non-fallback-worthy failures remain terminal as their original canonical failure payload rather than being wrapped as exhaustion.
+  - added focused proof in:
+    - `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj`
+    - `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`
+    - `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/step_execution_test.clj`
+  - focused verification green: `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test` → `28 tests, 84 assertions, 0 failures`.
+  - lint green: `clojure -M:lint --lint components/workflow-step-session-config components/workflow-runtime components/agent-session tests.edn deps.edn` → `0 errors, 0 warnings`.
