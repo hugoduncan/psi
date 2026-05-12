@@ -60,3 +60,7 @@ Reviewed the preloaded ambiguity-review result plus current `design-steps.md`, `
 
 Per request, `steps.md` implementation items were not executed. No blocking ambiguity design-step remained to record.
 
+## Inconsistency review — 2026-05-12 (follow-up 2)
+
+No new actionable inconsistency feedback found after re-reading `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, and the cited command/RPC/workflow code+test surfaces. Existing task artifacts remain aligned on optional scope threading, direct setter parity, workflow-owned transient scoping, and explicit proof coverage for both initial child-session model setup and ranked fallback switching.
+
