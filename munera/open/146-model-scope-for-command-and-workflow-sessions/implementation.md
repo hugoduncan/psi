@@ -50,3 +50,7 @@ Reviewed the preloaded inconsistency-review result and task artifacts before exe
 
 Per request, `steps.md` implementation items were not executed.
 
+## Ambiguity review — 2026-05-12 (follow-up)
+
+No new actionable ambiguity feedback found across `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, and the cited command/RPC/workflow code/test surfaces. Existing notes already cover the previously underspecified direct setter parity, workflow judge-session classification, and the need to prove both initial child-session model setup and ranked fallback switching remain non-persistent.
+
