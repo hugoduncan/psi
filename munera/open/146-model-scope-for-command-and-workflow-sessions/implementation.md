@@ -64,3 +64,9 @@ Per request, `steps.md` implementation items were not executed. No blocking ambi
 
 No new actionable inconsistency feedback found after re-reading `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, and the cited command/RPC/workflow code+test surfaces. Existing task artifacts remain aligned on optional scope threading, direct setter parity, workflow-owned transient scoping, and explicit proof coverage for both initial child-session model setup and ranked fallback switching.
 
+## Design-step follow-up execution — 2026-05-12 (requested no-op)
+
+Reviewed the preloaded inconsistency-review result and current `design-steps.md`, `steps.md`, `implementation.md`, `design.md`, and `plan.md` before acting. There were no newly added actionable unchecked follow-up items in `design-steps.md`, so no design-step checkboxes changed and no task-artifact updates were needed beyond recording this requested no-op pass.
+
+Per request, `steps.md` implementation items were not executed.
+
