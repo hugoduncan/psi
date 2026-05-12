@@ -2,16 +2,16 @@
 
 ## Design ambiguity review — pass 1 (2026-05-12)
 
-Six ambiguities found:
+Six ambiguities found and resolved:
 
-1. **Duplicated logprob formatting in `step_execution.clj` not addressed.** `prompt_request.clj` removal is specified, but `psi.workflow-runtime.statechart-runtime.step-execution` has an independent copy of `format-logprob-message`, `format-logprob-line`, `logprob-uncertain-threshold`, and `transcript-with-logprobs`. This copy injects a synthetic user message into the workflow `:transcript` output for *all* session steps with logprobs. Design is silent on whether to keep or remove it. Needs explicit decision.
+1. **Duplicated logprob formatting in `step_execution.clj` not addressed.** → **Resolved**: remove the duplicate. `:transcript` output becomes assistant-message-only. Updated design.md "Conversation injection removal" and "What is removed from core"; updated steps.md with new step.
 
-2. **`logprobs/perplexity` session-id sourcing in workflow invoke step.** Input is `{:session-id "..."}` but the `run` step creates a child session. Design doesn't specify how the invoke step obtains the child session-id. Workflow step outputs currently include `:text`, `:transcript`, `:logprobs`, `:final-llm-reply` — not `:session-id`. Either `:session-id` must be added as a step output surface, or an alternative sourcing mechanism must be specified.
+2. **`logprobs/perplexity` session-id sourcing in workflow invoke step.** → **Resolved**: add `:session-id` to session-step raw outputs in `execute-session-step!`. Value is `(:session-id execution-session)`, already available. Invoke step references `{:from {:step "run" :output :session-id}}`. Updated design.md with new "Session step `:session-id` output" section; updated steps.md and plan.md.
 
-3. **`:assistant-message` structure in event payload.** Design shows `{:role "assistant" :content [...]}` but doesn't state whether `:content` is the structured block array (`[{:type :text :text "..."}]`) or flattened string. Should specify: structured map as-is from `execution-result`.
+3. **`:assistant-message` structure in event payload.** → **Resolved**: explicitly stated as structured block-array form from execution-result (`{:role "assistant" :content [{:type :text :text "..."}]}`). Updated design.md turn-finished event section.
 
-4. **`:reply-text` derivation in `logprobs/perplexity` output.** Output includes `:reply-text` but stored data is structured `:assistant-message`. Design doesn't specify extraction logic. Should reference `turn-execution-contract/assistant-message-text` or equivalent.
+4. **`:reply-text` derivation in `logprobs/perplexity` output.** → **Resolved**: derived via `turn-execution-contract/assistant-message-text`. Updated design.md perplexity operation section and steps.md.
 
-5. **Workflow `report` step variable bindings unspecified.** Design says three steps (run → perplexity → report) but doesn't specify how `report` accesses both the perplexity result (from invoke step) and the original assistant text (from run step). Current `report` uses `{{transcript}}` from run — new bindings needed.
+5. **Workflow `report` step variable bindings unspecified.** → **Resolved**: `report` step vars reference `run`'s `:final-llm-reply` for reply-text, and `perplexity`'s `:result` envelope via `:path` for perplexity/token-count. Updated design.md with explicit `report` step variable bindings section; updated steps.md.
 
-6. **Extension namespace convention.** Design says "same pattern as `psi/github`" (which uses `psi.github.*`) but other extensions use `extensions.*`. Should pick one explicitly.
+6. **Extension namespace convention.** → **Resolved**: `extensions.logprobs` (majority convention). `psi.github.*` is the outlier. Updated design.md constraints and plan.md.

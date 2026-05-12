@@ -29,6 +29,8 @@ Three changes:
 
 `:logprobs` journal entries remain in the persistence journal (they are the record) but are no longer projected into provider messages by `journal->provider-messages`. The `format-logprob-message`, `format-logprob-line`, and `logprob-uncertain-threshold` code in `prompt_request.clj` is removed.
 
+The independent copy of logprob formatting in `psi.workflow-runtime.statechart-runtime.step-execution` (`format-logprob-message`, `format-logprob-line`, `logprob-uncertain-threshold`, and `transcript-with-logprobs`) is also removed. The `:transcript` session-step raw output becomes the assistant message only (no synthetic logprob user message). This is consistent with the "no synthetic messages" principle — logprob analysis is the extension's responsibility, not the transcript's.
+
 ### Turn-finished event enrichment
 
 The `session_turn_finished` extension event payload is enriched with logprobs and the assistant message from the terminal result:
@@ -52,6 +54,8 @@ The assistant reply text is also included in the payload so extensions can corre
 ```
 
 Both `:logprobs` and `:assistant-message` are carried directly in the event payload (not queried back). The extension is in-process; the values are just references.
+
+`:assistant-message` is the structured message map from the execution result — the block array form `{:role "assistant" :content [{:type :text :text "..."}]}`, not a flattened string. This is the canonical shape returned by `turn-execution-contract/execute-session-turn!`.
 
 ### Logprobs extension
 
@@ -92,6 +96,8 @@ Output:
         :reply-text        "the assistant's reply text"}}
 ```
 
+The `:reply-text` value is derived from the stored structured `:assistant-message` using `turn-execution-contract/assistant-message-text` — which extracts and joins `:text`-typed content blocks, falling back to string `:content`.
+
 When no logprobs are stored for the session:
 ```clojure
 {:status :ok
@@ -101,13 +107,27 @@ When no logprobs are stored for the session:
         :reply-text  nil}}
 ```
 
+### Session step `:session-id` output
+
+Session steps gain `:session-id` as a raw output surface — the child session-id used for execution. This is added to the `raw-outputs` map in `step_execution.clj`'s `execute-session-step!`. The value is `(:session-id execution-session)`. This enables downstream invoke steps to reference `{:from {:step "run" :output :session-id}}` to obtain the child session-id without new infrastructure.
+
 ### Workflow update
 
 The existing `local-logprobs` workflow is updated to use the deterministic operation instead of asking a session to parse projected text:
 
-1. `run` step: session step that runs the prompt with logprobs enabled (unchanged)
-2. `perplexity` step: `:invoke` step calling `logprobs/perplexity` with the run step's session-id
+1. `run` step: session step that runs the prompt with logprobs enabled (unchanged except `:session-id` is now a raw output)
+2. `perplexity` step: `:invoke` step calling `logprobs/perplexity` with `{:session-id {:from {:step "run" :output :session-id}}}`
 3. `report` step: session step that reports the message text and the perplexity value
+
+#### `report` step variable bindings
+
+The `report` step accesses data from both prior steps via `:vars`:
+
+- `"reply-text"` — `{:from {:step "run" :output :final-llm-reply}}` — the assistant's reply text from the run step
+- `"perplexity"` — `{:from {:step "perplexity" :output :result} :path [:outputs :data :perplexity]}` — the perplexity value from the invoke step's result envelope
+- `"token-count"` — `{:from {:step "perplexity" :output :result} :path [:outputs :data :token-count]}` — the token count from the invoke step's result envelope
+
+The `report` step's `:contributions` template uses these vars to render a structured report without needing to parse transcript text.
 
 ## Data flow
 
@@ -139,11 +159,14 @@ provider SSE chunks
 - `logprob-uncertain-threshold` constant in `prompt_request.clj`
 - The `:logprobs` kind branch in `journal->provider-messages` that produces synthetic user messages
 - Any test coverage proving the synthetic-message projection
+- `format-logprob-message`, `format-logprob-line`, `logprob-uncertain-threshold`, `format-token-str`, `format-prob`, and `transcript-with-logprobs` in `step_execution.clj`
+- The synthetic logprob user message injection into `:transcript` session-step raw output
 
 ## What is new
 
 - `:logprobs` and `:assistant-message` keys in `session_turn_finished` event payload (in `prompt-finish-base-result`)
-- `extensions/logprobs/` extension directory
+- `:session-id` as a session-step raw output surface in `step_execution.clj`
+- `extensions/logprobs/` extension directory with `extensions.logprobs` namespace
 - `logprobs/perplexity` deterministic operation
 - Updated `local-logprobs` workflow using the deterministic op
 
@@ -153,7 +176,7 @@ provider SSE chunks
 - The logprobs extension stores only the most recent logprob-bearing turn per session (not a history buffer) — keep it minimal
 - Turns without logprobs do not clear the stored snapshot — the extension retains the most recent logprob-bearing reply until a newer one replaces it
 - No new slash commands or user-facing controls
-- The extension follows the same init/registration pattern as `psi/github`
+- The extension follows the same init/registration pattern as `psi/github` but uses the `extensions.logprobs` namespace convention (matching the majority of extensions: `extensions.auto-session-name`, `extensions.mementum`, `extensions.munera`, etc.). `psi.github.*` is the outlier convention used only by the GitHub extension.
 
 ## Acceptance
 
