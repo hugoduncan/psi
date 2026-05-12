@@ -199,3 +199,9 @@ Completed:
 
 Blocked:
 - left `munera/plan.md` unchecked because it is still an administrative open/backlog decision rather than an implementation change required to satisfy the reviewed test gap
+
+## Test review — 2026-05-12 (follow-up 2)
+
+One actionable test-shaping gap remains.
+
+- Direct interactive model selection paths still only exercise omitted-scope/default semantics. `components/rpc/src/psi/rpc/session/command_pickers.clj` and `components/app-runtime/src/psi/app_runtime/tui_frontend_actions.clj` both call `session/set-model-in!` without a scope argument and have no focused tests proving they intentionally preserve default persistence behavior while aligning to the new optional-scope contract. Add narrow picker-path tests that assert these entrypoints remain omitted-scope/default callers and do not silently diverge from the canonical helper/API semantics introduced by this task.
