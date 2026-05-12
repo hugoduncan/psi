@@ -1,5 +1,6 @@
 (ns psi.workflow-runtime.statechart-runtime.step-execution
   (:require
+   [clojure.string :as str]
    [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
@@ -12,6 +13,52 @@
 
 (def assistant-message-text
   turn-execution/assistant-message-text)
+
+(def ^:private logprob-uncertain-threshold 0.90)
+
+(defn- format-token-str
+  [s]
+  (cond
+    (= s " ")  "\" \""
+    (= s "\n") "\"\\n\""
+    (= s "\t") "\"\\t\""
+    :else       (str "\"" s "\"")))
+
+(defn- format-prob [logprob]
+  (when (some? logprob)
+    (format "%.2f" (Math/exp logprob))))
+
+(defn- format-logprob-line
+  [{:keys [token logprob top]}]
+  (let [prob-str (or (format-prob logprob) "?")
+        top-alts (remove #(= (:token %) token) top)
+        alts-str (when (seq top-alts)
+                   (str "  |  "
+                        (str/join " " (map (fn [t]
+                                             (str (format-token-str (:token t)) " "
+                                                  (or (format-prob (:logprob t)) "?")))
+                                           top-alts))))]
+    (str "  " (format-token-str token) " " prob-str alts-str)))
+
+(defn- format-logprob-message
+  [tokens]
+  (let [uncertain (filter (fn [{:keys [logprob]}]
+                            (and (some? logprob) (< (Math/exp logprob) logprob-uncertain-threshold)))
+                          tokens)
+        lines (mapv format-logprob-line uncertain)
+        header "[logprob context — previous response]"]
+    (if (seq lines)
+      (str header "\nUncertain tokens (p < 0.90):\n"
+           (str/join "\n" lines)
+           "\nAll other tokens: p ≥ 0.90")
+      (str header "\nAll tokens p ≥ 0.90"))))
+
+(defn- transcript-with-logprobs
+  [assistant-message logprobs]
+  (cond-> (when assistant-message [assistant-message])
+    (seq logprobs)
+    (conj {:role "user"
+           :content (format-logprob-message logprobs)})))
 
 (defn operation-result->invoke-step-result
   [operation-result]
@@ -143,10 +190,11 @@
                                                             :attempt-id attempt-id
                                                             :updated-at (state/now)})
         (queue/enqueue-event! event-queue* working-memory* :actor/failed {}))
-      (let [raw-outputs {:final-llm-reply assistant-text
+      (let [logprobs (:execution-result/logprobs execution-result)
+            raw-outputs {:final-llm-reply assistant-text
                          :text assistant-text
-                         :transcript (when assistant-message [assistant-message])
-                         :logprobs (:execution-result/logprobs execution-result)}
+                         :transcript (transcript-with-logprobs assistant-message logprobs)
+                         :logprobs logprobs}
             normalized-outputs (workflow-ir/step-output-surfaces
                                 step-def
                                 {:outcome :ok

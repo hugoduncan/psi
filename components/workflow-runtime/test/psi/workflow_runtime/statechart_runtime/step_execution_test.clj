@@ -31,3 +31,25 @@
              :reason :bad-input
              :message "No repo"
              :details {:path "/tmp"}})))))
+
+(deftest transcript-with-logprobs-appends-synthetic-logprob-context-test
+  (testing "workflow session transcript includes synthetic logprob context after assistant message"
+    (is (= [{:role "assistant"
+             :content [{:type :text :text "done"}]}
+            {:role "user"
+             :content "[logprob context — previous response]\nUncertain tokens (p < 0.90):\n  \"done\" 0.82  |  \"nope\" 0.18\nAll other tokens: p ≥ 0.90"}]
+           (#'step-execution/transcript-with-logprobs
+            {:role "assistant"
+             :content [{:type :text :text "done"}]}
+            [{:token "done"
+              :logprob (Math/log 0.82)
+              :top [{:token "done" :logprob (Math/log 0.82)}
+                    {:token "nope" :logprob (Math/log 0.18)}]}]))))
+
+  (testing "workflow session transcript stays assistant-only when no logprobs were collected"
+    (is (= [{:role "assistant"
+             :content [{:type :text :text "done"}]}]
+           (#'step-execution/transcript-with-logprobs
+            {:role "assistant"
+             :content [{:type :text :text "done"}]}
+            nil)))))
