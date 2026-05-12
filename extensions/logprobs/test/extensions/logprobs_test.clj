@@ -39,7 +39,20 @@
     (let [tokens [{:token "a" :logprob (Math/log 0.5)}
                   {:token "b" :logprob nil}]]
       ;; Only one token with logprob, perplexity = exp(-(-0.693)/1) = 2.0
-      (is (< (abs (- 2.0 (logprobs/calculate-perplexity tokens))) 0.001)))))
+      (is (< (abs (- 2.0 (logprobs/calculate-perplexity tokens))) 0.001))))
+
+  (testing "all-nil-logprob tokens returns nil"
+    ;; Tokens present but every :logprob is nil — no usable data
+    (let [tokens [{:token "a" :logprob nil}
+                  {:token "b" :logprob nil}]]
+      (is (nil? (logprobs/calculate-perplexity tokens)))))
+
+  (testing "single token returns exp(-logprob)"
+    ;; N=1 boundary: perplexity = exp(-logprob)
+    (let [lp (Math/log 0.25)
+          tokens [{:token "x" :logprob lp}]]
+      ;; exp(-ln(0.25)) = exp(ln(4)) = 4.0
+      (is (< (abs (- 4.0 (logprobs/calculate-perplexity tokens))) 0.001)))))
 
 ;; ── Event-driven storage ─────────────────────────────────────────────────────
 
@@ -89,6 +102,50 @@
         (let [result (logprobs/perplexity-result "s1")]
           (is (= "t4" (:turn-id result)))
           (is (= "new" (:reply-text result))))))))
+
+;; ── Multi-session isolation ───────────────────────────────────────────────────
+
+(deftest multi-session-isolation-test
+  (let [registered-handlers (atom {})
+        api {:on (fn [event-name handler]
+                   (swap! registered-handlers assoc event-name handler))
+             :register-operation (fn [_op] nil)}]
+    (logprobs/init api)
+    (let [handler (get @registered-handlers "session_turn_finished")]
+
+      (testing "storing logprobs for s1 and s2 yields independent results"
+        (handler {:session-id "s1"
+                  :turn-id "t1-s1"
+                  :logprobs [{:token "a" :logprob (Math/log 0.5)}
+                             {:token "b" :logprob (Math/log 0.5)}]
+                  :assistant-message {:role "assistant" :content [{:type :text :text "ab"}]}})
+        (handler {:session-id "s2"
+                  :turn-id "t1-s2"
+                  :logprobs [{:token "x" :logprob (Math/log 0.25)}]
+                  :assistant-message {:role "assistant" :content [{:type :text :text "x"}]}})
+
+        (let [r1 (logprobs/perplexity-result "s1")
+              r2 (logprobs/perplexity-result "s2")]
+          (is (= "t1-s1" (:turn-id r1)))
+          (is (= "t1-s2" (:turn-id r2)))
+          (is (= "ab" (:reply-text r1)))
+          (is (= "x" (:reply-text r2)))
+          (is (= 2 (:token-count r1)))
+          (is (= 1 (:token-count r2)))
+          ;; s1 perplexity ≈ 2.0, s2 perplexity ≈ 4.0
+          (is (< (abs (- 2.0 (:perplexity r1))) 0.001))
+          (is (< (abs (- 4.0 (:perplexity r2))) 0.001))))
+
+      (testing "updating s2 does not affect s1"
+        (handler {:session-id "s2"
+                  :turn-id "t2-s2"
+                  :logprobs [{:token "y" :logprob (Math/log 0.1)}]
+                  :assistant-message {:role "assistant" :content [{:type :text :text "y"}]}})
+
+        (let [r1 (logprobs/perplexity-result "s1")
+              r2 (logprobs/perplexity-result "s2")]
+          (is (= "t1-s1" (:turn-id r1)) "s1 unchanged after s2 update")
+          (is (= "t2-s2" (:turn-id r2)) "s2 updated to new turn"))))))
 
 ;; ── Perplexity result ────────────────────────────────────────────────────────
 
