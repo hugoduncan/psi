@@ -205,3 +205,19 @@ Blocked:
 One actionable test-shaping gap remains.
 
 - Direct interactive model selection paths still only exercise omitted-scope/default semantics. `components/rpc/src/psi/rpc/session/command_pickers.clj` and `components/app-runtime/src/psi/app_runtime/tui_frontend_actions.clj` both call `session/set-model-in!` without a scope argument and have no focused tests proving they intentionally preserve default persistence behavior while aligning to the new optional-scope contract. Add narrow picker-path tests that assert these entrypoints remain omitted-scope/default callers and do not silently diverge from the canonical helper/API semantics introduced by this task.
+
+## Implementation follow-up execution — 2026-05-12 (picker-path test gap)
+
+Reviewed the preloaded follow-up result and executed the newly added unchecked implementation step.
+
+Completed:
+- added RPC command-picker coverage in `components/rpc/test/psi/rpc_test.clj` proving `handle-model-selection!` remains an omitted-scope/default caller while still using the canonical `session/set-model-in!` helper contract
+- added focused TUI direct-selection coverage in `components/app-runtime/test/psi/app_runtime/tui_frontend_actions_test.clj` proving `handle-action-result` for `:select-model` also remains an omitted-scope/default caller
+- marked the corresponding `steps.md` item done
+
+Verification:
+- `clojure -M:test --focus psi.tui.app-update-runtime-test --focus psi.rpc-test` → `34 tests, 175 assertions, 0 failures`
+
+Notes:
+- `components/emacs-ui/test/psi-dispatch-test.el` already had direct setter omitted-scope and explicit-scope transport coverage, so this follow-up closed the remaining picker-path gap on the Clojure RPC and TUI sides only
+- left `munera/plan.md` unchecked; it remains an administrative backlog/open-state decision rather than a code/test follow-up required by this review pass

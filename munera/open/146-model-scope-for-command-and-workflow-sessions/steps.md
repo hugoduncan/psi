@@ -11,5 +11,5 @@
 - [x] Add an end-to-end workflow child-session creation persistence regression proving the initial concrete-model setup path leaves project preferences and user config untouched, not just that the model-set seam receives `:scope :session`.
 - [x] Verify focused suites and lint; record results in `implementation.md`.
 - [x] Update the task’s recorded focused verification command/results to include `psi.agent-session.workflow-execution-test`, since the new end-to-end workflow initial-model persistence regression now lives there.
-- [ ] Add focused picker-path tests proving RPC command-picker and TUI direct model-selection entrypoints intentionally remain omitted-scope/default callers while still using the canonical optional-scope helper/API contract.
+- [x] Add focused picker-path tests proving RPC command-picker and TUI direct model-selection entrypoints intentionally remain omitted-scope/default callers while still using the canonical optional-scope helper/API contract.
 - [ ] Update `munera/plan.md` to include this task in backlog order if it should remain open after creation.

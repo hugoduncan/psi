@@ -10,7 +10,8 @@
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.query.core :as query]
-   [psi.rpc-test-support :as support]))
+   [psi.rpc-test-support :as support]
+   [psi.rpc.session.command-pickers]))
 
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
@@ -478,7 +479,32 @@
       (is (some? err))
       (is (= "request/invalid-params" (:error-code err)))
       (is (= "invalid request parameter :scope: session, project, or user"
-             (:error-message err))))))
+             (:error-message err)))))
+
+  (testing "picker-backed model selection preserves omitted-scope/default helper semantics"
+    (let [[ctx sid] (support/create-session-context)
+          captured  (atom nil)
+          emit!     (fn [& _])]
+      (with-redefs [session/set-model-in! (fn [ctx' session-id' model & [scope]]
+                                            (reset! captured {:ctx ctx'
+                                                              :session-id session-id'
+                                                              :model model
+                                                              :scope scope})
+                                            {:model model})]
+        (psi.rpc.session.command-pickers/handle-model-selection!
+         ctx sid
+         (fn [provider id]
+           (when (= [provider id] ["openai" "gpt-5.3-codex"])
+             {:provider :openai :id "gpt-5.3-codex" :supports-reasoning true}))
+         emit!
+         {:provider "openai" :id "gpt-5.3-codex"}))
+      (is (= {:ctx ctx
+              :session-id sid
+              :model {:provider "openai"
+                      :id "gpt-5.3-codex"
+                      :reasoning true}
+              :scope nil}
+             @captured)))))
 
 (deftest rpc-e2e-handshake-query-and-streaming-test
   (testing "handshake -> query_eql -> prompt with interleaved events"
