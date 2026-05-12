@@ -2,6 +2,10 @@
 
 Open tasks in suggested execution order:
 
+Active:
+
+`munera/open/145-logprobs-out-of-band-extension/`
+
 Backlog:
 
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
