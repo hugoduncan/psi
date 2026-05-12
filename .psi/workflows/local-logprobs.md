@@ -28,13 +28,13 @@ description: Run a prompt with a local model, no tools, non-streaming, and logpr
 
          {:name "perplexity"
           :type :invoke
-          :invoke {:operation "logprobs/perplexity"
-                   :args {:session-id {:from {:step "run" :output :session-id}}}}}
+          :operation "logprobs/perplexity"
+          :args {:session-id {:from {:step "run" :output :result}
+                              :path [:outputs :session-id]}}}
 
          {:name "report"
           :type :session
           :tools []
-          :extensions []
           :contributions [{:type :template
                            :text "Report exactly these two sections and nothing else.\n\n## Reply\n{{reply-text}}\n\n## Perplexity\nPerplexity: {{perplexity}}\nToken count: {{token-count}}"
                            :vars {"reply-text" {:from {:step "run" :output :final-llm-reply}}
