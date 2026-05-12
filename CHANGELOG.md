@@ -11,6 +11,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ### Fixed
 - Custom model providers whose selected session model stores `:provider` as a string now resolve provider-scoped auth, request options, and runtime model lookup consistently instead of falling back to built-in provider auth behavior.
+- Local `:openai-completions` models now project `/thinking off` into `chat_template_kwargs.enable_thinking=false`, allowing local OpenAI-compatible servers to disable hidden reasoning through the existing thinking-level control.
 
 ## [0.1.2049] - 2026-05-02
 

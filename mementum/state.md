@@ -105,6 +105,11 @@ Bootstrapped on 2026-04-02.
   - `:psi.agent-session/last-turn-logprobs` EQL resolver added
   - `/logprobs [on|off|N]` command: `set-logprobs-in!` in session_settings + core; `:session/set-logprobs` handler with `(or top-n 3)` nil-guard; `prefixed-command-prefixes` + `builtin-slash-commands` + `format-help` updated
   - 3 new test namespaces; 1702 tests, 0 failures
+- Local OpenAI-compatible chat-completions requests now project `/thinking off` onto `chat_template_kwargs.enable_thinking=false` for models marked `:locality :local`, while cloud models keep the existing reasoning-effort-only behavior.
+  - implementation lives in `psi.ai.providers.openai.reasoning/chat-template-kwargs` and `psi.ai.providers.openai.chat-completions/build-request`
+  - focused proof added in `psi.ai.providers.openai-test`
+  - docs updated in `doc/custom-providers.md`; changelog updated
+  - verification green: `clojure -M:test --focus psi.ai.providers.openai-test` → `24 tests, 119 assertions, 0 failures`
 
 ## Suggested next step
 - Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `134-psi-tool-mutation-surface-and-active-session-introspection`.

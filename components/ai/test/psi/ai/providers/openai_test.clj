@@ -573,11 +573,42 @@
             body (json/parse-string (:body req) true)]
         (is (= "high" (:reasoning_effort body)))))
 
-    (testing "thinking off omits reasoning effort"
+    (testing "thinking off omits reasoning effort for cloud models"
       (let [req  (#'openai/build-request convo model {:api-key "sk-test"
                                                       :thinking-level :off})
             body (json/parse-string (:body req) true)]
-        (is (nil? (:reasoning_effort body)))))))
+        (is (nil? (:reasoning_effort body)))
+        (is (nil? (:chat_template_kwargs body)))))))
+
+(deftest local-openai-completions-thinking-off-disables-chat-template-thinking-test
+  (let [model {:id                 "local-completions"
+               :name               "Local Completions"
+               :provider           :local
+               :api                :openai-completions
+               :base-url           "http://localhost:8080/v1"
+               :locality           :local
+               :supports-reasoning true
+               :supports-images    false
+               :supports-text      true
+               :context-window     128000
+               :max-tokens         16384
+               :input-cost         0.0
+               :output-cost        0.0
+               :cache-read-cost    0.0
+               :cache-write-cost   0.0}
+        convo (-> (conv/create "sys") (conv/add-user-message "hi"))]
+    (testing "thinking off adds chat_template_kwargs enable_thinking false for local models"
+      (let [req  (#'openai/build-request convo model {:thinking-level :off})
+            body (json/parse-string (:body req) true)]
+        (is (nil? (:reasoning_effort body)))
+        (is (= {:enable_thinking false}
+               (:chat_template_kwargs body)))))
+
+    (testing "thinking on leaves chat_template_kwargs unset for local models"
+      (let [req  (#'openai/build-request convo model {:thinking-level :medium})
+            body (json/parse-string (:body req) true)]
+        (is (= "medium" (:reasoning_effort body)))
+        (is (nil? (:chat_template_kwargs body)))))))
 
 (deftest openai-temperature-defaults-to-zero-test
   (testing "chat completions respects explicit temperature override"

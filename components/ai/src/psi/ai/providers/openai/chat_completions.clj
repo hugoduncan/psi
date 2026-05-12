@@ -134,14 +134,16 @@
                               (:tools conversation)))
         effort        (reasoning/reasoning-effort model options)
         temperature   (or (:temperature options) 0)
+        template-kw   (reasoning/chat-template-kwargs model options)
         body          (cond-> {:model          (:id model)
                                :messages       (vec messages)
                                :stream         true
                                :stream_options {:include_usage true}
                                :temperature    temperature}
-                        (:max-tokens options)    (assoc :max_tokens  (:max-tokens options))
-                        (seq tool-defs)          (assoc :tools tool-defs)
-                        effort                   (assoc :reasoning_effort effort)
+                        (:max-tokens options)       (assoc :max_tokens  (:max-tokens options))
+                        (seq tool-defs)             (assoc :tools tool-defs)
+                        effort                      (assoc :reasoning_effort effort)
+                        template-kw                 (assoc :chat_template_kwargs template-kw)
                         (:logprobs-enabled options) (assoc :logprobs true
                                                            :top_logprobs (or (:top-logprobs options) 3)))]
     {:headers (cond-> {"Content-Type" "application/json"}
