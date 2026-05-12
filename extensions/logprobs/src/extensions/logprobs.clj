@@ -43,7 +43,7 @@
   [session-id]
   (if-let [{:keys [logprobs assistant-message turn-id]} (get-logprobs session-id)]
     {:perplexity (calculate-perplexity logprobs)
-     :token-count (count logprobs)
+     :token-count (count (filter :logprob logprobs))
      :turn-id turn-id
      :reply-text (turn-execution/assistant-message-text assistant-message)}
     {:perplexity nil

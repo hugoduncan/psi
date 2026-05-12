@@ -16,6 +16,6 @@
   - 27 focused tests, 80 assertions, 0 failures
   - 1896 total tests, 9 pre-existing failures (workflow-execution-test dynamic delegate), 0 new failures
   - lint: 0 errors, 0 warnings
-- [ ] Fix `:token-count` in `perplexity-result` to use filtered count (tokens with non-nil `:logprob`) instead of `(count logprobs)`. Add test asserting `:token-count` matches effective N when tokens contain nil logprobs.
-- [ ] Add CHANGELOG entry under `[Unreleased]`: Added — `logprobs/perplexity` deterministic operation; Changed — logprob data moved out-of-band (no longer injected as synthetic user messages in conversation context); Changed — `local-logprobs` workflow uses structured `logprobs/perplexity` invoke step.
-- [ ] Update `mementum/state.md` line 104: `journal->provider-messages` no longer projects `:logprobs` entries — they are persisted but skipped during provider message projection.
+- [x] Fix `:token-count` in `perplexity-result` to use filtered count (tokens with non-nil `:logprob`) instead of `(count logprobs)`. Add test asserting `:token-count` matches effective N when tokens contain nil logprobs.
+- [x] Add CHANGELOG entry under `[Unreleased]`: Added — `logprobs/perplexity` deterministic operation; Changed — logprob data moved out-of-band (no longer injected as synthetic user messages in conversation context); Changed — `local-logprobs` workflow uses structured `logprobs/perplexity` invoke step.
+- [x] Update `mementum/state.md` line 104: `journal->provider-messages` no longer projects `:logprobs` entries — they are persisted but skipped during provider message projection.

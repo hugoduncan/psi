@@ -101,7 +101,7 @@ Bootstrapped on 2026-04-02.
   - `extract-openai-logprob-delta` (per-chunk) and `extract-llama-logprob-delta` (final chunk) emit `:logprob-delta` events; routed in `make-provider-event-consumer`
   - `handle-logprob-delta!` accumulates token vectors into `:logprob-buffer`; `handle-done!` flattens to `:logprobs` on turn-data; `execute-live-turn!` returns `:logprobs`; `execute-prepared-request!` includes `:execution-result/logprobs`
   - `build-record-response` writes `:last-turn-logprobs` to session-data and appends `:logprobs` journal entry when non-empty
-  - `journal->provider-messages` projects `:logprobs` entries as synthetic user messages (uncertain-token table, threshold 0.90); orphaned entries dropped
+  - `journal->provider-messages` skips `:logprobs` entries during provider message projection (logprob data is persisted in the journal but no longer projected as synthetic user messages; analysis is handled out-of-band by the `logprobs/perplexity` extension operation)
   - `:psi.agent-session/last-turn-logprobs` EQL resolver added
   - `/logprobs [on|off|N]` command: `set-logprobs-in!` in session_settings + core; `:session/set-logprobs` handler with `(or top-n 3)` nil-guard; `prefixed-command-prefixes` + `builtin-slash-commands` + `format-help` updated
   - 3 new test namespaces; 1702 tests, 0 failures

@@ -100,6 +100,20 @@
       (is (nil? (:turn-id result)))
       (is (nil? (:reply-text result))))))
 
+(deftest perplexity-result-token-count-matches-effective-n-test
+  (testing "token-count reflects only tokens with non-nil logprob"
+    (reset! @#'logprobs/store
+            {"s1" {:logprobs [{:token "a" :logprob (Math/log 0.5)}
+                              {:token "b" :logprob nil}
+                              {:token "c" :logprob (Math/log 0.5)}]
+                   :assistant-message {:role "assistant" :content [{:type :text :text "a b c"}]}
+                   :turn-id "t1"}})
+    (let [result (logprobs/perplexity-result "s1")]
+      (is (= 2 (:token-count result))
+          "token-count should be 2 (only tokens with non-nil :logprob)")
+      (is (< (abs (- 2.0 (:perplexity result))) 0.001)
+          "perplexity should match the 2 effective tokens"))))
+
 ;; ── Operation handler ────────────────────────────────────────────────────────
 
 (deftest invoke-perplexity-test
