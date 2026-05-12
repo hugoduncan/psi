@@ -13,74 +13,16 @@
    [psi.prompt-assets.skills :as skills]
    [psi.prompt-assets.system-prompt :as system-prompt]))
 
-(def ^:private logprob-uncertain-threshold 0.90)
-
-(defn- format-token-str
-  "Format a token string with visible escapes for whitespace-only tokens."
-  [s]
-  (cond
-    (= s " ")  "\" \""
-    (= s "\n") "\"\\n\""
-    (= s "\t") "\"\\t\""
-    :else       (str "\"" s "\"")))
-
-(defn- format-prob [logprob]
-  (when (some? logprob)
-    (format "%.2f" (Math/exp logprob))))
-
-(defn- format-logprob-line
-  [{:keys [token logprob top]}]
-  (let [prob-str   (or (format-prob logprob) "?")
-        top-alts   (remove #(= (:token %) token) top)
-        alts-str   (when (seq top-alts)
-                     (str "  |  "
-                          (str/join " " (map (fn [t]
-                                               (str (format-token-str (:token t)) " "
-                                                    (or (format-prob (:logprob t)) "?")))
-                                             top-alts))))]
-    (str "  " (format-token-str token) " " prob-str alts-str)))
-
-(defn- format-logprob-message
-  "Format a logprobs token vector into a synthetic user-visible text block."
-  [tokens]
-  (let [uncertain (filter (fn [{:keys [logprob]}]
-                            (and (some? logprob) (< (Math/exp logprob) logprob-uncertain-threshold)))
-                          tokens)
-        lines     (mapv format-logprob-line uncertain)
-        header    "[logprob context — previous response]"]
-    (if (seq lines)
-      (str header "\nUncertain tokens (p < 0.90):\n"
-           (str/join "\n" lines)
-           "\nAll other tokens: p ≥ 0.90")
-      (str header "\nAll tokens p ≥ 0.90"))))
-
 (defn journal->provider-messages
   "Project persisted journal entries into agent/provider message maps.
    :message entries become provider messages directly.
-   :logprobs entries become synthetic user messages injected after the preceding
-   assistant message; orphaned :logprobs entries (no preceding :message) are dropped."
+   :logprobs entries are persisted but not projected into provider messages."
   [journal]
-  (loop [entries  journal
-         acc      []
-         last-msg? false]
-    (if (empty? entries)
-      acc
-      (let [entry (first entries)
-            rest* (rest entries)]
-        (cond
-          (= :message (:kind entry))
-          (recur rest*
-                 (conj acc (get-in entry [:data :message]))
-                 true)
-
-          (and (= :logprobs (:kind entry)) last-msg?)
-          (let [tokens (get-in entry [:data :tokens])]
-            (recur rest*
-                   (conj acc {:role "user" :content (format-logprob-message tokens)})
-                   false))
-
-          :else
-          (recur rest* acc false))))))
+  (into []
+        (keep (fn [entry]
+                (when (= :message (:kind entry))
+                  (get-in entry [:data :message]))))
+        journal))
 
 (defn session->provider-messages
   "Project the persisted journal for `session-id` into provider-visible messages."

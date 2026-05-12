@@ -1,7 +1,6 @@
 (ns psi.agent-session.logprobs-test
-  "Tests for logprob feature: options projection, journal projection, and recording."
+  "Tests for logprob feature: options projection and recording."
   (:require
-   [clojure.string :as string]
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.prompt-recording :as recording]))
@@ -60,42 +59,19 @@
    :kind :logprobs
    :data {:turn-id turn-id :tokens tokens}})
 
-(deftest journal-logprobs-entry-projects-to-synthetic-user-message-test
-  (testing ":logprobs entry after :message projects to synthetic user message"
+(deftest journal-logprobs-entries-not-projected-test
+  (testing ":logprobs entries are not projected into provider messages"
     (let [journal [(message-entry "assistant" "Hello there")
                    (logprobs-entry "turn-1" sample-logprob-tokens)]
           msgs    (prompt-request/journal->provider-messages journal)]
-      (is (= 2 (count msgs)))
-      (is (= "assistant" (:role (first msgs))))
-      (is (= "user" (:role (second msgs))))
-      (is (string/includes? (:content (second msgs)) "[logprob context")))))
+      (is (= 1 (count msgs)))
+      (is (= "assistant" (:role (first msgs)))))))
 
 (deftest journal-logprobs-entry-orphaned-dropped-test
-  (testing "orphaned :logprobs entry (no preceding :message) is silently dropped"
+  (testing "orphaned :logprobs entry is silently dropped"
     (let [journal [(logprobs-entry "turn-1" sample-logprob-tokens)]
           msgs    (prompt-request/journal->provider-messages journal)]
       (is (empty? msgs)))))
-
-(deftest journal-logprobs-entry-all-certain-test
-  (testing "all-certain token message still emitted when all tokens p ≥ 0.90"
-    (let [certain-tokens [{:token "Hello" :logprob (Math/log 0.99) :top []}]
-          journal [(message-entry "assistant" "Hello")
-                   (logprobs-entry "turn-1" certain-tokens)]
-          msgs    (prompt-request/journal->provider-messages journal)]
-      (is (= 2 (count msgs)))
-      (is (string/includes? (:content (second msgs)) "All tokens p ≥ 0.90")))))
-
-(deftest journal-logprobs-entry-uncertain-tokens-formatted-test
-  (testing "uncertain token (p < 0.90) appears in logprob message"
-    (let [uncertain-tokens [{:token "was" :logprob (Math/log 0.72)
-                             :top [{:token "was" :logprob (Math/log 0.72)}
-                                   {:token "is"  :logprob (Math/log 0.19)}]}]
-          journal [(message-entry "assistant" "it was good")
-                   (logprobs-entry "turn-1" uncertain-tokens)]
-          msgs    (prompt-request/journal->provider-messages journal)]
-      (is (= 2 (count msgs)))
-      (is (string/includes? (:content (second msgs)) "Uncertain tokens"))
-      (is (string/includes? (:content (second msgs)) "\"was\"")))))
 
 (deftest journal-non-logprobs-entries-skipped-test
   (testing "non-message non-logprobs entries are skipped without disrupting projection"
