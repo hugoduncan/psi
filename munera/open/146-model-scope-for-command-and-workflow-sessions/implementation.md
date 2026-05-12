@@ -152,3 +152,9 @@ No new actionable inconsistency feedback found after re-reading `design.md`, `pl
 Reviewed the preloaded inconsistency-review result and current `design-steps.md`, `steps.md`, `implementation.md`, `design.md`, and `plan.md` before acting. There were no newly added actionable unchecked follow-up items in `design-steps.md`, so no design-step checkboxes changed and no task-artifact updates were needed beyond recording this requested no-op pass.
 
 Per request, `steps.md` implementation items were not executed.
+
+## Implementation review — 2026-05-12
+
+One actionable implementation gap remains.
+
+- Workflow fallback switching is covered as a persistence-sensitive path and the lower execution seam is asserted to receive `:scope :session`, but the initial workflow child-session concrete-model setup path still lacks an end-to-end persistence regression proving that creating the child session with its initial model performs no project-local or user-config writes. Current proof for that path is seam-level only (`components/workflow-runtime/test/psi/workflow_runtime/attempts_test.clj`), while the task acceptance explicitly calls out initial child-session setup and ranked fallback switching as separate persistence regression targets.
