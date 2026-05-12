@@ -100,6 +100,9 @@
                        (:model step-config)
                        (assoc :model (:model step-config))
 
+                       (:model-fallback step-config)
+                       (assoc :model-fallback (:model-fallback step-config))
+
                        (contains? step-config :prompt-component-selection)
                        (assoc :prompt-component-selection (:prompt-component-selection step-config))
 
