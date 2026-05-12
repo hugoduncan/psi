@@ -74,3 +74,6 @@ Implementation notes:
   - read the preloaded review result together with `steps.md`, `implementation.md`, `design.md`, and `plan.md` for task `144-workflow-model-query-execution-fallback`.
   - confirmed the task still has no newly added actionable unchecked follow-up items; `steps.md` and `design-steps.md` remain fully checked/already non-actionable for this implementation slice.
   - explicit no-op result: nothing remained to execute, so no code or checklist changes were required beyond recording this verification pass.
+- 2026-05-11 code-shaper review:
+  - actionable consistency issue: `psi.workflow-runtime.statechart-runtime.step-execution/execute-with-ranked-fallback!` always calls `attempts/set-execution-session-model!` for the first ranked candidate even though the child session is already created with that concrete `:model`; the concrete-model single-shot path executes without an extra model mutation.
+  - shaping follow-up: make ranked fallback reuse the session’s initial model for the first candidate and only mutate the child session when advancing to later fallback candidates, so fallback and non-fallback execution paths have one obvious model-setting story with fewer unnecessary side effects.
