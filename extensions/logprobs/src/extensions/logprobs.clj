@@ -2,8 +2,10 @@
   "Logprobs out-of-band extension.
 
    Subscribes to session_turn_finished, stores per-session logprob snapshots,
-   and registers the logprobs/perplexity deterministic operation."
+   registers the logprobs/perplexity deterministic operation,
+   and provides the /logprobs-table slash command."
   (:require
+   [clojure.string :as str]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
 
 ;; ── State ────────────────────────────────────────────────────────────────────
@@ -65,6 +67,55 @@
        :reason :missing-session-id
        :message "logprobs/perplexity requires :session-id in args"})))
 
+;; ── Logprobs table ───────────────────────────────────────────────────────────
+
+(defn- format-logprobs-table
+  "Format stored logprobs as a pretty EDN table string."
+  [logprobs]
+  (let [rows (mapv (fn [{:keys [token logprob top]}]
+                     (let [lp-str (if logprob (format "%.4f" logprob) "nil")
+                           pp-str (if logprob (format "%.4f" (Math/exp logprob)) "nil")
+                           top-entries (when (seq top)
+                                         (mapv (fn [{tk :token tl :logprob}]
+                                                 (str tk
+                                                      " (" (format "%.4f" (if tl (Math/exp tl) 0.0)) ")"))
+                                               top))]
+                       {:token token
+                        :logprob lp-str
+                        :prob pp-str
+                        :top (when top-entries (vec top-entries))}))
+                   logprobs)]
+    (str "#_(logprobs-table)\n"
+         "[" (str/join "\n  " (mapv pr-str rows)) "]\n"
+         "\n"
+         (str/join ["| Token | LogProb | Prob | Top Alternatives |\n"
+                    "|-------|---------|------|------------------|\n"
+                    (str/join "\n"
+                              (mapv (fn [{:keys [token logprob prob top]}]
+                                      (str "|" token " | " logprob " | " prob " | "
+                                           (if top (str/join ", " top) "—") " |"))
+                                    rows))]))))
+
+(defn- logprobs-table-handler
+  "Slash command handler for /logprobs-table.
+   Formats the most recent logprobs as EDN and posts it as a non-LLM session notification."
+  [_args api]
+  (let [session-id (:psi.agent-session/active-session-id
+                    ((:query api) [:psi.agent-session/active-session-id]))
+        data       (get-logprobs session-id)]
+    (if-let [{:keys [logprobs]} data]
+      (let [table (format-logprobs-table logprobs)
+            pp    (calculate-perplexity logprobs)
+            tc    (count (filter :logprob logprobs))]
+        ((:notify api)
+         (str "## Logprobs Table\n\n"
+              "**Perplexity:** " (format "%.4f" pp) " | **Tokens:** " tc "\n\n"
+              "```edn\n" table "\n```")
+         {:role "assistant" :custom-type :logprobs-table}))
+      ((:notify api)
+       "No logprobs data available for this session. Enable logprobs with `/logprobs on` first."
+       {:role "assistant" :custom-type :logprobs-table}))))
+
 ;; ── Event handler ────────────────────────────────────────────────────────────
 
 (defn- on-turn-finished [payload]
@@ -79,4 +130,10 @@
   ((:register-operation api)
    {:id "logprobs/perplexity"
     :description "Calculate perplexity of the most recent logprob-bearing reply for a session"
-    :handler invoke-perplexity}))
+    :handler invoke-perplexity})
+  (when-let [register-command (:register-command api)]
+    (register-command
+     {:name "logprobs-table"
+      :description "Pretty-print the most recent logprobs as an EDN table (non-LLM message)"
+      :handler (fn [args] (logprobs-table-handler args api))}))
+  nil)
