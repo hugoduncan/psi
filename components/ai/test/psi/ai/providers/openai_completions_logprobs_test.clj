@@ -97,3 +97,29 @@
       (is (some? (:logprob result)))
       (is (< (:logprob result) 0))
       (is (= 2 (count (:top result)))))))
+
+(deftest completion-response-with-logprobs-and-missing-model-pricing-test
+  (testing "non-streaming logprob response tolerates models without pricing metadata"
+    (let [model  {:id "qwen-3.6-27b"
+                  :provider :local3
+                  :api :openai-completions
+                  :base-url "http://localhost:1234"
+                  :supports-text true}
+          body   {:choices [{:message {:content "lambda(identity)"}
+                             :finish_reason "stop"
+                             :logprobs {:content [{:token "lambda"
+                                                   :logprob -0.2
+                                                   :top_logprobs [{:token "lambda" :logprob -0.2}
+                                                                  {:token "omega" :logprob -1.7}]}]}}]
+                  :usage {:prompt_tokens 10
+                          :completion_tokens 5
+                          :total_tokens 15}}
+          result (#'cc/completion-response->assistant-message model body)]
+      (is (= "assistant" (get-in result [:assistant-message :role])))
+      (is (= :stop (get-in result [:assistant-message :stop-reason])))
+      (is (= 0.0 (get-in result [:assistant-message :usage :cost :total])))
+      (is (= [{:token "lambda"
+               :logprob -0.2
+               :top [{:token "lambda" :logprob -0.2}
+                     {:token "omega" :logprob -1.7}]}]
+             (:logprobs result))))))

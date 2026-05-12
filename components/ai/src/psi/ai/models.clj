@@ -597,14 +597,17 @@
 ;; Cost calculation
 
 (defn calculate-cost
-  "Calculate cost for given usage and model"
+  "Calculate cost for given usage and model.
+   Missing token counts or model cost fields are treated as zero so
+   local/custom models without pricing metadata still produce a stable
+   zero-cost breakdown instead of failing usage shaping."
   [model usage]
   (let [{:keys [input-cost output-cost cache-read-cost cache-write-cost]} model
         {:keys [input-tokens output-tokens cache-read-tokens cache-write-tokens]} usage
-        input-cost-total (* (/ input-tokens 1000000.0) input-cost)
-        output-cost-total (* (/ output-tokens 1000000.0) output-cost)
-        cache-read-cost-total (* (/ cache-read-tokens 1000000.0) cache-read-cost)
-        cache-write-cost-total (* (/ cache-write-tokens 1000000.0) cache-write-cost)]
+        input-cost-total (* (/ (or input-tokens 0) 1000000.0) (or input-cost 0.0))
+        output-cost-total (* (/ (or output-tokens 0) 1000000.0) (or output-cost 0.0))
+        cache-read-cost-total (* (/ (or cache-read-tokens 0) 1000000.0) (or cache-read-cost 0.0))
+        cache-write-cost-total (* (/ (or cache-write-tokens 0) 1000000.0) (or cache-write-cost 0.0))]
     {:input input-cost-total
      :output output-cost-total
      :cache-read cache-read-cost-total
