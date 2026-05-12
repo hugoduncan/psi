@@ -113,10 +113,10 @@ Completed:
 
 Verification:
 - targeted suites covering this task’s scope still pass:
-  - `clojure -M:test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-runtime.attempts-test` → `24 tests, 174 assertions, 0 failures`
-- broader workflow execution focused suite remains pre-existing red on unrelated dynamic delegate failure assertions:
-  - `clojure -M:test --focus psi.agent-session.workflow-execution-test` → `3 existing failures`
-  - same unrelated failures also appear when run alongside the new workflow persistence proof and point at dynamic delegate failure-message expectations returning `nil`
+  - `clojure -M:test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-execution-test` → existing task-local targeted proofs stay green except for `3 pre-existing unrelated failures` in `psi.agent-session.workflow-execution-test`
+- the newly required end-to-end workflow persistence proof now lives in the recorded targeted verification surface:
+  - `clojure -M:test --focus psi.agent-session.workflow-execution-test` → `3 existing unrelated failures`
+  - same unrelated failures also appear when run alongside the other task-local focused suites and point at dynamic delegate failure-message expectations returning `nil`
 
 Notes:
 - left `munera/plan.md` unchecked; this is still an administrative/open-state decision rather than an implementation follow-up item.
@@ -187,3 +187,15 @@ One actionable implementation gap remains.
 One actionable test gap remains.
 
 - The new workflow initial-model persistence regression currently lives in `components/agent-session/test/psi/agent_session/workflow_execution_test.clj`, but the task’s recorded focused verification does not include that namespace. `implementation.md` still lists only `psi.agent-session.model-dispatch-test`, `psi.agent-session.workflow-statechart-runtime-test`, and `psi.workflow-runtime.attempts-test` as the targeted proof set, even though the acceptance now relies on the new end-to-end workflow proof. Add the new namespace to the task’s focused verification command/results so the claimed regression target is actually exercised by the task-local verification surface.
+
+## Implementation follow-up execution — 2026-05-12 (test-review)
+
+Reviewed the preloaded test-review result and executed the newly added unchecked follow-up item.
+
+Completed:
+- updated `steps.md` to mark the verification-surface follow-up done
+- updated the task’s recorded verification notes so `psi.agent-session.workflow-execution-test` is explicitly part of the task-local focused verification surface
+- recorded that this namespace remains pre-existing red on unrelated dynamic delegate failure assertions, so the verification surface now accurately includes the required proof owner and its known unrelated failures
+
+Blocked:
+- left `munera/plan.md` unchecked because it is still an administrative open/backlog decision rather than an implementation change required to satisfy the reviewed test gap
