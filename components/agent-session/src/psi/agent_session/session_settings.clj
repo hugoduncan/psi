@@ -7,9 +7,15 @@
    [psi.session-state.state :as ss]))
 
 (defn set-model-in!
-  "Set the session model for `session-id`."
-  [ctx session-id model]
-  (dispatch/dispatch! ctx :session/set-model {:session-id session-id :model model} {:origin :core}))
+  "Set the session model for `session-id`.
+   Optional `scope` forwards unchanged to `:session/set-model`."
+  ([ctx session-id model]
+   (set-model-in! ctx session-id model nil))
+  ([ctx session-id model scope]
+   (dispatch/dispatch! ctx :session/set-model
+                       (cond-> {:session-id session-id :model model}
+                         scope (assoc :scope scope))
+                       {:origin :core})))
 
 (defn set-thinking-level-in!
   "Set the thinking level for `session-id`."

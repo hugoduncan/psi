@@ -112,6 +112,17 @@
         result (session/set-session-name-in! ctx session-id name)]
     (response-frame (:id request) (:op request) true {:session-name (:session-name result)})))
 
+(def ^:private valid-model-scopes
+  #{:session :project :user})
+
+(defn- normalize-model-scope
+  [scope]
+  (cond
+    (nil? scope) nil
+    (keyword? scope) scope
+    (string? scope) (keyword (str/lower-case (str/trim scope)))
+    :else ::invalid))
+
 (defn handle-set-model
   [{:keys [ctx request params session-id resolve-model]}]
   (let [provider (get params :provider)
@@ -122,6 +133,11 @@
         _        (when-not (and (string? model-id) (not (str/blank? model-id)))
                    (throw (ex-info "invalid request parameter :model-id: non-empty string"
                                    {:error-code "request/invalid-params"})))
+        scope    (normalize-model-scope (:scope params))
+        _        (when (or (= ::invalid scope)
+                           (and (some? scope) (not (contains? valid-model-scopes scope))))
+                   (throw (ex-info "invalid request parameter :scope: session, project, or user"
+                                   {:error-code "request/invalid-params"})))
         resolved (resolve-model provider model-id)]
     (when-not resolved
       (throw (ex-info "unknown model"
@@ -130,7 +146,7 @@
           model        {:provider provider-str
                         :id (:id resolved)
                         :reasoning (:supports-reasoning resolved)}
-          result       (session/set-model-in! ctx session-id model)]
+          result       (session/set-model-in! ctx session-id model scope)]
       (response-frame (:id request) (:op request) true {:model {:provider (:provider (:model result))
                                                                 :id (:id (:model result))}}))))
 

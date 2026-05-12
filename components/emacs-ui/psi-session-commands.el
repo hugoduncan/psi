@@ -454,20 +454,27 @@ Refresh transcript state for STATE."
       (user-error "%s is required" label))
     text))
 
-(defun psi-emacs-set-model (&optional provider model-id)
+(defun psi-emacs-set-model (&optional provider model-id scope)
   "Select PROVIDER/MODEL-ID via `set_model` RPC op.
 
 When PROVIDER/MODEL-ID are omitted, open a completion picker backed by
-runtime model catalog query data."
+runtime model catalog query data. Optional SCOPE is forwarded unchanged
+when non-nil."
   (interactive)
   (let ((provider* (psi-emacs--normalize-provider-id provider))
-        (model-id* (psi-emacs--trim-optional-input model-id)))
+        (model-id* (psi-emacs--trim-optional-input model-id))
+        (scope* (psi-emacs--trim-optional-input scope)))
     (if (and provider* model-id*)
         (when (psi-emacs--dispatch-request
                "set_model"
-               `((:provider . ,provider*)
-                 (:model-id . ,model-id*)))
-          (message "psi: requested model (%s) %s" provider* model-id*))
+               (append `((:provider . ,provider*)
+                         (:model-id . ,model-id*))
+                       (when scope*
+                         `((:scope . ,scope*)))))
+          (message "psi: requested model (%s) %s%s"
+                   provider*
+                   model-id*
+                   (if scope* (format " [%s]" scope*) "")))
       (psi-emacs--open-model-selector))))
 
 (defun psi-emacs-cycle-model (&optional direction)

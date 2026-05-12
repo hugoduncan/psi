@@ -234,6 +234,17 @@
                      calls))
       (should (eq 'idle (psi-emacs-state-run-state psi-emacs--state))))))
 
+(ert-deftest psi-set-model-with-scope-dispatches-canonical-rpc-op ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls (psi-test--capture-request-sends
+                  (lambda ()
+                    (psi-emacs-set-model "openai" "gpt-5.3-codex" "session")))))
+      (should (equal '(("set_model" ((:provider . "openai") (:model-id . "gpt-5.3-codex") (:scope . "session"))))
+                     calls))
+      (should (eq 'idle (psi-emacs-state-run-state psi-emacs--state))))))
+
 (ert-deftest psi-set-model-no-arg-queries-runtime-catalog-and-dispatches-selection ()
   (with-temp-buffer
     (psi-emacs-mode)
