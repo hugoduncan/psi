@@ -131,7 +131,7 @@
 
 (defn execute-session-step!
   [ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt]
-  (let [{:keys [status assistant-text failure]}
+  (let [{:keys [status assistant-text failure execution-result assistant-message]}
         (if (fallback-enabled? execution-session)
           (execute-with-ranked-fallback! ctx execution-session prompt)
           (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt))]
@@ -143,14 +143,16 @@
                                                             :attempt-id attempt-id
                                                             :updated-at (state/now)})
         (queue/enqueue-event! event-queue* working-memory* :actor/failed {}))
-      (let [normalized-outputs (workflow-ir/step-output-surfaces
+      (let [raw-outputs {:final-llm-reply assistant-text
+                         :text assistant-text
+                         :transcript (when assistant-message [assistant-message])
+                         :logprobs (:execution-result/logprobs execution-result)}
+            normalized-outputs (workflow-ir/step-output-surfaces
                                 step-def
                                 {:outcome :ok
-                                 :outputs {:final-llm-reply assistant-text
-                                           :text assistant-text}})
+                                 :outputs raw-outputs})
             envelope {:outcome :ok
-                      :outputs (merge {:text assistant-text}
-                                      normalized-outputs)}]
+                      :outputs (merge raw-outputs normalized-outputs)}]
         (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
                                                             :payload envelope
                                                             :step-id step-id

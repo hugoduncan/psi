@@ -43,6 +43,6 @@ description: Run a prompt with a local model, no tools, non-streaming, and logpr
           :tools []
           :response-mode :non-streaming
           :contributions [{:type :template
-                           :text "Report exactly these two sections and nothing else.\n\n## Resulting Message\n[copy the assistant message text from the run step]\n\n## Logprob Results\n[copy the logprob results from the run step transcript]\n\nTranscript:\n\n{{transcript}}"
+                           :text "Report exactly these two sections and nothing else.\n\n## Resulting Message\n[copy the final assistant message text from the run step]\n\n## Logprob Results\n[copy the logprob context shown in the transcript after the assistant message]\n\nTranscript:\n\n{{transcript}}"
                            :vars {"transcript" {:from {:step "run" :output :transcript}
                                                  :projection :full}}}]}]}
