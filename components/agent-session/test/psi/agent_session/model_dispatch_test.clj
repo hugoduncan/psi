@@ -378,6 +378,13 @@
         (is (nil? (:developer-prompt sd)))
         (is (nil? (:developer-prompt-source sd)))))))
 
+(deftest runtime-agent-set-model-effect-test
+  (testing "runtime agent-set-model effect accepts scoped shape without changing transient runtime behavior"
+    (let [[ctx session-id] (create-session-context)
+          model {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}]
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model model :scope :session} {:origin :core})
+      (is (= model (:model (ss/get-session-data-in ctx session-id)))))))
+
 (deftest thinking-level-test
   (testing "set-thinking-level-in! updates level"
     (let [[ctx session-id] (create-session-context)]

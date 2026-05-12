@@ -12,5 +12,5 @@
 - [x] Verify focused suites and lint; record results in `implementation.md`.
 - [x] Update the task’s recorded focused verification command/results to include `psi.agent-session.workflow-execution-test`, since the new end-to-end workflow initial-model persistence regression now lives there.
 - [x] Add focused picker-path tests proving RPC command-picker and TUI direct model-selection entrypoints intentionally remain omitted-scope/default callers while still using the canonical optional-scope helper/API contract.
-- [ ] Add focused review/follow-up on runtime model-setting parity so `:runtime/agent-set-model` cannot silently diverge from the scoped `:session/set-model` contract; either thread optional scope coherently through that effect path or constrain the effect to an explicitly transient-only shape and prove the boundary.
+- [x] Add focused review/follow-up on runtime model-setting parity so `:runtime/agent-set-model` cannot silently diverge from the scoped `:session/set-model` contract; either thread optional scope coherently through that effect path or constrain the effect to an explicitly transient-only shape and prove the boundary.
 - [ ] Update `munera/plan.md` to include this task in backlog order if it should remain open after creation.

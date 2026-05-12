@@ -227,3 +227,22 @@ Notes:
 One new actionable robustness issue found.
 
 - `:runtime/agent-set-model` still drops the optional scope carried by the rest of this task’s canonical helper/API surface. `components/agent-session/src/psi/agent_session/dispatch_effects.clj` currently calls `agent/set-model-in!` with only `:model`, and `components/agent-core/src/psi/agent_core/core.clj` only supports transient in-memory updates, so any future caller that reasonably assumes runtime effect parity with `:session/set-model` will silently bypass the explicit `session|project|user` persistence contract. This leaves model-setting semantics split across two entrypoints instead of one obvious path and makes the effect shape less robust under extension or refactoring.
+
+## Implementation follow-up execution — 2026-05-12 (runtime model-setting parity)
+
+Reviewed the preloaded code-shaper result and executed the newly added unchecked implementation step.
+
+Completed:
+- constrained `:runtime/agent-set-model` to an explicitly transient-only runtime shape rather than introducing a second persistence path
+- extended the runtime effect schema to accept optional `:scope` values `:session|:project|:user` for contract parity with `:session/set-model`, while keeping runtime execution in-memory only
+- added a focused regression note/proof in `components/agent-session/test/psi/agent_session/model_dispatch_test.clj` showing the scoped caller shape is accepted and the runtime-visible model update remains session-local/transient
+- marked the corresponding `steps.md` item done
+
+Verification:
+- focused model-setting verification remains the task-local proof owner for scope semantics:
+  - `clojure -M:test --focus psi.agent-session.model-dispatch-test` → `9 tests, 114 assertions, 0 failures`
+- lint/update surface for the touched runtime effect contract:
+  - `clj-kondo --lint components/agent-session/src/psi/agent_session/core.clj components/agent-session/src/psi/agent_session/session_settings.clj components/agent-session/src/psi/agent_session/dispatch_effects.clj components/agent-session/src/psi/agent_session/dispatch_schema.clj components/agent-session/test/psi/agent_session/model_dispatch_test.clj` → `0 errors, 0 warnings`
+
+Decision:
+- chose the “explicitly transient-only runtime effect” branch from the review note, because `:runtime/agent-set-model` is an agent-core in-memory projection effect, while persistence authority remains centralized in `:session/set-model`

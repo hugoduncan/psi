@@ -10,7 +10,9 @@
   "Set the session model for `session-id`.
    Optional `scope` forwards unchanged to `:session/set-model`."
   ([ctx session-id model]
-   (set-model-in! ctx session-id model nil))
+   (dispatch/dispatch! ctx :session/set-model
+                       {:session-id session-id :model model}
+                       {:origin :core}))
   ([ctx session-id model scope]
    (dispatch/dispatch! ctx :session/set-model
                        (cond-> {:session-id session-id :model model}
