@@ -170,31 +170,33 @@
                 :else
                 (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt)))
             (catch Exception e
-              (let [attempt {:attempt-id attempt-id
-                             :status :pending
-                             :execution-session-id nil}
-                    failure-payload {:message (ex-message e)}]
+              (let [failure-payload {:message (ex-message e)}
+                    attempt-present? (= attempt-id (get-in @working-memory* [:attempt-ids step-id]))]
+                (when-not attempt-present?
+                  (swap! (:state* ctx)
+                         (fn [state-map]
+                           (-> state-map
+                               (update-in [:workflows :runs run-id]
+                                          #(workflow-attempts/append-attempt-to-run % step-id {:attempt-id attempt-id
+                                                                                               :status :pending
+                                                                                               :execution-session-id nil}))
+                               (workflow-progression-recording/start-latest-attempt run-id step-id)
+                               (workflow-progression-recording/increment-iteration-count run-id step-id)))))
                 (swap! working-memory*
                        (fn [wm]
-                         (-> wm
-                             (assoc-in [:attempt-ids step-id] attempt-id)
-                             (update-in [:attempt-counts step-id] (fnil inc 0))
-                             (assoc :current-step-id step-id
-                                    :blocked-step-id nil
-                                    :pending-actor-result {:kind :failure
-                                                           :payload failure-payload
-                                                           :step-id step-id
-                                                           :attempt-id attempt-id
-                                                           :updated-at (state/now)}
-                                    :updated-at (state/now))
-                             (update-in [:iteration-counts step-id] (fnil inc 0)))))
-                (swap! (:state* ctx)
-                       (fn [state-map]
-                         (-> state-map
-                             (update-in [:workflows :runs run-id]
-                                        #(workflow-attempts/append-attempt-to-run % step-id attempt))
-                             (workflow-progression-recording/start-latest-attempt run-id step-id)
-                             (workflow-progression-recording/increment-iteration-count run-id step-id))))
+                         (cond-> (-> wm
+                                     (assoc :current-step-id step-id
+                                            :blocked-step-id nil
+                                            :pending-actor-result {:kind :failure
+                                                                   :payload failure-payload
+                                                                   :step-id step-id
+                                                                   :attempt-id attempt-id
+                                                                   :updated-at (state/now)}
+                                            :updated-at (state/now)))
+                           (not attempt-present?)
+                           (-> (assoc-in [:attempt-ids step-id] attempt-id)
+                               (update-in [:attempt-counts step-id] (fnil inc 0))
+                               (update-in [:iteration-counts step-id] (fnil inc 0))))))
                 (queue/enqueue-event! event-queue* working-memory* :actor/failed {}))))
           nil)
 
