@@ -34,3 +34,10 @@ Implementation notes:
     - `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/step_execution_test.clj`
   - focused verification green: `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test` → `28 tests, 84 assertions, 0 failures`.
   - lint green: `clojure -M:lint --lint components/workflow-step-session-config components/workflow-runtime components/agent-session tests.edn deps.edn` → `0 errors, 0 warnings`.
+- 2026-05-11 implementation review:
+  - no new actionable implementation issues found after reviewing `design.md`, `plan.md`, `steps.md`, `implementation.md`, workflow fallback runtime owners, and focused fallback proofs.
+  - verified the shipped fallback shape matches task intent: ranked metadata is preserved once in `resolve-step-session-config`, concrete models stay single-shot, fallback-worthy failures are classified in `turn-execution-contract`, and ranked exhaustion stays on one canonical attempt as aggregate `:execution-error`.
+  - re-ran focused proof and lint successfully:
+    - `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test` → `28 tests, 84 assertions, 0 failures`
+    - `clojure -M:lint --lint components/workflow-step-session-config components/workflow-runtime components/agent-session tests.edn deps.edn` → `0 errors, 0 warnings`
+  - explicit result: no new actionable feedback.
