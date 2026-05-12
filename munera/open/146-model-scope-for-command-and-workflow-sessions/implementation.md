@@ -13,7 +13,90 @@ Expected likely owners:
 - RPC transport in `psi.rpc.session.ops`
 - workflow execution adapter/runtime seam in `psi.agent-session.context` and workflow runtime fallback paths
 
-No code changes yet.
+## Implementation execution — 2026-05-12
+
+Completed slices and commits:
+
+1. Helper/API and RPC scope threading
+- threaded optional scope through `psi.agent-session.session-settings/set-model-in!`
+- exposed matching arity in `psi.agent-session.core/set-model-in!`
+- extended RPC `set_model` op to accept optional `:scope`
+- added RPC validation for `session|project|user`
+- aligned Emacs direct setter transport call so it can carry optional scope without requiring new UI
+- commit: `8c85bd27` — `⚒ 146 thread model scope through helpers and RPC`
+
+2. `/model` grammar + help/documentation
+- extended `/model` command to accept:
+  - `/model`
+  - `/model <provider> <model-id>`
+  - `/model <provider> <model-id> <scope>`
+- added explicit invalid-scope error text
+- updated backend help text and Emacs help text to show `[session|project|user]`
+- kept omitted-scope behavior unchanged
+- commit: `dea5b195` — `⚒ 146 extend model command scope grammar`
+
+3. Workflow-owned transient model scoping
+- extended workflow execution adapter `set-session-model!` seam to carry optional scope
+- changed adapter assembly in `psi.agent-session.context` to forward scope unchanged to `:session/set-model`
+- changed workflow runtime attempt-session model updates to call the seam with `:session`
+- updated fallback-path tests to assert explicit `:scope :session`
+- added focused proof for the initial execution-session model-set helper path being explicitly session-scoped
+- commit: `5c805513` — `⚒ 146 make workflow model changes session-scoped`
+
+## Audit notes
+
+Authoritative model-set surfaces audited during execution:
+- backend command parser: `components/agent-session/src/psi/agent_session/commands.clj`
+- canonical helper surface: `components/agent-session/src/psi/agent_session/session_settings.clj`
+- public façade: `components/agent-session/src/psi/agent_session/core.clj`
+- RPC op handler: `components/rpc/src/psi/rpc/session/ops.clj`
+- Emacs direct setter: `components/emacs-ui/psi-session-commands.el`
+- TUI direct picker submit path: `components/app-runtime/src/psi/app_runtime/tui_frontend_actions.clj`
+- RPC picker submit path: `components/rpc/src/psi/rpc/session/command_pickers.clj`
+- workflow execution adapter seam: `components/agent-session/src/psi/agent_session/context.clj`
+- workflow runtime model switching owner: `components/workflow-runtime/src/psi/workflow_runtime/attempts.clj`
+- workflow-owned judge session creator reviewed for classification: `components/agent-session/src/psi/agent_session/workflow_judge.clj`
+
+Notable implementation choices:
+- direct interactive picker submit paths remain omitted-scope/default paths in this task; they are now compatible with the same canonical helper/API contract without adding new scope-picking UI
+- workflow runtime model switching now expresses transient intent explicitly at the seam instead of relying on lower defaults
+- judge sessions remain governed by the same no-persistence rule if they later set models through the shared helper/API path, but no new judge-specific model selection behavior was added
+
+## Focused proof added
+
+Command/RPC/helper coverage:
+- backend command tests for:
+  - explicit session scope
+  - invalid scope rejection
+  - updated usage/help text
+- RPC tests for:
+  - explicit session scope acceptance
+  - invalid scope rejection
+- model dispatch tests for:
+  - explicit session scope does not persist project prefs or user config
+  - explicit user scope persists user config only
+  - existing default/project persistence behavior retained
+- Emacs transport tests for:
+  - direct setter can send optional scope
+  - slash command coverage updated for third-argument form
+
+Workflow transient-scoping coverage:
+- initial workflow execution-session model helper path asserts `:scope :session`
+- ranked fallback model switching tests assert model-set seam calls carry `:scope :session`
+
+## Verification — 2026-05-12
+
+Focused suites run successfully after implementation:
+- `clojure -M:test --focus psi.rpc-test` → `14 tests, 96 assertions, 0 failures`
+- `clojure -M:test --focus psi.agent-session.commands-test` → `50 tests, 183 assertions, 0 failures`
+- `clojure -M:test --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.agent-session.model-dispatch-test` → `24 tests, 174 assertions, 0 failures`
+
+Lint:
+- pre-commit `cljfmt` + `clj-kondo` passed on each implementation commit
+
+## Remaining administrative item
+
+- `munera/plan.md` was not updated by this implementation because the task already exists in the backlog and no closure/reordering decision has been made yet.
 
 ## Design ambiguity review — pass 1 (2026-05-12)
 
@@ -69,4 +152,3 @@ No new actionable inconsistency feedback found after re-reading `design.md`, `pl
 Reviewed the preloaded inconsistency-review result and current `design-steps.md`, `steps.md`, `implementation.md`, `design.md`, and `plan.md` before acting. There were no newly added actionable unchecked follow-up items in `design-steps.md`, so no design-step checkboxes changed and no task-artifact updates were needed beyond recording this requested no-op pass.
 
 Per request, `steps.md` implementation items were not executed.
-
