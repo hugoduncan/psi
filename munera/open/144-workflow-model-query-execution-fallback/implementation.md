@@ -44,3 +44,10 @@ Implementation notes:
 - 2026-05-11 follow-up execution:
   - preloaded review result confirmed no newly added unchecked actionable items in `steps.md`; all task steps were already complete.
   - no code or task-artifact execution was possible/needed beyond recording this no-op follow-up result.
+- 2026-05-11 test review:
+  - reviewed task artifacts plus the workflow fallback proof owners named in `implementation.md` against `task-test-review`: `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj`, `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`, `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/step_execution_test.clj`, and the fallback classification seam in `components/workflow-runtime/src/psi/workflow_runtime/turn_execution_contract.clj`.
+  - confirmed focused proof still covers the task acceptance behaviours: ranked fallback success, concrete-model no-fallback, terminal non-fallback failure, ranked exhaustion, and empty/no-winner ranked metadata handling.
+  - re-ran focused proof and lint successfully:
+    - `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test` → `28 tests, 84 assertions, 0 failures`
+    - `clojure -M:lint --lint components/workflow-step-session-config components/workflow-runtime components/agent-session tests.edn deps.edn` → `0 errors, 0 warnings`
+  - explicit result: no new actionable test feedback.
