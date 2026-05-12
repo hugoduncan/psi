@@ -186,10 +186,19 @@
           (is (= {:outcome :ok
                   :outputs {:text "report output"
                             :final-llm-reply "report output"
-                            :transcript nil
+                            :transcript [{:role "assistant"
+                                          :content [{:type :text :text "report output"}]
+                                          :stop-reason :stop}]
+                            :logprobs nil
+                            :session-id "report-child"
                             :result {:outcome :ok
                                      :outputs {:final-llm-reply "report output"
-                                               :text "report output"}}}}
+                                               :text "report output"
+                                               :logprobs nil
+                                               :session-id "report-child"
+                                               :transcript [{:role "assistant"
+                                                             :content [{:type :text :text "report output"}]
+                                                             :stop-reason :stop}]}}}}
                  report-accepted))
           (is (= ["Review [{:id 1, :repo \"psi\"}] / 1 issue found"]
                  (mapv :prompt @prompts*))))))))

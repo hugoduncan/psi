@@ -14,7 +14,7 @@
   - commit: e582e29d
 - [x] Verify end-to-end: lint clean, focused tests green, no regressions in broader logprob/workflow test suites.
   - 27 focused tests, 80 assertions, 0 failures
-  - 1896 total tests, 9 pre-existing failures (workflow-execution-test dynamic delegate), 0 new failures
+  - 1898 total tests, 7 pre-existing failures (3 workflow-execution-test dynamic delegate + 4 tmux integration environmental), 0 new failures
   - lint: 0 errors, 0 warnings
 - [x] Fix `:token-count` in `perplexity-result` to use filtered count (tokens with non-nil `:logprob`) instead of `(count logprobs)`. Add test asserting `:token-count` matches effective N when tokens contain nil logprobs.
 - [x] Add CHANGELOG entry under `[Unreleased]`: Added — `logprobs/perplexity` deterministic operation; Changed — logprob data moved out-of-band (no longer injected as synthetic user messages in conversation context); Changed — `local-logprobs` workflow uses structured `logprobs/perplexity` invoke step.
@@ -22,6 +22,6 @@
 - [x] Add multi-session isolation test in `extensions/logprobs_test.clj`: store logprobs for "s1" and "s2", verify `perplexity-result` for each returns independent data and that storing for one does not affect the other.
 - [x] Add `calculate-perplexity` edge-case tests: (a) all-nil-logprob tokens → returns nil; (b) single token → returns `exp(-logprob)`.
 - [x] Acknowledge `:session-id` raw output test gap in `step_execution_test.clj` — `execute-session-step!` requires full runtime context so a unit test is impractical; add a comment in `step_execution_test.clj` noting the surface is integration-tested via workflow execution, or add assertion in an existing integration test if one exercises session-step outputs.
-- [ ] Fix `prompt-finish-dispatches-extension-turn-finished-event-test` in `prompt_lifecycle_test.clj:531`: update expected payload to include `:assistant-message` from the enriched `session_turn_finished` event. This test was broken by the event enrichment change and is a regression, not a pre-existing failure.
-- [ ] Fix `invoke-to-session-workflow-executes-and-exposes-cross-form-results-test` in `workflow_invoke_runtime_test.clj:186`: update expected `report-accepted` outputs to include `:logprobs`, `:session-id`, and `:transcript` (now `[assistant-message]` instead of nil). Broken by session-step raw output expansion.
-- [ ] Correct the verify step note: actual failure count is 3 pre-existing (workflow-execution-test dynamic delegate) + 2 new (prompt_lifecycle_test, workflow_invoke_runtime_test) = 5 total, not "9 pre-existing, 0 new".
+- [x] Fix `prompt-finish-dispatches-extension-turn-finished-event-test` in `prompt_lifecycle_test.clj:531`: update expected payload to include `:assistant-message` from the enriched `session_turn_finished` event. This test was broken by the event enrichment change and is a regression, not a pre-existing failure.
+- [x] Fix `invoke-to-session-workflow-executes-and-exposes-cross-form-results-test` in `workflow_invoke_runtime_test.clj:186`: update expected `report-accepted` outputs to include `:logprobs`, `:session-id`, and `:transcript` (now `[assistant-message]` instead of nil). Broken by session-step raw output expansion.
+- [x] Correct the verify step note: actual failure count is 3 pre-existing (workflow-execution-test dynamic delegate) + 4 tmux integration (environmental), 0 new failures from this task.

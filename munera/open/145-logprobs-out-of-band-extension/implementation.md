@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## Test-shaper follow-up execution (2026-05-12)
+
+Three follow-up items from the test-shaper review pass executed:
+
+1. **`prompt-finish-dispatches-extension-turn-finished-event-test` fixed.** Added `:assistant-message assistant-msg` to expected payload in `prompt_lifecycle_test.clj:533`. The `prompt-finish-base-result` conditionally assocs `:assistant-message` when present in terminal-result — test's terminal-result has it.
+
+2. **`invoke-to-session-workflow-executes-and-exposes-cross-form-results-test` fixed.** Updated expected `report-accepted` in `workflow_invoke_runtime_test.clj:186` to include `:logprobs nil`, `:session-id "report-child"`, and `:transcript` as `[assistant-message]` instead of nil. Also updated nested `:result :outputs` to match the full raw-outputs surface.
+
+3. **Verify step note corrected.** Updated from "9 pre-existing, 0 new" to accurate counts: 1898 tests, 7 pre-existing failures (3 workflow-execution-test dynamic delegate + 4 tmux integration environmental), 0 new failures from this task.
+
 ## Design ambiguity review — pass 1 (2026-05-12)
 
 Six ambiguities found and resolved:

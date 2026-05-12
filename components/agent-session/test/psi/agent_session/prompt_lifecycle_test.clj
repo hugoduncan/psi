@@ -529,7 +529,8 @@
                            :terminal-result terminal-result}
                           {:origin :core})
     (is (= [{:session-id session-id
-             :turn-id "turn-1"}]
+             :turn-id "turn-1"
+             :assistant-message assistant-msg}]
            @seen))))
 
 (deftest prompt-finish-triggers-follow-up-next-run-test
