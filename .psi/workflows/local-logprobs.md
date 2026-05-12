@@ -17,7 +17,8 @@ description: Run a prompt with a local model, no tools, non-streaming, and logpr
                             :prefer :lower}
                            {:criterion :output-cost
                             :prefer :lower}]}
-          :tools []
+          :tools ["read"]
+          :skills ["lambda-compiler"]
           :response-mode :non-streaming
           :logprobs true
           :top-logprobs 3
@@ -34,7 +35,7 @@ description: Run a prompt with a local model, no tools, non-streaming, and logpr
 
          {:name "report"
           :type :session
-          :tools []
+          :tools ["read"]
           :contributions [{:type :template
                            :text "Report exactly these two sections and nothing else.\n\n## Reply\n{{reply-text}}\n\n## Perplexity\nPerplexity: {{perplexity}}\nToken count: {{token-count}}"
                            :vars {"reply-text" {:from {:step "run" :output :final-llm-reply}}

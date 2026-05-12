@@ -265,6 +265,16 @@
       :text (:text yield-spec)
       nil)))
 
+(defn- skills-without-read-errors [step]
+  (when (= :session (:type step))
+    (let [skills (get-in step [:session :skills] [])
+          tools (get-in step [:session :tools] [])
+          has-read? (some #(= "read" %) tools)]
+      (when (and (seq skills) (not has-read?))
+        [{:type :skills-without-read-tool
+          :step (:name step)
+          :skills skills}]))))
+
 (defn- ref-errors [step-index current-step source-ref]
   (when (map? source-ref)
     (let [{target-step-name :step output-key :output yield-field :yield} source-ref
@@ -386,12 +396,14 @@
                                        :step step-name
                                        :output-key output-key
                                        :available-outputs (vec (keys (:outputs step)))}]))
+              skills-read-errors (skills-without-read-errors step)
               ref-errors* (mapcat #(ref-errors step-idx step-name %)
                                   (step-source-refs step))]
           (concat on-without-judge
                   judge-without-routing
                   missing-yields
                   local-yield-errors
+                  skills-read-errors
                   ref-errors*)))
       steps))))
 
