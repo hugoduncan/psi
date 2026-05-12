@@ -184,8 +184,13 @@
               :origin :core}
              {:effect/type :notify/extension-dispatch
               :event-name "session_turn_finished"
-              :payload {:session-id session-id
-                        :turn-id turn-id}}
+              :payload (cond-> {:session-id session-id
+                                :turn-id turn-id}
+                         (seq (:execution-result/logprobs terminal-result))
+                         (assoc :logprobs (:execution-result/logprobs terminal-result))
+
+                         (:execution-result/assistant-message terminal-result)
+                         (assoc :assistant-message (:execution-result/assistant-message terminal-result)))}
              {:effect/type :runtime/reconcile-and-emit-background-job-terminals}
              {:effect/type :statechart/send-event
               :event :session/reset}]
