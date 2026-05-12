@@ -8,6 +8,6 @@
 - [x] Update workflow-owned child-session model switching to use explicit `:scope :session`, including ranked fallback model switching.
 - [x] Add focused tests proving explicit `session` scope does not persist config, explicit `project` scope persists project-local prefs, and explicit `user` scope persists user config.
 - [x] Add a workflow regression test proving workflow-owned model changes do not persist project or user config.
-- [ ] Add an end-to-end workflow child-session creation persistence regression proving the initial concrete-model setup path leaves project preferences and user config untouched, not just that the model-set seam receives `:scope :session`.
+- [x] Add an end-to-end workflow child-session creation persistence regression proving the initial concrete-model setup path leaves project preferences and user config untouched, not just that the model-set seam receives `:scope :session`.
 - [x] Verify focused suites and lint; record results in `implementation.md`.
 - [ ] Update `munera/plan.md` to include this task in backlog order if it should remain open after creation.

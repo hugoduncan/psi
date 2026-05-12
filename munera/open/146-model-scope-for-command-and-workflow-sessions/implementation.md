@@ -98,6 +98,29 @@ Lint:
 
 - `munera/plan.md` was not updated by this implementation because the task already exists in the backlog and no closure/reordering decision has been made yet.
 
+## Implementation follow-up execution — 2026-05-12
+
+Reviewed the preloaded implementation-review result and executed the newly added unchecked implementation step for the initial workflow child-session setup persistence regression.
+
+Completed:
+- added end-to-end workflow execution regression coverage in `components/agent-session/test/psi/agent_session/workflow_execution_test.clj`
+- new proof executes a real workflow session step with an authored concrete model and asserts:
+  - child session completes with the expected concrete model
+  - project shared prefs remain unchanged
+  - no project-local prefs file is created
+  - no user config file is written
+  - no user-config persistence hook is invoked
+
+Verification:
+- targeted suites covering this task’s scope still pass:
+  - `clojure -M:test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-runtime.attempts-test` → `24 tests, 174 assertions, 0 failures`
+- broader workflow execution focused suite remains pre-existing red on unrelated dynamic delegate failure assertions:
+  - `clojure -M:test --focus psi.agent-session.workflow-execution-test` → `3 existing failures`
+  - same unrelated failures also appear when run alongside the new workflow persistence proof and point at dynamic delegate failure-message expectations returning `nil`
+
+Notes:
+- left `munera/plan.md` unchecked; this is still an administrative/open-state decision rather than an implementation follow-up item.
+
 ## Design ambiguity review — pass 1 (2026-05-12)
 
 Three actionable ambiguities found:

@@ -1,5 +1,6 @@
 (ns psi.agent-session.workflow-execution-test
   (:require
+   [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.deterministic-operation-registry.registry]
@@ -7,6 +8,8 @@
    [psi.agent-session.turn]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.workflow-execution-test-support :as support]
+   [psi.shared-config.project :as project-prefs]
+   [psi.shared-config.user :as user-config]
    [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
@@ -562,5 +565,53 @@
                  @step-executions*))
           (is (= 2 (get-in run [:step-runs "step-2-builder" :iteration-count])))
           (is (= 2 (get-in run [:step-runs "step-3-reviewer" :iteration-count]))))))))
+
+(deftest execute-run-initial-workflow-child-session-model-setup-does-not-persist-config-test
+  (testing "initial workflow child-session model setup leaves project prefs and user config untouched"
+    (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-workflow-session-scope-" (java.util.UUID/randomUUID))
+          _ (.mkdirs (java.io.File. cwd))
+          shared-f (project-prefs/project-preferences-file cwd)
+          local-f (project-prefs/project-local-preferences-file cwd)
+          user-f (java.io.File. (str cwd "/user-home/.psi/agent/config.edn"))
+          _ (.mkdirs (.getParentFile shared-f))
+          _ (.mkdirs (.getParentFile user-f))
+          _ (spit shared-f (pr-str {:version 1
+                                    :agent-session {:prompt-mode :prose}}))
+          [ctx session-id] (support/create-session-context {:cwd cwd})
+          definition {:definition-id "workflow-initial-model-no-persist"
+                      :steps [{:name "plan"
+                               :type :session
+                               :model {:provider "openai" :id "gpt-5"}
+                               :contributions [{:type :template
+                                                :text "Plan {{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (let [[s _ _] (workflow-runtime/create-run state {:definition definition
+                                                                       :run-id "run-initial-model-no-persist"
+                                                                       :parent-session-id session-id
+                                                                       :workflow-input {:input "ship it"}})]
+                       s)))
+          user-calls* (atom [])]
+      (with-redefs [user-config/user-config-file (fn [] user-f)
+                    user-config/update-agent-session! (fn [prefs]
+                                                        (swap! user-calls* conj prefs)
+                                                        {:version 1 :agent-session prefs})
+                    psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx _child-session-id _prompt]
+                      {:execution-result/assistant-message
+                       {:content "planner output"}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-initial-model-no-persist")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-initial-model-no-persist")
+              child-id (get-in run [:step-runs "plan" :attempts 0 :execution-session-id])
+              child-sd (get-in @(:state* ctx) [:agent-session :sessions child-id :data])]
+          (is (= :completed (:status result)))
+          (is (= {:provider "openai" :id "gpt-5"} (:model child-sd)))
+          (is (= {:version 1
+                  :agent-session {:prompt-mode :prose}}
+                 (edn/read-string (slurp shared-f))))
+          (is (false? (.exists local-f)))
+          (is (false? (.exists user-f)))
+          (is (= [] @user-calls*)))))))
 
 
