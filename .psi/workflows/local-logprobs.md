@@ -1,6 +1,6 @@
 ---
 name: local-logprobs
-description: Run a prompt with a local model, no tools, non-streaming, and logprobs, then report the resulting message and logprob results
+description: Run a prompt with a local model, no tools, non-streaming, and logprobs, then report the perplexity
 ---
 {:steps [{:name "run"
           :type :session
@@ -21,16 +21,24 @@ description: Run a prompt with a local model, no tools, non-streaming, and logpr
           :response-mode :non-streaming
           :logprobs true
           :top-logprobs 3
-		  :thinking-level :off
+          :thinking-level :off
           :contributions [{:type :template
                            :text "{{input}}"
                            :vars {"input" {:from :workflow-input}}}]}
 
+         {:name "perplexity"
+          :type :invoke
+          :invoke {:operation "logprobs/perplexity"
+                   :args {:session-id {:from {:step "run" :output :session-id}}}}}
+
          {:name "report"
           :type :session
           :tools []
-		  :extensions []
+          :extensions []
           :contributions [{:type :template
-                           :text "Report exactly these two sections and nothing else.\n\n## Resulting Message\n[copy the final assistant message text from the run step]\n\n## Logprob Results\n[copy the logprob context shown in the transcript after the assistant message]\n\nTranscript:\n\n{{transcript}}"
-                           :vars {"transcript" {:from {:step "run" :output :transcript}
-                                                 :projection :full}}}]}]}
+                           :text "Report exactly these two sections and nothing else.\n\n## Reply\n{{reply-text}}\n\n## Perplexity\nPerplexity: {{perplexity}}\nToken count: {{token-count}}"
+                           :vars {"reply-text" {:from {:step "run" :output :final-llm-reply}}
+                                  "perplexity" {:from {:step "perplexity" :output :result}
+                                                :path [:outputs :data :perplexity]}
+                                  "token-count" {:from {:step "perplexity" :output :result}
+                                                 :path [:outputs :data :token-count]}}}]}]}
