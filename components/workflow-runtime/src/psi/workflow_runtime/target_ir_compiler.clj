@@ -194,6 +194,21 @@
                     {:step step
                      :supported-types #{:invoke :session :delegate}}))))
 
+(defn- compile-step-with-context
+  "Compile a single step, enriching any compile exception with step name and index."
+  [step idx]
+  (try
+    (compile-step step)
+    (catch clojure.lang.ExceptionInfo e
+      (throw (ex-info (ex-message e)
+                      (merge (ex-data e)
+                             {:step-name  (:name step)
+                              :step-index idx}))))
+    (catch Exception e
+      (throw (ex-info (str "Unexpected error compiling step: " (ex-message e))
+                      {:step-name  (:name step)
+                       :step-index idx})))))
+
 (defn compile-workflow-definition
   "Compile a target-authored workflow definition into normalized workflow IR.
 
@@ -204,7 +219,9 @@
     (throw (ex-info "Target workflow definition must be of the form `{:steps [...]}`"
                     {:workflow-definition workflow-definition})))
   (cond-> {:version :workflow-ir/v1
-           :steps (mapv compile-step (:steps workflow-definition))}
+           :steps (vec (map-indexed (fn [idx step]
+                                      (compile-step-with-context step idx))
+                                    (:steps workflow-definition)))}
     (contains? workflow-definition :terminal-contract)
     (assoc :terminal-contract (:terminal-contract workflow-definition))))
 
@@ -216,7 +233,10 @@
     :ir workflow-ir?
     :structural-errors explain-data?
     :semantic-errors [error*]
-    :compile-error string?}"
+    :compile-error {:message string :data map}?}
+
+   `:compile-error` is nil when compilation succeeds; a map with `:message` and
+   `:data` when an ExceptionInfo is thrown during compilation."
   [workflow-definition]
   (try
     (let [ir (compile-workflow-definition workflow-definition)
@@ -227,4 +247,5 @@
        :ir nil
        :structural-errors nil
        :semantic-errors []
-       :compile-error (.getMessage e)})))
+       :compile-error {:message (ex-message e)
+                       :data    (ex-data e)}})))

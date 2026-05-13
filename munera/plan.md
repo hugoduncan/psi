@@ -19,6 +19,7 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 
 Notes:
+- `140-workflow-ir-compilation-errors-actionable` is complete and closed: `"invalid value"` fallback test added to `format-structural-errors-test`; all 4 AC and 8 verification expectations met; 16 formatter tests, 63 assertions, 0 failures.
 - `141` is open: workflow-scoped child-session execution-mode support so workflow-owned child sessions can request `:response-mode :non-streaming`; intentionally narrower than a full session-wide streaming toggle.
 - `145` is complete and should move to `munera/closed/`: logprob data moved out-of-band into `extensions.logprobs`; `journal->provider-messages` no longer projects synthetic user messages; `session_turn_finished` carries `:logprobs` and `:assistant-message`; `local-logprobs` now uses `logprobs/perplexity`; extension storage simplified to a single latest snapshot carrying `:session-id`; focused tests green, docs synced.
 - `140` is complete and closed: logprob collection flag for OpenAI chat-completions endpoint;
