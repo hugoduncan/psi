@@ -15,3 +15,6 @@ Expected likely owners:
 - `components/agent-session/src/psi/agent_session/context.clj`
 - `components/agent-session/src/psi/agent_session/workflow_judge.clj`
 - focused tests under `components/workflow-runtime/test/psi/workflow_runtime/` and `components/agent-session/test/psi/agent_session/`
+
+2026-05-13 ambiguity review:
+- Actionable ambiguity: `design.md` declares the seam field list authoritative after implementation but omits `:model-fallback`, while the current authored step path still carries `:model-fallback` in step-config and `statechart_runtime.clj` forwards it into `create-step-attempt-session!`, which then preserves it only on the returned execution-session map rather than crossing the child-session creation seam. The task should explicitly decide whether `:model-fallback` is part of the child-session contract, or explicitly mark it caller-local/non-seam state with preserved behaviour rationale so the “authoritative field list” does not silently narrow real workflow-authored behaviour.
