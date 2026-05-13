@@ -8,10 +8,10 @@ Approach:
 Execution slices:
 
 Slice 1 — Mutation dispatch seam discovery and contract shaping
-1. inspect the current `psi-tool` action dispatch path and identify the narrowest production-owned helper or helper extraction for invoking a named registered mutation
-2. confirm the helper path does not rely on raw `eval` or slash-command parsing
+1. wire `psi-tool(action: "mutate")` through the already-chosen canonical helper `psi.agent-session.extensions.runtime-eql/run-extension-mutation-in!`
+2. confirm that helper path continues to invoke registered mutations through the live runtime graph rather than raw `eval` or slash-command parsing
 3. align implementation with the already-defined request/result/error contract in `design.md`
-4. record the chosen helper path and any routing constraints in `implementation.md`
+4. record the helper's remaining routing constraint in `implementation.md`: preserve caller-supplied `params :session-id` as authoritative when a mutation intentionally targets a session other than the invoking session
 
 Slice 2 — `psi-tool(action: "mutate")` implementation
 1. add `"mutate"` to the allowed `psi-tool` action contract
@@ -23,12 +23,11 @@ Slice 2 — `psi-tool(action: "mutate")` implementation
 7. shape success results as `#:psi-tool{:action :mutate ... :result ...}` with `:psi-tool/error` absent
 8. shape invalid-request and mutation-execution failures as structured `:error` results with explicit phase labels, preserved `ex-data` where available, and `:psi-tool/result` absent
 
-Slice 3 — Active session introspection attr
-1. identify the authoritative live source for the current active session id in the invoking context
-2. add and wire root attr `:psi.agent-session/active-session-id`
+Slice 3 — Integrate with existing active session introspection attr
+1. consume the now-landed `:psi.agent-session/active-session-id` root attr from task 139 as a prerequisite surface
+2. record its authoritative source of truth in this task's implementation notes: the invoking query context's bound `:psi.agent-session/session-id`, not adapter-local UI focus or session ordering
 3. keep semantics explicit: active conversation target for the live invoking runtime, not inferred oldest/newest session ordering
-4. return `nil` rather than guessing when there is no active conversation target
-5. add focused proof for correctness, nil behavior, and root queryability
+4. use the existing focused proof from task 139 as prerequisite coverage and add only workflow-composition proof here where this task depends on it
 
 Slice 4 — Compact session summary attr
 1. identify the smallest existing canonical session-info source/projection that can back a compact operational summary surface
@@ -62,6 +61,5 @@ Scope boundaries:
 
 Implementation questions to answer while coding:
 - what exact helper/path should own registered mutation execution for `psi-tool` so the new action stays canonical and narrow?
-- what exact live runtime value should be treated as the source of truth for `:psi.agent-session/active-session-id`?
 - should the compact summary attr reuse the existing `context-sessions` projection and trim it, or have its own resolver/projection path?
 - what is the cleanest way to normalize validation vs mutation-execution errors into the documented tool result shape?
