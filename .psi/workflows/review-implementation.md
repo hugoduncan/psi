@@ -52,7 +52,7 @@ description: Review a Munera task implementation, record terse notes, execute ad
                      :from {:step "review-test-shape" :yield :text}}]}
          {:name "final-summary"
           :type :session
-          :tools ["read" "bash"]
+          :tools ["read" "bash" "work-on"]
           :contributions [{:type :source
                            :from :workflow-original}
                           {:type :source
@@ -64,7 +64,7 @@ description: Review a Munera task implementation, record terse notes, execute ad
                           {:type :source
                            :from {:step "review-code-shape" :yield :text}}
                           {:type :template
-                           :text "Produce the user-facing final result for the Munera task identified by {{input}}. Independently inspect that specific task's artifacts, especially steps.md, implementation.md, design.md, and plan.md when present, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether all four review passes completed cleanly\n- the key issues found and resolved across the four passes (task-implementation-review, task-test-review, test-shaper, code-shaper)\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior."
+                           :text "Produce the user-facing final result for the Munera task identified by {{input}}. First extract `worktree_path:` from the handoff data in `{{input}}` and call `work-on <worktree_path>` before reading any task artifacts. Independently inspect that specific task's artifacts, especially steps.md, implementation.md, design.md, and plan.md when present, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether all four review passes completed cleanly\n- the key issues found and resolved across the four passes (task-implementation-review, task-test-review, test-shaper, code-shaper)\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior."
                            :vars {"input" {:from :workflow-input
                                            :path [:input]}}}]}]}
 

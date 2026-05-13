@@ -66,9 +66,8 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
          {:name "review"
           :type :delegate
           :target "review-implementation"
-          :prompt-string {:type :template
-                          :text "Improve the implemented Munera task described by {{implementation_report}} by running the review-implementation workflow in the same PR worktree. Work independently. Use the preloaded design handoff so the review can compare implementation against the intended design. Use the `clojure-coding-standards` and `testing-without-mocks` skills while carrying out review follow-up work. Execute the review workflow until it converges, update the task artifacts as it goes, preserve any meaningful deviations from the initial design in `implementation.md` so they can be summarized back onto the PR, and commit the review/task-artifact updates at the end of the review pass if there are changes to record."
-                          :vars {"implementation_report" {:from {:step "implement" :yield :text}}}}
+          :prompt-string {:type :map
+                          :fields {:input {:from {:step "implement" :yield :text}}}}
           :context [{:type :source
                      :from :workflow-original}
                     {:type :source
