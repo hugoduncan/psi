@@ -7,12 +7,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Added
-- `logprobs/perplexity` deterministic operation: calculates perplexity of the most recent logprob-bearing reply for a session, available to workflows via invoke steps.
+- logprobs extension with `logprobs/perplexity` deterministic operation: calculates perplexity of the most recent logprob-bearing reply for a session, available to workflows via invoke steps.
 - `gh-issue-refine` workflow: the `discover` step is now a deterministic `:invoke` step backed by the new `psi/github` extension, replacing a non-deterministic AI builder-delegate step. Issue selection is fully determined by the `gh` CLI and selection rules — no AI sampling occurs during issue discovery.
-
-### Changed
-- Logprob data moved out-of-band: token probability data is no longer injected as synthetic user messages in the conversation context. Logprobs are still persisted in the journal and available via the `logprobs/perplexity` operation.
-- `local-logprobs` workflow now uses a structured `logprobs/perplexity` invoke step instead of asking a session to parse projected text.
+- Major improvements to workflows - branching, deterministic steps, session controls
 
 ### Fixed
 - Custom model providers whose selected session model stores `:provider` as a string now resolve provider-scoped auth, request options, and runtime model lookup consistently instead of falling back to built-in provider auth behavior.
