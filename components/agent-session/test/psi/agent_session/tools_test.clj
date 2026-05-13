@@ -366,7 +366,9 @@
             (is (= (.getAbsolutePath (.getCanonicalFile (io/file tmpdir)))
                    (:psi-tool/worktree-path parsed)))
             (is (= :session (:psi-tool/worktree-source parsed)))
-            (is (re-find #"outside target worktree" (:content result)))))
+            (is (re-find #"outside target worktree" (:content result)))
+            (is (re-find #"running psi runtime may have been started from a different checkout" (:content result)))
+            (is (re-find #"restart psi from the target worktree" (:content result)))))
         (finally
           (delete-tree! tmpdir)))))
 

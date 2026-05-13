@@ -107,10 +107,7 @@
   "Return the repo root when running from source on disk, nil otherwise.
    Returns nil when running from an uberjar (jar: URL scheme) so that
    psi-owned extension local/root paths are not resolved — extensions are
-   already on the classpath in that case.
-
-   Also serves as the canonical runtime source-root/reload-root discovery helper
-   for live reload guidance."
+   already on the classpath in that case."
   []
   (when-let [url (io/resource "psi/agent_session/extension_installs.clj")]
     (when (= "file" (.getProtocol url))

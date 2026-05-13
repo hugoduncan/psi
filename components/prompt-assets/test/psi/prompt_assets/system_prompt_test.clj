@@ -180,8 +180,8 @@
                     {:prompt-mode :prose})]
         (is (str/includes? prompt "psi-tool(action: \"query\", query: \"[:psi.graph/root-seeds]\")"))
         (is (str/includes? prompt "psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\") = in-process ψ eval in an already loaded namespace; psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\") = managed project nREPL eval for the target worktree."))
-        (is (str/includes? prompt "psi-tool(action: \"query\", query: \"[:psi.runtime/source-root :psi.agent-session/worktree-path]\""))
-        (is (str/includes? prompt "use runtime source-root for reload targeting"))
+        (is (str/includes? prompt "psi self-reload is worktree-authoritative"))
+        (is (str/includes? prompt "runtime/worktree mismatch"))
         (is (str/includes? prompt "psi-tool(action: \"reload-code\", namespaces: [\"psi.agent-session.tools\"])"))
         (is (str/includes? prompt "psi-tool(action: \"project-repl\", op: \"status\")"))
         (is (str/includes? prompt "psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\")"))

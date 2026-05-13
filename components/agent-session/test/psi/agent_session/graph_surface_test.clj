@@ -104,8 +104,7 @@
     :psi.agent-session/active-session-id
     :psi.runtime/nrepl-host
     :psi.runtime/nrepl-port
-    :psi.runtime/nrepl-endpoint
-    :psi.runtime/source-root})
+    :psi.runtime/nrepl-endpoint})
 
 (defn- assert-canonical-graph-root-attrs
   [root-attrs]

@@ -277,7 +277,9 @@
           (throw (ex-info (str "Reload namespace has no canonical source path: " ns-name)
                           {:phase :validate :action "reload-code" :namespace ns-name :worktree-path worktree-path})))
         (when-not (path-under-root? worktree-path source-path)
-          (throw (ex-info (str "Reload namespace source path is outside target worktree: " ns-name)
+          (throw (ex-info (str "Reload namespace source path is outside target worktree: " ns-name
+                               ". Reload targets the requested/session worktree-path. "
+                               "The running psi runtime may have been started from a different checkout; restart psi from the target worktree if you want self-reload to follow your edits.")
                           {:phase :validate
                            :action "reload-code"
                            :namespace ns-name
