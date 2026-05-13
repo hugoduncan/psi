@@ -35,6 +35,28 @@
                (str/join "\n"))
       "Assistant turn ended in error"))
 
+(defn- fallback-worthy-execution-message?
+  [message]
+  (let [text (some-> message str/lower-case)]
+    (boolean
+     (and (seq text)
+          (or (str/includes? text "connection refused")
+              (str/includes? text "connection reset")
+              (str/includes? text "connection timed out")
+              (str/includes? text "timed out")
+              (str/includes? text "unreachable")
+              (str/includes? text "refused")
+              (str/includes? text "transport")
+              (str/includes? text "provider execution failure")
+              (str/includes? text "premature end of chunk")
+              (str/includes? text "failed to connect"))))))
+
+(defn fallback-worthy-execution-failure?
+  [assistant-message]
+  (let [{:keys [turn/outcome]} (turn-recording/classify-assistant-message assistant-message)]
+    (and (= :turn.outcome/error outcome)
+         (fallback-worthy-execution-message? (assistant-error-message assistant-message)))))
+
 (defn execution-failure-payload
   [execution-session-id assistant-message]
   (let [{:keys [turn/outcome]} (turn-recording/classify-assistant-message assistant-message)]
@@ -44,6 +66,10 @@
 
       (= :turn.outcome/error outcome)
       (assoc :turn-outcome outcome)
+
+      (fallback-worthy-execution-failure? assistant-message)
+      (assoc :reason :provider-unavailable
+             :fallback-worthy? true)
 
       execution-session-id
       (assoc :session-id execution-session-id))))

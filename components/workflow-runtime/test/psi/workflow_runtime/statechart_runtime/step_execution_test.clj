@@ -31,3 +31,16 @@
              :reason :bad-input
              :message "No repo"
              :details {:path "/tmp"}})))))
+
+;; NOTE: `:session-id` is included in session-step raw outputs (execute-session-step!)
+;; but requires full runtime context (ctx, parent session, execution session) to test.
+;; This surface is integration-tested via workflow execution (e.g. local-logprobs workflow
+;; exercises {:from {:step "run" :output :session-id}} in its invoke step).
+;; A unit-level assertion is impractical here without substantial test infrastructure.
+
+(deftest assistant-message-text-test
+  (testing "assistant-message-text delegates to turn-execution-contract"
+    (is (= "hello world"
+           (step-execution/assistant-message-text
+            {:role "assistant"
+             :content [{:type :text :text "hello world"}]})))))

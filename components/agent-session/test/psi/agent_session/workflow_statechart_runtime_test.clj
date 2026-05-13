@@ -1,11 +1,12 @@
 (ns psi.agent-session.workflow-statechart-runtime-test
   (:require
-   [clojure.test :refer [deftest is]]
+   [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.turn]
    [psi.workflow-runtime.turn-execution-contract]
    [psi.agent-session.test-support :as test-support]
    [psi.workflow-runtime.attempts]
+   [psi.workflow-runtime.execution-adapter]
    [psi.agent-session.workflow-judge]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]
@@ -233,6 +234,278 @@
         (remove-watch (:working-memory* wf-ctx) ::capture-pending-actor-result)))
     (is (seq @pending-snapshots*))
     (is (every? #(not (contains? % :execution-result)) @pending-snapshots*))))
+
+(deftest child-session-creation-failure-records-execution-failure-test
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx linear-definition "run-child-session-failure")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-child-session-failure")]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [& _]
+                    (throw (ex-info "Invalid initial agent state"
+                                    {:errors {:model "bad-model"}})))]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-child-session-failure")
+          attempt (get-in run [:step-runs "plan" :attempts 0])]
+      (is (= :failed (:status run)))
+      (is (= :execution-failed (:status attempt)))
+      (is (= "Invalid initial agent state"
+             (get-in attempt [:execution-error :message]))))))
+
+(deftest workflow-model-query-ranked-fallback-success-test
+  (testing "first-ranked connection-refused failure falls back to the next ranked candidate and completes the step"
+    (let [[ctx session-id] (create-session-context)
+          definition {:definition-id "model-query-fallback"
+                      :steps [{:name "plan"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text :match :true}]}
+                               :contributions [{:type :template
+                                                :text "Plan {{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+          _ (install-run! ctx definition "run-model-fallback-success")
+          wf-ctx (runtime/create-workflow-context ctx session-id "run-model-fallback-success")
+          model-calls* (atom [])
+          current-model* (atom nil)
+          turn-count* (atom 0)]
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      {:attempt {:attempt-id (:attempt-id opts)
+                                 :status :pending
+                                 :execution-session-id "plan-child"}
+                       :execution-session {:session-id "plan-child"
+                                           :model (:model opts)
+                                           :model-fallback {:type :ranked-model-candidates
+                                                            :candidates [{:provider "local" :id "first"}
+                                                                         {:provider "openai" :id "second"}]}}})
+                    psi.workflow-runtime.execution-adapter/set-session-model!
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
+                      (reset! current-model* model)
+                      {:ok true})
+                    psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                    (fn [_ctx _sid _prompt]
+                      (swap! turn-count* inc)
+                      (if (= {:provider "local" :id "first"}
+                             (or @current-model* {:provider "local" :id "first"}))
+                        {:status :error
+                         :session-id "plan-child"
+                         :assistant-message {:role "assistant"
+                                             :error-message "Connection refused"
+                                             :content [{:type :error :text "Connection refused"}]}
+                         :assistant-text ""
+                         :execution-result {}
+                         :failure {:reason :provider-unavailable
+                                   :message "Connection refused"
+                                   :fallback-worthy? true}}
+                        {:status :ok
+                         :session-id "plan-child"
+                         :assistant-message {:role "assistant"
+                                             :content [{:type :text :text "fallback success"}]}
+                         :assistant-text "fallback success"
+                         :execution-result {}}))]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-model-fallback-success")
+            attempt (get-in run [:step-runs "plan" :attempts 0])]
+        (is (= :completed (:status run)))
+        (is (= "fallback success"
+               (get-in run [:step-runs "plan" :accepted-result :outputs :final-llm-reply])))
+        (is (= [{:model {:provider "openai" :id "second"}
+                 :scope :session}]
+               @model-calls*))
+        (is (= 2 @turn-count*))
+        (is (= :succeeded (:status attempt)))))))
+
+(deftest workflow-concrete-model-does-not-fallback-test
+  (testing "explicit concrete workflow models remain single-shot without ranked fallback"
+    (let [[ctx session-id] (create-session-context)
+          definition {:definition-id "concrete-model-no-fallback"
+                      :steps [{:name "plan"
+                               :type :session
+                               :model {:provider "openai" :id "gpt-5"}
+                               :contributions [{:type :template
+                                                :text "Plan {{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+          _ (install-run! ctx definition "run-concrete-model-no-fallback")
+          wf-ctx (runtime/create-workflow-context ctx session-id "run-concrete-model-no-fallback")
+          model-calls* (atom [])
+          turn-count* (atom 0)]
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      {:attempt {:attempt-id (:attempt-id opts)
+                                 :status :pending
+                                 :execution-session-id "plan-child"}
+                       :execution-session {:session-id "plan-child"
+                                           :model (:model opts)}})
+                    psi.workflow-runtime.execution-adapter/set-session-model!
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
+                      {:ok true})
+                    psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                    (fn [_ctx _sid _prompt]
+                      (swap! turn-count* inc)
+                      {:status :error
+                       :session-id "plan-child"
+                       :assistant-message {:role "assistant"
+                                           :error-message "Connection refused"
+                                           :content [{:type :error :text "Connection refused"}]}
+                       :assistant-text ""
+                       :execution-result {}
+                       :failure {:reason :provider-unavailable
+                                 :message "Connection refused"
+                                 :fallback-worthy? true}})]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-concrete-model-no-fallback")
+            attempt (get-in run [:step-runs "plan" :attempts 0])]
+        (is (= :failed (:status run)))
+        (is (= [] @model-calls*))
+        (is (= 1 @turn-count*))
+        (is (= "Connection refused"
+               (get-in attempt [:execution-error :message])))))))
+
+(deftest workflow-model-query-non-fallback-failure-is-terminal-test
+  (testing "non-fallback-worthy failures remain terminal for the ranked candidate sequence"
+    (let [[ctx session-id] (create-session-context)
+          definition {:definition-id "model-query-terminal-failure"
+                      :steps [{:name "plan"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text :match :true}]}
+                               :contributions [{:type :template
+                                                :text "Plan {{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+          _ (install-run! ctx definition "run-model-fallback-terminal")
+          wf-ctx (runtime/create-workflow-context ctx session-id "run-model-fallback-terminal")
+          model-calls* (atom [])
+          current-model* (atom nil)
+          turn-count* (atom 0)]
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      {:attempt {:attempt-id (:attempt-id opts)
+                                 :status :pending
+                                 :execution-session-id "plan-child"}
+                       :execution-session {:session-id "plan-child"
+                                           :model (:model opts)
+                                           :model-fallback {:type :ranked-model-candidates
+                                                            :candidates [{:provider "local" :id "first"}
+                                                                         {:provider "openai" :id "second"}]}}})
+                    psi.workflow-runtime.execution-adapter/set-session-model!
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
+                      (reset! current-model* model)
+                      {:ok true})
+                    psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                    (fn [_ctx _sid _prompt]
+                      (swap! turn-count* inc)
+                      {:status :error
+                       :session-id "plan-child"
+                       :assistant-message {:role "assistant"
+                                           :error-message "Validation failed"
+                                           :content [{:type :error :text "Validation failed"}]}
+                       :assistant-text ""
+                       :execution-result {}
+                       :failure {:reason :invalid-request
+                                 :message "Validation failed"}})]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-model-fallback-terminal")
+            attempt (get-in run [:step-runs "plan" :attempts 0])]
+        (is (= :failed (:status run)))
+        (is (= [] @model-calls*))
+        (is (= 1 @turn-count*))
+        (is (= :invalid-request
+               (get-in attempt [:execution-error :reason])))))))
+
+(deftest workflow-model-query-ranked-candidates-exhausted-test
+  (testing "exhausting ranked model-query candidates records one canonical attempt with aggregate candidate failures"
+    (let [[ctx session-id] (create-session-context)
+          definition {:definition-id "model-query-exhausted"
+                      :steps [{:name "plan"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text :match :true}]}
+                               :contributions [{:type :template
+                                                :text "Plan {{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+          _ (install-run! ctx definition "run-model-fallback-exhausted")
+          wf-ctx (runtime/create-workflow-context ctx session-id "run-model-fallback-exhausted")
+          model-calls* (atom [])
+          current-model* (atom nil)]
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      {:attempt {:attempt-id (:attempt-id opts)
+                                 :status :pending
+                                 :execution-session-id "plan-child"}
+                       :execution-session {:session-id "plan-child"
+                                           :model (:model opts)
+                                           :model-fallback {:type :ranked-model-candidates
+                                                            :candidates [{:provider "local" :id "first"}
+                                                                         {:provider "openai" :id "second"}]}}})
+                    psi.workflow-runtime.execution-adapter/set-session-model!
+                    (fn [_ctx _sid model scope]
+                      (swap! model-calls* conj {:model model :scope scope})
+                      (reset! current-model* model)
+                      {:ok true})
+                    psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                    (fn [_ctx _sid _prompt]
+                      {:status :error
+                       :session-id "plan-child"
+                       :assistant-message {:role "assistant"
+                                           :error-message (str "Connection refused for " (:id (or @current-model* {:provider "local" :id "first"})))
+                                           :content [{:type :error :text (str "Connection refused for " (:id (or @current-model* {:provider "local" :id "first"})))}]}
+                       :assistant-text ""
+                       :execution-result {}
+                       :failure {:reason :provider-unavailable
+                                 :message (str "Connection refused for " (:id (or @current-model* {:provider "local" :id "first"})))
+                                 :fallback-worthy? true}})]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-model-fallback-exhausted")
+            attempt (get-in run [:step-runs "plan" :attempts 0])]
+        (is (= :failed (:status run)))
+        (is (= [{:model {:provider "openai" :id "second"}
+                 :scope :session}]
+               @model-calls*))
+        (is (= :ranked-candidate-exhausted
+               (get-in attempt [:execution-error :reason])))
+        (is (= 2 (count (get-in attempt [:execution-error :candidate-failures]))))
+        (is (= [{:model {:provider "local" :id "first"}
+                 :failure {:reason :provider-unavailable
+                           :message "Connection refused for first"
+                           :fallback-worthy? true}}
+                {:model {:provider "openai" :id "second"}
+                 :failure {:reason :provider-unavailable
+                           :message "Connection refused for second"
+                           :fallback-worthy? true}}]
+               (get-in attempt [:execution-error :candidate-failures])))))))
+
+(deftest workflow-model-query-empty-ranked-candidates-fails-coherently-test
+  (testing "empty ranked-candidate metadata yields one coherent terminal workflow failure"
+    (let [[ctx session-id] (create-session-context)
+          definition {:definition-id "model-query-empty-ranked"
+                      :steps [{:name "plan"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text :match :true}]}
+                               :contributions [{:type :template
+                                                :text "Plan {{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+          _ (install-run! ctx definition "run-model-fallback-empty")
+          wf-ctx (runtime/create-workflow-context ctx session-id "run-model-fallback-empty")]
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      {:attempt {:attempt-id (:attempt-id opts)
+                                 :status :pending
+                                 :execution-session-id "plan-child"}
+                       :execution-session {:session-id "plan-child"
+                                           :model (:model opts)
+                                           :model-fallback {:type :ranked-model-candidates
+                                                            :candidates []}}})
+                    psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                    (fn [& _]
+                      (throw (ex-info "should not execute turn when no candidates exist" {})))]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+      (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-model-fallback-empty")
+            attempt (get-in run [:step-runs "plan" :attempts 0])]
+        (is (= :failed (:status run)))
+        (is (= :execution-failed (:status attempt)))))))
 
 (deftest cancel-from-blocked-state-test
   (let [[ctx session-id] (create-session-context)

@@ -13,6 +13,7 @@
 (def codex-reasoning codex/codex-reasoning)
 (def build-codex-request codex/build-codex-request)
 (def stream-openai chat/stream-openai)
+(def execute-openai chat/execute-openai)
 (def stream-openai-codex codex/stream-openai-codex)
 
 (defn- codex-model?
@@ -29,6 +30,14 @@
   [conversation model options consume-fn]
   ((provider-stream model) conversation model options consume-fn))
 
+(defn execute-openai-dispatch
+  [conversation model options]
+  (if (codex-model? model)
+    (throw (ex-info "Non-streaming execution is not implemented for OpenAI Codex responses"
+                    {:provider :openai :api :openai-codex-responses}))
+    (execute-openai conversation model options)))
+
 (def provider
   {:name   :openai
-   :stream stream-openai-dispatch})
+   :stream stream-openai-dispatch
+   :execute execute-openai-dispatch})

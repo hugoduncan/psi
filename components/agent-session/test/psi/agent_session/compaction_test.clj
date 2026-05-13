@@ -120,6 +120,30 @@
       (is (= 3 (count msgs)))
       (is (re-find #"Summary" (get-in msgs [0 :content 0 :text]))))))
 
+;; ── logprobs entries: compaction transparency ─────────────────────────────
+
+(deftest logprobs-entries-skipped-by-compaction-test
+  (testing ":logprobs entries are not message-like and not valid cut-points"
+    (let [tokens [{:token "hi" :logprob -0.01 :top []}]
+          u1     (persist/message-entry (user-message "u1"))
+          a1     (persist/message-entry (assistant-text-message "a1"))
+          lp     (persist/logprobs-entry "turn-1" tokens)
+          u2     (persist/message-entry (user-message "u2"))
+          a2     (persist/message-entry (assistant-text-message "a2"))]
+      ;; :logprobs entry must not produce a provider message
+      (let [msgs (compaction/rebuild-messages-from-journal-entries [u1 a1 lp u2 a2])]
+        (is (= 4 (count msgs))
+            ":logprobs entry must be skipped (not projected) in journal rebuild"))
+      ;; :logprobs entry must not be a valid cut-point in prepare-compaction
+      (let [sd (assoc (session/initial-session)
+                      :session-entries [u1 a1 lp u2 a2]
+                      :context-window 100000)
+            prep (compaction/prepare-compaction sd 1)]
+        (is (some? prep) "compaction preparation must succeed")
+        ;; The first kept entry must be a real message entry, not the logprobs entry
+        (is (not= (:id lp) (:first-kept-entry-id prep))
+            ":logprobs entry must not be a valid cut-point")))))
+
 (deftest rebuild-messages-from-journal-test
   (testing "latest compaction boundary is respected"
     (let [u1   (persist/message-entry (user-message "u1"))

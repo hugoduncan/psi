@@ -340,4 +340,51 @@
     (let [result (workflow-ir/validate-workflow-ir {:steps []})]
       (is (false? (:valid? result)))
       (is (some? (:structural-errors result)))
-      (is (= [] (:semantic-errors result))))))
+      (is (= [] (:semantic-errors result)))))
+
+  (testing "semantic validation rejects session steps with skills but no read tool"
+    (let [ir {:version :workflow-ir/v1
+              :steps [{:name "run"
+                       :type :session
+                       :session {:tools []
+                                 :skills ["lambda-compiler"]
+                                 :contributions [{:type :template
+                                                  :text "hello"
+                                                  :vars {}}]}
+                       :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                       :yields {:type :text :text :final-llm-reply}}]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :skills-without-read-tool
+               :step "run"
+               :skills ["lambda-compiler"]}]
+             (:semantic-errors result)))))
+
+  (testing "semantic validation allows session steps with skills when read tool is present"
+    (let [ir {:version :workflow-ir/v1
+              :steps [{:name "run"
+                       :type :session
+                       :session {:tools ["read"]
+                                 :skills ["lambda-compiler"]
+                                 :contributions [{:type :template
+                                                  :text "hello"
+                                                  :vars {}}]}
+                       :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                       :yields {:type :text :text :final-llm-reply}}]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             result))))
+
+  (testing "semantic validation allows session steps with no skills and no read tool"
+    (let [ir {:version :workflow-ir/v1
+              :steps [{:name "run"
+                       :type :session
+                       :session {:tools []
+                                 :contributions [{:type :template
+                                                  :text "hello"
+                                                  :vars {}}]}
+                       :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                       :yields {:type :text :text :final-llm-reply}}]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             result)))))

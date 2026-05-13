@@ -49,8 +49,8 @@
                                        :execution-session-id "child-1"}])))))
           seen* (atom [])]
       (with-redefs [psi.workflow-runtime.statechart-runtime/create-workflow-context
-                    (fn [_ctx _parent-session-id run-id]
-                      (swap! seen* conj [:create run-id])
+                    (fn [_ctx parent-session-id run-id]
+                      (swap! seen* conj [:create run-id parent-session-id])
                       {:wm :stub-wm})
                     psi.workflow-runtime.statechart-runtime/send-and-drain!
                     (fn [_wf-ctx _wm event _data]
@@ -60,6 +60,6 @@
           (is (= :completed (:status result)))
           (is (true? (:terminal? result)))
           (is (false? (:blocked? result)))
-          (is (= [[:create "run-resume"]
+          (is (= [[:create "run-resume" session-id]
                   [:event :workflow/resume]]
                  @seen*)))))))

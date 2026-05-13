@@ -109,7 +109,7 @@
   nil)
 
 (defn- create-workflow-child-session!
-  [ctx parent-session-id {:keys [child-session-id session-name system-prompt prompt-mode tool-defs thinking-level model skills
+  [ctx parent-session-id {:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level model skills
                                  developer-prompt developer-prompt-source preloaded-messages
                                  cache-breakpoints prompt-component-selection
                                  workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
@@ -126,6 +126,9 @@
                                :tool-defs tool-defs
                                :thinking-level thinking-level}
                         (some? prompt-mode) (assoc :prompt-mode prompt-mode)
+                        (some? response-mode) (assoc :response-mode response-mode)
+                        (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
+                        (some? top-logprobs) (assoc :top-logprobs top-logprobs)
                         (some? model) (assoc :model model)
                         (some? skills) (assoc :skills skills)
                         (some? preloaded-messages) (assoc :preloaded-messages preloaded-messages)
@@ -158,6 +161,11 @@
     :get-session-data (:get-session-data-fn ctx)
     :list-context-sessions (:list-context-sessions-fn ctx)
     :find-skill (:find-skill-fn ctx)
+    :set-session-model! (fn [ctx session-id model scope]
+                          (dispatch/dispatch! ctx :session/set-model
+                                              (cond-> {:session-id session-id :model model}
+                                                scope (assoc :scope scope))
+                                              {:origin :core}))
     :execute-judge! (:execute-workflow-judge-fn ctx)}))
 
 (defn- callback-fns [mutations projection-listeners*]

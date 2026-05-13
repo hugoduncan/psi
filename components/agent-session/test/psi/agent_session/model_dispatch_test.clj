@@ -9,6 +9,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-persistence.core :as persist]
    [psi.shared-config.project :as project-prefs]
+   [psi.shared-config.user :as user-config]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.state-accessors :as sa]
@@ -377,6 +378,13 @@
         (is (nil? (:developer-prompt sd)))
         (is (nil? (:developer-prompt-source sd)))))))
 
+(deftest runtime-agent-set-model-effect-test
+  (testing "runtime agent-set-model effect accepts scoped shape without changing transient runtime behavior"
+    (let [[ctx session-id] (create-session-context)
+          model {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}]
+      (session/dispatch-in! ctx :session/set-model {:session-id session-id :model model :scope :session} {:origin :core})
+      (is (= model (:model (ss/get-session-data-in ctx session-id)))))))
+
 (deftest thinking-level-test
   (testing "set-thinking-level-in! updates level"
     (let [[ctx session-id] (create-session-context)]
@@ -405,6 +413,50 @@
              (edn/read-string (slurp shared-f))))
       (is (.exists local-f))
       (is (= "anthropic" (get-in (edn/read-string (slurp local-f)) [:agent-session :model-provider])))))
+
+  (testing "explicit session-scoped model changes do not persist project or user config"
+    (let [cwd        (str (System/getProperty "java.io.tmpdir") "/psi-session-scope-prefs-" (java.util.UUID/randomUUID))
+          _          (.mkdirs (java.io.File. cwd))
+          shared-f   (project-prefs/project-preferences-file cwd)
+          local-f    (project-prefs/project-local-preferences-file cwd)
+          user-calls* (atom [])
+          _          (.mkdirs (.getParentFile shared-f))
+          _          (spit shared-f (pr-str {:version 1
+                                             :agent-session {:prompt-mode :prose}}))
+          [ctx session-id] (create-session-context {:cwd cwd})
+          model      {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}]
+      (with-redefs [user-config/update-agent-session! (fn [prefs]
+                                                        (swap! user-calls* conj prefs)
+                                                        {:version 1 :agent-session prefs})]
+        (session/set-model-in! ctx session-id model :session))
+      (is (= model (:model (ss/get-session-data-in ctx session-id))))
+      (is (= {:version 1
+              :agent-session {:prompt-mode :prose}}
+             (edn/read-string (slurp shared-f))))
+      (is (false? (.exists local-f)))
+      (is (= [] @user-calls*))))
+
+  (testing "explicit user-scoped model changes persist only user config"
+    (let [cwd        (str (System/getProperty "java.io.tmpdir") "/psi-user-scope-prefs-" (java.util.UUID/randomUUID))
+          _          (.mkdirs (java.io.File. cwd))
+          shared-f   (project-prefs/project-preferences-file cwd)
+          local-f    (project-prefs/project-local-preferences-file cwd)
+          user-f     (java.io.File. (str cwd "/user-home/.psi/agent/config.edn"))
+          _          (.mkdirs (.getParentFile shared-f))
+          _          (.mkdirs (.getParentFile user-f))
+          _          (spit shared-f (pr-str {:version 1
+                                             :agent-session {:prompt-mode :prose}}))
+          [ctx session-id] (create-session-context {:cwd cwd})
+          model      {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}]
+      (with-redefs [user-config/user-config-file (fn [] user-f)]
+        (session/set-model-in! ctx session-id model :user))
+      (is (= model (:model (ss/get-session-data-in ctx session-id))))
+      (is (= {:version 1
+              :agent-session {:prompt-mode :prose}}
+             (edn/read-string (slurp shared-f))))
+      (is (false? (.exists local-f)))
+      (is (= "anthropic" (get-in (edn/read-string (slurp user-f)) [:agent-session :model-provider])))
+      (is (= "claude-sonnet-4-6" (get-in (edn/read-string (slurp user-f)) [:agent-session :model-id])))))
 
   (testing "set-thinking-level-in! persists project preferences to the local project layer"
     (let [cwd      (str (System/getProperty "java.io.tmpdir") "/psi-project-prefs-" (java.util.UUID/randomUUID))

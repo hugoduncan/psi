@@ -14,7 +14,9 @@
    [psi.prompt-assets.system-prompt :as system-prompt]))
 
 (defn journal->provider-messages
-  "Project persisted journal entries into agent/provider message maps."
+  "Project persisted journal entries into agent/provider message maps.
+   :message entries become provider messages directly.
+   :logprobs entries are persisted but not projected into provider messages."
   [journal]
   (into []
         (keep (fn [entry]
@@ -60,6 +62,10 @@
     (cond-> {}
       (contains? session-data :thinking-level)
       (assoc :thinking-level (:thinking-level session-data))
+
+      (:logprobs-enabled session-data)
+      (assoc :logprobs-enabled true
+             :top-logprobs (or (:top-logprobs session-data) 3))
 
       (some? api-key)
       (assoc :api-key api-key)
@@ -171,6 +177,7 @@
      :turn/session-model                (:model session-data)
      :turn/thinking-level               (:thinking-level session-data)
      :turn/prompt-mode                  (:prompt-mode session-data)
+     :turn/response-mode                (:response-mode session-data)
      :turn/active-tools                 (:active-tools session-data)
      :turn/developer-prompt             (:developer-prompt session-data)
      :turn/developer-prompt-source      (:developer-prompt-source session-data)

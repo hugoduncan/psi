@@ -349,7 +349,7 @@ Returns selected MODEL-ENTRY map or nil when cancelled/no selection."
          "/jobs [status ...]   List background jobs"
          "/job <job-id>        Inspect a background job"
          "/cancel-job <job-id> Request cancellation for a background job"
-         "/model [provider model-id]    Open model selector or set directly"
+         "/model [provider model-id [session|project|user]]    Open model selector or set directly"
          "/thinking [level]             Open thinking selector or set directly"
          "/help, /?     Show this help")
    "\n"))
@@ -454,20 +454,27 @@ Refresh transcript state for STATE."
       (user-error "%s is required" label))
     text))
 
-(defun psi-emacs-set-model (&optional provider model-id)
+(defun psi-emacs-set-model (&optional provider model-id scope)
   "Select PROVIDER/MODEL-ID via `set_model` RPC op.
 
 When PROVIDER/MODEL-ID are omitted, open a completion picker backed by
-runtime model catalog query data."
+runtime model catalog query data. Optional SCOPE is forwarded unchanged
+when non-nil."
   (interactive)
   (let ((provider* (psi-emacs--normalize-provider-id provider))
-        (model-id* (psi-emacs--trim-optional-input model-id)))
+        (model-id* (psi-emacs--trim-optional-input model-id))
+        (scope* (psi-emacs--trim-optional-input scope)))
     (if (and provider* model-id*)
         (when (psi-emacs--dispatch-request
                "set_model"
-               `((:provider . ,provider*)
-                 (:model-id . ,model-id*)))
-          (message "psi: requested model (%s) %s" provider* model-id*))
+               (append `((:provider . ,provider*)
+                         (:model-id . ,model-id*))
+                       (when scope*
+                         `((:scope . ,scope*)))))
+          (message "psi: requested model (%s) %s%s"
+                   provider*
+                   model-id*
+                   (if scope* (format " [%s]" scope*) "")))
       (psi-emacs--open-model-selector))))
 
 (defun psi-emacs-cycle-model (&optional direction)
@@ -519,17 +526,23 @@ runtime model catalog query data."
     (cond
      ((= argc 0)
       (call-interactively #'psi-emacs-set-model))
-     ((= argc 2)
+     ((or (= argc 2) (= argc 3))
       (let ((provider (nth 0 args))
-            (model-id (nth 1 args)))
+            (model-id (nth 1 args))
+            (scope (nth 2 args)))
         (when (psi-emacs--dispatch-request
                "set_model"
-               `((:provider . ,provider)
-                 (:model-id . ,model-id)))
-          (message "psi: requested model (%s) %s" provider model-id))))
+               (append `((:provider . ,provider)
+                         (:model-id . ,model-id))
+                       (when scope
+                         `((:scope . ,scope)))))
+          (message "psi: requested model (%s) %s%s"
+                   provider
+                   model-id
+                   (if scope (format " [%s]" scope) "")))))
      (t
       (psi-emacs--append-assistant-message
-       "Usage: /model OR /model <provider> <model-id>")))))
+       "Usage: /model OR /model <provider> <model-id> [session|project|user]")))))
 
 (defun psi-emacs--handle-idle-thinking-command (_state message)
   "Handle idle `/thinking` MESSAGE."

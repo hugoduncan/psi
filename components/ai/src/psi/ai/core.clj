@@ -185,6 +185,14 @@
   [ctx model]
   (resolve-provider (context-provider-registry ctx) model))
 
+(defn- provider-execute
+  [ctx model]
+  (let [provider-impl (resolve-provider (context-provider-registry ctx) model)]
+    (or (:execute provider-impl)
+        (throw (ex-info "Provider does not support non-streaming execution"
+                        {:provider (:provider model)
+                         :api (:api model)})))))
+
 (defn- stream-with
   [stream-fn ctx conversation model options & [consume-fn]]
   (let [provider-impl (provider-stream ctx model)]
@@ -222,6 +230,17 @@
                model
                options))
 
+(defn execute-response-in
+  "Execute assistant response in an isolated `ctx` without streaming.
+
+  Returns either {:assistant-message ... :logprobs ...} on success or
+  {:type :error ...} on provider/runtime failure."
+  [ctx conversation model options]
+  {:pre [(schemas/valid? schemas/Conversation conversation)
+         (schemas/valid? schemas/Model model)
+         (schemas/valid? schemas/StreamOptions options)]}
+  ((provider-execute ctx model) conversation model options))
+
 ;; ───────────────────────────────────────────────────────────────────────────
 ;; Public API — streaming (global wrappers)
 ;; ───────────────────────────────────────────────────────────────────────────
@@ -250,6 +269,14 @@
    See `psi.ai.streaming/stream-response-seq` for event shapes."
   [conversation model options]
   (stream-response-seq-in (global-ctx) conversation model options))
+
+(defn execute-response
+  "Execute assistant response without streaming.
+
+   Returns either {:assistant-message ... :logprobs ...} on success or
+   {:type :error ...} on provider/runtime failure."
+  [conversation model options]
+  (execute-response-in (global-ctx) conversation model options))
 
 ;; ───────────────────────────────────────────────────────────────────────────
 ;; Public API — models

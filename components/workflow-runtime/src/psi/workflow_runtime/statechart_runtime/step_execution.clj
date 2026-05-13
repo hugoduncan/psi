@@ -4,6 +4,7 @@
    [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
+   [psi.workflow-runtime.attempts :as attempts]
    [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.statechart-runtime.queue :as queue]
    [psi.workflow-runtime.statechart-runtime.state :as state]
@@ -67,10 +68,73 @@
                         :pending-kind :failure
                         :payload execution-error})))
 
+(defn- fallback-candidates
+  [execution-session]
+  (get-in execution-session [:model-fallback :candidates]))
+
+(defn- fallback-enabled?
+  [execution-session]
+  (and (= :ranked-model-candidates (get-in execution-session [:model-fallback :type]))
+       (contains? execution-session :model-fallback)))
+
+(defn- candidate-failure
+  [model failure]
+  {:model model
+   :failure failure})
+
+(defn- exhaustion-failure
+  [candidate-failures]
+  {:reason :ranked-candidate-exhausted
+   :message "Workflow model-query candidates exhausted"
+   :candidate-failures candidate-failures})
+
+(defn- execute-with-ranked-fallback!
+  [ctx execution-session prompt]
+  (let [initial-candidates (vec (fallback-candidates execution-session))]
+    (if-not (seq initial-candidates)
+      {:status :error
+       :session-id (:session-id execution-session)
+       :assistant-message nil
+       :assistant-text ""
+       :execution-result nil
+       :failure (exhaustion-failure [])}
+      (loop [remaining initial-candidates
+             candidate-failures []
+             current-session execution-session
+             first-candidate? true]
+        (let [model (first remaining)
+              current-session (if first-candidate?
+                                (assoc current-session :model model)
+                                (attempts/set-execution-session-model! ctx current-session model))
+              result (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt)]
+          (cond
+            (= :ok (:status result))
+            result
+
+            (and (next remaining)
+                 (get-in result [:failure :fallback-worthy?]))
+            (recur (next remaining)
+                   (conj candidate-failures (candidate-failure model (:failure result)))
+                   current-session
+                   false)
+
+            :else
+            (let [all-failures (conj candidate-failures (candidate-failure model (:failure result)))]
+              {:status :error
+               :session-id (:session-id current-session)
+               :assistant-message (:assistant-message result)
+               :assistant-text (:assistant-text result)
+               :execution-result (:execution-result result)
+               :failure (if (get-in result [:failure :fallback-worthy?])
+                          (exhaustion-failure all-failures)
+                          (:failure result))})))))))
+
 (defn execute-session-step!
   [ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt]
-  (let [{:keys [status assistant-text failure]}
-        (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)]
+  (let [{:keys [status assistant-text failure execution-result assistant-message]}
+        (if (fallback-enabled? execution-session)
+          (execute-with-ranked-fallback! ctx execution-session prompt)
+          (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt))]
     (if (= :error status)
       (do
         (swap! working-memory* assoc :pending-actor-result {:kind :failure
@@ -79,14 +143,18 @@
                                                             :attempt-id attempt-id
                                                             :updated-at (state/now)})
         (queue/enqueue-event! event-queue* working-memory* :actor/failed {}))
-      (let [normalized-outputs (workflow-ir/step-output-surfaces
+      (let [logprobs (:execution-result/logprobs execution-result)
+            raw-outputs {:final-llm-reply assistant-text
+                         :text assistant-text
+                         :transcript (when assistant-message [assistant-message])
+                         :logprobs logprobs
+                         :session-id (:session-id execution-session)}
+            normalized-outputs (workflow-ir/step-output-surfaces
                                 step-def
                                 {:outcome :ok
-                                 :outputs {:final-llm-reply assistant-text
-                                           :text assistant-text}})
+                                 :outputs raw-outputs})
             envelope {:outcome :ok
-                      :outputs (merge {:text assistant-text}
-                                      normalized-outputs)}]
+                      :outputs (merge raw-outputs normalized-outputs)}]
         (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
                                                             :payload envelope
                                                             :step-id step-id

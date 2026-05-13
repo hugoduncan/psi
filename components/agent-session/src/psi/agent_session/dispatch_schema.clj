@@ -36,7 +36,9 @@
     [:map [:effect/type [:= :runtime/agent-start-loop-with-messages]]
      [:messages [:vector :any]]]]
    [:runtime/agent-set-model
-    [:map [:effect/type [:= :runtime/agent-set-model]] [:model :map]]]
+    [:map [:effect/type [:= :runtime/agent-set-model]]
+     [:model :map]
+     [:scope {:optional true} [:enum :session :project :user]]]]
    [:runtime/agent-set-thinking-level
     [:map [:effect/type [:= :runtime/agent-set-thinking-level]] [:level :keyword]]]
    [:runtime/agent-set-system-prompt

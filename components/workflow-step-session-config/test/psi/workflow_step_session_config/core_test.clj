@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.ai.model-registry :as model-registry]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter]
    [psi.workflow-runtime.step-test-support :as support]
@@ -77,7 +78,7 @@
                                        {:name "step-2-builder"
                                         :type :session
                                         :system-prompt "Focus only on correctness."
-                                        :tools []
+                                        :tools ["read"]
                                         :skills ["testing-best-practices"]
                                         :model "gpt-5"
                                         :thinking-level :high
@@ -98,15 +99,66 @@
                                           override-definition]
                                          {:definition-id "plan-build-overrides"
                                           :run-id "run-overrides"
+                                          :parent-session-id session-id
                                           :workflow-input {:input "build it"}})
           builder-config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-2-builder")]
       (is (= "Focus only on correctness.\n\nCoordinate a plan-build cycle." (:developer-prompt builder-config)))
 
       (is (= :high (:thinking-level builder-config)))
-      (is (= "gpt-5" (:model builder-config)))
+      (is (= {:provider "openai" :id "gpt-5"} (:model builder-config)))
 
-      (is (= [] (mapv :name (:tool-defs builder-config))))
+      (is (= ["read"] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config)))))))
+
+(deftest resolve-step-session-config-prefers-delegating-session-over-context-defaults-test
+  (testing "workflow child sessions inherit model and prompt-mode from the authoritative delegating session rather than the first context session"
+    (let [[ctx first-session-id] (support/create-session-context {:persist? false})
+          second-session-id (:session-id (session/new-session-in! ctx nil {:session-name "delegator"}))
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (-> state
+                         (assoc-in [:agent-session :sessions first-session-id :data :prompt-mode] :first-mode)
+                         (assoc-in [:agent-session :sessions first-session-id :data :model]
+                                   {:provider "openai" :id "first-model"})
+                         (assoc-in [:agent-session :sessions first-session-id :data :updated-at]
+                                   (java.time.Instant/parse "2026-05-07T10:00:00Z"))
+                         (assoc-in [:agent-session :sessions second-session-id :data :prompt-mode] :delegating-mode)
+                         (assoc-in [:agent-session :sessions second-session-id :data :model]
+                                   {:provider "openai" :id "delegating-model"})
+                         (assoc-in [:agent-session :sessions second-session-id :data :updated-at]
+                                   (java.time.Instant/parse "2026-05-07T11:00:00Z")))))
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta]
+                                         {:definition-id "planner"
+                                          :run-id "run-delegating-parent"
+                                          :parent-session-id second-session-id
+                                          :workflow-input {:input "plan it"}})
+          listed-session-ids (mapv :session-id (psi.workflow-runtime.execution-adapter/list-context-sessions ctx))
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= [first-session-id second-session-id] listed-session-ids))
+      (is (= second-session-id (:parent-session-id workflow-run)))
+      (is (= :delegating-mode (:prompt-mode config)))
+      (is (= {:provider "openai" :id "delegating-model"} (:model config))))))
+
+(deftest resolve-step-session-config-defaults-response-mode-to-streaming-test
+  (testing "workflow child sessions resolve explicit default :streaming response mode when absent"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          workflow-run (do
+                         (swap! (:state* ctx)
+                                (fn [state]
+                                  (let [state (reduce (fn [s definition]
+                                                        (let [[s' _ _] (workflow-registry/register-definition s definition)]
+                                                          s'))
+                                                      state
+                                                      [support/single-step-definition-with-meta])
+                                        [state' _ _] (workflow-runtime/create-run state
+                                                                                  {:definition-id "planner"
+                                                                                   :run-id "run-response-mode-1"
+                                                                                   :workflow-input {:input "plan it"}})]
+                                    (assoc-in state' [:agent-session :sessions session-id :data :prompt-mode] :prose))))
+                         (workflow-runtime/workflow-run-in @(:state* ctx) "run-response-mode-1"))
+          config (workflow-step-session-config/resolve-step-session-config ctx session-id workflow-run "step-1")]
+      (is (= :streaming (:response-mode config))))))
 
 (deftest resolve-step-session-config-inherits-parent-prompt-mode-test
   (testing "workflow child sessions inherit parent prompt mode into step session config"
@@ -164,6 +216,7 @@
                                     :name "planner-missing-skill"
                                     :steps [{:name "step-1"
                                              :type :session
+                                             :tools ["read"]
                                              :skills ["missing-skill"]
                                              :contributions [{:type :template
                                                               :text "{{input}}"
@@ -182,6 +235,177 @@
                :source :project
                :disable-model-invocation false}]
              (:skills config))))))
+
+(deftest resolve-step-session-config-explicit-response-mode-test
+  (testing "workflow child sessions carry explicit :response-mode from authored step session config"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          response-mode-definition {:definition-id "planner-non-streaming"
+                                    :name "planner-non-streaming"
+                                    :steps [{:name "step-1"
+                                             :type :session
+                                             :response-mode :non-streaming
+                                             :contributions [{:type :template
+                                                              :text "{{input}}"
+                                                              :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                                    :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [response-mode-definition]
+                                         {:definition-id "planner-non-streaming"
+                                          :run-id "run-non-streaming"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= :non-streaming (:response-mode config))))))
+
+(deftest resolve-step-session-config-defaults-logprobs-to-disabled-test
+  (testing "workflow child sessions default logprobs to disabled and omit top-logprobs when absent"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta]
+                                         {:definition-id "planner"
+                                          :run-id "run-logprobs-default"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (false? (:logprobs config)))
+      (is (not (contains? config :top-logprobs))))))
+
+(deftest resolve-step-session-config-explicit-logprobs-test
+  (testing "workflow child sessions carry explicit logprob controls from authored step session config"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          definition {:definition-id "planner-logprobs"
+                      :name "planner-logprobs"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :response-mode :non-streaming
+                               :logprobs true
+                               :top-logprobs 5
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-logprobs"
+                                          :run-id "run-logprobs-explicit"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= :non-streaming (:response-mode config)))
+      (is (true? (:logprobs config)))
+      (is (= 5 (:top-logprobs config))))))
+
+(deftest resolve-step-session-config-resolves-model-query-to-concrete-model-test
+  (testing "workflow child sessions resolve authored model-query specs to a concrete model before runtime use"
+    (let [models-path (doto (java.io.File/createTempFile "psi-workflow-step-models" ".edn")
+                        (spit (pr-str {:version 1
+                                       :providers {"local-helper"
+                                                   {:base-url "http://localhost:11434/v1"
+                                                    :api :openai-completions
+                                                    :auth {:auth-header? false}
+                                                    :models [{:id "fast-free"
+                                                              :name "Fast Free Local"
+                                                              :supports-text true
+                                                              :locality :local
+                                                              :latency-tier :low
+                                                              :cost-tier :zero
+                                                              :input-cost 0.0
+                                                              :output-cost 0.0}]}}})))
+          _ (model-registry/init! {:user-models-path (.getAbsolutePath models-path)})
+          [ctx session-id] (support/create-session-context {:persist? false})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
+                   {:provider "anthropic" :id "claude-sonnet-4-6"})
+          definition {:definition-id "planner-model-query"
+                      :name "planner-model-query"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text
+                                                  :match :true}
+                                                 {:criterion :latency-tier
+                                                  :equals :low}
+                                                 {:criterion :cost-tier
+                                                  :one-of [:zero :low]}]
+                                       :prefer [{:criterion :locality
+                                                 :equals :local}
+                                                {:criterion :input-cost
+                                                 :prefer :lower}
+                                                {:criterion :output-cost
+                                                 :prefer :lower}]}
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-model-query"
+                                          :run-id "run-model-query"
+                                          :parent-session-id session-id
+                                          :workflow-input {:input "plan it"}})
+          config (try
+                   (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")
+                   (finally
+                     (model-registry/init! {})))]
+      (is (= {:provider "local-helper" :id "fast-free"}
+             (:model config)))
+      (is (= :ranked-model-candidates
+             (get-in config [:model-fallback :type])))
+      (is (= :ok
+             (get-in config [:model-fallback :selection-outcome])))
+      (is (nil? (get-in config [:model-fallback :selection-reason])))
+      (is (= {:provider "local-helper" :id "fast-free"}
+             (first (get-in config [:model-fallback :candidates])))))))
+
+(deftest resolve-step-session-config-model-query-no-winner-preserves-empty-ranked-metadata-test
+  (testing "workflow child sessions preserve no-winner ranked metadata for authored model-query specs"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :model]
+                   {:provider "anthropic" :id "claude-sonnet-4-6"})
+          definition {:definition-id "planner-model-query-no-winner"
+                      :name "planner-model-query-no-winner"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :model {:type :model-query
+                                       :require [{:criterion :supports-text
+                                                  :match :true}
+                                                 {:criterion :context-window
+                                                  :at-least 999999999}]}
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-model-query-no-winner"
+                                          :run-id "run-model-query-no-winner"
+                                          :parent-session-id session-id
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (nil? (:model config)))
+      (is (= {:type :ranked-model-candidates
+              :selection-outcome :no-winner
+              :selection-reason :required-constraints-unsatisfied
+              :candidates []}
+             (:model-fallback config))))))
+
+(deftest resolve-step-session-config-drops-top-logprobs-when-logprobs-disabled-test
+  (testing "workflow child sessions drop authored top-logprobs when logprobs are false"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          definition {:definition-id "planner-logprobs-disabled"
+                      :name "planner-logprobs-disabled"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :logprobs false
+                               :top-logprobs 9
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-logprobs-disabled"
+                                          :run-id "run-logprobs-disabled"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (false? (:logprobs config)))
+      (is (not (contains? config :top-logprobs))))))
 
 (deftest resolve-step-session-config-missing-tool-falls-back-to-normalized-tool-shape-test
   (testing "missing tool references fall back to normalized tool definition shape at the public boundary"

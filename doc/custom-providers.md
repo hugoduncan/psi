@@ -116,6 +116,13 @@ Use cases:
 A common use for `:auth-header? false` is an OpenAI-compatible local server that
 accepts requests without a bearer token and rejects unexpected auth headers.
 
+For local `:openai-completions` models, psi also projects the normal session
+`/thinking` control onto a local-only compatibility extension when thinking is
+set to `off`: the request body includes
+`{:chat_template_kwargs {:enable_thinking false}}`. This helps local
+OpenAI-compatible servers that expose hidden reasoning via a nonstandard
+`chat_template_kwargs.enable_thinking` flag.
+
 ## Reload after editing
 
 If psi is already running, reload the definitions after editing either models

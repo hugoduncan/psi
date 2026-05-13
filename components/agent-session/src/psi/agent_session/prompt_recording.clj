@@ -12,7 +12,8 @@
    next prompt lifecycle event so orchestration can remain dispatch-visible."
   [session-id execution-result _progress-queue]
   (let [{:keys [turn-id turn-outcome tool-calls assistant-message next-event classified]}
-        (turn-recording/build-recording-decision execution-result)]
+        (turn-recording/build-recording-decision execution-result)
+        logprobs (:execution-result/logprobs execution-result)]
     {:root-state-update
      (session/session-update
       session-id
@@ -22,8 +23,10 @@
                :turn-outcome    turn-outcome
                :stop-reason     (:execution-result/stop-reason execution-result)
                :tool-call-count (count tool-calls)
-               :recorded-at     (java.time.Instant/now)}))
-     :effects [(journal-append-effect/append-message-effect session-id assistant-message)]
+               :recorded-at     (java.time.Instant/now)}
+              :last-turn-logprobs logprobs))
+     :effects (cond-> [(journal-append-effect/append-message-effect session-id assistant-message)]
+                (seq logprobs) (conj (journal-append-effect/append-logprobs-effect session-id turn-id logprobs)))
      :return {:recorded? true
               :turn-id turn-id
               :outcome turn-outcome

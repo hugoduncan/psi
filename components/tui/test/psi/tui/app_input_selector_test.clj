@@ -121,7 +121,8 @@
       (is (= :slash_command (:context ac)))
       (is (= :auto (:trigger-mode ac)))
       (is (seq (:candidates ac)))
-      (is (some #(= "/help" (:value %)) (:candidates ac))))))
+      (is (some #(= "/help" (:value %)) (:candidates ac)))
+      (is (not-any? #(= "/logprobs" (:value %)) (:candidates ac))))))
 
 (deftest autocomplete-slash-includes-extension-commands-test
   (testing "slash autocomplete includes extension command names"

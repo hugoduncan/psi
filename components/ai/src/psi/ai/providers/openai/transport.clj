@@ -18,6 +18,12 @@
                         (proxy/request-proxy-options url)
                         {:as :stream :cookie-policy :none :throw-exceptions false})))
 
+(defn execute-response
+  [url request]
+  (http/post url (merge request
+                        (proxy/request-proxy-options url)
+                        {:as :text :cookie-policy :none :throw-exceptions false})))
+
 (defn redact-authorization
   [value]
   (when (string? value)

@@ -139,6 +139,7 @@
       (is (string? run-id))
       (is (= :pending (get-in parsed [:psi-tool/workflow :run :status])))
       (is (= {:task "ship it"} (get-in parsed [:psi-tool/workflow :run :workflow-input])))
+      (is (= session-id (get-in parsed [:psi-tool/workflow :run :parent-session-id])))
       (is (= run-id (get-in @(:state* ctx) [:workflows :run-order 0])))))
 
   (testing "workflow create-run plus execute-run completes an ad-hoc inline workflow"

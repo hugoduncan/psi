@@ -26,3 +26,7 @@
 (defn append-session-info-effect
   [session-id name]
   (append-journal-entry-effect session-id (persist/session-info-entry name)))
+
+(defn append-logprobs-effect
+  [session-id turn-id tokens]
+  (append-journal-entry-effect session-id (persist/logprobs-entry turn-id tokens)))

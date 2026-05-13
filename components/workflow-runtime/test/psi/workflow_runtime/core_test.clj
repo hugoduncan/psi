@@ -70,6 +70,20 @@
       (is (= "only-step" (:current-step-id run)))
       (is (= "only-step" (-> run :effective-definition :step-order first))))))
 
+(deftest create-run-preserves-parent-session-id-test
+  (testing "create-run persists the authoritative delegating session id when provided"
+    (let [[state1 definition-id _]
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
+          [_ _ run]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "run-with-parent"
+                                               :parent-session-id "session-delegator"
+                                               :workflow-input {:task "ship it"}})]
+      (is (= "session-delegator" (:parent-session-id run)))
+      (is (= "session-delegator"
+             (get-in run [:history 0 :data :parent-session-id]))))))
+
 (deftest update-run-workflow-input-test
   (testing "update-run-workflow-input replaces workflow input and records history"
     (let [[state1 definition-id _]

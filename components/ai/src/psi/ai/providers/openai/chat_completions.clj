@@ -134,14 +134,18 @@
                               (:tools conversation)))
         effort        (reasoning/reasoning-effort model options)
         temperature   (or (:temperature options) 0)
+        template-kw   (reasoning/chat-template-kwargs model options)
         body          (cond-> {:model          (:id model)
                                :messages       (vec messages)
                                :stream         true
                                :stream_options {:include_usage true}
                                :temperature    temperature}
-                        (:max-tokens options)  (assoc :max_tokens  (:max-tokens options))
-                        (seq tool-defs)        (assoc :tools tool-defs)
-                        effort                 (assoc :reasoning_effort effort))]
+                        (:max-tokens options)       (assoc :max_tokens  (:max-tokens options))
+                        (seq tool-defs)             (assoc :tools tool-defs)
+                        effort                      (assoc :reasoning_effort effort)
+                        template-kw                 (assoc :chat_template_kwargs template-kw)
+                        (:logprobs-enabled options) (assoc :logprobs true
+                                                           :top_logprobs (or (:top-logprobs options) 3)))]
     {:headers (cond-> {"Content-Type" "application/json"}
                 ;; Skip Authorization when :no-auth-header is set
                 ;; (e.g. local servers that reject auth headers)
@@ -283,6 +287,34 @@
                    :content-index idx})))
   (reset! tool-state {}))
 
+(defn- normalize-openai-logprob-token
+  [item]
+  {:token   (:token item)
+   :logprob (:logprob item)
+   :top     (mapv (fn [t] {:token (:token t) :logprob (:logprob t)})
+                  (or (:top_logprobs item) []))})
+
+(defn- normalize-llama-logprob-token
+  [item]
+  {:token   (:content item)
+   :logprob (when-let [p (some-> (:probs item) first :prob)]
+              (when (pos? p) (Math/log p)))
+   :top     (mapv (fn [t] {:token (:tok_str t) :logprob (when (and (:prob t) (pos? (:prob t)))
+                                                          (Math/log (:prob t)))})
+                  (or (:probs item) []))})
+
+(defn- extract-openai-logprob-delta
+  "Extract per-chunk logprob data from OpenAI SSE delta (choices[0].logprobs.content)."
+  [choice]
+  (when-let [tokens (seq (get-in choice [:logprobs :content]))]
+    (mapv normalize-openai-logprob-token tokens)))
+
+(defn- extract-llama-logprob-delta
+  "Extract logprob data from llama.cpp final SSE chunk (completion_probabilities)."
+  [chunk]
+  (when-let [tokens (seq (:completion_probabilities chunk))]
+    (mapv normalize-llama-logprob-token tokens)))
+
 (defn- emit-chat-chunk!
   [stream-state consume-fn choice delta]
   (let [{:keys [stream-started?]} stream-state
@@ -300,6 +332,8 @@
                            {:type :thinking-delta
                             :content-index 0
                             :delta reasoning-delta}))
+    (when-let [logprob-tokens (extract-openai-logprob-delta choice)]
+      (consume-fn {:type :logprob-delta :tokens logprob-tokens}))
     (doseq [[fallback-idx tool-call]
             (map-indexed vector (extract-tool-call-fragments choice delta))]
       (process-chat-tool-call! stream-state consume-fn
@@ -324,6 +358,8 @@
       (do
         (force-start-pending-chat-tools! stream-state consume-fn)
         (emit-chat-tool-ends! stream-state consume-fn)
+        (when-let [logprob-tokens (extract-llama-logprob-delta chunk)]
+          (consume-fn {:type :logprob-delta :tokens logprob-tokens}))
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
                                       done?
@@ -338,6 +374,61 @@
           delta  (:delta choice)]
       (emit-chat-chunk! stream-state consume-fn choice delta)
       (finish-chat-chunk! stream-state consume-fn model chunk choice))))
+
+(defn- non-streaming-request
+  [conversation model options]
+  (let [request (build-request conversation model options)
+        body    (-> (:body request)
+                    (json/parse-string true)
+                    (assoc :stream false)
+                    (dissoc :stream_options))]
+    (assoc request :body (json/generate-string body))))
+
+(defn- tool-call-block
+  [tool-call]
+  {:type :tool-call
+   :id (or (:id tool-call) (content/new-call-id))
+   :name (get-in tool-call [:function :name])
+   :arguments (content/normalize-tool-arguments
+               (get-in tool-call [:function :arguments]))})
+
+(defn- completion-message->content
+  [message]
+  (let [text (content/string-fragment (:content message))
+        tool-calls (mapv tool-call-block (or (:tool_calls message) []))]
+    (cond-> []
+      (seq text) (conj {:type :text :text text})
+      (seq tool-calls) (into tool-calls))))
+
+(defn- completion-response->assistant-message
+  [model body]
+  (let [choice (first (:choices body))
+        message (:message choice)
+        stop-reason (keyword (or (:finish_reason choice) "stop"))
+        usage (some-> (:usage body) (completions-usage-map model))
+        logprobs (or (extract-openai-logprob-delta choice)
+                     (extract-llama-logprob-delta body))]
+    {:assistant-message (cond-> {:role "assistant"
+                                 :content (completion-message->content message)
+                                 :stop-reason stop-reason
+                                 :timestamp (java.time.Instant/now)}
+                          (map? usage) (assoc :usage usage))
+     :logprobs logprobs}))
+
+(defn execute-openai
+  [conversation model options]
+  (let [url     (str (:base-url model) "/chat/completions")
+        request (non-streaming-request conversation model options)]
+    (try
+      (transport/capture-request! model options :openai-completions url request)
+      (let [response (transport/execute-response url request)]
+        (if (transport/error-status? (:status response))
+          (transport/response->error response)
+          (let [body (json/parse-string (:body response) true)
+                _    (transport/capture-response! model options :openai-completions url body)]
+            (completion-response->assistant-message model body))))
+      (catch Exception e
+        (transport/exception->error e)))))
 
 (defn stream-openai
   [conversation model options consume-fn]

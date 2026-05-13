@@ -5,6 +5,7 @@
    construction, wait/timeout/abort handling, and canonical execution-result
    shaping for one prepared turn."
   (:require
+   [psi.ai.core :as ai]
    [psi.ai.models :as models]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.accumulator :as accum]
@@ -128,6 +129,8 @@
                                                           :delta         (:delta event)})
           :toolcall-end             (turn-sc/send-event! turn-ctx :turn/toolcall-end
                                                          {:content-index (:content-index event)})
+          :logprob-delta            (call-action! :on-logprob-delta
+                                                  {:tokens (:tokens event)})
           :done                     (turn-sc/send-event! turn-ctx :turn/done
                                                          {:reason (:reason event)
                                                           :usage  (:usage event)})
@@ -181,12 +184,52 @@
                          {:idle-timeout-ms (:llm-stream-idle-timeout-ms ai-options)
                           :wait-poll-ms    (:llm-stream-wait-poll-ms ai-options)
                           :abort-pred      cancelled-pred})
-        _               (swap! (:turn-data turn-ctx) dissoc :stream-handle)]
+        _               (swap! (:turn-data turn-ctx) dissoc :stream-handle)
+        logprobs        (get @(:turn-data turn-ctx) :logprobs)]
     {:turn-id           turn-id
      :model             ai-model
      :ai-options        ai-options
      :turn-ctx          turn-ctx
-     :assistant-message assistant-msg}))
+     :assistant-message assistant-msg
+     :logprobs          logprobs}))
+
+(defn- response-mode-for
+  [ctx session-id prepared-request]
+  (or (get-in prepared-request [:prepared-request/session-snapshot :response-mode])
+      (:response-mode (ss/get-session-data-in ctx session-id))
+      :streaming))
+
+(defn- execute-non-streaming-turn!
+  [ai-ctx ctx session-id {:keys [ai-conv ai-model base-ai-options turn-id]}]
+  (let [ai-options (capture-aware-ai-options ctx session-id turn-id base-ai-options)
+        result     (if ai-ctx
+                     (ai/execute-response-in ai-ctx ai-conv ai-model ai-options)
+                     (ai/execute-response ai-conv ai-model ai-options))]
+    (if (= :error (:type result))
+      {:turn-id turn-id
+       :model ai-model
+       :ai-options ai-options
+       :assistant-message (cond-> {:role "assistant"
+                                   :content [{:type :error :text (:error-message result)}]
+                                   :stop-reason :error
+                                   :error-message (:error-message result)
+                                   :timestamp (java.time.Instant/now)}
+                            (:http-status result) (assoc :http-status (:http-status result)))
+       :logprobs nil}
+      {:turn-id turn-id
+       :model ai-model
+       :ai-options ai-options
+       :assistant-message (:assistant-message result)
+       :logprobs (:logprobs result)})))
+
+(defn- provider-captures-for-turn
+  [ctx session-id turn-id]
+  {:request-captures  (->> (trs/provider-requests-in ctx session-id)
+                           (filter #(= turn-id (:turn-id %)))
+                           vec)
+   :response-captures (->> (trs/provider-replies-in ctx session-id)
+                           (filter #(= turn-id (:turn-id %)))
+                           vec)})
 
 (defn execute-prepared-request!
   "Execute one prepared request through the live turn runtime.
@@ -198,13 +241,20 @@
                             (:model (ss/get-session-data-in ctx session-id))
                             (models/get-model :sonnet-4.6))
         base-ai-options (or (:prepared-request/ai-options prepared-request) {})
-        {:keys [assistant-message]}
-        (execute-live-turn! ai-ctx ctx session-id
-                            {:ai-conv         ai-conv
-                             :ai-model        ai-model
-                             :base-ai-options base-ai-options
-                             :progress-queue  progress-queue
-                             :turn-id         turn-id})
+        response-mode   (response-mode-for ctx session-id prepared-request)
+        {:keys [assistant-message logprobs]}
+        (if (= :non-streaming response-mode)
+          (execute-non-streaming-turn! ai-ctx ctx session-id
+                                       {:ai-conv ai-conv
+                                        :ai-model ai-model
+                                        :base-ai-options base-ai-options
+                                        :turn-id turn-id})
+          (execute-live-turn! ai-ctx ctx session-id
+                              {:ai-conv         ai-conv
+                               :ai-model        ai-model
+                               :base-ai-options base-ai-options
+                               :progress-queue  progress-queue
+                               :turn-id         turn-id}))
         outcome         (classify-assistant-message assistant-message)]
     {:execution-result/turn-id             turn-id
      :execution-result/session-id          session-id
@@ -212,10 +262,10 @@
      :execution-result/model               ai-model
      :execution-result/assistant-message   assistant-message
      :execution-result/usage               (:usage assistant-message)
-     :execution-result/provider-captures   {:request-captures []
-                                            :response-captures []}
+     :execution-result/provider-captures   (provider-captures-for-turn ctx session-id turn-id)
      :execution-result/turn-outcome        (:turn/outcome outcome)
      :execution-result/tool-calls          (:tool-calls outcome)
      :execution-result/error-message       (:error-message assistant-message)
      :execution-result/http-status         (:http-status assistant-message)
-     :execution-result/stop-reason         (:stop-reason assistant-message)}))
+     :execution-result/stop-reason         (:stop-reason assistant-message)
+     :execution-result/logprobs            logprobs}))

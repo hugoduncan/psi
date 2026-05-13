@@ -304,12 +304,16 @@
     (emit-tool-assembly-progress! progress-queue td :end idx updated
                                   (canonical-provider-tool-call-id (:turn-id @td) (:id updated)))))
 
+(defn- handle-logprob-delta! [td data]
+  (swap! td update :logprob-buffer (fnil conj []) (:tokens data)))
+
 (defn- handle-done! [td done-p progress-queue data]
-  (let [{:keys [thinking-blocks text-buffer tool-calls]} @td
+  (let [{:keys [thinking-blocks text-buffer tool-calls logprob-buffer]} @td
         completed (complete-tool-calls (:turn-id @td) tool-calls)
         content   (build-final-content thinking-blocks text-buffer completed)
         usage     (:usage data)
         stop-reason (or (:reason data) :stop)
+        logprobs  (when (seq logprob-buffer) (into [] cat logprob-buffer))
         final     (cond-> {:role        "assistant"
                            :content     content
                            :stop-reason stop-reason
@@ -317,7 +321,7 @@
                     (map? usage) (assoc :usage usage))]
     (note-last-provider-event! td :done data)
     (emit-tool-assembly-errors! progress-queue completed)
-    (swap! td assoc :final-message final :stop-reason stop-reason)
+    (swap! td assoc :final-message final :stop-reason stop-reason :logprobs logprobs)
     (deliver done-p final)))
 
 (defn- handle-error! [td done-p data]
@@ -368,6 +372,7 @@
         :on-toolcall-start (handle-toolcall-start! ctx session-id td progress-queue ai-model thinking-buffers data)
         :on-toolcall-delta (handle-toolcall-delta! ctx session-id td progress-queue data)
         :on-toolcall-end (handle-toolcall-end! ctx session-id td progress-queue data)
+        :on-logprob-delta (handle-logprob-delta! td data)
         :on-done (handle-done! td done-p progress-queue data)
         :on-error (handle-error! td done-p data)
         :on-reset (reset! td (turn-sc/create-turn-data))

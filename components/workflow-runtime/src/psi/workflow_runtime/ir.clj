@@ -60,14 +60,17 @@
    step-yield-ref-schema])
 
 (def source-spec-schema
-  [:and
+  [:or
    [:map
-    [:from source-ref-schema]
-    [:path {:optional true} path-schema]
-    [:projection {:optional true} projection-schema]]
-   [:fn {:error/message "source-spec cannot contain both :path and :projection"}
-    (fn [{:keys [path projection]}]
-      (not (and path projection)))]])
+    [:value :any]]
+   [:and
+    [:map
+     [:from source-ref-schema]
+     [:path {:optional true} path-schema]
+     [:projection {:optional true} projection-schema]]
+    [:fn {:error/message "source-spec cannot contain both :path and :projection"}
+     (fn [{:keys [path projection]}]
+       (not (and path projection)))]]])
 
 (def output-spec-schema
   [:map
@@ -134,11 +137,17 @@
    [:operation operation-id-schema]
    [:args {:optional true} [:map-of :keyword [:or literal-schema source-spec-schema]]]])
 
+(def response-mode-schema
+  [:enum :streaming :non-streaming])
+
 (def session-spec-schema
   [:map
    [:model {:optional true} [:maybe model-id-schema]]
    [:tools {:optional true} [:vector tool-id-schema]]
    [:skills {:optional true} [:vector skill-id-schema]]
+   [:response-mode {:optional true} [:maybe response-mode-schema]]
+   [:logprobs {:optional true} :boolean]
+   [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
    [:contributions [:vector contribution-schema]]])
 
 (def map-prompt-string-schema
@@ -255,6 +264,16 @@
       :data (:data yield-spec)
       :text (:text yield-spec)
       nil)))
+
+(defn- skills-without-read-errors [step]
+  (when (= :session (:type step))
+    (let [skills (get-in step [:session :skills] [])
+          tools (get-in step [:session :tools] [])
+          has-read? (some #(= "read" %) tools)]
+      (when (and (seq skills) (not has-read?))
+        [{:type :skills-without-read-tool
+          :step (:name step)
+          :skills skills}]))))
 
 (defn- ref-errors [step-index current-step source-ref]
   (when (map? source-ref)
@@ -377,12 +396,14 @@
                                        :step step-name
                                        :output-key output-key
                                        :available-outputs (vec (keys (:outputs step)))}]))
+              skills-read-errors (skills-without-read-errors step)
               ref-errors* (mapcat #(ref-errors step-idx step-name %)
                                   (step-source-refs step))]
           (concat on-without-judge
                   judge-without-routing
                   missing-yields
                   local-yield-errors
+                  skills-read-errors
                   ref-errors*)))
       steps))))
 

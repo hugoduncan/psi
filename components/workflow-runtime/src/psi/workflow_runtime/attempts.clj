@@ -44,13 +44,18 @@
       (update-in [:step-runs step-id :attempts] (fnil conj []) attempt)
       (assoc :updated-at (now))))
 
+(defn set-execution-session-model!
+  [ctx execution-session model]
+  (execution-adapter/set-session-model! ctx (:session-id execution-session) model :session)
+  (assoc execution-session :model model))
+
 (defn create-step-attempt-session!
   "Create one canonical execution child session for a workflow step attempt.
 
    Returns {:attempt attempt-map :execution-session session-data}.
 
    The created session is marked as workflow-owned and linked by run/step/attempt ids."
-  [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection]}]
+  [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection model-fallback]}]
   (let [attempt-id'      (normalize-attempt-id attempt-id)
         child-session-id (str (java.util.UUID/randomUUID))
         result           (execution-adapter/create-child-session!
@@ -59,6 +64,10 @@
                           {:child-session-id           child-session-id
                            :session-name               session-name
                            :system-prompt              system-prompt
+                           :prompt-mode                prompt-mode
+                           :response-mode              response-mode
+                           :logprobs                   logprobs
+                           :top-logprobs               top-logprobs
                            :tool-defs                  tool-defs
                            :thinking-level             thinking-level
                            :model                      model
@@ -82,4 +91,5 @@
       (throw (ex-info "Workflow attempt child session is not schema-valid"
                       {:session-id child-session-id})))
     {:attempt attempt
-     :execution-session child-sd}))
+     :execution-session (cond-> child-sd
+                          model-fallback (assoc :model-fallback model-fallback))}))

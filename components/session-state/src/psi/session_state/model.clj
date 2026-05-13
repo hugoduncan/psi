@@ -52,7 +52,7 @@
 
 (def session-entry-kind-schema
   [:enum :message :thinking-level :model :compaction :branch-summary
-   :custom :custom-message :label :session-info])
+   :custom :custom-message :label :session-info :logprobs])
 
 (def session-entry-schema
   [:map
@@ -78,6 +78,9 @@
 
 (def prompt-mode-schema
   [:enum :lambda :prose])
+
+(def response-mode-schema
+  [:enum :streaming :non-streaming])
 
 (def prompt-component-schema
   [:enum :preamble :context-files :skills :runtime-metadata])
@@ -138,6 +141,7 @@
    [:workflow-step-id {:optional true} [:maybe :string]]
    [:workflow-attempt-id {:optional true} [:maybe :string]]
    [:workflow-owned? {:optional true} :boolean]
+   [:response-mode {:optional true} [:maybe response-mode-schema]]
    [:model {:optional true} [:maybe model-schema]]
    [:thinking-level thinking-level-schema]
    [:is-streaming :boolean]
@@ -185,7 +189,10 @@
    [:tool-output-overrides {:optional true} [:map-of :string [:map
                                                               [:max-lines {:optional true} [:maybe :int]]
                                                               [:max-bytes {:optional true} [:maybe :int]]]]]
-   [:scheduler {:optional true} scheduler-state-schema]])
+   [:scheduler {:optional true} scheduler-state-schema]
+   [:logprobs-enabled {:optional true} :boolean]
+   [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
+   [:last-turn-logprobs {:optional true} [:maybe [:vector :map]]]])
 
 (defn valid-session? [s] (m/validate agent-session-schema s))
 (defn explain-session [s] (m/explain agent-session-schema s))

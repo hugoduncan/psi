@@ -10,7 +10,8 @@
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.query.core :as query]
-   [psi.rpc-test-support :as support]))
+   [psi.rpc-test-support :as support]
+   [psi.rpc.session.command-pickers]))
 
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
@@ -446,6 +447,64 @@
           (future-cancel loop-future)
           (try (.close in-writer) (catch Exception _ nil))
           (try (.close in-reader) (catch Exception _ nil)))))))
+
+(deftest rpc-set-model-scope-test
+  (testing "set_model accepts explicit session scope without persisting project preferences"
+    (let [cwd        (str (System/getProperty "java.io.tmpdir") "/psi-rpc-model-scope-" (java.util.UUID/randomUUID))
+          _          (.mkdirs (java.io.File. cwd))
+          [ctx sid]  (support/create-session-context {:cwd cwd})
+          state      (atom {:transport {:ready? true :pending {}}
+                            :connection {}})
+          handler    (support/make-handler ctx state)
+          input      (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                          "{:id \"m1\" :kind :request :op \"set_model\" :params {:provider \"openai\" :model-id \"gpt-5.3-codex\" :scope \"session\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames     (support/parse-frames out-lines)
+          resp       (some #(when (and (= :response (:kind %)) (= "set_model" (:op %))) %) frames)]
+      (is (some? resp))
+      (is (= true (:ok resp)))
+      (is (= "openai" (get-in (ss/get-session-data-in ctx sid) [:model :provider])))
+      (is (false? (.exists (java.io.File. (str cwd "/.psi/preferences.local.edn")))))))
+
+  (testing "set_model rejects invalid explicit scope"
+    (let [[ctx sid] (support/create-session-context)
+          state     (atom {:transport {:ready? true :pending {}}
+                           :connection {}})
+          handler   (support/make-handler ctx state)
+          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                         "{:id \"m1\" :kind :request :op \"set_model\" :params {:provider \"openai\" :model-id \"gpt-5.3-codex\" :scope \"bogus\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames    (support/parse-frames out-lines)
+          err       (some #(when (= :error (:kind %)) %) frames)]
+      (is (some? err))
+      (is (= "request/invalid-params" (:error-code err)))
+      (is (= "invalid request parameter :scope: session, project, or user"
+             (:error-message err)))))
+
+  (testing "picker-backed model selection preserves omitted-scope/default helper semantics"
+    (let [[ctx sid] (support/create-session-context)
+          captured  (atom nil)
+          emit!     (fn [& _])]
+      (with-redefs [session/set-model-in! (fn [ctx' session-id' model & [scope]]
+                                            (reset! captured {:ctx ctx'
+                                                              :session-id session-id'
+                                                              :model model
+                                                              :scope scope})
+                                            {:model model})]
+        (psi.rpc.session.command-pickers/handle-model-selection!
+         ctx sid
+         (fn [provider id]
+           (when (= [provider id] ["openai" "gpt-5.3-codex"])
+             {:provider :openai :id "gpt-5.3-codex" :supports-reasoning true}))
+         emit!
+         {:provider "openai" :id "gpt-5.3-codex"}))
+      (is (= {:ctx ctx
+              :session-id sid
+              :model {:provider "openai"
+                      :id "gpt-5.3-codex"
+                      :reasoning true}
+              :scope nil}
+             @captured)))))
 
 (deftest rpc-e2e-handshake-query-and-streaming-test
   (testing "handshake -> query_eql -> prompt with interleaved events"

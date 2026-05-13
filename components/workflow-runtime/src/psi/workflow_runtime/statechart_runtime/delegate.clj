@@ -43,6 +43,7 @@
         [state' delegate-run-id _]
         (workflow-runtime/create-run @(:state* ctx)
                                      {:definition-id target-name
+                                      :parent-session-id parent-session-id
                                       :workflow-input prompt-string
                                       :workflow-original context})
         _ (reset! (:state* ctx) state')

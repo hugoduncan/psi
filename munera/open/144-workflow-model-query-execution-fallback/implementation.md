@@ -1,0 +1,82 @@
+Implementation notes:
+- task created to add workflow-local fallback across ranked `:model-query` candidates after observing `local-logprobs` fail on a first-ranked local candidate with `Connection refused`
+- scope intent: mirror auto-session-name’s ranked-candidate resilience pattern, but keep ownership in workflow execution rather than global model selection or ordinary session execution
+- to decide before code changes:
+  - the narrowest seam where ranked candidates should be preserved or reintroduced
+  - the fallback-worthy execution failure predicate
+  - how fallback attempts should appear in workflow attempt/session bookkeeping without obscuring diagnosis
+- 2026-05-11 ambiguity review:
+  - design/plan leave the authoritative ranked-sequence carrier ambiguous: current `resolve-step-session-config` collapses `:model-query` to one concrete `:model`, but the task text still allows either carrying ranked metadata in session-config or re-resolving at execution; choose one authoritative shape so implementation and proof do not drift.
+  - design/acceptance do not yet define the public failure contract for ranked-candidate exhaustion: specify where aggregate candidate failures live and how the terminal error appears in workflow attempt/result bookkeeping so fallback diagnostics are testable rather than implicit.
+- 2026-05-11 ambiguity follow-up execution:
+  - inventoried the current path: `psi.workflow-step-session-config.core/resolved-step-model` currently calls `psi.ai.model-selection/resolve-selection` and collapses query models to one concrete `:model`; `psi.workflow-runtime.statechart-runtime` then consumes that session-config to create one canonical child attempt session via `psi.workflow-runtime.attempts/create-step-attempt-session!`.
+  - chosen authoritative ranked-sequence carrier: preserve ranked fallback metadata in `resolve-step-session-config` output while keeping the compatibility concrete `:model` field set to the first ranked candidate; workflow runtime consumes that preserved ranked sequence once per step attempt and must not re-rank between candidate attempts.
+  - chosen exhaustion contract: ranked-candidate exhaustion is recorded on the single canonical workflow attempt as `:execution-error`, with a stable exhaustion reason and ranked `:candidate-failures` details; no synthetic extra workflow attempts are created for individual candidates.
+  - no `steps.md` execution performed; this pass only completed ambiguity follow-up in task design artifacts.
+- 2026-05-11 inconsistency review:
+  - actionable inconsistency: `design.md`, `plan.md`, and `steps.md` all require the fallback-worthy execution failure predicate to be chosen and recorded in `implementation.md` before code changes, but `implementation.md` still leaves that predicate undecided; record the canonical predicate (and where it is applied) before implementation/proof so task intent and execution guidance match.
+- 2026-05-11 inconsistency follow-up execution:
+  - canonical fallback-worthy execution failure predicate chosen: only bounded workflow child-session turn failures whose terminal payload indicates execution-time provider availability/transport failure are eligible for ranked-candidate fallback.
+  - authoritative first classification seam: `psi.workflow-runtime.turn-execution-contract/execute-session-turn!`, because it is the lower bounded execution owner that converts provider/session turn outcomes into canonical workflow failure payloads.
+  - implementation intent at that seam: enrich the canonical `:failure` payload from `execution-failure-payload` with stable machine-readable classification (for example a dedicated reason/category) when the underlying execution result or assistant error message shows transport/unreachable/provider-execution failure such as connection refused.
+  - runtime application seam: workflow candidate iteration should consume only that canonical classified failure payload from `psi.workflow-runtime.statechart-runtime.step-execution/execute-session-step!`; it must not re-inspect provider-specific raw exception shapes throughout workflow runtime.
+  - terminal/non-fallback cases: workflow/judge result failures, invalid workflow definitions, deterministic local shaping/validation failures, and ordinary semantic model responses remain terminal for the ranked candidate sequence.
+  - no `steps.md` execution performed; this pass only resolved the pre-code inconsistency by recording the predicate and application seam.
+- 2026-05-11 implementation execution:
+  - extended `psi.workflow-step-session-config.core/resolve-step-session-config` so authored workflow `:model-query` specs preserve ranked fallback metadata under `:model-fallback` while retaining the compatibility concrete `:model` as the first ranked candidate.
+  - preserved explicit concrete workflow models on the existing single-model path with no ranked metadata added.
+  - added canonical fallback classification in `psi.workflow-runtime.turn-execution-contract`: transport/provider availability failures such as connection refused now surface `:reason :provider-unavailable` and `:fallback-worthy? true` on the bounded failure payload.
+  - added workflow-local ranked candidate iteration in `psi.workflow-runtime.statechart-runtime.step-execution/execute-session-step!`; iteration reuses the single canonical workflow attempt, sets successive concrete child-session models in ranked order, stops on the first success, and does not mint synthetic per-candidate workflow attempts.
+  - exhaustion now records one terminal `:execution-error` with `:reason :ranked-candidate-exhausted` and ranked `:candidate-failures`; non-fallback-worthy failures remain terminal as their original canonical failure payload rather than being wrapped as exhaustion.
+  - added focused proof in:
+    - `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj`
+    - `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`
+    - `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/step_execution_test.clj`
+  - focused verification green: `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test` → `28 tests, 84 assertions, 0 failures`.
+  - lint green: `clojure -M:lint --lint components/workflow-step-session-config components/workflow-runtime components/agent-session tests.edn deps.edn` → `0 errors, 0 warnings`.
+- 2026-05-11 implementation review:
+  - no new actionable implementation issues found after reviewing `design.md`, `plan.md`, `steps.md`, `implementation.md`, workflow fallback runtime owners, and focused fallback proofs.
+  - verified the shipped fallback shape matches task intent: ranked metadata is preserved once in `resolve-step-session-config`, concrete models stay single-shot, fallback-worthy failures are classified in `turn-execution-contract`, and ranked exhaustion stays on one canonical attempt as aggregate `:execution-error`.
+  - re-ran focused proof and lint successfully:
+    - `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test` → `28 tests, 84 assertions, 0 failures`
+    - `clojure -M:lint --lint components/workflow-step-session-config components/workflow-runtime components/agent-session tests.edn deps.edn` → `0 errors, 0 warnings`
+  - explicit result: no new actionable feedback.
+- 2026-05-11 follow-up execution:
+  - preloaded review result confirmed no newly added unchecked actionable items in `steps.md`; all task steps were already complete.
+  - no code or task-artifact execution was possible/needed beyond recording this no-op follow-up result.
+- 2026-05-11 test review:
+  - reviewed task artifacts plus the workflow fallback proof owners named in `implementation.md` against `task-test-review`: `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj`, `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`, `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/step_execution_test.clj`, and the fallback classification seam in `components/workflow-runtime/src/psi/workflow_runtime/turn_execution_contract.clj`.
+  - confirmed focused proof still covers the task acceptance behaviours: ranked fallback success, concrete-model no-fallback, terminal non-fallback failure, ranked exhaustion, and empty/no-winner ranked metadata handling.
+  - re-ran focused proof and lint successfully:
+    - `clojure -M:test --focus psi.agent-session.workflow-statechart-runtime-test --focus psi.workflow-step-session-config.core-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test` → `28 tests, 84 assertions, 0 failures`
+    - `clojure -M:lint --lint components/workflow-step-session-config components/workflow-runtime components/agent-session tests.edn deps.edn` → `0 errors, 0 warnings`
+  - explicit result: no new actionable test feedback.
+- 2026-05-11 follow-up execution:
+  - read the preloaded review result plus `steps.md`, `implementation.md`, `design.md`, and `plan.md` for task `144-workflow-model-query-execution-fallback`.
+  - confirmed there were no newly added unchecked actionable follow-up items to execute; `steps.md` remains fully checked and aligned with the prior implementation/review/test-review passes.
+  - no blocking unfinished step exists, so no additional code or task-artifact changes were required beyond recording this verification.
+- 2026-05-11 test-shaper review:
+  - reviewed task artifacts plus the workflow fallback production/test owners against `.psi/skills/test-shaper/SKILL.md` for clarity, signal, robustness, determinism, behavior focus, and economical coverage.
+  - no new actionable test-shaping feedback: focused proofs remain behavior-oriented and cover the acceptance partitions without obvious redundancy or hidden incidental setup.
+  - explicit result: no new actionable feedback.
+- 2026-05-11 test-shaper review (independent pass):
+  - reread `.psi/skills/test-shaper/SKILL.md`, task artifacts, `components/workflow-step-session-config/src/psi/workflow_step_session_config/core.clj`, `components/workflow-runtime/src/psi/workflow_runtime/turn_execution_contract.clj`, `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj`, and the focused fallback proofs in `components/workflow-step-session-config/test/psi/workflow_step_session_config/core_test.clj`, `components/workflow-runtime/test/psi/workflow_runtime/statechart_runtime/step_execution_test.clj`, and `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj`.
+  - no new actionable test-shaping feedback: the fallback proof remains deterministic, behavior-focused, and partitioned across success, terminal failure, exhaustion, concrete-model no-fallback, and no-winner/empty-candidate handling without obvious redundant cases.
+  - explicit result: no new actionable feedback.
+- 2026-05-11 follow-up execution:
+  - used the preloaded review result plus `steps.md`, `implementation.md`, `design.md`, and `plan.md` to identify newly added actionable follow-up work.
+  - confirmed no newly added unchecked follow-up items exist in `steps.md`; all task checklist items remain complete.
+  - no blocking unfinished step exists, so no further code or task-artifact changes were required beyond recording this no-op execution pass.
+- 2026-05-11 follow-up execution (independent pass):
+  - checked `steps.md` after the independent test-shaper review and confirmed it introduced no new actionable unchecked follow-up items.
+  - explicit no-op result: no code, test, or task-artifact changes were required beyond recording that this pass produced no new actionable feedback.
+- 2026-05-11 follow-up execution (preloaded review result pass):
+  - read the preloaded review result together with `steps.md`, `implementation.md`, `design.md`, and `plan.md` for task `144-workflow-model-query-execution-fallback`.
+  - confirmed the task still has no newly added actionable unchecked follow-up items; `steps.md` and `design-steps.md` remain fully checked/already non-actionable for this implementation slice.
+  - explicit no-op result: nothing remained to execute, so no code or checklist changes were required beyond recording this verification pass.
+- 2026-05-11 code-shaper review:
+  - actionable consistency issue: `psi.workflow-runtime.statechart-runtime.step-execution/execute-with-ranked-fallback!` always calls `attempts/set-execution-session-model!` for the first ranked candidate even though the child session is already created with that concrete `:model`; the concrete-model single-shot path executes without an extra model mutation.
+  - shaping follow-up: make ranked fallback reuse the session’s initial model for the first candidate and only mutate the child session when advancing to later fallback candidates, so fallback and non-fallback execution paths have one obvious model-setting story with fewer unnecessary side effects.
+- 2026-05-11 follow-up execution:
+  - implemented the code-shaper follow-up in `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj`: ranked fallback now reuses the child session's initial concrete model for the first candidate and only calls `attempts/set-execution-session-model!` when advancing to later ranked candidates.
+  - updated focused workflow fallback proofs in `components/agent-session/test/psi/agent_session/workflow_statechart_runtime_test.clj` so ranked fallback success/exhaustion assert only later-candidate model mutations while first-candidate terminal behavior remains mutation-free.

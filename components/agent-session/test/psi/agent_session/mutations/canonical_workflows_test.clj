@@ -50,12 +50,15 @@
           _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
                                                             :definition sample-definition})
           result (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                                        :session-id "delegating-session"
                                                         :definition-id "test-workflow"
                                                         :workflow-input {:input "hello" :original "hello"}
                                                         :run-id "run-1"})]
       (is (= "run-1" (:psi.workflow/run-id result)))
       (is (= :pending (:psi.workflow/status result)))
       (is (nil? (:psi.workflow/error result)))
+      (is (= "delegating-session"
+             (get-in @(:state* ctx) [:workflows :runs "run-1" :parent-session-id])))
       (is (some? (get-in @(:state* ctx) [:workflows :runs "run-1"])))))
 
   (testing "returns error for unknown definition"

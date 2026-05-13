@@ -234,6 +234,17 @@
                      calls))
       (should (eq 'idle (psi-emacs-state-run-state psi-emacs--state))))))
 
+(ert-deftest psi-set-model-with-scope-dispatches-canonical-rpc-op ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((calls (psi-test--capture-request-sends
+                  (lambda ()
+                    (psi-emacs-set-model "openai" "gpt-5.3-codex" "session")))))
+      (should (equal '(("set_model" ((:provider . "openai") (:model-id . "gpt-5.3-codex") (:scope . "session"))))
+                     calls))
+      (should (eq 'idle (psi-emacs-state-run-state psi-emacs--state))))))
+
 (ert-deftest psi-set-model-no-arg-queries-runtime-catalog-and-dispatches-selection ()
   (with-temp-buffer
     (psi-emacs-mode)
@@ -757,10 +768,7 @@
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
 (ert-deftest psi-on-rpc-event-defers-frontend-action-prompts-out-of-process-filter-path ()
-  "Frontend action prompts should be deferred off the process filter path.
-
-Regression: bare `/tree` now arrives as `ui/frontend-action-requested`. Prompting
-synchronously from the RPC event callback can make Emacs appear to do nothing."
+  "Defer frontend action prompts off the process filter path."
   (with-temp-buffer
     (psi-emacs-mode)
     (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
@@ -787,10 +795,5 @@ synchronously from the RPC event callback can make Emacs appear to do nothing."
         (should (functionp scheduled-fn))
         (funcall scheduled-fn)
         (should (equal frame handled))))))
-
-
 ;;; Command/session dispatch tests moved to psi-dispatch-command-test.el
-
 (provide 'psi-dispatch-test)
-
-;;; psi-dispatch-test.el ends here

@@ -95,5 +95,29 @@ Bootstrapped on 2026-04-02.
   - 3 focused unit tests in `resolvers_test.clj`; `root-queryable-attrs-contract-test` auto-covers the new attr
   - 1678 tests, 12513 assertions, 0 failures; lint clean; live query verified
 
+- Task 140 logprobs-openai-completions-flag is now complete and closed:
+  - added `:logprobs-enabled` / `:top-logprobs` / `:last-turn-logprobs` to `agent-session-schema`; `:logprobs` to `session-entry-kind-schema`
+  - `build-request` injects `"logprobs": true` / `"top_logprobs": N` when enabled; `session->request-options` propagates the flags
+  - `extract-openai-logprob-delta` (per-chunk) and `extract-llama-logprob-delta` (final chunk) emit `:logprob-delta` events; routed in `make-provider-event-consumer`
+  - `handle-logprob-delta!` accumulates token vectors into `:logprob-buffer`; `handle-done!` flattens to `:logprobs` on turn-data; `execute-live-turn!` returns `:logprobs`; `execute-prepared-request!` includes `:execution-result/logprobs`
+  - `build-record-response` writes `:last-turn-logprobs` to session-data and appends `:logprobs` journal entry when non-empty
+  - `journal->provider-messages` skips `:logprobs` entries during provider message projection (logprob data is persisted in the journal but no longer projected as synthetic user messages; analysis is handled out-of-band by the `logprobs/perplexity` extension operation)
+  - `:psi.agent-session/last-turn-logprobs` EQL resolver added
+  - `/logprobs [on|off|N]` command: `set-logprobs-in!` in session_settings + core; `:session/set-logprobs` handler with `(or top-n 3)` nil-guard; `prefixed-command-prefixes` + `builtin-slash-commands` + `format-help` updated
+  - 3 new test namespaces; 1702 tests, 0 failures
+- Task 145 logprobs-out-of-band-extension is now complete locally:
+  - removed synthetic logprob projection from both `prompt_request.clj` and workflow session-step transcript shaping; session-step `:transcript` is assistant-message only
+  - enriched `session_turn_finished` payload with `:logprobs` and structured `:assistant-message`
+  - added `extensions.logprobs/logprobs-perplexity` deterministic operation surface via `logprobs/perplexity`
+  - updated `local-logprobs` workflow to `run → perplexity → report`
+  - simplified extension storage from per-session cache to a single latest snapshot carrying `:session-id`, `:turn-id`, `:logprobs`, and `:assistant-message`
+  - removed `logprobs-table` command and stale `/logprobs on` guidance from the extension
+  - focused extension verification green after simplification: `7 tests, 43 assertions, 0 failures`; lint clean
+- Local OpenAI-compatible chat-completions requests now project `/thinking off` onto `chat_template_kwargs.enable_thinking=false` for models marked `:locality :local`, while cloud models keep the existing reasoning-effort-only behavior.
+  - implementation lives in `psi.ai.providers.openai.reasoning/chat-template-kwargs` and `psi.ai.providers.openai.chat-completions/build-request`
+  - focused proof added in `psi.ai.providers.openai-test`
+  - docs updated in `doc/custom-providers.md`; changelog updated
+  - verification green: `clojure -M:test --focus psi.ai.providers.openai-test` → `24 tests, 119 assertions, 0 failures`
+
 ## Suggested next step
 - Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `134-psi-tool-mutation-surface-and-active-session-introspection`.

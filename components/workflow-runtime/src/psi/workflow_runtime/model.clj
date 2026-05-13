@@ -182,6 +182,7 @@
    [:status workflow-run-status-schema]
    [:effective-definition :map]
    [:source-definition-id {:optional true} [:maybe workflow-definition-id-schema]]
+   [:parent-session-id {:optional true} [:maybe :string]]
    [:workflow-input {:optional true} :any]
    [:workflow-original {:optional true} :any]
    [:current-step-id {:optional true} [:maybe workflow-step-id-schema]]

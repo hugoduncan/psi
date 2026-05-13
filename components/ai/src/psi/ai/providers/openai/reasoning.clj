@@ -23,3 +23,16 @@
     (get thinking-level->effort
          (:thinking-level options)
          "medium")))
+
+(defn chat-template-kwargs
+  "Return OpenAI-compatible chat_template_kwargs overrides for MODEL/OPTIONS,
+   or nil when no override should be sent.
+
+   Some local OpenAI-compatible servers expose hidden reasoning through a
+   nonstandard chat_template_kwargs.enable_thinking flag. Psi projects the
+   canonical :thinking-level control onto that local-only transport extension
+   when thinking is explicitly off."
+  [model options]
+  (when (and (= :local (:locality model))
+             (= :off (:thinking-level options)))
+    {:enable_thinking false}))

@@ -106,8 +106,10 @@
   (turn/consume-queued-input-text-in! ctx session-id))
 
 (defn set-model-in!
-  [ctx session-id model]
-  (settings/set-model-in! ctx session-id model))
+  ([ctx session-id model]
+   (settings/set-model-in! ctx session-id model))
+  ([ctx session-id model scope]
+   (settings/set-model-in! ctx session-id model scope)))
 
 (defn set-thinking-level-in!
   [ctx session-id level]

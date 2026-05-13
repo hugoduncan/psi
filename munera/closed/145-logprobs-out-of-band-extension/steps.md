@@ -1,0 +1,28 @@
+# Steps
+
+- [x] Remove logprob conversation projection from `prompt_request.clj`: delete `logprob-uncertain-threshold`, `format-logprob-line`, `format-logprob-message`, `format-token-str`, `format-prob`, and the `:logprobs` branch in `journal->provider-messages`. Update or remove affected tests.
+  - commit: 6dac4426
+- [x] Remove logprob formatting from `step_execution.clj`: delete `logprob-uncertain-threshold`, `format-logprob-line`, `format-logprob-message`, `format-token-str`, `format-prob`, and `transcript-with-logprobs`. Change `:transcript` raw output to `(when assistant-message [assistant-message])` (assistant message only, no synthetic logprob user message). Update affected tests.
+  - commit: a4e33bab
+- [x] Add `:session-id` to session-step raw outputs in `step_execution.clj`: include `(:session-id execution-session)` in the `raw-outputs` map of `execute-session-step!`.
+  - commit: a4e33bab (combined with step 2)
+- [x] Enrich `session_turn_finished` event payload: thread `:logprobs` and `:assistant-message` from `terminal-result` through `prompt-finish-base-result` into the `:notify/extension-dispatch` effect payload. Add focused test.
+  - commit: da03445e
+- [x] Create `extensions/logprobs/` extension with `extensions.logprobs` namespace: `init` subscribes to `session_turn_finished`, stores a single last logprob-bearing snapshot (`:session-id` + logprobs + assistant-message + turn-id) in an atom — only replaces on non-empty logprobs, retains on empty. Registers `logprobs/perplexity` deterministic operation returning session-id, perplexity, token-count, turn-id, and reply-text (`:reply-text` derived via `turn-execution-contract/assistant-message-text`). Add focused tests for perplexity calculation, event-driven storage, session-id matching, and retention across logprob-free turns.
+  - commit: f5fce64a; simplified further in 729ecfd9
+- [x] Update the `local-logprobs` workflow: replace the two-step layout with three steps (run → perplexity invoke → report). The `perplexity` invoke step sources `:session-id` from `{:from {:step "run" :output :session-id}}`. The `report` step's vars reference `run`'s `:final-llm-reply` and `perplexity`'s `:result` envelope (via `:path`) for perplexity and token-count values.
+  - commit: e582e29d
+- [x] Verify end-to-end: lint clean, focused tests green, no regressions in broader logprob/workflow test suites.
+  - 27 focused tests, 80 assertions, 0 failures
+  - 1898 total tests, 7 pre-existing failures (3 workflow-execution-test dynamic delegate + 4 tmux integration environmental), 0 new failures
+  - lint: 0 errors, 0 warnings
+- [x] Fix `:token-count` in `perplexity-result` to use filtered count (tokens with non-nil `:logprob`) instead of `(count logprobs)`. Add test asserting `:token-count` matches effective N when tokens contain nil logprobs.
+- [x] Add CHANGELOG entry under `[Unreleased]`: Added — `logprobs/perplexity` deterministic operation; Changed — logprob data moved out-of-band (no longer injected as synthetic user messages in conversation context); Changed — `local-logprobs` workflow uses structured `logprobs/perplexity` invoke step.
+- [x] Update `mementum/state.md` line 104: `journal->provider-messages` no longer projects `:logprobs` entries — they are persisted but skipped during provider message projection.
+- [x] Replace the earlier multi-session isolation expectation with single-snapshot semantics in `extensions/logprobs_test.clj`: verify the stored snapshot carries `:session-id`, that matching session requests succeed, and that mismatched session requests return the empty result.
+  - commit: 729ecfd9
+- [x] Add `calculate-perplexity` edge-case tests: (a) all-nil-logprob tokens → returns nil; (b) single token → returns `exp(-logprob)`.
+- [x] Acknowledge `:session-id` raw output test gap in `step_execution_test.clj` — `execute-session-step!` requires full runtime context so a unit test is impractical; add a comment in `step_execution_test.clj` noting the surface is integration-tested via workflow execution, or add assertion in an existing integration test if one exercises session-step outputs.
+- [x] Fix `prompt-finish-dispatches-extension-turn-finished-event-test` in `prompt_lifecycle_test.clj:531`: update expected payload to include `:assistant-message` from the enriched `session_turn_finished` event. This test was broken by the event enrichment change and is a regression, not a pre-existing failure.
+- [x] Fix `invoke-to-session-workflow-executes-and-exposes-cross-form-results-test` in `workflow_invoke_runtime_test.clj:186`: update expected `report-accepted` outputs to include `:logprobs`, `:session-id`, and `:transcript` (now `[assistant-message]` instead of nil). Broken by session-step raw output expansion.
+- [x] Correct the verify step note: actual failure count is 3 pre-existing (workflow-execution-test dynamic delegate) + 4 tmux integration (environmental), 0 new failures from this task.

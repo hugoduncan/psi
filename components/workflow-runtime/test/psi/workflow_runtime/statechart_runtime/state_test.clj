@@ -39,3 +39,13 @@
     (testing "working memory seeds zero iteration and attempt counts for each step"
       (is (= {"plan" 0 "build" 0} (:iteration-counts wm)))
       (is (= {"plan" 0 "build" 0} (:attempt-counts wm))))))
+
+(deftest create-working-memory-falls-back-to-run-parent-session-id-test
+  (let [[state _ _] (workflow-runtime/create-run {:workflows {:runs {} :run-order []}}
+                                                 {:definition linear-definition
+                                                  :run-id "run-2"
+                                                  :parent-session-id "delegating-session"
+                                                  :workflow-input {:input "ship it"}})
+        ctx {:state* (atom state)}
+        wm (state/create-working-memory ctx (:parent-session-id (workflow-runtime/workflow-run-in state "run-2")) "run-2")]
+    (is (= "delegating-session" (:parent-session-id wm)))))

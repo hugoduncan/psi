@@ -4,7 +4,8 @@
    [psi.agent-session.core :as session-core]
    [psi.session-state.state :as session-state]
    [psi.agent-session.test-support :as test-support]
-   [psi.workflow-runtime.attempts :as workflow-attempts]))
+   [psi.workflow-runtime.attempts :as workflow-attempts]
+   [psi.workflow-runtime.execution-adapter]))
 
 (defn- create-session-context
   ([]
@@ -25,6 +26,9 @@
             :workflow-step-id "plan"
             :attempt-id "attempt-1"
             :session-name "workflow plan attempt"
+            :response-mode :non-streaming
+            :logprobs true
+            :top-logprobs 4
             :tool-defs []
             :thinking-level :off})]
       (is (= "attempt-1" (:attempt-id attempt)))
@@ -35,6 +39,9 @@
       (is (= "run-1" (:workflow-run-id execution-session)))
       (is (= "plan" (:workflow-step-id execution-session)))
       (is (= "attempt-1" (:workflow-attempt-id execution-session)))
+      (is (= :non-streaming (:response-mode execution-session)))
+      (is (true? (:logprobs-enabled execution-session)))
+      (is (= 4 (:top-logprobs execution-session)))
       (is (= parent-session-id (:parent-session-id execution-session)))
       (is (instance? java.time.Instant (:created-at execution-session)))
       (is (instance? java.time.Instant (:updated-at execution-session)))
@@ -42,6 +49,44 @@
       (is (some? (session-state/agent-ctx-in ctx (:session-id execution-session))))
       (is (some? (session-state/sc-session-id-in ctx (:session-id execution-session))))
       (session-core/shutdown-context! ctx))))
+
+(deftest create-step-attempt-session-preserves-combined-response-mode-and-logprobs-controls-test
+  (testing "workflow attempt child-session creation preserves non-streaming and logprob controls on the same path"
+    (let [[ctx parent-session-id] (create-session-context {:persist? false})
+          {:keys [execution-session]}
+          (workflow-attempts/create-step-attempt-session!
+           ctx
+           parent-session-id
+           {:workflow-run-id "run-1"
+            :workflow-step-id "plan"
+            :attempt-id "attempt-2"
+            :session-name "workflow plan attempt"
+            :response-mode :non-streaming
+            :logprobs true
+            :top-logprobs 6
+            :tool-defs []
+            :thinking-level :off})]
+      (is (= {:response-mode :non-streaming
+              :logprobs-enabled true
+              :top-logprobs 6}
+             (select-keys execution-session [:response-mode :logprobs-enabled :top-logprobs])))
+      (session-core/shutdown-context! ctx))))
+
+(deftest set-execution-session-model-is-session-scoped-test
+  (testing "workflow-owned execution-session model updates are explicitly session-scoped"
+    (let [calls* (atom [])
+          execution-session {:session-id "child-1"}]
+      (with-redefs [psi.workflow-runtime.execution-adapter/set-session-model!
+                    (fn [_ctx sid model scope]
+                      (swap! calls* conj {:session-id sid :model model :scope scope})
+                      {:ok true})]
+        (is (= {:session-id "child-1"
+                :model {:provider "openai" :id "gpt-5"}}
+               (workflow-attempts/set-execution-session-model! {} execution-session {:provider "openai" :id "gpt-5"})))
+        (is (= [{:session-id "child-1"
+                 :model {:provider "openai" :id "gpt-5"}
+                 :scope :session}]
+               @calls*))))))
 
 (deftest append-attempt-to-run-test
   (testing "append-attempt-to-run records attempt under the selected step"
