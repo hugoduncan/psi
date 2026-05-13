@@ -194,6 +194,23 @@ then to `"invalid value"` as a final catch-all. Description is never blank.
 **Verification:** 1757 tests, 12130 assertions, 0 failures; lint 0 errors, 0 warnings.
 All acceptance criteria now fully satisfied including verification expectation #4.
 
+### code-shaper follow-up pass (2026-05-13) — ns docstring + guard tightening
+
+**Item 1 — ns docstring updated:**
+Added "human-readable formatting of all compilation error types (compile errors,
+structural Malli errors, and semantic validation errors)" as the third bullet in
+the `ns` docstring. The namespace is now locally comprehensible: its three
+responsibilities are declared at the top.
+
+**Item 2 — `format-compile-error` guard tightened:**
+Changed `(if step-name ...)` to `(if (and step-name (some? step-index)) ...)`.
+Updated the docstring to document the co-presence invariant enforced by
+`compile-step-with-context` and explain why the guard is symmetric.
+
+Verification: lint 0 errors, 0 warnings; focused test suites:
+- `compilation-error-format-test`: 16 tests, 70 assertions, 0 failures
+- `ir-test`: 3 tests, 69 assertions, 0 failures
+
 ### code-shaper review (2026-05-13)
 
 **Simplicity gap — ir.clj ns docstring out of sync with actual scope.**

@@ -1,10 +1,12 @@
 (ns psi.workflow-runtime.ir
-  "Canonical normalized workflow IR schema and minimal semantic validation.
+  "Canonical normalized workflow IR schema, semantic validation, and error formatting.
 
    This namespace defines the runtime-owned validation boundary for compiled
    workflow IR values. It owns:
    - Malli structural schemas for normalized workflow IR
    - minimal IR-intrinsic semantic validation only
+   - human-readable formatting of all compilation error types (compile errors,
+     structural Malli errors, and semantic validation errors)
 
    Semantic checks intentionally stop at invariants intrinsic to normalized IR:
    - step refs must target prior steps only
@@ -491,11 +493,14 @@
 (defn- format-compile-error
   "Format a compile-error map `{:message string :data map}` into a human-readable line.
 
-   When `:step-name` is present in `:data`, prefixes the message with step context."
+   When both `:step-name` and `:step-index` are present in `:data`, prefixes the
+   message with step context. Both keys are always co-present when set by
+   `compile-step-with-context`; the guard enforces this invariant defensively so
+   a partial map cannot produce \"(index nil)\" output."
   [{:keys [message data]}]
   (let [step-name  (:step-name data)
         step-index (:step-index data)]
-    (if step-name
+    (if (and step-name (some? step-index))
       (str "Step '" step-name "' (index " step-index "): " message)
       message)))
 
