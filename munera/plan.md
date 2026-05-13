@@ -10,6 +10,7 @@ Backlog:
 `munera/open/136-built-in-registration-path-for-workflow/`
 `munera/open/141-workflow-child-session-non-streaming-execution/`
 `munera/open/144-workflow-model-query-execution-fallback/`
+`munera/open/147-workflow-child-session-creation-contract/`
 `munera/open/134-psi-tool-mutation-surface-and-active-session-introspection/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
