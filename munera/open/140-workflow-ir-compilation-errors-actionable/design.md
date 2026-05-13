@@ -4,6 +4,9 @@
 - GitHub issue: #73
 - Issue URL: https://github.com/hugoduncan/psi/issues/73
 - Issue title: Make workflow IR compilation errors actionable
+- PR: #89
+- PR URL: https://github.com/hugoduncan/psi/pull/89
+- PR branch: 73-workflow-ir-compilation-errors
 
 ## Problem Statement
 
@@ -120,8 +123,8 @@ Add `format-compilation-errors` in `workflow-runtime/ir.clj` (or a new thin
 a single human-readable string.
 
 Formatting rules:
-- If `compile-error` is non-nil: include `ex-data` fields `:step-name` and
-  `:step-index` when present.
+- If `compile-error` is non-nil: it is a map `{:message string :data map}`.
+  Include `:step-name` and `:step-index` from `:data` when present.
   Format: `"Step '<name>' (index <N>): <message>"` or `"<message>"` when no step
   context is available.
 - If `structural-errors` is non-nil: render the Malli explain-data into human-readable
@@ -150,12 +153,19 @@ Replace the opaque throw in `compile-definition-to-ir!` with:
                   {:source source
                    :definition-id (:definition-id definition)
                    :authored-grammar :target
-                   :compile-error compile-error
+                   :compile-error compile-error   ; {:message string :data map} or nil
                    :structural-errors structural-errors
                    :semantic-errors semantic-errors})))
 ```
 
 The `ex-data` is preserved for programmatic consumers; the message is now actionable.
+
+Note: `compile-error` in `ex-data` is now a map `{:message … :data …}` (not a bare
+string). Any consumer that previously read `(get (ex-data e) :compile-error)` as a
+string must be updated to use `(get-in (ex-data e) [:compile-error :message])`.
+In this codebase no external consumer reads `:compile-error` directly — the existing
+tests only check `:compile-error` via `compile-and-validate-workflow-definition`
+return values, so the shape change is contained to that return map and `core.clj`.
 
 ## Main Data Structures and State Shapes
 
@@ -181,10 +191,41 @@ No new persistent state. The internal error data shapes are:
 }
 ```
 
+### Compile-error return shape from `compile-and-validate-workflow-definition`
+
+`compile-and-validate-workflow-definition` currently stores only `.getMessage e` (a
+string) in `:compile-error`. The formatter needs `:step-name` and `:step-index` from
+`ex-data` to emit step-contextual messages. Therefore the catch block must be updated
+to also capture `ex-data`:
+
+```clojure
+;; updated catch block in compile-and-validate-workflow-definition
+(catch clojure.lang.ExceptionInfo e
+  {:valid? false
+   :ir nil
+   :structural-errors nil
+   :semantic-errors []
+   :compile-error {:message (ex-message e)
+                   :data    (ex-data e)}})
+```
+
+`compile-definition-to-ir!` in `core.clj` destructures `:compile-error` as a map
+(not a string) and passes it to `format-compilation-errors`. The docstring for
+`compile-and-validate-workflow-definition` must be updated to reflect the new shape:
+
+```clojure
+;; updated return spec comment
+{:valid? boolean
+ :ir workflow-ir?
+ :structural-errors explain-data?
+ :semantic-errors [error*]
+ :compile-error {:message string :data map}?}   ; nil when no compile error
+```
+
 ### Formatter input / output
 ```clojure
 ;; input
-compile-error     : string? | nil
+compile-error     : {:message string :data map}? | nil
 structural-errors : malli/explain-data | nil
 semantic-errors   : [semantic-error-map]
 
@@ -198,7 +239,13 @@ string  ; multi-line human-readable message
 - `psi.workflow-runtime.target-ir-compiler`
   - Add `compile-step-with-context` private helper.
   - Change `compile-workflow-definition` to use it (replaces `(mapv compile-step ...)`)
-  - No public API change.
+  - Change `compile-and-validate-workflow-definition` catch block: `:compile-error`
+    value changes from `string` to `{:message string :data map}`.
+    Docstring updated to reflect new return shape.
+  - **Existing callers**: `compile-target-dynamic-delegate-invalid-target-shape-test`
+    and `compile-target-judge-routing-and-loop-bounds-test` in
+    `target_ir_compiler_test.clj` compare `:compile-error` to a string — these tests
+    must be updated to compare against `(get-in result [:compile-error :message])`.
 
 - `psi.workflow-runtime.ir` (preferred) or new `psi.workflow-runtime.error-format`
   - Add `format-compilation-errors [compile-error structural-errors semantic-errors] → string`.
@@ -282,8 +329,11 @@ The implementation is done when all of the following are true:
 5. A test with a valid workflow definition produces no error and compiles without
    regression.
 6. All existing tests in `target_ir_compiler_test.clj`, `ir_runtime_adoption_test.clj`,
-   and `compiler_test.clj` remain green.
+   and `compiler_test.clj` remain green (after updating the two tests that compare
+   `:compile-error` to a bare string — see Interface Surfaces section).
 7. The formatter is covered by its own focused unit tests for each semantic error type.
+8. A test confirms that `create-run` (via `compile-definition-to-ir!`) surfaces a
+   step-contextual message when a step with an unsupported type is compiled.
 
 ## Acceptance Criteria
 
