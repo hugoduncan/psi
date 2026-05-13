@@ -321,8 +321,9 @@
       (is (= :ok (:psi-tool/overall-status parsed)))
       (is (= (System/getProperty "user.dir") (:psi-tool/worktree-path parsed)))
       (is (= :session (:psi-tool/worktree-source parsed)))
+      (is (string? (get-in parsed [:psi-tool/graph-refresh :steps 3 :summary])))
       (is (= "preserved current extension registry without rediscovery"
-             (get-in parsed [:psi-tool/graph-refresh :steps 3 :summary])))))
+             (get-in parsed [:psi-tool/graph-refresh :steps 5 :summary])))))
 
   (testing "reloading model namespaces reinitializes the model registry for the effective worktree"
     (let [dir (str (java.nio.file.Files/createTempDirectory "psi-tool-model-registry-reload-"
@@ -412,7 +413,7 @@
         (is (string? (:psi-tool/worktree-path parsed)))
         (is (= :ok (get-in parsed [:psi-tool/code-reload :status])))
         (is (contains? parsed :psi-tool/graph-refresh))
-        (is (contains? (get-in parsed [:psi-tool/graph-refresh :steps 3]) :install)))))
+        (is (contains? (get-in parsed [:psi-tool/graph-refresh :steps 5]) :install)))))
 
   (testing "worktree mode rejects non-absolute explicit worktree-path"
     (let [tool   (tools/make-psi-tool (fn [_q] {}))
@@ -502,12 +503,12 @@
                                ((:execute tool) {"action" "reload-code"}))
             parsed           (read-string (:content result))]
         (is (false? (:is-error result)))
-        (is (= :restart-required (get-in parsed [:psi-tool/graph-refresh :steps 3 :install :status])))
-        (is (= true (get-in parsed [:psi-tool/graph-refresh :steps 3 :install :restart-required?])))
-        (is (= ['bar/remote] (get-in parsed [:psi-tool/graph-refresh :steps 3 :install :restart-required-libs])))
+        (is (= :restart-required (get-in parsed [:psi-tool/graph-refresh :steps 5 :install :status])))
+        (is (= true (get-in parsed [:psi-tool/graph-refresh :steps 5 :install :restart-required?])))
+        (is (= ['bar/remote] (get-in parsed [:psi-tool/graph-refresh :steps 5 :install :restart-required-libs])))
         (is (= {:loaded 1 :restart-required 1 :not-applicable 1}
-               (get-in parsed [:psi-tool/graph-refresh :steps 3 :install :status-counts])))
-        (is (= 1 (get-in parsed [:psi-tool/graph-refresh :steps 3 :install :diagnostic-count]))))))
+               (get-in parsed [:psi-tool/graph-refresh :steps 5 :install :status-counts])))
+        (is (= 1 (get-in parsed [:psi-tool/graph-refresh :steps 5 :install :diagnostic-count]))))))
 
   (testing "namespace mode may target loaded project namespaces"
     (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/in-worktree.clj"))

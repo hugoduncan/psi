@@ -45,7 +45,7 @@
 
 (defn register-all!
   "Register all dispatch handlers for the agent-session pipeline.
-   Called once during context creation via requiring-resolve."
+   Safe to call again after reload to replace handler fns with the current vars."
   [ctx]
   (sc-actions/register! ctx)
   (ui-handlers/register! ctx)

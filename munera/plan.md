@@ -18,6 +18,7 @@ Backlog:
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
+`munera/open/149-reload-fixup-inventory-and-safety/`
 
 Notes:
 - `140-workflow-ir-compilation-errors-actionable` is complete and closed: `"invalid value"` fallback test added to `format-structural-errors-test`; all 4 AC and 8 verification expectations met; 16 formatter tests, 63 assertions, 0 failures.

@@ -8,6 +8,9 @@
    [psi.agent-core.core :as agent]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.agent-session.resolvers :as session-resolvers]
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [psi.state-kernel.dispatch :as kernel-dispatch]
    [psi.tool-registry.registry :as tool-registry]
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
@@ -357,12 +360,14 @@
        vec))
 
 (defn- refresh-query-runtime! [ctx]
-  ;; Resolvers are derived fresh per-request via session-resolver-surface — no stale
-  ;; snapshot to refresh.  Mutation registrations are handled separately by
-  ;; refresh-all-mutations! which updates the :all-mutations-atom in ctx.
+  ;; Agent-session and agent-core both cache Pathom env snapshots in defonce
+  ;; atoms. Those envs capture resolver vars and must be dropped so the next
+  ;; query rebuilds from the freshly reloaded namespaces.
+  (session-resolvers/invalidate-query-env!)
+  (agent/invalidate-query-env!)
   (if-not ctx
-    {:status :ok :summary "resolver registrations unchanged (no runtime ctx provided)"}
-    {:status :ok :summary "resolver registrations are derived per-request; no snapshot to refresh"}))
+    {:status :ok :summary "invalidated cached query envs (no runtime ctx provided)"}
+    {:status :ok :summary "invalidated cached agent-session and agent-core query envs"}))
 
 (defn- refresh-all-mutations!
   "Reset the ctx :all-mutations-atom to the live value of
@@ -392,6 +397,36 @@
       (when agent-ctx
         (agent/set-tools-in! agent-ctx tool-defs))
       {:status :ok :summary (str "refreshed live tool defs (" (count tool-defs) " tools)")})))
+
+(defn- refresh-dispatch-handlers! [ctx]
+  ;; The state-kernel handler registry is a long-lived defonce atom keyed to
+  ;; function values registered during context creation. Re-register handlers so
+  ;; dispatch resolves to the current vars after reload.
+  (kernel-dispatch/clear-handlers!)
+  (if-not ctx
+    {:status :ok :summary "dispatch handlers reset (no runtime ctx provided)"}
+    (do
+      ((requiring-resolve 'psi.agent-session.dispatch-handlers/register-all!) ctx)
+      {:status :ok
+       :summary (str "re-registered dispatch handlers (" (count (kernel-dispatch/registered-event-types)) " events)")
+       :event-count (count (kernel-dispatch/registered-event-types))})))
+
+(defn- maybe-refresh-built-in-workflow! [ctx session-id]
+  ;; Built-in workflow keeps long-lived defonce runtime state, command/tool
+  ;; registration, prompt contribution registration, and loaded definitions.
+  ;; Re-initialize it when it is already active so those surfaces point at the
+  ;; freshly reloaded vars.
+  (let [workflow-state @workflow-runtime-state/state
+        initialized?   (and workflow-state
+                            (contains? workflow-state :api))]
+    (if-not initialized?
+      {:status :ok :summary "built-in workflow runtime state unchanged (not initialized)"}
+      (if-not (and ctx session-id)
+        {:status :ok :summary "built-in workflow runtime state unchanged (no session runtime provided)"}
+        (let [result ((requiring-resolve 'psi.agent-session.workflow.bootstrap/init-built-in!) ctx session-id)]
+          {:status :ok
+           :summary (str "reinitialized built-in workflow runtime state (" (count (:loaded-definitions result)) " definitions)")
+           :definition-count (count (:loaded-definitions result))})))))
 
 (defn- install-summary [install-state]
   (let [entries (vals (get-in install-state [:psi.extensions/effective :entries-by-lib]))
@@ -492,6 +527,8 @@
         refresh-steps [(assoc (refresh-query-runtime! ctx) :step :resolver-registration-refresh)
                        (assoc (refresh-all-mutations! ctx) :step :mutation-registration-refresh)
                        (assoc (refresh-live-tool-defs! ctx session-id) :step :live-tool-definition-refresh)
+                       (assoc (refresh-dispatch-handlers! ctx) :step :dispatch-handler-refresh)
+                       (assoc (maybe-refresh-built-in-workflow! ctx session-id) :step :built-in-workflow-refresh)
                        (assoc (if namespace-mode? (preserve-extension-registry-step) (refresh-worktree-extensions! ctx session-id effective-path)) :step :extension-refresh)]
         refresh-error (some #(when (= :error (:status %)) %) refresh-steps)
         graph-refresh {:status (if refresh-error :error :ok)

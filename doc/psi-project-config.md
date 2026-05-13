@@ -137,3 +137,10 @@ Rules:
 - worktree mode does not discover brand new namespaces from disk
 - namespace mode reloads exactly the requested already loaded namespaces in request order
 - reload reports code reload and graph/runtime refresh separately; success of one does not imply success of the other
+- graph/runtime refresh currently includes mandatory safety fixups for:
+  - cached Pathom query env invalidation
+  - mutation snapshot refresh
+  - live tool definition refresh
+  - dispatch handler re-registration
+  - built-in workflow runtime reinitialization when already active
+- when adding a new long-lived defonce registry, cached env, or runtime state object that captures function values, update the reload fixup inventory and add an explicit refresh step if stale references would break psi after reload

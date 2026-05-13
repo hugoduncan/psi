@@ -140,6 +140,13 @@
 
 (def ^:private query-env (atom nil))
 
+(defn invalidate-query-env!
+  "Drop the cached Pathom env so the next query rebuilds from the current
+   resolver vars after reload."
+  []
+  (reset! query-env nil)
+  nil)
+
 (defn- ensure-query-env! []
   (or @query-env (reset! query-env (build-env))))
 
