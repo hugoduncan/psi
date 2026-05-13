@@ -193,3 +193,39 @@ then to `"invalid value"` as a final catch-all. Description is never blank.
 
 **Verification:** 1757 tests, 12130 assertions, 0 failures; lint 0 errors, 0 warnings.
 All acceptance criteria now fully satisfied including verification expectation #4.
+
+### test-shaper review (2026-05-13)
+
+`compilation_error_format_test.clj` — four signal/robustness gaps found:
+
+**Gap 1 — step-context + message co-location not pinned.**
+`format-compile-error-with-step-context-test` uses two independent `contains-line?`
+checks for `"Step 'my-step' (index 2):"` and `"Unsupported target workflow step type"`.
+These would pass even if the formatter split them onto separate lines. The contract
+is that they appear on the same line; the test does not enforce it.
+Fix: assert the combined substring `"Step 'my-step' (index 2): Unsupported target workflow step type"` is present.
+
+**Gap 2 — real-Malli structural test does not assert the path appears.**
+The `"real Malli explain-data"` testing block checks only that every "Structural error"
+line is non-blank after the colon. It does not assert that the path appears in the
+output. Design acceptance criterion #4 and verification expectation #4 require
+"includes a path or field name". The path check is absent.
+Fix: add an assertion that the output contains a path segment (e.g. `"steps"` or
+`"contributions"`) from the real explain-data.
+
+**Gap 3 — non-prior-step-ref integration test uses a self-reference.**
+`create-run-surfaces-step-contextual-message-test` "non-prior step ref produces message
+naming both steps" uses `step-a` referencing itself. Since referrer and target share
+the same name, checking `(str/includes? msg "step-a")` does not distinguish the two
+roles. The test description overstates what is verified.
+Fix: either use a two-step workflow where step-b forward-references step-a (different
+names), or narrow the description to "self-reference is detected".
+
+**Gap 4 — format-multiple-errors-test: only step names checked, not constraint text.**
+The test checks that `"step-a"`, `"step-b"`, `"step-c"` appear in the output but does
+not verify that the constraint text for each error type is present. A formatter bug
+that dropped the constraint text but kept the step name would pass. Also: no test
+covers a mix of compile-error + semantic-errors in one call (the formatter supports
+this but it is untested).
+Fix: add at least one assertion per error entry that checks the constraint text, not
+just the step name. Add a mixed compile-error + semantic-error test.
