@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2067] - 2026-05-12
+
 ### Added
 - logprobs extension with `logprobs/perplexity` deterministic operation: calculates perplexity of the most recent logprob-bearing reply for a session, available to workflows via invoke steps.
 - `gh-issue-refine` workflow: the `discover` step is now a deterministic `:invoke` step backed by the new `psi/github` extension, replacing a non-deterministic AI builder-delegate step. Issue selection is fully determined by the `gh` CLI and selection rules — no AI sampling occurs during issue discovery.
@@ -51,7 +53,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2049...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2067...HEAD
+[0.1.2067]: https://github.com/hugoduncan/psi/compare/v0.1.2049...v0.1.2067
 [0.1.2049]: https://github.com/hugoduncan/psi/compare/v0.1.2034...v0.1.2049
 [0.1.2034]: https://github.com/hugoduncan/psi/compare/v0.1.2026...v0.1.2034
 [0.1.2026]: https://github.com/hugoduncan/psi/compare/v0.1.2021...v0.1.2026
