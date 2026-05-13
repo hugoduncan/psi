@@ -21,7 +21,7 @@ Three changes:
 
 1. **Remove conversation injection**: delete the synthetic-user-message projection of `:logprobs` journal entries from `journal->provider-messages`
 2. **Enrich the turn-finished event**: add `:logprobs` to the `session_turn_finished` extension event payload so extensions receive the data
-3. **Create a logprobs extension** at `extensions/logprobs/` that subscribes to the event, stores per-session logprob data, and registers a `logprobs/perplexity` deterministic operation
+3. **Create a logprobs extension** at `extensions/logprobs/` that subscribes to the event, stores a single most-recent logprob snapshot out-of-band, and registers a `logprobs/perplexity` deterministic operation
 
 ## Desired behaviour
 
@@ -62,20 +62,21 @@ Both `:logprobs` and `:assistant-message` are carried directly in the event payl
 A new extension at `extensions/logprobs/` that:
 
 - Subscribes to `session_turn_finished` via `(:on api)`
-- On each event: if `:logprobs` is present and non-empty, stores the logprobs and associated assistant-message for that session, replacing any previously stored data. If `:logprobs` is absent or empty, retains whatever is currently stored for that session — does not clear.
+- On each event: if `:logprobs` is present and non-empty, stores a single snapshot containing the `:session-id`, `:turn-id`, `:logprobs`, and associated `:assistant-message`, replacing any previously stored snapshot. If `:logprobs` is absent or empty, retains whatever snapshot is currently stored — does not clear.
 - Registers one deterministic operation: `logprobs/perplexity`
 
 #### Storage semantics
 
-The extension stores a per-session snapshot:
+The extension stores exactly one snapshot:
 
 ```clojure
-{:logprobs          [{:token "..." :logprob -0.023 ...} ...]
- :assistant-message {:role "assistant" :content [...]}
+{:session-id        "..."
+ :logprobs          [{:token "..." :logprob -0.023 ...} ...]
+ :assistant-message {:role "assistant" :content [...]} 
  :turn-id           "..."}
 ```
 
-This snapshot is replaced only when a turn arrives with non-empty logprobs. Subsequent turns without logprobs (e.g. tool-use turns, turns on sessions without logprob collection) leave the stored snapshot intact. This means `logprobs/perplexity` always returns the most recent logprob-bearing reply, not nil just because a later turn happened to lack logprobs.
+This snapshot is replaced only when a turn arrives with non-empty logprobs. Subsequent turns without logprobs (e.g. tool-use turns, turns on sessions without logprob collection) leave the stored snapshot intact. `logprobs/perplexity` returns data only when the requested `:session-id` matches the stored snapshot's `:session-id`; otherwise it returns the empty result. This keeps the storage model minimal while preserving session correctness for workflow callers.
 
 #### `logprobs/perplexity` operation
 
@@ -90,7 +91,8 @@ Input: `{:session-id "..."}`
 Output:
 ```clojure
 {:status :ok
- :data {:perplexity        4.23
+ :data {:session-id        "..."
+        :perplexity        4.23
         :token-count       157
         :turn-id           "..."
         :reply-text        "the assistant's reply text"}}
@@ -98,13 +100,14 @@ Output:
 
 The `:reply-text` value is derived from the stored structured `:assistant-message` using `turn-execution-contract/assistant-message-text` — which extracts and joins `:text`-typed content blocks, falling back to string `:content`.
 
-When no logprobs are stored for the session:
+When no logprobs are stored for the session, or when the stored snapshot belongs to a different session:
 ```clojure
 {:status :ok
- :data {:perplexity  nil
+ :data {:session-id  nil
+        :perplexity nil
         :token-count 0
-        :turn-id     nil
-        :reply-text  nil}}
+        :turn-id    nil
+        :reply-text nil}}
 ```
 
 ### Session step `:session-id` output
@@ -139,8 +142,8 @@ provider SSE chunks
 → prompt-record-response-handler (`:logprobs` journal entry + `:last-turn-logprobs` session-data)
 → prompt-finish-handler (`:logprobs` on terminal-result carried into event payload)
 → session_turn_finished extension event (`:logprobs` in payload)
-→ logprobs extension receives event, stores per-session
-→ logprobs/perplexity deterministic op computes on stored data
+→ logprobs extension receives event, stores a single latest snapshot
+→ logprobs/perplexity deterministic op computes on stored data when `:session-id` matches
 ```
 
 ## What stays in core
@@ -175,7 +178,7 @@ provider SSE chunks
 ## Constraints
 
 - The `:logprobs` journal entry kind remains valid and persisted — only its projection into provider messages is removed
-- The logprobs extension stores only the most recent logprob-bearing turn per session (not a history buffer) — keep it minimal
+- The logprobs extension stores only a single most-recent logprob-bearing snapshot (not a history buffer, and not a per-session map) — keep it minimal
 - Turns without logprobs do not clear the stored snapshot — the extension retains the most recent logprob-bearing reply until a newer one replaces it
 - No new slash commands or user-facing controls
 - The extension follows the same init/registration pattern as `psi/github` but uses the `extensions.logprobs` namespace convention (matching the majority of extensions: `extensions.auto-session-name`, `extensions.mementum`, `extensions.munera`, etc.). `psi.github.*` is the outlier convention used only by the GitHub extension.
@@ -184,8 +187,8 @@ provider SSE chunks
 
 - `:logprobs` journal entries are no longer projected as synthetic user messages in provider conversations
 - `session_turn_finished` event payload includes `:logprobs` and `:assistant-message` from the terminal result
-- `logprobs/perplexity` deterministic operation returns correct perplexity and reply text for a session with logprobs data
-- `logprobs/perplexity` returns `{:perplexity nil :token-count 0 :turn-id nil :reply-text nil}` when no data is available
-- A subsequent turn without logprobs does not clear previously stored logprob data — `logprobs/perplexity` still returns the earlier result
+- `logprobs/perplexity` deterministic operation returns correct perplexity and reply text for a session with matching stored logprobs data
+- `logprobs/perplexity` returns `{:session-id nil :perplexity nil :token-count 0 :turn-id nil :reply-text nil}` when no data is available or when the stored snapshot belongs to a different session
+- A subsequent turn without logprobs does not clear previously stored logprob data — `logprobs/perplexity` still returns the earlier result for the matching session
 - `local-logprobs` workflow uses the `logprobs/perplexity` invoke step and reports the numeric perplexity
-- Focused tests cover: perplexity calculation, event subscription/storage, conversation projection removal
+- Focused tests cover: perplexity calculation, event subscription/storage, session-id matching, conversation projection removal

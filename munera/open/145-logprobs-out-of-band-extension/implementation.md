@@ -46,7 +46,7 @@ Three issues found:
 
 Four gaps found against design behaviours and test-review skill criteria:
 
-1. **No multi-session isolation test.** Extension stores per-session data in an atom keyed by session-id. No test verifies that storing/querying logprobs for session "s1" is independent of session "s2". Basic correctness property of the per-session storage design.
+1. **Storage model simplified after implementation.** The extension no longer stores a per-session map keyed by session-id. It now stores a single snapshot carrying `:session-id`, and tests verify session-id matching semantics instead of multi-session isolation.
 
 2. **No `calculate-perplexity` test for all-nil-logprob tokens.** When every token has `:logprob nil`, `(keep :logprob tokens)` yields empty seq, `n=0`, returns nil. This boundary between "tokens present but unusable" and "no tokens" is untested.
 
@@ -69,7 +69,7 @@ Two broken tests and one accuracy issue found.
 No actionable issues found. Assessed against simplicity, consistency, and robustness:
 
 - **Simplicity**: clean single-responsibility separation throughout. `extensions.logprobs` — storage, computation, operation handler, event handler, init are each distinct. `calculate-perplexity` is pure computation; `store-logprobs!` is pure side-effect; `on-turn-finished` is flow control. `journal->provider-messages` simplified from loop+cond to `into`+`keep`. `prompt-finish-base-result` uses idiomatic `cond->` for conditional payload enrichment.
-- **Consistency**: naming follows Clojure conventions (`!` for side-effects, `get-*` for reads). Extension follows established patterns (`defonce ^:private store`, `init` signature, `@#'` for test access to private atoms — matches `auto-session-name`, `work-on`, etc.). Data shapes are consistent: logprob token maps flow unchanged from turn-runtime through event payload into extension storage. `store` naming (vs `state` in other extensions) is more descriptive for a single-purpose store — acceptable deviation.
+- **Consistency**: naming follows Clojure conventions (`!` for side-effects, `get-*` for reads). Extension follows established patterns (`defonce ^:private store`, `init` signature, `@#'` for test access to private atoms — matches `auto-session-name`, `work-on`, etc.). Data shapes are consistent: logprob token maps flow unchanged from turn-runtime through event payload into extension storage. The simplified single-snapshot store reduces conceptual surface while preserving the session-id in the stored value.
 - **Robustness**: guards at every boundary — `when-let` for nil session-id in event handler, `(seq logprobs)` in both `store-logprobs!` and `prompt-finish-base-result`, `(when (pos? n) ...)` for zero-division in `calculate-perplexity`, explicit error for missing session-id in `invoke-perplexity`. No nil propagation paths. `##Inf` possible for extreme logprob values (e.g. -1000) but domain-constrained — LLM logprobs are typically in [-10, 0].
 
 Verified: lint 0 errors/0 warnings, 1734 unit tests (3 pre-existing failures), 148 extension tests (0 failures).

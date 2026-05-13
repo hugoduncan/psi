@@ -10,7 +10,7 @@ Three vertical slices executed in dependency order:
 
 3. **Enrich turn-finished event** — thread logprobs and structured assistant-message from `terminal-result` through `prompt-finish-base-result` into the `session_turn_finished` payload. Small, surgical change in `turn/handlers.clj`.
 
-4. **Logprobs extension + workflow update** — create the extension at `extensions/logprobs/` with `extensions.logprobs` namespace, event subscription, per-session storage, and `logprobs/perplexity` operation (using `turn-execution-contract/assistant-message-text` for reply-text). Update the `local-logprobs` workflow to three steps (run → perplexity invoke → report) with explicit variable bindings.
+4. **Logprobs extension + workflow update** — create the extension at `extensions/logprobs/` with `extensions.logprobs` namespace, event subscription, single-snapshot storage, and `logprobs/perplexity` operation (using `turn-execution-contract/assistant-message-text` for reply-text). Update the `local-logprobs` workflow to three steps (run → perplexity invoke → report) with explicit variable bindings.
 
 ## Decisions
 
@@ -18,7 +18,7 @@ Three vertical slices executed in dependency order:
 
 - **Carry data in payload**: the logprobs vector is carried directly in the event payload (not queried back via EQL). The extension is in-process and the vector is a reference — no serialization overhead.
 
-- **Last-turn only storage**: the extension stores only the most recent turn's logprobs per session. A history buffer is a future extension concern.
+- **Single-snapshot storage**: the extension stores only one most-recent logprob-bearing snapshot total. The snapshot carries `:session-id`; `logprobs/perplexity` returns data only when the requested session matches that snapshot. A history buffer or per-session cache is a future extension concern.
 
 - **Perplexity formula**: `exp(-1/N * Σ logprob_i)` where `logprob_i` is the natural-log probability of each token. Standard definition — lower is more confident.
 
