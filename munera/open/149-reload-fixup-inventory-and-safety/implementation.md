@@ -18,3 +18,4 @@
   - dispatch handler re-registration
   - built-in workflow runtime reinitialization through `reload-code`
 - Updated reload guidance in `doc/psi-project-config.md` so future reload-sensitive long-lived state gets explicit review.
+- Improved reload error reporting so compile failures and cyclic live-process load failures surface clearer structured diagnostics, including compile source/line/column and a reload-order hint for cyclic dependency cases.

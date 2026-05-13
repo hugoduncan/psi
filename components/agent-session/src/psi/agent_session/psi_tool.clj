@@ -161,13 +161,52 @@
 (defn- sanitize-psi-tool-data [x] (sanitize-psi-tool-result x))
 (defn- ordered-map [& kvs] (apply array-map kvs))
 
+(defn- throwable-chain
+  [e]
+  (take-while some? (iterate ex-cause e)))
+
+(defn- reload-issue-diagnostic
+  [e]
+  (let [messages  (map #(or (ex-message %) (str %)) (throwable-chain e))
+        cyclic?   (some #(str/includes? % "Cyclic load dependency") messages)
+        data-seq  (keep ex-data (throwable-chain e))
+        data      (apply merge data-seq)
+        compiler? (or (instance? clojure.lang.Compiler$CompilerException e)
+                      (contains? data :clojure.error/phase)
+                      (contains? data :clojure.error/source)
+                      (contains? data :clojure.error/line)
+                      (contains? data :clojure.error/column))]
+    (cond-> {}
+      compiler?
+      (assoc :issue :compile-error
+             :summary "Reloaded source failed to compile in the running process")
+
+      (:clojure.error/source data)
+      (assoc :source (:clojure.error/source data))
+
+      (:clojure.error/line data)
+      (assoc :line (:clojure.error/line data))
+
+      (:clojure.error/column data)
+      (assoc :column (:clojure.error/column data))
+
+      cyclic?
+      (assoc :issue :cyclic-load-dependency
+             :summary "Reload hit a cyclic load dependency in the live process"
+             :hint (str "This often means reload order matters for the namespaces involved. "
+                        "If you are reloading psi-tool itself, reload any newly depended-on namespaces first, "
+                        "then reload psi.agent-session.psi-tool. For broader changes, prefer a small dependency-first "
+                        "namespace reload before a larger worktree reload.")))))
+
 (defn- psi-tool-error-summary
   ([e] (psi-tool-error-summary nil e))
   ([default-phase e]
-   {:message (or (ex-message e) (str e))
-    :class   (.getName (class e))
-    :phase   (or (:phase (ex-data e)) default-phase :execute)
-    :data    (some-> (ex-data e) sanitize-psi-tool-data)}))
+   (cond-> {:message (or (ex-message e) (str e))
+            :class   (.getName (class e))
+            :phase   (or (:phase (ex-data e)) default-phase :execute)
+            :data    (some-> (ex-data e) sanitize-psi-tool-data)}
+     (= :reload-code (or (:phase (ex-data e)) default-phase))
+     (assoc :reload-diagnostic (reload-issue-diagnostic e)))))
 
 (defn- format-psi-tool-error [prefix e]
   {:content  (str prefix (or (ex-message e) (str e)))
