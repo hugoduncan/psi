@@ -9,6 +9,7 @@
   (:require
    [clojure.string :as str]
    [psi.session-state.model :as session]
+   [psi.workflow-runtime.child-session-contract :as child-session-contract]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn- now []
@@ -58,9 +59,7 @@
   [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection model-fallback]}]
   (let [attempt-id'      (normalize-attempt-id attempt-id)
         child-session-id (str (java.util.UUID/randomUUID))
-        result           (execution-adapter/create-child-session!
-                          ctx
-                          parent-session-id
+        request          (child-session-contract/assert-valid-request!
                           {:child-session-id           child-session-id
                            :session-name               session-name
                            :system-prompt              system-prompt
@@ -80,7 +79,14 @@
                            :workflow-run-id            workflow-run-id
                            :workflow-step-id           workflow-step-id
                            :workflow-attempt-id        attempt-id'
-                           :workflow-owned?            true})
+                           :workflow-owned?            true}
+                          :psi.workflow-runtime.attempts/create-step-attempt-session!)
+        result           (-> (execution-adapter/create-child-session!
+                              ctx
+                              parent-session-id
+                              request)
+                             (child-session-contract/assert-valid-result!
+                              :psi.workflow-runtime.attempts/create-step-attempt-session!))
         _                result
         child-sd         (execution-adapter/get-session-data ctx child-session-id)
         attempt          (new-attempt {:attempt-id attempt-id'

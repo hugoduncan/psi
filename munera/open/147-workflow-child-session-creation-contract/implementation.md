@@ -42,3 +42,38 @@ Expected likely owners:
   - workflow-judge tests own judge-specific request semantics
   - higher realization-edge proof should live with `create-workflow-child-session!`
 - No blocker: both unchecked design-steps were documentation/design alignment work and are now complete.
+
+2026-05-13 implementation:
+- Added lower contract owner `psi.workflow-runtime.child-session-contract` with closed malli request/result schemas plus executable assertion helpers.
+- Authoritative request contract now covers the supported workflow child-session create surface crossing `psi.workflow-runtime.execution-adapter/create-child-session!`; minimal result contract remains `{:psi.agent-session/session-id <id>}`.
+- `psi.workflow-runtime.attempts/create-step-attempt-session!` now validates the request before crossing the adapter seam and validates the returned result immediately after seam crossing.
+- `psi.agent-session.workflow-judge/execute-judge!` now validates its narrower judge create request before crossing the seam and validates the returned result immediately after seam crossing.
+- `psi.agent-session.context/create-workflow-child-session!` now treats the incoming request as the shared realization-edge contract input, validates it before realization, and validates the minimal result shape before returning.
+- Preserved caller-local `:model-fallback` behaviour: it remains outside the create-child seam and is still reattached only to the returned `:execution-session` map from `create-step-attempt-session!`.
+
+2026-05-13 proof additions:
+- Added pure contract tests in `components/workflow-runtime/test/psi/workflow_runtime/child_session_contract_test.clj` for valid request/result handling and local malformed request/result failures.
+- Extended `execution_adapter_test.clj` to prove `create-child-session!` forwards ctx, parent-session-id, and opts unchanged.
+- Extended `attempts_test.clj` as the canonical attempt-path proof owner for:
+  - supported request surface forwarding
+  - local malformed request failures
+  - local malformed result failures
+  - preserved caller-local `:model-fallback` reattachment on the returned execution-session map
+- Extended `workflow_judge_test.clj` as the canonical judge-path proof owner for:
+  - explicit judge defaults
+  - projected preload message forwarding
+  - local malformed request failures
+  - local malformed result failures
+- Added higher realization-edge proof in `components/agent-session/test/psi/agent_session/workflow_child_session_context_test.clj` covering both:
+  - wider attempt-shaped requests
+  - narrower judge-shaped requests
+  - persisted child-session state and runtime initialization
+  - local malformed request failure at realization time
+
+2026-05-13 verification:
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/workflow_judge.clj components/workflow-runtime/src/psi/workflow_runtime/attempts.clj components/workflow-runtime/src/psi/workflow_runtime/child_session_contract.clj components/workflow-runtime/test/psi/workflow_runtime/child_session_contract_test.clj components/workflow-runtime/test/psi/workflow_runtime/execution_adapter_test.clj components/workflow-runtime/test/psi/workflow_runtime/attempts_test.clj components/agent-session/test/psi/agent_session/workflow_judge_test.clj components/agent-session/test/psi/agent_session/workflow_child_session_context_test.clj`
+  - result: clean
+- `clojure -M:test --focus psi.workflow-runtime.child-session-contract-test --focus psi.workflow-runtime.execution-adapter-test --focus psi.workflow-runtime.attempts-test --focus psi.agent-session.workflow-judge-test --focus psi.agent-session.workflow-child-session-context-test`
+  - result: `27 tests, 125 assertions, 0 failures`
+- `clojure -M:test --focus psi.agent-session.child-session-mutation-test --focus psi.agent-session.workflow_execution_test --focus psi.agent-session.workflow_statechart_runtime_test`
+  - result: `9 tests, 34 assertions, 0 failures`

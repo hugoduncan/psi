@@ -7,6 +7,7 @@
    [clojure.string :as str]
    [psi.session-persistence.core :as persist]
    [psi.workflow-judge :as workflow-judge]
+   [psi.workflow-runtime.child-session-contract :as child-session-contract]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
 
@@ -52,16 +53,18 @@
         projected     (workflow-judge/project-messages actor-msgs projection)
         judge-sid     (str (java.util.UUID/randomUUID))
         expected-sigs (keys routing-table)]
-    (execution-adapter/create-child-session!
-     ctx
-     parent-session-id
-     {:child-session-id   judge-sid
-      :session-name       "workflow judge"
-      :system-prompt      (:system-prompt judge-spec)
-      :tool-defs          []
-      :thinking-level     :off
-      :preloaded-messages projected
-      :workflow-owned?    true})
+    (-> (child-session-contract/assert-valid-request!
+         {:child-session-id   judge-sid
+          :session-name       "workflow judge"
+          :system-prompt      (:system-prompt judge-spec)
+          :tool-defs          []
+          :thinking-level     :off
+          :preloaded-messages projected
+          :workflow-owned?    true}
+         :psi.agent-session.workflow-judge/execute-judge!)
+        (#(execution-adapter/create-child-session! ctx parent-session-id %))
+        (child-session-contract/assert-valid-result!
+         :psi.agent-session.workflow-judge/execute-judge!))
     ;; First attempt
     (let [initial-result (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec))]
       (loop [attempt 0

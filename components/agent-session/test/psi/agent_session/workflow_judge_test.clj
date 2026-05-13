@@ -24,7 +24,7 @@
                (workflow-execution-adapter/create
                 {:create-child-session! (fn [_ctx _parent opts]
                                           (swap! created-sessions* conj opts)
-                                          nil)})}]
+                                          {:psi.agent-session/session-id (:child-session-id opts)})})}]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid]
                       [{:role "user" :content "Build it"}
@@ -49,6 +49,15 @@
           (is (= {:action :complete} (:routing-result result)))
           (is (= [] (:tool-defs (first @created-sessions*))))
           (is (= "You are a judge." (:system-prompt (first @created-sessions*))))
+          (is (= {:child-session-id (:child-session-id (first @created-sessions*))
+                  :session-name "workflow judge"
+                  :system-prompt "You are a judge."
+                  :tool-defs []
+                  :thinking-level :off
+                  :preloaded-messages [{:role "user" :content "Build it"}
+                                       {:role "assistant" :content [{:type :text :text "Done building."}]}]
+                  :workflow-owned? true}
+                 (first @created-sessions*)))
           (is (= 1 (count @prompts*)))
           (is (= "APPROVED or REVISE?" (:text (first @prompts*)))))))))
 
@@ -57,7 +66,8 @@
     (let [prompt-count* (atom 0)
           ctx {workflow-execution-adapter/adapter-key
                (workflow-execution-adapter/create
-                {:create-child-session! (fn [_ctx _parent _opts] nil)})}
+                {:create-child-session! (fn [_ctx _parent opts]
+                                          {:psi.agent-session/session-id (:child-session-id opts)})})}
           judge-spec {:prompt "APPROVED or REVISE?"
                       :projection :none}
           routing-table {"APPROVED" {:goto :next}
@@ -97,7 +107,8 @@
     (let [prompts* (atom [])
           ctx {workflow-execution-adapter/adapter-key
                (workflow-execution-adapter/create
-                {:create-child-session! (fn [_ctx _parent _opts] nil)})}
+                {:create-child-session! (fn [_ctx _parent opts]
+                                          {:psi.agent-session/session-id (:child-session-id opts)})})}
           ;; Compiled :llm judge spec — no :prompt key, contributions hold the text
           judge-spec {:type :llm
                       :session {:contributions [{:type :template
@@ -136,7 +147,8 @@
     (let [prompt-count* (atom 0)
           ctx {workflow-execution-adapter/adapter-key
                (workflow-execution-adapter/create
-                {:create-child-session! (fn [_ctx _parent _opts] nil)})}
+                {:create-child-session! (fn [_ctx _parent opts]
+                                          {:psi.agent-session/session-id (:child-session-id opts)})})}
           judge-spec {:prompt "APPROVED or REVISE?"
                       :projection :none}
           routing-table {"APPROVED" {:goto :next}
@@ -163,3 +175,60 @@
           (is (nil? (:judge-event result)))
           (is (= {:action :no-match} (:routing-result result)))
           (is (= 3 @prompt-count*)))))))
+
+(deftest execute-judge-invalid-request-fails-locally-test
+  (testing "malformed judge child-session requests fail at the shared contract boundary"
+    (let [ctx {workflow-execution-adapter/adapter-key
+               (workflow-execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent _opts]
+                                          (throw (ex-info "should not be called" {})))})}
+          ex (try
+               (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                             (fn [_ctx _sid] [])]
+                 (workflow-judge/execute-judge!
+                  ctx
+                  "parent-1"
+                  "actor-1"
+                  {:prompt "APPROVED or REVISE?"
+                   :system-prompt [:not-a-string]
+                   :projection :none}
+                  {"APPROVED" {:goto :next}}
+                  {:current-step-id "step-1"
+                   :step-order ["step-1"]
+                   :step-runs {"step-1" {:step-id "step-1" :attempts [] :iteration-count 1}}}))
+               nil
+               (catch clojure.lang.ExceptionInfo ex
+                 ex))]
+      (is (some? ex))
+      (is (= :workflow-child-session-create (:contract (ex-data ex))))
+      (is (= :request (:stage (ex-data ex))))
+      (is (= :psi.agent-session.workflow-judge/execute-judge!
+             (:caller (ex-data ex)))))))
+
+(deftest execute-judge-invalid-result-fails-locally-test
+  (testing "malformed judge child-session create results fail at the shared contract boundary"
+    (let [ctx {workflow-execution-adapter/adapter-key
+               (workflow-execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent _opts]
+                                          {:session-id "judge-1"})})}
+          ex (try
+               (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                             (fn [_ctx _sid] [])]
+                 (workflow-judge/execute-judge!
+                  ctx
+                  "parent-1"
+                  "actor-1"
+                  {:prompt "APPROVED or REVISE?"
+                   :projection :none}
+                  {"APPROVED" {:goto :next}}
+                  {:current-step-id "step-1"
+                   :step-order ["step-1"]
+                   :step-runs {"step-1" {:step-id "step-1" :attempts [] :iteration-count 1}}}))
+               nil
+               (catch clojure.lang.ExceptionInfo ex
+                 ex))]
+      (is (some? ex))
+      (is (= :workflow-child-session-create (:contract (ex-data ex))))
+      (is (= :result (:stage (ex-data ex))))
+      (is (= :psi.agent-session.workflow-judge/execute-judge!
+             (:caller (ex-data ex)))))))
