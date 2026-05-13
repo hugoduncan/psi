@@ -132,3 +132,31 @@ explain-data." `create-run-surfaces-step-contextual-message-test` covers compile
 and semantic errors but not structural errors end-to-end. Add a `create-run` case that
 triggers a structural error (e.g. `:workflow-runtime` source ref) and asserts the
 message contains a path segment and does not contain raw Malli schema data.
+
+### Follow-up pass 2 (2026-05-13) — structural error formatter fix + tests
+
+**Root cause of blank description:** Real Malli explain-data error entries carry
+`:path`, `:in`, `:schema`, `:value` and sometimes `:type` (e.g.
+`:malli.core/missing-key`, `:malli.core/invalid-type`) but NEVER `:message`. Some
+entries (e.g. `[:= :workflow-input]` schema failures) have no `:type` either —
+only `:path`, `:in`, `:schema`, `:value`.
+
+**Fix applied:** `format-structural-error` in `ir.clj` now uses:
+```clojure
+(let [msg (or message (some-> type name) "invalid value")]
+  ...)
+```
+Falls back to `(name type)` when `:type` is present (e.g. `"missing-key"`),
+then to `"invalid value"` as a final catch-all. Description is never blank.
+
+**Tests added:**
+1. `format-structural-errors-test` — new `testing` block: calls `explain-workflow-ir`
+   with a `:workflow-runtime` source ref (real Malli explain-data), asserts every
+   "Structural error" line does not end with a bare ":".
+2. `create-run-surfaces-step-contextual-message-test` — new `testing` block: same
+   `:workflow-runtime` source ref triggers a structural error via `create-run`; asserts
+   message contains "Structural error", description is not blank, and
+   "malli.core" does not appear.
+
+**Verification:** 1757 tests, 12130 assertions, 0 failures; lint 0 errors, 0 warnings.
+All acceptance criteria now fully satisfied including verification expectation #4.

@@ -157,7 +157,33 @@
   (testing "structural error with empty path still renders"
     (let [explain-data {:errors [{:path [] :message "top-level shape invalid"}]}
           out (format-errors nil explain-data [])]
-      (is (contains-line? out "Structural error: top-level shape invalid")))))
+      (is (contains-line? out "Structural error: top-level shape invalid"))))
+
+  (testing "real Malli explain-data (no :message key) produces non-blank description"
+    ;; Real Malli explain-data entries carry :path, :in, :schema, :value, :type
+    ;; (e.g. :malli.core/missing-key) but NOT :message.  The formatter must fall
+    ;; back to (name :type) so the description is never blank.
+    ;; A :workflow-runtime source ref compiles but fails structural validation.
+    (let [real-explain-data
+          (workflow-ir/explain-workflow-ir
+           {:version :workflow-ir/v1
+            :steps   [{:name "status"
+                       :type :session
+                       :session
+                       {:contributions
+                        [{:type :template
+                          :text "Status: {{status}}"
+                          :vars {"status" {:from :workflow-runtime
+                                           :path [:status]}}}]}}]})
+          out (format-errors nil real-explain-data [])]
+      (is (some? real-explain-data) "expected structural validation to fail")
+      ;; Each error line must contain the path and a non-blank description
+      (let [structural-lines (->> (str/split-lines out)
+                                  (filter #(str/includes? % "Structural error")))]
+        (is (seq structural-lines) "expected at least one structural error line")
+        (doseq [line structural-lines]
+          (is (not (str/ends-with? (str/trim line) ":"))
+              (str "description is blank in: " line)))))))
 
 ;;;; multiple errors
 
@@ -246,4 +272,31 @@
         (is false "expected exception")
         (catch clojure.lang.ExceptionInfo e
           (is (str/includes? (ex-message e) "judge-step"))
-          (is (str/includes? (ex-message e) "routing table")))))))
+          (is (str/includes? (ex-message e) "routing table"))))))
+
+  (testing "structurally invalid IR produces message with path segment and no raw Malli schema dump"
+    ;; A :workflow-runtime source ref compiles but fails structural validation.
+    ;; The message must contain a path segment and must not dump raw Malli schema data.
+    (let [state {:workflows {:definitions {} :runs {} :run-order []}}]
+      (try
+        (workflow-runtime/create-run
+         state
+         {:definition {:steps [{:name "status"
+                                :type :session
+                                :contributions [{:type :template
+                                                 :text "Status: {{status}}"
+                                                 :vars {"status" {:from :workflow-runtime
+                                                                  :path [:status]}}}]}]}
+          :run-id     "structural-error-run"})
+        (is false "expected exception")
+        (catch clojure.lang.ExceptionInfo e
+          (let [msg (ex-message e)]
+            (is (str/includes? msg "Workflow IR compilation failed"))
+            ;; path segment appears (not raw Malli schema dump)
+            (is (str/includes? msg "Structural error"))
+            ;; description is not blank — the line does not end with just ":"
+            (is (not (re-find #"Structural error[^:]*: *\n" msg))
+                "structural error description must not be blank")
+            ;; no raw Malli schema keyword dumps (schema vectors like [:= :session])
+            (is (not (str/includes? msg "malli.core"))
+                "raw Malli internals must not appear in message")))))))

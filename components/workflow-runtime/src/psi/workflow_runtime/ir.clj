@@ -500,11 +500,17 @@
       message)))
 
 (defn- format-structural-error
-  "Format a single Malli explain-data error entry into a human-readable line."
-  [{:keys [path message]}]
-  (if (seq path)
-    (str "Structural error at " (pr-str path) ": " message)
-    (str "Structural error: " message)))
+  "Format a single Malli explain-data error entry into a human-readable line.
+
+   Real Malli explain-data error entries carry :path, :in, :schema, :value and
+   sometimes :type (e.g. :malli.core/missing-key) but do NOT carry :message.
+   Falls back to (name :type) when present, then to \"invalid value\" so the
+   description is never blank."
+  [{:keys [path message type]}]
+  (let [msg (or message (some-> type name) "invalid value")]
+    (if (seq path)
+      (str "Structural error at " (pr-str path) ": " msg)
+      (str "Structural error: " msg))))
 
 (defn- format-semantic-error
   "Format a single semantic error map into a human-readable line."
