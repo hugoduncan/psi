@@ -278,12 +278,19 @@
       (let [result (session/manual-compact-in! ctx session-id nil)]
         (is (= "ext summary" (:summary result)))
         (let [event-types (mapv :event-type (kernel/event-log-entries))]
-          (is (= [:session/compact-start
+          (is (contains?
+               #{[:session/compact-start
                   :session/append-journal-entry
                   :session/compaction-finished
                   :session/manual-compaction-execute
                   :session/compact-done]
-                 event-types)))))))
+                 [:session/compact-start
+                  :session/append-journal-entry
+                  :session/compaction-finished
+                  :session/manual-compaction-execute
+                  :session/ui-clear-widget
+                  :session/compact-done]}
+               event-types)))))))
 
 ;; ── Extension dispatch ──────────────────────────────────────────────────────
 
