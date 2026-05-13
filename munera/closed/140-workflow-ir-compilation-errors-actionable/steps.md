@@ -20,3 +20,5 @@
 - [x] Add path-presence assertion to the `"real Malli explain-data"` testing block in `format-structural-errors-test`: assert the output contains a path segment (e.g. `"steps"` or `"contributions"`) — design criterion #4 requires "includes a path or field name"
 - [x] Fix the `"non-prior step ref"` integration test in `create-run-surfaces-step-contextual-message-test`: use a two-step workflow where step-b forward-references step-a so referrer and target have distinct names, or narrow the test description to "self-reference is detected"
 - [x] Strengthen `format-multiple-errors-test`: add per-entry assertions for constraint text (not just step names); add a mixed compile-error + semantic-errors test case
+- [ ] Update `ir.clj` ns docstring to declare error formatting as a third owned responsibility (alongside schemas and semantic validation)
+- [ ] Tighten `format-compile-error` guard: change `(if step-name ...)` to `(if (and step-name (some? step-index)) ...)` so a `:step-name`-present / `:step-index`-absent map cannot produce `"(index nil)"` output; or add a docstring note asserting the co-presence invariant

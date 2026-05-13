@@ -194,6 +194,26 @@ then to `"invalid value"` as a final catch-all. Description is never blank.
 **Verification:** 1757 tests, 12130 assertions, 0 failures; lint 0 errors, 0 warnings.
 All acceptance criteria now fully satisfied including verification expectation #4.
 
+### code-shaper review (2026-05-13)
+
+**Simplicity gap — ir.clj ns docstring out of sync with actual scope.**
+The docstring describes "Malli structural schemas" and "minimal IR-intrinsic semantic
+validation" but the namespace now also owns error formatting
+(`format-compilation-errors`, `format-compile-error`, `format-structural-error`,
+`format-semantic-error`). The docstring should be updated to declare this third
+responsibility so the namespace is locally comprehensible.
+
+**Robustness gap — `format-compile-error` asymmetric guard.**
+`(if step-name ...)` produces `"Step 'foo' (index nil): ..."` when `:step-name` is
+present but `:step-index` is absent. In practice both are always set together by
+`compile-step-with-context`, but the guard is asymmetric and the invariant is
+undocumented. Either guard on `(and step-name step-index)` or add a docstring note
+that both keys are always co-present.
+
+No other actionable issues. Naming, argument order, data shapes, idioms, and
+formatting are all consistent. The formatter's three private helpers cleanly separate
+computation from dispatch. All semantic error types are covered.
+
 ### test-shaper follow-up pass (2026-05-13) — all 4 signal/robustness gaps resolved
 
 All four gaps from the test-shaper review applied to `compilation_error_format_test.clj`:
