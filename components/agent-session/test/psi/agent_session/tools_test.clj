@@ -559,22 +559,24 @@
       (is (= :project-repl (:psi-tool/action parsed)))
       (is (= :error (:psi-tool/overall-status parsed)))))
 
-  (testing "project-repl start returns structured started payload"
-    (let [[ctx session-id] (create-session-context {:persist? false
-                                                    :session-defaults {:worktree-path (System/getProperty "user.dir")}})
+  (testing "project-repl start returns structured missing-start-command payload when no project repl is configured"
+    (let [worktree         (str (java.nio.file.Files/createTempDirectory
+                                 "psi-project-nrepl-tool-"
+                                 (make-array java.nio.file.attribute.FileAttribute 0)))
+          [ctx session-id] (create-session-context {:persist? false
+                                                    :session-defaults {:worktree-path worktree}})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
-      (with-redefs [psi.project-nrepl.ops/start (fn [_ctx worktree-path]
-                                                  {:status :started
-                                                   :instance {:worktree-path worktree-path
-                                                              :acquisition-mode :started
-                                                              :lifecycle-state :ready
-                                                              :readiness true
-                                                              :endpoint {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}}})]
+      (try
         (let [result ((:execute tool) {"action" "project-repl" "op" "start"})
               parsed (read-string (:content result))]
           (is (false? (:is-error result)))
-          (is (= :started (get-in parsed [:psi-tool/project-repl :status])))
-          (is (= :started (get-in parsed [:psi-tool/project-repl :instance :acquisition-mode])))))))
+          (is (= :missing-start-command (get-in parsed [:psi-tool/project-repl :status])))
+          (is (= :config (get-in parsed [:psi-tool/project-repl :phase])))
+          (is (re-find #"requires a configured start-command" (get-in parsed [:psi-tool/project-repl :message])))
+          (is (re-find #":agent-session :project-nrepl :start-command" (get-in parsed [:psi-tool/project-repl :message]))))
+        (finally
+          (doseq [f (reverse (file-seq (clojure.java.io/file worktree)))]
+            (.delete f))))))
 
   (testing "project-repl attach returns structured attached payload"
     (let [[ctx session-id] (create-session-context {:persist? false

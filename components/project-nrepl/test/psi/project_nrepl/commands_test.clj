@@ -1,5 +1,6 @@
 (ns psi.project-nrepl.commands-test
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.commands :as project-nrepl-commands]
    [psi.project-nrepl.ops]
@@ -22,22 +23,22 @@
       (is (re-find #"Project nREPL" (:message result)))))
 
   (testing "/project-repl start reports missing command configuration clearly"
-    (let [worktree-path    (System/getProperty "user.dir")
+    (let [worktree-path    (str (java.nio.file.Files/createTempDirectory
+                                 "psi-project-nrepl-commands-"
+                                 (make-array java.nio.file.attribute.FileAttribute 0)))
           [ctx session-id] (test-support/create-test-session {:persist? false
                                                               :session-defaults {:worktree-path worktree-path}})]
-      (with-redefs [psi.project-nrepl.ops/start (fn [_ctx _worktree-path]
-                                                  {:status :missing-start-command
-                                                   :worktree-path worktree-path
-                                                   :config-paths ["~/.psi/agent/config.edn"
-                                                                  (str worktree-path "/.psi/project.edn")
-                                                                  (str worktree-path "/.psi/project.local.edn")]})]
+      (try
         (let [result (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id "/project-repl start")]
           (is (= :text (:type result)))
           (is (re-find #"requires a configured start-command" (:message result)))
           (is (re-find #":agent-session :project-nrepl :start-command" (:message result)))
           (is (re-find #"~/.psi/agent/config.edn" (:message result)))
           (is (re-find #"/.psi/project.edn" (:message result)))
-          (is (re-find #"/.psi/project.local.edn" (:message result)))))))
+          (is (re-find #"/.psi/project.local.edn" (:message result))))
+        (finally
+          (doseq [f (reverse (file-seq (io/file worktree-path)))]
+            (.delete f))))))
 
   (testing "/project-repl eval routes through shared project nREPL ops helper"
     (let [[ctx session-id] (test-support/create-test-session {:persist? false
