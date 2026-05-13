@@ -3,6 +3,7 @@
   (:require
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.extension-installs :as extension-installs]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.resolvers.support :as support]
@@ -348,16 +349,19 @@
   {::pco/input  [:psi/agent-session-ctx]
    ::pco/output [:psi.runtime/nrepl-host
                  :psi.runtime/nrepl-port
-                 :psi.runtime/nrepl-endpoint]}
-  (let [runtime* (accessors/nrepl-runtime-in agent-session-ctx)
-        host     (:host runtime*)
-        port     (:port runtime*)
-        endpoint (or (:endpoint runtime*)
-                     (when (and (string? host) (integer? port))
-                       (str host ":" port)))]
+                 :psi.runtime/nrepl-endpoint
+                 :psi.runtime/source-root]}
+  (let [runtime*    (accessors/nrepl-runtime-in agent-session-ctx)
+        host        (:host runtime*)
+        port        (:port runtime*)
+        endpoint    (or (:endpoint runtime*)
+                        (when (and (string? host) (integer? port))
+                          (str host ":" port)))
+        source-root (extension-installs/runtime-root)]
     {:psi.runtime/nrepl-host host
      :psi.runtime/nrepl-port port
-     :psi.runtime/nrepl-endpoint endpoint}))
+     :psi.runtime/nrepl-endpoint endpoint
+     :psi.runtime/source-root source-root}))
 
 (pco/defresolver agent-session-git-context
   "Bridge resolver: derive :git/context from the explicit session worktree path so

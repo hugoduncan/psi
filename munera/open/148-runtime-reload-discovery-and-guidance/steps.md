@@ -1,7 +1,7 @@
-- [ ] Add runtime reload source-root resolver
-- [ ] Add focused resolver tests
-- [ ] Update psi-tool reload docs with discovery-first workflow
-- [ ] Update system prompt reload guidance
-- [ ] Add focused prompt/doc tests as needed
-- [ ] Verify focused tests pass
+- [x] Add runtime reload source-root resolver
+- [x] Add focused resolver tests
+- [x] Update psi-tool reload docs with discovery-first workflow
+- [x] Update system prompt reload guidance
+- [x] Add focused prompt/doc tests as needed
+- [x] Verify focused tests pass
 

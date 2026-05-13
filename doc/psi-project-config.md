@@ -70,6 +70,20 @@ Example:
 
 ### Reload code
 
+When reload targeting is unclear, first discover whether the running ψ runtime source root differs from the invoking session worktree:
+
+```clojure
+{:action "query"
+ :query  "[:psi.runtime/source-root :psi.agent-session/worktree-path]"
+ :entity "{:psi.agent-session/session-id \"sid\"}"}
+```
+
+Interpretation:
+- `:psi.agent-session/worktree-path` is the invoking session worktree
+- `:psi.runtime/source-root` is the source checkout currently owning the running ψ runtime when running from source
+- if they differ, use `:psi.runtime/source-root` for explicit `reload-code` targeting
+- `:psi.runtime/source-root` may be nil in packaged/non-source runtimes
+
 `reload-code` supports exactly one targeting mode:
 
 1. namespace mode

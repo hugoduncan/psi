@@ -273,13 +273,17 @@
   (testing "runtime nREPL attrs resolve nil when runtime has no nREPL server"
     (let [result (q [:psi.runtime/nrepl-host
                      :psi.runtime/nrepl-port
-                     :psi.runtime/nrepl-endpoint])]
+                     :psi.runtime/nrepl-endpoint
+                     :psi.runtime/source-root])]
       (is (contains? result :psi.runtime/nrepl-host))
       (is (contains? result :psi.runtime/nrepl-port))
       (is (contains? result :psi.runtime/nrepl-endpoint))
+      (is (contains? result :psi.runtime/source-root))
       (is (nil? (:psi.runtime/nrepl-host result)))
       (is (nil? (:psi.runtime/nrepl-port result)))
-      (is (nil? (:psi.runtime/nrepl-endpoint result)))))
+      (is (nil? (:psi.runtime/nrepl-endpoint result)))
+      (is (or (nil? (:psi.runtime/source-root result))
+              (string? (:psi.runtime/source-root result))))))
 
   (testing "runtime nREPL attrs reflect effective runtime atom values"
     (let [runtime-atom (atom {:host "localhost"
@@ -289,10 +293,19 @@
                                                 :nrepl-runtime-atom runtime-atom})
           result       (q-in ctx [:psi.runtime/nrepl-host
                                   :psi.runtime/nrepl-port
-                                  :psi.runtime/nrepl-endpoint])]
+                                  :psi.runtime/nrepl-endpoint
+                                  :psi.runtime/source-root])]
       (is (= "localhost" (:psi.runtime/nrepl-host result)))
       (is (= 7888 (:psi.runtime/nrepl-port result)))
-      (is (= "localhost:7888" (:psi.runtime/nrepl-endpoint result)))))
+      (is (= "localhost:7888" (:psi.runtime/nrepl-endpoint result)))
+      (is (or (nil? (:psi.runtime/source-root result))
+              (string? (:psi.runtime/source-root result))))))
+
+  (testing "runtime source-root is discoverable when running from source"
+    (let [result (q [:psi.runtime/source-root])]
+      (is (contains? result :psi.runtime/source-root))
+      (is (or (nil? (:psi.runtime/source-root result))
+              (string? (:psi.runtime/source-root result))))))
 
   (testing "runtime nREPL attrs are discoverable in graph root-queryable attrs and edges"
     (let [result    (q [:psi.graph/root-queryable-attrs :psi.graph/edges])
@@ -301,9 +314,11 @@
       (is (contains? root-attrs :psi.runtime/nrepl-host))
       (is (contains? root-attrs :psi.runtime/nrepl-port))
       (is (contains? root-attrs :psi.runtime/nrepl-endpoint))
+      (is (contains? root-attrs :psi.runtime/source-root))
       (is (contains? edge-attrs :psi.runtime/nrepl-host))
       (is (contains? edge-attrs :psi.runtime/nrepl-port))
-      (is (contains? edge-attrs :psi.runtime/nrepl-endpoint)))))
+      (is (contains? edge-attrs :psi.runtime/nrepl-endpoint))
+      (is (contains? edge-attrs :psi.runtime/source-root)))))
 
 (deftest authenticated-providers-resolver-test
   (testing "resolver returns empty vector when oauth context is absent"
