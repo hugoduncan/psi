@@ -2,15 +2,27 @@
 
 ## Goal
 
-Make it easy for ψ to discover the correct reload target for the running runtime and to use `psi-tool` reload surfaces reliably without trial and error.
+Make `psi-tool` reload behavior reliable and unsurprising when developing psi itself.
 
 ## Why
 
-A live reload attempt from this worktree failed because the running ψ instance had loaded source from a different checkout. The current reload API is explicit, but the discoverability of the correct `worktree-path` is weak: session worktree and runtime source root can diverge.
+A live reload attempt from this worktree failed because the running ψ instance had loaded source from a different checkout. That exposed a policy question.
+
+For psi self-development, the authoritative target should be the session `worktree-path`, not the checkout the current runtime happened to be started from. If those differ, that is a mismatch to surface clearly, not an alternate reload target to prefer.
+
+## Decision
+
+Adopt worktree-authoritative self-reload semantics.
+
+- session `worktree-path` remains the canonical target for psi self-reload
+- runtime source provenance is not a public reload-targeting contract
+- if a requested namespace resolves outside the target worktree, reload should fail clearly and explain that the runtime appears to be running from a different checkout
+- docs and prompt guidance should reinforce worktree authority and mismatch diagnosis rather than suggesting fallback to runtime source root
 
 ## Acceptance
 
-- a root-queryable runtime attr exposes the effective source root/worktree to use for code reloads when running from source
-- docs and prompt guidance show the discovery-first reload workflow
-- focused proof covers the new attr and guidance text
+- `:psi.runtime/source-root` is removed from the public graph surface
+- reload docs and prompt guidance describe worktree-authoritative reload behavior
+- namespace reload mismatch errors explicitly explain that the loaded namespace source is outside the target worktree and that the running runtime may come from a different checkout
+- focused proof covers the revised error guidance and the removal of the temporary attr/guidance
 
