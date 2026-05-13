@@ -65,3 +65,19 @@ Commit: 3fe3d3b7
 
 **Lint:** 0 errors, 0 warnings (clj-kondo + cljfmt pre-commit hooks passed)
 **Tests:** 1756 tests, 0 failures (full unit suite)
+
+### task-implementation-review pass (2026-05-13)
+
+All acceptance criteria met. All 1756+150 tests green. Code matches design precisely.
+
+**One gap found:**
+
+`format-semantic-error` in `ir.clj` handles `:skills-without-read-tool` (added beyond
+the design's semantic-error-type list), but `compilation_error_format_test.clj` has no
+focused unit test for this branch. Design acceptance criterion #7 requires "the formatter
+is covered by its own focused unit tests for each semantic error type." The
+`:skills-without-read-tool` case is exercised via `ir_test.clj` at the semantic-validator
+level but not at the formatter level.
+
+**No other issues.** Architecture fit, error enrichment, formatter wiring, mutation-surface
+passthrough, and test coverage for all design-listed types are all correct.
