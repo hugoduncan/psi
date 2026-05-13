@@ -109,7 +109,7 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 
 `psi-tool` is the live runtime introspection/modification tool with canonical action-based requests:
 - `query` — EQL graph reads
-- `eval` — in-process namespace-scoped Clojure eval
+- `eval` — in-process ψ namespace-scoped Clojure eval
 - `reload-code` — explicit namespace/worktree code reload with distinct reload and graph-refresh reporting
 - `project-repl` — managed project REPL status/start/attach/stop/eval/interrupt operations with structured reports
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation

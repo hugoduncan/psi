@@ -30,8 +30,8 @@
                      :lambda "λf. find(exact) → replace"}
    "write"          {:prose  "Create or overwrite files"
                      :lambda "λf. create(f) ∨ overwrite(f)"}
-   "psi-tool"       {:prose  "Execute live psi runtime operations: action-based graph query, in-process eval, explicit code reload, and managed project REPL control."
-                     :lambda "λaction. runtime(query ∨ eval ∨ reload-code ∨ project-repl) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"}})
+   "psi-tool"       {:prose  "Execute live psi runtime operations: action-based graph query, in-process ψ eval, explicit code reload, and managed project REPL control."
+                     :lambda "λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"}})
 
 ;;; Lambda mode constants
 
@@ -55,7 +55,8 @@
   resolver-detail → entity({:psi.resolver/sym 'ns/name}) + [:psi.resolver/input :psi.resolver/output]
   session-targeting → entity({:psi.agent-session/session-id \"sid\"}) | ¬omit → ¬silent-wrong-session
   child-sessions → [:psi.agent-session/context-sessions] | attrs discoverable via resolver-index ∨ attr-index
-  usage → {:psi.agent-session/ usage-input usage-output usage-cache-read usage-cache-write context-tokens context-window}")
+  usage → {:psi.agent-session/ usage-input usage-output usage-cache-read usage-cache-write context-tokens context-window}
+  eval-split → eval[ns,form] = ψ-process ∧ loaded-ns | project-repl/eval[code] = target-worktree ∧ managed-nrepl")
 
 (defn- format-graph-capabilities
   "Format a terse capability list from :psi.graph/capabilities maps."
@@ -314,7 +315,7 @@
        "  - Always supply session-id when targeting a specific session; omitting it silently queries the wrong session.\n"
        "- Child sessions:\n"
        "  - psi-tool(action: \"query\", query: \"[:psi.agent-session/context-sessions]\") then use attr-index or resolver-index to discover valid child attrs.\n"
-       "- Eval: psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\") — namespace must be already loaded.\n"
+       "- Eval split: psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\") = in-process ψ eval in an already loaded namespace; psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\") = managed project nREPL eval for the target worktree.\n"
        "- Reload code:\n"
        "  - namespace mode: psi-tool(action: \"reload-code\", namespaces: [\"psi.agent-session.tools\"])\n"
        "  - worktree mode (session-derived): psi-tool(action: \"reload-code\")\n"
