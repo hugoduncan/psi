@@ -42,17 +42,9 @@
           not-empty))
 
 (defn- missing-start-command-message
-  [worktree-path]
-  (str "Project nREPL start requires a configured start-command for " worktree-path "\n"
-       "Configure `:agent-session :project-nrepl :start-command` in either:\n"
-       "- ~/.psi/agent/config.edn\n"
-       "- " worktree-path "/.psi/project.edn (shared project defaults)\n"
-       "- " worktree-path "/.psi/project.local.edn (local project overrides)\n"
-       "\n"
-       "Example:\n"
-       "{:agent-session\n"
-       " {:project-nrepl\n"
-       "  {:start-command [\"bb\" \"nrepl-server\"]}}}"))
+  [result]
+  (or (:message result)
+      (str "Project nREPL start requires a configured start-command for " (:worktree-path result))))
 
 (defn dispatch-project-nrepl-command
   [ctx session-id trimmed]
@@ -65,7 +57,7 @@
       (let [{:keys [status instance] :as result} (project-nrepl-ops/start ctx worktree-path)]
         {:type :text
          :message (case status
-                    :missing-start-command (missing-start-command-message (:worktree-path result))
+                    :missing-start-command (missing-start-command-message result)
                     :present (str "Project nREPL already ready for " (:worktree-path instance)
                                   " at " (get-in instance [:endpoint :host]) ":" (get-in instance [:endpoint :port]))
                     :started (str "Started project nREPL for " (:worktree-path instance)

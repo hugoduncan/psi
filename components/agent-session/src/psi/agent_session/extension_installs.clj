@@ -103,7 +103,7 @@
   [lib]
   (get psi-owned-extension-catalog lib))
 
-(defn- runtime-root
+(defn runtime-root
   "Return the repo root when running from source on disk, nil otherwise.
    Returns nil when running from an uberjar (jar: URL scheme) so that
    psi-owned extension local/root paths are not resolved — extensions are

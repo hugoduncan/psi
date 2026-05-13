@@ -41,11 +41,26 @@
 
 (defn- missing-start-command-result
   [worktree-path]
-  {:status :missing-start-command
-   :worktree-path worktree-path
-   :config-paths ["~/.psi/agent/config.edn"
-                  (str worktree-path "/.psi/project.edn")
-                  (str worktree-path "/.psi/project.local.edn")]})
+  (let [config-paths ["~/.psi/agent/config.edn"
+                      (str worktree-path "/.psi/project.edn")
+                      (str worktree-path "/.psi/project.local.edn")]
+        message      (str "Project nREPL start requires a configured start-command for " worktree-path "\n"
+                          "Configure `:agent-session :project-nrepl :start-command` in either:\n"
+                          "- ~/.psi/agent/config.edn\n"
+                          "- " worktree-path "/.psi/project.edn (shared project defaults)\n"
+                          "- " worktree-path "/.psi/project.local.edn (local project overrides)\n"
+                          "\n"
+                          "Example:\n"
+                          "{:agent-session\n"
+                          " {:project-nrepl\n"
+                          "  {:start-command [\"bb\" \"nrepl-server\"]}}}")]
+    {:status :missing-start-command
+     :worktree-path worktree-path
+     :phase :config
+     :config-paths config-paths
+     :message message
+     :hint "Configure :agent-session :project-nrepl :start-command in user or project config before starting project-repl."
+     :example-config {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}}))
 
 (defn start
   [ctx worktree-path]

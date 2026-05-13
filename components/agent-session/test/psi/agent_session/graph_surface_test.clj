@@ -101,7 +101,10 @@
     :psi.graph/domain-coverage
     :psi.graph/resolver-index
     :psi.graph/attr-index
-    :psi.agent-session/active-session-id})
+    :psi.agent-session/active-session-id
+    :psi.runtime/nrepl-host
+    :psi.runtime/nrepl-port
+    :psi.runtime/nrepl-endpoint})
 
 (defn- assert-canonical-graph-root-attrs
   [root-attrs]

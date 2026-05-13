@@ -1,0 +1,6 @@
+- [x] Inspect `reload-code` and record the current fixup path plus all existing explicit repair cases.
+- [x] Inventory reload-sensitive namespaces / owners and classify each by surviving in-memory surface, symptom, and severity.
+- [x] Identify the missing cases classified `breaks-psi`.
+- [x] Implement focused fixups for all currently known `breaks-psi` cases.
+- [x] Add focused proof for the mandatory reload-safety cases.
+- [x] Update concise developer guidance for future reload-sensitive additions.

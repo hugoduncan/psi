@@ -1,5 +1,6 @@
 (ns psi.project-nrepl.ops-test
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config]
    [psi.project-nrepl.eval]
@@ -10,19 +11,37 @@
   (let [[ctx _] (test-support/create-test-session {:persist? false})]
     ctx))
 
+(defn- temp-dir []
+  (str (java.nio.file.Files/createTempDirectory
+        "psi-project-nrepl-ops-"
+        (make-array java.nio.file.attribute.FileAttribute 0))))
+
+(defn- delete-tree! [path]
+  (when path
+    (let [f (io/file path)]
+      (when (.exists f)
+        (doseq [x (reverse (file-seq f))]
+          (.delete x))))))
+
 (deftest start-test
-  (testing "start returns structured missing-start-command result"
+  (testing "start returns structured missing-start-command result with actionable guidance"
     (let [ctx      (make-ctx)
-          worktree (System/getProperty "user.dir")]
-      (with-redefs [psi.project-nrepl.config/resolve-config (fn [_]
-                                                              {:project-nrepl {}})]
+          worktree (temp-dir)]
+      (try
         (let [result (project-nrepl-ops/start ctx worktree)]
           (is (= :missing-start-command (:status result)))
           (is (= worktree (:worktree-path result)))
+          (is (= :config (:phase result)))
           (is (= ["~/.psi/agent/config.edn"
                   (str worktree "/.psi/project.edn")
                   (str worktree "/.psi/project.local.edn")]
-                 (:config-paths result))))))))
+                 (:config-paths result)))
+          (is (re-find #"requires a configured start-command" (:message result)))
+          (is (re-find #":agent-session :project-nrepl :start-command" (:message result)))
+          (is (= {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
+                 (:example-config result))))
+        (finally
+          (delete-tree! worktree))))))
 
 (deftest eval-op-test
   (testing "eval-op preserves the public success contract"

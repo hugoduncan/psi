@@ -70,6 +70,32 @@ Example:
 
 ### Reload code
 
+For psi self-development, reload is worktree-authoritative.
+
+Interpretation:
+- `:psi.agent-session/worktree-path` is the invoking session worktree
+- when editing psi itself, that worktree is the canonical reload target
+- namespace reload resolves target source files from that worktree and loads them into the running process
+- if reload reports that the previously loaded namespace source differs from the target worktree source, treat that as a diagnostic warning rather than a reload failure
+
+Reliable self-reload loop:
+1. discover the active target worktree
+2. start with one small already loaded namespace reload
+3. inspect any mismatch warnings for loaded-source-path vs target-source-path
+4. expand to worktree reload only after the small reload succeeds
+
+Examples:
+
+```clojure
+{:action "query"
+ :query  "[:psi.agent-session/worktree-path]"}
+```
+
+```clojure
+{:action     "reload-code"
+ :namespaces ["psi.prompt-assets.system-prompt"]}
+```
+
 `reload-code` supports exactly one targeting mode:
 
 1. namespace mode
@@ -111,3 +137,10 @@ Rules:
 - worktree mode does not discover brand new namespaces from disk
 - namespace mode reloads exactly the requested already loaded namespaces in request order
 - reload reports code reload and graph/runtime refresh separately; success of one does not imply success of the other
+- graph/runtime refresh currently includes mandatory safety fixups for:
+  - cached Pathom query env invalidation
+  - mutation snapshot refresh
+  - live tool definition refresh
+  - dispatch handler re-registration
+  - built-in workflow runtime reinitialization when already active
+- when adding a new long-lived defonce registry, cached env, or runtime state object that captures function values, update the reload fixup inventory and add an explicit refresh step if stale references would break psi after reload

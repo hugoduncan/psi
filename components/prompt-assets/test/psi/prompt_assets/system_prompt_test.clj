@@ -85,7 +85,7 @@
         (is (str/includes? prompt "bash → λcmd. shell(cmd)"))
         (is (str/includes? prompt "edit → λf. find(exact) → replace"))
         (is (str/includes? prompt "write → λf. create(f) ∨ overwrite(f)"))
-        (is (str/includes? prompt "psi-tool → λaction. runtime(query ∨ eval ∨ reload-code ∨ project-repl) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"))))
+        (is (str/includes? prompt "psi-tool → λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"))))
 
     (testing "includes graph capabilities data"
       (let [prompt (sys-prompt/build-system-prompt
@@ -155,7 +155,7 @@
         (is (str/includes? prompt "You are ψ (Psi)"))
         (is (str/includes? prompt "Available tools:"))
         (is (str/includes? prompt "read: Read file contents"))
-        (is (str/includes? prompt "psi-tool: Execute live psi runtime operations: action-based graph query, in-process eval, explicit code reload, and managed project REPL control."))
+        (is (str/includes? prompt "psi-tool: Execute live psi runtime operations: action-based graph query, in-process ψ eval, explicit code reload, and managed project REPL control."))
         (is (str/includes? prompt "Guidelines:"))
         (is (str/includes? prompt "Capability graph (EQL discovery):"))
         (is (not (str/includes? prompt "λ engage(nucleus).")))))
@@ -179,7 +179,12 @@
       (let [prompt (sys-prompt/build-system-prompt
                     {:prompt-mode :prose})]
         (is (str/includes? prompt "psi-tool(action: \"query\", query: \"[:psi.graph/root-seeds]\")"))
-        (is (str/includes? prompt "psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\")"))
+        (is (str/includes? prompt "psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\") = in-process ψ eval in an already loaded namespace; psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\") = managed project nREPL eval for the target worktree."))
+        (is (str/includes? prompt "psi self-reload is worktree-authoritative"))
+        (is (str/includes? prompt "psi-tool(action: \"query\", query: \"[:psi.agent-session/worktree-path]\")"))
+        (is (str/includes? prompt "start small: reload one already loaded namespace"))
+        (is (str/includes? prompt "warning-only mismatch diagnostics"))
+        (is (str/includes? prompt "do not retarget reload to some other checkout"))
         (is (str/includes? prompt "psi-tool(action: \"reload-code\", namespaces: [\"psi.agent-session.tools\"])"))
         (is (str/includes? prompt "psi-tool(action: \"project-repl\", op: \"status\")"))
         (is (str/includes? prompt "psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\")"))

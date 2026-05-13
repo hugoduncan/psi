@@ -118,6 +118,11 @@ Bootstrapped on 2026-04-02.
   - focused proof added in `psi.ai.providers.openai-test`
   - docs updated in `doc/custom-providers.md`; changelog updated
   - verification green: `clojure -M:test --focus psi.ai.providers.openai-test` → `24 tests, 119 assertions, 0 failures`
+- Reload discoverability/self-guidance improved locally:
+  - live-verified the small-namespace self-reload loop from the current session worktree using `psi-tool` query for `[:psi.agent-session/worktree-path]` followed by `reload-code` for `psi.prompt-assets.system-prompt`
+  - confirmed namespace reload also succeeds without explicit `worktree-path` when invoked from a session carrying the canonical worktree
+  - updated `AGENTS.md` with a concise psi self-reload loop near runtime tooling guidance
+  - updated `README.md` to point readers at the documented self-reload loop in `doc/psi-project-config.md`
 
 ## Suggested next step
 - Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `134-psi-tool-mutation-surface-and-active-session-introspection`.

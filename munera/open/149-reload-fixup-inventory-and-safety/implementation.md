@@ -1,0 +1,21 @@
+# Implementation
+
+- Inspected `psi.agent-session.psi-tool/execute-psi-tool-reload-report` and its existing refresh steps.
+- Built an explicit inventory in `inventory.md` covering cached query envs, mutation snapshots, dispatch handler registry, built-in workflow runtime state, tool defs, model registry, extension registry behavior, and broader context callback-map notes.
+- Identified three missing `breaks-psi` fixups:
+  - cached Pathom env invalidation for `psi.agent-session.resolvers`
+  - cached Pathom env invalidation for `psi.agent-core.core`
+  - state-kernel dispatch handler re-registration
+  - built-in workflow runtime reinitialization when already active
+- Implemented public query-env invalidation helpers in:
+  - `psi.agent-session.resolvers/invalidate-query-env!`
+  - `psi.agent-core.core/invalidate-query-env!`
+- Changed reload graph refresh to invalidate both cached query envs.
+- Added dispatch handler refresh step that clears and re-registers the state-kernel handler registry from current vars.
+- Added built-in workflow refresh step that re-runs built-in workflow bootstrap when workflow runtime state is already initialized.
+- Added focused tests in `reload_fixup_runtime_test.clj` for:
+  - query env invalidation
+  - dispatch handler re-registration
+  - built-in workflow runtime reinitialization through `reload-code`
+- Updated reload guidance in `doc/psi-project-config.md` so future reload-sensitive long-lived state gets explicit review.
+- Improved reload error reporting so compile failures and cyclic live-process load failures surface clearer structured diagnostics, including compile source/line/column and a reload-order hint for cyclic dependency cases.

@@ -8,6 +8,9 @@
    [psi.agent-core.core :as agent]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.agent-session.resolvers :as session-resolvers]
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [psi.state-kernel.dispatch :as kernel-dispatch]
    [psi.tool-registry.registry :as tool-registry]
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
@@ -21,7 +24,7 @@
    :description (str "Execute a live psi runtime operation. Canonical requests use `action` with one of: "
                      "`query`, `eval`, `reload-code`, `project-repl`, `workflow`, or `scheduler`. `query` executes an EQL query against the live session graph; "
                      "`eval` evaluates an in-process Clojure form in a named already-loaded namespace; "
-                     "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; "
+                     "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; omit `worktree-path` to use the invoking session worktree when available; "
                      "`project-repl` controls the managed project REPL with explicit `op` values `status|start|attach|stop|eval|interrupt`; "
                      "`workflow` manages deterministic workflow definitions and runs with explicit `op` values `list-definitions|create-run|execute-run|read-run|list-runs|resume-run|cancel-run`; "
                      "`scheduler` manages one-shot delayed work for the invoking session with explicit `op` values `create|list|cancel`, including delayed same-session prompts and delayed fresh top-level session creation. "
@@ -36,7 +39,7 @@
                               :form          {:type "string" :description "For `action: \"eval\"`: Clojure form string using full Clojure reader syntax (quote, deref, anon-fn, var) read with *read-eval* false and evaluated in the named namespace."}
                               :namespaces    {:type "array" :items {:type "string"}
                                               :description "For `action: \"reload-code\"` namespace mode: ordered vector of already loaded namespace names to reload."}
-                              :worktree-path {:type "string" :description "For `action: \"reload-code\"` worktree mode, and `action: \"project-repl\"`: explicit absolute target worktree path. When absent, invoking session worktree may be used."}
+                              :worktree-path {:type "string" :description "For `action: \"reload-code\"` worktree mode, and `action: \"project-repl\"`: explicit absolute target worktree path. When absent, invoking session worktree may be used; for psi self-development, that session worktree is the canonical reload target."}
                               :op            {:type "string" :enum ["status" "start" "attach" "stop" "eval" "interrupt"]
                                               :description "For `action: \"project-repl\"`: managed project REPL operation discriminator."}
                               :host          {:type "string" :description "For `action: \"project-repl\"`, `op: \"attach\"`: explicit attach host override."}
@@ -158,13 +161,52 @@
 (defn- sanitize-psi-tool-data [x] (sanitize-psi-tool-result x))
 (defn- ordered-map [& kvs] (apply array-map kvs))
 
+(defn- throwable-chain
+  [e]
+  (take-while some? (iterate ex-cause e)))
+
+(defn- reload-issue-diagnostic
+  [e]
+  (let [messages  (map #(or (ex-message %) (str %)) (throwable-chain e))
+        cyclic?   (some #(str/includes? % "Cyclic load dependency") messages)
+        data-seq  (keep ex-data (throwable-chain e))
+        data      (apply merge data-seq)
+        compiler? (or (instance? clojure.lang.Compiler$CompilerException e)
+                      (contains? data :clojure.error/phase)
+                      (contains? data :clojure.error/source)
+                      (contains? data :clojure.error/line)
+                      (contains? data :clojure.error/column))]
+    (cond-> {}
+      compiler?
+      (assoc :issue :compile-error
+             :summary "Reloaded source failed to compile in the running process")
+
+      (:clojure.error/source data)
+      (assoc :source (:clojure.error/source data))
+
+      (:clojure.error/line data)
+      (assoc :line (:clojure.error/line data))
+
+      (:clojure.error/column data)
+      (assoc :column (:clojure.error/column data))
+
+      cyclic?
+      (assoc :issue :cyclic-load-dependency
+             :summary "Reload hit a cyclic load dependency in the live process"
+             :hint (str "This often means reload order matters for the namespaces involved. "
+                        "If you are reloading psi-tool itself, reload any newly depended-on namespaces first, "
+                        "then reload psi.agent-session.psi-tool. For broader changes, prefer a small dependency-first "
+                        "namespace reload before a larger worktree reload.")))))
+
 (defn- psi-tool-error-summary
   ([e] (psi-tool-error-summary nil e))
   ([default-phase e]
-   {:message (or (ex-message e) (str e))
-    :class   (.getName (class e))
-    :phase   (or (:phase (ex-data e)) default-phase :execute)
-    :data    (some-> (ex-data e) sanitize-psi-tool-data)}))
+   (cond-> {:message (or (ex-message e) (str e))
+            :class   (.getName (class e))
+            :phase   (or (:phase (ex-data e)) default-phase :execute)
+            :data    (some-> (ex-data e) sanitize-psi-tool-data)}
+     (= :reload-code (or (:phase (ex-data e)) default-phase))
+     (assoc :reload-diagnostic (reload-issue-diagnostic e)))))
 
 (defn- format-psi-tool-error [prefix e]
   {:content  (str prefix (or (ex-message e) (str e)))
@@ -227,7 +269,7 @@
   (or (some-> ns-name symbol find-ns)
       (throw (ex-info (str "Eval namespace is not loaded: " ns-name) {:phase :validate :ns ns-name}))))
 
-(declare absolute-directory-path! path-under-root?)
+(declare absolute-directory-path!)
 
 (defn- canonical-file [path]
   (when (seq (str path))
@@ -236,8 +278,12 @@
 
 (defn- canonical-path [path] (some-> path canonical-file .getAbsolutePath))
 
-(defn- namespace-resource-paths [ns-obj]
-  (let [base (some-> ns-obj ns-name str (str/replace "." "/") (str/replace "-" "_"))]
+(defn- namespace-resource-paths [ns-or-name]
+  (let [base (cond
+               (instance? clojure.lang.Namespace ns-or-name) (some-> ns-or-name ns-name str)
+               (string? ns-or-name) ns-or-name
+               :else nil)
+        base (some-> base (str/replace "." "/") (str/replace "-" "_"))]
     (when base
       [(str base ".clj")
        (str base ".cljc")
@@ -248,6 +294,61 @@
       (some->> (namespace-resource-paths ns-obj)
                (keep #(some-> % io/resource .getFile canonical-path))
                first)))
+
+(defn- worktree-src-dirs [worktree-path]
+  (->> (file-seq (io/file worktree-path))
+       (filter #(.isDirectory ^java.io.File %))
+       (filter #(= "src" (.getName ^java.io.File %)))
+       (map #(.getAbsolutePath (.getCanonicalFile ^java.io.File %)))
+       sort
+       vec))
+
+(defn- target-source-path-for-ns [worktree-path ns-name]
+  (let [matches (->> (for [src-dir (worktree-src-dirs worktree-path)
+                           rel-path (namespace-resource-paths ns-name)
+                           :let [f (io/file src-dir rel-path)]
+                           :when (.isFile ^java.io.File f)]
+                       (.getAbsolutePath (.getCanonicalFile ^java.io.File f)))
+                     distinct
+                     sort
+                     vec)]
+    (cond
+      (= 1 (count matches))
+      (first matches)
+
+      (empty? matches)
+      nil
+
+      :else
+      (throw (ex-info (str "Reload namespace resolves to multiple source files under target worktree: " ns-name)
+                      {:phase :validate
+                       :action "reload-code"
+                       :namespace ns-name
+                       :worktree-path worktree-path
+                       :target-source-paths matches})))))
+
+(defn- reload-warning [ns-name loaded-source-path target-source-path]
+  (when (and loaded-source-path target-source-path (not= loaded-source-path target-source-path))
+    {:type :warning
+     :namespace ns-name
+     :message (str "Reload namespace source path differs from target worktree source: " ns-name)
+     :loaded-source-path loaded-source-path
+     :target-source-path target-source-path}))
+
+(defn- reload-target-for-namespace! [ns-name worktree-path]
+  (let [loaded-source-path (some-> ns-name symbol find-ns canonical-source-path-for-ns)
+        target-source-path (target-source-path-for-ns worktree-path ns-name)]
+    (when-not target-source-path
+      (throw (ex-info (str "Reload namespace source path is not present under target worktree: " ns-name)
+                      {:phase :validate
+                       :action "reload-code"
+                       :namespace ns-name
+                       :worktree-path worktree-path
+                       :loaded-source-path loaded-source-path})))
+    {:ns-name ns-name
+     :loaded-source-path loaded-source-path
+     :target-source-path target-source-path
+     :warning (reload-warning ns-name loaded-source-path target-source-path)}))
 
 (defn- loaded-namespace? [ns-name] (boolean (some-> ns-name symbol find-ns)))
 
@@ -270,19 +371,7 @@
   (when (some? worktree-path)
     (absolute-directory-path! worktree-path))
   (when (and (some? namespaces) (some? worktree-path))
-    (doseq [ns-name namespaces]
-      (let [ns-obj      (some-> ns-name symbol find-ns)
-            source-path (canonical-source-path-for-ns ns-obj)]
-        (when-not source-path
-          (throw (ex-info (str "Reload namespace has no canonical source path: " ns-name)
-                          {:phase :validate :action "reload-code" :namespace ns-name :worktree-path worktree-path})))
-        (when-not (path-under-root? worktree-path source-path)
-          (throw (ex-info (str "Reload namespace source path is outside target worktree: " ns-name)
-                          {:phase :validate
-                           :action "reload-code"
-                           :namespace ns-name
-                           :worktree-path worktree-path
-                           :source-path source-path})))))))
+    (mapv #(reload-target-for-namespace! % worktree-path) namespaces)))
 
 (defn- absolute-directory-path! [worktree-path]
   (when-not (and (string? worktree-path) (not (str/blank? worktree-path)))
@@ -294,29 +383,30 @@
       (throw (ex-info "psi-tool reload-code explicit worktree-path must resolve to an existing directory" {:phase :validate :action "reload-code" :worktree-path worktree-path})))
     (.getAbsolutePath (.getCanonicalFile f))))
 
-(defn- path-under-root? [root-path candidate-path]
-  (let [root (canonical-file root-path)
-        candidate (canonical-file candidate-path)]
-    (when (and root candidate)
-      (let [root-path* (.toPath root)
-            child-path (.toPath candidate)]
-        (.startsWith child-path root-path*)))))
-
 (defn worktree-reload-candidates [worktree-path]
   (->> (all-ns)
-       (map (fn [ns-obj] {:ns-name (str (ns-name ns-obj)) :source-path (canonical-source-path-for-ns ns-obj)}))
-       (filter :source-path)
-       (filter #(path-under-root? worktree-path (:source-path %)))
+       (map (fn [ns-obj]
+              (let [ns-name (str (ns-name ns-obj))
+                    loaded-source-path (canonical-source-path-for-ns ns-obj)
+                    target-source-path (target-source-path-for-ns worktree-path ns-name)]
+                (when target-source-path
+                  {:ns-name ns-name
+                   :loaded-source-path loaded-source-path
+                   :target-source-path target-source-path
+                   :warning (reload-warning ns-name loaded-source-path target-source-path)}))))
+       (keep identity)
        (sort-by :ns-name)
        vec))
 
 (defn- refresh-query-runtime! [ctx]
-  ;; Resolvers are derived fresh per-request via session-resolver-surface — no stale
-  ;; snapshot to refresh.  Mutation registrations are handled separately by
-  ;; refresh-all-mutations! which updates the :all-mutations-atom in ctx.
+  ;; Agent-session and agent-core both cache Pathom env snapshots in defonce
+  ;; atoms. Those envs capture resolver vars and must be dropped so the next
+  ;; query rebuilds from the freshly reloaded namespaces.
+  (session-resolvers/invalidate-query-env!)
+  (agent/invalidate-query-env!)
   (if-not ctx
-    {:status :ok :summary "resolver registrations unchanged (no runtime ctx provided)"}
-    {:status :ok :summary "resolver registrations are derived per-request; no snapshot to refresh"}))
+    {:status :ok :summary "invalidated cached query envs (no runtime ctx provided)"}
+    {:status :ok :summary "invalidated cached agent-session and agent-core query envs"}))
 
 (defn- refresh-all-mutations!
   "Reset the ctx :all-mutations-atom to the live value of
@@ -346,6 +436,36 @@
       (when agent-ctx
         (agent/set-tools-in! agent-ctx tool-defs))
       {:status :ok :summary (str "refreshed live tool defs (" (count tool-defs) " tools)")})))
+
+(defn- refresh-dispatch-handlers! [ctx]
+  ;; The state-kernel handler registry is a long-lived defonce atom keyed to
+  ;; function values registered during context creation. Re-register handlers so
+  ;; dispatch resolves to the current vars after reload.
+  (kernel-dispatch/clear-handlers!)
+  (if-not ctx
+    {:status :ok :summary "dispatch handlers reset (no runtime ctx provided)"}
+    (do
+      ((requiring-resolve 'psi.agent-session.dispatch-handlers/register-all!) ctx)
+      {:status :ok
+       :summary (str "re-registered dispatch handlers (" (count (kernel-dispatch/registered-event-types)) " events)")
+       :event-count (count (kernel-dispatch/registered-event-types))})))
+
+(defn- maybe-refresh-built-in-workflow! [ctx session-id]
+  ;; Built-in workflow keeps long-lived defonce runtime state, command/tool
+  ;; registration, prompt contribution registration, and loaded definitions.
+  ;; Re-initialize it when it is already active so those surfaces point at the
+  ;; freshly reloaded vars.
+  (let [workflow-state @workflow-runtime-state/state
+        initialized?   (and workflow-state
+                            (contains? workflow-state :api))]
+    (if-not initialized?
+      {:status :ok :summary "built-in workflow runtime state unchanged (not initialized)"}
+      (if-not (and ctx session-id)
+        {:status :ok :summary "built-in workflow runtime state unchanged (no session runtime provided)"}
+        (let [result ((requiring-resolve 'psi.agent-session.workflow.bootstrap/init-built-in!) ctx session-id)]
+          {:status :ok
+           :summary (str "reinitialized built-in workflow runtime state (" (count (:loaded-definitions result)) " definitions)")
+           :definition-count (count (:loaded-definitions result))})))))
 
 (defn- install-summary [install-state]
   (let [entries (vals (get-in install-state [:psi.extensions/effective :entries-by-lib]))
@@ -391,10 +511,19 @@
      :model-count (count (model-registry/all-models-seq))
      :load-error (model-registry/get-load-error)}))
 
-(defn reload-namespace! [worktree-path ns-name]
-  (require (symbol ns-name) :reload)
-  (when ((set ["psi.ai.models" "psi.ai.model-registry"]) ns-name)
-    (reload-model-registry-step! worktree-path)))
+(defn reload-namespace!
+  ([worktree-path ns-name]
+   (if-let [target-source-path (target-source-path-for-ns worktree-path ns-name)]
+     (reload-namespace! worktree-path ns-name target-source-path)
+     (throw (ex-info (str "Reload namespace source path is not present under target worktree: " ns-name)
+                     {:phase :validate
+                      :action "reload-code"
+                      :namespace ns-name
+                      :worktree-path worktree-path}))))
+  ([worktree-path ns-name target-source-path]
+   (load-file target-source-path)
+   (when ((set ["psi.ai.models" "psi.ai.model-registry"]) ns-name)
+     (reload-model-registry-step! worktree-path))))
 
 (defn- execute-psi-tool-reload-report [{:keys [ctx session-id cwd]} {:keys [namespaces worktree-path]}]
   (let [started-at (System/nanoTime)
@@ -414,27 +543,31 @@
                            (some? worktree-path) (absolute-directory-path! worktree-path)
                            (some? session-derived-path) session-derived-path
                            :else (throw (ex-info "psi-tool reload-code worktree mode requires explicit worktree-path or invoking session worktree-path" {:phase :validate :action "reload-code"}))))
-        _ (validate-reload-namespace-targeting! requested-nses effective-path)
+        namespace-targets (when namespace-mode? (validate-reload-namespace-targeting! requested-nses effective-path))
         worktree-source (if (some? worktree-path) :explicit :session)
         candidates (if namespace-mode?
-                     (mapv (fn [ns-name] {:ns-name ns-name}) requested-nses)
+                     namespace-targets
                      (let [matches (worktree-reload-candidates effective-path)]
                        (when (empty? matches)
                          (throw (ex-info "psi-tool reload-code worktree target is not reloadable in the current runtime" {:phase :validate :action "reload-code" :worktree-path effective-path})))
                        matches))
-        reload-result (loop [remaining candidates reloaded []]
-                        (if-let [{:keys [ns-name]} (first remaining)]
-                          (let [step-result (try (reload-namespace! effective-path ns-name) {:ok? true}
-                                                 (catch Exception e {:ok? false :error e}))]
+        reload-result (loop [remaining candidates reloaded [] warnings []]
+                        (if-let [{:keys [ns-name target-source-path warning]} (first remaining)]
+                          (let [step-result (try (reload-namespace! effective-path ns-name target-source-path) {:ok? true}
+                                                 (catch Exception e {:ok? false :error e}))
+                                warnings' (cond-> warnings warning (conj warning))]
                             (if (:ok? step-result)
-                              (recur (rest remaining) (conj reloaded ns-name))
+                              (recur (rest remaining) (conj reloaded ns-name) warnings')
                               {:status :error :namespace-count (count reloaded) :namespaces reloaded
+                               :warnings warnings'
                                :summary (str "reload stopped after failure in " ns-name)
                                :error (assoc (psi-tool-error-summary :reload-code (:error step-result)) :namespace ns-name)}))
-                          {:status :ok :namespace-count (count reloaded) :namespaces reloaded :summary (str "reloaded " (count reloaded) " namespaces")}))
+                          {:status :ok :namespace-count (count reloaded) :namespaces reloaded :warnings warnings :summary (str "reloaded " (count reloaded) " namespaces")}))
         refresh-steps [(assoc (refresh-query-runtime! ctx) :step :resolver-registration-refresh)
                        (assoc (refresh-all-mutations! ctx) :step :mutation-registration-refresh)
                        (assoc (refresh-live-tool-defs! ctx session-id) :step :live-tool-definition-refresh)
+                       (assoc (refresh-dispatch-handlers! ctx) :step :dispatch-handler-refresh)
+                       (assoc (maybe-refresh-built-in-workflow! ctx session-id) :step :built-in-workflow-refresh)
                        (assoc (if namespace-mode? (preserve-extension-registry-step) (refresh-worktree-extensions! ctx session-id effective-path)) :step :extension-refresh)]
         refresh-error (some #(when (= :error (:status %)) %) refresh-steps)
         graph-refresh {:status (if refresh-error :error :ok)
