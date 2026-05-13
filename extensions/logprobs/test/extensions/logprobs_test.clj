@@ -193,3 +193,24 @@
     (testing "registers logprobs/perplexity operation"
       (is (= 1 (count @registered-ops)))
       (is (= "logprobs/perplexity" (:id (first @registered-ops)))))))
+
+(deftest init-registers-command-when-api-supports-it-test
+  (let [registered-commands (atom [])
+        api {:on (fn [_ _] nil)
+             :register-operation (fn [_] nil)
+             :register-command (fn [name spec]
+                                 (swap! registered-commands conj (assoc spec :name name)))}]
+    (logprobs/init api)
+    (testing "registers logprobs-table command"
+      (is (= 1 (count @registered-commands)))
+      (is (= "logprobs-table" (:name (first @registered-commands))))
+      (is (fn? (:handler (first @registered-commands)))))))
+
+(deftest init-skips-command-when-api-lacks-register-command-test
+  (let [registered-ops (atom [])
+        api {:on (fn [_ _] nil)
+             :register-operation (fn [op] (swap! registered-ops conj op))}]
+    (testing "does not throw when :register-command is absent"
+      (is (nil? (logprobs/init api))))
+    (testing "still registers the operation"
+      (is (= 1 (count @registered-ops))))))
