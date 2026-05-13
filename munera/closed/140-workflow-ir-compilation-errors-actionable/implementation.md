@@ -194,6 +194,33 @@ then to `"invalid value"` as a final catch-all. Description is never blank.
 **Verification:** 1757 tests, 12130 assertions, 0 failures; lint 0 errors, 0 warnings.
 All acceptance criteria now fully satisfied including verification expectation #4.
 
+### test-shaper follow-up pass (2026-05-13) — all 4 signal/robustness gaps resolved
+
+All four gaps from the test-shaper review applied to `compilation_error_format_test.clj`:
+
+**Gap 1 — combined substring assertion:**
+`format-compile-error-with-step-context-test` now asserts the combined string
+`"Step 'my-step' (index 2): Unsupported target workflow step type"` on a single line.
+The two independent `contains-line?` checks were replaced by one joint assertion.
+
+**Gap 2 — path-presence assertion in real-Malli block:**
+`format-structural-errors-test` "real Malli explain-data" testing block now asserts
+that the output contains `"steps"` or `"contributions"` — satisfying design criterion
+#4 ("includes a path or field name").
+
+**Gap 3 — two-step forward-reference integration test:**
+`create-run-surfaces-step-contextual-message-test` "non-prior step ref" case replaced
+with a two-step workflow where step-b (first) forward-references step-a (second).
+Referrer and target now have distinct names; assertions check both `"step-b"`,
+`"step-a"`, and `"not prior"` independently.
+
+**Gap 4 — constraint text + mixed-channel test:**
+`format-multiple-errors-test` now asserts constraint text (`"missing :yields"`,
+`"routing table"`) in addition to step names. Added a second testing block for a
+mixed compile-error + semantic-errors call, asserting both channels render.
+
+Verification: 16 tests, 70 assertions, 0 failures; lint 0 errors, 0 warnings.
+
 ### test-shaper review (2026-05-13)
 
 `compilation_error_format_test.clj` — four signal/robustness gaps found:

@@ -31,14 +31,16 @@
 
 (deftest format-compile-error-with-step-context-test
   ;; compile-error that carries step-name and step-index in :data
-  (testing "compile-error with step context includes step name and index"
+  (testing "compile-error with step context includes step name and index on the same line"
     (let [out (format-errors
                {:message "Unsupported target workflow step type"
                 :data    {:step-name "my-step" :step-index 2
                           :step {:name "my-step" :type :unknown}}}
                nil [])]
-      (is (contains-line? out "Step 'my-step' (index 2):"))
-      (is (contains-line? out "Unsupported target workflow step type"))))
+      ;; Both the step context prefix and the message must appear on the SAME line.
+      ;; Two independent contains-line? checks would pass even if they were on
+      ;; separate lines; this assertion pins the combined contract.
+      (is (contains-line? out "Step 'my-step' (index 2): Unsupported target workflow step type"))))
 
   (testing "compile-error without step context emits the message directly"
     (let [out (format-errors
@@ -173,7 +175,7 @@
           (is (not (str/ends-with? (str/trim line) ":"))
               (str "line must not end with bare ':' — got: " line))))))
 
-  (testing "real Malli explain-data (no :message key) produces non-blank description"
+  (testing "real Malli explain-data (no :message key) produces non-blank description with path"
     ;; Real Malli explain-data entries carry :path, :in, :schema, :value, :type
     ;; (e.g. :malli.core/missing-key) but NOT :message.  The formatter must fall
     ;; back to (name :type) so the description is never blank.
@@ -191,25 +193,56 @@
                                            :path [:status]}}}]}}]})
           out (format-errors nil real-explain-data [])]
       (is (some? real-explain-data) "expected structural validation to fail")
-      ;; Each error line must contain the path and a non-blank description
+      ;; Each error line must contain a non-blank description
       (let [structural-lines (->> (str/split-lines out)
                                   (filter #(str/includes? % "Structural error")))]
         (is (seq structural-lines) "expected at least one structural error line")
         (doseq [line structural-lines]
           (is (not (str/ends-with? (str/trim line) ":"))
-              (str "description is blank in: " line)))))))
+              (str "description is blank in: " line))))
+      ;; Design criterion #4: the output must include a path or field name.
+      ;; The :workflow-runtime source ref is nested under :steps / :contributions,
+      ;; so at least one of those path segments must appear in the formatted output.
+      (is (or (str/includes? out "steps")
+              (str/includes? out "contributions"))
+          "formatted output must include a path segment (e.g. 'steps' or 'contributions')"))))
 
 ;;;; multiple errors
 
 (deftest format-multiple-errors-test
-  ;; All errors enumerated, not just the first
-  (testing "multiple semantic errors all appear in output"
+  ;; All errors enumerated, not just the first; constraint text appears per entry.
+  (testing "multiple semantic errors: step names AND constraint text all appear in output"
     (let [out (format-errors nil nil [{:type :missing-yields :step "step-a"}
                                       {:type :missing-yields :step "step-b"}
                                       {:type :judge-without-routing :step "step-c"}])]
+      ;; Step names present
       (is (contains-line? out "step-a"))
       (is (contains-line? out "step-b"))
-      (is (contains-line? out "step-c")))))
+      (is (contains-line? out "step-c"))
+      ;; Constraint text present for each error type — a formatter bug that drops
+      ;; constraint text but keeps the step name would still pass name-only checks.
+      (is (str/includes? out "missing :yields")
+          "constraint text for :missing-yields must appear")
+      (is (str/includes? out "routing table")
+          "constraint text for :judge-without-routing must appear")))
+
+  (testing "mixed compile-error + semantic-errors: both channels rendered"
+    ;; The formatter supports compile-error AND semantic-errors simultaneously.
+    ;; This path was previously untested.
+    (let [out (format-errors
+               {:message "Unsupported target workflow step type"
+                :data    {:step-name "bad-step" :step-index 0}}
+               nil
+               [{:type :missing-yields :step "other-step"}])]
+      ;; compile-error line
+      (is (contains-line? out "Step 'bad-step' (index 0): Unsupported target workflow step type")
+          "compile-error line must appear")
+      ;; semantic-error line
+      (is (contains-line? out "Step 'other-step': missing :yields")
+          "semantic-error line must appear")
+      ;; both in same output
+      (is (str/includes? out "bad-step"))
+      (is (str/includes? out "other-step")))))
 
 ;;;; Integration: compile-step-with-context enriches exceptions
 
@@ -253,22 +286,32 @@
           (is (str/includes? (ex-message e) "broken-step"))
           (is (str/includes? (ex-message e) "Workflow IR compilation failed"))))))
 
-  (testing "non-prior step ref produces message naming both steps"
+  (testing "forward step ref: step-b references step-a which comes after it — message names both steps"
+    ;; step-b appears first and forward-references step-a (which is later).
+    ;; The referrer (step-b) and the target (step-a) have distinct names so the
+    ;; test distinguishes the two roles rather than relying on a single name appearing twice.
     (let [state {:workflows {:definitions {} :runs {} :run-order []}}]
       (try
         (workflow-runtime/create-run
          state
-         {:definition {:steps [{:name "step-a"
+         {:definition {:steps [{:name "step-b"
                                 :type :session
                                 :contributions [{:type :template
                                                  :text "{{x}}"
                                                  :vars {"x" {:from {:step "step-a"
-                                                                    :output :final-llm-reply}}}}]}]}
-          :run-id     "self-ref-run"})
+                                                                    :output :final-llm-reply}}}}]}
+                               {:name "step-a"
+                                :type :session
+                                :contributions [{:type :source :from :workflow-input}]}]}
+          :run-id     "forward-ref-run"})
         (is false "expected exception")
         (catch clojure.lang.ExceptionInfo e
-          (is (str/includes? (ex-message e) "step-a"))
-          (is (str/includes? (ex-message e) "not prior"))))))
+          (is (str/includes? (ex-message e) "step-b")
+              "referrer step name must appear in message")
+          (is (str/includes? (ex-message e) "step-a")
+              "referenced step name must appear in message")
+          (is (str/includes? (ex-message e) "not prior")
+              "constraint text must appear in message")))))
 
   (testing "judge without routing produces message naming the step and constraint"
     (let [state {:workflows {:definitions {} :runs {} :run-order []}}]
