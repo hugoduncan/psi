@@ -77,3 +77,9 @@ Expected likely owners:
   - result: `27 tests, 125 assertions, 0 failures`
 - `clojure -M:test --focus psi.agent-session.child-session-mutation-test --focus psi.agent-session.workflow_execution_test --focus psi.agent-session.workflow_statechart_runtime_test`
   - result: `9 tests, 34 assertions, 0 failures`
+
+2026-05-13 follow-up execution:
+- Preloaded review-added actionable items were already implemented in the current worktree on task commit `016933a6` (`⚒ 147 workflow child-session creation contract`).
+- Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md`; no newly added unchecked actionable follow-up items remain for this task.
+- Re-ran the focused workflow child-session contract suites, nearby integration/regression suites, and lint to confirm the landed implementation remains green after the review follow-up pass.
+- No blocker: there were no remaining unchecked follow-up items to execute beyond verification of the already-landed work.
