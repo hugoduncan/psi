@@ -269,6 +269,14 @@ search text (file contents): `git grep "λ"`
 **charm for TUI** https://codeberg.org/timokramer/charm.clj
 **repair after edit:** `clj-paren-repair <file>` — fixes delimiters, formats code
 
+**psi self-reload loop:**
+1. query `[:psi.agent-session/worktree-path]`
+2. treat that session worktree as authoritative for psi self-development
+3. start with one small already loaded namespace reload, e.g. `psi.prompt-assets.system-prompt`
+4. use `psi-tool` `action: "reload-code"` with either explicit `worktree-path` or the invoking session worktree
+5. inspect any `:psi-tool/code-reload :warnings` mismatch diagnostics, but do not retarget reload to a different checkout just because the current runtime was started there
+6. widen to worktree reload only after the small namespace reload succeeds
+
 ## Architecture — Viable System Model
 
 ```

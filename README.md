@@ -115,7 +115,7 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
 
 See:
-- [`doc/psi-project-config.md`](doc/psi-project-config.md) for examples and worktree-authoritative reload targeting rules
+- [`doc/psi-project-config.md`](doc/psi-project-config.md) for examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
 - [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
 
 ### Workflows
