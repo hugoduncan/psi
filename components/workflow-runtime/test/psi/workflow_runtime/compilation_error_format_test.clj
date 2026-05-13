@@ -124,6 +124,15 @@
       (is (contains-line? out "producer"))
       (is (contains-line? out "text")))))
 
+(deftest format-semantic-error-skills-without-read-tool-test
+  ;; :skills-without-read-tool — step declares skills but 'read' is absent from :tools
+  (testing ":skills-without-read-tool includes step name and constraint"
+    (let [out (format-errors nil nil [{:type   :skills-without-read-tool
+                                       :step   "skill-step"
+                                       :skills ["my-skill"]}])]
+      (is (contains-line? out "Step 'skill-step'"))
+      (is (contains-line? out "skills require the 'read' tool")))))
+
 (deftest format-semantic-error-unknown-type-fallback-test
   ;; Unknown semantic error type uses fallback format
   (testing "unknown semantic error type falls back to raw representation"

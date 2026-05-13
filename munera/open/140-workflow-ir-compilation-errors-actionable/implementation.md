@@ -81,3 +81,13 @@ level but not at the formatter level.
 
 **No other issues.** Architecture fit, error enrichment, formatter wiring, mutation-surface
 passthrough, and test coverage for all design-listed types are all correct.
+
+### Follow-up pass (2026-05-13) — skills-without-read-tool formatter test
+
+Added `format-semantic-error-skills-without-read-tool-test` to
+`compilation_error_format_test.clj`. Asserts that `:skills-without-read-tool` produces
+a line containing the step name and the "skills require the 'read' tool" constraint
+message. Suite: 16 tests, 50 assertions, 0 failures. Lint clean.
+
+Acceptance criterion #7 now fully satisfied — all semantic error types covered at the
+formatter level.

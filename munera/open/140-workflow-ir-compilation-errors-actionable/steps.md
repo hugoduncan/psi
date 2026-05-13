@@ -11,4 +11,4 @@
 - [x] Test integration: confirm compile-exception step-context appears in `create-run` error messages for unsupported step type, bad source ref, judge-without-routing
 - [x] Regression: all existing `target_ir_compiler_test.clj`, `ir_runtime_adoption_test.clj`, `compiler_test.clj` tests green (1756 tests, 0 failures)
 - [ ] Review: verify all acceptance criteria; close task
-- [ ] Add focused unit test for `:skills-without-read-tool` in `compilation_error_format_test.clj` — `format-semantic-error` handles this branch but no formatter-level test covers it (acceptance criterion #7)
+- [x] Add focused unit test for `:skills-without-read-tool` in `compilation_error_format_test.clj` — `format-semantic-error` handles this branch but no formatter-level test covers it (acceptance criterion #7)
