@@ -133,6 +133,24 @@ and semantic errors but not structural errors end-to-end. Add a `create-run` cas
 triggers a structural error (e.g. `:workflow-runtime` source ref) and asserts the
 message contains a path segment and does not contain raw Malli schema data.
 
+### task-test-review pass 2 (2026-05-13)
+
+**All acceptance criteria and verification expectations are met.** 1757 tests, 0 failures.
+All semantic error types have formatter-level unit tests. Structural error blank-description
+bug was fixed. `create-run` integration tests cover unsupported-step, non-prior-step-ref,
+judge-without-routing, and structural-error paths.
+
+**One minor gap found:**
+
+`format-structural-error` has a final `"invalid value"` fallback for Malli error entries
+with neither `:message` nor `:type`. The real-Malli test in `format-structural-errors-test`
+exercises the `:type` fallback path (e.g. `:malli.core/missing-key`), but the `"invalid value"`
+catch-all has no test. This is a robustness gap for hypothetical future Malli error shapes
+where no `:type` key is present — unlikely in practice but untested.
+
+**No other issues.** Mutation surface passthrough, step-context enrichment, formatter wiring,
+and all design-listed semantic error types are fully covered.
+
 ### Follow-up pass 2 (2026-05-13) — structural error formatter fix + tests
 
 **Root cause of blank description:** Real Malli explain-data error entries carry
