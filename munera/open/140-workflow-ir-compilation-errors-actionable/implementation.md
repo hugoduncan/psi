@@ -48,4 +48,20 @@ Impact on existing tests: two tests in `target_ir_compiler_test.clj` compare
 
 PR provenance added to design.md and this file.
 
-_Append further decisions, discoveries, and trade-offs here as implementation progresses._
+### Implementation pass (2026-05-13) — complete
+
+Commit: 3fe3d3b7
+
+**Files changed:**
+- `target_ir_compiler.clj`: added `compile-step-with-context`; `compile-workflow-definition` uses `map-indexed`; catch block stores `{:message … :data …}`
+- `ir.clj`: added `clojure.string` require; added `format-compile-error`, `format-structural-error`, `format-semantic-error`, `format-compilation-errors` (public)
+- `core.clj`: added `workflow-ir` require; `compile-definition-to-ir!` calls `format-compilation-errors`
+- `compilation_error_format_test.clj`: new — unit tests for all semantic error types, structural errors, step context, multi-error, integration tests for `create-run`
+- `target_ir_compiler_test.clj`: two `:compile-error` bare-string comparisons → `(get-in … [:message])`
+- `ir_runtime_adoption_test.clj`: `#"execution-valid canonical IR"` → `#"Workflow IR compilation failed"`
+
+**Deviations from design:**
+- None. All design decisions followed as specified.
+
+**Lint:** 0 errors, 0 warnings (clj-kondo + cljfmt pre-commit hooks passed)
+**Tests:** 1756 tests, 0 failures (full unit suite)
