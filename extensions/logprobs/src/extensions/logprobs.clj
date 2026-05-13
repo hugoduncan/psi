@@ -133,7 +133,7 @@
     :handler invoke-perplexity})
   (when-let [register-command (:register-command api)]
     (register-command
-     {:name "logprobs-table"
-      :description "Pretty-print the most recent logprobs as an EDN table (non-LLM message)"
+     "logprobs-table"
+     {:description "Pretty-print the most recent logprobs as an EDN table (non-LLM message)"
       :handler (fn [args] (logprobs-table-handler args api))}))
   nil)

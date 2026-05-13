@@ -210,16 +210,19 @@
       (is (= "logprobs/perplexity" (:id (first @registered-ops)))))))
 
 (deftest init-registers-command-when-api-supports-it-test
-  (let [registered-ops    (atom [])
+  (let [registered-ops      (atom [])
         registered-commands (atom [])
         api {:on (fn [_ _] nil)
              :register-operation (fn [op] (swap! registered-ops conj op))
-             :register-command (fn [cmd] (swap! registered-commands conj cmd))}]
+             :register-command (fn [name opts]
+                                 (swap! registered-commands conj {:name name :opts opts}))}]
     (logprobs/init api)
     (testing "registers logprobs-table command"
       (is (= 1 (count @registered-commands)))
       (is (= "logprobs-table" (:name (first @registered-commands))))
-      (is (some? (:handler (first @registered-commands)))))))
+      (is (= "Pretty-print the most recent logprobs as an EDN table (non-LLM message)"
+             (get-in (first @registered-commands) [:opts :description])))
+      (is (some? (get-in (first @registered-commands) [:opts :handler]))))))
 
 (deftest init-skips-command-when-api-lacks-register-command-test
   (let [registered-ops (atom [])
