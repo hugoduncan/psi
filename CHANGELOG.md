@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Fixed
+- Workflow IR compilation errors now identify the failing step by name and index, state the violated constraint in plain language, and enumerate all errors — replacing the single opaque "Workflow definition does not compile to execution-valid canonical IR" message.
+
 ## [0.1.2067] - 2026-05-12
 
 ### Added
