@@ -105,6 +105,14 @@ Bootstrapped on 2026-04-02.
   - `:psi.agent-session/last-turn-logprobs` EQL resolver added
   - `/logprobs [on|off|N]` command: `set-logprobs-in!` in session_settings + core; `:session/set-logprobs` handler with `(or top-n 3)` nil-guard; `prefixed-command-prefixes` + `builtin-slash-commands` + `format-help` updated
   - 3 new test namespaces; 1702 tests, 0 failures
+- Task 145 logprobs-out-of-band-extension is now complete locally:
+  - removed synthetic logprob projection from both `prompt_request.clj` and workflow session-step transcript shaping; session-step `:transcript` is assistant-message only
+  - enriched `session_turn_finished` payload with `:logprobs` and structured `:assistant-message`
+  - added `extensions.logprobs/logprobs-perplexity` deterministic operation surface via `logprobs/perplexity`
+  - updated `local-logprobs` workflow to `run → perplexity → report`
+  - simplified extension storage from per-session cache to a single latest snapshot carrying `:session-id`, `:turn-id`, `:logprobs`, and `:assistant-message`
+  - removed `logprobs-table` command and stale `/logprobs on` guidance from the extension
+  - focused extension verification green after simplification: `7 tests, 43 assertions, 0 failures`; lint clean
 - Local OpenAI-compatible chat-completions requests now project `/thinking off` onto `chat_template_kwargs.enable_thinking=false` for models marked `:locality :local`, while cloud models keep the existing reasoning-effort-only behavior.
   - implementation lives in `psi.ai.providers.openai.reasoning/chat-template-kwargs` and `psi.ai.providers.openai.chat-completions/build-request`
   - focused proof added in `psi.ai.providers.openai-test`
