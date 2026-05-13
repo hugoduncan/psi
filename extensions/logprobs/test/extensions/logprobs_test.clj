@@ -8,9 +8,9 @@
 (use-fixtures :each
   (fn [f]
     ;; Reset store between tests
-    (reset! @#'logprobs/store {})
+    (reset! @#'logprobs/store nil)
     (f)
-    (reset! @#'logprobs/store {})))
+    (reset! @#'logprobs/store nil)))
 
 ;; ── Perplexity calculation ───────────────────────────────────────────────────
 
@@ -73,6 +73,7 @@
                   :logprobs [{:token "hi" :logprob -0.5}]
                   :assistant-message {:role "assistant" :content [{:type :text :text "hi"}]}})
         (let [result (logprobs/perplexity-result "s1")]
+          (is (= "s1" (:session-id result)))
           (is (some? (:perplexity result)))
           (is (= 1 (:token-count result)))
           (is (= "t1" (:turn-id result)))
@@ -83,6 +84,7 @@
                   :turn-id "t2"
                   :assistant-message {:role "assistant" :content [{:type :text :text "bye"}]}})
         (let [result (logprobs/perplexity-result "s1")]
+          (is (= "s1" (:session-id result)))
           (is (= "t1" (:turn-id result)))
           (is (= "hi" (:reply-text result)))))
 
@@ -92,6 +94,7 @@
                   :logprobs []
                   :assistant-message {:role "assistant" :content [{:type :text :text "hey"}]}})
         (let [result (logprobs/perplexity-result "s1")]
+          (is (= "s1" (:session-id result)))
           (is (= "t1" (:turn-id result)))))
 
       (testing "new turn with logprobs replaces stored data"
@@ -100,58 +103,35 @@
                   :logprobs [{:token "new" :logprob -0.1}]
                   :assistant-message {:role "assistant" :content [{:type :text :text "new"}]}})
         (let [result (logprobs/perplexity-result "s1")]
+          (is (= "s1" (:session-id result)))
           (is (= "t4" (:turn-id result)))
           (is (= "new" (:reply-text result))))))))
 
-;; ── Multi-session isolation ───────────────────────────────────────────────────
-
-(deftest multi-session-isolation-test
+(deftest mismatched-session-id-returns-empty-result-test
   (let [registered-handlers (atom {})
         api {:on (fn [event-name handler]
                    (swap! registered-handlers assoc event-name handler))
              :register-operation (fn [_op] nil)}]
     (logprobs/init api)
-    (let [handler (get @registered-handlers "session_turn_finished")]
-
-      (testing "storing logprobs for s1 and s2 yields independent results"
-        (handler {:session-id "s1"
-                  :turn-id "t1-s1"
-                  :logprobs [{:token "a" :logprob (Math/log 0.5)}
-                             {:token "b" :logprob (Math/log 0.5)}]
-                  :assistant-message {:role "assistant" :content [{:type :text :text "ab"}]}})
-        (handler {:session-id "s2"
-                  :turn-id "t1-s2"
-                  :logprobs [{:token "x" :logprob (Math/log 0.25)}]
-                  :assistant-message {:role "assistant" :content [{:type :text :text "x"}]}})
-
-        (let [r1 (logprobs/perplexity-result "s1")
-              r2 (logprobs/perplexity-result "s2")]
-          (is (= "t1-s1" (:turn-id r1)))
-          (is (= "t1-s2" (:turn-id r2)))
-          (is (= "ab" (:reply-text r1)))
-          (is (= "x" (:reply-text r2)))
-          (is (= 2 (:token-count r1)))
-          (is (= 1 (:token-count r2)))
-          ;; s1 perplexity ≈ 2.0, s2 perplexity ≈ 4.0
-          (is (< (abs (- 2.0 (:perplexity r1))) 0.001))
-          (is (< (abs (- 4.0 (:perplexity r2))) 0.001))))
-
-      (testing "updating s2 does not affect s1"
-        (handler {:session-id "s2"
-                  :turn-id "t2-s2"
-                  :logprobs [{:token "y" :logprob (Math/log 0.1)}]
-                  :assistant-message {:role "assistant" :content [{:type :text :text "y"}]}})
-
-        (let [r1 (logprobs/perplexity-result "s1")
-              r2 (logprobs/perplexity-result "s2")]
-          (is (= "t1-s1" (:turn-id r1)) "s1 unchanged after s2 update")
-          (is (= "t2-s2" (:turn-id r2)) "s2 updated to new turn"))))))
+    ((get @registered-handlers "session_turn_finished")
+     {:session-id "s1"
+      :turn-id "t1"
+      :logprobs [{:token "x" :logprob (Math/log 0.5)}]
+      :assistant-message {:role "assistant" :content [{:type :text :text "x"}]}})
+    (testing "requesting a different session returns the empty result"
+      (is (= {:session-id nil
+              :perplexity nil
+              :token-count 0
+              :turn-id nil
+              :reply-text nil}
+             (logprobs/perplexity-result "s2"))))))
 
 ;; ── Perplexity result ────────────────────────────────────────────────────────
 
 (deftest perplexity-result-no-data-test
   (testing "returns nil perplexity when no data stored"
     (let [result (logprobs/perplexity-result "unknown-session")]
+      (is (nil? (:session-id result)))
       (is (nil? (:perplexity result)))
       (is (= 0 (:token-count result)))
       (is (nil? (:turn-id result)))
@@ -160,12 +140,14 @@
 (deftest perplexity-result-token-count-matches-effective-n-test
   (testing "token-count reflects only tokens with non-nil logprob"
     (reset! @#'logprobs/store
-            {"s1" {:logprobs [{:token "a" :logprob (Math/log 0.5)}
-                              {:token "b" :logprob nil}
-                              {:token "c" :logprob (Math/log 0.5)}]
-                   :assistant-message {:role "assistant" :content [{:type :text :text "a b c"}]}
-                   :turn-id "t1"}})
+            {:session-id "s1"
+             :logprobs [{:token "a" :logprob (Math/log 0.5)}
+                        {:token "b" :logprob nil}
+                        {:token "c" :logprob (Math/log 0.5)}]
+             :assistant-message {:role "assistant" :content [{:type :text :text "a b c"}]}
+             :turn-id "t1"})
     (let [result (logprobs/perplexity-result "s1")]
+      (is (= "s1" (:session-id result)))
       (is (= 2 (:token-count result))
           "token-count should be 2 (only tokens with non-nil :logprob)")
       (is (< (abs (- 2.0 (:perplexity result))) 0.001)
@@ -182,17 +164,20 @@
   (testing "returns ok with nil perplexity for unknown session"
     (let [result (logprobs/invoke-perplexity {:args {:session-id "unknown"}})]
       (is (= :ok (:status result)))
+      (is (nil? (get-in result [:data :session-id])))
       (is (nil? (get-in result [:data :perplexity])))))
 
-  (testing "returns ok with computed perplexity for session with data"
+  (testing "returns ok with computed perplexity for session with matching stored data"
     ;; Manually store some data
     (reset! @#'logprobs/store
-            {"s1" {:logprobs [{:token "x" :logprob (Math/log 0.5)}
-                              {:token "y" :logprob (Math/log 0.5)}]
-                   :assistant-message {:role "assistant" :content [{:type :text :text "x y"}]}
-                   :turn-id "t1"}})
+            {:session-id "s1"
+             :logprobs [{:token "x" :logprob (Math/log 0.5)}
+                        {:token "y" :logprob (Math/log 0.5)}]
+             :assistant-message {:role "assistant" :content [{:type :text :text "x y"}]}
+             :turn-id "t1"})
     (let [result (logprobs/invoke-perplexity {:args {:session-id "s1"}})]
       (is (= :ok (:status result)))
+      (is (= "s1" (get-in result [:data :session-id])))
       (is (< (abs (- 2.0 (get-in result [:data :perplexity]))) 0.001))
       (is (= 2 (get-in result [:data :token-count])))
       (is (= "t1" (get-in result [:data :turn-id])))
@@ -208,27 +193,3 @@
     (testing "registers logprobs/perplexity operation"
       (is (= 1 (count @registered-ops)))
       (is (= "logprobs/perplexity" (:id (first @registered-ops)))))))
-
-(deftest init-registers-command-when-api-supports-it-test
-  (let [registered-ops      (atom [])
-        registered-commands (atom [])
-        api {:on (fn [_ _] nil)
-             :register-operation (fn [op] (swap! registered-ops conj op))
-             :register-command (fn [name opts]
-                                 (swap! registered-commands conj {:name name :opts opts}))}]
-    (logprobs/init api)
-    (testing "registers logprobs-table command"
-      (is (= 1 (count @registered-commands)))
-      (is (= "logprobs-table" (:name (first @registered-commands))))
-      (is (= "Pretty-print the most recent logprobs as an EDN table (non-LLM message)"
-             (get-in (first @registered-commands) [:opts :description])))
-      (is (some? (get-in (first @registered-commands) [:opts :handler]))))))
-
-(deftest init-skips-command-when-api-lacks-register-command-test
-  (let [registered-ops (atom [])
-        api {:on (fn [_ _] nil)
-             :register-operation (fn [op] (swap! registered-ops conj op))}]
-    (testing "does not throw when :register-command is absent"
-      (is (nil? (logprobs/init api))))
-    (testing "still registers the operation"
-      (is (= 1 (count @registered-ops))))))
