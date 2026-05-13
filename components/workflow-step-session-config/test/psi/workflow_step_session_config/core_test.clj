@@ -78,7 +78,7 @@
                                        {:name "step-2-builder"
                                         :type :session
                                         :system-prompt "Focus only on correctness."
-                                        :tools []
+                                        :tools ["read"]
                                         :skills ["testing-best-practices"]
                                         :model "gpt-5"
                                         :thinking-level :high
@@ -107,7 +107,7 @@
       (is (= :high (:thinking-level builder-config)))
       (is (= {:provider "openai" :id "gpt-5"} (:model builder-config)))
 
-      (is (= [] (mapv :name (:tool-defs builder-config))))
+      (is (= ["read"] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config)))))))
 
 (deftest resolve-step-session-config-prefers-delegating-session-over-context-defaults-test
@@ -216,6 +216,7 @@
                                     :name "planner-missing-skill"
                                     :steps [{:name "step-1"
                                              :type :session
+                                             :tools ["read"]
                                              :skills ["missing-skill"]
                                              :contributions [{:type :template
                                                               :text "{{input}}"
