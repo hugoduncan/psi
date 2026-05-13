@@ -75,7 +75,7 @@ This is preferred over adding one-off lifecycle commands because it improves the
 
 ## Out of scope
 
-- authoritative active session id root attr — see task 139
+- re-designing the authoritative active session id root attr delivered by task 139; this task should consume that existing surface rather than reopening it
 - bespoke convenience commands for deleting/cleaning old sessions
 - broad batching/looping DSLs inside `psi-tool`
 - generic arbitrary dispatch event submission
@@ -354,9 +354,9 @@ If implementation touches existing session-targeting semantics, it must preserve
 
 ## Intended workflow after the change
 
-The canonical operator/agent workflow (assuming task 139 delivers `:psi.agent-session/active-session-id`) should be:
+The canonical operator/agent workflow should be:
 
-1. query `:psi.agent-session/active-session-id` (task 139)
+1. query `:psi.agent-session/active-session-id`
 2. query `:psi.agent-session/context-session-summaries`
 3. select explicit non-active session ids in caller logic
 4. call `psi-tool(action: "mutate", mutation: "psi.extension/close-session", params: {:session-id ...})` for each chosen session
@@ -365,7 +365,7 @@ This keeps policy in caller logic and capability in the tool/runtime surface.
 
 ### End-to-end example
 
-Step 1 — query the active session id (requires task 139):
+Step 1 — query the active session id:
 
 ```json
 {
@@ -442,7 +442,7 @@ Cover at least:
 
 ### 3. composed workflow/integration test
 
-Add at least one proof of the intended operator workflow (note: `:psi.agent-session/active-session-id` requires task 139; the integration test may use a known session id directly in place of that query step, or treat 139 as a prerequisite):
+Add at least one proof of the intended operator workflow using the now-landed `:psi.agent-session/active-session-id` root attr:
 
 - create or load more than one context session
 - query compact session summaries
@@ -470,4 +470,4 @@ This integration proof exists to show that the new surface removes the need for 
 - `012-psi-tool-session-targeting-introspection` established the need for trustworthy explicit session targeting
 - `023-extend-psi-tool-for-project-repl` is a precedent for adding a focused imperative `psi-tool` capability without broadening into a generic command proxy
 - `033-psi-tool-scheduler-surface` is a precedent for explicit structured imperative tool actions
-- `139-active-session-id-root-attr` — authoritative active session id; composes with this task's compact summaries and mutate action for full session-admin workflows
+- `139-active-session-id-root-attr` is complete and now provides the authoritative active session id root attr that composes with this task's compact summaries and mutate action for full session-admin workflows

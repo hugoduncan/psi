@@ -31,11 +31,13 @@ Slice 3 — Integrate with existing active session introspection attr
 
 Slice 4 — Compact session summary attr
 1. identify the smallest existing canonical session-info source/projection that can back a compact operational summary surface
-2. add and wire root attr `:psi.agent-session/context-session-summaries`
-3. keep only the intended identification/selection fields
-4. explicitly exclude transcript-heavy or message-body payloads, including `:psi.session-info/first-message`, `:psi.session-info/all-messages-text`, and message-history joins
-5. preserve the canonical ordering of the existing context session inventory surface
-6. add focused proof for shape, content, boundedness, exclusions, and ordering
+2. use the live context-session inventory source `psi.session-state.state/list-context-sessions-in` as the canonical ordering/source-of-truth path, not the discovery resolver's persisted session listing
+3. add and wire root attr `:psi.agent-session/context-session-summaries`
+4. extend the shared live session-info projection in `resolvers/session.clj` to expose canonical `:updated-at`/`:psi.session-info/updated` alongside the existing context-session fields, then trim that shared projection to the exact compact-summary v1 field set
+5. keep only the intended identification/selection fields
+6. explicitly exclude transcript-heavy or message-body payloads, including `:psi.session-info/first-message`, `:psi.session-info/all-messages-text`, and message-history joins
+7. preserve the canonical ordering of the existing context session inventory surface
+8. add focused proof for shape, content, boundedness, exclusions, and ordering
 
 Slice 5 — Composed workflow proof and docs
 1. add focused tests for successful mutation invocation and explicit validation failure behavior

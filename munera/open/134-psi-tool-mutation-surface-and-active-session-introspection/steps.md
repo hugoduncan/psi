@@ -16,16 +16,17 @@ Slice 2 — `psi-tool(action: "mutate")`
 - [ ] Shape successful mutation results under `:psi-tool/result` with `:psi-tool/error` absent, including canonical `nil` results
 - [ ] Shape validation and mutation-execution failures under structured `:psi-tool/error` with preserved `ex-data` where available and `:psi-tool/result` absent
 
-Slice 3 — Active session introspection
-- [ ] Identify and record the concrete runtime source of truth for `:psi.agent-session/active-session-id` relative to the invoking tool context
-- [ ] Add and wire an authoritative `:psi.agent-session/active-session-id` root attr
-- [ ] Return `nil` rather than guessing when there is no active conversation target
-- [ ] Add focused proof for the new active-session-id introspection attr, including nil behavior and invoking-context-relative semantics
+Slice 3 — Active session introspection prerequisite
+- [x] Confirm task 139 landed `:psi.agent-session/active-session-id` in `resolvers/session.clj`
+- [x] Confirm the source of truth is the invoking query context's bound `:psi.agent-session/session-id`, not adapter-local UI focus or session ordering
+- [x] Confirm focused proof already exists for non-nil, present-but-nil, root-queryable, and ordering-independent semantics
+- [ ] Add only composed-workflow proof in this task where `:psi.agent-session/active-session-id` participates in the query → select → mutate flow
 
 Slice 4 — Compact session summary introspection
-- [ ] Identify and record the chosen owner/resolver path for `:psi.agent-session/context-session-summaries`
+- [x] Identify and record the chosen owner/resolver path for `:psi.agent-session/context-session-summaries`
 - [ ] Add and wire a compact `:psi.agent-session/context-session-summaries` root attr
-- [ ] Prefer reusing the existing canonical session-info source/projection trimmed to the allowed fields
+- [x] Prefer reusing the existing canonical session-info source/projection trimmed to the allowed fields
+- [ ] Extend the shared live context-session projection to expose canonical `:psi.session-info/updated` from `:updated-at` so the compact summary attr can satisfy the exact v1 field contract without diverging from the existing context inventory source
 - [ ] Keep the compact session-summary surface free of heavy transcript/message payloads, including `:psi.session-info/first-message`, `:psi.session-info/all-messages-text`, and message-history joins
 - [ ] Expose exactly the allowed summary fields in v1 and no additional fields
 - [ ] Preserve the canonical ordering of the existing context session inventory surface and record the inherited ordering rule in implementation notes
