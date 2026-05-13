@@ -29,3 +29,6 @@ Expected likely owners:
   - `create-step-attempt-session!` reattaches `:model-fallback` only to the returned `:execution-session` map, which is the value later consumed by workflow step execution fallback logic.
 - Design updated to make this explicit so the authoritative create-child field list does not silently narrow or accidentally absorb non-persisted attempt/runtime metadata.
 - No blocker: the ambiguity was resolvable from current code and tests.
+
+2026-05-13 inconsistency review:
+- Actionable inconsistency: `design.md`/`plan.md` require the contract to cover both workflow attempt sessions and judge sessions under the same explicit seam, but `steps.md` omits any audit/proof work for the higher realization owner `create-workflow-child-session!` to verify the judge path’s narrower field surface against the same authoritative contract and omits any explicit follow-up to reconcile the existing mixed proof ownership split (`components/workflow-runtime/test/.../attempts_test.clj` vs `components/agent-session/test/.../workflow_attempts_test.clj`). Add design steps so implementation deliberately proves one authoritative contract across both callers and chooses the canonical proof owners rather than leaving duplicate/fragmented coverage implicit.
