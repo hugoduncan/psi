@@ -91,3 +91,44 @@ message. Suite: 16 tests, 50 assertions, 0 failures. Lint clean.
 
 Acceptance criterion #7 now fully satisfied — all semantic error types covered at the
 formatter level.
+
+### task-test-review pass (2026-05-13)
+
+**Issue 1 — `format-structural-error` produces blank description with real Malli data (bug)**
+
+Malli `explain-data` error entries do not carry a `:message` key by default — only
+`:path`, `:in`, `:schema`, `:value`, `:type` (e.g. `:malli.core/missing-key`).
+`format-structural-error` uses `(:message error-entry)` which is `nil` for most schema
+violations, producing `"Structural error at [...]: "` (empty after the colon).
+
+Verified at runtime:
+```
+Structural error at [:steps 0 :session :session :contributions 0 :template :vars 1 0 :value]: 
+```
+
+The `format-structural-errors-test` uses hand-crafted `{:errors [{:path [...] :message "..."}]}`
+maps that always have `:message` — the test passes but does not exercise real Malli output.
+
+Fix: `format-structural-error` should fall back to `(:type error-entry)` (or a
+human-friendly rendering of it) when `:message` is nil. E.g.:
+```clojure
+(let [msg (or message (some-> type name))]
+  (if (seq path)
+    (str "Structural error at " (pr-str path) ": " msg)
+    (str "Structural error: " msg)))
+```
+Also update `format-structural-errors-test` to include a case using real Malli
+`explain-data` (via `explain-workflow-ir`) to guard against regression.
+
+Design acceptance criterion #4 requires the message "includes a path or field name,
+not raw Malli explain-data" — the path is present, but the blank description makes the
+message only partially actionable.
+
+**Issue 2 — No `create-run` integration test for structural error path**
+
+Design verification expectation #4: "A test with a structurally invalid IR (Malli
+schema violation) produces a message that includes a path or field name, not raw Malli
+explain-data." `create-run-surfaces-step-contextual-message-test` covers compile errors
+and semantic errors but not structural errors end-to-end. Add a `create-run` case that
+triggers a structural error (e.g. `:workflow-runtime` source ref) and asserts the
+message contains a path segment and does not contain raw Malli schema data.

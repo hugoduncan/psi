@@ -11,4 +11,7 @@
 - [x] Test integration: confirm compile-exception step-context appears in `create-run` error messages for unsupported step type, bad source ref, judge-without-routing
 - [x] Regression: all existing `target_ir_compiler_test.clj`, `ir_runtime_adoption_test.clj`, `compiler_test.clj` tests green (1756 tests, 0 failures)
 - [ ] Review: verify all acceptance criteria; close task
+- [ ] Fix `format-structural-error` to fall back to `(:type error-entry)` (e.g. `(name type)`) when `:message` is nil — real Malli explain-data errors lack `:message`; current output is `"Structural error at [...]: "` (blank description)
+- [ ] Update `format-structural-errors-test` to include a case using real Malli explain-data (via `explain-workflow-ir`) asserting the path and a non-blank description appear in output
+- [ ] Add a `create-run` integration test case for the structural error path in `create-run-surfaces-step-contextual-message-test`: use a `:workflow-runtime` source ref (or similar) to trigger a structural error and assert the message contains a path segment and no raw Malli schema dump
 - [x] Add focused unit test for `:skills-without-read-tool` in `compilation_error_format_test.clj` — `format-semantic-error` handles this branch but no formatter-level test covers it (acceptance criterion #7)
