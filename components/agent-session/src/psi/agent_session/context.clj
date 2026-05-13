@@ -28,6 +28,7 @@
    [psi.agent-session.session-runtime :as session-runtime]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.workflow-runtime.child-session-contract :as workflow-child-session-contract]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-step-materialization.core :as workflow-step-materialization]
@@ -109,49 +110,56 @@
   nil)
 
 (defn- create-workflow-child-session!
-  [ctx parent-session-id {:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level model skills
-                                 developer-prompt developer-prompt-source preloaded-messages
-                                 cache-breakpoints prompt-component-selection
-                                 workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
-  (dispatch/dispatch! ctx
-                      :session/create-child
-                      (cond-> {:session-id parent-session-id
-                               :child-session-id child-session-id
-                               :session-name session-name
-                               :worktree-path (or (some-> parent-session-id (ss/get-session-data-in ctx) :worktree-path)
-                                                  (some-> (ss/list-context-sessions-in ctx) first :worktree-path)
-                                                  (:worktree-path (:session-defaults ctx))
-                                                  (:cwd ctx))
-                               :system-prompt system-prompt
-                               :tool-defs tool-defs
-                               :thinking-level thinking-level}
-                        (some? prompt-mode) (assoc :prompt-mode prompt-mode)
-                        (some? response-mode) (assoc :response-mode response-mode)
-                        (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
-                        (some? top-logprobs) (assoc :top-logprobs top-logprobs)
-                        (some? model) (assoc :model model)
-                        (some? skills) (assoc :skills skills)
-                        (some? preloaded-messages) (assoc :preloaded-messages preloaded-messages)
-                        (some? cache-breakpoints) (assoc :cache-breakpoints cache-breakpoints)
-                        (some? prompt-component-selection) (assoc :prompt-component-selection prompt-component-selection)
-                        (some? developer-prompt) (assoc :developer-prompt developer-prompt)
-                        (some? developer-prompt-source) (assoc :developer-prompt-source developer-prompt-source)
-                        (some? workflow-run-id) (assoc :workflow-run-id workflow-run-id)
-                        (some? workflow-step-id) (assoc :workflow-step-id workflow-step-id)
-                        (some? workflow-attempt-id) (assoc :workflow-attempt-id workflow-attempt-id)
-                        (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?))
-                      {:origin :mutations})
-  (let [sd (ss/get-session-data-in ctx child-session-id)
-        messages (vec (or preloaded-messages []))
-        fresh (session-runtime/create-runtime! ctx child-session-id {:session-data sd :messages messages :agent-initial (:agent-initial ctx)})]
-    (swap! (:state* ctx)
-           (fn [state]
-             (-> state
-                 (assoc-in [:agent-session :sessions child-session-id :agent-ctx] (:agent-ctx fresh))
-                 (assoc-in [:agent-session :sessions child-session-id :sc-session-id] (:sc-session-id fresh)))))
-    (when (seq messages)
-      (agent-core/replace-messages-in! (:agent-ctx fresh) messages)))
-  {:psi.agent-session/session-id child-session-id})
+  [ctx parent-session-id request]
+  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level model skills
+                developer-prompt developer-prompt-source preloaded-messages
+                cache-breakpoints prompt-component-selection
+                workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}
+        (workflow-child-session-contract/assert-valid-request!
+         request
+         :psi.agent-session.context/create-workflow-child-session!)]
+    (dispatch/dispatch! ctx
+                        :session/create-child
+                        (cond-> {:session-id parent-session-id
+                                 :child-session-id child-session-id
+                                 :session-name session-name
+                                 :worktree-path (or (some-> parent-session-id (ss/get-session-data-in ctx) :worktree-path)
+                                                    (some-> (ss/list-context-sessions-in ctx) first :worktree-path)
+                                                    (:worktree-path (:session-defaults ctx))
+                                                    (:cwd ctx))
+                                 :system-prompt system-prompt
+                                 :tool-defs tool-defs
+                                 :thinking-level thinking-level}
+                          (some? prompt-mode) (assoc :prompt-mode prompt-mode)
+                          (some? response-mode) (assoc :response-mode response-mode)
+                          (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
+                          (some? top-logprobs) (assoc :top-logprobs top-logprobs)
+                          (some? model) (assoc :model model)
+                          (some? skills) (assoc :skills skills)
+                          (some? preloaded-messages) (assoc :preloaded-messages preloaded-messages)
+                          (some? cache-breakpoints) (assoc :cache-breakpoints cache-breakpoints)
+                          (some? prompt-component-selection) (assoc :prompt-component-selection prompt-component-selection)
+                          (some? developer-prompt) (assoc :developer-prompt developer-prompt)
+                          (some? developer-prompt-source) (assoc :developer-prompt-source developer-prompt-source)
+                          (some? workflow-run-id) (assoc :workflow-run-id workflow-run-id)
+                          (some? workflow-step-id) (assoc :workflow-step-id workflow-step-id)
+                          (some? workflow-attempt-id) (assoc :workflow-attempt-id workflow-attempt-id)
+                          (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?))
+                        {:origin :mutations})
+    (let [sd (ss/get-session-data-in ctx child-session-id)
+          messages (vec (or preloaded-messages []))
+          fresh (session-runtime/create-runtime! ctx child-session-id {:session-data sd :messages messages :agent-initial (:agent-initial ctx)})
+          result {:psi.agent-session/session-id child-session-id}]
+      (swap! (:state* ctx)
+             (fn [state]
+               (-> state
+                   (assoc-in [:agent-session :sessions child-session-id :agent-ctx] (:agent-ctx fresh))
+                   (assoc-in [:agent-session :sessions child-session-id :sc-session-id] (:sc-session-id fresh)))))
+      (when (seq messages)
+        (agent-core/replace-messages-in! (:agent-ctx fresh) messages))
+      (workflow-child-session-contract/assert-valid-result!
+       result
+       :psi.agent-session.context/create-workflow-child-session!))))
 
 (defn workflow-execution-adapter
   [ctx]

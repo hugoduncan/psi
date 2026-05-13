@@ -38,6 +38,21 @@
       (is (= execution-adapter/adapter-key (:adapter-key (ex-data ex))))
       (is (= :create-child-session! (:operation (ex-data ex)))))))
 
+(deftest create-child-session-forwards-parent-and-opts-unchanged-test
+  (testing "create-child-session! forwards ctx, parent-session-id, and opts unchanged"
+    (let [calls* (atom [])
+          ctx {execution-adapter/adapter-key
+               (execution-adapter/create
+                {:create-child-session! (fn [ctx' parent opts]
+                                          (swap! calls* conj {:ctx ctx' :parent parent :opts opts})
+                                          {:psi.agent-session/session-id (:child-session-id opts)})})}
+          opts {:child-session-id "child-1"
+                :session-name "workflow child"
+                :workflow-owned? true}
+          result (execution-adapter/create-child-session! ctx "parent-1" opts)]
+      (is (= {:psi.agent-session/session-id "child-1"} result))
+      (is (= [{:ctx ctx :parent "parent-1" :opts opts}] @calls*)))))
+
 (deftest prompt-execution-result-missing-operation-test
   (testing "missing prompt-execution-result operation fails clearly"
     (let [ex (ex-for #(execution-adapter/prompt-execution-result!

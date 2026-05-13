@@ -2,10 +2,11 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session-core]
-   [psi.session-state.state :as session-state]
    [psi.agent-session.test-support :as test-support]
+   [psi.session-state.model]
+   [psi.session-state.state :as session-state]
    [psi.workflow-runtime.attempts :as workflow-attempts]
-   [psi.workflow-runtime.execution-adapter]))
+   [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn- create-session-context
   ([]
@@ -72,6 +73,123 @@
              (select-keys execution-session [:response-mode :logprobs-enabled :top-logprobs])))
       (session-core/shutdown-context! ctx))))
 
+(deftest create-step-attempt-session-forwards-supported-request-surface-test
+  (testing "attempt path validates and forwards the supported workflow child-session create surface"
+    (let [create-calls* (atom [])
+          child-session-id* (atom nil)
+          ctx {execution-adapter/adapter-key
+               (execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent opts]
+                                          (reset! child-session-id* (:child-session-id opts))
+                                          (swap! create-calls* conj opts)
+                                          {:psi.agent-session/session-id (:child-session-id opts)})
+                 :get-session-data (fn [_ctx sid]
+                                     {:session-id sid})})}]
+      (with-redefs [psi.session-state.model/valid-session? (constantly true)]
+        (let [{:keys [execution-session]}
+              (workflow-attempts/create-step-attempt-session!
+               ctx
+               "parent-1"
+               {:workflow-run-id "run-1"
+                :workflow-step-id "plan"
+                :attempt-id "attempt-1"
+                :session-name "workflow plan attempt"
+                :system-prompt "system"
+                :prompt-mode :lambda
+                :response-mode :non-streaming
+                :logprobs true
+                :top-logprobs 2
+                :tool-defs [{:name "read"}]
+                :thinking-level :off
+                :model {:provider "openai" :id "gpt-5"}
+                :skills [{:name "skill-a"}]
+                :developer-prompt "dev"
+                :developer-prompt-source :explicit
+                :preloaded-messages [{:role "user" :content "hello"}]
+                :cache-breakpoints #{:system :tools}
+                :prompt-component-selection {:components #{:tools}}
+                :model-fallback {:type :ranked-model-candidates
+                                 :candidates [{:provider "x" :id "y"}]}})]
+          (is (= 1 (count @create-calls*)))
+          (is (= {:child-session-id @child-session-id*
+                  :session-name "workflow plan attempt"
+                  :system-prompt "system"
+                  :prompt-mode :lambda
+                  :response-mode :non-streaming
+                  :logprobs true
+                  :top-logprobs 2
+                  :tool-defs [{:name "read"}]
+                  :thinking-level :off
+                  :model {:provider "openai" :id "gpt-5"}
+                  :skills [{:name "skill-a"}]
+                  :developer-prompt "dev"
+                  :developer-prompt-source :explicit
+                  :preloaded-messages [{:role "user" :content "hello"}]
+                  :cache-breakpoints #{:system :tools}
+                  :prompt-component-selection {:components #{:tools}}
+                  :workflow-run-id "run-1"
+                  :workflow-step-id "plan"
+                  :workflow-attempt-id "attempt-1"
+                  :workflow-owned? true}
+                 (first @create-calls*)))
+          (is (= {:type :ranked-model-candidates
+                  :candidates [{:provider "x" :id "y"}]}
+                 (:model-fallback execution-session))))))))
+
+(deftest create-step-attempt-session-invalid-request-fails-locally-test
+  (testing "malformed attempt child-session requests fail at the contract boundary"
+    (let [ctx {execution-adapter/adapter-key
+               (execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent _opts]
+                                          (throw (ex-info "should not be called" {})))
+                 :get-session-data (fn [_ctx _sid] nil)})}
+          ex (try
+               (workflow-attempts/create-step-attempt-session!
+                ctx
+                "parent-1"
+                {:workflow-run-id "run-1"
+                 :workflow-step-id "plan"
+                 :attempt-id "attempt-1"
+                 :session-name "workflow plan attempt"
+                 :tool-defs []
+                 :thinking-level :off
+                 :model :not-a-map})
+               nil
+               (catch clojure.lang.ExceptionInfo ex
+                 ex))]
+      (is (some? ex))
+      (is (= :workflow-child-session-create (:contract (ex-data ex))))
+      (is (= :request (:stage (ex-data ex))))
+      (is (= :psi.workflow-runtime.attempts/create-step-attempt-session!
+             (:caller (ex-data ex)))))))
+
+(deftest create-step-attempt-session-invalid-result-fails-locally-test
+  (testing "malformed adapter results fail at the contract boundary"
+    (let [ctx {execution-adapter/adapter-key
+               (execution-adapter/create
+                {:create-child-session! (fn [_ctx _parent _opts]
+                                          {:session-id "child-1"})
+                 :get-session-data (fn [_ctx _sid]
+                                     (throw (ex-info "should not reach get-session-data" {})))})}
+          ex (try
+               (workflow-attempts/create-step-attempt-session!
+                ctx
+                "parent-1"
+                {:workflow-run-id "run-1"
+                 :workflow-step-id "plan"
+                 :attempt-id "attempt-1"
+                 :session-name "workflow plan attempt"
+                 :tool-defs []
+                 :thinking-level :off})
+               nil
+               (catch clojure.lang.ExceptionInfo ex
+                 ex))]
+      (is (some? ex))
+      (is (= :workflow-child-session-create (:contract (ex-data ex))))
+      (is (= :result (:stage (ex-data ex))))
+      (is (= :psi.workflow-runtime.attempts/create-step-attempt-session!
+             (:caller (ex-data ex)))))))
+
 (deftest set-execution-session-model-is-session-scoped-test
   (testing "workflow-owned execution-session model updates are explicitly session-scoped"
     (let [calls* (atom [])
@@ -96,7 +214,8 @@
                                       :step-order ["plan"]
                                       :steps {"plan" {:executor {:type :agent}
                                                       :result-schema :any
-                                                      :retry-policy {:max-attempts 1 :retry-on #{:execution-failed}}}}}
+                                                      :retry-policy {:max-attempts 1
+                                                                     :retry-on #{:execution-failed}}}}}
                :workflow-input {}
                :current-step-id "plan"
                :step-runs {"plan" {:step-id "plan" :attempts []}}
