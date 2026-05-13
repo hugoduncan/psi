@@ -21,7 +21,7 @@
    :description (str "Execute a live psi runtime operation. Canonical requests use `action` with one of: "
                      "`query`, `eval`, `reload-code`, `project-repl`, `workflow`, or `scheduler`. `query` executes an EQL query against the live session graph; "
                      "`eval` evaluates an in-process Clojure form in a named already-loaded namespace; "
-                     "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; use `namespaces` to reload one small already loaded namespace first, and omit `worktree-path` to use the invoking session worktree when available; "
+                     "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; omit `worktree-path` to use the invoking session worktree when available; "
                      "`project-repl` controls the managed project REPL with explicit `op` values `status|start|attach|stop|eval|interrupt`; "
                      "`workflow` manages deterministic workflow definitions and runs with explicit `op` values `list-definitions|create-run|execute-run|read-run|list-runs|resume-run|cancel-run`; "
                      "`scheduler` manages one-shot delayed work for the invoking session with explicit `op` values `create|list|cancel`, including delayed same-session prompts and delayed fresh top-level session creation. "
@@ -35,7 +35,7 @@
                               :ns            {:type "string" :description "For `action: \"eval\"`: already loaded namespace string in which to evaluate `form`."}
                               :form          {:type "string" :description "For `action: \"eval\"`: Clojure form string using full Clojure reader syntax (quote, deref, anon-fn, var) read with *read-eval* false and evaluated in the named namespace."}
                               :namespaces    {:type "array" :items {:type "string"}
-                                              :description "For `action: \"reload-code\"` namespace mode: ordered vector of already loaded namespace names to reload. For psi self-development, start with one small already loaded namespace."}
+                                              :description "For `action: \"reload-code\"` namespace mode: ordered vector of already loaded namespace names to reload."}
                               :worktree-path {:type "string" :description "For `action: \"reload-code\"` worktree mode, and `action: \"project-repl\"`: explicit absolute target worktree path. When absent, invoking session worktree may be used; for psi self-development, that session worktree is the canonical reload target."}
                               :op            {:type "string" :enum ["status" "start" "attach" "stop" "eval" "interrupt"]
                                               :description "For `action: \"project-repl\"`: managed project REPL operation discriminator."}
