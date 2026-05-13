@@ -185,7 +185,7 @@
                      :prompt-string "Handle the issue using the selected workflow."}]})]
       (is (false? valid?))
       (is (= "Delegate target must be a workflow name string or workflow source-spec"
-             compile-error)))))
+             (get-in compile-error [:message]))))))
 
 (deftest compile-target-judge-routing-and-loop-bounds-test
   (testing "target authored judges, routing, and loop bounds compile into canonical IR"
@@ -250,7 +250,7 @@
                      :prompt-string "Handle the issue using the selected workflow."}]})]
       (is (false? valid?))
       (is (= "Delegate target must be a workflow name string or workflow source-spec"
-             compile-error)))))
+             (get-in compile-error [:message]))))))
 
 (deftest create-run-compiles-target-authored-definition-at-effective-definition-seam-test
   (testing "create-run compiles target-authored definitions at the effective-definition seam"

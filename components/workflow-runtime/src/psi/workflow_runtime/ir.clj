@@ -15,6 +15,7 @@
 
    Broader execution/compiler semantics remain out of scope for this slice."
   (:require
+   [clojure.string :as str]
    [malli.core :as m]))
 
 ;(def ids)
@@ -484,3 +485,85 @@
       :delegated (when (= :text yield-field)
                    (step-output-value step accepted-result :final-llm-reply))
       nil)))
+
+;;;; Compilation error formatting
+
+(defn- format-compile-error
+  "Format a compile-error map `{:message string :data map}` into a human-readable line.
+
+   When `:step-name` is present in `:data`, prefixes the message with step context."
+  [{:keys [message data]}]
+  (let [step-name  (:step-name data)
+        step-index (:step-index data)]
+    (if step-name
+      (str "Step '" step-name "' (index " step-index "): " message)
+      message)))
+
+(defn- format-structural-error
+  "Format a single Malli explain-data error entry into a human-readable line."
+  [{:keys [path message]}]
+  (if (seq path)
+    (str "Structural error at " (pr-str path) ": " message)
+    (str "Structural error: " message)))
+
+(defn- format-semantic-error
+  "Format a single semantic error map into a human-readable line."
+  [{:keys [type step ref output-key available-outputs available-yield-fields] :as err}]
+  (case type
+    :routing-without-judge
+    (str "Step '" step "': routing table (:on) requires a judge")
+
+    :judge-without-routing
+    (str "Step '" step "': judge requires a non-empty routing table (:on)")
+
+    :missing-yields
+    (str "Step '" step "': missing :yields")
+
+    :missing-local-yield-output-key
+    (str "Step '" step "': yield references output key " output-key
+         " which is not declared in :outputs (available: " (pr-str available-outputs) ")")
+
+    :missing-step-ref
+    (str "Step '" step "': references unknown step '" (:step ref) "'")
+
+    :non-prior-step-ref
+    (str "Step '" step "': references step '" (:step ref)
+         "' which is not prior (forward/self references are not allowed)")
+
+    :missing-output-key
+    (str "Step '" step "': references output key " (:output ref)
+         " of step '" (:step ref) "' but that key is not declared"
+         " (available: " (pr-str available-outputs) ")")
+
+    :missing-yield-field
+    (str "Step '" step "': references yield field " (:yield ref)
+         " of step '" (:step ref) "' but that field is not available"
+         " (available: " (pr-str available-yield-fields) ")")
+
+    :skills-without-read-tool
+    (str "Step '" step "': skills require the 'read' tool to be present in :tools")
+
+    ;; fallback for unknown types
+    (str "Step '" step "': " type " (raw: " (pr-str err) ")")))
+
+(defn format-compilation-errors
+  "Format workflow IR compilation errors into a single actionable human-readable string.
+
+   Accepts:
+   - `compile-error`     — {:message string :data map} or nil
+   - `structural-errors` — Malli explain-data or nil
+   - `semantic-errors`   — seq of semantic error maps (may be empty)
+
+   Returns a multi-line string prefixed with 'Workflow IR compilation failed:'."
+  [compile-error structural-errors semantic-errors]
+  (let [lines (cond-> []
+                (some? compile-error)
+                (conj (format-compile-error compile-error))
+
+                (some? structural-errors)
+                (into (map format-structural-error (:errors structural-errors)))
+
+                (seq semantic-errors)
+                (into (map format-semantic-error semantic-errors)))]
+    (str "Workflow IR compilation failed:\n"
+         (str/join "\n" lines))))

@@ -5,6 +5,7 @@
    - create workflow runs with immutable effective-definition snapshots
    - expose small pure run lookup/update helpers for later dispatch/mutation/query layers"
   (:require
+   [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-runtime.statechart :as workflow-statechart]
    [psi.workflow-runtime.target-ir-compiler :as workflow-target-ir-compiler]
@@ -38,7 +39,8 @@
   (let [{:keys [valid? ir structural-errors semantic-errors compile-error]}
         (workflow-target-ir-compiler/compile-and-validate-workflow-definition definition)]
     (when-not valid?
-      (throw (ex-info "Workflow definition does not compile to execution-valid canonical IR"
+      (throw (ex-info (workflow-ir/format-compilation-errors
+                       compile-error structural-errors semantic-errors)
                       {:source source
                        :definition-id (:definition-id definition)
                        :authored-grammar :target

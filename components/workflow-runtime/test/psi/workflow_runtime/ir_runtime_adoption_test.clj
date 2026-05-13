@@ -62,7 +62,7 @@
   (testing "run creation fails fast when target-authored definitions use non-canonical workflow-runtime refs"
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
-         #"execution-valid canonical IR"
+         #"Workflow IR compilation failed"
          (workflow-runtime/create-run
           {:workflows {:definitions {} :runs {} :run-order []}}
           {:definition runtime-ref-definition
@@ -75,7 +75,7 @@
       (is (= "runtime-ref" definition-id))
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
-           #"execution-valid canonical IR"
+           #"Workflow IR compilation failed"
            (workflow-runtime/create-run state1 {:definition-id definition-id
                                                 :run-id "runtime-ref-run"}))))))
 
