@@ -133,6 +133,21 @@ and semantic errors but not structural errors end-to-end. Add a `create-run` cas
 triggers a structural error (e.g. `:workflow-runtime` source ref) and asserts the
 message contains a path segment and does not contain raw Malli schema data.
 
+### Follow-up pass 3 (2026-05-13) — "invalid value" fallback test
+
+Added `testing` block `"\"invalid value\" fallback when entry has neither :message nor :type"`
+inside `format-structural-errors-test` in `compilation_error_format_test.clj`.
+
+Hand-crafts a Malli error entry with only `:path` and `:in` (no `:message`, no `:type`).
+Asserts:
+- output contains `"invalid value"` (catch-all fires)
+- no `"Structural error"` line ends with a bare `":"`
+
+Verification: 16 tests, 63 assertions, 0 failures; lint 0 errors, 0 warnings.
+
+All acceptance criteria and verification expectations now fully satisfied.
+Task closed.
+
 ### task-test-review pass 2 (2026-05-13)
 
 **All acceptance criteria and verification expectations are met.** 1757 tests, 0 failures.

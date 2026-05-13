@@ -159,6 +159,20 @@
           out (format-errors nil explain-data [])]
       (is (contains-line? out "Structural error: top-level shape invalid"))))
 
+  (testing "\"invalid value\" fallback when entry has neither :message nor :type"
+    ;; Hand-crafted entry with only :path — no :message, no :type.
+    ;; format-structural-error must fall back to the \"invalid value\" catch-all
+    ;; and must NOT produce a line ending with a bare \":\"."
+    (let [explain-data {:errors [{:path [:steps 0 :session :contributions 0 :value]
+                                  :in   [:steps 0 :session :contributions 0 :value]}]}
+          out (format-errors nil explain-data [])]
+      (is (contains-line? out "invalid value")
+          "fallback text 'invalid value' must appear in output")
+      (doseq [line (str/split-lines out)]
+        (when (str/includes? line "Structural error")
+          (is (not (str/ends-with? (str/trim line) ":"))
+              (str "line must not end with bare ':' — got: " line))))))
+
   (testing "real Malli explain-data (no :message key) produces non-blank description"
     ;; Real Malli explain-data entries carry :path, :in, :schema, :value, :type
     ;; (e.g. :malli.core/missing-key) but NOT :message.  The formatter must fall
