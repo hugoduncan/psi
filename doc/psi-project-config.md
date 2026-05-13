@@ -78,6 +78,24 @@ Interpretation:
 - if reload reports that a loaded namespace source is outside the target worktree, treat that as a runtime/worktree mismatch rather than a signal to target some other checkout
 - the reliable fix for that mismatch is to restart psi from the worktree you are editing
 
+Reliable self-reload loop:
+1. discover the active target worktree
+2. start with one small already loaded namespace reload
+3. expand to worktree reload only after the small reload succeeds
+4. if reload reports source-outside-worktree, restart psi from the edited worktree instead of retargeting reload to another checkout
+
+Examples:
+
+```clojure
+{:action "query"
+ :query  "[:psi.agent-session/worktree-path]"}
+```
+
+```clojure
+{:action     "reload-code"
+ :namespaces ["psi.prompt-assets.system-prompt"]}
+```
+
 `reload-code` supports exactly one targeting mode:
 
 1. namespace mode

@@ -56,7 +56,8 @@
   session-targeting → entity({:psi.agent-session/session-id \"sid\"}) | ¬omit → ¬silent-wrong-session
   child-sessions → [:psi.agent-session/context-sessions] | attrs discoverable via resolver-index ∨ attr-index
   usage → {:psi.agent-session/ usage-input usage-output usage-cache-read usage-cache-write context-tokens context-window}
-  eval-split → eval[ns,form] = ψ-process ∧ loaded-ns | project-repl/eval[code] = target-worktree ∧ managed-nrepl")
+  eval-split → eval[ns,form] = ψ-process ∧ loaded-ns | project-repl/eval[code] = target-worktree ∧ managed-nrepl
+  reload-loop → query([:psi.agent-session/worktree-path]) → reload-code[small_ns_first ∨ worktree] → if(source_outside_worktree) then restart_psi_from(edited_worktree) ∧ ¬retarget(other_checkout)")
 
 (defn- format-graph-capabilities
   "Format a terse capability list from :psi.graph/capabilities maps."
@@ -318,10 +319,13 @@
        "- Eval split: psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\") = in-process ψ eval in an already loaded namespace; psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\") = managed project nREPL eval for the target worktree.\n"
        "- Reload code:\n"
        "  - psi self-reload is worktree-authoritative: use the session worktree-path or an explicit target worktree-path\n"
+       "  - discover target first: psi-tool(action: \"query\", query: \"[:psi.agent-session/worktree-path]\")\n"
+       "  - start small: reload one already loaded namespace before attempting broader worktree reloads\n"
        "  - namespace mode: psi-tool(action: \"reload-code\", namespaces: [\"psi.agent-session.tools\"])\n"
        "  - worktree mode (session-derived): psi-tool(action: \"reload-code\")\n"
        "  - worktree mode (explicit): psi-tool(action: \"reload-code\", worktree-path: \"/abs/path/to/worktree\")\n"
        "  - if reload reports that a loaded namespace source is outside the target worktree, treat that as a runtime/worktree mismatch and restart psi from the worktree you are editing\n"
+       "  - do not retarget reload to some other checkout just because the current runtime was started there\n"
        "- Managed project REPL:\n"
        "  - status: psi-tool(action: \"project-repl\", op: \"status\")\n"
        "  - start: psi-tool(action: \"project-repl\", op: \"start\")\n"
