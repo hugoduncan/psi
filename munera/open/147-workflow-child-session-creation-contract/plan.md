@@ -14,11 +14,16 @@ Implement this as one small vertical slice that names the workflow child-session
    - validate incoming opts and returned result in the higher session-owned realization path (`create-workflow-child-session!`) or an equivalent single authoritative realization edge
    - make failures local and descriptive
 
-3. **Strengthen caller-specific proofs**
+3. **Prove the shared realization edge and choose proof owners deliberately**
+   - verify `psi.agent-session.context/create-workflow-child-session!` applies the same authoritative request/result contract regardless of whether the caller is the wider attempt path or the narrower judge path
+   - make the realization-edge proof authoritative for contract application at creation time, rather than inferring it only from caller-specific tests
+   - choose canonical proof owners so attempt request forwarding lives in workflow-runtime tests, judge request semantics live in workflow-judge tests, and higher realization-edge contract application lives with `create-workflow-child-session!` instead of remaining duplicated implicitly across attempt-oriented suites
+
+4. **Strengthen caller-specific proofs**
    - extend attempt-session tests so `create-step-attempt-session!` proves exact forwarding of the supported create surface and workflow-attempt invariants
    - extend judge tests so workflow-created judge sessions prove the same seam usage with judge-specific defaults and preloaded-message semantics
 
-4. **Add at least one real integration proof**
+5. **Add at least one real integration proof**
    - run a real workflow session-step path through config shaping → create request → create-child seam → realized child session
    - assert persisted child-session state and runtime readiness rather than only checking that a mock received expected args
 

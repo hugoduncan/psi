@@ -22,10 +22,13 @@ In scope:
 - cover both workflow step execution sessions and workflow-created judge sessions under that seam
 - make the request shape, result shape, and behavioural invariants explicit in one authoritative owner
 - validate the contract at the seam or immediately adjacent owners so malformed requests/results fail clearly
+- explicitly verify that `psi.agent-session.context/create-workflow-child-session!` applies the same authoritative create-child request/result contract for both the wider attempt caller surface and the narrower judge caller surface
+- choose and document canonical proof owners so workflow child-session contract coverage is not split ambiguously across duplicate attempt-oriented tests
 - add focused tests for:
   - pure contract validation
   - workflow attempt child-session request forwarding and invariants
   - judge child-session request forwarding and invariants
+  - higher realization-edge contract application in `create-workflow-child-session!` across both caller shapes
   - at least one integration path proving authored workflow child-session config materializes into a real runtime-ready child session through the seam
 
 Out of scope:

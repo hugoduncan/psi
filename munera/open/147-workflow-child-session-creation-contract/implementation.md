@@ -32,3 +32,13 @@ Expected likely owners:
 
 2026-05-13 inconsistency review:
 - Actionable inconsistency: `design.md`/`plan.md` require the contract to cover both workflow attempt sessions and judge sessions under the same explicit seam, but `steps.md` omits any audit/proof work for the higher realization owner `create-workflow-child-session!` to verify the judge path’s narrower field surface against the same authoritative contract and omits any explicit follow-up to reconcile the existing mixed proof ownership split (`components/workflow-runtime/test/.../attempts_test.clj` vs `components/agent-session/test/.../workflow_attempts_test.clj`). Add design steps so implementation deliberately proves one authoritative contract across both callers and chooses the canonical proof owners rather than leaving duplicate/fragmented coverage implicit.
+
+2026-05-13 inconsistency follow-up:
+- Completed the newly added design-step follow-ups by updating task artifacts only.
+- `design.md` now explicitly requires proof that `psi.agent-session.context/create-workflow-child-session!` applies the same authoritative create-child request/result contract to both the wider attempt caller surface and the narrower judge caller surface.
+- `plan.md` now treats higher realization-edge proof as its own deliberate slice before caller-specific proof strengthening.
+- `steps.md` now makes the realization-edge proof explicit and assigns canonical proof ownership by role:
+  - workflow-runtime attempt tests own attempt-side request forwarding and attempt invariants
+  - workflow-judge tests own judge-specific request semantics
+  - higher realization-edge proof should live with `create-workflow-child-session!`
+- No blocker: both unchecked design-steps were documentation/design alignment work and are now complete.
