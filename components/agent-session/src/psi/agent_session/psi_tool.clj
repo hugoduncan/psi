@@ -227,7 +227,7 @@
   (or (some-> ns-name symbol find-ns)
       (throw (ex-info (str "Eval namespace is not loaded: " ns-name) {:phase :validate :ns ns-name}))))
 
-(declare absolute-directory-path! path-under-root?)
+(declare absolute-directory-path!)
 
 (defn- canonical-file [path]
   (when (seq (str path))
@@ -236,8 +236,12 @@
 
 (defn- canonical-path [path] (some-> path canonical-file .getAbsolutePath))
 
-(defn- namespace-resource-paths [ns-obj]
-  (let [base (some-> ns-obj ns-name str (str/replace "." "/") (str/replace "-" "_"))]
+(defn- namespace-resource-paths [ns-or-name]
+  (let [base (cond
+               (instance? clojure.lang.Namespace ns-or-name) (some-> ns-or-name ns-name str)
+               (string? ns-or-name) ns-or-name
+               :else nil)
+        base (some-> base (str/replace "." "/") (str/replace "-" "_"))]
     (when base
       [(str base ".clj")
        (str base ".cljc")
@@ -248,6 +252,61 @@
       (some->> (namespace-resource-paths ns-obj)
                (keep #(some-> % io/resource .getFile canonical-path))
                first)))
+
+(defn- worktree-src-dirs [worktree-path]
+  (->> (file-seq (io/file worktree-path))
+       (filter #(.isDirectory ^java.io.File %))
+       (filter #(= "src" (.getName ^java.io.File %)))
+       (map #(.getAbsolutePath (.getCanonicalFile ^java.io.File %)))
+       sort
+       vec))
+
+(defn- target-source-path-for-ns [worktree-path ns-name]
+  (let [matches (->> (for [src-dir (worktree-src-dirs worktree-path)
+                           rel-path (namespace-resource-paths ns-name)
+                           :let [f (io/file src-dir rel-path)]
+                           :when (.isFile ^java.io.File f)]
+                       (.getAbsolutePath (.getCanonicalFile ^java.io.File f)))
+                     distinct
+                     sort
+                     vec)]
+    (cond
+      (= 1 (count matches))
+      (first matches)
+
+      (empty? matches)
+      nil
+
+      :else
+      (throw (ex-info (str "Reload namespace resolves to multiple source files under target worktree: " ns-name)
+                      {:phase :validate
+                       :action "reload-code"
+                       :namespace ns-name
+                       :worktree-path worktree-path
+                       :target-source-paths matches})))))
+
+(defn- reload-warning [ns-name loaded-source-path target-source-path]
+  (when (and loaded-source-path target-source-path (not= loaded-source-path target-source-path))
+    {:type :warning
+     :namespace ns-name
+     :message (str "Reload namespace source path differs from target worktree source: " ns-name)
+     :loaded-source-path loaded-source-path
+     :target-source-path target-source-path}))
+
+(defn- reload-target-for-namespace! [ns-name worktree-path]
+  (let [loaded-source-path (some-> ns-name symbol find-ns canonical-source-path-for-ns)
+        target-source-path (target-source-path-for-ns worktree-path ns-name)]
+    (when-not target-source-path
+      (throw (ex-info (str "Reload namespace source path is not present under target worktree: " ns-name)
+                      {:phase :validate
+                       :action "reload-code"
+                       :namespace ns-name
+                       :worktree-path worktree-path
+                       :loaded-source-path loaded-source-path})))
+    {:ns-name ns-name
+     :loaded-source-path loaded-source-path
+     :target-source-path target-source-path
+     :warning (reload-warning ns-name loaded-source-path target-source-path)}))
 
 (defn- loaded-namespace? [ns-name] (boolean (some-> ns-name symbol find-ns)))
 
@@ -270,21 +329,7 @@
   (when (some? worktree-path)
     (absolute-directory-path! worktree-path))
   (when (and (some? namespaces) (some? worktree-path))
-    (doseq [ns-name namespaces]
-      (let [ns-obj      (some-> ns-name symbol find-ns)
-            source-path (canonical-source-path-for-ns ns-obj)]
-        (when-not source-path
-          (throw (ex-info (str "Reload namespace has no canonical source path: " ns-name)
-                          {:phase :validate :action "reload-code" :namespace ns-name :worktree-path worktree-path})))
-        (when-not (path-under-root? worktree-path source-path)
-          (throw (ex-info (str "Reload namespace source path is outside target worktree: " ns-name
-                               ". Reload targets the requested/session worktree-path. "
-                               "The running psi runtime may have been started from a different checkout; restart psi from the target worktree if you want self-reload to follow your edits.")
-                          {:phase :validate
-                           :action "reload-code"
-                           :namespace ns-name
-                           :worktree-path worktree-path
-                           :source-path source-path})))))))
+    (mapv #(reload-target-for-namespace! % worktree-path) namespaces)))
 
 (defn- absolute-directory-path! [worktree-path]
   (when-not (and (string? worktree-path) (not (str/blank? worktree-path)))
@@ -296,19 +341,18 @@
       (throw (ex-info "psi-tool reload-code explicit worktree-path must resolve to an existing directory" {:phase :validate :action "reload-code" :worktree-path worktree-path})))
     (.getAbsolutePath (.getCanonicalFile f))))
 
-(defn- path-under-root? [root-path candidate-path]
-  (let [root (canonical-file root-path)
-        candidate (canonical-file candidate-path)]
-    (when (and root candidate)
-      (let [root-path* (.toPath root)
-            child-path (.toPath candidate)]
-        (.startsWith child-path root-path*)))))
-
 (defn worktree-reload-candidates [worktree-path]
   (->> (all-ns)
-       (map (fn [ns-obj] {:ns-name (str (ns-name ns-obj)) :source-path (canonical-source-path-for-ns ns-obj)}))
-       (filter :source-path)
-       (filter #(path-under-root? worktree-path (:source-path %)))
+       (map (fn [ns-obj]
+              (let [ns-name (str (ns-name ns-obj))
+                    loaded-source-path (canonical-source-path-for-ns ns-obj)
+                    target-source-path (target-source-path-for-ns worktree-path ns-name)]
+                (when target-source-path
+                  {:ns-name ns-name
+                   :loaded-source-path loaded-source-path
+                   :target-source-path target-source-path
+                   :warning (reload-warning ns-name loaded-source-path target-source-path)}))))
+       (keep identity)
        (sort-by :ns-name)
        vec))
 
@@ -393,10 +437,19 @@
      :model-count (count (model-registry/all-models-seq))
      :load-error (model-registry/get-load-error)}))
 
-(defn reload-namespace! [worktree-path ns-name]
-  (require (symbol ns-name) :reload)
-  (when ((set ["psi.ai.models" "psi.ai.model-registry"]) ns-name)
-    (reload-model-registry-step! worktree-path)))
+(defn reload-namespace!
+  ([worktree-path ns-name]
+   (if-let [target-source-path (target-source-path-for-ns worktree-path ns-name)]
+     (reload-namespace! worktree-path ns-name target-source-path)
+     (throw (ex-info (str "Reload namespace source path is not present under target worktree: " ns-name)
+                     {:phase :validate
+                      :action "reload-code"
+                      :namespace ns-name
+                      :worktree-path worktree-path}))))
+  ([worktree-path ns-name target-source-path]
+   (load-file target-source-path)
+   (when ((set ["psi.ai.models" "psi.ai.model-registry"]) ns-name)
+     (reload-model-registry-step! worktree-path))))
 
 (defn- execute-psi-tool-reload-report [{:keys [ctx session-id cwd]} {:keys [namespaces worktree-path]}]
   (let [started-at (System/nanoTime)
@@ -416,24 +469,26 @@
                            (some? worktree-path) (absolute-directory-path! worktree-path)
                            (some? session-derived-path) session-derived-path
                            :else (throw (ex-info "psi-tool reload-code worktree mode requires explicit worktree-path or invoking session worktree-path" {:phase :validate :action "reload-code"}))))
-        _ (validate-reload-namespace-targeting! requested-nses effective-path)
+        namespace-targets (when namespace-mode? (validate-reload-namespace-targeting! requested-nses effective-path))
         worktree-source (if (some? worktree-path) :explicit :session)
         candidates (if namespace-mode?
-                     (mapv (fn [ns-name] {:ns-name ns-name}) requested-nses)
+                     namespace-targets
                      (let [matches (worktree-reload-candidates effective-path)]
                        (when (empty? matches)
                          (throw (ex-info "psi-tool reload-code worktree target is not reloadable in the current runtime" {:phase :validate :action "reload-code" :worktree-path effective-path})))
                        matches))
-        reload-result (loop [remaining candidates reloaded []]
-                        (if-let [{:keys [ns-name]} (first remaining)]
-                          (let [step-result (try (reload-namespace! effective-path ns-name) {:ok? true}
-                                                 (catch Exception e {:ok? false :error e}))]
+        reload-result (loop [remaining candidates reloaded [] warnings []]
+                        (if-let [{:keys [ns-name target-source-path warning]} (first remaining)]
+                          (let [step-result (try (reload-namespace! effective-path ns-name target-source-path) {:ok? true}
+                                                 (catch Exception e {:ok? false :error e}))
+                                warnings' (cond-> warnings warning (conj warning))]
                             (if (:ok? step-result)
-                              (recur (rest remaining) (conj reloaded ns-name))
+                              (recur (rest remaining) (conj reloaded ns-name) warnings')
                               {:status :error :namespace-count (count reloaded) :namespaces reloaded
+                               :warnings warnings'
                                :summary (str "reload stopped after failure in " ns-name)
                                :error (assoc (psi-tool-error-summary :reload-code (:error step-result)) :namespace ns-name)}))
-                          {:status :ok :namespace-count (count reloaded) :namespaces reloaded :summary (str "reloaded " (count reloaded) " namespaces")}))
+                          {:status :ok :namespace-count (count reloaded) :namespaces reloaded :warnings warnings :summary (str "reloaded " (count reloaded) " namespaces")}))
         refresh-steps [(assoc (refresh-query-runtime! ctx) :step :resolver-registration-refresh)
                        (assoc (refresh-all-mutations! ctx) :step :mutation-registration-refresh)
                        (assoc (refresh-live-tool-defs! ctx session-id) :step :live-tool-definition-refresh)

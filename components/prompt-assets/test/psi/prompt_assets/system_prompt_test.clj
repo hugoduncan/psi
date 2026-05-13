@@ -183,7 +183,7 @@
         (is (str/includes? prompt "psi self-reload is worktree-authoritative"))
         (is (str/includes? prompt "psi-tool(action: \"query\", query: \"[:psi.agent-session/worktree-path]\")"))
         (is (str/includes? prompt "start small: reload one already loaded namespace"))
-        (is (str/includes? prompt "runtime/worktree mismatch"))
+        (is (str/includes? prompt "warning-only mismatch diagnostics"))
         (is (str/includes? prompt "do not retarget reload to some other checkout"))
         (is (str/includes? prompt "psi-tool(action: \"reload-code\", namespaces: [\"psi.agent-session.tools\"])"))
         (is (str/includes? prompt "psi-tool(action: \"project-repl\", op: \"status\")"))

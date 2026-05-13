@@ -75,14 +75,14 @@ For psi self-development, reload is worktree-authoritative.
 Interpretation:
 - `:psi.agent-session/worktree-path` is the invoking session worktree
 - when editing psi itself, that worktree is the canonical reload target
-- if reload reports that a loaded namespace source is outside the target worktree, treat that as a runtime/worktree mismatch rather than a signal to target some other checkout
-- the reliable fix for that mismatch is to restart psi from the worktree you are editing
+- namespace reload resolves target source files from that worktree and loads them into the running process
+- if reload reports that the previously loaded namespace source differs from the target worktree source, treat that as a diagnostic warning rather than a reload failure
 
 Reliable self-reload loop:
 1. discover the active target worktree
 2. start with one small already loaded namespace reload
-3. expand to worktree reload only after the small reload succeeds
-4. if reload reports source-outside-worktree, restart psi from the edited worktree instead of retargeting reload to another checkout
+3. inspect any mismatch warnings for loaded-source-path vs target-source-path
+4. expand to worktree reload only after the small reload succeeds
 
 Examples:
 
