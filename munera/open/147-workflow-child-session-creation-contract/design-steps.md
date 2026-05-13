@@ -1,1 +1,1 @@
-- [ ] Resolve whether the workflow child-session seam contract includes `:model-fallback`, or explicitly declare it caller-local/out of scope and explain how step-authored model fallback remains preserved if the contract field list stays authoritative without it.
+- [x] Resolve whether the workflow child-session seam contract includes `:model-fallback`, or explicitly declare it caller-local/out of scope and explain how step-authored model fallback remains preserved if the contract field list stays authoritative without it.

@@ -79,6 +79,21 @@ Workflow child-session creation requests must support the current workflow-owned
   - `:prompt-component-selection`
   - `:logprobs`
   - `:top-logprobs`
+
++ Explicitly out of seam scope:
++ - `:model-fallback`
++
++ `:model-fallback` is currently workflow step execution metadata produced by
++ `psi.workflow-step-session-config.core/resolve-step-session-config` and carried
++ by `psi.workflow-runtime.statechart-runtime` into
++ `psi.workflow-runtime.attempts/create-step-attempt-session!`. It does not cross
++ `execution-adapter/create-child-session!`, is not part of the persisted created
++ child-session state in `psi.agent-session.context/create-workflow-child-session!`,
++ and is instead reattached caller-locally onto the returned `:execution-session`
++ map so later step execution can drive fallback retries. The authoritative seam
++ field list for child-session creation therefore excludes `:model-fallback`
++ intentionally; this task must preserve the existing fallback behaviour while
++ keeping that metadata outside the create-child contract.
 - optional workflow linkage
   - `:workflow-run-id`
   - `:workflow-step-id`

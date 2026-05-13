@@ -18,3 +18,14 @@ Expected likely owners:
 
 2026-05-13 ambiguity review:
 - Actionable ambiguity: `design.md` declares the seam field list authoritative after implementation but omits `:model-fallback`, while the current authored step path still carries `:model-fallback` in step-config and `statechart_runtime.clj` forwards it into `create-step-attempt-session!`, which then preserves it only on the returned execution-session map rather than crossing the child-session creation seam. The task should explicitly decide whether `:model-fallback` is part of the child-session contract, or explicitly mark it caller-local/non-seam state with preserved behaviour rationale so the “authoritative field list” does not silently narrow real workflow-authored behaviour.
+
+2026-05-13 ambiguity follow-up:
+- Resolved `:model-fallback` as caller-local, out of the workflow child-session creation seam.
+- Audit result:
+  - `psi.workflow-step-session-config.core/resolve-step-session-config` may produce `:model-fallback` alongside `:model`.
+  - `psi.workflow-runtime.statechart-runtime` forwards that key into `psi.workflow-runtime.attempts/create-step-attempt-session!`.
+  - `psi.workflow-runtime.attempts/create-step-attempt-session!` does not include `:model-fallback` in the opts passed to `execution-adapter/create-child-session!`.
+  - `psi.agent-session.context/create-workflow-child-session!` therefore never realizes or persists `:model-fallback` on the child session.
+  - `create-step-attempt-session!` reattaches `:model-fallback` only to the returned `:execution-session` map, which is the value later consumed by workflow step execution fallback logic.
+- Design updated to make this explicit so the authoritative create-child field list does not silently narrow or accidentally absorb non-persisted attempt/runtime metadata.
+- No blocker: the ambiguity was resolvable from current code and tests.

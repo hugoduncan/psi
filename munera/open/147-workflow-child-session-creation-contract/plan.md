@@ -28,6 +28,7 @@ Implement this as one small vertical slice that names the workflow child-session
 - **Shared seam, distinct callers**: attempt child sessions and judge child sessions share the seam but retain separate higher-level semantics.
 - **Minimal result shape**: keep the return contract small unless implementation finds a specific consumer need.
 - **Schema/validation over prose-only contract**: tests should rely on one executable contract owner, not only naming conventions.
+- **`model-fallback` stays caller-local**: the child-session creation seam covers persisted child-session creation inputs/outputs, while workflow step model-fallback metadata remains attempt/runtime state carried around the seam and reattached to the returned execution-session map.
 
 ## Risks
 
