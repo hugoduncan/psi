@@ -1,5 +1,54 @@
 # Implementation Notes — 151 edit-clj structural edit extension
 
+## 2026-05-14 — code-shaper review pass 1
+
+Reviewed `core.clj`, `extension.clj`, `core_test.clj`, `extension_test.clj` against design.md.
+
+**S1 — Double zipper walk + dead `:node` field (simplicity).**
+`find-candidates` stores `{:node … :row … :col … :text …}` in each candidate map, but
+`replace-in` never reads `:node` — it re-parses `file-content` from scratch and walks again
+by position to find the replacement site.  The stored `:node` is dead data and the second
+walk is redundant.  Fix: store the zipper loc (`:zloc`) in the candidate map and use it
+directly in `replace-in`, eliminating the second `z/of-string` + loop.
+
+**S2 — Dead first parameter `_old-node` in `replace-in` (simplicity).**
+`replace-in` accepts `[_old-node new-node file-content candidates]` but `_old-node` is
+never read.  The underscore prefix documents the intent, but the parameter itself should be
+removed from the public signature to avoid confusing callers and polluting the API surface.
+
+**S3 — `replace-failed` code is untested and undocumented (robustness).**
+The `replace-failed` error branch in `replace-in` can be triggered if a candidate's
+position is found during `find-candidates` but not re-located in the second walk (e.g.
+due to a bug in position tracking).  No test covers this path, and it is absent from the
+design's result shapes.  Either add a test that exercises it via a test-double or remove
+the branch and let an exception propagate (making the impossible case loud).
+
+**S4 — `ok.new` deviates from design spec (consistency).**
+Design says `ok.new` = "the `new-string` argument string verbatim."  Code returns
+`(n/string new-node)` where `new-node` is the significant child extracted by
+`parse-single-form`.  If `new-string` has leading/trailing whitespace (e.g. `"  :foo  "`),
+`n/string` returns `":foo"`, not the argument verbatim.  The test only checks
+`(= "(* x 2)" (:new result))` where argument and node-string coincidentally match.
+Either update the design to say "node string of the parsed form" or store and return the
+original argument string.
+
+**S5 — `n/sexpr` / `z/sexpr` mixing (consistency).**
+`find-candidates` computes the target via `(n/sexpr old-node)` but compares candidates
+via `(z/sexpr z)`.  `z/sexpr` delegates to `(n/sexpr (z/node z))`, so they are
+semantically equivalent, but mixing the two entry points without explanation is a
+consistency smell.  Unify to one call site.
+
+**S6 — AC 7 second subtest contradicts the "verbatim" claim (consistency).**
+The second case in `comment-in-new-string-preserved-test` asserts that
+`";; comment\n:y"` parses successfully but does not assert the comment survives in the
+output.  When `new-string` begins with a comment, `parse-single-form` extracts `:y` as the
+significant node; `n/string` returns `":y"` — the comment is silently dropped.  The test
+comment says "parse must succeed" but says nothing about preservation.  The design AC 7
+says "comments inside `new-string` are preserved verbatim."  A leading comment is
+arguably not "inside" the form, but the boundary is unstated; the test should either
+assert the comment is dropped (document the known limitation) or the design should
+explicitly exclude leading comments from the preservation guarantee.
+
 ## 2026-05-14 — Ambiguity follow-up execution (design-steps A1–A7)
 
 All seven design follow-up steps executed against design.md:
