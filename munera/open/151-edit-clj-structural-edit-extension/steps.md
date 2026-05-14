@@ -17,8 +17,8 @@
   - return vector of `{:node :row :col :text}` maps
 
 - [ ] Implement `psi.edit-clj.core/apply-line-filter`
-  - filter candidates by `start-line ≤ :row ≤ end-line` (start-row only)
-  - identity (no filtering) when neither bound supplied
+  - each bound independently open when absent: keep where `(no start-line OR start-line ≤ :row) AND (no end-line OR :row ≤ end-line)`
+  - no-op when neither bound is supplied
 
 - [ ] Implement `psi.edit-clj.core/replace-in`
   - receive old-node, new-node, file-content string, filtered candidates
@@ -56,7 +56,8 @@
     4. Read file content
     5. `core/find-candidates` → `core/apply-line-filter` → `core/replace-in`
     6. On `:ok` write updated content back to file
-    7. Serialise result map to JSON string via cheshire
+    7. Merge `:filename` (resolved path string) into result map (core omits it)
+    8. Serialise result map to JSON string via cheshire
   - supports `([args])` and `([args opts])` arities; `:cwd` from opts for path resolution
 
 - [ ] Implement `psi.edit-clj.extension/tool-def`
@@ -68,6 +69,8 @@
   - register tool via `(:register-tool api)`
 
 - [ ] Write `extensions/edit-clj/test/psi/edit_clj/extension_test.clj`
+  - AC 2 (file-unchanged): execute with no-match → temp file content identical before and after call
+  - AC 3 (file-unchanged): execute with ambiguous-match → temp file content identical before and after call
   - AC 4 (order): both strings invalid → old-string parse-error returned
   - AC 4 (order): invalid old-string + missing file → parse-error (not file-not-found)
   - AC 5: valid strings + non-existent file → file-not-found JSON (`"status": "error"`)

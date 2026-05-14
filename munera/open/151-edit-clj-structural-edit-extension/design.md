@@ -58,7 +58,7 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 3. Open the file. Error if not found/unreadable.
 4. Parse the **whole file** into a format-preserving zipper with position tracking. The line range is never used to limit the parse input: a file slice may not contain complete forms, and rewrite-clj assigns positions relative to the start of whatever it was given — feeding it a slice would produce wrong positions throughout.
 5. Walk depth-first. At each node, skip if `sexpr` is not available (comments, whitespace, uneval nodes). Otherwise compare `sexpr` to target.
-6. Optionally filter candidates by line range using the node's **start row** only: a node is in-range when `start-line ≤ node-start-row ≤ end-line`. The node's end row is irrelevant — a form that begins within the range but extends past `end-line` is still considered in-range. A form that ends within the range but begins before `start-line` is excluded.
+6. Optionally filter candidates by line range using the node's **start row** only. Each bound is independently optional and open when absent: a node is included when `(start-line is absent OR start-line ≤ node-start-row) AND (end-line is absent OR node-start-row ≤ end-line)`. When neither bound is supplied the filter is a no-op. The node's end row is irrelevant — a form that begins within the range but extends past `end-line` is still considered in-range. A form that ends within the range but begins before `start-line` is excluded.
 7. Collect all matches before replacement.
 8. Zero matches → `no-match` error; file unchanged.
 9. Two or more matches → `ambiguous-match` error with location list; file unchanged.

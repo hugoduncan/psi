@@ -29,16 +29,19 @@ Key functions:
 - `find-candidates` — depth-first zipper walk over a file-content string; collect all
   nodes whose `sexpr` equals the target `sexpr`. Skip nodes where `sexpr` throws
   (comments, whitespace, uneval). Return a vector of `{:node :row :col :text}` maps.
-- `apply-line-filter` — given candidates and optional `start-line`/`end-line`,
-  keep only those with `start-line ≤ node-row ≤ end-line`. Identity when neither bound
-  is supplied.
+- `apply-line-filter` — given candidates and optional `start-line`/`end-line`, each
+  bound independently open when absent: keep candidates where
+  `(no start-line OR start-line ≤ node-row) AND (no end-line OR node-row ≤ end-line)`.
+  No-op when neither bound is supplied.
 - `replace-in` — given already-parsed old-node, new-node, file-content string, and
   filtered candidates, perform the replacement and return the updated file-content
   string. Branches on candidate count: zero → no-match map, many → ambiguous-match map,
   one → replace and return ok map. Never touches the filesystem.
 
-Result maps mirror the design's output shapes (keywords, not strings — JSON
-serialisation happens in the extension layer).
+Result maps use keywords and match the design's output shapes **except** that core never
+includes `:filename` — core receives file content, not a path. The extension merges
+`:filename` (the resolved path string) into every result map before JSON serialisation.
+JSON serialisation happens in the extension layer.
 
 Note: `core` exposes composable helpers; it does **not** orchestrate the full
 validation order. The extension owns that sequence (see step 4).
@@ -72,7 +75,8 @@ Cover every AC:
   5. `core/find-candidates(old-node, file-content)` → `core/apply-line-filter` →
      `core/replace-in(old-node, new-node, file-content, candidates)`
   6. On `:ok` write updated content back to the file
-  7. Serialise result map to JSON string via cheshire
+  7. Merge `:filename` (resolved path string) into the result map
+  8. Serialise result map to JSON string via cheshire
 - `tool-def` — tool map with `:name`, `:description` (≤ 20 words, one-form contract
   explicit), `:parameters` as data map, `:execute` fn supporting both
   `([args])` and `([args opts])` arities.
