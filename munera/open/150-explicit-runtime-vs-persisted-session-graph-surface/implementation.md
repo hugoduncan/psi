@@ -86,6 +86,16 @@
   - result: `0 errors, 0 warnings`
 - explicit review outcome: no new actionable feedback
 
+## 2026-05-14 — code-shaper
+
+- no new actionable code-shaping feedback found after reviewing the task for simplicity, consistency, and robustness across the explicit runtime/persisted resolver split, graph discoverability proofs, and caller/doc migrations
+- checked for code-shaper concerns and found no new issues:
+  - runtime-session list/count share one payload helper instead of duplicating inventory logic
+  - compact summaries remain a separate narrow resolver, keeping full inventory vs operational summary responsibilities distinct
+  - resolver/index/introspection proofs consistently teach the explicit `:psi.runtime-session/*` and `:psi.persisted-session/*` surfaces without reintroducing mixed naming
+  - no new naming, data-shape, or local-comprehension drift stood out in the reviewed surfaces
+- explicit review outcome: no new actionable feedback
+
 ## 2026-05-14 — follow-up execution
 
 - preloaded review result already landed the newly added actionable follow-up items before this execution pass; no remaining unchecked follow-up items were present in `steps.md`
