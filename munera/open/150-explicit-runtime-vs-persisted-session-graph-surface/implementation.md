@@ -134,3 +134,10 @@
   - `clojure -M:test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test --focus psi.prompt-assets.system-prompt-test --focus psi.introspection.graph-test`
   - result: `58 tests, 3552 assertions, 0 failures`
 - explicit review outcome: no new actionable feedback
+
+## 2026-05-14 — follow-up execution
+
+- extracted no separate handoff `worktree_path:` from the task-local artifacts; attempted `work-on` before reading task artifacts but the harness only exposes a parameterless `work-on` helper and no standalone `work-on` command was available, so execution continued in the current worktree at `/Users/duncan/projects/hugoduncan/psi/refactor`
+- inspected the preloaded review notes in `implementation.md` plus `steps.md`, `design.md`, and `plan.md` to identify newly added actionable follow-up work
+- result: no remaining unchecked follow-up items were present in `steps.md`; all prior review-added items were already marked complete
+- no blocking reason found; there was no additional newly added unchecked work to execute in this pass
