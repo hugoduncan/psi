@@ -1,0 +1,26 @@
+# Steps
+
+- [x] Confirm explicit attr-id naming choice for runtime and persisted session domains
+  - chosen: `:psi.runtime-session/list`, `:psi.runtime-session/count`, `:psi.runtime-session/active-id`
+  - chosen: `:psi.persisted-session/list`, `:psi.persisted-session/list-all`
+- [x] Identify current resolver owners and decide authoritative implementation path for old/new attrs
+  - runtime inventory/count/active-id proof currently lives in `components/agent-session/src/psi/agent_session/resolvers/session.clj` and companion tests in `components/agent-session/test/psi/agent_session/resolvers_test.clj`
+  - persisted discovery callers/defaults currently include Emacs `/resume`, TUI `/resume`, and app-runtime resume selector surfaces consuming `:psi.session/list`
+  - authoritative migration direction: add explicit attrs on the existing authoritative resolver owners and keep old attrs as compatibility outputs during the migration window rather than introducing a separate introspection-filter policy first
+- [ ] Add explicit runtime session attrs
+- [ ] Rename/add explicit runtime session resolver owners
+- [ ] Add explicit persisted session attrs
+- [ ] Rename/add explicit persisted session resolver owners
+- [ ] Preserve compatibility for existing attrs during migration
+- [ ] Update internal callers to prefer the explicit attrs where needed
+  - minimum in-task migration set: Emacs `/resume`, TUI `/resume`, app-runtime resume selector shaping, and focused resolver/graph proofs that currently teach the old attrs
+- [ ] Update docs/examples to prefer the explicit attrs
+- [ ] Add focused resolver and graph-surface tests for new attrs
+- [ ] Add migration compatibility tests for old attrs
+- [ ] Verify the explicit attrs are discoverable in graph introspection surfaces
+- [x] Decide compact-summary scope for this task
+  - `:psi.agent-session/context-session-summaries` stays out of scope; no mirrored `:psi.runtime-session/*` summary attr is added in this slice
+- [x] Decide discoverability behavior for compatibility attrs during migration
+  - new explicit attrs must appear in `:psi.graph/root-queryable-attrs`; old attrs may remain there if still mechanically root-queryable, with docs/tests teaching the new attrs as canonical
+- [x] Enumerate the required in-task migration set that must switch to the new names
+  - fixed set: Emacs `/resume`, TUI `/resume`, app-runtime resume selector shaping, and focused resolver/graph teaching surfaces
