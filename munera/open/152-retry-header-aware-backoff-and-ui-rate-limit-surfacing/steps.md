@@ -32,3 +32,6 @@
 - [x] Record the provider-doc-grounded retry/rate-limit assumptions actually used by the implementation in `implementation.md`.
 - [x] Add focused UI-facing proof that Emacs-visible status includes retry timing and rate-limit information.
 - [x] Add focused UI-facing proof that TUI/backend-visible status/footer content includes retry timing and rate-limit information.
+- [ ] Add focused `psi.session-state.model-test` coverage proving the canonical nested `:retry` field is part of the valid session shape, defaults to `nil`, and accepts the normalized retry metadata map shape when populated.
+- [ ] Extend RPC spec/test coverage so `session/updated` explicitly includes the canonical nested `:retry` payload contract rather than only legacy scalar retry fields.
+- [ ] Add a focused Emacs projection regression test that `session/updated` nested `:retry` data is preserved intentionally or that any intentional discard is documented and asserted explicitly.
