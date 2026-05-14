@@ -129,17 +129,23 @@ Action: When `:is-error` is truthy, increment `[:tools tool-name :errors]` and `
 
 Payload: `{:session-id "..." :turn-id "..." ...}`
 
-Action: Query session token usage via the extension API's `:query` function using the EQL path `[{[:psi.agent-session/session-id <sid>] [:psi.agent-session/usage-input :psi.agent-session/usage-output :psi.agent-session/usage-cache-read :psi.agent-session/usage-cache-write]}]`. Compute the delta from the last-known session totals (tracked in a transient in-memory map, not persisted) and add the delta to the aggregate `:tokens` counters.
+Action: Query session token usage via the extension API's `:query-session` function: `((:query-session api) session-id [:psi.agent-session/usage-input :psi.agent-session/usage-output :psi.agent-session/usage-cache-read :psi.agent-session/usage-cache-write])`. Compute the delta from the last-known session totals (tracked in a transient in-memory map, not persisted) and add the delta to the aggregate `:tokens` counters.
 
 **Why delta-based:** The EQL resolver returns cumulative session totals. The extension must track the last-seen totals per session in memory so it can compute the incremental contribution of each turn. The per-session tracking map is transient (not persisted) because it is only needed within a running process — on restart, the first turn for each session will be treated as a full delta, which is acceptable because sessions rarely span process restarts and the aggregate totals are approximate anyway.
 
 **Alternative considered — enrich `session_turn_finished` payload:** This would require modifying `prompt-finish-base-result` in `turn/handlers.clj`, violating the "no core modifications" constraint. The EQL query approach is slightly less efficient but respects the extension boundary.
 
+### Workflow Tracking
+
+Workflow start/completion events are not currently emitted to the extension event bus. The workflow runtime uses internal statechart events (`:workflow/start`, `:workflow/complete`) but these are not dispatched through `ext/dispatch-in`.
+
+**Decision:** Workflow tracking is included in the schema and data shape (so the surface is ready) but will not be populated in the initial version. A future core enhancement could emit `workflow_started` and `workflow_completed` extension events; the extension is already shaped to consume them.
+
 ### Command Tracking
 
 Slash commands are not currently emitted as extension events. The extension registers its own `/metrics` command but cannot observe other command invocations without core changes.
 
-**Decision:** Command tracking is included in the schema and data shape (so the surface is ready) but will initially only track commands that extensions themselves register and invoke. The `/metrics` command itself will be self-tracked. A future core enhancement could emit a `command_invoked` event to enable full command tracking; the extension is already wired to consume it.
+**Decision:** Command tracking is included in the schema and data shape (so the surface is ready) but will initially only track the extension's own `/metrics` command via self-tracking. A future core enhancement could emit a `command_invoked` event to enable full command tracking.
 
 ### Deterministic Operation Tracking
 
@@ -153,7 +159,7 @@ Deterministic operations are not currently emitted as extension events either. T
 
 **Load on init:** The extension needs the worktree path to locate the persistence file. It obtains this via `((:query api) [:psi.agent-session/worktree-path])` during init. If the query returns nil (no worktree), persistence is disabled and the extension operates in memory-only mode.
 
-**Write strategy:** After each counter mutation, schedule an async flush. Use a simple debounce: track a `dirty?` flag and flush after a short delay (500ms) or immediately on explicit request (e.g., from the `/metrics` command). The flush writes the full metrics map to the EDN file atomically (write to temp file, rename).
+**Write strategy:** After each counter mutation, write synchronously within the `swap!` callback's aftermath. Specifically: each event handler calls a `persist-if-dirty!` function after `swap!` returns. This function checks a `:dirty?` flag in the atom, and if true, writes the metrics to disk and clears the flag. The write is synchronous but fast (small EDN file). No debounce thread or timer needed — the event rate is low enough (one per tool call, one per turn) that synchronous writes are acceptable. The `/metrics` command also triggers a flush to ensure the displayed data matches what's on disk.
 
 **Atomic writes:** `spit` to a `.metrics.edn.tmp` file in the same directory, then `java.nio.file.Files/move` with `ATOMIC_MOVE` + `REPLACE_EXISTING`. This prevents partial writes from corrupting the file.
 
@@ -165,10 +171,16 @@ Deterministic operations are not currently emitted as extension events either. T
 (defn init [api]
   (let [worktree-path (get ((:query api) [:psi.agent-session/worktree-path])
                            :psi.agent-session/worktree-path)
-        initial-state (load-metrics worktree-path)]
-    (reset! store {:metrics initial-state
-                   :worktree-path worktree-path
-                   :session-usage-cache {}})
+        initial-state (when-not @store
+                        (load-metrics worktree-path))]
+    ;; Only reset store on first init (defonce preserves across reloads).
+    ;; On reload, just update worktree-path in case it changed.
+    (if @store
+      (swap! store assoc :worktree-path worktree-path)
+      (reset! store {:metrics (or initial-state (empty-metrics))
+                     :worktree-path worktree-path
+                     :session-usage-cache {}
+                     :dirty? false}))
     ((:on api) "tool_call" on-tool-call)
     ((:on api) "tool_result" on-tool-result)
     ((:on api) "session_turn_finished" (make-turn-finished-handler api))
@@ -184,6 +196,8 @@ Deterministic operations are not currently emitted as extension events either. T
 ```
 
 The `session_turn_finished` handler is created via `make-turn-finished-handler` which closes over the `api` map to access the `:query` function for EQL usage lookups.
+
+**Reload behavior:** On extension reload, the `defonce` atom is preserved. `init` detects the non-nil store and only updates the `:worktree-path` (in case the session switched worktrees). Accumulated counters and the session-usage-cache survive the reload.
 
 ### Operation Handler
 
@@ -257,7 +271,11 @@ extensions/metrics/
 
 **`extensions/tests.edn`:** Add metrics test paths to the Kaocha test suite if one exists, or rely on the extension-level deps.edn test alias.
 
-**Manifest registration:** The extension must be registered in the project manifest so `bootstrap-manifest-extensions-in!` discovers and activates it. This follows the same pattern as other built-in extensions.
+**Manifest registration (three places):**
+
+1. **Catalog entry:** Add `'psi/metrics {:psi/init 'psi.metrics.extension/init :source-policies {:installed {:local/root "extensions/metrics"}}}` to `psi-owned-extension-catalog` in `components/agent-session/src/psi/agent_session/extension_installs.clj`. This is the same registration pattern used by all built-in extensions (github, logprobs, etc.). While technically touching a core component file, it is a data-only catalog addition — no behavioral changes.
+2. **Project manifest:** Add `psi/metrics {}` to `.psi/extensions.edn` under `:deps` to enable the extension in this project.
+3. **Classpath:** Add `psi/metrics {:local/root "metrics"}` to `extensions/deps.edn` under `:deps` so the classpath can resolve it.
 
 ### Key Invariants
 

@@ -23,6 +23,14 @@ Like skill activations, slash command and deterministic operation invocations ar
 
 The extension obtains the worktree path via `((:query api) [:psi.agent-session/worktree-path])` during init. This is the same pattern used by commit-checks (which reads `workspace-dir` from event payloads). If nil, persistence is disabled gracefully.
 
+### Workflow tracking excluded from initial version
+
+No workflow start/completion events are emitted to the extension event bus. The workflow runtime uses internal statechart events but does not dispatch through `ext/dispatch-in`. Schema includes `:workflows` for forward compatibility.
+
+### Catalog registration is data-only
+
+Adding the extension to `psi-owned-extension-catalog` in `extension_installs.clj` is technically touching a core component file, but it's a data-only catalog entry — the same pattern used by all other built-in extensions. No behavioral changes to core code.
+
 ### Namespace convention: `psi.metrics.*`
 
 Follows `psi.github.*` pattern for project-owned extensions rather than the flat `extensions.*` convention used by simpler extensions. This allows clean multi-namespace decomposition.
