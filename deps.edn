@@ -78,7 +78,8 @@
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
                         "extensions/github/src"
-                        "extensions/logprobs/src"]
+                        "extensions/logprobs/src"
+                        "extensions/metrics/src"]
           :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
@@ -116,7 +117,8 @@
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
                         "extensions/github/src"
-                        "extensions/logprobs/src"]
+                        "extensions/logprobs/src"
+                        "extensions/metrics/src"]
           :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
@@ -153,7 +155,8 @@
                            "extensions/plan-state-learning/src"
                            "extensions/work-on/src"
                            "extensions/github/src"
-                           "extensions/logprobs/src"]
+                           "extensions/logprobs/src"
+                           "extensions/metrics/src"]
              :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
              :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
              :main-opts   ["-m" "psi.tui.test-harness.tui-demo-main"]}
@@ -228,6 +231,7 @@
                              "extensions/work-on/test"
                              "extensions/github/test"
                              "extensions/logprobs/test"
+                             "extensions/metrics/test"
                              "components/extension-test-helpers/src"]
                :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
                              nrepl/nrepl         {:mvn/version "1.5.1"}}
@@ -280,6 +284,7 @@
                         "extensions/work-on/test"
                         "extensions/github/test"
                         "extensions/logprobs/test"
+                        "extensions/metrics/test"
                         "components/ai/src"
                         "components/engine/src"
                         "components/query/src"
@@ -327,6 +332,7 @@
                         "extensions/work-on/src"
                         "extensions/github/src"
                         "extensions/logprobs/src"
+                        "extensions/metrics/src"
                         "components/extension-test-helpers/src"]
           :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
                         nrepl/nrepl         {:mvn/version "1.5.1"}}
