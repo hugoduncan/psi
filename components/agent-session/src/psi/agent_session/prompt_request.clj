@@ -13,16 +13,67 @@
    [psi.prompt-assets.skills :as skills]
    [psi.prompt-assets.system-prompt :as system-prompt]))
 
+(defn- assistant-tool-call-ids
+  [message]
+  (into []
+        (comp (filter #(= :tool-call (:type %)))
+              (map :id)
+              (filter string?))
+        (:content message)))
+
+(defn- tool-result-message?
+  [message]
+  (= "toolResult" (:role message)))
+
+(defn- tool-result-id
+  [message]
+  (:tool-call-id message))
+
+(defn- interrupted-tool-result
+  [tool-call-id timestamp]
+  {:role "toolResult"
+   :tool-call-id tool-call-id
+   :tool-name "interrupted"
+   :content [{:type :text
+              :text "Tool execution interrupted before completion."}]
+   :is-error true
+   :timestamp (or timestamp (java.time.Instant/now))})
+
+(defn- repair-dangling-tool-uses
+  "Ensure every assistant tool-call block is followed by corresponding
+   contiguous toolResult messages before any later non-toolResult message.
+
+   When a session was interrupted after journaling an assistant tool-use but
+   before journaling its matching toolResult, synthesize an error toolResult in
+   the provider-facing projection so follow-on prompts remain valid."
+  [messages]
+  (loop [remaining (seq messages)
+         repaired  []]
+    (if-let [message (first remaining)]
+      (let [tool-call-ids (seq (assistant-tool-call-ids message))]
+        (if (and (= "assistant" (:role message)) tool-call-ids)
+          (let [[tool-results tail] (split-with tool-result-message? (rest remaining))
+                present-ids         (into #{} (keep tool-result-id) tool-results)
+                missing-results     (->> tool-call-ids
+                                         (remove present-ids)
+                                         (mapv #(interrupted-tool-result % (:timestamp message))))]
+            (recur tail (into repaired (concat [message] tool-results missing-results))))
+          (recur (next remaining) (conj repaired message))))
+      repaired)))
+
 (defn journal->provider-messages
   "Project persisted journal entries into agent/provider message maps.
    :message entries become provider messages directly.
-   :logprobs entries are persisted but not projected into provider messages."
+   :logprobs entries are persisted but not projected into provider messages.
+   Dangling assistant tool uses are repaired with synthetic error tool results
+   in the provider-facing projection so interrupted sessions remain usable."
   [journal]
-  (into []
-        (keep (fn [entry]
-                (when (= :message (:kind entry))
-                  (get-in entry [:data :message]))))
-        journal))
+  (repair-dangling-tool-uses
+   (into []
+         (keep (fn [entry]
+                 (when (= :message (:kind entry))
+                   (get-in entry [:data :message]))))
+         journal)))
 
 (defn session->provider-messages
   "Project the persisted journal for `session-id` into provider-visible messages."
