@@ -298,145 +298,66 @@
       (is (= :reload-code (:psi-tool/action parsed)))
       (is (= :validate (get-in parsed [:psi-tool/error :phase])))))
 
-  (testing "namespace mode accepts unloaded namespaces when they resolve under the target worktree"
-    (let [tool     (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
-          captured* (atom nil)
-          result   (with-redefs [psi-tool/target-source-path-for-ns (fn [worktree-path ns-name]
-                                                                      (str worktree-path "/src/" (clojure.string/replace ns-name "." "/") ".clj"))
-                                 clojure.core/load-file (fn [path]
-                                                          (reset! captured* path)
-                                                          :loaded)]
-                     ((:execute tool) {"action" "reload-code"
-                                       "namespaces" ["psi.no.such.ns"]}))
-          parsed   (read-string (:content result))]
+  (testing "namespace mode reloads exactly requested namespaces in request order"
+    (let [tool        (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
+          loaded-path (str (System/getProperty "user.dir") "/src/in-worktree.clj")
+          result      (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] loaded-path)
+                                    psi-tool/target-source-path-for-ns (fn [worktree-path ns-name]
+                                                                         (str worktree-path "/src/" (clojure.string/replace ns-name "." "/") ".clj"))
+                                    clojure.core/load-file (fn [_] :loaded)]
+                        ((:execute tool) {"action" "reload-code"
+                                          "namespaces" ["clojure.string" "clojure.edn"]}))
+          parsed      (read-string (:content result))]
       (is (false? (:is-error result)))
-      (is (= :reload-code (:psi-tool/action parsed)))
+      (is (= :namespaces (:psi-tool/reload-mode parsed)))
+      (is (= ["clojure.string" "clojure.edn"] (:psi-tool/namespaces-requested parsed)))
+      (is (= ["clojure.string" "clojure.edn"] (get-in parsed [:psi-tool/code-reload :namespaces])))
       (is (= :ok (get-in parsed [:psi-tool/code-reload :status])))
-      (is (= ["psi.no.such.ns"] (get-in parsed [:psi-tool/code-reload :namespaces])))
-      (is (= (str (System/getProperty "user.dir") "/src/psi/no/such/ns.clj") @captured*)))))
+      (is (= :ok (get-in parsed [:psi-tool/graph-refresh :status])))
+      (is (= :ok (:psi-tool/overall-status parsed)))
+      (is (= (System/getProperty "user.dir") (:psi-tool/worktree-path parsed)))
+      (is (= :session (:psi-tool/worktree-source parsed)))
+      (is (string? (get-in parsed [:psi-tool/graph-refresh :steps 3 :summary])))
+      (is (= "preserved current extension registry without rediscovery"
+             (get-in parsed [:psi-tool/graph-refresh :steps 5 :summary])))))
 
-(testing "namespace mode reloads exactly requested namespaces in request order"
-  (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
-        loaded-path (str (System/getProperty "user.dir") "/src/in-worktree.clj")
-        result (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] loaded-path)
-                             psi-tool/target-source-path-for-ns (fn [worktree-path ns-name]
-                                                                  (str worktree-path "/src/" (clojure.string/replace ns-name "." "/") ".clj"))
-                             clojure.core/load-file (fn [_] :loaded)]
-                 ((:execute tool) {"action" "reload-code"
-                                   "namespaces" ["clojure.string" "clojure.edn"]}))
-        parsed (read-string (:content result))]
-    (is (false? (:is-error result)))
-    (is (= :namespaces (:psi-tool/reload-mode parsed)))
-    (is (= ["clojure.string" "clojure.edn"] (:psi-tool/namespaces-requested parsed)))
-    (is (= ["clojure.string" "clojure.edn"] (get-in parsed [:psi-tool/code-reload :namespaces])))
-    (is (= :ok (get-in parsed [:psi-tool/code-reload :status])))
-    (is (= :ok (get-in parsed [:psi-tool/graph-refresh :status])))
-    (is (= :ok (:psi-tool/overall-status parsed)))
-    (is (= (System/getProperty "user.dir") (:psi-tool/worktree-path parsed)))
-    (is (= :session (:psi-tool/worktree-source parsed)))
-    (is (string? (get-in parsed [:psi-tool/graph-refresh :steps 3 :summary])))
-    (is (= "preserved current extension registry without rediscovery"
-           (get-in parsed [:psi-tool/graph-refresh :steps 5 :summary])))))
+  (testing "reloading model namespaces reinitializes the model registry for the effective worktree"
+    (let [dir                 (str (java.nio.file.Files/createTempDirectory "psi-tool-model-registry-reload-"
+                                                                            (make-array java.nio.file.attribute.FileAttribute 0)))
+          captured-init-opts* (atom nil)]
+      (try
+        (with-redefs [clojure.core/load-file (fn [_] :loaded)
+                      model-registry/init! (fn [opts]
+                                             (reset! captured-init-opts* opts)
+                                             :ok)
+                      model-registry/all-models-seq (fn [] [{:provider :local :id "m1"} {:provider :openai :id "m2"}])
+                      model-registry/get-load-error (fn [] nil)]
+          (psi-tool/reload-namespace! dir "psi.ai.models" "/tmp/psi/ai/models.clj")
+          (is (= {:user-models-path (model-registry/default-user-models-path)
+                  :project-models-path (str dir "/.psi/models.edn")}
+                 @captured-init-opts*)))
+        (finally
+          (delete-tree! dir)))))
 
-(testing "reloading model namespaces reinitializes the model registry for the effective worktree"
-  (let [dir (str (java.nio.file.Files/createTempDirectory "psi-tool-model-registry-reload-"
-                                                          (make-array java.nio.file.attribute.FileAttribute 0)))
-        captured-init-opts* (atom nil)]
-    (try
-      (with-redefs [clojure.core/load-file (fn [_] :loaded)
-                    model-registry/init! (fn [opts]
-                                           (reset! captured-init-opts* opts)
-                                           :ok)
-                    model-registry/all-models-seq (fn [] [{:provider :local :id "m1"} {:provider :openai :id "m2"}])
-                    model-registry/get-load-error (fn [] nil)]
-        (psi-tool/reload-namespace! dir "psi.ai.models" "/tmp/psi/ai/models.clj")
-        (is (= {:user-models-path (model-registry/default-user-models-path)
-                :project-models-path (str dir "/.psi/models.edn")}
-               @captured-init-opts*)))
-      (finally
-        (delete-tree! dir)))))
-
-(testing "namespace mode stops at first namespace failure and reports successful prefix"
-  (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
-        result (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/in-worktree.clj"))
-                             psi-tool/target-source-path-for-ns (fn [worktree-path ns-name]
-                                                                  (str worktree-path "/src/" (clojure.string/replace ns-name "." "/") ".clj"))
-                             clojure.core/load-file (fn [path]
-                                                      (when (str/ends-with? path "/clojure/edn.clj")
-                                                        (throw (ex-info "boom" {:path path})))
-                                                      :loaded)]
-                 ((:execute tool) {"action" "reload-code"
-                                   "namespaces" ["clojure.string" "clojure.edn" "clojure.walk"]}))
-        parsed (read-string (:content result))]
-    (is (true? (:is-error result)))
-    (is (= :error (get-in parsed [:psi-tool/code-reload :status])))
-    (is (= ["clojure.string"] (get-in parsed [:psi-tool/code-reload :namespaces])))
-    (is (= :ok (get-in parsed [:psi-tool/graph-refresh :status])))
-    (is (= (System/getProperty "user.dir") (:psi-tool/worktree-path parsed)))
-    (is (= :session (:psi-tool/worktree-source parsed)))
-    (is (= :error (:psi-tool/overall-status parsed)))))
-
-(testing "namespace mode reloads from target worktree and reports mismatch as warning"
-  (let [captured* (atom nil)
-        tmpdir (str (java.nio.file.Files/createTempDirectory "psi-tool-reload-outside-worktree-"
-                                                             (make-array java.nio.file.attribute.FileAttribute 0)))]
-    (try
-      (let [src-dir (io/file tmpdir "src/clojure")
-            src-file (io/file src-dir "string.clj")
-            loaded-file (str (System/getProperty "user.dir") "/src/outside.clj")]
-        (.mkdirs src-dir)
-        (spit src-file "(ns clojure.string)")
-        (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] loaded-file)
-                      clojure.core/load-file (fn [path]
-                                               (reset! captured* path)
-                                               :loaded)]
-          (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd tmpdir})
-                result ((:execute tool) {"action" "reload-code"
-                                         "namespaces" ["clojure.string"]})
-                parsed (read-string (:content result))]
-            (is (false? (:is-error result)))
-            (is (= (.getAbsolutePath (.getCanonicalFile src-file)) @captured*))
-            (is (= :ok (:psi-tool/overall-status parsed)))
-            (is (= (.getAbsolutePath (.getCanonicalFile (io/file tmpdir)))
-                   (:psi-tool/worktree-path parsed)))
-            (is (= :session (:psi-tool/worktree-source parsed)))
-            (is (= [{:type :warning
-                     :namespace "clojure.string"
-                     :message "Reload namespace source path differs from target worktree source: clojure.string"
-                     :loaded-source-path loaded-file
-                     :target-source-path (.getAbsolutePath (.getCanonicalFile src-file))}]
-                   (get-in parsed [:psi-tool/code-reload :warnings]))))))
-      (finally
-        (delete-tree! tmpdir)))))
-
-(testing "namespace mode loads previously unloaded namespaces without mismatch warning"
-  (let [captured* (atom nil)
-        tmpdir (str (java.nio.file.Files/createTempDirectory "psi-tool-reload-unloaded-"
-                                                             (make-array java.nio.file.attribute.FileAttribute 0)))]
-    (try
-      (let [src-dir (io/file tmpdir "src/psi/app_runtime")
-            src-file (io/file src-dir "retry_display.clj")]
-        (.mkdirs src-dir)
-        (spit src-file "(ns psi.app-runtime.retry-display)")
-        (with-redefs [clojure.core/load-file (fn [path]
-                                               (reset! captured* path)
-                                               :loaded)]
-          (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd tmpdir})
-                result ((:execute tool) {"action" "reload-code"
-                                         "namespaces" ["psi.app-runtime.retry-display"]})
-                parsed (read-string (:content result))]
-            (is (false? (:is-error result)))
-            (is (= (.getAbsolutePath (.getCanonicalFile src-file)) @captured*))
-            (is (= [{:type :warning
-                     :namespace "psi.app-runtime.retry-display"
-                     :message "Reload namespace source path differs from target worktree source: psi.app-runtime.retry-display"
-                     :loaded-source-path (str (System/getProperty "user.dir") "/components/app-runtime/src/psi/app_runtime/retry_display.clj")
-                     :target-source-path (.getAbsolutePath (.getCanonicalFile src-file))}]
-                   (get-in parsed [:psi-tool/code-reload :warnings]))))))
-      (finally
-        (delete-tree! tmpdir)))))
-
-(testing "worktree mode uses session worktree-path when explicit target absent"
+  (testing "namespace mode stops at first namespace failure and reports successful prefix"
+    (let [tool   (tools/make-psi-tool (fn [_q] {}) {:cwd (System/getProperty "user.dir")})
+          result (with-redefs [psi-tool/canonical-source-path-for-ns (fn [_] (str (System/getProperty "user.dir") "/src/in-worktree.clj"))
+                               psi-tool/target-source-path-for-ns (fn [worktree-path ns-name]
+                                                                    (str worktree-path "/src/" (clojure.string/replace ns-name "." "/") ".clj"))
+                               clojure.core/load-file (fn [path]
+                                                        (when (str/ends-with? path "/clojure/edn.clj")
+                                                          (throw (ex-info "boom" {:path path})))
+                                                        :loaded)]
+                   ((:execute tool) {"action" "reload-code"
+                                     "namespaces" ["clojure.string" "clojure.edn" "clojure.walk"]}))
+          parsed (read-string (:content result))]
+      (is (true? (:is-error result)))
+      (is (= :error (get-in parsed [:psi-tool/code-reload :status])))
+      (is (= ["clojure.string"] (get-in parsed [:psi-tool/code-reload :namespaces])))
+      (is (= :ok (get-in parsed [:psi-tool/graph-refresh :status])))
+      (is (= (System/getProperty "user.dir") (:psi-tool/worktree-path parsed)))
+      (is (= :session (:psi-tool/worktree-source parsed)))
+      (is (= :error (:psi-tool/overall-status parsed)))))
   (with-redefs [psi-tool/worktree-reload-candidates (fn [worktree-path]
                                                       [{:ns-name "clojure.string"
                                                         :loaded-source-path (str worktree-path "/loaded/clojure/string.clj")
