@@ -7,9 +7,12 @@
    [clojure.walk :as walk]
    [psi.agent-core.core :as agent]
    [psi.ai.model-registry :as model-registry]
+   [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.agent-session.extensions.runtime-eql :as runtime-eql]
    [psi.agent-session.resolvers :as session-resolvers]
    [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [psi.history.resolvers :as history-resolvers]
    [psi.state-kernel.dispatch :as kernel-dispatch]
    [psi.tool-registry.registry :as tool-registry]
    [psi.project-nrepl.ops :as project-nrepl-ops]
@@ -22,7 +25,7 @@
   {:name        "psi-tool"
    :label       "Psi Tool"
    :description (str "Execute a live psi runtime operation. Canonical requests use `action` with one of: "
-                     "`query`, `eval`, `reload-code`, `project-repl`, `workflow`, or `scheduler`. `query` executes an EQL query against the live session graph; "
+                     "`query`, `eval`, `mutate`, `reload-code`, `project-repl`, `workflow`, or `scheduler`. `query` executes an EQL query against the live session graph; "
                      "`eval` evaluates an in-process Clojure form in a named already-loaded namespace; "
                      "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; omit `worktree-path` to use the invoking session worktree when available; "
                      "`project-repl` controls the managed project REPL with explicit `op` values `status|start|attach|stop|eval|interrupt`; "
@@ -31,10 +34,12 @@
                      "Legacy query-only calls of the form `{query: ...}` remain accepted only as a compatibility alias for `action: \"query\"`. "
                      "Optional `entity` seeds root attributes for explicit query targeting, e.g. entity {:psi.agent-session/session-id \"sid\"}.")
    :parameters  {:type       "object"
-                 :properties {:action        {:type "string" :enum ["query" "eval" "reload-code" "project-repl" "workflow" "scheduler"]
+                 :properties {:action        {:type "string" :enum ["query" "eval" "mutate" "reload-code" "project-repl" "workflow" "scheduler"]
                                               :description "Canonical psi-tool operation discriminator."}
                               :query         {:type "string" :description "For `action: \"query\"`: EQL query vector as EDN string, e.g. \"[:psi.agent-session/phase :psi.agent-session/session-id]\""}
                               :entity        {:type "string" :description "For `action: \"query\"`: optional EDN root entity map to seed the query, e.g. \"{:psi.agent-session/session-id \\\"sid\\\"}\" for explicit session targeting."}
+                              :mutation      {:type "string" :description "For `action: \"mutate\"`: qualified mutation symbol string, e.g. \"psi.extension/close-session\"."}
+                              :params        {:description "For `action: \"mutate\"`: mutation params map/object. String-keyed maps may be normalized to keyword keys at the top level."}
                               :ns            {:type "string" :description "For `action: \"eval\"`: already loaded namespace string in which to evaluate `form`."}
                               :form          {:type "string" :description "For `action: \"eval\"`: Clojure form string using full Clojure reader syntax (quote, deref, anon-fn, var) read with *read-eval* false and evaluated in the named namespace."}
                               :namespaces    {:type "array" :items {:type "string"}
@@ -87,13 +92,13 @@
     (some? query)  "query"
     :else          nil))
 
-(def ^:private psi-tool-supported-actions ["query" "eval" "reload-code" "project-repl" "workflow" "scheduler"])
+(def ^:private psi-tool-supported-actions ["query" "eval" "mutate" "reload-code" "project-repl" "workflow" "scheduler"])
 (def ^:private project-repl-supported-ops ["status" "start" "attach" "stop" "eval" "interrupt"])
 (def ^:private workflow-supported-ops ["list-definitions" "create-run" "execute-run" "read-run" "list-runs" "resume-run" "cancel-run"])
 (def ^:private scheduler-supported-ops ["create" "list" "cancel"])
 
 (defn- validate-psi-tool-request
-  [{:strs [query entity ns form namespaces worktree-path op host port code definition-id definition workflow-input run-id chain-name reason message kind session-config label delay-ms at schedule-id] :as args}]
+  [{:strs [query entity mutation params ns form namespaces worktree-path op host port code definition-id definition workflow-input run-id chain-name reason message kind session-config label delay-ms at schedule-id] :as args}]
   (let [effective-action (psi-tool-action args)]
     (cond
       (nil? effective-action)
@@ -120,6 +125,16 @@
           (throw (ex-info "psi-tool eval action requires `form`"
                           {:phase :validate :action effective-action})))
         {:action effective-action :ns ns :form form})
+
+      (= effective-action "mutate")
+      (do
+        (when (contains? args "entity")
+          (throw (ex-info "psi-tool mutate does not support `entity`; pass targeting data in `params`"
+                          {:phase :validate :action effective-action :mutation mutation})))
+        (when-not (string? mutation)
+          (throw (ex-info "psi-tool mutate action requires `mutation`"
+                          {:phase :validate :action effective-action})))
+        {:action effective-action :mutation mutation :params params})
 
       (= effective-action "reload-code")
       {:action effective-action :namespaces namespaces :worktree-path worktree-path}
@@ -213,10 +228,12 @@
    :is-error true})
 
 (defn telemetry-args
-  [{:strs [action query ns form namespaces worktree-path op host port code definition-id definition workflow-input run-id chain-name reason message kind session-config label delay-ms at schedule-id]}]
+  [{:strs [action query mutation params ns form namespaces worktree-path op host port code definition-id definition workflow-input run-id chain-name reason message kind session-config label delay-ms at schedule-id]}]
   (cond-> (ordered-map)
     action (assoc "action" action)
     query (assoc "query" query)
+    mutation (assoc "mutation" mutation)
+    params (assoc "params" params)
     ns (assoc "ns" ns)
     form (assoc "form" form)
     namespaces (assoc "namespaces" namespaces)
@@ -252,6 +269,73 @@
            (catch clojure.lang.ArityException _
              (throw (ex-info "psi-tool query-fn does not support explicit entity seeding" {:entity entity-map}))))
       (query-fn q))))
+
+(defn- normalize-top-level-string-keys [m]
+  (into {}
+        (map (fn [[k v]]
+               [(if (string? k) (keyword k) k) v]))
+        m))
+
+(defn- parse-qualified-mutation-symbol [mutation]
+  (let [op-sym (try
+                 (parse-edn-string mutation)
+                 (catch Exception _
+                   ::invalid))]
+    (when-not (qualified-symbol? op-sym)
+      (throw (ex-info (str "Invalid psi-tool mutation symbol: " mutation)
+                      {:phase :validate :mutation mutation})))
+    op-sym))
+
+(defn- mutation-op-name [mutation]
+  (or (some-> mutation :config ::pco/op-name)
+      (some-> mutation meta ::pco/op-name)))
+
+(defn- registered-mutation-syms [ctx]
+  (->> (concat (or (some-> ctx :all-mutations-atom deref) (:all-mutations ctx))
+               history-resolvers/all-mutations)
+       (keep mutation-op-name)
+       set))
+
+(defn- validate-mutation-params [mutation params]
+  (cond
+    (nil? params) {}
+    (map? params) (normalize-top-level-string-keys params)
+    :else (throw (ex-info "psi-tool mutate requires `params` to be a map"
+                          {:phase :validate
+                           :mutation mutation
+                           :params-type (keyword (cond
+                                                   (string? params) "string"
+                                                   (vector? params) "vector"
+                                                   (sequential? params) "sequential"
+                                                   :else (.getSimpleName (class params))))}))))
+
+(defn- execute-psi-tool-mutate-report [{:keys [ctx session-id]} {:keys [mutation params]}]
+  (let [started-at (System/nanoTime)
+        op-sym     (parse-qualified-mutation-symbol mutation)
+        params*    (validate-mutation-params mutation params)]
+    (when-not ctx
+      (throw (ex-info "psi-tool mutate requires runtime context"
+                      {:phase :validate :action "mutate" :mutation mutation})))
+    (when-not session-id
+      (throw (ex-info "psi-tool mutate requires invoking session-id"
+                      {:phase :validate :action "mutate" :mutation mutation})))
+    (when-not (contains? (registered-mutation-syms ctx) op-sym)
+      (throw (ex-info (str "Unknown psi-tool mutation: " mutation)
+                      {:phase :validate :mutation mutation})))
+    (try
+      (let [result (runtime-eql/run-extension-mutation-in! ctx session-id op-sym params*)
+            duration-ms (long (/ (- (System/nanoTime) started-at) 1000000))]
+        {:psi-tool/action :mutate
+         :psi-tool/mutation op-sym
+         :psi-tool/duration-ms duration-ms
+         :psi-tool/overall-status :ok
+         :psi-tool/result (sanitize-psi-tool-data result)})
+      (catch Exception e
+        {:psi-tool/action :mutate
+         :psi-tool/mutation op-sym
+         :psi-tool/duration-ms (long (/ (- (System/nanoTime) started-at) 1000000))
+         :psi-tool/overall-status :error
+         :psi-tool/error (psi-tool-error-summary :mutation e)}))))
 
 (defn- serialize-psi-tool-output [{:keys [overrides tool-call-id]} output narrowing-hint]
   (let [policy     (tool-output/effective-policy (or overrides {}) "psi-tool")
@@ -585,9 +669,10 @@
              :psi-tool/worktree-source worktree-source}
       namespace-mode? (assoc :psi-tool/namespaces-requested requested-nses))))
 
-(defn truncation-visible-prefix [{:keys [action ns form namespaces worktree-path op code definition-id run-id schedule-id label kind]}]
+(defn truncation-visible-prefix [{:keys [action mutation ns form namespaces worktree-path op code definition-id run-id schedule-id label kind]}]
   (case action
     "eval" (str "Eval action=eval ns=" ns " form=" form)
+    "mutate" (str "Mutate action=mutate mutation=" mutation)
     "reload-code" (if namespaces
                     (str "Reload action=reload-code mode=namespaces namespaces=" (pr-str namespaces))
                     (str "Reload action=reload-code mode=worktree worktree-path=" worktree-path))
@@ -651,6 +736,10 @@
                                 safe-result (sanitize-psi-tool-result result)
                                 output (pr-str safe-result)]
                             (serialize-psi-tool-output opts output "Use a narrower query to reduce output size."))
+                  "mutate" (let [report (execute-psi-tool-mutate-report {:ctx (:ctx opts) :session-id (:session-id opts)} request)
+                                 safe-report (sanitize-psi-tool-data report)
+                                 output (pr-str safe-report)]
+                             (assoc (serialize-operation-output opts request output "Use a narrower mutation result to reduce output size.") :is-error (not= :ok (:psi-tool/overall-status safe-report))))
                   "eval" (let [report (execute-psi-tool-eval-report request)
                                output (pr-str report)]
                            (assoc (serialize-operation-output opts request output "Use a smaller eval result to reduce output size.") :is-error (boolean (:psi-tool/error report))))
@@ -674,6 +763,14 @@
                 (let [action (psi-tool-action args)]
                   (case action
                     "eval" {:content (pr-str {:psi-tool/action :eval :psi-tool/ns (get args "ns") :psi-tool/duration-ms 0 :psi-tool/error (psi-tool-error-summary :eval e)}) :is-error true}
+                    "mutate" {:content (pr-str {:psi-tool/action :mutate
+                                                :psi-tool/mutation (try
+                                                                     (some-> (get args "mutation") parse-qualified-mutation-symbol)
+                                                                     (catch Exception _ nil))
+                                                :psi-tool/duration-ms 0
+                                                :psi-tool/overall-status :error
+                                                :psi-tool/error (psi-tool-error-summary :mutation e)})
+                              :is-error true}
                     "reload-code" (let [worktree-path (or (try
                                                             (some-> (get args "worktree-path") absolute-directory-path!)
                                                             (catch Exception _ nil))

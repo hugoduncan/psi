@@ -227,7 +227,16 @@
                                           :psi.session-info/worktree-path
                                           :psi.session-info/name
                                           :psi.session-info/display-name
-                                          :psi.session-info/created]}])
+                                          :psi.session-info/parent-session-id
+                                          :psi.session-info/created
+                                          :psi.session-info/updated]}
+                                        {:psi.agent-session/context-session-summaries
+                                         [:psi.session-info/id
+                                          :psi.session-info/display-name
+                                          :psi.session-info/created
+                                          :psi.session-info/updated
+                                          :psi.session-info/parent-session-id
+                                          :psi.session-info/worktree-path]}])
           persisted-result   (q-in ctx [{:psi.session/list
                                          [:psi.session-info/id
                                           :psi.session-info/path
@@ -235,6 +244,7 @@
                                           :psi.session-info/name
                                           :psi.session-info/message-count]}])
           context-sessions   (:psi.agent-session/context-sessions process-result)
+          context-summaries  (:psi.agent-session/context-session-summaries process-result)
           persisted          (:psi.session/list persisted-result)]
       (is (<= 2 (:psi.agent-session/context-session-count process-result)))
       (is (some #(= sid-1 (:psi.session-info/id %)) context-sessions))
@@ -246,6 +256,29 @@
       (is (every? #(= cwd (:psi.session-info/worktree-path %)) context-sessions))
       (is (every? #(= cwd (:psi.session-info/worktree-path %)) context-sessions))
       (is (every? #(instance? java.time.Instant (:psi.session-info/created %)) context-sessions))
+      (is (every? #(or (nil? (:psi.session-info/updated %))
+                       (instance? java.time.Instant (:psi.session-info/updated %)))
+                  context-sessions))
+
+      (is (= (mapv #(select-keys % [:psi.session-info/id
+                                    :psi.session-info/display-name
+                                    :psi.session-info/created
+                                    :psi.session-info/updated
+                                    :psi.session-info/parent-session-id
+                                    :psi.session-info/worktree-path])
+                   context-sessions)
+             context-summaries)
+          "compact summaries preserve canonical ordering and exact trimmed field projection")
+      (is (every? #(= #{:psi.session-info/id
+                        :psi.session-info/display-name
+                        :psi.session-info/created
+                        :psi.session-info/updated
+                        :psi.session-info/parent-session-id
+                        :psi.session-info/worktree-path}
+                      (set (keys %)))
+                  context-summaries))
+      (is (every? #(not (contains? % :psi.session-info/first-message)) context-summaries))
+      (is (every? #(not (contains? % :psi.session-info/all-messages-text)) context-summaries))
 
       (is (vector? persisted))
       (is (some #(= sid-1 (:psi.session-info/id %)) persisted))

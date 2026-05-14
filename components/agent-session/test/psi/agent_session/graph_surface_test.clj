@@ -102,6 +102,7 @@
     :psi.graph/resolver-index
     :psi.graph/attr-index
     :psi.agent-session/active-session-id
+    :psi.agent-session/context-session-summaries
     :psi.runtime/nrepl-host
     :psi.runtime/nrepl-port
     :psi.runtime/nrepl-endpoint})
@@ -121,7 +122,9 @@
           edge-attrs (keep :attribute (:psi.graph/edges result))]
       (is (graph-attr-present? root-attrs :psi.agent-session/context-session-count))
       (is (graph-attr-present? edge-attrs :psi.agent-session/context-session-count))
-      (is (graph-attr-present? edge-attrs :psi.agent-session/context-sessions)))))
+      (is (graph-attr-present? edge-attrs :psi.agent-session/context-sessions))
+      (is (graph-attr-present? root-attrs :psi.agent-session/context-session-summaries))
+      (is (graph-attr-present? edge-attrs :psi.agent-session/context-session-summaries)))))
 
 (deftest background-jobs-graph-introspection-test
   (testing "background job attrs are discoverable in graph introspection"
@@ -291,8 +294,14 @@
       (is (seq root-attrs))
       (is (every? keyword? root-attrs))
       (assert-canonical-graph-root-attrs root-attrs)
-      (let [result (q (vec root-attrs))]
-        (doseq [attr root-attrs]
+      ;; Query each advertised root attr independently instead of issuing one
+      ;; mega-query over the full root surface. Some graph-introspection attrs
+      ;; are large and self-descriptive; batching them all together can create
+      ;; pathological expansion/printing behavior that obscures the real
+      ;; contract we want to prove here: each root attr is individually
+      ;; resolvable from session root.
+      (doseq [attr root-attrs]
+        (let [result (q [attr])]
           (is (contains? result attr)
               (str "expected root-queryable attr to resolve: " attr)))))))
 

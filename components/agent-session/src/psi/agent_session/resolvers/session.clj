@@ -15,6 +15,26 @@
 
 ;; ── Core session fields ─────────────────────────────────
 
+(defn- context-session-info [m]
+  {:psi.session-info/id                  (:session-id m)
+   :psi.session-info/path                (:session-file m)
+   :psi.session-info/worktree-path       (:worktree-path m)
+   :psi.session-info/name                (:session-name m)
+   :psi.session-info/display-name        (:display-name m)
+   :psi.session-info/parent-session-id   (:parent-session-id m)
+   :psi.session-info/parent-session-path (:parent-session-path m)
+   :psi.session-info/created             (:created-at m)
+   :psi.session-info/updated             (:updated-at m)})
+
+(defn- context-session-summary [m]
+  (select-keys (context-session-info m)
+               [:psi.session-info/id
+                :psi.session-info/display-name
+                :psi.session-info/created
+                :psi.session-info/updated
+                :psi.session-info/parent-session-id
+                :psi.session-info/worktree-path]))
+
 (pco/defresolver agent-session-identity
   "Resolve stable identity, naming, and context session registry fields.
    Note: :context-active-session-id removed — adapters (RPC, TUI) own focus locally."
@@ -33,7 +53,8 @@
                    :psi.session-info/display-name
                    :psi.session-info/parent-session-id
                    :psi.session-info/parent-session-path
-                   :psi.session-info/created]}]}
+                   :psi.session-info/created
+                   :psi.session-info/updated]}]}
   (let [resolver-sid session-id
         sd           (support/session-data agent-session-ctx session-id)
         hs           (ss/list-context-sessions-in agent-session-ctx)
@@ -47,16 +68,25 @@
                                                     messages)
      :psi.agent-session/context-session-count      (count hs)
      :psi.agent-session/context-sessions
-     (mapv (fn [m]
-             {:psi.session-info/id                  (:session-id m)
-              :psi.session-info/path                (:session-file m)
-              :psi.session-info/worktree-path       (:worktree-path m)
-              :psi.session-info/name                (:session-name m)
-              :psi.session-info/display-name        (:display-name m)
-              :psi.session-info/parent-session-id   (:parent-session-id m)
-              :psi.session-info/parent-session-path (:parent-session-path m)
-              :psi.session-info/created             (:created-at m)})
-           hs)}))
+     (mapv context-session-info hs)}))
+
+(pco/defresolver context-session-summaries-resolver
+  "Resolve a compact operational session inventory from the live context-session source.
+   Preserves the canonical ordering of `ss/list-context-sessions-in` while exposing
+   only the compact v1 identification/selection fields."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [{:psi.agent-session/context-session-summaries
+                  [:psi.session-info/id
+                   :psi.session-info/display-name
+                   :psi.session-info/created
+                   :psi.session-info/updated
+                   :psi.session-info/parent-session-id
+                   :psi.session-info/worktree-path]}]}
+  (let [_resolver-sid session-id
+        hs            (ss/list-context-sessions-in agent-session-ctx)]
+    {:psi.agent-session/context-session-summaries
+     (mapv context-session-summary hs)}))
 
 ;; ── Phase and streaming state ───────────────────────────
 
@@ -553,6 +583,7 @@
 
 (def resolvers
   [agent-session-identity
+   context-session-summaries-resolver
    agent-session-phase
    agent-session-model
    agent-session-queues

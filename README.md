@@ -110,12 +110,14 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 `psi-tool` is the live runtime introspection/modification tool with canonical action-based requests:
 - `query` — EQL graph reads
 - `eval` — in-process ψ namespace-scoped Clojure eval
+- `mutate` — invoke registered runtime mutations with structured success/error reports
 - `reload-code` — explicit namespace/worktree code reload with distinct reload and graph-refresh reporting
 - `project-repl` — managed project REPL status/start/attach/stop/eval/interrupt operations with structured reports
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
 
 See:
-- [`doc/psi-project-config.md`](doc/psi-project-config.md) for examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
+- [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
+- [`doc/graph-surface.md`](doc/graph-surface.md) for graph discovery, root-queryable attrs, and session inventory discovery surfaces
 - [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
 
 ### Workflows

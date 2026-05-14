@@ -118,6 +118,20 @@ Bootstrapped on 2026-04-02.
   - focused proof added in `psi.ai.providers.openai-test`
   - docs updated in `doc/custom-providers.md`; changelog updated
   - verification green: `clojure -M:test --focus psi.ai.providers.openai-test` → `24 tests, 119 assertions, 0 failures`
+- Task 134 psi-tool mutation surface and active-session/session-summary introspection is now implemented locally:
+  - added `psi-tool(action: "mutate")` in `components/agent-session/src/psi/agent_session/psi_tool.clj`
+  - request validation now covers required `mutation`, unsupported `entity`, params-map shape, qualified-symbol parsing, and registered-mutation lookup
+  - success reports preserve canonical mutation payloads under `:psi-tool/result`; failures return structured `:psi-tool/error`
+  - wired mutate through the canonical runtime helper `psi.agent-session.extensions.runtime-eql/run-extension-mutation-in!`
+  - fixed explicit targeting in that helper so an already-supplied business `:session-id` is preserved for session-scoped mutations instead of being overwritten by the invoking session id
+  - added compact root attr `:psi.agent-session/context-session-summaries` in `resolvers/session.clj`
+  - shared live context projection now exposes `:psi.session-info/updated` from session `:updated-at`
+  - compact summaries expose exact v1 fields only: `id`, `display-name`, `created`, `updated`, `parent-session-id`, `worktree-path`
+  - focused verification green with increased heap:
+    - `psi.agent-session.graph-surface-test` → `22 tests, 2247 assertions, 0 failures`
+    - `psi.agent-session.tools-test/psi-tool-integration-test` → `1 test, 53 assertions, 0 failures`
+    - `psi.agent-session.resolvers-test` + `psi.agent-session.session-close-mutation-test` → `23 tests, 141 assertions, 0 failures`
+  - while isolating verification, found and fixed a separate graph test pathology: `graph_surface_test.clj/root-queryable-attrs-contract-test` no longer issues one mega-query over every root attr, because that expansion path could trigger suite OOMs; it now queries each advertised root attr independently
 - Reload discoverability/self-guidance improved locally:
   - live-verified the small-namespace self-reload loop from the current session worktree using `psi-tool` query for `[:psi.agent-session/worktree-path]` followed by `reload-code` for `psi.prompt-assets.system-prompt`
   - confirmed namespace reload also succeeds without explicit `worktree-path` when invoked from a session carrying the canonical worktree
