@@ -4,8 +4,8 @@
 
 - [ ] Create `extensions/metrics/deps.edn` with malli dep and test alias
 - [ ] Create `psi.metrics.schema` — malli schemas for metrics data shape
-- [ ] Create `psi.metrics.counters` — pure counter update functions (increment tool, increment error, add token delta)
-- [ ] Create `psi.metrics.persistence` — load/save EDN with atomic writes, schema validation on load
+- [ ] Create `psi.metrics.counters` — pure counter update functions (increment tool, increment error, add per-model token delta)
+- [ ] Create `psi.metrics.persistence` — load/save EDN with atomic writes, write-coalescing via `writing?` CAS gate, schema validation on load
 - [ ] Create `psi.metrics.extension` — init, event handlers, operation handler, command handler
 - [ ] Wire into `extensions/deps.edn` (add `psi/metrics` dep and test paths)
 - [ ] Add catalog entry in `extension_installs.clj` (`psi-owned-extension-catalog`)
@@ -14,9 +14,9 @@
 ## Tests
 
 - [ ] `psi.metrics.schema-test` — schema validation for valid/invalid metrics maps
-- [ ] `psi.metrics.counters-test` — pure counter increment functions
-- [ ] `psi.metrics.persistence-test` — round-trip load/save, corrupt file handling, missing directory creation
-- [ ] `psi.metrics.extension-test` — init registration, event handler behavior, operation handler, command rendering
+- [ ] `psi.metrics.counters-test` — pure counter increment functions, per-model token delta
+- [ ] `psi.metrics.persistence-test` — round-trip load/save, corrupt file handling, missing directory creation, write-coalescing under concurrent mutations
+- [ ] `psi.metrics.extension-test` — init registration, event handler behavior, per-model token accumulation, operation handler, command rendering
 
 ## Verification
 

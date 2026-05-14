@@ -39,6 +39,26 @@ Follows `psi.github.*` pattern for project-owned extensions rather than the flat
 
 Uses write-to-temp + `Files/move` with `ATOMIC_MOVE` to prevent partial-read corruption. Same approach used in session persistence elsewhere in the codebase.
 
+## PR #94 Feedback — 2026-05-14
+
+### Per-model token usage (hugoduncan)
+
+Feedback: "Token-usage metrics should be per model."
+
+Changed `:tokens` from a flat `{:input N :output N ...}` map to `[:map-of :string token-totals-schema]` keyed by model-id. The `session_turn_finished` handler now queries `:psi.agent-session/model-id` alongside usage attrs and accumulates deltas under the model-id key. Falls back to `"unknown"` when model-id is nil.
+
+### Parallel tool call write safety (hugoduncan)
+
+Feedback: "Need to check if parallel tool calling would cause parallel metric file writes."
+
+Confirmed: `tool-runtime/batch.clj` uses `ExecutorService.invokeAll` for multi-tool batches, producing concurrent `tool_call`/`tool_result` extension events. The atom `swap!` is thread-safe for in-memory counters, but synchronous file persist after each event would serialize event handlers on I/O and produce redundant writes.
+
+### Out-of-band write-coalescing persistence (hugoduncan)
+
+Feedback: "If needed we could have metrics written out of band, and check for the need to write again when a write completes."
+
+Replaced synchronous persist with a dirty-flag + `writing?` CAS gate pattern: event handlers set `:dirty?` and call `maybe-persist!`; only one thread enters the write path at a time via `compare-and-set!` on `writing?`; after each write, the writer re-checks `:dirty?` and loops if concurrent events re-dirtied the state. This coalesces rapid-fire events into minimal disk I/O.
+
 ### `defonce` store preservation
 
 The store atom uses `defonce` so extension reloads preserve accumulated counters. Init re-subscribes to events but does not reset the atom.

@@ -18,7 +18,7 @@ Psi has no visibility into which capabilities are actually used, how often they 
 - Workflow execution counting (by workflow id)
 - Command invocation counting (by command name)
 - Deterministic operation invocation counting (by operation id)
-- Token usage accumulation (aggregate input/output/cache-read/cache-write across all sessions)
+- Token usage accumulation per model (input/output/cache-read/cache-write keyed by model-id)
 - Project-scoped persistence (EDN file in `.psi/`)
 - Deterministic operation `metrics/summary` returning current counter state
 - Slash command `/metrics` rendering human-readable summary
@@ -28,7 +28,7 @@ Psi has no visibility into which capabilities are actually used, how often they 
 
 - User-global (cross-project) aggregation
 - Skill activation tracking (no existing extension event emitted for skill selection; would require core changes)
-- Per-session token breakdowns (the extension tracks aggregate totals only; per-session detail is already available via the EQL resolver `agent-session-usage`)
+- Per-session token breakdowns (the extension tracks per-model aggregate totals, not per-session; per-session detail is already available via the EQL resolver `agent-session-usage`)
 - Cost tracking (requires model-specific pricing data not available to extensions)
 - Historical time-series or bucketed metrics
 - Metrics export (Prometheus, OpenTelemetry, etc.)
@@ -38,7 +38,7 @@ Psi has no visibility into which capabilities are actually used, how often they 
 - **Extension boundary only** — no behavioral modifications to existing core components. The extension uses only the public extension API (`init` receives the `api` map). The only core file touched is the data-only `psi-owned-extension-catalog` map in `extension_installs.clj` to register the new extension (same pattern as all built-in extensions).
 - **Event-driven** — observes existing extension events: `tool_call`, `tool_result`, `session_turn_finished`. No new hooks in core required.
 - **Project-scoped persistence** — EDN file at `<worktree>/.psi/metrics.edn`. Loaded on init, flushed on mutation.
-- **Minimal overhead** — counter increments are in-memory atom updates; persistence is fire-and-forget I/O after each event batch, not on the critical path of tool execution.
+- **Minimal overhead** — counter increments are in-memory atom updates; persistence is out-of-band with write-coalescing so concurrent events (e.g., parallel tool calls) never serialize on disk I/O.
 - **Schema-first** — malli schema defines the canonical metrics data shape; validated on load and available for consumers.
 
 ## Design
@@ -56,7 +56,7 @@ init(api) →
   register-command("metrics",       metrics-command-handler)
 ```
 
-State is held in a single `(defonce store (atom nil))` containing both the metrics counters and the resolved persistence path.
+State is held in a single `(defonce store (atom nil))` containing both the metrics counters and the resolved persistence path. A separate `(defonce writing? (atom false))` gate serializes disk writes.
 
 ### Implementation Strategy
 
@@ -74,10 +74,14 @@ The metrics atom holds a map with this shape:
  :workflows   {"workflow-id" {:invocations 3}}
  :commands    {"command-name" {:invocations 7}}
  :operations  {"operation-id" {:invocations 2}}
- :tokens      {:input       12500
-               :output      3400
-               :cache-read  8000
-               :cache-write 1200}
+ :tokens      {"claude-sonnet-4-20250514" {:input       12500
+                                            :output      3400
+                                            :cache-read  8000
+                                            :cache-write 1200}
+               "gpt-4o"                  {:input       5000
+                                            :output      1200
+                                            :cache-read  0
+                                            :cache-write 0}}
  :updated-at  "2026-05-14T10:00:00Z"}
 ```
 
@@ -107,7 +111,7 @@ The metrics atom holds a map with this shape:
    [:workflows [:map-of :string counter-schema]]
    [:commands [:map-of :string counter-schema]]
    [:operations [:map-of :string counter-schema]]
-   [:tokens token-totals-schema]
+   [:tokens [:map-of :string token-totals-schema]]
    [:updated-at [:maybe :string]]])
 ```
 
@@ -129,7 +133,9 @@ Action: When `:is-error` is truthy, increment `[:tools tool-name :errors]` and `
 
 Payload: `{:session-id "..." :turn-id "..." ...}`
 
-Action: Query session token usage via the extension API's `:query-session` function: `((:query-session api) session-id [:psi.agent-session/usage-input :psi.agent-session/usage-output :psi.agent-session/usage-cache-read :psi.agent-session/usage-cache-write])`. Compute the delta from the last-known session totals (tracked in a transient in-memory map, not persisted) and add the delta to the aggregate `:tokens` counters.
+Action: Query session token usage and model-id via the extension API's `:query-session` function: `((:query-session api) session-id [:psi.agent-session/usage-input :psi.agent-session/usage-output :psi.agent-session/usage-cache-read :psi.agent-session/usage-cache-write :psi.agent-session/model-id])`. Compute the delta from the last-known session totals (tracked in a transient in-memory map, not persisted) and add the delta to the `:tokens` counters under the model-id key. If model-id is nil, use `"unknown"` as the key.
+
+**Why per-model:** Different models have different token economics and capabilities. Aggregate-only totals hide which models consume the most tokens. Per-model breakdown enables informed model selection and cost awareness.
 
 **Why delta-based:** The EQL resolver returns cumulative session totals. The extension must track the last-seen totals per session in memory so it can compute the incremental contribution of each turn. The per-session tracking map is transient (not persisted) because it is only needed within a running process — on restart, the first turn for each session will be treated as a full delta, which is acceptable because sessions rarely span process restarts and the aggregate totals are approximate anyway.
 
@@ -159,7 +165,18 @@ Deterministic operations are not currently emitted as extension events either. T
 
 **Load on init:** The extension needs the worktree path to locate the persistence file. It obtains this via `((:query api) [:psi.agent-session/worktree-path])` during init. If the query returns nil (no worktree), persistence is disabled and the extension operates in memory-only mode.
 
-**Write strategy:** After each counter mutation, persist synchronously. Each event handler calls `persist!` after `swap!` returns. `persist!` uses a second `swap!` to atomically read the current metrics and clear the `:dirty?` flag, then writes the snapshot to disk outside the swap. This ensures no lost writes and no double-writes. The write is synchronous but fast (small EDN file). No debounce thread or timer needed — the event rate is low enough (one per tool call, one per turn) that synchronous writes are acceptable. The `/metrics` command also triggers a persist to ensure the displayed data matches what's on disk.
+**Write strategy — out-of-band with write-coalescing:** Parallel tool calls produce concurrent `tool_call` and `tool_result` events, which means multiple threads may mutate the metrics atom concurrently. The atom `swap!` is thread-safe, but synchronous file writes after each `swap!` would serialize all event handlers on disk I/O and risk redundant writes.
+
+Instead, persistence uses a dirty-flag + single-writer loop:
+
+1. Each event handler calls `swap!` to update counters, then sets a `:dirty?` flag in the atom and calls `maybe-persist!`.
+2. `maybe-persist!` uses `compare-and-set!` on a separate `(defonce writing? (atom false))` flag to ensure only one thread enters the write path at a time.
+3. The writer atomically reads the current metrics snapshot and clears `:dirty?`, writes the snapshot to disk, then checks `:dirty?` again — if it was re-dirtied during the write (by another concurrent event), it loops and writes again.
+4. When the writer finds `:dirty?` is false after a write, it resets `writing?` to false and exits.
+
+This ensures: (a) no concurrent file writes, (b) no lost updates — if events arrive during a write, the loop catches them, (c) minimal I/O — rapid-fire events coalesce into a single write of the latest state.
+
+The `/metrics` command also triggers a `maybe-persist!` to ensure the displayed data matches what's on disk.
 
 **Atomic writes:** `spit` to a `.metrics.edn.tmp` file in the same directory, then `java.nio.file.Files/move` with `ATOMIC_MOVE` + `REPLACE_EXISTING`. This prevents partial writes from corrupting the file.
 
@@ -227,13 +244,11 @@ No arguments required. Returns the full metrics map conforming to `metrics-schem
 | write | 12 | 0 |
 | delegate | 8 | 0 |
 
-### Token Usage
-| Category | Tokens |
-|----------|--------|
-| Input | 125,000 |
-| Output | 34,000 |
-| Cache Read | 80,000 |
-| Cache Write | 12,000 |
+### Token Usage (by model)
+| Model | Input | Output | Cache Read | Cache Write |
+|-------|-------|--------|------------|-------------|
+| claude-sonnet-4-20250514 | 125,000 | 34,000 | 80,000 | 12,000 |
+| gpt-4o | 5,000 | 1,200 | 0 | 0 |
 
 _Updated: 2026-05-14T10:00:00Z_
 ```
@@ -282,7 +297,7 @@ extensions/metrics/
 1. **Counter monotonicity:** Counters only increment, never decrement. The `updated-at` timestamp advances on every mutation.
 2. **Schema conformance:** The persisted EDN always conforms to `metrics-schema`. Load rejects non-conforming data.
 3. **Graceful degradation:** If persistence path is unavailable (no worktree), the extension operates in memory-only mode without error.
-4. **Thread safety:** All counter mutations go through `swap!` on the store atom. Persistence writes are serialized.
+4. **Thread safety:** All counter mutations go through `swap!` on the store atom. Persistence writes are serialized via a `writing?` CAS gate — at most one thread writes at a time, and writes coalesce concurrent mutations.
 5. **No behavioral core modifications:** The extension uses only the public extension API surface. The only core file touched is the data-only catalog registration.
 
 ### Edge Cases
@@ -290,7 +305,7 @@ extensions/metrics/
 - **No worktree:** Init succeeds, persistence disabled, counters are in-memory only.
 - **Corrupt EDN file:** Log warning, start with empty counters, do not overwrite the corrupt file until the first successful mutation.
 - **Missing `.psi/` directory:** Create it on first write (using `io/make-parents`).
-- **Concurrent writes:** Atomic file rename prevents partial reads. The atom serializes in-memory mutations.
+- **Concurrent writes from parallel tool calls:** Parallel tool execution produces concurrent `tool_call`/`tool_result` events. The atom serializes in-memory counter updates. The `writing?` CAS gate ensures at most one disk write at a time; the dirty-check loop after each write coalesces rapid-fire mutations into minimal I/O. Atomic file rename prevents partial reads.
 - **Extension reload:** `defonce` on the store atom preserves counters across reloads. The init function re-subscribes to events but does not reset counters.
 - **EQL query failure on turn finished:** If the usage query fails (e.g., session already closed), skip token tracking for that turn and log at debug level.
 
@@ -305,14 +320,17 @@ extensions/metrics/
 7. `load-metrics` returns empty counters for missing or corrupt files.
 8. `save-metrics` writes valid EDN that round-trips through `load-metrics`.
 9. Counter functions are pure and independently testable.
-10. Token delta computation correctly handles first-seen sessions and cumulative totals.
+10. Token delta computation correctly handles first-seen sessions, cumulative totals, and per-model keying.
+11. `maybe-persist!` coalesces concurrent mutations — only one thread writes at a time, and re-dirtied state triggers a follow-up write.
 
 ## Acceptance Criteria
 
 1. Extension subscribes to `tool_call`, `tool_result`, and `session_turn_finished` events and increments appropriate counters.
-2. Counters persist to `<worktree>/.psi/metrics.edn` and restore on init.
-3. `metrics/summary` deterministic operation returns current counter state conforming to malli schema.
-4. `/metrics` slash command renders a human-readable markdown summary.
-5. Metrics data conforms to an explicit malli schema (validated on load, available for consumers).
-6. No behavioral modifications to existing core components (data-only catalog entry is acceptable).
-7. Extension operates gracefully when no worktree path is available (memory-only mode).
+2. Token usage is accumulated per model-id (queried via EQL on each `session_turn_finished`).
+3. Counters persist to `<worktree>/.psi/metrics.edn` and restore on init.
+4. Persistence uses out-of-band write-coalescing so parallel tool call events do not serialize on disk I/O.
+5. `metrics/summary` deterministic operation returns current counter state conforming to malli schema.
+6. `/metrics` slash command renders a human-readable markdown summary with per-model token breakdown.
+7. Metrics data conforms to an explicit malli schema (validated on load, available for consumers).
+8. No behavioral modifications to existing core components (data-only catalog entry is acceptable).
+9. Extension operates gracefully when no worktree path is available (memory-only mode).
