@@ -48,11 +48,13 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 3. Open the file. Error if not found/unreadable.
 4. Parse the file into a format-preserving zipper with position tracking.
 5. Walk depth-first. At each node, skip if `sexpr` is not available (comments, whitespace, uneval nodes). Otherwise compare `sexpr` to target.
-6. Optionally filter candidates by line range (start-line ≤ node-start-line ≤ end-line).
+6. Optionally filter candidates by line range using the node's **start row** only: a node is in-range when `start-line ≤ node-start-row ≤ end-line`. The node's end row is irrelevant — a form that begins within the range but extends past `end-line` is still considered in-range. A form that ends within the range but begins before `start-line` is excluded.
 7. Collect all matches before replacement.
 8. Zero matches → `no-match` error; file unchanged.
 9. Two or more matches → `ambiguous-match` error with location list; file unchanged.
 10. Exactly one match → replace node with parsed `new-string` node; write file.
+
+**Line-range semantics rationale:** Filtering by start row only is the most useful behaviour for the primary disambiguation use case — "there are two identical forms, I want the one near line N." Requiring the entire form to be within the range would silently fail when a large form starts at the target line but extends further, producing a confusing `no-match` even though the right node was identified.
 
 **Output:** JSON object — see result shapes below.
 
@@ -79,7 +81,7 @@ ambiguous-match → {status, code, filename, match-count, matches [{line, column
 
 - Follow `github` for `deps.edn` structure and `work-on` for tool registration shape.
 - Core logic: `rewrite-clj.zip` for format-preserving zipper; `rewrite-clj.zip/sexpr` for equality; `rewrite-clj.zip/replace` for substitution; `rewrite-clj.zip/root-string` for serializing back to text.
-- Line-range filtering: use `rewrite-clj.zip/node` → `rewrite-clj.node/start-row` (or zip position metadata) for candidate filtering.
+- Line-range filtering: use `rewrite-clj.zip/node` → `rewrite-clj.node/start-row` for candidate filtering; end-row is not consulted. rewrite-clj nodes carry `:row`/`:col` position metadata accessible via `rewrite-clj.node/meta`.
 - Error short-circuit with early returns; no exceptions for expected error paths.
 - Parameters stored as data map (not `pr-str` string) — normalized by `defs/normalize-tool-def`.
 - Result serialized to JSON string via `cheshire.core/generate-string` before returning from `:execute`.
@@ -91,7 +93,12 @@ ambiguous-match → {status, code, filename, match-count, matches [{line, column
 3. When `old-string` matches two or more nodes, the file is unchanged and the result is `{:status "error" :code "ambiguous-match" :matches [...] ...}`.
 4. Invalid Clojure in `old-string` or `new-string` returns `{:status "error" :code "parse-error" :argument "old-string"|"new-string" ...}`.
 5. Non-existent file returns `{:status "error" :code "file-not-found" ...}`.
-6. `start-line`/`end-line` constrains matching to the given line window; nodes outside the window are not considered.
+6. `start-line`/`end-line` constrains matching by node start row. Specific cases:
+   - a. Two identical forms in the file; one starts inside the range, the other outside → single match (disambiguation succeeds).
+   - b. A form whose start row is within the range but whose end row extends past `end-line` → matched (start-row only rule).
+   - c. A form whose end row is within the range but whose start row is before `start-line` → not matched (start-row before range).
+   - d. Two identical forms both starting within the range → `ambiguous-match` (range alone cannot disambiguate; `old-string` must be made more specific).
+   - e. A valid range that contains no node starts matching `old-string` → `no-match`; file unchanged.
 7. Multi-form `old-string` or `new-string` returns a `parse-error`.
 8. The extension `init` registers exactly one tool named `"edit-clj"`.
 9. All unit tests pass; lint clean.
