@@ -18,8 +18,10 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 - Core logic namespace `psi.edit-clj.core` (pure: zipper walk, match, replace)
 - Extension entry point `psi.edit-clj.extension` (calls `register-tool`)
 - Unit tests covering all result shapes (ok, file-not-found, parse-error, no-match, ambiguous-match)
-- `deps.edn` with `rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}` as runtime dep
+- `deps.edn` with `rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}` and `cheshire/cheshire {:mvn/version "5.13.0"}` as runtime deps
 - Wire into `extensions/deps.edn` and `extensions/tests.edn`
+- Wire into top-level `deps.edn` source paths and top-level `tests.edn` test/source paths
+- Add entry to `bases/main/src/psi/launcher/extensions.clj` psi-owned-extension-catalog with init symbol `psi.edit-clj.extension/init`
 
 **Out of scope:**
 - Multi-form replacement in a single call
@@ -45,6 +47,8 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 | `new-string` | string | yes | Exactly one parseable Clojure form. Replaces the matched node verbatim. |
 | `start-line` | integer | no | 1-indexed first line of the match window (inclusive). |
 | `end-line` | integer | no | 1-indexed last line of the match window (inclusive). |
+
+**Validation order (explicit contract):** `old-string` is validated first, then `new-string`, then the file is opened. The first error encountered is returned and no further validation is performed. If `old-string` is invalid and `new-string` is also invalid, the `old-string` parse error is returned. If both strings are valid but the file does not exist, `file-not-found` is returned.
 
 **Matching:**
 1. Parse `old-string` via `rewrite-clj` zipper; call `.sexpr` to get the target value. Error if the string yields more than one form or is unparseable.
@@ -72,11 +76,19 @@ no-match        → {status, code, filename, message, hint}
 ambiguous-match → {status, code, filename, match-count, matches [{line, column, text}], message, hint}
 ```
 
+**Field semantics:**
+
+- `ok.old` — the actual matched node text as it appears in the file (from `rewrite-clj.zip/string` on the matched node), not the `old-string` argument. This reflects the real file content that was replaced, which may differ from the argument in whitespace and formatting.
+- `ok.new` — the `new-string` argument string verbatim.
+- `ok.location` — the matched node's start position **before** replacement (line/column in the original file). This is the file position the agent used to identify the target; the post-write position is irrelevant for confirmation.
+- `no-match.hint` — "Try adding or widening the `start-line`/`end-line` range, or verify that `old-string` appears in the file."
+- `ambiguous-match.hint` — "Narrow the `start-line`/`end-line` range to isolate the intended occurrence."
+
 ## Architecture alignment
 
 - Extension lives under `extensions/edit-clj/`, following the pattern of `github`, `work-on`, `hello-ext`.
 - Core logic in `psi.edit-clj.core` is a pure namespace: takes strings and file content, returns a result map. No I/O — I/O is isolated in `psi.edit-clj.extension` (file read/write).
-- The tool's `:execute` fn receives `(args opts)` where `opts` includes `:cwd` (session worktree path). Relative filenames are resolved against `:cwd`.
+- The tool's `:execute` fn must support both `([args])` and `([args opts])` arities (consistent with the `work-on` pattern), where `opts` includes `:cwd` (session worktree path). Relative filenames are resolved against `:cwd`. When called with one argument, `:cwd` is treated as absent (relative paths resolve against the process working directory).
 - Tool registered via `(:register-tool api)` in `init`, matching the `work-on` pattern.
 - No state atom required — tool is stateless.
 - Output is a JSON string (cheshire) so it renders cleanly in the agent conversation.

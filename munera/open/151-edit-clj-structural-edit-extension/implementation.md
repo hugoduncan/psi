@@ -1,5 +1,19 @@
 # Implementation Notes — 151 edit-clj structural edit extension
 
+## 2026-05-14 — Ambiguity follow-up execution (design-steps A1–A7)
+
+All seven design follow-up steps executed against design.md:
+
+- **A1**: `ok.old` = matched node text via `rewrite-clj.zip/string`; `ok.new` = `new-string` argument verbatim. Added to Result shapes § Field semantics.
+- **A2**: `no-match.hint` = "Try adding or widening the `start-line`/`end-line` range, or verify that `old-string` appears in the file." `ambiguous-match.hint` = "Narrow the `start-line`/`end-line` range to isolate the intended occurrence." Added to Field semantics.
+- **A3**: Validation order stated as explicit contract before Matching steps: old-string → new-string → file open; first error returned; both-invalid → old-string error wins.
+- **A4**: `cheshire/cheshire {:mvn/version "5.13.0"}` added to Scope deps list alongside rewrite-clj.
+- **A5**: Wiring scope expanded in Scope: top-level `deps.edn` source paths, top-level `tests.edn` test/source paths, and `bases/main/src/psi/launcher/extensions.clj` catalog entry with init symbol `psi.edit-clj.extension/init`.
+- **A6**: `ok.location` = old node's start position before replacement. Added to Field semantics.
+- **A7**: `:execute` must support both `([args])` and `([args opts])` arities per `work-on` pattern. Updated Architecture alignment §.
+
+---
+
 ## 2026-05-14 — Ambiguity review pass 1
 
 Reviewed design.md against the extension codebase (work-on, github, hello-ext, launcher/extensions.clj, deps.edn, tests.edn).
