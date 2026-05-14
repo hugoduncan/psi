@@ -27,6 +27,10 @@ The extension obtains the worktree path via `((:query api) [:psi.agent-session/w
 
 No workflow start/completion events are emitted to the extension event bus. The workflow runtime uses internal statechart events but does not dispatch through `ext/dispatch-in`. Schema includes `:workflows` for forward compatibility.
 
+### Standalone extension — not in central extensions/deps.edn
+
+`psi/github` and `psi/logprobs` are not present in `extensions/deps.edn` (the central file covering simpler flat-namespace extensions). They are standalone with their own `deps.edn` and `:test` alias. `psi/metrics` follows the same pattern: standalone `extensions/metrics/deps.edn`, tests run via `clj -M:test` inside that directory. No changes to `extensions/deps.edn` or `extensions/tests.edn`.
+
 ### Catalog registration is data-only
 
 Adding the extension to `psi-owned-extension-catalog` in `extension_installs.clj` is technically touching a core component file, but it's a data-only catalog entry — the same pattern used by all other built-in extensions. No behavioral changes to core code.
@@ -62,3 +66,26 @@ Replaced synchronous persist with a dirty-flag + `writing?` CAS gate pattern: ev
 ### `defonce` store preservation
 
 The store atom uses `defonce` so extension reloads preserve accumulated counters. Init re-subscribes to events but does not reset the atom.
+
+## Refinement Pass — 2026-05-13
+
+### Wiring correction: standalone extension
+
+Verified against the actual repo: `psi/github` and `psi/logprobs` are absent from `extensions/deps.edn` — they are fully standalone extensions with their own deps.edn and test aliases. The design previously incorrectly specified adding `psi/metrics` to `extensions/deps.edn`. Corrected: metrics is standalone, wiring is catalog entry + project manifest only.
+
+### API surface verified
+
+- `(:query api)` — takes single EQL vector, returns result map. Used during `init` to obtain worktree path.
+- `(:query-session api)` — takes `(session-id eql-query)`, returns result map. Used in `session_turn_finished` handler to obtain per-session usage attrs and model-id.
+- `(:register-operation api)` — takes `{:id :description :handler}` map. Same as logprobs/github.
+- `(:register-command api)` — optional key; takes `(name opts-map)`. Same as logprobs.
+- `(:on api)` — takes `(event-name handler-fn)`. Same as logprobs.
+- `(:notify api)` — takes `(content & [opts])`. Used in command handler.
+
+### Test infrastructure
+
+Tests use `psi.extension-test-helpers.nullable-api/create-nullable-extension-api` (same as work-on, github tests). The nullable API provides `:query-session`, `:on`, `:register-operation`, `:register-command`, `:notify` — all needed by metrics. No mocks required.
+
+### Malli dependency
+
+Malli (`metosin/malli`) is not a transitive dep of the extension API or logprobs. Must be declared explicitly in `extensions/metrics/deps.edn` alongside the extension-test-helpers in the `:test` alias.

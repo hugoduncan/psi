@@ -280,17 +280,14 @@ extensions/metrics/
 
 ### Wiring
 
-**`extensions/deps.edn`:** Add `psi/metrics {:local/root "metrics"}` to `:deps`.
+The metrics extension follows the same standalone pattern as `psi/github` and `psi/logprobs` — it is **not** added to the central `extensions/deps.edn` (which only covers the simpler flat-namespace extensions). It has its own `deps.edn` with a `:test` alias and is run independently.
 
-**`extensions/deps.edn` test alias:** Add `"metrics/test"` to `:extra-paths` under `:test`.
-
-**`extensions/tests.edn`:** Add metrics test paths to the Kaocha test suite if one exists, or rely on the extension-level deps.edn test alias.
-
-**Manifest registration (three places):**
+**Manifest registration (two places):**
 
 1. **Catalog entry:** Add `'psi/metrics {:psi/init 'psi.metrics.extension/init :source-policies {:installed {:local/root "extensions/metrics"}}}` to `psi-owned-extension-catalog` in `components/agent-session/src/psi/agent_session/extension_installs.clj`. This is the same registration pattern used by all built-in extensions (github, logprobs, etc.). While technically touching a core component file, it is a data-only catalog addition — no behavioral changes.
 2. **Project manifest:** Add `psi/metrics {}` to `.psi/extensions.edn` under `:deps` to enable the extension in this project.
-3. **Classpath:** Add `psi/metrics {:local/root "metrics"}` to `extensions/deps.edn` under `:deps` so the classpath can resolve it.
+
+**Tests:** Run via `clj -M:test` inside `extensions/metrics/` using the `:test` alias in `extensions/metrics/deps.edn`. No changes to the central `extensions/deps.edn` or `extensions/tests.edn`.
 
 ### Key Invariants
 

@@ -7,7 +7,6 @@
 - [ ] Create `psi.metrics.counters` — pure counter update functions (increment tool, increment error, add per-model token delta)
 - [ ] Create `psi.metrics.persistence` — load/save EDN with atomic writes, write-coalescing via `writing?` CAS gate, schema validation on load
 - [ ] Create `psi.metrics.extension` — init, event handlers, operation handler, command handler
-- [ ] Wire into `extensions/deps.edn` (add `psi/metrics` dep and test paths)
 - [ ] Add catalog entry in `extension_installs.clj` (`psi-owned-extension-catalog`)
 - [ ] Add `psi/metrics {}` to `.psi/extensions.edn`
 
