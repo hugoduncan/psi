@@ -35,7 +35,7 @@ Psi has no visibility into which capabilities are actually used, how often they 
 
 ## Constraints
 
-- **Extension boundary only** — no modifications to existing core components. The extension uses only the public extension API (`init` receives the `api` map).
+- **Extension boundary only** — no behavioral modifications to existing core components. The extension uses only the public extension API (`init` receives the `api` map). The only core file touched is the data-only `psi-owned-extension-catalog` map in `extension_installs.clj` to register the new extension (same pattern as all built-in extensions).
 - **Event-driven** — observes existing extension events: `tool_call`, `tool_result`, `session_turn_finished`. No new hooks in core required.
 - **Project-scoped persistence** — EDN file at `<worktree>/.psi/metrics.edn`. Loaded on init, flushed on mutation.
 - **Minimal overhead** — counter increments are in-memory atom updates; persistence is fire-and-forget I/O after each event batch, not on the critical path of tool execution.
@@ -159,7 +159,7 @@ Deterministic operations are not currently emitted as extension events either. T
 
 **Load on init:** The extension needs the worktree path to locate the persistence file. It obtains this via `((:query api) [:psi.agent-session/worktree-path])` during init. If the query returns nil (no worktree), persistence is disabled and the extension operates in memory-only mode.
 
-**Write strategy:** After each counter mutation, write synchronously within the `swap!` callback's aftermath. Specifically: each event handler calls a `persist-if-dirty!` function after `swap!` returns. This function checks a `:dirty?` flag in the atom, and if true, writes the metrics to disk and clears the flag. The write is synchronous but fast (small EDN file). No debounce thread or timer needed — the event rate is low enough (one per tool call, one per turn) that synchronous writes are acceptable. The `/metrics` command also triggers a flush to ensure the displayed data matches what's on disk.
+**Write strategy:** After each counter mutation, persist synchronously. Each event handler calls `persist!` after `swap!` returns. `persist!` uses a second `swap!` to atomically read the current metrics and clear the `:dirty?` flag, then writes the snapshot to disk outside the swap. This ensures no lost writes and no double-writes. The write is synchronous but fast (small EDN file). No debounce thread or timer needed — the event rate is low enough (one per tool call, one per turn) that synchronous writes are acceptable. The `/metrics` command also triggers a persist to ensure the displayed data matches what's on disk.
 
 **Atomic writes:** `spit` to a `.metrics.edn.tmp` file in the same directory, then `java.nio.file.Files/move` with `ATOMIC_MOVE` + `REPLACE_EXISTING`. This prevents partial writes from corrupting the file.
 
@@ -283,7 +283,7 @@ extensions/metrics/
 2. **Schema conformance:** The persisted EDN always conforms to `metrics-schema`. Load rejects non-conforming data.
 3. **Graceful degradation:** If persistence path is unavailable (no worktree), the extension operates in memory-only mode without error.
 4. **Thread safety:** All counter mutations go through `swap!` on the store atom. Persistence writes are serialized.
-5. **No core modifications:** The extension uses only the public extension API surface.
+5. **No behavioral core modifications:** The extension uses only the public extension API surface. The only core file touched is the data-only catalog registration.
 
 ### Edge Cases
 
@@ -314,5 +314,5 @@ extensions/metrics/
 3. `metrics/summary` deterministic operation returns current counter state conforming to malli schema.
 4. `/metrics` slash command renders a human-readable markdown summary.
 5. Metrics data conforms to an explicit malli schema (validated on load, available for consumers).
-6. No modifications to existing core components.
+6. No behavioral modifications to existing core components (data-only catalog entry is acceptable).
 7. Extension operates gracefully when no worktree path is available (memory-only mode).
