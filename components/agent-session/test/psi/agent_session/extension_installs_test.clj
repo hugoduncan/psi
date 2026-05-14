@@ -3,7 +3,8 @@
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.extension-installs :as installs]
-   [psi.agent-session.test-support :as test-support])
+   [psi.agent-session.test-support :as test-support]
+   [psi.launcher.extensions :as launcher.extensions])
   (:import
    (java.nio.file Files)
    (java.nio.file.attribute FileAttribute)))
@@ -135,3 +136,7 @@
         (is (= :not-applicable
                (get-in result [:psi.extensions/effective :entries-by-lib 'support/lib :status])))
         (is (vector? (:psi.extensions/diagnostics result)))))))
+
+(deftest psi-owned-extension-catalog-parity-with-launcher
+  (is (= (set (keys launcher.extensions/psi-owned-extension-catalog))
+         (set (keys installs/psi-owned-extension-catalog)))))
