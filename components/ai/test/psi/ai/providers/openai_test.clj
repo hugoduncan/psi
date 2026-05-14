@@ -636,6 +636,41 @@
           body  (json/parse-string (:body req) true)]
       (is (not (contains? body :temperature))))))
 
+(deftest local-openai-non-streaming-response-preserves-usage-test
+  (testing "non-streaming local OpenAI-compatible responses keep usage totals"
+    (let [model {:id "qwen-3.6-27b"
+                 :provider :local3
+                 :api :openai-completions
+                 :base-url "http://localhost:8082/v1"
+                 :supports-text true}
+          convo (-> (conv/create "sys")
+                    (conv/add-user-message "Reply with exactly: hi"))
+          body {:choices [{:finish_reason "stop"
+                           :index 0
+                           :message {:role "assistant"
+                                     :content "hi"
+                                     :reasoning_content "internal reasoning"}}]
+                :usage {:prompt_tokens 15
+                        :completion_tokens 152
+                        :total_tokens 167}}]
+      (with-redefs [http/post (fn [_url _req]
+                                {:status 200
+                                 :body (json/generate-string body)})]
+        (let [result ((:execute openai/provider) convo model {:no-auth-header true})]
+          (is (= "hi" (get-in result [:assistant-message :content 0 :text])))
+          (is (= :stop (get-in result [:assistant-message :stop-reason])))
+          (is (= {:input-tokens 15
+                  :output-tokens 152
+                  :cache-read-tokens 0
+                  :cache-write-tokens 0
+                  :total-tokens 167
+                  :cost {:input 0.0
+                         :output 0.0
+                         :cache-read 0.0
+                         :cache-write 0.0
+                         :total 0.0}}
+                 (get-in result [:assistant-message :usage]))))))))
+
 (deftest completions-reasoning-delta-shapes-map-to-thinking-delta-test
   (testing "chat completions reasoning delta variants are emitted as :thinking-delta"
     (let [model  (models/get-model :gpt-5)
@@ -671,6 +706,44 @@
                   (filter #(= :thinking-delta (:type %)))
                   (mapv :delta))))
       (is (some #(= :done (:type %)) @events)))))
+
+(deftest completions-trailing-usage-after-finish-reason-is-preserved-test
+  (testing "chat completions keep trailing usage when finish_reason arrives before usage"
+    (let [model {:id "qwen-3.6-27b"
+                 :provider :local3
+                 :api :openai-completions
+                 :base-url "http://localhost:1234"
+                 :supports-text true}
+          convo (-> (conv/create "sys")
+                    (conv/add-user-message "hello"))
+          events (atom [])
+          sse (str
+               "data: " (json/generate-string
+                         {:choices [{:delta {:role "assistant"}}]}) "\n\n"
+               "data: " (json/generate-string
+                         {:choices [{:delta {:content "Hello"}}]}) "\n\n"
+               "data: " (json/generate-string
+                         {:choices [{:finish_reason "stop"}]}) "\n\n"
+               "data: " (json/generate-string
+                         {:usage {:prompt_tokens 42
+                                  :completion_tokens 128
+                                  :total_tokens 170}}) "\n\n"
+               "data: [DONE]\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key "sk-test"}
+         (fn [ev] (swap! events conj ev))))
+      (let [done-events (filter #(= :done (:type %)) @events)]
+        (is (= 1 (count done-events)))
+        (is (= :stop (:reason (first done-events))))
+        (is (= {:input-tokens 42
+                :output-tokens 128
+                :cache-read-tokens 0
+                :cache-write-tokens 0
+                :total-tokens 170
+                :cost {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+               (:usage (first done-events))))))))
 
 (deftest completions-non-2xx-response-map-surfaces-body-message-test
   (let [model  (models/get-model :gpt-5)
