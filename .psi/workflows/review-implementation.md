@@ -49,24 +49,7 @@ description: Review a Munera task implementation, record terse notes, execute ad
                     {:type :source
                      :from {:step "review-task-tests" :yield :text}}
                     {:type :source
-                     :from {:step "review-test-shape" :yield :text}}]}
-         {:name "final-summary"
-          :type :session
-          :tools ["read" "bash" "work-on"]
-          :contributions [{:type :source
-                           :from :workflow-original}
-                          {:type :source
-                           :from {:step "review-task-implementation" :yield :text}}
-                          {:type :source
-                           :from {:step "review-task-tests" :yield :text}}
-                          {:type :source
-                           :from {:step "review-test-shape" :yield :text}}
-                          {:type :source
-                           :from {:step "review-code-shape" :yield :text}}
-                          {:type :template
-                           :text "Produce the user-facing final result for the Munera task identified by {{input}}. First extract `worktree_path:` from the handoff data in `{{input}}` and call `work-on <worktree_path>` before reading any task artifacts. Independently inspect that specific task's artifacts, especially steps.md, implementation.md, design.md, and plan.md when present, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether all four review passes completed cleanly\n- the key issues found and resolved across the four passes (task-implementation-review, task-test-review, test-shaper, code-shaper)\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior."
-                           :vars {"input" {:from :workflow-input
-                                           :path [:input]}}}]}]}
+                     :from {:step "review-test-shape" :yield :text}}]}]}
 
 Run four sequential `review-step` passes against a Munera task, in order:
 1. `task-implementation-review` — correctness and completeness of the implementation
@@ -74,4 +57,8 @@ Run four sequential `review-step` passes against a Munera task, in order:
 3. `test-shaper` — clarity, signal, and robustness of the tests
 4. `code-shaper` — simplicity, consistency, and robustness of the code
 
-Each pass loops internally (review → follow-up → judge) until it produces no new actionable feedback. Prior pass results are forwarded as context so later passes avoid duplicating already-addressed issues. A final summary step collects all four pass outputs for the user.
+Each pass loops internally (review → follow-up → judge) until it produces no new actionable feedback. Prior pass results are forwarded as context so later passes avoid duplicating already-addressed issues.
+
+Input shape: `{:input "munera/open/003-foo"}`
+
+Child sessions inherit the invoking session's worktree — no worktree setup is needed. For pipeline use with structured handoff data, use `review-implementation-in-worktree` instead.

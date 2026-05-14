@@ -1,0 +1,78 @@
+---
+name: gh-pr-refine
+description: Find a PR labeled refine, incorporate new PR comments into the Munera task design and plan, iterate review until clear, push and update the PR
+---
+{:steps [{:name      "select"
+          :type      :invoke
+          :operation "github/find-pr"
+          :args      {:labels ["refine"]
+                      :input  {:from :workflow-input :path [:input]}}
+          :outputs   {:summary {:source :invoke/summary}
+                      :data    {:source :invoke/data}}
+          :yields    {:type :text :text :summary}}
+         {:name "prep"
+          :type :delegate
+          :target "builder"
+          :prompt-string {:type :template
+                          :text "Prepare the existing worktree for the PR described by {{select_report}}. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR branch, and base branch.\n2. Find an existing worktree for the PR branch. Use `git worktree list` and match on the branch name. If no worktree exists, create one from the PR branch.\n3. In the worktree, fetch origin and ensure the PR branch is checked out and up to date with `origin/<pr-branch>`.\n4. Verify `git branch --show-current` matches the PR branch.\n\nOutput requirements:\n- Output a compact Markdown handoff with these headings exactly:\n  - `## Prep Outcome`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`"
+                          :vars {"select_report" {:from {:step "select" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "select" :yield :text}}]}
+         {:name "refine"
+          :type :delegate
+          :target "builder"
+          :prompt-string {:type :template
+                          :text "Incorporate new PR feedback into the Munera task design for the PR described by {{prep_report}}. Use the `task-design` skill and work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR URL, PR branch, and worktree path.\n2. In the worktree, read `munera/plan.md` and inspect `munera/open/` to find the existing Munera task for this PR.\n3. Read the current task `design.md`, `plan.md` (if present), `steps.md`, and `implementation.md`.\n4. Retrieve PR comments with timestamps and authors:\n   ```\n   gh pr view <pr_number> --json comments,reviews\n   ```\n5. Determine the last push timestamp on the PR branch:\n   ```\n   git -C <worktree_path> log -1 --format=%cI\n   ```\n6. Identify **new feedback**: comments and review comments posted after the last commit timestamp. Exclude comments authored by bot or app accounts (look for `[bot]` suffix or `app/` author type). These are the comments that need to be addressed.\n7. If no new human comments are found since the last commit, report that explicitly and skip refinement.\n8. For each piece of new feedback, determine whether it:\n   - Requests a design change → update `design.md`\n   - Requests a plan/approach change → update `plan.md` and/or `steps.md`\n   - Asks a question → resolve it in the design if possible, or note it as an open question in `implementation.md`\n   - Is purely informational → acknowledge in `implementation.md`\n9. Refine `design.md` with the `task-design` skill to ensure it remains complete and unambiguous after incorporating the feedback.\n10. Keep `plan.md` and `steps.md` synchronized with the updated design.\n11. Record terse notes in `implementation.md` about what feedback was addressed and how.\n12. Commit the refinement changes with a descriptive commit message referencing the PR number.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Refine Outcome`\n  - `## Feedback Addressed`\n  - `## Handoff Data`\n- Under `## Feedback Addressed`, list each piece of feedback incorporated and what changed.\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`\n  - `feedback_count:`\n  - `ambiguity_status:`\n\nSet `ambiguity_status:` to either `ambiguous` or `clear`."
+                          :vars {"prep_report" {:from {:step "prep" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "select" :yield :text}}
+                    {:type :source
+                     :from {:step "prep" :yield :text}}]}
+         {:name "review-status"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :source
+                           :from :workflow-original}
+                          {:type :source
+                           :from {:step "select" :yield :text}}
+                          {:type :source
+                           :from {:step "prep" :yield :text}}
+                          {:type :source
+                           :from {:step "refine" :yield :text}}
+                          {:type :template
+                           :text "Respond exactly with one word: REPEAT or DONE.\n\nUse the actor step context to identify the specific Munera task under review, especially the `munera_task_path`, `worktree_path`, and PR metadata. Then independently inspect the task artifacts in that task directory, especially `design.md` and `plan.md`, and use `steps.md` / `implementation.md` when helpful.\n\nReturn REPEAT if the identified task design still has material ambiguities, missing decisions, incomplete acceptance criteria, or an underspecified implementation approach after incorporating the PR feedback. Return DONE only if the identified Munera task design is complete and unambiguous enough to hand off for implementation, including the implementation strategy, key algorithms, data structures, and interface changes.\n\nDo not re-review the whole repository generically. Judge the specific Munera task named by the actor output."
+                           :vars {}}]
+          :judge {:type :llm
+                  :contributions [{:type :template
+                                   :text "Respond exactly with one word: REPEAT or DONE."
+                                   :vars {}}]}
+          :on {"REPEAT" {:goto "refine"
+                          :max-iterations 4}
+               "DONE" {:goto :next}}}
+         {:name "publish"
+          :type :delegate
+          :target "builder"
+          :prompt-string {:type :template
+                          :text "Push the refined design and update the PR described by {{refine_report}}. Work independently.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR URL, PR branch, worktree path, and Munera task path.\n2. In the worktree, verify the local branch matches the PR branch.\n3. Commit any remaining uncommitted changes if needed.\n4. Read the final `design.md` content from the Munera task.\n5. Update the PR description body to reflect the current refined design:\n   ```\n   gh pr edit <pr_number> --body-file <path_to_design.md>\n   ```\n6. Push the changes to the PR branch:\n   ```\n   git push origin HEAD:refs/heads/<pr_branch>\n   ```\n7. Post a PR comment summarizing what changed in response to the feedback. Format it clearly so reviewers can see at a glance what was addressed. Example structure:\n   ```\n   ## Design Refined\n\n   Incorporated feedback from recent comments:\n\n   - [summary of change 1]\n   - [summary of change 2]\n   ...\n   ```\n8. If any step fails, report the failure clearly.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Publish Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`"
+                          :vars {"refine_report" {:from {:step "refine" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "select" :yield :text}}
+                    {:type :source
+                     :from {:step "prep" :yield :text}}
+                    {:type :source
+                     :from {:step "refine" :yield :text}}]}
+         {:name      "edit-labels"
+          :type      :invoke
+          :operation "github/edit-labels"
+          :args      {:number {:from {:step "select" :output :data} :path [:pr-number]}
+                      :remove ["refine"]
+                      :add    ["waiting"]
+                      :target "pr"}}]}
+
+Coordinate refinement of an existing GitHub PR labeled `refine`: select the PR, locate its existing branch worktree, read new PR comments posted since the last commit, incorporate that feedback into the Munera task design and plan, iterate review until the design is complete and unambiguous, push the updated design, update the PR description to match, post a comment summarizing what changed, remove the `refine` label, and add a `waiting` label.
