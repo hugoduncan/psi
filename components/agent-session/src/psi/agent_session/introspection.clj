@@ -7,6 +7,7 @@
    [psi.agent-session.resolvers :as resolvers]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]
+   [psi.turn-runtime.stream]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]))
 
 (defn replay-dispatch-event-log-in!
@@ -26,8 +27,12 @@
 (defn diagnostics-in
   "Return a diagnostic snapshot map."
   [ctx session-id]
-  (let [sd    (ss/get-session-data-in ctx session-id)
-        phase (ss/sc-phase-in ctx session-id)]
+  (let [sd          (ss/get-session-data-in ctx session-id)
+        phase       (ss/sc-phase-in ctx session-id)
+        turn-ctx    (ss/get-state-value-in ctx (ss/state-path :turn-ctx session-id))
+        stream-live? (boolean
+                      (when-let [stream-handle (some-> turn-ctx :turn-data deref :stream-handle)]
+                        (not (psi.turn-runtime.stream/cancelled-stream-handle? stream-handle))))]
     {:phase                   phase
      :session-id              session-id
      :is-idle                 (= phase :idle)
@@ -45,6 +50,7 @@
      :workflow-count          (extension-workflow-runtime/workflow-count-in (:workflow-registry ctx))
      :workflow-running-count  (extension-workflow-runtime/running-count-in (:workflow-registry ctx))
      :journal-entries         (count (ss/get-state-value-in ctx (ss/state-path :journal session-id)))
+     :turn-stream-live?       stream-live?
      :agent-diagnostics       (agent/diagnostics-in (ss/agent-ctx-in ctx session-id))}))
 
 (defn query-in

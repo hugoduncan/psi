@@ -8,7 +8,9 @@
   (:require
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
+   [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.tools :as tools]
    [psi.session-state.state :as ss]))
 
 (defn- next-active-session-id
@@ -38,6 +40,35 @@
                           {:session-id session-id
                            :schedule-id schedule-id}
                           {:origin :core})))
+  true)
+
+(defn- interrupted-tool-result-message
+  [tool-call-id]
+  {:role "toolResult"
+   :tool-call-id tool-call-id
+   :tool-name "interrupted"
+   :content [{:type :text
+              :text "Tool execution interrupted before completion."}]
+   :is-error true
+   :timestamp (java.time.Instant/now)})
+
+(defn- repair-pending-tool-calls-before-close!
+  [ctx session-id]
+  (when-let [agent-ctx (ss/agent-ctx-in ctx session-id)]
+    (doseq [tool-call-id (:pending-tool-calls (agent/get-data-in agent-ctx))]
+      (let [message (interrupted-tool-result-message tool-call-id)]
+        (dispatch/dispatch! ctx
+                            :session/tool-agent-record-result
+                            {:session-id session-id
+                             :tool-result-msg message}
+                            {:origin :core}))))
+  true)
+
+(defn- abort-session-runtime!
+  [ctx session-id]
+  (when-let [agent-ctx (ss/agent-ctx-in ctx session-id)]
+    (agent/abort-in! agent-ctx))
+  (tools/abort-bash!)
   true)
 
 (defn- remove-session-state!
@@ -71,6 +102,8 @@
                                   keys
                                   vec)
           _                  (cancel-owned-schedules! ctx session-id sd)
+          _                  (abort-session-runtime! ctx session-id)
+          _                  (repair-pending-tool-calls-before-close! ctx session-id)
           _                  (doseq [schedule-id owned-schedule-ids]
                                (interrupt-scheduler-timer! ctx schedule-id))
           _                  (when sc-session-id

@@ -82,6 +82,9 @@
 (def response-mode-schema
   [:enum :streaming :non-streaming])
 
+(def interruption-reason-schema
+  [:enum :user-abort :deferred-interrupt :session-close :context-shutdown])
+
 (def prompt-component-schema
   [:enum :preamble :context-files :skills :runtime-metadata])
 
@@ -148,6 +151,7 @@
    [:is-compacting :boolean]
    [:interrupt-pending :boolean]
    [:interrupt-requested-at {:optional true} [:maybe inst?]]
+   [:interrupt-reason {:optional true} [:maybe interruption-reason-schema]]
    [:base-system-prompt :string]
    [:system-prompt :string]
    [:prompt-mode {:optional true} prompt-mode-schema]
@@ -237,6 +241,7 @@
      :is-streaming            false
      :is-compacting           false
      :interrupt-pending       false
+     :interrupt-reason        nil
      :interrupt-requested-at  nil
      :base-system-prompt      ""
      :system-prompt           ""

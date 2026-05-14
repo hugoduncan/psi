@@ -3,7 +3,8 @@
   (:require
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as model-registry]
-   [psi.agent-session.prompt-request :as prompt-request]))
+   [psi.agent-session.prompt-request :as prompt-request]
+   [psi.session-persistence.core :as persist]))
 
 ;; ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -181,3 +182,58 @@
       (is (nil? (:api-key opts)))
       (is (nil? (:no-auth-header opts)))
       (is (nil? (:headers opts))))))
+
+(deftest journal->provider-messages-repairs-dangling-tool-use-test
+  (testing "missing tool result is repaired with synthetic error toolResult before later messages"
+    (let [assistant {:role "assistant"
+                     :content [{:type :text :text "working"}
+                               {:type :tool-call :id "call-1" :name "bash" :arguments "{}"}]
+                     :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+          later-user {:role "user"
+                      :content [{:type :text :text "status?"}]}
+          messages (prompt-request/journal->provider-messages
+                    [(persist/message-entry assistant)
+                     (persist/message-entry later-user)])]
+      (is (= ["assistant" "toolResult" "user"] (mapv :role messages)))
+      (is (= "call-1" (:tool-call-id (second messages))))
+      (is (true? (:is-error (second messages))))
+      (is (= "Tool execution interrupted before completion."
+             (get-in (second messages) [:content 0 :text])))))
+
+  (testing "existing contiguous tool result is preserved and no synthetic repair is added"
+    (let [assistant {:role "assistant"
+                     :content [{:type :tool-call :id "call-1" :name "bash" :arguments "{}"}]
+                     :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+          result    {:role "toolResult"
+                     :tool-call-id "call-1"
+                     :tool-name "bash"
+                     :content [{:type :text :text "done"}]}
+          later-user {:role "user"
+                      :content [{:type :text :text "status?"}]}
+          messages  (prompt-request/journal->provider-messages
+                     [(persist/message-entry assistant)
+                      (persist/message-entry result)
+                      (persist/message-entry later-user)])]
+      (is (= ["assistant" "toolResult" "user"] (mapv :role messages)))
+      (is (= "done" (get-in (second messages) [:content 0 :text]))))))
+
+(deftest tail-dangling-tool-result-repairs-test
+  (testing "returns repair for dangling trailing assistant tool call"
+    (let [assistant {:role "assistant"
+                     :content [{:type :tool-call :id "call-tail" :name "bash" :arguments "{}"}]
+                     :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+          repairs   (prompt-request/tail-dangling-tool-result-repairs [assistant])]
+      (is (= 1 (count repairs)))
+      (is (= "call-tail" (:tool-call-id (first repairs))))
+      (is (true? (:is-error (first repairs))))))
+
+  (testing "returns no repair when trailing tool result already exists"
+    (let [assistant {:role "assistant"
+                     :content [{:type :tool-call :id "call-tail" :name "bash" :arguments "{}"}]
+                     :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+          result    {:role "toolResult"
+                     :tool-call-id "call-tail"
+                     :tool-name "bash"
+                     :content [{:type :text :text "done"}]}
+          repairs   (prompt-request/tail-dangling-tool-result-repairs [assistant result])]
+      (is (= [] repairs)))))

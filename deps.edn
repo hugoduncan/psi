@@ -78,9 +78,11 @@
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
                         "extensions/github/src"
+                        "extensions/edit-clj/src"
                         "extensions/logprobs/src"
                         "extensions/metrics/src"]
-          :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
+          :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
+                        rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
   :psi   {:extra-paths ["bases/main/src"
@@ -117,9 +119,11 @@
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
                         "extensions/github/src"
+                        "extensions/edit-clj/src"
                         "extensions/logprobs/src"
                         "extensions/metrics/src"]
-          :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
+          :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
+                        rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
   :tui-demo {:extra-paths ["components/tui/src"
@@ -155,9 +159,11 @@
                            "extensions/plan-state-learning/src"
                            "extensions/work-on/src"
                            "extensions/github/src"
+                           "extensions/edit-clj/src"
                            "extensions/logprobs/src"
                            "extensions/metrics/src"]
-             :extra-deps  {nrepl/nrepl {:mvn/version "1.5.1"}}
+             :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
+                           rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
              :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
              :main-opts   ["-m" "psi.tui.test-harness.tui-demo-main"]}
   :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.5.1"}}}
@@ -283,6 +289,7 @@
                         "extensions/plan-state-learning/test"
                         "extensions/work-on/test"
                         "extensions/github/test"
+                        "extensions/edit-clj/test"
                         "extensions/logprobs/test"
                         "extensions/metrics/test"
                         "components/ai/src"
@@ -331,11 +338,13 @@
                         "extensions/plan-state-learning/src"
                         "extensions/work-on/src"
                         "extensions/github/src"
+                        "extensions/edit-clj/src"
                         "extensions/logprobs/src"
                         "extensions/metrics/src"
                         "components/extension-test-helpers/src"]
-          :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
-                        nrepl/nrepl         {:mvn/version "1.5.1"}}
+          :extra-deps  {lambdaisland/kaocha    {:mvn/version "1.91.1392"}
+                        nrepl/nrepl            {:mvn/version "1.5.1"}
+                        rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "kaocha.runner"]}
   :build {:deps      {io.github.clojure/tools.build {:mvn/version "0.10.12"}}

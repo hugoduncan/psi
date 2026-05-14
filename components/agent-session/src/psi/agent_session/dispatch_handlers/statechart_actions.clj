@@ -74,21 +74,29 @@
 
   (kernel/register-handler!
    :on-agent-done
-   (fn [_ctx {:keys [session-id]}]
-     {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
-                                                                    :retry-attempt 0
-                                                                    :interrupt-pending false
-                                                                    :interrupt-requested-at nil))
-      :effects [{:effect/type :runtime/mark-workflow-jobs-terminal}
-                {:effect/type :runtime/emit-background-job-terminal-messages}
-                {:effect/type :scheduler/drain-queue}]}))
+   (fn [ctx {:keys [session-id]}]
+     (let [sd                 (session/get-session-data-in ctx session-id)
+           interruption-reason (:interrupt-reason sd)]
+       {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
+                                                                      :retry-attempt 0
+                                                                      :interrupt-pending false
+                                                                      :interrupt-requested-at nil
+                                                                      :interrupt-reason nil))
+        :effects (cond-> [{:effect/type :runtime/mark-workflow-jobs-terminal}
+                          {:effect/type :runtime/emit-background-job-terminal-messages}
+                          {:effect/type :scheduler/drain-queue}]
+                   interruption-reason
+                   (into [{:effect/type :runtime/record-pending-tool-call-interrupts
+                           :session-id session-id
+                           :reason interruption-reason}]))})))
 
   (kernel/register-handler!
    :on-abort
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
                                                                     :interrupt-pending false
-                                                                    :interrupt-requested-at nil))
+                                                                    :interrupt-requested-at nil
+                                                                    :interrupt-reason nil))
       :effects [{:effect/type :runtime/agent-abort}
                 {:effect/type :scheduler/drain-queue}]}))
 

@@ -138,5 +138,13 @@ Bootstrapped on 2026-04-02.
   - updated `AGENTS.md` with a concise psi self-reload loop near runtime tooling guidance
   - updated `README.md` to point readers at the documented self-reload loop in `doc/psi-project-config.md`
 
+- Task 151 edit-clj structural edit extension is now complete and closed:
+  - added `extensions/edit-clj/` with `psi.edit-clj.core` (pure: parse-single-form, find-candidates, apply-line-filter, replace-in) and `psi.edit-clj.extension` (tool registration + file I/O + JSON serialisation)
+  - tool named `"edit-clj"`; matches by sexpr equality via `rewrite-clj`; supports optional `start-line`/`end-line` filtering by node start-row
+  - validation order: old-string → new-string → file (first error returned)
+  - result shapes: ok, parse-error, file-not-found, no-match, ambiguous-match
+  - wired into top-level `deps.edn` (4 source-path locations + test paths + `rewrite-clj/rewrite-clj 1.1.47` in runtime+test extra-deps), `tests.edn` (unit, extensions, integration suites), and `psi-owned-extension-catalog` (`:development`+`:installed` only, following `github` pattern)
+  - 19 extension tests, 73 assertions; 1776+169 broader suite green; lint clean
+
 ## Suggested next step
-- Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `134-psi-tool-mutation-surface-and-active-session-introspection`.
+- Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `149-reload-fixup-inventory-and-safety`.

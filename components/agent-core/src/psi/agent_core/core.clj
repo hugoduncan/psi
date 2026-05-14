@@ -396,9 +396,15 @@
     data))
 
 (defn record-tool-result-in!
-  "Append a tool result message and emit message_start / message_end."
+  "Append a tool result message, clear its pending tool-call id, and emit
+   message_start / message_end."
   [ctx tool-result-msg]
-  (let [data (swap-data! ctx update :messages conj tool-result-msg)]
+  (let [tool-call-id (:tool-call-id tool-result-msg)
+        data         (swap-data! ctx
+                                 (fn [d]
+                                   (cond-> (update d :messages conj tool-result-msg)
+                                     tool-call-id
+                                     (update :pending-tool-calls disj tool-call-id))))]
     (emit-in! ctx {:type :message-start :message tool-result-msg})
     (emit-in! ctx {:type :message-end   :message tool-result-msg})
     data))
@@ -412,16 +418,19 @@
   (get-data-in ctx))
 
 (defn emit-tool-start-in!
-  "Emit tool_execution_start for `tool-call`."
+  "Emit tool_execution_start for `tool-call` and mark it pending."
   [ctx tool-call]
-  (emit-in! ctx {:type         :tool-execution-start
-                 :tool-call-id (:id tool-call)
-                 :tool-name    (:name tool-call)
-                 :args         (:arguments tool-call)})
-  (get-data-in ctx))
+  (let [tool-call-id (:id tool-call)]
+    (swap-data! ctx update :pending-tool-calls (fnil conj #{}) tool-call-id)
+    (emit-in! ctx {:type         :tool-execution-start
+                   :tool-call-id tool-call-id
+                   :tool-name    (:name tool-call)
+                   :args         (:arguments tool-call)})
+    (get-data-in ctx)))
 
 (defn emit-tool-end-in!
-  "Emit tool_execution_end for `tool-call` with `result` and `is-error?`."
+  "Emit tool_execution_end for `tool-call` with `result` and `is-error?`.
+   Pending state is cleared when the tool result is recorded."
   [ctx tool-call result is-error?]
   (emit-in! ctx {:type         :tool-execution-end
                  :tool-call-id (:id tool-call)

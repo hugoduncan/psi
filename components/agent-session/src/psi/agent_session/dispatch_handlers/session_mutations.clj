@@ -449,13 +449,14 @@
 
   (register-core-handler!
    :session/request-interrupt
-   (fn [ctx {:keys [session-id already-pending? requested-at]}]
+   (fn [ctx {:keys [session-id already-pending? requested-at reason]}]
      (let [sd (session/get-session-data-in ctx session-id)]
        {:root-state-update
         (session/session-update session-id
                                 (fn [_]
                                   (cond-> (assoc sd
                                                  :interrupt-pending true
+                                                 :interrupt-reason (or reason :deferred-interrupt)
                                                  :steering-messages [])
                                     (not already-pending?)
                                     (assoc :interrupt-requested-at requested-at))))

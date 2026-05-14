@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.dispatch]
    [psi.agent-session.extensions]
    [psi.agent-session.prompt-chain]
    [psi.agent-session.prompt-request]
@@ -10,6 +11,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.turn]
    [psi.state-kernel.dispatch :as kernel]
+   [psi.session-persistence.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [clojure.java.io :as io]
@@ -67,6 +69,32 @@
       (is (= 3 (count effects)))
       (is (= [:session/prompt-submit :session/prompt :session/prompt-prepare-request]
              (mapv :event-type effects))))))
+
+(deftest prompt-submit-handler-adds-tail-repair-effect-before-user-message-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        assistant-msg {:role "assistant"
+                       :content [{:type :tool-call :id "tc-tail" :name "bash" :arguments "{}"}]
+                       :stop-reason :tool_use
+                       :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+        user-msg {:role "user"
+                  :content [{:type :text :text "status?"}]
+                  :timestamp (java.time.Instant/now)}]
+    (session/dispatch-in! ctx :session/append-journal-entry
+                          {:session-id session-id
+                           :entry (psi.session-persistence.core/message-entry assistant-msg)}
+                          {:origin :core})
+    (let [handler-result ((:fn (kernel/handler-entry :session/prompt-submit))
+                          ctx
+                          {:session-id session-id
+                           :user-msg user-msg})
+          effects (:effects handler-result)]
+      (is (= 2 (count effects)))
+      (is (= :runtime/dispatch-event (-> effects first :effect/type)))
+      (is (= "toolResult" (get-in (first effects) [:event-data :entry :data :message :role])))
+      (is (= "tc-tail" (get-in (first effects) [:event-data :entry :data :message :tool-call-id])))
+      (is (= :runtime/dispatch-event (-> effects second :effect/type)))
+      (is (= "user" (get-in (second effects) [:event-data :entry :data :message :role])))
+      (is (= 1 (get-in handler-result [:return :repaired-tool-result-count]))))))
 
 (deftest prompt-record-response-appends-assistant-once-test
   (let [[ctx session-id] (create-session-context {:persist? false})
@@ -198,6 +226,78 @@
       (session/prompt-in! ctx session-id "hello")
       (is (= [session-id] @sync-calls)
           "prompt-in! should run git-head sync after a normal prompt turn"))))
+
+(deftest stranded-streaming-session-recovers-on-next-prompt-test
+  (let [[ctx session-id] (create-session-context {:persist? false})]
+    (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+    (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+    (is (= :streaming (ss/sc-phase-in ctx session-id)))
+    (is (true? (:is-streaming (ss/get-session-data-in ctx session-id))))
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [_ai-ctx _ctx sid prepared _pq]
+                    {:execution-result/turn-id (:prepared-request/id prepared)
+                     :execution-result/session-id sid
+                     :execution-result/assistant-message {:role "assistant"
+                                                          :content [{:type :text :text "recovered"}]
+                                                          :stop-reason :stop
+                                                          :timestamp (java.time.Instant/now)}
+                     :execution-result/turn-outcome :turn.outcome/stop
+                     :execution-result/tool-calls []
+                     :execution-result/stop-reason :stop})]
+      (session/prompt-in! ctx session-id "hello after stall"))
+    (is (= :idle (ss/sc-phase-in ctx session-id)))
+    (is (false? (:is-streaming (ss/get-session-data-in ctx session-id))))
+    (is (= ["user" "assistant"] (mapv :role (journal-messages ctx session-id))))))
+
+(deftest queue-while-streaming-recovers-stranded-session-test
+  (let [[ctx session-id] (create-session-context {:persist? false})]
+    (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+    (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+    (let [result (session/queue-while-streaming-in! ctx session-id "nudge" :steer)]
+      (is (= false (:accepted? result)))
+      (is (= :not-streaming (:behavior result)))
+      (is (true? (:recovered? result)))
+      (is (= :idle (ss/sc-phase-in ctx session-id)))
+      (is (= [] (:steering-messages (ss/get-session-data-in ctx session-id)))))))
+
+(deftest abort-records-interrupted-tool-results-with-reason-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        agent-ctx        (ss/agent-ctx-in ctx session-id)
+        appended*        (atom [])]
+    (swap! (:data-atom agent-ctx) assoc :pending-tool-calls #{"tc-abort"})
+    (with-redefs [psi.agent-session.dispatch/dispatch!
+                  (let [orig psi.agent-session.dispatch/dispatch!]
+                    (fn [ctx event-type event-data opts]
+                      (when (= :session/tool-agent-record-result event-type)
+                        (swap! appended* conj (:tool-result-msg event-data)))
+                      (orig ctx event-type event-data opts)))]
+      (session/abort-in! ctx session-id))
+    (is (= 1 (count @appended*)))
+    (is (= "tc-abort" (:tool-call-id (first @appended*))))
+    (is (true? (:is-error (first @appended*))))
+    (is (= :user-abort (get-in (first @appended*) [:details :interruption :reason])))
+    (is (str/includes? (get-in (first @appended*) [:content 0 :text]) "Reason: user-abort."))))
+
+(deftest deferred-interrupt-records-interrupted-tool-results-with-reason-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        agent-ctx        (ss/agent-ctx-in ctx session-id)
+        appended*        (atom [])]
+    (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+    (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+    (swap! (:data-atom agent-ctx) assoc :pending-tool-calls #{"tc-interrupt"})
+    (session/request-interrupt-in! ctx session-id)
+    (with-redefs [psi.agent-session.dispatch/dispatch!
+                  (let [orig psi.agent-session.dispatch/dispatch!]
+                    (fn [ctx event-type event-data opts]
+                      (when (= :session/tool-agent-record-result event-type)
+                        (swap! appended* conj (:tool-result-msg event-data)))
+                      (orig ctx event-type event-data opts)))]
+      (session/dispatch-in! ctx :on-agent-done {:session-id session-id} {:origin :statechart}))
+    (is (= 1 (count @appended*)))
+    (is (= "tc-interrupt" (:tool-call-id (first @appended*))))
+    (is (true? (:is-error (first @appended*))))
+    (is (= :deferred-interrupt (get-in (first @appended*) [:details :interruption :reason])))
+    (is (str/includes? (get-in (first @appended*) [:content 0 :text]) "Reason: deferred-interrupt."))))
 
 (deftest abort-cancels-active-prompt-runtime-test
   (let [[ctx session-id] (create-session-context {:persist? false})
@@ -350,41 +450,27 @@
 
 (deftest queued-steering-is-injected-into-continuation-prepared-request-test
   (let [[ctx session-id] (create-session-context {:persist? false})
-        assistant-msg    {:role "assistant"
-                          :content [{:type :tool-call :id "tc-1" :name "read" :arguments "{}"}]
-                          :stop-reason :stop
-                          :timestamp (java.time.Instant/now)}
-        execution-result {:execution-result/turn-id "turn-1"
-                          :execution-result/session-id session-id
-                          :execution-result/assistant-message assistant-msg
-                          :execution-result/turn-outcome :turn.outcome/tool-use
-                          :execution-result/tool-calls [{:id "tc-1" :name "read" :arguments "{}"}]
-                          :execution-result/stop-reason :stop}
-        tool-result-msg  {:role "toolResult"
-                          :tool-call-id "tc-1"
-                          :tool-name "read"
-                          :content [{:type :text :text "file body"}]
-                          :timestamp (java.time.Instant/now)}]
+        user-msg        {:role "user"
+                         :content [{:type :text :text "hi"}]
+                         :timestamp (java.time.Instant/now)}
+        assistant-msg   {:role "assistant"
+                         :content [{:type :tool-call :id "tc-1" :name "read" :arguments "{}"}]
+                         :stop-reason :stop
+                         :timestamp (java.time.Instant/now)}
+        tool-result-msg {:role "toolResult"
+                         :tool-call-id "tc-1"
+                         :tool-name "read"
+                         :content [{:type :text :text "file body"}]
+                         :timestamp (java.time.Instant/now)}]
     (session/dispatch-in! ctx :session/bootstrap-prompt-state
                           {:session-id session-id
                            :system-prompt "sys"}
                           {:origin :core})
-    (session/dispatch-in! ctx :session/prompt-submit
-                          {:session-id session-id
-                           :user-msg {:role "user"
-                                      :content [{:type :text :text "hi"}]
-                                      :timestamp (java.time.Instant/now)}}
-                          {:origin :core})
-    (with-redefs [psi.agent-session.prompt-chain/run-prompt-tools! (fn [_ctx _sid _res _pq]
-                                                                     {:continued? true :tool-call-count 1})]
-      (session/dispatch-in! ctx :session/prompt-record-response
+    (doseq [message [user-msg assistant-msg tool-result-msg]]
+      (session/dispatch-in! ctx :session/append-journal-entry
                             {:session-id session-id
-                             :execution-result execution-result}
+                             :entry (psi.session-persistence.core/message-entry message)}
                             {:origin :core}))
-    (session/dispatch-in! ctx :session/tool-record-result
-                          {:session-id session-id
-                           :shaped-result {:result-message tool-result-msg}}
-                          {:origin :core})
     (session/dispatch-in! ctx :session/enqueue-steering-message
                           {:session-id session-id
                            :text "Please be brief."}

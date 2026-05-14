@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]))
@@ -81,6 +82,23 @@
       (session/close-session-in! ctx session-id)
       ;; After close: working memory is gone, sc-phase returns nil
       (is (nil? (sc/sc-phase (:sc-env ctx) sc-session-id))))))
+
+(deftest close-session-records-interrupted-tool-results-for-pending-calls-test
+  (testing "close-session-in! appends interrupted tool results before session removal side effects complete"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          agent-ctx        (ss/agent-ctx-in ctx session-id)
+          appended*        (atom [])]
+      (swap! (:data-atom agent-ctx) assoc :pending-tool-calls #{"tc-pending"})
+      (with-redefs [dispatch/dispatch!
+                    (let [orig dispatch/dispatch!]
+                      (fn [ctx event-type event-data opts]
+                        (when (= :session/tool-agent-record-result event-type)
+                          (swap! appended* conj (:tool-result-msg event-data)))
+                        (orig ctx event-type event-data opts)))]
+        (session/close-session-in! ctx session-id))
+      (is (= 1 (count @appended*)))
+      (is (= "tc-pending" (:tool-call-id (first @appended*))))
+      (is (true? (:is-error (first @appended*)))))))
 
 (deftest close-session-tree-closes-all-descendants-test
   (testing "close-session-tree-in! closes all descendants then the root"
