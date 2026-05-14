@@ -32,12 +32,16 @@ Key functions:
 - `apply-line-filter` — given candidates and optional `start-line`/`end-line`,
   keep only those with `start-line ≤ node-row ≤ end-line`. Identity when neither bound
   is supplied.
-- `edit` — orchestrate: validate `old-string` → validate `new-string` → parse file zipper
-  → walk → filter → branch on match count → return result map. Never touches the
-  filesystem.
+- `replace-in` — given already-parsed old-node, new-node, file-content string, and
+  filtered candidates, perform the replacement and return the updated file-content
+  string. Branches on candidate count: zero → no-match map, many → ambiguous-match map,
+  one → replace and return ok map. Never touches the filesystem.
 
 Result maps mirror the design's output shapes (keywords, not strings — JSON
 serialisation happens in the extension layer).
+
+Note: `core` exposes composable helpers; it does **not** orchestrate the full
+validation order. The extension owns that sequence (see step 4).
 
 ### 3 — Tests for `psi.edit-clj.core`
 
@@ -48,8 +52,8 @@ Cover every AC:
 - AC 1 — single match replaced; content outside node unchanged character-for-character
 - AC 2 — no-match result; input string returned unchanged
 - AC 3 — ambiguous-match result with correct match count and locations
-- AC 4 — parse-error for invalid `old-string`; parse-error for invalid `new-string`;
-  old-string error returned when both are invalid (validation order)
+- AC 4 (partial) — `parse-single-form` returns parse-error for invalid Clojure and for
+  multi-form input; argument name is preserved in the error map
 - AC 6a–f — line-range cases (duplicate forms, straddling forms, nested symbol in
   straddling parent, range with no matching starts)
 - AC 7 — `new-string` containing an inline comment; comment text present in output string
@@ -60,21 +64,29 @@ Cover every AC:
 `extensions/edit-clj/src/psi/edit_clj/extension.clj` — file I/O + tool wiring.
 
 - `resolve-path` — resolve `filename` against `cwd` when relative.
-- `execute` — read file; delegate to `core/edit`; on `:ok` write result back; serialise
-  final result map to JSON string via cheshire.
+- `execute` — owns the validation order per the design contract:
+  1. `core/parse-single-form(old-string, "old-string")` → return error map if invalid
+  2. `core/parse-single-form(new-string, "new-string")` → return error map if invalid
+  3. Resolve path against `:cwd`; return `file-not-found` map if not readable
+  4. Read file content
+  5. `core/find-candidates(old-node, file-content)` → `core/apply-line-filter` →
+     `core/replace-in(old-node, new-node, file-content, candidates)`
+  6. On `:ok` write updated content back to the file
+  7. Serialise result map to JSON string via cheshire
 - `tool-def` — tool map with `:name`, `:description` (≤ 20 words, one-form contract
   explicit), `:parameters` as data map, `:execute` fn supporting both
   `([args])` and `([args opts])` arities.
 - `init` — register single tool via `(:register-tool api)`.
 
-`file-not-found` is produced here (before calling `core/edit`) when the resolved path
-does not exist or is not readable.
-
 ### 5 — Tests for `psi.edit-clj.extension`
 
 `extensions/edit-clj/test/psi/edit_clj/extension_test.clj`
 
-- AC 5 — non-existent file → `file-not-found` result (JSON string, `"status": "error"`)
+- AC 4 (validation order) — both `old-string` and `new-string` invalid → old-string
+  parse-error returned; invalid `old-string` with missing file → parse-error returned
+  (not file-not-found), confirming the extension checks strings before the file
+- AC 5 — non-existent file (both strings valid) → `file-not-found` result (JSON string,
+  `"status": "error"`)
 - AC 9 — tool `:description` is ≤ 20 words and mentions the one-form contract
 - AC 10 — `init` registers exactly one tool named `"edit-clj"` (using
   `ext/create-registry` + `ext/create-extension-api` pattern from `github`'s

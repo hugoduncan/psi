@@ -14,9 +14,9 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 
 **In scope:**
 - New extension directory `extensions/edit-clj/`
-- Single tool `edit-clj` registered via `psi.extension/register-tool`
+- Single tool `edit-clj` registered via `(:register-tool api)` in `init`
 - Core logic namespace `psi.edit-clj.core` (pure: zipper walk, match, replace)
-- Extension entry point `psi.edit-clj.extension` (calls `register-tool`)
+- Extension entry point `psi.edit-clj.extension` (calls `(:register-tool api)`)
 - Unit tests covering all result shapes (ok, file-not-found, parse-error, no-match, ambiguous-match)
 - `deps.edn` with `rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}` and `cheshire/cheshire {:mvn/version "5.13.0"}` as runtime deps
 - Wire into top-level `deps.edn` source paths (`extensions/edit-clj/src`) and top-level `tests.edn` test/source paths (`extensions/edit-clj/test`, `extensions/edit-clj/src`) — **not** into `extensions/deps.edn` or `extensions/tests.edn` (github follows this same top-level-only model and is absent from both extensions-level files)
