@@ -77,7 +77,15 @@
                                        "new-string" ":ok"}))]
       (is (= "error" (:status result)))
       (is (= "parse-error" (:code result)))
-      (is (= "old-string" (:argument result))))))
+      (is (= "old-string" (:argument result)))))
+
+  (testing "R4: valid old-string + invalid new-string → parse-error for new-string"
+    (let [result (parse-json (execute {"filename"   "/nonexistent/any-file.clj"
+                                       "old-string" ":ok"
+                                       "new-string" "(["}))]
+      (is (= "error" (:status result)))
+      (is (= "parse-error" (:code result)))
+      (is (= "new-string" (:argument result))))))
 
 ;; ── AC 5 — non-existent file → file-not-found ────────────────────────────────
 
@@ -102,6 +110,9 @@
       (is (= "ok" (:status result)))
       (is (= (.getAbsolutePath f) (:filename result)))
       (is (contains? result :location))
+      ;; R3: all five ok-result fields must be present in the serialised JSON
+      (is (contains? result :old))
+      (is (contains? result :new))
       (is (str/includes? (slurp f) "(- a b)"))
       (is (not (str/includes? (slurp f) "(+ a b)")))))
 

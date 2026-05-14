@@ -36,6 +36,29 @@
       (is (= "(+ x 1)" (:old result)))
       (is (= "(* x 2)" (:new result))))))
 
+;; ── R1/R2 — sexpr-equality ignores whitespace; ok.old = file node text ──────────
+
+(deftest sexpr-whitespace-insensitive-test
+  (testing "R1: old-string matches file node despite internal whitespace differences"
+    ;; File has extra spaces inside the form; old-string uses normalised spacing.
+    ;; sexpr equality must succeed; the result must be :ok (not no-match).
+    (let [content "(defn f [] (+  x  1))\n"
+          result  (edit "(+ x 1)" "(* x 2)" content)]
+      (is (= "ok" (:status result))
+          "sexpr equality should match despite whitespace differences")
+      (is (str/includes? (:content result) "(* x 2)"))
+      ;; R2: :old must equal the file node text, not the old-string argument
+      (is (= "(+  x  1)" (:old result))
+          "ok.old should be the file node text, not the old-string argument")))
+
+  (testing "R2: ok.old != old-string when file node has extra whitespace"
+    (let [content "(let [a  1] a)\n"
+          result  (edit "(let [a 1] a)" ":replaced" content)]
+      (is (= "ok" (:status result)))
+      (is (= "(let [a  1] a)" (:old result)))
+      (is (not= "(let [a 1] a)" (:old result))
+          "ok.old must differ from old-string when whitespace differs"))))
+
 ;; ── S4 — ok.new is new-string argument verbatim ─────────────────────────────────
 
 (deftest ok-new-verbatim-test

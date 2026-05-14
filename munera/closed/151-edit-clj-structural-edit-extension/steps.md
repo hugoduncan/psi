@@ -40,11 +40,10 @@
 
 ## task-implementation-review follow-up (review pass 1)
 
-- [ ] R1 — Add `core_test` case: `old-string "(+ x 1)"` matches file node `"(+  x  1)"` (extra internal spaces) → `ok` result, verifying sexpr equality ignores whitespace. Assert `:content` has the replacement and `:old` = `"(+  x  1)"` (file text, not old-string).
-- [ ] R2 — Add `core_test` case: `old-string` and file node differ in whitespace → assert `(:old result)` equals the file node text, not the `old-string` argument (companion to R1; documents `ok.old` semantics explicitly).
-- [ ] R3 — Extend `extension_test` `round-trip-write-test`: assert `(contains? result :old)` and `(contains? result :new)` on the parsed JSON result, confirming all five `ok` fields are present in the serialized output.
-
-- [ ] R4 — Add `extension_test` case to `validation-order-test`: valid `old-string` + invalid `new-string` + any filename → `parse-error` with `argument = "new-string"` returned. Confirms the new-string branch in `execute` is exercised at the extension level.
+- [x] R1 — Add `core_test` case: `old-string "(+ x 1)"` matches file node `"(+  x  1)"` (extra internal spaces) → `ok` result, verifying sexpr equality ignores whitespace. Assert `:content` has the replacement and `:old` = `"(+  x  1)"` (file text, not old-string).
+- [x] R2 — Add `core_test` case: `old-string` and file node differ in whitespace → assert `(:old result)` equals the file node text, not the `old-string` argument (companion to R1; documents `ok.old` semantics explicitly).
+- [x] R3 — Extend `extension_test` `round-trip-write-test`: assert `(contains? result :old)` and `(contains? result :new)` on the parsed JSON result, confirming all five `ok` fields are present in the serialized output.
+- [x] R4 — Add `extension_test` case to `validation-order-test`: valid `old-string` + invalid `new-string` + any filename → `parse-error` with `argument = "new-string"` returned. Confirms the new-string branch in `execute` is exercised at the extension level.
 
 ## code-shaper follow-up (review pass 1)
 

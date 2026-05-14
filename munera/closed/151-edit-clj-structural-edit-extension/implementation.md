@@ -1,5 +1,15 @@
 # Implementation Notes — 151 edit-clj structural edit extension
 
+## 2026-05-14 — task-test-review follow-up execution (R1–R4)
+
+All four review follow-up items executed:
+
+- **R1+R2**: Added `sexpr-whitespace-insensitive-test` in `core_test.clj`. Two subtests: (1) `"(+ x 1)"` as `old-string` matches file node `"(+  x  1)"` — asserts `ok` status, replacement present in `:content`, and `:old` = `"(+  x  1)"` (file text). (2) `"(let [a 1] a)"` matches `"(let [a  1] a)"` — asserts `:old` ≠ `old-string`, proving field semantics.
+- **R3**: Extended `round-trip-write-test` first subtest to assert `(contains? result :old)` and `(contains? result :new)` on parsed JSON — all five `ok` fields now verified in the serialised output.
+- **R4**: Added third case to `validation-order-test`: valid `old-string ":ok"` + invalid `new-string "(["` → `parse-error` with `argument = "new-string"`. Exercises the new-string validation branch in `execute` at the extension level.
+
+Verification: 21 tests, 89 assertions, 0 failures (extensions/edit-clj); 171 tests, 667 assertions, 0 failures (top-level :extensions suite); lint clean.
+
 ## 2026-05-14 — task-implementation-review pass 1
 
 Code matches design. Wiring correct (top-level deps.edn, tests.edn, launcher catalog). Lint clean. 20 tests, 78 assertions, 0 failures.
