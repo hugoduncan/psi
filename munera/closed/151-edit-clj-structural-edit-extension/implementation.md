@@ -1,5 +1,18 @@
 # Implementation Notes — 151 edit-clj structural edit extension
 
+## 2026-05-14 — task-implementation-review pass 1
+
+Code matches design. Wiring correct (top-level deps.edn, tests.edn, launcher catalog). Lint clean. 20 tests, 78 assertions, 0 failures.
+
+**R1 — Sexpr-whitespace-insensitivity not tested (robustness).**
+The primary differentiator from the text `edit` tool is S-expression equality ignoring whitespace and formatting. No test exercises a case where `old-string` whitespace differs from the file node (e.g. `"(+  x  1)"` in file, `"(+ x 1)"` as `old-string`). A test suite using only exact-string inputs would pass even if the implementation accidentally used string equality instead of `sexpr` equality. This gap means the core feature claim has no falsifying test.
+
+**R2 — `ok.old` field never tested with a differing value (consistency).**
+Design says `ok.old` = "actual matched node text as it appears in the file … may differ from the argument in whitespace." The sole test asserting `:old` uses `old-string = "(+ x 1)"` and file content `"(+ x 1)"` — they coincide. No test shows `ok.old ≠ old-string`. This is the companion gap to R1: the field semantics are unverified for the case the design specifically calls out.
+
+**R3 — Extension round-trip test omits `:old` and `:new` field assertions (consistency).**
+`round-trip-write-test` checks `:status`, `:filename`, and `(contains? result :location)` but does not assert `:old` or `:new` are present in the JSON result. The design's `ok` result shape specifies all five fields; the extension test only verifies three of them.
+
 ## 2026-05-14 — code-shaper follow-up execution (S1–S6)
 
 All six shaper items executed:
