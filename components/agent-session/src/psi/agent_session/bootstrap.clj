@@ -75,6 +75,16 @@
        :tool-count        (count (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id))))
        :extension-results ext-results})))
 
+(defn refresh-active-tools-in!
+  [ctx session-id]
+  (let [ext-tools    (tool-registry/all-tools-in (:extension-registry ctx))
+        active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))]
+    (session/dispatch-in! ctx
+                          :session/set-active-tools
+                          {:session-id session-id
+                           :tool-maps (into (vec active-tools) ext-tools)}
+                          {:origin :core})))
+
 (defn bootstrap-in!
   "Reusable session bootstrap for CLI/TUI and tests.
 
@@ -138,13 +148,7 @@
                               :error e}))
                          extension-results)
         _         (when refresh-active-tools?
-                    (let [ext-tools (tool-registry/all-tools-in (:extension-registry ctx))
-                          active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))]
-                      (session/dispatch-in! ctx
-                                            :session/set-active-tools
-                                            {:session-id session-id
-                                             :tool-maps (into (vec active-tools) ext-tools)}
-                                            {:origin :core})))
+                    (refresh-active-tools-in! ctx session-id))
         summary   {:timestamp              (java.time.Instant/now)
                    :prompt-count           prompt-count
                    :skill-count            skill-count
