@@ -85,6 +85,13 @@
      :installed   {:local/root "extensions/logprobs"}
      :jar         {:mvn/version :psi/release-version}}}
 
+   'psi/metrics
+   {:psi/init 'psi.metrics.extension/init
+    :source-policies
+    {:development {:local/root "extensions/metrics"}
+     :installed   {:local/root "extensions/metrics"}
+     :jar         {:mvn/version :psi/release-version}}}
+
    'psi/work-on
    {:psi/init 'extensions.work-on/init
     :source-policies

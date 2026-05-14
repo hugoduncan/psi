@@ -1,0 +1,251 @@
+(ns psi.metrics.extension-test
+  (:require
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is use-fixtures]]
+   [psi.extension-test-helpers.nullable-api :as nullable]
+   [psi.metrics.extension :as ext]
+   [psi.metrics.schema :as schema]))
+
+;;; Fixtures
+
+(use-fixtures :each
+  (fn [f]
+    ;; Reset the defonce atoms between tests so each test starts clean.
+    (reset! ext/store nil)
+    (reset! ext/writing? false)
+    (f)
+    (reset! ext/store nil)
+    (reset! ext/writing? false)))
+
+;;; Helpers
+
+(defn- make-api
+  "Create a nullable extension API augmented with :register-operation support.
+   opts are forwarded to create-nullable-extension-api.
+   Returns {:api ... :state atom :ops atom}."
+  ([] (make-api {}))
+  ([opts]
+   (let [{:keys [api state]} (nullable/create-nullable-extension-api opts)
+         ops (atom [])
+         api* (assoc api
+                     :register-operation
+                     (fn [op-spec]
+                       (swap! ops conj op-spec)
+                       nil))]
+     {:api api* :state state :ops ops})))
+
+(defn- fire-event
+  "Fire all registered handlers for event-name with payload."
+  [state event-name payload]
+  (doseq [h (get-in @state [:handlers event-name])]
+    (h payload)))
+
+;;; init registration
+
+(deftest init-registers-three-event-handlers-test
+  ;; init subscribes to tool_call, tool_result, and session_turn_finished.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (is (seq (get-in @state [:handlers "tool_call"])))
+    (is (seq (get-in @state [:handlers "tool_result"])))
+    (is (seq (get-in @state [:handlers "session_turn_finished"])))))
+
+(deftest init-registers-metrics-summary-operation-test
+  ;; init registers the metrics/summary deterministic operation via :register-operation.
+  (let [{:keys [api ops]} (make-api)]
+    (ext/init api)
+    (let [registered (filter #(= "metrics/summary" (:id %)) @ops)]
+      (is (= 1 (count registered)))
+      (is (fn? (:handler (first registered)))))))
+
+(deftest init-registers-metrics-command-test
+  ;; init registers the /metrics slash command when :register-command is available.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (is (contains? (:commands @state) "metrics"))))
+
+(deftest init-returns-nil-test
+  ;; init must return nil.
+  (let [{:keys [api]} (make-api)]
+    (is (nil? (ext/init api)))))
+
+;;; tool_call event
+
+(deftest tool-call-increments-invocation-counter-test
+  ;; tool_call events increment the invocation counter for the named tool.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_call" {:tool-name "bash" :tool-call-id "c1" :input {}})
+    (fire-event state "tool_call" {:tool-name "bash" :tool-call-id "c2" :input {}})
+    (fire-event state "tool_call" {:tool-name "read" :tool-call-id "c3" :input {}})
+    (let [metrics (:metrics @ext/store)]
+      (is (= 2 (get-in metrics [:tools "bash" :invocations])))
+      (is (= 1 (get-in metrics [:tools "read" :invocations]))))))
+
+(deftest tool-call-without-tool-name-is-ignored-test
+  ;; tool_call events with no :tool-name are silently ignored.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_call" {:tool-call-id "c1" :input {}})
+    (is (= {} (get-in @ext/store [:metrics :tools])))))
+
+;;; tool_result event
+
+(deftest tool-result-error-increments-error-counter-test
+  ;; tool_result with :is-error true increments the error counter.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "bash" :tool-call-id "c1" :is-error true :content "Command not found"})
+    (let [metrics (:metrics @ext/store)]
+      (is (= 1 (get-in metrics [:tools "bash" :errors])))
+      (is (= 1 (get-in metrics [:tools "bash" :error-reasons "Command not found"]))))))
+
+(deftest tool-result-success-does-not-increment-error-counter-test
+  ;; tool_result with :is-error false does not touch error counters.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "bash" :tool-call-id "c1" :is-error false :content "ok"})
+    (let [metrics (:metrics @ext/store)]
+      (is (nil? (get-in metrics [:tools "bash" :errors]))))))
+
+(deftest tool-result-error-reason-truncated-to-80-chars-test
+  ;; The error reason key is derived from the first line, max 80 chars.
+  (let [{:keys [api state]} (make-api)
+        long-message (apply str (repeat 100 "x"))]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "read" :tool-call-id "c1" :is-error true :content long-message})
+    (let [reasons (get-in @ext/store [:metrics :tools "read" :error-reasons])]
+      (is (= 1 (count reasons)))
+      (is (<= (count (first (keys reasons))) 80)))))
+
+;;; session_turn_finished event — token accumulation
+
+(deftest turn-finished-accumulates-token-delta-per-model-test
+  ;; session_turn_finished queries usage and accumulates delta under the model-id key.
+  (let [query-session-fn (fn [_session-id _eql]
+                           {:psi.agent-session/usage-input 100
+                            :psi.agent-session/usage-output 50
+                            :psi.agent-session/usage-cache-read 0
+                            :psi.agent-session/usage-cache-write 0
+                            :psi.agent-session/model-id "claude-3"})
+        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        api* (assoc api :query-session query-session-fn)]
+    (ext/init api*)
+    (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
+    (let [metrics (:metrics @ext/store)]
+      (is (= 100 (get-in metrics [:tokens "claude-3" :input])))
+      (is (= 50  (get-in metrics [:tokens "claude-3" :output]))))))
+
+(deftest turn-finished-computes-delta-on-second-turn-test
+  ;; The second turn for a session contributes only the incremental delta.
+  (let [call-count (atom 0)
+        responses  [{:psi.agent-session/usage-input 100
+                     :psi.agent-session/usage-output 50
+                     :psi.agent-session/usage-cache-read 0
+                     :psi.agent-session/usage-cache-write 0
+                     :psi.agent-session/model-id "claude-3"}
+                    {:psi.agent-session/usage-input 160
+                     :psi.agent-session/usage-output 80
+                     :psi.agent-session/usage-cache-read 0
+                     :psi.agent-session/usage-cache-write 0
+                     :psi.agent-session/model-id "claude-3"}]
+        query-session-fn (fn [_session-id _eql]
+                           (let [idx @call-count]
+                             (swap! call-count inc)
+                             (nth responses idx nil)))
+        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        api* (assoc api :query-session query-session-fn)]
+    (ext/init api*)
+    (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
+    (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t2"})
+    (let [metrics (:metrics @ext/store)]
+      ;; Total input: 100 (turn1) + 60 (turn2 delta: 160-100) = 160.
+      (is (= 160 (get-in metrics [:tokens "claude-3" :input])))
+      ;; Total output: 50 + 30 = 80.
+      (is (= 80  (get-in metrics [:tokens "claude-3" :output]))))))
+
+(deftest turn-finished-uses-unknown-when-model-id-nil-test
+  ;; When model-id is nil, token delta is accumulated under "unknown".
+  (let [query-session-fn (fn [_session-id _eql]
+                           {:psi.agent-session/usage-input 10
+                            :psi.agent-session/usage-output 5
+                            :psi.agent-session/usage-cache-read 0
+                            :psi.agent-session/usage-cache-write 0
+                            :psi.agent-session/model-id nil})
+        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        api* (assoc api :query-session query-session-fn)]
+    (ext/init api*)
+    (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
+    (is (= 10 (get-in @ext/store [:metrics :tokens "unknown" :input])))))
+
+;;; metrics/summary operation
+
+(deftest invoke-summary-returns-ok-with-schema-conforming-data-test
+  ;; metrics/summary returns {:status :ok :data <metrics-map>} conforming to schema.
+  (let [{:keys [api ops state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_call" {:tool-name "read" :tool-call-id "c1" :input {}})
+    (let [op-handler (:handler (first (filter #(= "metrics/summary" (:id %)) @ops)))
+          result (op-handler {:args {}})]
+      (is (= :ok (:status result)))
+      (is (schema/valid? (:data result))))))
+
+;;; /metrics command
+
+(deftest metrics-command-calls-notify-with-markdown-test
+  ;; The /metrics command calls (:notify api) with a markdown-formatted string.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_call" {:tool-name "bash" :tool-call-id "c1" :input {}})
+    (let [cmd-handler (get-in @state [:commands "metrics" :handler])]
+      (cmd-handler {})
+      (let [msgs (:messages @state)]
+        (is (seq msgs))
+        (is (str/includes? (:content (last msgs)) "## Usage Metrics"))))))
+
+(deftest metrics-command-includes-tool-section-when-tools-tracked-test
+  ;; The /metrics output includes a Tools section when tool invocations exist.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_call" {:tool-name "edit" :tool-call-id "c1" :input {}})
+    (let [cmd-handler (get-in @state [:commands "metrics" :handler])]
+      (cmd-handler {})
+      (is (str/includes? (:content (last (:messages @state))) "### Tools")))))
+
+(deftest metrics-command-shows-commands-section-when-invoked-test
+  ;; Invoking /metrics self-tracks the invocation under :commands.
+  ;; Even with no other events, the commands section appears.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (let [cmd-handler (get-in @state [:commands "metrics" :handler])]
+      (cmd-handler {})
+      (let [content (:content (last (:messages @state)))]
+        (is (str/includes? content "## Usage Metrics"))
+        (is (str/includes? content "metrics"))))))
+
+;;; Reload behaviour
+
+(deftest reload-preserves-counters-test
+  ;; A second call to init (simulating reload) preserves existing counters.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_call" {:tool-name "bash" :tool-call-id "c1" :input {}})
+    ;; Simulate reload: call init again.
+    (ext/init api)
+    (is (= 1 (get-in @ext/store [:metrics :tools "bash" :invocations])))))
+
+;;; Schema conformance of returned data
+
+(deftest summary-data-conforms-to-schema-after-events-test
+  ;; After processing several events the metrics map still conforms to schema.
+  (let [{:keys [api ops state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_call" {:tool-name "bash" :tool-call-id "c1" :input {}})
+    (fire-event state "tool_result" {:tool-name "bash" :tool-call-id "c1"
+                                     :is-error true :content "fail"})
+    (let [op-handler (:handler (first (filter #(= "metrics/summary" (:id %)) @ops)))
+          result (op-handler {:args {}})]
+      (is (schema/valid? (:data result))))))

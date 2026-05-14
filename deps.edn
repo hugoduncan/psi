@@ -79,8 +79,9 @@
                         "extensions/work-on/src"
                         "extensions/github/src"
                         "extensions/edit-clj/src"
-                        "extensions/logprobs/src"]
-          :extra-deps  {nrepl/nrepl         {:mvn/version "1.5.1"}
+                        "extensions/logprobs/src"
+                        "extensions/metrics/src"]
+          :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
                         rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
@@ -119,8 +120,9 @@
                         "extensions/work-on/src"
                         "extensions/github/src"
                         "extensions/edit-clj/src"
-                        "extensions/logprobs/src"]
-          :extra-deps  {nrepl/nrepl         {:mvn/version "1.5.1"}
+                        "extensions/logprobs/src"
+                        "extensions/metrics/src"]
+          :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
                         rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "psi.main"]}
@@ -158,8 +160,9 @@
                            "extensions/work-on/src"
                            "extensions/github/src"
                            "extensions/edit-clj/src"
-                           "extensions/logprobs/src"]
-             :extra-deps  {nrepl/nrepl            {:mvn/version "1.5.1"}
+                           "extensions/logprobs/src"
+                           "extensions/metrics/src"]
+             :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
                            rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
              :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
              :main-opts   ["-m" "psi.tui.test-harness.tui-demo-main"]}
@@ -234,6 +237,7 @@
                              "extensions/work-on/test"
                              "extensions/github/test"
                              "extensions/logprobs/test"
+                             "extensions/metrics/test"
                              "components/extension-test-helpers/src"]
                :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
                              nrepl/nrepl         {:mvn/version "1.5.1"}}
@@ -287,6 +291,7 @@
                         "extensions/github/test"
                         "extensions/edit-clj/test"
                         "extensions/logprobs/test"
+                        "extensions/metrics/test"
                         "components/ai/src"
                         "components/engine/src"
                         "components/query/src"
@@ -335,6 +340,7 @@
                         "extensions/github/src"
                         "extensions/edit-clj/src"
                         "extensions/logprobs/src"
+                        "extensions/metrics/src"
                         "components/extension-test-helpers/src"]
           :extra-deps  {lambdaisland/kaocha    {:mvn/version "1.91.1392"}
                         nrepl/nrepl            {:mvn/version "1.5.1"}
