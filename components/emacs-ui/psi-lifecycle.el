@@ -72,6 +72,7 @@
    :session-is-compacting nil
    :session-pending-message-count 0
    :session-retry-attempt 0
+   :session-retry nil
    :session-model-provider nil
    :session-model-id nil
    :session-model-reasoning nil
@@ -407,6 +408,7 @@ When PRESERVE-TOOL-OUTPUT-VIEW-MODE is non-nil, keep the current
     (setf (psi-emacs-state-session-is-compacting psi-emacs--state) nil)
     (setf (psi-emacs-state-session-pending-message-count psi-emacs--state) 0)
     (setf (psi-emacs-state-session-retry-attempt psi-emacs--state) 0)
+    (setf (psi-emacs-state-session-retry psi-emacs--state) nil)
     (setf (psi-emacs-state-session-model-provider psi-emacs--state) nil)
     (setf (psi-emacs-state-session-model-id psi-emacs--state) nil)
     (setf (psi-emacs-state-session-model-reasoning psi-emacs--state) nil)

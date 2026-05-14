@@ -136,7 +136,8 @@
                                                           :usage  (:usage event)})
           :error                    (turn-sc/send-event! turn-ctx :turn/error
                                                          (cond-> {:error-message (:error-message event)}
-                                                           (:http-status event) (assoc :http-status (:http-status event))))
+                                                           (:http-status event) (assoc :http-status (:http-status event))
+                                                           (:headers event) (assoc :headers (:headers event))))
           nil)))))
 
 (defn await-assistant-message!
@@ -214,7 +215,8 @@
                                    :stop-reason :error
                                    :error-message (:error-message result)
                                    :timestamp (java.time.Instant/now)}
-                            (:http-status result) (assoc :http-status (:http-status result)))
+                            (:http-status result) (assoc :http-status (:http-status result))
+                            (:headers result) (assoc :provider-error/headers (:headers result)))
        :logprobs nil}
       {:turn-id turn-id
        :model ai-model

@@ -25,3 +25,43 @@
 - Updated `plan.md` so the reset rule is no longer deferred to implementation.
 - Tightened proof expectations in task artifacts so focused tests must assert each branch of the canonical reset rule directly.
 - No blocking reason; newly added design-step completed.
+
+2026-05-14 implementation
+- Narrowest canonical normalization owner chosen: `psi.session-state.model` now owns pure retry/rate-limit header normalization helpers (`normalized-headers`, `header-value`, `retry-after-delay-ms`, `rate-limit-reset->timing`, `retry-metadata`). This keeps provider/header interpretation in backend-owned session/retry semantics rather than UI or transport-local formatting.
+- Preserved provider headers through the canonical retry path:
+  - turn-runtime now carries provider `:headers` into turn error handling and records them on assistant error messages as `:provider-error/headers`
+  - non-streaming provider errors also project `:provider-error/headers`
+  - `prompt_loop/finish-agent-loop!` now forwards `:provider-error/headers` onto the `:pending-agent-event` consumed by `:on-retry-triggered`
+  - thrown ex-data errors in `prompt_loop` now preserve `:headers` as `:provider-error/headers`
+- Session state/schema extended with canonical nested `:retry` metadata and default `nil` ownership.
+- Retry scheduling path updated in `statechart_actions.clj`:
+  - computes normalized retry metadata from provider headers when present
+  - prefers valid `Retry-After` / `X-Retry-After`
+  - falls back to existing exponential backoff when retry-after is absent/invalid
+  - stores canonical `:retry` metadata while incrementing `:retry-attempt`
+  - schedules the retry effect using the chosen delay
+- Retry lifecycle clearing implemented:
+  - `on-agent-done` clears `:retry`
+  - `on-abort` clears `:retry`
+  - `on-compact-done` clears `:retry`
+  - `on-retry-resume` clears `:retry` before restarting the agent loop
+- Shared backend projections updated:
+  - `session-summary` now includes nested `:retry` and extends `:status-session-line` with retry timing/source/rate-limit fragments
+  - session resolver surface now exposes `:psi.agent-session/retry`
+  - RPC `session/updated` requires and emits the canonical `:retry` map unchanged
+- Existing UI mechanisms reused as designed:
+  - Emacs keeps consuming `status-session-line` via existing status diagnostics projection; only payload/state storage was extended to preserve `:retry`
+  - TUI keeps consuming the existing footer/status line surface; footer projection now appends retry timing and normalized rate-limit text to the canonical backend `:status-line`
+- Provider-doc-grounded assumptions used for this slice:
+  - treat provider docs as guidance for retryable/rate-limit behavior, but do not require any given header to be present
+  - when valid retry timing headers are observed, they are treated as authoritative timing guidance
+  - missing headers are not protocol errors; fallback backoff remains canonical
+  - both standard and legacy `X-` prefixed rate-limit headers remain supported to accommodate gateways/proxies/compatible endpoints
+- Focused verification completed:
+  - `clojure -M:test --focus psi.agent-session.retry-headers-test --focus psi.agent-session.statechart-actions-test --focus psi.app-runtime.session-summary-test --focus psi.rpc-events-test --focus psi.app-runtime.footer-test`
+  - result: `25 tests, 105 assertions, 0 failures`
+- Emacs focused verification completed:
+  - `emacs -Q --batch -L components/emacs-ui -L components/emacs-ui/test -l ert -l components/emacs-ui/test/psi-streaming-runtime-test.el -f ert-run-tests-batch-and-exit`
+  - result: `21 tests, 0 unexpected`
+- Lint status:
+  - touched files lint clean except for pre-existing warnings in `turn_runtime/core.clj` about unresolved `ai/execute-response-in` / `ai/execute-response`, with no new lint errors introduced by this slice.

@@ -1,34 +1,34 @@
 # Steps
 
-- [ ] Inspect the current retry/error propagation path and record the narrowest canonical owner for retry/rate-limit header normalization.
-- [ ] Review the linked Anthropic and OpenAI error documentation and record any concrete retry/rate-limit guidance that should constrain this task's implementation assumptions.
-- [ ] Decide and document the canonical retry metadata state shape for this task.
-- [ ] Implement case-insensitive lookup for retry/rate-limit headers, covering both standard and `X-` prefixed names.
-- [ ] Implement `Retry-After` / `X-Retry-After` parsing.
-  - [ ] Support delta-seconds values.
-  - [ ] Support HTTP-date values when parseable.
-  - [ ] Ignore invalid values and fall back cleanly.
-- [ ] Implement `RateLimit-Limit` / `X-RateLimit-Limit` parsing.
-- [ ] Implement `RateLimit-Remaining` / `X-RateLimit-Remaining` parsing.
-- [ ] Implement `RateLimit-Reset` / `X-RateLimit-Reset` parsing with one explicit documented numeric interpretation rule.
-- [ ] Normalize parsed retry/rate-limit headers into one canonical backend-owned retry metadata shape.
-- [ ] Preserve provider response headers through the canonical retry path up to the retry scheduling point when present.
-- [ ] Extend session state/schema to store the active retry metadata.
-- [ ] Update retry scheduling so valid `Retry-After` overrides exponential backoff and invalid/missing values fall back to exponential backoff.
-- [ ] Record retry resume timing and delay source in session state when scheduling a retry.
-- [ ] Clear or replace stale retry metadata when retry waiting ends or is superseded.
-- [ ] Extend the shared backend projection / session summary surface with retry timing metadata.
-- [ ] Extend the shared backend projection / session summary surface with normalized rate-limit metadata.
-- [ ] Extend RPC `session/updated` payloads to include the retry/rate-limit metadata needed by frontends.
-- [ ] Surface retry timing in Emacs UI status/diagnostics.
-- [ ] Surface rate-limit information in Emacs UI status/diagnostics.
-- [ ] Surface retry timing in the TUI status/footer/session summary.
-- [ ] Surface rate-limit information in the TUI status/footer/session summary.
-- [ ] Add focused tests for retry-after parsing and precedence.
-- [ ] Add focused tests for exponential fallback when retry-after is missing or invalid.
-- [ ] Add focused tests for standard and `X-` prefixed rate-limit header normalization.
-- [ ] Add focused tests proving retry scheduling uses the selected provider-aware delay.
-- [ ] Add focused tests proving `session/updated` exposes retry/rate-limit metadata.
-- [ ] Record the provider-doc-grounded retry/rate-limit assumptions actually used by the implementation in `implementation.md`.
-- [ ] Add focused UI-facing proof that Emacs-visible status includes retry timing and rate-limit information.
-- [ ] Add focused UI-facing proof that TUI/backend-visible status/footer content includes retry timing and rate-limit information.
+- [x] Inspect the current retry/error propagation path and record the narrowest canonical owner for retry/rate-limit header normalization.
+- [x] Review the linked Anthropic and OpenAI error documentation and record any concrete retry/rate-limit guidance that should constrain this task's implementation assumptions.
+- [x] Decide and document the canonical retry metadata state shape for this task.
+- [x] Implement case-insensitive lookup for retry/rate-limit headers, covering both standard and `X-` prefixed names.
+- [x] Implement `Retry-After` / `X-Retry-After` parsing.
+  - [x] Support delta-seconds values.
+  - [x] Support HTTP-date values when parseable.
+  - [x] Ignore invalid values and fall back cleanly.
+- [x] Implement `RateLimit-Limit` / `X-RateLimit-Limit` parsing.
+- [x] Implement `RateLimit-Remaining` / `X-RateLimit-Remaining` parsing.
+- [x] Implement `RateLimit-Reset` / `X-RateLimit-Reset` parsing with one explicit documented numeric interpretation rule.
+- [x] Normalize parsed retry/rate-limit headers into one canonical backend-owned retry metadata shape.
+- [x] Preserve provider response headers through the canonical retry path up to the retry scheduling point when present.
+- [x] Extend session state/schema to store the active retry metadata.
+- [x] Update retry scheduling so valid `Retry-After` overrides exponential backoff and invalid/missing values fall back to exponential backoff.
+- [x] Record retry resume timing and delay source in session state when scheduling a retry.
+- [x] Clear or replace stale retry metadata when retry waiting ends or is superseded.
+- [x] Extend the shared backend projection / session summary surface with retry timing metadata.
+- [x] Extend the shared backend projection / session summary surface with normalized rate-limit metadata.
+- [x] Extend RPC `session/updated` payloads to include the retry/rate-limit metadata needed by frontends.
+- [x] Surface retry timing in Emacs UI status/diagnostics.
+- [x] Surface rate-limit information in Emacs UI status/diagnostics.
+- [x] Surface retry timing in the TUI status/footer/session summary.
+- [x] Surface rate-limit information in the TUI status/footer/session summary.
+- [x] Add focused tests for retry-after parsing and precedence.
+- [x] Add focused tests for exponential fallback when retry-after is missing or invalid.
+- [x] Add focused tests for standard and `X-` prefixed rate-limit header normalization.
+- [x] Add focused tests proving retry scheduling uses the selected provider-aware delay.
+- [x] Add focused tests proving `session/updated` exposes retry/rate-limit metadata.
+- [x] Record the provider-doc-grounded retry/rate-limit assumptions actually used by the implementation in `implementation.md`.
+- [x] Add focused UI-facing proof that Emacs-visible status includes retry timing and rate-limit information.
+- [x] Add focused UI-facing proof that TUI/backend-visible status/footer content includes retry timing and rate-limit information.

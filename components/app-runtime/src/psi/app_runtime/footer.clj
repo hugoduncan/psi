@@ -19,6 +19,7 @@
    :psi.agent-session/context-fraction
    :psi.agent-session/context-window
    :psi.agent-session/auto-compaction-enabled
+   :psi.agent-session/retry
    :psi.agent-session/model-provider
    :psi.agent-session/model-id
    :psi.agent-session/model-reasoning
@@ -81,6 +82,26 @@
     (if (number? fraction)
       (str (format "%.1f" (* 100.0 fraction)) "%/" window suffix)
       (str "?/" window suffix))))
+
+(defn- format-relative-seconds
+  [ms]
+  (let [seconds (max 0 (long (Math/ceil (/ (double (max 0 ms)) 1000.0))))]
+    (str seconds "s")))
+
+(defn- retry-status-text
+  [retry now-ms]
+  (when (:active? retry)
+    (let [retry-text     (str "retry in " (format-relative-seconds (- (or (:resume-at retry) now-ms)
+                                                                      now-ms)))
+          rate-limit     (:rate-limit retry)
+          remaining-text (when (some? (:remaining rate-limit))
+                           (str "remaining "
+                                (:remaining rate-limit)
+                                (when (some? (:limit rate-limit))
+                                  (str "/" (:limit rate-limit)))))
+          reset-text     (when-let [reset-at (:reset-at rate-limit)]
+                           (str "reset in " (format-relative-seconds (- reset-at now-ms))))]
+      (str/join " · " (remove str/blank? [retry-text remaining-text reset-text])))))
 
 (defn- usage-parts
   [d context-text]
@@ -258,15 +279,17 @@
          context-fraction         (:psi.agent-session/context-fraction d)
          context-window           (:psi.agent-session/context-window d)
          auto-compact?            (boolean (:psi.agent-session/auto-compaction-enabled d))
+         retry                    (:psi.agent-session/retry d)
+         now-ms                   (.toEpochMilli (java.time.Instant/now))
          context-text             (footer-context-text context-fraction context-window auto-compact?)
          usage-parts*             (usage-parts d context-text)
          model-text*              (model-text d)
          path-text*               (path-text d fallback-worktree-path)
          statuses*                (status-items (:psi.ui/statuses d))
+         retry-status             (retry-status-text retry now-ms)
          session-activity-buckets (footer-session-activity-buckets context-sessions)
          session-activity-line    (footer-session-activity-line context-sessions)
-         status-line              (->> statuses*
-                                       (map :status/text)
+         status-line              (->> (concat (map :status/text statuses*) [retry-status])
                                        (remove str/blank?)
                                        (str/join " "))
          stats-line               (str/join " " (concat usage-parts* [model-text*]))
@@ -289,6 +312,7 @@
                        :window                   context-window
                        :auto-compaction-enabled auto-compact?
                        :text                     context-text}
+      :footer/retry retry
       :footer/model {:provider                   (:psi.agent-session/model-provider d)
                      :id                         (:psi.agent-session/model-id d)
                      :reasoning                  (boolean (:psi.agent-session/model-reasoning d))

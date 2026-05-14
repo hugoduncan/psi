@@ -51,7 +51,7 @@
     "error"})
 
 (def ^:private required-event-payload-keys
-  {"session/updated" #{:session-id :phase :is-streaming :is-compacting :pending-message-count :retry-attempt :interrupt-pending}
+  {"session/updated" #{:session-id :phase :is-streaming :is-compacting :pending-message-count :retry-attempt :retry :interrupt-pending}
    "session/resumed" #{:session-id :session-file :message-count}
    "session/rehydrated" #{:messages :tool-calls :tool-order}
    "context/updated" #{:active-session-id :sessions}
@@ -126,6 +126,7 @@
                                   :is-compacting
                                   :pending-message-count
                                   :retry-attempt
+                                  :retry
                                   :interrupt-pending
                                   :model-provider
                                   :model-id

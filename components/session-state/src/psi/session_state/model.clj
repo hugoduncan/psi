@@ -2,6 +2,7 @@
   "Canonical session-state model authority: session schemas, defaults, pure
    derived predicates, and entry helpers. No atom, I/O, or runtime ownership."
   (:require
+   [clojure.string :as str]
    [malli.core :as m]
    [psi.agent-session.scheduler :as scheduler]))
 
@@ -164,6 +165,21 @@
    [:steering-messages [:vector :string]]
    [:follow-up-messages [:vector :string]]
    [:retry-attempt :int]
+   [:retry {:optional true}
+    [:maybe
+     [:map
+      [:active? :boolean]
+      [:attempt :int]
+      [:delay-ms :int]
+      [:delay-source [:enum :retry-after :exponential-backoff]]
+      [:resume-at :int]
+      [:rate-limit {:optional true}
+       [:maybe
+        [:map
+         [:limit {:optional true} [:maybe :int]]
+         [:remaining {:optional true} [:maybe :int]]
+         [:reset-at {:optional true} [:maybe :int]]
+         [:reset-after-ms {:optional true} [:maybe :int]]]]]]]]
    [:auto-retry-enabled :boolean]
    [:auto-compaction-enabled :boolean]
    [:scoped-models [:vector scoped-model-schema]]
@@ -253,6 +269,7 @@
      :steering-messages       []
      :follow-up-messages      []
      :retry-attempt           0
+     :retry                   nil
      :auto-retry-enabled      (:auto-retry-enabled default-config)
      :auto-compaction-enabled false
      :scoped-models           []
@@ -378,3 +395,85 @@
 (defn exponential-backoff-ms
   [attempt base-ms max-ms]
   (min max-ms (long (* base-ms (Math/pow 2 attempt)))))
+
+(defn- parse-long-safe
+  [s]
+  (when (string? s)
+    (try
+      (Long/parseLong s)
+      (catch Exception _
+        nil))))
+
+(defn- integer-string?
+  [s]
+  (boolean (re-matches #"^[0-9]+$" (or s ""))))
+
+(defn- normalize-header-name
+  [header-name]
+  (when header-name
+    (-> (str header-name)
+        str/lower-case
+        str/trim)))
+
+(defn normalized-headers
+  [headers]
+  (reduce-kv (fn [acc k v]
+               (assoc acc (normalize-header-name k) v))
+             {}
+             (or headers {})))
+
+(defn header-value
+  [headers & names]
+  (let [headers* (normalized-headers headers)]
+    (some #(get headers* (normalize-header-name %)) names)))
+
+(defn retry-after-delay-ms
+  [header-value now-ms]
+  (let [raw (some-> header-value str str/trim)]
+    (cond
+      (not (seq raw))
+      nil
+
+      (integer-string? raw)
+      (* 1000 (Long/parseLong raw))
+
+      :else
+      (try
+        (let [resume-ms (.toEpochMilli (.toInstant (java.time.ZonedDateTime/parse raw java.time.format.DateTimeFormatter/RFC_1123_DATE_TIME)))
+              delay-ms  (- resume-ms (long now-ms))]
+          (when (pos? delay-ms)
+            delay-ms))
+        (catch Exception _
+          nil)))))
+
+(defn rate-limit-reset->timing
+  [header-value now-ms]
+  (when-let [n (some-> header-value str str/trim parse-long-safe)]
+    (cond
+      (>= n 1000000000000)
+      {:reset-at n}
+
+      (>= n 1000000000)
+      {:reset-at (* 1000 n)}
+
+      :else
+      (let [reset-after-ms (* 1000 n)]
+        {:reset-after-ms reset-after-ms
+         :reset-at (+ (long now-ms) reset-after-ms)}))))
+
+(defn retry-metadata
+  [headers attempt exponential-delay-ms now-ms]
+  (let [retry-after-ms (retry-after-delay-ms (header-value headers "retry-after" "x-retry-after") now-ms)
+        delay-ms       (or retry-after-ms exponential-delay-ms)
+        rate-limit     (merge
+                        (when-some [limit (some-> (header-value headers "ratelimit-limit" "x-ratelimit-limit") str str/trim parse-long-safe)]
+                          {:limit limit})
+                        (when-some [remaining (some-> (header-value headers "ratelimit-remaining" "x-ratelimit-remaining") str str/trim parse-long-safe)]
+                          {:remaining remaining})
+                        (rate-limit-reset->timing (header-value headers "ratelimit-reset" "x-ratelimit-reset") now-ms))]
+    {:active? true
+     :attempt (int attempt)
+     :delay-ms delay-ms
+     :delay-source (if retry-after-ms :retry-after :exponential-backoff)
+     :resume-at (+ (long now-ms) delay-ms)
+     :rate-limit (when (seq rate-limit) rate-limit)}))

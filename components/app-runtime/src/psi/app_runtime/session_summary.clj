@@ -1,6 +1,7 @@
 (ns psi.app-runtime.session-summary
   "Adapter-neutral session summary projection shared across interactive UIs."
   (:require
+   [clojure.string :as str]
    [psi.agent-session.message-text :as message-text]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]))
@@ -48,6 +49,28 @@
           (str model-label " • thinking " thinking-label)
           model-label)))))
 
+(defn- format-relative-seconds
+  [ms]
+  (let [seconds (max 0 (long (Math/ceil (/ (double (max 0 ms)) 1000.0))))]
+    (str seconds "s")))
+
+(defn- retry-summary-fragment
+  [retry now-ms]
+  (when (:active? retry)
+    (let [delay-text     (format-relative-seconds (- (or (:resume-at retry) now-ms) now-ms))
+          rate-limit     (:rate-limit retry)
+          remaining-text (when (some? (:remaining rate-limit))
+                           (str " remaining:"
+                                (:remaining rate-limit)
+                                (when (some? (:limit rate-limit))
+                                  (str "/" (:limit rate-limit)))))
+          reset-text     (when-let [reset-at (:reset-at rate-limit)]
+                           (str " reset-in:" (format-relative-seconds (- reset-at now-ms))))]
+      (str " retrying-in:" delay-text
+           " source:" (name (:delay-source retry))
+           remaining-text
+           reset-text))))
+
 (defn session-summary
   [ctx session-id]
   (let [sd                       (ss/get-session-data-in ctx session-id)
@@ -58,6 +81,8 @@
         session-display-name     (message-text/session-display-name (:session-name sd) journal-messages)
         pending-message-count    (+ (safe-count (:steering-messages sd))
                                     (safe-count (:follow-up-messages sd)))
+        retry                    (:retry sd)
+        now-ms                   (.toEpochMilli (java.time.Instant/now))
         summary                  {:session-id                 (:session-id sd)
                                   :session-file               (:session-file sd)
                                   :session-name               (:session-name sd)
@@ -67,6 +92,7 @@
                                   :is-compacting              (boolean (:is-compacting sd))
                                   :pending-message-count      pending-message-count
                                   :retry-attempt              (or (:retry-attempt sd) 0)
+                                  :retry                      retry
                                   :interrupt-pending          (boolean (:interrupt-pending sd))
                                   :model-provider             (:provider model)
                                   :model-id                   (:id model)
@@ -81,9 +107,11 @@
                          :thinking-level             thinking-level
                          :effective-reasoning-effort effective-effort})
            :status-session-line
-           (str "session: " (:session-id summary)
-                " phase:" (or (:phase summary) "unknown")
-                " streaming:" (if (:is-streaming summary) "yes" "no")
-                " compacting:" (if (:is-compacting summary) "yes" "no")
-                " pending:" (:pending-message-count summary)
-                " retry:" (:retry-attempt summary)))))
+           (str/trim
+            (str "session: " (:session-id summary)
+                 " phase:" (or (:phase summary) "unknown")
+                 " streaming:" (if (:is-streaming summary) "yes" "no")
+                 " compacting:" (if (:is-compacting summary) "yes" "no")
+                 " pending:" (:pending-message-count summary)
+                 " retry:" (:retry-attempt summary)
+                 (or (retry-summary-fragment retry now-ms) ""))))))
