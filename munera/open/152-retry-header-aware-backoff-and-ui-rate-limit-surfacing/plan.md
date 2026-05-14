@@ -51,8 +51,15 @@
 
 ## Decisions to make during implementation
 
-- the explicit numeric interpretation rule for `RateLimit-Reset`
 - whether to surface both absolute instants and preformatted relative helper text from the backend, or only normalized raw values plus existing UI formatting
+
+## Fixed numeric reset interpretation rule
+
+- canonical `RateLimit-Reset` numeric interpretation is now fixed, not deferred:
+  - values `>= 1000000000000` mean epoch milliseconds
+  - otherwise values `>= 1000000000` mean epoch seconds and must be normalized to epoch milliseconds
+  - otherwise values mean relative seconds from now and must be normalized into both `:reset-after-ms` and derived absolute `:reset-at`
+- focused proof must assert each branch of that rule directly so implementation does not reopen the interpretation question
 
 ## Design decisions fixed by ambiguity follow-up
 

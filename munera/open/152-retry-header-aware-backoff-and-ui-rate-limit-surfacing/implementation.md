@@ -18,3 +18,10 @@
 
 2026-05-14 inconsistency review
 - Inconsistency: design/acceptance now require one explicit tested backend rule for numeric `RateLimit-Reset` interpretation, but plan only lists that rule as a decision to make during implementation and steps only mention implementing/documenting a rule. This leaves task intent, plan, and execution checklist out of sync on whether the rule is already fixed versus still open; resolve by choosing and recording the canonical rule in design/plan and adding proof expectations against that exact rule.
+
+2026-05-14 inconsistency follow-up execution
+- Fixed the open `RateLimit-Reset` inconsistency in task artifacts.
+- Updated `design.md` to choose one canonical numeric interpretation rule: `>= 1000000000000` → epoch ms; otherwise `>= 1000000000` → epoch seconds; otherwise relative seconds from now.
+- Updated `plan.md` so the reset rule is no longer deferred to implementation.
+- Tightened proof expectations in task artifacts so focused tests must assert each branch of the canonical reset rule directly.
+- No blocking reason; newly added design-step completed.

@@ -2,4 +2,4 @@
 - [x] Define one authoritative surfaced retry/rate-limit metadata shape and field naming shared across session summary, Pathom/resolvers, and RPC `session/updated`, or explicitly document any justified projection-specific divergence.
 - [x] Define the exact backend-owned TUI-visible rendering surface that satisfies acceptance (for example session summary line, footer status line, or another named surface) so UI proof is objective.
 - [x] Define the canonical transport-to-session header propagation contract: which error/result map carries provider response headers to `:on-retry-triggered`, and under what key/path.
-- [ ] Fix the unresolved `RateLimit-Reset` rule inconsistency by choosing one canonical numeric interpretation rule in `design.md`/`plan.md` and tightening proof expectations to assert that exact rule rather than leaving it as an implementation-time decision.
+- [x] Fix the unresolved `RateLimit-Reset` rule inconsistency by choosing one canonical numeric interpretation rule in `design.md`/`plan.md` and tightening proof expectations to assert that exact rule rather than leaving it as an implementation-time decision.

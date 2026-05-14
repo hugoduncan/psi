@@ -195,13 +195,14 @@ Header lookup must be case-insensitive by behavior, either because headers are n
 
 The runtime must choose one canonical interpretation for ambiguous numeric reset values so the ambiguity is resolved once in backend code rather than repeatedly in the UI.
 
-The design must explicitly define how numeric `RateLimit-Reset` values are interpreted. Acceptable normalized semantics for this task include one documented rule such as:
+Canonical numeric `RateLimit-Reset` rule for this task:
 
-- parse as epoch milliseconds when obviously millisecond-scale
-- otherwise parse as epoch seconds when plausibly timestamp-scale
-- otherwise parse as relative seconds from now
+- parse the value as an integer when possible
+- values `>= 1000000000000` are interpreted as epoch milliseconds
+- otherwise values `>= 1000000000` are interpreted as epoch seconds and normalized to epoch milliseconds
+- otherwise values are interpreted as relative seconds from now and normalized into both `:reset-after-ms` and derived absolute `:reset-at`
 
-The exact threshold rule is an implementation decision, but the task must make it explicit and test it.
+This rule is backend-owned, must be documented in code, and must be asserted directly by focused tests.
 
 The same applies to `Retry-After` HTTP-date parsing: the backend must normalize it to an absolute retry instant and derived delay.
 
