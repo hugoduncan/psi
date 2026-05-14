@@ -73,3 +73,10 @@ Clarifications locked from review:
   - `JAVA_TOOL_OPTIONS='-Xmx2g' clojure -M:test --focus psi.agent-session.graph-surface-test` → `22 tests, 2247 assertions, 0 failures`
   - `JAVA_TOOL_OPTIONS='-Xmx2g' clojure -M:test --focus psi.agent-session.tools-test/psi-tool-integration-test --reporter kaocha.report/dots --no-randomize` → `1 tests, 53 assertions, 0 failures`
   - `JAVA_TOOL_OPTIONS='-Xmx2g' clojure -M:test --focus psi.agent-session.resolvers-test --focus psi.agent-session.session-close-mutation-test --reporter kaocha.report/dots --no-randomize` → `23 tests, 141 assertions, 0 failures`
+
+2026-05-14 follow-up execution:
+- completed the review-added proof-gap follow-up for top-level string-key normalization on `psi-tool(action: "mutate")`
+- added a focused live-surface test in `components/agent-session/test/psi/agent_session/psi_tool_mutate_test.clj` that invokes `psi.extension/close-session` through `psi-tool` with string-keyed `params`
+- the proof asserts the request succeeds via the live tool surface, closes the explicit target session, and leaves the invoking session intact, covering the v1 contract promised by design/docs
+- focused verification green:
+  - `JAVA_TOOL_OPTIONS='-Xmx2g' clojure -M:test --focus psi.agent-session.psi-tool-mutate-test --reporter kaocha.report/dots --no-randomize` → `1 tests, 44 assertions, 0 failures`

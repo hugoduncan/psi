@@ -39,7 +39,7 @@ Slice 5 — Composed workflow proof and docs
 - [x] Add a composed workflow proof for query active session → query compact summaries → mutate chosen session → verify result
 - [x] Verify the chosen session is gone, the active session remains, and `:psi.agent-session/active-session-id` is unchanged when the closed session was not active
 - [ ] Update documentation/examples for the canonical query → select → mutate workflow
-- [ ] Add focused psi-tool proof that top-level string-keyed mutate params are normalized and accepted through the live tool surface (the v1 contract/docs promise this behavior, but the current mutate-focused tests do not prove it explicitly)
+- [x] Add focused psi-tool proof that top-level string-keyed mutate params are normalized and accepted through the live tool surface (the v1 contract/docs promise this behavior, but the current mutate-focused tests do not prove it explicitly)
 - [x] Verify that session cleanup and similar admin workflows are implementable in caller logic without a bespoke delete-old-sessions command
 
 Verification

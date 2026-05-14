@@ -38,6 +38,24 @@
       (is (nil? (ss/get-session-data-in ctx target-id)))
       (is (some? (ss/get-session-data-in ctx session-id)))))
 
+  (testing "psi-tool mutate accepts top-level string-keyed params through the live tool surface"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          child-sd         (session/new-session-in! ctx session-id {})
+          target-id        (:session-id child-sd)
+          tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+          result           ((:execute tool) {"action" "mutate"
+                                             "mutation" "psi.extension/close-session"
+                                             "params" {"session-id" target-id
+                                                       "unknown" {:preserved? true}}})
+          parsed           (read-string (:content result))]
+      (is (false? (:is-error result)))
+      (is (= :ok (:psi-tool/overall-status parsed)))
+      (is (= {:psi.agent-session/close-session-closed? true
+              :psi.agent-session/close-session-id target-id}
+             (:psi-tool/result parsed)))
+      (is (nil? (ss/get-session-data-in ctx target-id)))
+      (is (some? (ss/get-session-data-in ctx session-id)))))
+
   (testing "psi-tool mutate rejects unknown mutation names with validate error"
     (let [[ctx session-id] (create-session-context {:persist? false})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
