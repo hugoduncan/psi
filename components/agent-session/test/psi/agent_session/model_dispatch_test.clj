@@ -332,6 +332,7 @@
       (test-support/update-state! ctx :session-data assoc
                                   :interrupt-pending false
                                   :steering-messages ["queued steer"])
+      (swap! (:data-atom (ss/agent-ctx-in ctx session-id)) assoc :pending-tool-calls #{"tc-interrupt-test"})
       ;; Force streaming deterministically so interrupt behavior does not depend
       ;; on prompt runtime timing.
       (sc/send-event! (:sc-env ctx)
@@ -342,6 +343,7 @@
       (let [sd    (ss/get-session-data-in ctx session-id)
             entry (last (kernel/event-log-entries))]
         (is (true? (:interrupt-pending sd)))
+        (is (= :deferred-interrupt (:interrupt-reason sd)))
         (is (= [] (:steering-messages sd)))
         (is (instance? java.time.Instant (:interrupt-requested-at sd)))
         (is (= :session/request-interrupt (:event-type entry)))

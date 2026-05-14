@@ -278,6 +278,27 @@
     (is (= :user-abort (get-in (first @appended*) [:details :interruption :reason])))
     (is (str/includes? (get-in (first @appended*) [:content 0 :text]) "Reason: user-abort."))))
 
+(deftest deferred-interrupt-records-interrupted-tool-results-with-reason-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        agent-ctx        (ss/agent-ctx-in ctx session-id)
+        appended*        (atom [])]
+    (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+    (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+    (swap! (:data-atom agent-ctx) assoc :pending-tool-calls #{"tc-interrupt"})
+    (session/request-interrupt-in! ctx session-id)
+    (with-redefs [psi.agent-session.dispatch/dispatch!
+                  (let [orig psi.agent-session.dispatch/dispatch!]
+                    (fn [ctx event-type event-data opts]
+                      (when (= :session/tool-agent-record-result event-type)
+                        (swap! appended* conj (:tool-result-msg event-data)))
+                      (orig ctx event-type event-data opts)))]
+      (session/dispatch-in! ctx :on-agent-done {:session-id session-id} {:origin :statechart}))
+    (is (= 1 (count @appended*)))
+    (is (= "tc-interrupt" (:tool-call-id (first @appended*))))
+    (is (true? (:is-error (first @appended*))))
+    (is (= :deferred-interrupt (get-in (first @appended*) [:details :interruption :reason])))
+    (is (str/includes? (get-in (first @appended*) [:content 0 :text]) "Reason: deferred-interrupt."))))
+
 (deftest abort-cancels-active-prompt-runtime-test
   (let [[ctx session-id] (create-session-context {:persist? false})
         started (promise)

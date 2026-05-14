@@ -189,13 +189,16 @@
                             :session/request-interrupt
                             {:session-id       session-id
                              :already-pending? already-pending?
-                             :requested-at     (java.time.Instant/now)}
+                             :requested-at     (java.time.Instant/now)
+                             :reason           :deferred-interrupt}
                             {:origin :core})
         {:accepted? (not already-pending?)
          :pending? true
+         :reason :deferred-interrupt
          :dropped-steering-text dropped-text})
       {:accepted? false
        :pending? (boolean (:interrupt-pending sd))
+       :reason (:interrupt-reason sd)
        :dropped-steering-text ""})))
 
 (defn- interrupted-tool-result-message
