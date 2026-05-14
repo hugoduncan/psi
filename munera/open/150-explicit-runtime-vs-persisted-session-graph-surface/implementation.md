@@ -94,3 +94,13 @@
   - `clojure -M:test --focus psi.prompt-assets.system-prompt-test --focus psi.introspection.graph-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test`
   - result: `58 tests, 3551 assertions, 4 failures`
 - explicit review outcome: actionable feedback recorded
+
+## 2026-05-14 — task-test-review follow-up execution
+
+- updated prompt-assets graph guidance to stop teaching removed `:psi.agent-session/context-sessions`; the system prompt now points child-session discovery at `:psi.runtime-session/list`
+- updated prompt-assets proof in `components/prompt-assets/test/psi/prompt_assets/system_prompt_test.clj` to assert the explicit runtime-session guidance
+- updated introspection proof in `components/introspection/test/psi/introspection/graph_test.clj` to inspect `runtime-session-list-resolver` output and to assert `:psi.session-info/id` remains reachable via `:psi.runtime-session/list` and the surviving compact summary surface
+- verification:
+  - `clojure -M:test --focus psi.prompt-assets.system-prompt-test --focus psi.introspection.graph-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test`
+  - result: `58 tests, 3552 assertions, 0 failures`
+- no blocking reason remained; both newly added task-test-review follow-up items are complete

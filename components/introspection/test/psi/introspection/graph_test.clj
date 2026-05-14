@@ -155,14 +155,14 @@
                                 (filter map?))]
           (is (seq join-outputs) "expected at least one join map in resolver outputs")))))
 
-  (testing "context-sessions resolver output contains session-info join"
+  (testing "runtime-session resolver output contains session-info join"
     (let [index  (graph/derive-resolver-index (:resolver-ops (cached-operation-metadata)))
-          entry  (first (filter #(= 'psi.agent-session.resolvers.session/agent-session-identity
+          entry  (first (filter #(= 'psi.agent-session.resolvers.session/runtime-session-list-resolver
                                     (:psi.resolver/sym %))
                                 index))
           joins  (filter map? (:psi.resolver/output entry))
-          cs-key :psi.agent-session/context-sessions]
-      (is entry "agent-session-identity resolver should be in index")
+          cs-key :psi.runtime-session/list]
+      (is entry "runtime-session-list-resolver should be in index")
       (is (some #(contains? % cs-key) joins))
       (is (some #(contains? (set (get % cs-key [])) :psi.session-info/id) joins)))))
 
@@ -181,11 +181,13 @@
           (is (vector? (:psi.attr/produced-by v)))
           (is (map? (:psi.attr/reachable-via v)))))
 
-      (testing "psi.session-info/id is indexed and reachable via context-sessions"
+      (testing "psi.session-info/id is indexed and reachable via explicit runtime session surfaces"
         (let [entry (get attr-index :psi.session-info/id)]
           (is entry ":psi.session-info/id should appear in attr-index")
           (is (contains? (:psi.attr/reachable-via entry)
-                         :psi.agent-session/context-sessions))))
+                         :psi.runtime-session/list))
+          (is (contains? (:psi.attr/reachable-via entry)
+                         :psi.agent-session/context-session-summaries))))
 
       (testing "flat attrs have empty reachable-via"
         (let [flat-entry (get attr-index :psi.agent-session/session-name)]

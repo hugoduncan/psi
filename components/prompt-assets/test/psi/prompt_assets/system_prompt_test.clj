@@ -188,7 +188,7 @@
         (is (str/includes? prompt "psi-tool(action: \"reload-code\", namespaces: [\"psi.agent-session.tools\"])"))
         (is (str/includes? prompt "psi-tool(action: \"project-repl\", op: \"status\")"))
         (is (str/includes? prompt "psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\")"))
-        (is (str/includes? prompt "psi.agent-session/context-sessions"))
+        (is (str/includes? prompt "psi.runtime-session/list"))
         (is (str/includes? prompt "psi.graph/resolver-index"))
         (is (str/includes? prompt "psi.graph/attr-index"))
         (is (str/includes? prompt "psi.resolver/sym"))))

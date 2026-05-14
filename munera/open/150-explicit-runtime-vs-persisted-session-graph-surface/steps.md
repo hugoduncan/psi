@@ -24,5 +24,5 @@
   - new explicit attrs must appear in `:psi.graph/root-queryable-attrs`; old attrs may remain there if still mechanically root-queryable, with docs/tests teaching the new attrs as canonical
 - [x] Enumerate the required in-task migration set that must switch to the new names
   - fixed set: Emacs `/resume`, TUI `/resume`, app-runtime resume selector shaping, and focused resolver/graph teaching surfaces
-- [ ] Update prompt-assets graph guidance/tests to stop teaching removed `:psi.agent-session/context-sessions` and teach the explicit runtime-session child-session discovery surface instead
-- [ ] Update introspection graph tests to assert resolver-index and attr-index reachability through the surviving explicit runtime session surfaces instead of removed `:psi.agent-session/context-sessions`
+- [x] Update prompt-assets graph guidance/tests to stop teaching removed `:psi.agent-session/context-sessions` and teach the explicit runtime-session child-session discovery surface instead
+- [x] Update introspection graph tests to assert resolver-index and attr-index reachability through the surviving explicit runtime session surfaces instead of removed `:psi.agent-session/context-sessions`
