@@ -161,6 +161,24 @@ the thinking block from the buffer.  Thinking is transcript and must survive."
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-tool-executing-event-uses-transport-safe-call-summary-before-result ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (psi-emacs--handle-rpc-event
+           '((:event . "tool/executing")
+             (:data . ((:tool-id . "t-live")
+                       (:tool-name . "search-docs")
+                       (:call-summary . "🔍 hello")
+                       (:parsed-args . ((:query . "hello")))))))
+          (let ((buf (buffer-string)))
+            (should (string-match-p "🔍 hello running" buf))
+            (should-not (string-match-p "🔍 hello success" buf))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-header-line-updates-from-rpc-state-transitions ()
   (with-temp-buffer
     (psi-emacs-mode)

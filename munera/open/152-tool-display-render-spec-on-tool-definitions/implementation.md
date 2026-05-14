@@ -55,3 +55,14 @@
     - Emacs tool-row proof now exercises RPC-compatible `:call-summary` event data
     - RPC event/progress tests assert transport-safe call-summary projection
     - active-tool projection tests now assert stale renderer removal on replacement.
+
+- 2026-05-14 ψ test review:
+  - Actionable test gap: the follow-up proof set now verifies transport-safe `:call-summary` on RPC `tool/executing` and `tool/result` events, and verifies Emacs consumption of `:call-summary` on `tool/result`, but it still does not prove the live Emacs `tool/executing` path that users see before result completion. Because header rendering is updated during execution, the missing `tool/executing` Emacs proof leaves the most important remote live-row path unproven.
+  - Actionable test-shape concern: the RPC prompt proof in `components/rpc/test/psi/rpc_prompt_test.clj` still depends on broad `with-redefs` overrides for `runtime/resolve-api-key-in` and `http/post`. The test remains useful and high-signal as an integration proof, but it does not fully match the project preference for injectable/nullable dependencies without stubbing. Treat this as test debt rather than a blocker for this task.
+  - Follow-up expectation: add a focused Emacs proof that `tool/executing` with transport-safe `:call-summary` updates the visible row header before any `tool/result`, and consider later narrowing the RPC prompt proof’s dependency seam if a smaller injectable harness becomes available.
+
+- 2026-05-14 ψ test follow-up:
+  - Added focused Emacs proof `psi-tool-executing-event-uses-transport-safe-call-summary-before-result`.
+  - The new proof exercises the live remote row path directly: a `tool/executing` RPC event with `:call-summary` must render the visible header with `running` status before any `tool/result` arrives.
+  - Re-ran the focused Emacs/RPC proof set after the addition.
+  - Kept the RPC prompt proof-shape concern as explicit deferred test debt; no narrower injectable harness was introduced in this task.
