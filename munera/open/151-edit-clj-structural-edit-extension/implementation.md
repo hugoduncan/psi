@@ -57,3 +57,13 @@ Not specified. Since the file is written after replacement, the old node's file 
 
 **A7 — `:execute` arity: single or dual?**
 Design specifies `(args opts)` but `work-on` uses two arities `([args] [args _opts])`. Not stated whether single-arity is sufficient or dual-arity is required for compatibility.
+
+---
+
+## 2026-05-14 — Inconsistency follow-up execution (design-steps I1–I3)
+
+Investigated the actual codebase to resolve three wiring/catalog inconsistencies. Verified against `extensions/deps.edn`, `extensions/tests.edn`, top-level `deps.edn`, and `bases/main/src/psi/launcher/extensions.clj`.
+
+- **I1 — Wiring model resolved**: `github` is absent from `extensions/deps.edn` (not listed as a `:local/root` dep) and absent from the `extensions/tests.edn` `:test` alias extra-paths. It is wired exclusively via top-level `deps.edn` source paths and top-level `tests.edn`. Updated Scope in design.md: removed the `extensions/deps.edn`/`extensions/tests.edn` bullet; replaced with explicit top-level-only wiring statement (`extensions/edit-clj/src` in source paths, `extensions/edit-clj/test` + `extensions/edit-clj/src` in test paths), with an explicit note that github follows the same model.
+- **I2 — Catalog lib key specified**: `'psi/edit-clj` — follows the `'psi/<extension-name>` pattern used by all existing entries. Added to Scope catalog entry spec in design.md.
+- **I3 — `:source-policies` shape specified**: `:development` + `:installed` only, no `:jar`. `github` is the only psi-owned extension without `:jar`; since design says "follow github", no `:jar` policy. Added to Scope catalog entry spec in design.md.

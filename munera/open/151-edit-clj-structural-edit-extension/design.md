@@ -19,9 +19,11 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 - Extension entry point `psi.edit-clj.extension` (calls `register-tool`)
 - Unit tests covering all result shapes (ok, file-not-found, parse-error, no-match, ambiguous-match)
 - `deps.edn` with `rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}` and `cheshire/cheshire {:mvn/version "5.13.0"}` as runtime deps
-- Wire into `extensions/deps.edn` and `extensions/tests.edn`
-- Wire into top-level `deps.edn` source paths and top-level `tests.edn` test/source paths
-- Add entry to `bases/main/src/psi/launcher/extensions.clj` psi-owned-extension-catalog with init symbol `psi.edit-clj.extension/init`
+- Wire into top-level `deps.edn` source paths (`extensions/edit-clj/src`) and top-level `tests.edn` test/source paths (`extensions/edit-clj/test`, `extensions/edit-clj/src`) — **not** into `extensions/deps.edn` or `extensions/tests.edn` (github follows this same top-level-only model and is absent from both extensions-level files)
+- Add entry to `bases/main/src/psi/launcher/extensions.clj` psi-owned-extension-catalog with:
+  - lib key: `'psi/edit-clj`
+  - init symbol: `psi.edit-clj.extension/init`
+  - `:source-policies` with `:development` and `:installed` only (no `:jar`), following the `github` pattern
 
 **Out of scope:**
 - Multi-form replacement in a single call
