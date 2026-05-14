@@ -1,0 +1,5 @@
+- 2026-05-14 ψ ambiguity review:
+  - Actionable ambiguity: task directory is missing required `plan.md` and `steps.md`, so the intended implementation approach and execution checklist are not reviewable yet.
+  - Actionable ambiguity: the design requires extension registration alone to drive shared display behavior, but it does not disambiguate the canonical owner/projection path for non-serializable render hooks (`tool-registry` vs UI state vs runtime projection), especially since EQL snapshots currently strip renderer fns while interactive projections preserve them.
+  - Actionable ambiguity: acceptance 3 says built-in display should no longer depend on frontend hardcoded name branches "for the cases covered by this task", but the covered built-ins/tool rows are not enumerated beyond a minimum list, leaving the migration boundary unclear.
+  - Actionable ambiguity: acceptance 7 permits deferring custom result rendering, but the design does not state whether the chosen minimal slice may omit `:render-result-fn` entirely or must still carry/result-project a dormant result contract.
