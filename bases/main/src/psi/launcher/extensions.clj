@@ -72,6 +72,12 @@
     {:development {:local/root "extensions/github"}
      :installed   {:local/root "extensions/github"}}}
 
+   'psi/edit-clj
+   {:psi/init 'psi.edit-clj.extension/init
+    :source-policies
+    {:development {:local/root "extensions/edit-clj"}
+     :installed   {:local/root "extensions/edit-clj"}}}
+
    'psi/logprobs
    {:psi/init 'extensions.logprobs/init
     :source-policies
