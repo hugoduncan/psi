@@ -85,3 +85,12 @@
   - `clj-kondo --lint components/agent-session/src components/agent-session/test components/app-runtime/src components/app-runtime/test components/emacs-ui components/rpc/src components/tui/test doc`
   - result: `0 errors, 0 warnings`
 - explicit review outcome: no new actionable feedback
+
+## 2026-05-14 — task-test-review
+
+- actionable test/doc-sync issue found: prompt-assets prose guidance still teaches the removed `:psi.agent-session/context-sessions` child-session surface in `components/prompt-assets/test/psi/prompt_assets/system_prompt_test.clj:191`, so the review proof surface fails after the explicit runtime-session migration
+- actionable introspection-proof issue found: `components/introspection/test/psi/introspection/graph_test.clj` still asserts resolver-index and attr-index reachability through removed `:psi.agent-session/context-sessions` instead of the surviving explicit runtime compact/list surfaces, so focused review verification currently fails
+- review verification:
+  - `clojure -M:test --focus psi.prompt-assets.system-prompt-test --focus psi.introspection.graph-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test`
+  - result: `58 tests, 3551 assertions, 4 failures`
+- explicit review outcome: actionable feedback recorded
