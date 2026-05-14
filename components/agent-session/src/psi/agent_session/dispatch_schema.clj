@@ -58,6 +58,10 @@
      [:tool-call :map] [:result :any] [:is-error? :boolean]]]
    [:runtime/agent-record-tool-result
     [:map [:effect/type [:= :runtime/agent-record-tool-result]] [:tool-result-msg :map]]]
+   [:runtime/record-pending-tool-call-interrupts
+    [:map [:effect/type [:= :runtime/record-pending-tool-call-interrupts]]
+     [:session-id :string]
+     [:reason :keyword]]]
    [:runtime/tool-execute
     [:map [:effect/type [:= :runtime/tool-execute]]
      [:tool-name :string] [:args :map] [:opts {:optional true} [:maybe :map]]]]

@@ -359,12 +359,13 @@
   (let [call {:id "call-1" :name "bash" :arguments "{}"}
         res  {:content [{:type :text :text "ok"}]}]
 
-    (testing "emit-tool-start-in! emits tool_execution_start event"
+    (testing "emit-tool-start-in! emits tool_execution_start event and marks the call pending"
       (let [ctx (agent/create-context)]
         (agent/create-agent-in! ctx)
         (agent/emit-tool-start-in! ctx call)
         (let [events (agent/drain-events-in! ctx)]
-          (is (some #(= :tool-execution-start (:type %)) events)))))
+          (is (some #(= :tool-execution-start (:type %)) events))
+          (is (= #{"call-1"} (:pending-tool-calls (agent/get-data-in ctx)))))))
 
     (testing "emit-tool-end-in! emits tool_execution_end event"
       (let [ctx (agent/create-context)]
@@ -381,13 +382,15 @@
         (let [events (agent/drain-events-in! ctx)]
           (is (some #(= :turn-end (:type %)) events)))))
 
-    (testing "record-tool-result-in! appends to messages and emits events"
+    (testing "record-tool-result-in! appends to messages, emits events, and clears pending call"
       (let [ctx    (agent/create-context)
             result {:role "tool-result" :tool-call-id "c1" :tool-name "bash"
                     :content [] :is-error false}]
         (agent/create-agent-in! ctx)
+        (swap! (:data-atom ctx) assoc :pending-tool-calls #{"c1"})
         (agent/record-tool-result-in! ctx result)
         (is (= [result] (:messages (agent/get-data-in ctx))))
+        (is (= #{} (:pending-tool-calls (agent/get-data-in ctx))))
         (let [events (agent/drain-events-in! ctx)
               types  (map :type events)]
           (is (some #{:message-start} types))

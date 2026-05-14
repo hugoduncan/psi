@@ -5,6 +5,7 @@
    `psi.agent-session.turn.handlers`; this namespace only registers dispatch handlers."
   (:require
    [psi.agent-session.journal-append-effect :as journal-append-effect]
+   [psi.agent-session.prompt-request :as prompt-request]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -28,11 +29,23 @@
 
   (register-core-handler!
    :session/prompt-submit
-   (fn [_ctx {:keys [session-id user-msg]}]
-     {:effects [(journal-append-effect/append-message-effect session-id user-msg)]
-      :return {:submitted? true
-               :turn-id (str (java.util.UUID/randomUUID))
-               :user-msg user-msg}}))
+   (fn [ctx {:keys [session-id user-msg]}]
+     (let [journal  (persist/all-entries-in ctx session-id)
+           messages (into []
+                          (keep (fn [entry]
+                                  (when (= :message (:kind entry))
+                                    (get-in entry [:data :message]))))
+                          journal)
+           repairs  (prompt-request/tail-dangling-tool-result-repairs messages)
+           effects  (into []
+                          (concat
+                           (map #(journal-append-effect/append-message-effect session-id %) repairs)
+                           [(journal-append-effect/append-message-effect session-id user-msg)]))]
+       {:effects effects
+        :return {:submitted? true
+                 :turn-id (str (java.util.UUID/randomUUID))
+                 :user-msg user-msg
+                 :repaired-tool-result-count (count repairs)}})))
 
   (register-core-handler!
    :session/submit-synthetic-user-prompt

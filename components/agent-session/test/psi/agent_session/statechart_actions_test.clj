@@ -71,6 +71,7 @@
   (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming false
                                                                         :retry-attempt 3
                                                                         :interrupt-pending true
+                                                                        :interrupt-reason :deferred-interrupt
                                                                         :interrupt-requested-at #inst "2026-01-01T00:00:00.000Z"}})]
     (with-registered-handlers
       ctx
@@ -86,12 +87,16 @@
              (is (= {:is-streaming false
                      :retry-attempt 0
                      :interrupt-pending false
-                     :interrupt-requested-at nil}
+                     :interrupt-requested-at nil
+                     :interrupt-reason nil}
                     (select-keys (session-state/get-session-data-in ctx session-id)
-                                 [:is-streaming :retry-attempt :interrupt-pending :interrupt-requested-at])))
+                                 [:is-streaming :retry-attempt :interrupt-pending :interrupt-requested-at :interrupt-reason])))
              (is (= [{:effect/type :runtime/mark-workflow-jobs-terminal}
                      {:effect/type :runtime/emit-background-job-terminal-messages}
-                     {:effect/type :scheduler/drain-queue}]
+                     {:effect/type :scheduler/drain-queue}
+                     {:effect/type :runtime/record-pending-tool-call-interrupts
+                      :session-id session-id
+                      :reason :deferred-interrupt}]
                     (:effects result)))))
 
          (testing "on-abort clears interrupt state and emits agent-abort effect"
