@@ -1,6 +1,7 @@
 (ns psi.rpc.session.streams
   "Shared progress/event stream lifecycle helpers for RPC session workflows."
   (:require
+   [psi.app-runtime.projections :as projections]
    [psi.rpc.events :as events]
    [psi.rpc.session.emit :as emit]))
 
@@ -9,9 +10,11 @@
     :or   {thread-name "rpc-progress-loop"}}]
   (let [stop? (atom false)
         tag-session (fn [evt]
-                      (if (contains? evt :session-id)
-                        evt
-                        (assoc evt :session-id session-id)))
+                      (cond-> (if (contains? evt :session-id)
+                                evt
+                                (assoc evt :session-id session-id))
+                        (contains? #{:tool-executing :tool-result} (:event-kind evt))
+                        (assoc :ui-snapshot (projections/extension-ui-snapshot ctx))))
         thread (start-daemon-thread!
                 (fn []
                   (loop []

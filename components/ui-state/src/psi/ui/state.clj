@@ -430,6 +430,22 @@
             :render-call-fn   render-call-fn
             :render-result-fn render-result-fn})))
 
+(defn register-tool-def-renderers!
+  "Project canonical tool-definition render hooks into interactive UI state.
+   No-op when the tool definition carries neither render hook."
+  [ui-state-atom tool-def]
+  (let [tool-name        (:name tool-def)
+        ext-path         (or (:extension-path tool-def)
+                             (:ext-path tool-def)
+                             (:source tool-def))
+        render-call-fn   (:render-call-fn tool-def)
+        render-result-fn (:render-result-fn tool-def)]
+    (when (and ui-state-atom
+               (string? tool-name)
+               (or (contains? tool-def :render-call-fn)
+                   (contains? tool-def :render-result-fn)))
+      (register-tool-renderer! ui-state-atom tool-name ext-path render-call-fn render-result-fn))))
+
 (defn register-message-renderer!
   "Register a custom render fn for extension-injected messages.
    `render-fn` is (fn [message opts] → string)."
@@ -531,6 +547,10 @@
 (defn register-tool-renderer
   [ui-state tool-name ext-path render-call-fn render-result-fn]
   (reduce-ui ui-state register-tool-renderer! tool-name ext-path render-call-fn render-result-fn))
+
+(defn register-tool-def-renderers
+  [ui-state tool-def]
+  (reduce-ui ui-state register-tool-def-renderers! tool-def))
 
 (defn register-message-renderer
   [ui-state custom-type ext-path render-fn]

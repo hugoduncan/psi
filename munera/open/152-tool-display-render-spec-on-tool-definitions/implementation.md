@@ -23,3 +23,15 @@
   - Added explicit Emacs shared-path parity implementation/proof work to `plan.md` and `steps.md` rather than leaving parity implicit.
   - Tightened documentation follow-up in `steps.md` and `plan.md` so `doc/extensions.md` must be rewritten to present tool-definition display hooks as the primary path, with imperative `:register-tool-renderer` reduced to compatibility/advanced usage.
   - No blockers encountered; all newly added inconsistency design-steps completed without executing `steps.md` implementation items.
+
+- 2026-05-14 ψ implementation:
+  - Added canonical render-hook preservation to `psi.tool-registry.defs/normalize-tool-def` for `:render-call-fn` and `:render-result-fn`.
+  - Added shared helper owner `components/tool-registry/src/psi/tool_registry/render.clj` for built-in call-header rendering semantics (`bash`, `read`, `edit`, `write`).
+  - Projected canonical tool-definition render hooks into interactive UI state via `psi.ui.state/register-tool-def-renderers!` and used that path from tool registration and session active-tool updates.
+  - Migrated the in-scope built-in tools in `psi.agent-session.tools` onto the shared render-hook path by attaching `:render-call-fn` to the canonical built-in tool definitions and the derived runtime tool maps.
+  - Kept TUI generic fallback behavior intact while reusing shared built-in call-header logic.
+  - Added RPC progress-path UI snapshot projection for tool lifecycle events so Emacs can consume shared renderer hooks during live tool-row rendering.
+  - Updated Emacs tool-row rendering to prefer shared tool-definition render hooks from projected UI snapshot data while retaining generic fallback summaries.
+  - Updated extension docs to teach tool-definition render hooks as the primary display customization path and demote direct imperative `:register-tool-renderer` use to compatibility/advanced status.
+  - Added focused tests for canonical hook preservation, registration projection, shared UI projection behavior, TUI extension call/result rendering, and Emacs shared-path call rendering.
+  - Verification still pending.

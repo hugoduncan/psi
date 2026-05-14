@@ -434,13 +434,14 @@ This disables completion UI sort hooks for ordered backend-owned lists such as
                 (parsed-args (psi-emacs--event-data-get data '(:parsed-args parsed-args)))
                 (is-error (psi-emacs--event-data-get data '(:is-error is-error)))
                 (details (psi-emacs--event-data-get data '(:details details)))
+                (ui-snapshot (psi-emacs--event-data-get data '(:ui-snapshot ui-snapshot)))
                 (stage (replace-regexp-in-string "^tool/" "" event))
                 (raw-text (or (psi-emacs--event-data-get data
                                                          '(:result-text result-text :text text :output output :delta delta :message message))
                               ""))
                 (body-text raw-text))
            (psi-emacs--reset-stream-watchdog psi-emacs--state)
-           (psi-emacs--upsert-tool-row tool-id stage body-text tool-name arguments parsed-args is-error details))))
+           (psi-emacs--upsert-tool-row tool-id stage body-text tool-name arguments parsed-args is-error details ui-snapshot))))
       ("command-result"
        (psi-emacs--handle-command-result-event data))
       ("ui/dialog-requested"

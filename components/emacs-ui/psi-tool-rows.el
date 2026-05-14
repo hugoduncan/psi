@@ -10,6 +10,7 @@
 (require 'ansi-color)
 (require 'json)
 (require 'psi-globals)
+(require 'map)
 
 (declare-function psi-emacs--event-data-get "psi-events" (data keys))
 (declare-function psi-emacs--region-bounds "psi-regions" (kind id))
@@ -229,11 +230,31 @@ For edit, derive from details.firstChangedLine and oldText span when available."
         (t ""))))
     (_ "")))
 
-(defun psi-emacs--tool-summary (tool-name parsed-args arguments tool-id &optional details)
+(defun psi-emacs--tool-renderer-call (tool-name ui-snapshot args)
+  "Return custom call summary from UI-SNAPSHOT for TOOL-NAME, or nil."
+  (let* ((tool-renderers (and (listp ui-snapshot)
+                              (or (alist-get :tool-renderers ui-snapshot nil nil #'equal)
+                                  (plist-get ui-snapshot :tool-renderers))))
+         (renderer (and tool-renderers
+                        (or (alist-get tool-name tool-renderers nil nil #'equal)
+                            (alist-get (intern tool-name) tool-renderers nil nil #'equal)
+                            (and (listp tool-renderers)
+                                 (cdr (assoc tool-name tool-renderers))))))
+         (render-fn (and renderer
+                         (or (and (listp renderer)
+                                  (alist-get :render-call-fn renderer nil nil #'equal))
+                             (and (listp renderer)
+                                  (plist-get renderer :render-call-fn))))))
+    (when (functionp render-fn)
+      (condition-case _
+          (funcall render-fn args)
+        (error nil)))))
+
+(defun psi-emacs--tool-summary (tool-name parsed-args arguments tool-id &optional details ui-snapshot)
   "Return display summary for a tool row.
 
-Prefers TOOL-NAME + key call argument (path/command) over internal TOOL-ID.
-For read/edit, appends optional line-number suffix when derivable.
+Prefers tool-definition render hooks from UI-SNAPSHOT when present.
+Otherwise falls back to the generic built-in/file-aware summary behavior.
 TOOL-ID remains fallback-only when tool name is absent."
   (let* ((name-raw (or tool-name
                        (psi-emacs--tool-display-id tool-id)
@@ -241,31 +262,36 @@ TOOL-ID remains fallback-only when tool name is absent."
          (name (if (symbolp name-raw)
                    (symbol-name name-raw)
                  (format "%s" name-raw)))
-         (display-name (psi-emacs--tool-display-name name))
          (args-info (psi-emacs--tool-args-map parsed-args arguments))
          (args (plist-get args-info :args))
          (invalid-args? (plist-get args-info :invalid-args-type))
-         (known-tool? (member name '("read" "edit" "write" "bash")))
-         (primary-value (pcase name
-                          ((or "read" "edit" "write")
-                           (psi-emacs--tool-arg-get args '("path" :path path)))
-                          ("bash"
-                           (psi-emacs--tool-arg-get args '("command" :command command)))
-                          (_ nil)))
-         (primary-text (psi-emacs--tool-primary-text name primary-value))
-         (line-range-suffix (if (member name '("read" "edit"))
-                                (psi-emacs--tool-line-range-suffix name args details)
-                              ""))
-         (summary (cond
-                   (invalid-args?
-                    (format "%s [invalid arg]" display-name))
-                   ((and known-tool? primary-text)
-                    (format "%s %s%s" display-name primary-text line-range-suffix))
-                   (known-tool?
-                    (format "%s …" display-name))
-                   (t
-                    display-name))))
-    (psi-emacs--truncate-single-line summary psi-emacs--tool-header-max-chars)))
+         (custom (and (not invalid-args?)
+                      (psi-emacs--tool-renderer-call name ui-snapshot args))))
+    (psi-emacs--truncate-single-line
+     (or custom
+         (let* ((display-name (psi-emacs--tool-display-name name))
+                (known-tool? (member name '("read" "edit" "write" "bash")))
+                (primary-value (pcase name
+                                 ((or "read" "edit" "write")
+                                  (psi-emacs--tool-arg-get args '("path" :path path)))
+                                 ("bash"
+                                  (psi-emacs--tool-arg-get args '("command" :command command)))
+                                 (_ nil)))
+                (primary-text (psi-emacs--tool-primary-text name primary-value))
+                (line-range-suffix (if (member name '("read" "edit"))
+                                       (psi-emacs--tool-line-range-suffix name args details)
+                                     ""))
+                (summary (cond
+                          (invalid-args?
+                           (format "%s [invalid arg]" display-name))
+                          ((and known-tool? primary-text)
+                           (format "%s %s%s" display-name primary-text line-range-suffix))
+                          (known-tool?
+                           (format "%s …" display-name))
+                          (t
+                           display-name))))
+           summary))
+     psi-emacs--tool-header-max-chars)))
 
 (defun psi-emacs--tool-status-label (stage is-error)
   "Return normalized display status from lifecycle STAGE and IS-ERROR."
@@ -409,11 +435,11 @@ MODE nil is treated as collapsed (default)."
       (psi-emacs--tool-row-string tool-summary status (or accumulated-text ""))
     (psi-emacs--tool-row-header-string tool-summary status)))
 
-(defun psi-emacs--upsert-tool-row (tool-id stage text &optional tool-name arguments parsed-args is-error details)
+(defun psi-emacs--upsert-tool-row (tool-id stage text &optional tool-name arguments parsed-args is-error details ui-snapshot)
   "Create or update TOOL-ID row for lifecycle STAGE.
 
 TEXT represents tool execution output snapshots.
-TOOL-NAME, ARGUMENTS, PARSED-ARGS, and DETAILS update display metadata.
+TOOL-NAME, ARGUMENTS, PARSED-ARGS, DETAILS, and UI-SNAPSHOT update display metadata.
 Rows are rendered according to global tool-output-view-mode."
   (when (and psi-emacs--state tool-id)
     (let* ((follow-anchor (psi-emacs--draft-anchor-at-end-p))
@@ -435,9 +461,10 @@ Rows are rendered according to global tool-output-view-mode."
            (details* (if (null details)
                          (plist-get row :details)
                        details))
+           (ui-snapshot* (or ui-snapshot (plist-get row :ui-snapshot)))
            (status (psi-emacs--tool-status-label stage is-error*))
            (accumulated (psi-emacs--tool-next-accumulated-text row stage text arguments))
-           (tool-summary (psi-emacs--tool-summary tool-name* parsed-args* arguments* tool-id details*))
+           (tool-summary (psi-emacs--tool-summary tool-name* parsed-args* arguments* tool-id details* ui-snapshot*))
            (rendered (psi-emacs--render-tool-row tool-summary status accumulated view-mode)))
       (if (and (markerp start)
                (markerp end)
@@ -483,6 +510,7 @@ Rows are rendered according to global tool-output-view-mode."
                                  :arguments arguments*
                                  :parsed-args parsed-args*
                                  :details details*
+                                 :ui-snapshot ui-snapshot*
                                  :is-error is-error*
                                  :stage stage
                                  :status status
@@ -537,6 +565,7 @@ Rows are rendered according to global tool-output-view-mode."
                                          :arguments arguments*
                                          :parsed-args parsed-args*
                                          :details details*
+                                         :ui-snapshot ui-snapshot*
                                          :is-error is-error*
                                          :stage stage
                                          :status status
@@ -561,6 +590,7 @@ Rows are rendered according to global tool-output-view-mode."
                                      :arguments arguments*
                                      :parsed-args parsed-args*
                                      :details details*
+                                     :ui-snapshot ui-snapshot*
                                      :is-error is-error*
                                      :stage stage
                                      :status status
@@ -602,7 +632,8 @@ This command is valid even when no tool rows exist."
                                              (plist-get row* :parsed-args)
                                              (plist-get row* :arguments)
                                              tool-id
-                                             (plist-get row* :details))))
+                                             (plist-get row* :details)
+                                             (plist-get row* :ui-snapshot))))
                           (status (or (plist-get row* :status)
                                       (psi-emacs--tool-status-label
                                        (plist-get row* :stage)

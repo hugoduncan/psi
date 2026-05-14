@@ -752,7 +752,7 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
             (completed? (or (alist-get :psi.tool-lifecycle.summary/completed? summary nil nil #'equal)
                             (alist-get 'psi.tool-lifecycle.summary/completed? summary nil nil #'equal))))
         (when (and tool-id completed?)
-          (psi-emacs--upsert-tool-row tool-id "result" result-text tool-name arguments parsed-args is-error nil))))))
+          (psi-emacs--upsert-tool-row tool-id "result" result-text tool-name arguments parsed-args is-error nil nil))))))
 
 (defun psi-emacs--rehydrate-live-turn-tool-calls (tool-calls)
   "Replay in-progress TOOL-CALLS into pending tool rows."
@@ -766,7 +766,7 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
                            (alist-get 'arguments tool-call nil nil #'equal)
                            "")))
         (when tool-id
-          (psi-emacs--upsert-tool-row tool-id "start" "" tool-name arguments nil nil nil))))))
+          (psi-emacs--upsert-tool-row tool-id "start" "" tool-name arguments nil nil nil nil))))))
 
 (defun psi-emacs--rehydrate-switch-state-from-query-frame (state frame)
   "Restore transcript-adjacent switch state for STATE from `query_eql` FRAME."

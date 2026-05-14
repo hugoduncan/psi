@@ -93,12 +93,13 @@
                          (tool-call-block? block)
                          (let [nb (normalize-tool-call-block block)
                                id (:id nb)
-                               tc {:name      (:name nb)
-                                   :args      (or (:arguments nb) "")
-                                   :status    :pending
-                                   :result    nil
-                                   :is-error  false
-                                   :expanded? false}]
+                               tc {:name        (:name nb)
+                                   :args        (or (:arguments nb) "")
+                                   :parsed-args (:input nb)
+                                   :status      :pending
+                                   :result      nil
+                                   :is-error    false
+                                   :expanded?   false}]
                            (-> a
                                (update :tool-calls #(if (contains? % id) % (assoc % id tc)))
                                (update :tool-order #(if (some #{id} %) % (conj % id)))
@@ -117,14 +118,15 @@
              content  (:content msg)
              details  (:details msg)
              err?     (boolean (:is-error msg))
-             fallback {:name      (:tool-name msg)
-                       :args      ""
-                       :status    (if err? :error :success)
-                       :result    text
-                       :content   content
-                       :details   details
-                       :is-error  err?
-                       :expanded? false}]
+             fallback {:name        (:tool-name msg)
+                       :args        ""
+                       :parsed-args nil
+                       :status      (if err? :error :success)
+                       :result      text
+                       :content     content
+                       :details     details
+                       :is-error    err?
+                       :expanded?   false}]
          (-> acc
              (update :tool-calls
                      (fn [m]

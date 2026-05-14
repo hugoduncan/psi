@@ -135,6 +135,35 @@ the thinking block from the buffer.  Thinking is transcript and must survive."
                                           "t-edit"
                                           '((:firstChangedLine . 7))))))
 
+(ert-deftest psi-tool-summary-prefers-shared-renderer-hook-when-projected ()
+  (let ((renderer (lambda (args)
+                    (concat "🔍 " (alist-get :query args nil nil #'equal)))))
+    (should (equal "🔍 hello"
+                   (psi-emacs--tool-summary "search-docs"
+                                            '((:query . "hello"))
+                                            nil
+                                            "t-search"
+                                            nil
+                                            `(:tool-renderers (("search-docs" . (:render-call-fn ,renderer)))))))))
+
+(ert-deftest psi-tool-row-event-uses-shared-ui-snapshot-renderer ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (let ((renderer (lambda (args)
+                          (concat "🔍 " (alist-get :query args nil nil #'equal)))))
+          (psi-emacs--upsert-tool-row "t-render" "result" "ok"
+                                      "search-docs"
+                                      nil
+                                      '((:query . "hello"))
+                                      nil
+                                      nil
+                                      `(:tool-renderers (("search-docs" . (:render-call-fn ,renderer)))))
+          (should (string-match-p "🔍 hello success" (buffer-string))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (ert-deftest psi-header-line-updates-from-rpc-state-transitions ()
   (with-temp-buffer
     (psi-emacs-mode)

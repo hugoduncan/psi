@@ -1,7 +1,8 @@
 (ns psi.tool-registry.registry
   "Tool-specific extension-registry ownership: validation, registration, and queries."
   (:require
-   [psi.tool-registry.defs :as defs]))
+   [psi.tool-registry.defs :as defs]
+   [psi.ui.state :as ui-state]))
 
 (def ^:private tool-name-pattern
   "Canonical tool names are kebab-case ASCII.
@@ -44,6 +45,9 @@
     (let [tool* (defs/normalize-tool-def (assoc tool :source :extension :ext-path ext-path))]
       (swap! (:state reg)
              assoc-in [:extensions ext-path :tools tool-name] tool*)
+      (ui-state/register-tool-def-renderers!
+       (get-in @(:state reg) [:ui :extension-ui])
+       (assoc tool* :extension-path ext-path))
       reg)))
 
 (defn- extension-item-maps

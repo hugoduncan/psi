@@ -643,19 +643,40 @@ Levels: `:info`, `:warning`, `:error`.
 
 ### Custom Renderers
 
-Extensions can override how tool calls and results are displayed, and
-add renderers for custom message types.
+Preferred path: attach optional tool-display render hooks directly to the
+canonical tool definition you register with `:register-tool`.
+
+```clojure
+((:register-tool api)
+ {:name        "search-docs"
+  :description "Search project documentation"
+  :parameters  [{:name "query" :type "string" :required true}]
+  :render-call-fn
+  (fn [args]
+    (str "🔍 Searching: " (:query args)))
+  :render-result-fn
+  (fn [result _opts]
+    (str "📄 " (:content result)))
+  :execute
+  (fn [args]
+    {:content (str "Found: " (:query args))
+     :is-error false})})
+```
+
+This shared registration path is the canonical owner for tool display behavior:
+
+- built-in tools and extension tools use the same mechanism
+- interactive UIs receive the hooks automatically through runtime projection
+- EQL/UI snapshots still strip executable functions from serialised metadata
+
+`(:register-tool-renderer ui)` remains available as a compatibility or advanced
+escape hatch, but it is no longer the preferred common path for tool display
+customization.
+
+Extensions can still register custom message renderers imperatively:
 
 ```clojure
 (when-let [ui (:ui api)]
-  ;; Custom tool renderer
-  ((:register-tool-renderer ui) "search_docs"
-   ;; render-call-fn: (fn [args] → ANSI string)
-   (fn [args] (str "🔍 Searching: " (:query args)))
-   ;; render-result-fn: (fn [result opts] → ANSI string)
-   (fn [result _opts] (str "📄 " (:content result))))
-
-  ;; Custom message renderer
   ((:register-message-renderer ui) "code-review"
    ;; render-fn: (fn [message opts] → ANSI string)
    (fn [msg _opts] (str "📝 Review: " (:summary msg)))))

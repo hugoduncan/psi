@@ -16,10 +16,17 @@
               :properties {"p" {:type "string"}}}
              (:parameters normalized)))))
 
-  (testing "runtime execute fns are preserved canonically"
-    (let [exec-fn    (fn [_args _opts] {:content "ok" :is-error false})
-          normalized (tool-defs/normalize-tool-def {:name "x" :execute exec-fn})]
-      (is (identical? exec-fn (:execute normalized)))))
+  (testing "runtime execute and render fns are preserved canonically"
+    (let [exec-fn         (fn [_args _opts] {:content "ok" :is-error false})
+          render-call-fn  (fn [_args] "call")
+          render-result-fn (fn [_result _opts] "result")
+          normalized      (tool-defs/normalize-tool-def {:name "x"
+                                                         :execute exec-fn
+                                                         :render-call-fn render-call-fn
+                                                         :render-result-fn render-result-fn})]
+      (is (identical? exec-fn (:execute normalized)))
+      (is (identical? render-call-fn (:render-call-fn normalized)))
+      (is (identical? render-result-fn (:render-result-fn normalized)))))
 
   (testing "EDN string parameters are parsed into canonical data when possible"
     (let [tool {:name "x"

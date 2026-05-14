@@ -1,13 +1,15 @@
 (ns psi.tool-registry.registry-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.tool-registry.registry :as tool-registry]))
+   [psi.tool-registry.registry :as tool-registry]
+   [psi.ui.state :as ui-state]))
 
 (defn- create-test-registry []
   {:state (atom {:extensions {}
                  :registration-order []
                  :flag-values {}
-                 :event-bus {}})})
+                 :event-bus {}
+                 :ui {:extension-ui (ui-state/create-ui-state)}})})
 
 (defn- register-extension-in!
   [reg ext-path]
@@ -72,6 +74,18 @@
         (is (= "/ext/a" (:extension-path (first tools))))
         (is (= :extension (:source (first tools))))
         (is (= {:type "object" :properties {}} (:parameters (first tools)))))))
+
+  (testing "register-tool projects canonical render hooks into interactive ui renderer state"
+    (let [reg            (create-test-registry)
+          call-render-fn (fn [_args] "custom call")
+          result-render-fn (fn [_result _opts] "custom result")]
+      (register-extension-in! reg "/ext/a")
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool"
+                                                     :render-call-fn call-render-fn
+                                                     :render-result-fn result-render-fn})
+      (let [renderer (ui-state/get-tool-renderer (get-in @(:state reg) [:ui :extension-ui]) "my-tool")]
+        (is (identical? call-render-fn (:render-call-fn renderer)))
+        (is (identical? result-render-fn (:render-result-fn renderer))))))
 
   (testing "first registration per name wins"
     (let [reg (create-test-registry)]

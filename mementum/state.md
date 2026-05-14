@@ -147,4 +147,13 @@ Bootstrapped on 2026-04-02.
   - 19 extension tests, 73 assertions; 1776+169 broader suite green; lint clean
 
 ## Suggested next step
+- Task 152 tool-display render spec on tool definitions is now implemented locally:
+  - canonical tool defs preserve optional `:render-call-fn` / `:render-result-fn`
+  - shared built-in call-header render hooks now live on the in-scope built-ins (`bash`, `read`, `edit`, `write`)
+  - registration/session tool activation projects canonical hooks into interactive UI renderer state via `psi.ui.state/register-tool-def-renderers!`
+  - TUI now consumes shared built-in header semantics and extension tool renderers through the same renderer path
+  - Emacs tool rows now prefer projected shared renderer hooks when present while retaining generic fallback summaries
+  - RPC progress events now attach interactive UI snapshot data for tool lifecycle events so Emacs can use shared live renderers
+  - extension docs now teach tool-definition render hooks as the preferred customization path; direct `:register-tool-renderer` is demoted to compatibility/advanced usage
+  - focused verification green: Clojure focused tests `62 tests, 262 assertions, 0 failures`; Emacs focused tests `23 tests, 0 unexpected`; lint clean
 - Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `149-reload-fixup-inventory-and-safety`.

@@ -9,7 +9,8 @@
    [clojure.string :as str]
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.tool-path :as tool-path])
+   [psi.agent-session.tool-path :as tool-path]
+   [psi.tool-registry.render :as tool-render])
   (:import
    [java.awt.geom AffineTransform]
    [java.awt.image AffineTransformOp BufferedImage]
@@ -29,7 +30,8 @@
                  :properties {:path   {:type "string" :description "File path to read"}
                               :offset {:type "integer" :description "1-indexed line number to start reading from"}
                               :limit  {:type "integer" :description "Maximum number of lines to read from offset"}}
-                 :required   ["path"]}})
+                 :required   ["path"]}
+   :render-call-fn (tool-render/builtin-call-render-fn "read")})
 
 (def bash-tool
   {:name        "bash"
@@ -38,7 +40,8 @@
    :parameters  {:type       "object"
                  :properties {:command {:type "string" :description "Bash command to run"}
                               :timeout {:type "integer" :description "Timeout in seconds (default 30)"}}
-                 :required   ["command"]}})
+                 :required   ["command"]}
+   :render-call-fn (tool-render/builtin-call-render-fn "bash")})
 
 (def edit-tool
   {:name        "edit"
@@ -48,7 +51,8 @@
                  :properties {:path    {:type "string" :description "File path"}
                               :oldText {:type "string" :description "Exact text to find"}
                               :newText {:type "string" :description "Replacement text"}}
-                 :required   ["path" "oldText" "newText"]}})
+                 :required   ["path" "oldText" "newText"]}
+   :render-call-fn (tool-render/builtin-call-render-fn "edit")})
 
 (def write-tool
   {:name        "write"
@@ -57,7 +61,8 @@
    :parameters  {:type       "object"
                  :properties {:path    {:type "string" :description "File path"}
                               :content {:type "string" :description "Content to write"}}
-                 :required   ["path" "content"]}})
+                 :required   ["path" "content"]}
+   :render-call-fn (tool-render/builtin-call-render-fn "write")})
 
 (def psi-tool psi-tool/psi-tool)
 
@@ -570,21 +575,25 @@
     :label       (:label read-tool)
     :description (:description read-tool)
     :parameters  (:parameters read-tool)
+    :render-call-fn (:render-call-fn read-tool)
     :execute     execute-read}
    {:name        (:name bash-tool)
     :label       (:label bash-tool)
     :description (:description bash-tool)
     :parameters  (:parameters bash-tool)
+    :render-call-fn (:render-call-fn bash-tool)
     :execute     execute-bash}
    {:name        (:name edit-tool)
     :label       (:label edit-tool)
     :description (:description edit-tool)
     :parameters  (:parameters edit-tool)
+    :render-call-fn (:render-call-fn edit-tool)
     :execute     execute-edit}
    {:name        (:name write-tool)
     :label       (:label write-tool)
     :description (:description write-tool)
     :parameters  (:parameters write-tool)
+    :render-call-fn (:render-call-fn write-tool)
     :execute     execute-write}])
 
 ;; ============================================================
@@ -603,21 +612,25 @@
       :label       (:label read-tool)
       :description (:description read-tool)
       :parameters  (:parameters read-tool)
+      :render-call-fn (:render-call-fn read-tool)
       :execute     (fn [args] (execute-read args opts))}
      {:name        (:name bash-tool)
       :label       (:label bash-tool)
       :description (:description bash-tool)
       :parameters  (:parameters bash-tool)
+      :render-call-fn (:render-call-fn bash-tool)
       :execute     (fn [args] (execute-bash args opts))}
      {:name        (:name edit-tool)
       :label       (:label edit-tool)
       :description (:description edit-tool)
       :parameters  (:parameters edit-tool)
+      :render-call-fn (:render-call-fn edit-tool)
       :execute     (fn [args] (execute-edit args opts))}
      {:name        (:name write-tool)
       :label       (:label write-tool)
       :description (:description write-tool)
       :parameters  (:parameters write-tool)
+      :render-call-fn (:render-call-fn write-tool)
       :execute     (fn [args] (execute-write args opts))}]))
 
 (defn make-read-only-tools-with-cwd
@@ -629,6 +642,7 @@
       :label       (:label read-tool)
       :description (:description read-tool)
       :parameters  (:parameters read-tool)
+      :render-call-fn (:render-call-fn read-tool)
       :execute     (fn [args] (execute-read args opts))}]))
 
 ;; ============================================================

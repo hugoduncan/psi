@@ -615,6 +615,40 @@
           out       (ansi/strip-ansi (app/view s1))]
       (is (str/includes? out "$ git status")))))
 
+(deftest tool-header-extension-renderer-via-shared-ui-path-test
+  (testing "extension-contributed tool call headers render through shared ui snapshot renderer path"
+    (let [state (assoc (init-state)
+                       :phase :idle
+                       :messages [{:role :tool :tool-id "t1"}]
+                       :tool-order ["t1"]
+                       :tool-calls {"t1" {:name "my-tool"
+                                          :parsed-args {:query "hello"}
+                                          :status :success
+                                          :result "ok"
+                                          :is-error false}}
+                       :ui-snapshot {:tool-renderers {"my-tool" {:render-call-fn (fn [args] (str "🔍 " (:query args)))
+                                                                 :render-result-fn (fn [_ _] "RESULT")}}})
+          out   (ansi/strip-ansi (app/view state))]
+      (is (str/includes? out "🔍 hello")))))
+
+(deftest tool-result-extension-renderer-via-shared-ui-path-test
+  (testing "extension-contributed tool result bodies render through shared ui snapshot renderer path"
+    (let [state (assoc (init-state)
+                       :width 80
+                       :phase :idle
+                       :tools-expanded? true
+                       :messages [{:role :tool :tool-id "t1"}]
+                       :tool-order ["t1"]
+                       :tool-calls {"t1" {:name "my-tool"
+                                          :parsed-args {:query "hello"}
+                                          :status :success
+                                          :result "ignored"
+                                          :is-error false}}
+                       :ui-snapshot {:tool-renderers {"my-tool" {:render-call-fn (fn [_] "call")
+                                                                 :render-result-fn (fn [_ _] "CUSTOM RESULT")}}})
+          out   (ansi/strip-ansi (app/view state))]
+      (is (str/includes? out "CUSTOM RESULT")))))
+
 (deftest tool-collapsed-no-content-test
   (testing "collapsed mode shows no content body regardless of result size"
     (let [update-fn (app/make-update (stub-agent-fn ""))

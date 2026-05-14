@@ -16,7 +16,8 @@
    [psi.session-state.state :as session]
    [psi.skill-registry.registry :as skill-registry]
    [psi.tool-registry.defs :as tool-defs]
-   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
+   [psi.ui.state :as ui-state]))
 
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))
@@ -200,9 +201,14 @@
    :session/set-active-tools
    (fn [_ctx {:keys [session-id tool-maps]}]
      (let [tool-defs (tool-defs/normalize-tool-defs tool-maps)]
-       {:root-state-update (session/session-update session-id #(assoc %
-                                                                      :active-tools (->> tool-defs (map :name) set)
-                                                                      :tool-defs tool-defs))
+       {:root-state-update (fn [root]
+                             (let [root' ((session/session-update session-id #(assoc %
+                                                                                     :active-tools (->> tool-defs (map :name) set)
+                                                                                     :tool-defs tool-defs)) root)
+                                   ui*   (get-in root' [:ui :extension-ui])]
+                               (doseq [tool-def tool-defs]
+                                 (ui-state/register-tool-def-renderers! ui* tool-def))
+                               root'))
         :effects [{:effect/type :runtime/agent-set-tools
                    :tool-maps tool-defs}
                   {:effect/type :runtime/refresh-system-prompt

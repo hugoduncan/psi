@@ -234,6 +234,19 @@
         (is (= "call" ((:render-call-fn r) {})))
         (is (= "result" ((:render-result-fn r) {} {}))))))
 
+  (testing "projecting canonical tool-def renderers registers shared renderer entries"
+    (let [ui      (ui/create-ui-state)
+          call-fn (fn [_args] "call")
+          res-fn  (fn [_result _opts] "result")]
+      (ui/register-tool-def-renderers! ui {:name "my-tool"
+                                           :extension-path "/ext/a"
+                                           :render-call-fn call-fn
+                                           :render-result-fn res-fn})
+      (let [r (ui/get-tool-renderer ui "my-tool")]
+        (is (= "my-tool" (:tool-name r)))
+        (is (= "call" ((:render-call-fn r) {})))
+        (is (= "result" ((:render-result-fn r) {} {}))))))
+
   (testing "all-tool-renderers returns all"
     (let [ui (ui/create-ui-state)]
       (ui/register-tool-renderer! ui "t1" "/ext/a" nil nil)

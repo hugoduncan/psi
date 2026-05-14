@@ -53,7 +53,13 @@
                                    (boolean (:enabled? tool))
                                    true)}
       (contains? tool :execute)
-      (assoc :execute (:execute tool)))))
+      (assoc :execute (:execute tool))
+
+      (contains? tool :render-call-fn)
+      (assoc :render-call-fn (:render-call-fn tool))
+
+      (contains? tool :render-result-fn)
+      (assoc :render-result-fn (:render-result-fn tool)))))
 
 (defn normalize-tool-defs
   [tools]

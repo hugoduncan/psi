@@ -38,6 +38,10 @@
            (mapv :extension-id (:statuses snapshot))))
     (is (= #{:render-call-fn :render-result-fn}
            (set (keys (get-in snapshot [:tool-renderers "read"])))))
+    (is (= "call"
+           ((get-in snapshot [:tool-renderers "read" :render-call-fn]) {})))
+    (is (= "result"
+           ((get-in snapshot [:tool-renderers "read" :render-result-fn]) {} {})))
     (is (= #{:render-fn}
            (set (keys (get-in snapshot [:message-renderers "custom"])))))
     (is (true? (:tools-expanded? snapshot)))))

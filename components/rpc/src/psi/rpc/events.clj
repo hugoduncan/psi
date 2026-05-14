@@ -204,7 +204,8 @@
                        :tool-id    (:tool-id progress-event)
                        :tool-name  (:tool-name progress-event)}
                 (some? (:arguments progress-event))   (assoc :arguments (:arguments progress-event))
-                (some? (:parsed-args progress-event)) (assoc :parsed-args (:parsed-args progress-event)))}
+                (some? (:parsed-args progress-event)) (assoc :parsed-args (:parsed-args progress-event))
+                (some? (:ui-snapshot progress-event)) (assoc :ui-snapshot (:ui-snapshot progress-event)))}
 
       :tool-execution-update
       {:event "tool/update"
@@ -218,13 +219,14 @@
 
       :tool-result
       {:event "tool/result"
-       :data  {:session-id  (:session-id progress-event)
-               :tool-id     (:tool-id progress-event)
-               :tool-name   (:tool-name progress-event)
-               :content     (or (:content progress-event) [])
-               :result-text (or (:result-text progress-event) "")
-               :details     (:details progress-event)
-               :is-error    (boolean (:is-error progress-event))}}
+       :data  (cond-> {:session-id  (:session-id progress-event)
+                       :tool-id     (:tool-id progress-event)
+                       :tool-name   (:tool-name progress-event)
+                       :content     (or (:content progress-event) [])
+                       :result-text (or (:result-text progress-event) "")
+                       :details     (:details progress-event)
+                       :is-error    (boolean (:is-error progress-event))}
+                (some? (:ui-snapshot progress-event)) (assoc :ui-snapshot (:ui-snapshot progress-event)))}
 
       nil)))
 
