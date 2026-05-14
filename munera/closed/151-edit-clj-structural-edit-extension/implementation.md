@@ -134,6 +134,21 @@ Design specifies `(args opts)` but `work-on` uses two arities `([args] [args _op
 
 ---
 
+## 2026-05-14 — task-test-review pass 1
+
+Reviewed `core_test.clj` and `extension_test.clj` against design.md acceptance criteria and the skill criteria: well-formed, full behaviour coverage, no mocks/stubs.
+
+**Infrastructure deps:** `nullable/create-nullable-extension-api` used throughout extension tests; real temp files for I/O cases. No mocks, no stubs — compliant.
+
+**Well-formedness:** Tests are clear and focused. `edit` helper in `core_test` is a clean orchestration shim. Minor: `round-trip-write-test` asserts `(contains? result :location)` but not the location value — weaker than `single-match-replace-test` which asserts `{:line 3 :column 15}`.
+
+**Coverage gaps — pre-existing (steps.md R1/R2/R3 still unchecked):**
+- R1/R2: No test exercises sexpr-equality across differing whitespace (the primary differentiator from text `edit`). All `core_test` inputs use exact-string matches. The core feature claim has no falsifying test.
+- R3: `round-trip-write-test` does not assert `:old` or `:new` fields in the JSON result; only `:status`, `:filename`, `:location` are checked.
+
+**R4 — new gap: extension new-string parse-error path untested.**
+`validation-order-test` covers "both invalid → old-string wins" and "invalid old-string → parse-error beats file-not-found" but has no case for "valid old-string + invalid new-string → new-string parse-error". The `execute` new-string branch is exercised only indirectly. Design validation-order contract requires this to be an explicit assertion.
+
 ## 2026-05-14 — Inconsistency follow-up execution (design-steps I1–I3)
 
 Investigated the actual codebase to resolve three wiring/catalog inconsistencies. Verified against `extensions/deps.edn`, `extensions/tests.edn`, top-level `deps.edn`, and `bases/main/src/psi/launcher/extensions.clj`.
