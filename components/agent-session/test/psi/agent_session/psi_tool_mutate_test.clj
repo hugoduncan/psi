@@ -141,23 +141,23 @@
                                                        {:ctx ctx :session-id active-session-id})
           exec                    (:execute tool)
           active-result           (read-string (:content (exec {"action" "query"
-                                                                "query" "[:psi.agent-session/active-session-id]"})))
+                                                                "query" "[:psi.runtime-session/active-id]"})))
           summary-result          (read-string (:content (exec {"action" "query"
                                                                 "query" "[{:psi.agent-session/context-session-summaries [:psi.session-info/id :psi.session-info/display-name :psi.session-info/created :psi.session-info/updated :psi.session-info/parent-session-id :psi.session-info/worktree-path]}]"})))
           chosen-id               (->> (:psi.agent-session/context-session-summaries summary-result)
                                        (map :psi.session-info/id)
-                                       (remove #{(:psi.agent-session/active-session-id active-result)})
+                                       (remove #{(:psi.runtime-session/active-id active-result)})
                                        first)
           mutate-result           (read-string (:content (exec {"action" "mutate"
                                                                 "mutation" "psi.extension/close-session"
                                                                 "params" {"session-id" chosen-id}})))
           verify-result           (read-string (:content (exec {"action" "query"
-                                                                "query" "[{:psi.agent-session/context-session-summaries [:psi.session-info/id :psi.session-info/display-name]} :psi.agent-session/active-session-id]"})))
+                                                                "query" "[{:psi.agent-session/context-session-summaries [:psi.session-info/id :psi.session-info/display-name]} :psi.runtime-session/active-id]"})))
           remaining-ids           (set (map :psi.session-info/id (:psi.agent-session/context-session-summaries verify-result)))]
-      (is (= active-session-id (:psi.agent-session/active-session-id active-result)))
+      (is (= active-session-id (:psi.runtime-session/active-id active-result)))
       (is (= child-session-id chosen-id))
       (is (= :ok (:psi-tool/overall-status mutate-result)))
       (is (= child-session-id (get-in mutate-result [:psi-tool/result :psi.agent-session/close-session-id])))
       (is (not (contains? remaining-ids child-session-id)))
       (is (contains? remaining-ids active-session-id))
-      (is (= active-session-id (:psi.agent-session/active-session-id verify-result))))))
+      (is (= active-session-id (:psi.runtime-session/active-id verify-result))))))

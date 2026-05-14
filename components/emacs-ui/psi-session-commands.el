@@ -572,18 +572,18 @@ Return nil for no argument. Otherwise return trimmed argument string."
 
 (defun psi-emacs--resume-session-list-query ()
   "Return canonical EQL query string for `/resume` session discovery."
-  "[{:psi.session/list [:psi.session-info/path
-                        :psi.session-info/name
-                        :psi.session-info/worktree-path
-                        :psi.session-info/first-message
-                        :psi.session-info/modified]}]")
+  "[{:psi.persisted-session/list [:psi.session-info/path
+                                  :psi.session-info/name
+                                  :psi.session-info/worktree-path
+                                  :psi.session-info/first-message
+                                  :psi.session-info/modified]}]")
 
 (defun psi-emacs--resume-session-list-from-query-frame (frame)
   "Extract session list vector from `query_eql` FRAME."
   (let* ((data (alist-get :data frame nil nil #'equal))
          (result (and (listp data) (alist-get :result data nil nil #'equal)))
          (sessions (and (listp result)
-                        (alist-get :psi.session/list result nil nil #'equal))))
+                        (alist-get :psi.persisted-session/list result nil nil #'equal))))
     (cond
      ((vectorp sessions) (append sessions nil))
      ((listp sessions) sessions)

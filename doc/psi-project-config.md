@@ -94,7 +94,7 @@ Typical validation failure shape:
 ```
 
 Canonical session-admin flow:
-1. query `:psi.agent-session/active-session-id`
+1. query `:psi.runtime-session/active-id`
 2. query `:psi.agent-session/context-session-summaries`
 3. choose explicit non-active session ids in caller logic
 4. call `action: "mutate"` with `psi.extension/close-session`
@@ -103,7 +103,7 @@ Example discovery + mutate sequence:
 
 ```clojure
 {:action "query"
- :query  "[:psi.agent-session/active-session-id]"}
+ :query  "[:psi.runtime-session/active-id]"}
 ```
 
 ```clojure

@@ -5,19 +5,19 @@
   - chosen: `:psi.persisted-session/list`, `:psi.persisted-session/list-all`
 - [x] Identify current resolver owners and decide authoritative implementation path for old/new attrs
   - runtime inventory/count/active-id proof currently lives in `components/agent-session/src/psi/agent_session/resolvers/session.clj` and companion tests in `components/agent-session/test/psi/agent_session/resolvers_test.clj`
-  - persisted discovery callers/defaults currently include Emacs `/resume`, TUI `/resume`, and app-runtime resume selector surfaces consuming `:psi.session/list`
+  - persisted discovery callers/defaults currently include Emacs `/resume`, TUI `/resume`, and app-runtime resume selector surfaces consuming `:psi.persisted-session/list`
   - authoritative migration direction: add explicit attrs on the existing authoritative resolver owners and keep old attrs as compatibility outputs during the migration window rather than introducing a separate introspection-filter policy first
-- [ ] Add explicit runtime session attrs
-- [ ] Rename/add explicit runtime session resolver owners
-- [ ] Add explicit persisted session attrs
-- [ ] Rename/add explicit persisted session resolver owners
-- [ ] Preserve compatibility for existing attrs during migration
-- [ ] Update internal callers to prefer the explicit attrs where needed
-  - minimum in-task migration set: Emacs `/resume`, TUI `/resume`, app-runtime resume selector shaping, and focused resolver/graph proofs that currently teach the old attrs
-- [ ] Update docs/examples to prefer the explicit attrs
-- [ ] Add focused resolver and graph-surface tests for new attrs
-- [ ] Add migration compatibility tests for old attrs
-- [ ] Verify the explicit attrs are discoverable in graph introspection surfaces
+- [x] Add explicit runtime session attrs
+- [x] Rename/add explicit runtime session resolver owners
+- [x] Add explicit persisted session attrs
+- [x] Rename/add explicit persisted session resolver owners
+- [x] Remove the ambiguous old attrs instead of preserving compatibility aliases
+- [x] Update internal callers to prefer the explicit attrs where needed
+  - completed minimum in-task migration set: Emacs `/resume`, TUI `/resume`, app-runtime resume selector shaping, and focused resolver/graph proofs that previously taught the old attrs
+- [x] Update docs/examples to prefer the explicit attrs
+- [x] Add focused resolver and graph-surface tests for new attrs
+- [x] Add migration compatibility tests for old attrs
+- [x] Verify the explicit attrs are discoverable in graph introspection surfaces
 - [x] Decide compact-summary scope for this task
   - `:psi.agent-session/context-session-summaries` stays out of scope; no mirrored `:psi.runtime-session/*` summary attr is added in this slice
 - [x] Decide discoverability behavior for compatibility attrs during migration

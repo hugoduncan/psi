@@ -8,8 +8,8 @@ Make the graph surface encode the distinction between in-memory runtime sessions
 
 The current session graph mixes two different concepts under names that are individually reasonable but collectively ambiguous:
 
-- in-memory/runtime session state is exposed through `:psi.agent-session/context-sessions`, `:psi.agent-session/context-session-count`, and `:psi.agent-session/active-session-id`
-- persisted/on-disk session discovery is exposed through `:psi.session/list` and `:psi.session/list-all`
+- in-memory/runtime session state is exposed through `:psi.runtime-session/list`, `:psi.runtime-session/count`, and `:psi.runtime-session/active-id`
+- persisted/on-disk session discovery is exposed through `:psi.persisted-session/list` and `:psi.persisted-session/list-all`
 
 That naming split reflects implementation history more than user meaning. `context` vs `list` does not make the storage boundary obvious, and a caller can easily mistake persisted-session discovery for the current runtime context.
 
@@ -121,9 +121,9 @@ The explicit runtime attrs must describe the currently loaded in-memory runtime 
 
 At minimum:
 
-- runtime session list returns the same semantic set currently represented by `:psi.agent-session/context-sessions`
-- runtime session count returns the same semantic count currently represented by `:psi.agent-session/context-session-count`
-- runtime active id returns the same semantic value currently represented by `:psi.agent-session/active-session-id`
+- runtime session list returns the same semantic set currently represented by `:psi.runtime-session/list`
+- runtime session count returns the same semantic count currently represented by `:psi.runtime-session/count`
+- runtime active id returns the same semantic value currently represented by `:psi.runtime-session/active-id`
 
 ### Persisted session surface
 
@@ -131,22 +131,25 @@ The explicit persisted attrs must describe session journals discoverable from di
 
 At minimum:
 
-- persisted session list preserves the current worktree-scoped persisted discovery semantics of `:psi.session/list`
-- persisted session list-all preserves the current cross-project persisted discovery semantics of `:psi.session/list-all`
+- persisted session list preserves the current worktree-scoped persisted discovery semantics of `:psi.persisted-session/list`
+- persisted session list-all preserves the current cross-project persisted discovery semantics of `:psi.persisted-session/list-all`
 
 ## Compatibility and migration
 
-This task should prefer a staged migration rather than a flag day.
+This task does not keep the ambiguous old attrs alive.
 
 Required migration shape:
 
 1. add the new explicit attrs
-2. keep current attrs available as compatibility aliases or equivalent compatibility surfaces
-3. migrate internal graph consumers, docs, and examples to the explicit attrs
-4. add clear proof that the explicit attrs and compatibility attrs preserve the expected behaviour during the migration window
-5. only consider removal of old attrs in a later dedicated cleanup task if that churn is still worthwhile
+2. migrate internal graph consumers, docs, and examples to the explicit attrs in the same task
+3. remove the old ambiguous attrs rather than keeping compatibility aliases
+4. add proof that the new explicit attrs preserve the intended runtime and persisted behaviours after the old attrs are removed
 
-This task is successful even if the old attrs remain, as long as the new explicit attrs are authoritative and preferred.
+Why this choice:
+
+- ambiguous compatibility attrs would keep the old operator trap alive
+- the point of this task is to make the storage boundary obvious at the call site
+- retaining both naming schemes in the graph would continue to teach and reward the wrong mental model
 
 ## Scope
 
@@ -190,22 +193,21 @@ Constraint:
 - avoid relying on AGENTS/README/operator memory to encode the distinction when the graph can encode it directly
 - during migration, graph discovery must still surface compatibility attrs only if the new explicit attrs are also present and documented as the preferred choice
 
-## Discoverability contract during migration
+## Discoverability contract
 
-Compatibility means queryability, not preferred discoverability.
+The graph should only teach the explicit names after this task lands.
 
 Required contract for this task:
 
 - the new explicit attrs must appear in `:psi.graph/root-queryable-attrs`
-- old attrs may remain root-queryable during the migration window if the underlying resolver inputs still make them root-reachable
-- if old attrs remain listed in `:psi.graph/root-queryable-attrs`, docs/examples/tests updated in this task must still teach the new explicit attrs as the preferred surface and must include proof that both old and new attrs remain queryable during migration
-- this task does not require custom filtering or hidden-root machinery solely to remove compatibility attrs from introspection
+- the removed ambiguous attrs must no longer appear in `:psi.graph/root-queryable-attrs`
+- docs/examples/tests updated in this task must teach only the explicit attrs as the canonical surface
 
 Why this contract:
 
-- `:psi.graph/root-queryable-attrs` is derived mechanically from the registered resolver surface, so keeping compatibility attrs queryable while adding explicit attrs naturally leaves both discoverable unless a special-case filtering layer is introduced
-- introducing special-case discovery suppression here would broaden the task beyond naming clarity into introspection policy redesign
-- making the preferred surface obvious through the new names plus migrated docs/examples/tests is sufficient for this slice while preserving compatibility safety
+- the graph is itself a teaching and discovery surface
+- leaving the old attrs discoverable would preserve the same ambiguity this task exists to remove
+- no special hidden-root machinery is needed when the ambiguous attrs are removed from the resolver surface entirely
 
 ## Migration set required in this task
 
@@ -219,7 +221,7 @@ The minimum in-task migration set is fixed here so the new names become the prac
 
 Rules for this migration set:
 
-- resume flows that intentionally browse persisted on-disk sessions must migrate from `:psi.session/list` to `:psi.persisted-session/list`
+- resume flows that intentionally browse persisted on-disk sessions must migrate from `:psi.persisted-session/list` to `:psi.persisted-session/list`
 - proofs of the loaded runtime context must migrate to `:psi.runtime-session/*` where they are demonstrating active in-memory session state
 - compatibility attrs may remain in place for callers not explicitly migrated in this task, but the above teaching/default surfaces must switch
 

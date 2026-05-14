@@ -124,7 +124,7 @@
        :ui/action
        (ui-actions/resume-session-action
         (session/query-in ctx sid
-                          [{:psi.session/list
+                          [{:psi.persisted-session/list
                             [:psi.session-info/path
                              :psi.session-info/name
                              :psi.session-info/worktree-path

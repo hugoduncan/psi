@@ -126,33 +126,24 @@
      :psi.session-info/first-message       (:first-message info)
      :psi.session-info/all-messages-text   (:all-messages-text info)}))
 
-(pco/defresolver session-list-resolver
-  "Resolve all sessions for the current session's worktree path, sorted by modified desc."
-  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
-  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
-   ::pco/output [{:psi.session/list
-                  [:psi.session-info/path
-                   :psi.session-info/id
-                   :psi.session-info/worktree-path
-                   :psi.session-info/name
-                   :psi.session-info/parent-session-id
-                   :psi.session-info/parent-session-path
-                   :psi.session-info/created
-                   :psi.session-info/modified
-                   :psi.session-info/message-count
-                   :psi.session-info/first-message
-                   :psi.session-info/all-messages-text]}]}
-  {:psi.session/list
+(defn- persisted-session-list-payload
+  [agent-session-ctx session-id]
+  {:psi.persisted-session/list
    (mapv session-info->eql
          (journal-store/list-sessions
           (journal-store/session-dir-for
            (support/session-worktree-path agent-session-ctx session-id))))})
 
-(pco/defresolver session-list-all-resolver
-  "Resolve all sessions across all project directories, sorted by modified desc."
-  [{_ctx :psi/agent-session-ctx}]
-  {::pco/input  [:psi/agent-session-ctx]
-   ::pco/output [{:psi.session/list-all
+(defn- persisted-session-list-all-payload
+  []
+  {:psi.persisted-session/list-all
+   (mapv session-info->eql (journal-store/list-all-sessions))})
+
+(pco/defresolver persisted-session-list-resolver
+  "Resolve all persisted sessions for the current session's worktree path, sorted by modified desc."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [{:psi.persisted-session/list
                   [:psi.session-info/path
                    :psi.session-info/id
                    :psi.session-info/worktree-path
@@ -164,8 +155,25 @@
                    :psi.session-info/message-count
                    :psi.session-info/first-message
                    :psi.session-info/all-messages-text]}]}
-  {:psi.session/list-all
-   (mapv session-info->eql (journal-store/list-all-sessions))})
+  (persisted-session-list-payload agent-session-ctx session-id))
+
+(pco/defresolver persisted-session-list-all-resolver
+  "Resolve all persisted sessions across all project directories, sorted by modified desc."
+  [{_ctx :psi/agent-session-ctx}]
+  {::pco/input  [:psi/agent-session-ctx]
+   ::pco/output [{:psi.persisted-session/list-all
+                  [:psi.session-info/path
+                   :psi.session-info/id
+                   :psi.session-info/worktree-path
+                   :psi.session-info/name
+                   :psi.session-info/parent-session-id
+                   :psi.session-info/parent-session-path
+                   :psi.session-info/created
+                   :psi.session-info/modified
+                   :psi.session-info/message-count
+                   :psi.session-info/first-message
+                   :psi.session-info/all-messages-text]}]}
+  (persisted-session-list-all-payload))
 
 ;; ── Resolver collection ─────────────────────────────────
 
@@ -177,5 +185,5 @@
    tool-summary-resolver
    tool-detail-resolver
    resolver-detail-resolver
-   session-list-resolver
-   session-list-all-resolver])
+   persisted-session-list-resolver
+   persisted-session-list-all-resolver])

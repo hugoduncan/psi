@@ -35,17 +35,38 @@
                 :psi.session-info/parent-session-id
                 :psi.session-info/worktree-path]))
 
+(defn- runtime-session-list-payload
+  [agent-session-ctx _session-id]
+  (let [hs (ss/list-context-sessions-in agent-session-ctx)]
+    {:psi.runtime-session/count (count hs)
+     :psi.runtime-session/list  (mapv context-session-info hs)}))
+
 (pco/defresolver agent-session-identity
-  "Resolve stable identity, naming, and context session registry fields.
+  "Resolve stable identity and naming fields.
    Note: :context-active-session-id removed — adapters (RPC, TUI) own focus locally."
   [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
    ::pco/output [:psi.agent-session/session-id
                  :psi.agent-session/session-file
                  :psi.agent-session/session-name
-                 :psi.agent-session/session-display-name
-                 :psi.agent-session/context-session-count
-                 {:psi.agent-session/context-sessions
+                 :psi.agent-session/session-display-name]}
+  (let [resolver-sid session-id
+        sd           (support/session-data agent-session-ctx session-id)
+        messages     (when resolver-sid
+                       (support/agent-core-messages agent-session-ctx session-id))]
+    {:psi.agent-session/session-id           (:session-id sd)
+     :psi.agent-session/session-file         (:session-file sd)
+     :psi.agent-session/session-name         (:session-name sd)
+     :psi.agent-session/session-display-name (message-text/session-display-name
+                                              (:session-name sd)
+                                              messages)}))
+
+(pco/defresolver runtime-session-list-resolver
+  "Resolve the explicit runtime-session inventory from the loaded in-memory context."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.runtime-session/count
+                 {:psi.runtime-session/list
                   [:psi.session-info/id
                    :psi.session-info/path
                    :psi.session-info/worktree-path
@@ -55,20 +76,7 @@
                    :psi.session-info/parent-session-path
                    :psi.session-info/created
                    :psi.session-info/updated]}]}
-  (let [resolver-sid session-id
-        sd           (support/session-data agent-session-ctx session-id)
-        hs           (ss/list-context-sessions-in agent-session-ctx)
-        messages     (when resolver-sid
-                       (support/agent-core-messages agent-session-ctx session-id))]
-    {:psi.agent-session/session-id                 (:session-id sd)
-     :psi.agent-session/session-file               (:session-file sd)
-     :psi.agent-session/session-name               (:session-name sd)
-     :psi.agent-session/session-display-name       (message-text/session-display-name
-                                                    (:session-name sd)
-                                                    messages)
-     :psi.agent-session/context-session-count      (count hs)
-     :psi.agent-session/context-sessions
-     (mapv context-session-info hs)}))
+  (runtime-session-list-payload agent-session-ctx session-id))
 
 (pco/defresolver context-session-summaries-resolver
   "Resolve a compact operational session inventory from the live context-session source.
@@ -555,13 +563,13 @@
 
 ;; ── Invoking session identity (root-queryable) ─────────
 
-(pco/defresolver active-session-id-resolver
+(pco/defresolver runtime-active-session-id-resolver
   "Resolve the invoking session's own identity from the psi-tool query context.
    Returns the session-id present in the query context, or nil when present-but-nil.
-   Answers \"which session am I?\" from root without entity seeding.
+   Answers \"which runtime session am I?\" from root without entity seeding.
 
    Input is a single root seed [:psi.agent-session/session-id] so Pathom3 includes
-   :psi.agent-session/active-session-id in root-queryable-attrs. All psi-tool queries
+   :psi.runtime-session/active-id in root-queryable-attrs. All psi-tool queries
    seed :psi.agent-session/session-id into the entity map (see tool_plan.clj).
 
    Returns nil when :psi.agent-session/session-id is present-but-nil in the entity map.
@@ -569,8 +577,8 @@
    is expected Pathom3 behaviour, not a case handled here."
   [{:psi.agent-session/keys [session-id]}]
   {::pco/input  [:psi.agent-session/session-id]
-   ::pco/output [:psi.agent-session/active-session-id]}
-  {:psi.agent-session/active-session-id session-id})
+   ::pco/output [:psi.runtime-session/active-id]}
+  {:psi.runtime-session/active-id session-id})
 
 (pco/defresolver last-turn-logprobs-resolver
   "Resolve the logprob token vector from the most recent logprob-enabled turn.
@@ -583,6 +591,7 @@
 
 (def resolvers
   [agent-session-identity
+   runtime-session-list-resolver
    context-session-summaries-resolver
    agent-session-phase
    agent-session-model
@@ -612,5 +621,5 @@
    agent-session-authenticated-providers
    agent-session-rpc-trace
    startup-bootstrap-resolver
-   active-session-id-resolver
+   runtime-active-session-id-resolver
    last-turn-logprobs-resolver])

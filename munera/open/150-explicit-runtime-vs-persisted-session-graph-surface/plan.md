@@ -15,11 +15,10 @@
    - ensure resolver names encode `persisted-session`
    - preserve current persisted discovery semantics and entity shapes
 
-4. Add compatibility surfaces for existing attrs
-   - preserve existing root-queryable attrs long enough for migration
-   - route old and new names through one obvious authoritative implementation path where practical
-   - keep graph introspection clear about the new preferred surface by proving the explicit attrs are present and teaching them as canonical, not by introducing hidden-root filtering for compatibility attrs
-   - accept that mechanically-derived `:psi.graph/root-queryable-attrs` may list both old and new attrs during the migration window
+4. Remove the ambiguous old attrs
+   - delete the old ambiguous graph attrs rather than keeping compatibility aliases
+   - update the authoritative implementation paths so only the explicit names remain queryable
+   - keep graph introspection clear by ensuring only the explicit attrs remain in the resolver surface and root-queryable list
 
 5. Migrate internal callers and graph-facing docs/examples/tests
    - update the fixed in-task migration set whose continued old-name usage would undermine the clarity goal:

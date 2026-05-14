@@ -315,7 +315,7 @@
        "  - psi-tool(action: \"query\", query: \"[:psi.agent-session/session-name :psi.agent-session/model-id]\", entity: \"{:psi.agent-session/session-id \\\"sid\\\"}\")\n"
        "  - Always supply session-id when targeting a specific session; omitting it silently queries the wrong session.\n"
        "- Child sessions:\n"
-       "  - psi-tool(action: \"query\", query: \"[:psi.agent-session/context-sessions]\") then use attr-index or resolver-index to discover valid child attrs.\n"
+       "  - psi-tool(action: \"query\", query: \"[:psi.runtime-session/list]\") then use attr-index or resolver-index to discover valid child attrs.\n"
        "- Eval split: psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\") = in-process ψ eval in an already loaded namespace; psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\") = managed project nREPL eval for the target worktree.\n"
        "- Reload code:\n"
        "  - psi self-reload is worktree-authoritative: use the session worktree-path or an explicit target worktree-path\n"

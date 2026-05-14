@@ -58,7 +58,7 @@ Then query discovered attrs directly, for example:
 Session-admin discovery example:
 
 ```clojure
-[:psi.agent-session/active-session-id
+[:psi.runtime-session/active-id
  {:psi.agent-session/context-session-summaries
   [:psi.session-info/id
    :psi.session-info/display-name
@@ -69,7 +69,7 @@ Session-admin discovery example:
 ```
 
 Canonical session-admin flow:
-1. query `:psi.agent-session/active-session-id`
+1. query `:psi.runtime-session/active-id`
 2. query `:psi.agent-session/context-session-summaries`
 3. choose explicit non-active session ids in caller logic
 4. invoke `psi-tool(action: "mutate")` with `psi.extension/close-session`
@@ -90,8 +90,12 @@ Prompt lifecycle introspection example:
 ## Root discovery
 
 Notable session-admin root attrs include:
-- `:psi.agent-session/active-session-id` — the invoking session id from the live query context
-- `:psi.agent-session/context-session-summaries` — compact live context inventory for safe operational selection
+- `:psi.runtime-session/active-id` — the invoking runtime session id from the live query context
+- `:psi.runtime-session/list` — the explicit in-memory runtime session inventory
+- `:psi.runtime-session/count` — the in-memory runtime session count
+- `:psi.persisted-session/list` — the persisted session inventory for the current worktree
+- `:psi.persisted-session/list-all` — the persisted session inventory across all project directories
+- `:psi.agent-session/context-session-summaries` — compact live runtime context summary for safe operational selection
 
 ### `:psi.graph/root-seeds`
 
