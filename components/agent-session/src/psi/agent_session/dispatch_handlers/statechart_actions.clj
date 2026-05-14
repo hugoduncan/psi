@@ -4,7 +4,7 @@
    on-compacting-entered, on-compact-done, on-retry-triggered, on-retrying-entered,
    on-retry-resume."
   (:require
-   [psi.session-state.model :as session-data]
+   [psi.session-state.model :as session-model]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-state.state :as session]))
 
@@ -28,7 +28,7 @@
   (let [stop-reason (or (:stop-reason msg) (:stopReason msg))]
     (and (map? msg)
          (or (= :error stop-reason) (= "error" stop-reason))
-         (session-data/context-overflow-error? (:error-message msg)))))
+         (session-model/context-overflow-error? (:error-message msg)))))
 
 (defn- threshold-auto-compact? [session-data config]
   (let [tokens  (:context-tokens session-data)
@@ -68,11 +68,12 @@
   (let [attempt              (:retry-attempt sd)
         base-ms              (get-in ctx [:config :auto-retry-base-delay-ms] 2000)
         max-ms               (get-in ctx [:config :auto-retry-max-delay-ms] 60000)
-        exponential-delay-ms (session-data/exponential-backoff-ms attempt base-ms max-ms)
+        exponential-delay-ms (session-model/exponential-backoff-ms attempt base-ms max-ms)
         now-fn               (or (:now-fn ctx) #(java.time.Instant/now))
         now-ms               (.toEpochMilli ^java.time.Instant (now-fn))
-        provider-headers     (:provider-error/headers event)]
-    (session-data/retry-metadata provider-headers attempt exponential-delay-ms now-ms)))
+        provider-headers     (:provider-error/headers event)
+        retry-metadata*      (requiring-resolve 'psi.session-state.model/retry-metadata)]
+    (retry-metadata* provider-headers attempt exponential-delay-ms now-ms)))
 
 (defn register!
   "Register all statechart action handlers.
