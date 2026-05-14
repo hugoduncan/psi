@@ -14,6 +14,23 @@ All seven design follow-up steps executed against design.md:
 
 ---
 
+## 2026-05-14 — Inconsistency review pass 1
+
+Reviewed design.md against extensions/deps.edn, extensions/tests.edn, top-level deps.edn, tests.edn, and bases/main/src/psi/launcher/extensions.clj.
+
+### Findings
+
+**I1 — Wiring scope conflicts with the github reference pattern.**
+Design says "Wire into `extensions/deps.edn` and `extensions/tests.edn`", but `github` (the stated reference pattern) is NOT wired into `extensions/deps.edn` or the `extensions/tests.edn` `:test` alias — it is wired only into top-level `deps.edn` source paths and `tests.edn`. The two wiring models are mutually inconsistent; the design must choose one and apply it consistently.
+
+**I2 — Catalog lib key (the `'psi/...` symbol) never specified.**
+Design says "Add entry to `psi-owned-extension-catalog` with init symbol `psi.edit-clj.extension/init`" but never names the catalog map key (e.g. `'psi/edit-clj`). Every existing entry has an explicit lib symbol key; without it the implementor must guess.
+
+**I3 — Catalog `:source-policies` shape unspecified.**
+The design says to add a psi-owned-extension-catalog entry but does not specify `:source-policies`. All psi-owned extensions have `:development` + `:installed` + `:jar` policies *except* `github` (which has no `:jar`). Since the design says "follow github", it is unclear whether `:jar` should be included. This must be stated.
+
+---
+
 ## 2026-05-14 — Ambiguity review pass 1
 
 Reviewed design.md against the extension codebase (work-on, github, hello-ext, launcher/extensions.clj, deps.edn, tests.edn).
