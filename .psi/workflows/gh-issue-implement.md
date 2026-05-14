@@ -65,7 +65,7 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
                      :from {:step "design" :yield :text}}]}
          {:name "review"
           :type :delegate
-          :target "review-implementation"
+          :target "review-implementation-in-worktree"
           :prompt-string {:type :map
                           :fields {:input {:from {:step "implement" :yield :text}}}}
           :context [{:type :source
