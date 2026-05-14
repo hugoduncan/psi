@@ -226,6 +226,39 @@
       (is (= [session-id] @sync-calls)
           "prompt-in! should run git-head sync after a normal prompt turn"))))
 
+(deftest stranded-streaming-session-recovers-on-next-prompt-test
+  (let [[ctx session-id] (create-session-context {:persist? false})]
+    (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+    (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+    (is (= :streaming (ss/sc-phase-in ctx session-id)))
+    (is (true? (:is-streaming (ss/get-session-data-in ctx session-id))))
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [_ai-ctx _ctx sid prepared _pq]
+                    {:execution-result/turn-id (:prepared-request/id prepared)
+                     :execution-result/session-id sid
+                     :execution-result/assistant-message {:role "assistant"
+                                                          :content [{:type :text :text "recovered"}]
+                                                          :stop-reason :stop
+                                                          :timestamp (java.time.Instant/now)}
+                     :execution-result/turn-outcome :turn.outcome/stop
+                     :execution-result/tool-calls []
+                     :execution-result/stop-reason :stop})]
+      (session/prompt-in! ctx session-id "hello after stall"))
+    (is (= :idle (ss/sc-phase-in ctx session-id)))
+    (is (false? (:is-streaming (ss/get-session-data-in ctx session-id))))
+    (is (= ["user" "assistant"] (mapv :role (journal-messages ctx session-id))))))
+
+(deftest queue-while-streaming-recovers-stranded-session-test
+  (let [[ctx session-id] (create-session-context {:persist? false})]
+    (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+    (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+    (let [result (session/queue-while-streaming-in! ctx session-id "nudge" :steer)]
+      (is (= false (:accepted? result)))
+      (is (= :not-streaming (:behavior result)))
+      (is (true? (:recovered? result)))
+      (is (= :idle (ss/sc-phase-in ctx session-id)))
+      (is (= [] (:steering-messages (ss/get-session-data-in ctx session-id)))))))
+
 (deftest abort-cancels-active-prompt-runtime-test
   (let [[ctx session-id] (create-session-context {:persist? false})
         started (promise)
