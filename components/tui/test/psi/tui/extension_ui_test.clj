@@ -223,7 +223,7 @@
 
 ;; ── Render registry ─────────────────────────────────────────
 
-(deftest tool-renderer-test
+(deftest register-tool-renderer-test
   (testing "register and retrieve tool renderer"
     (let [ui      (ui/create-ui-state)
           call-fn (fn [_args] "call")
@@ -232,8 +232,9 @@
       (let [r (ui/get-tool-renderer ui "my-tool")]
         (is (= "my-tool" (:tool-name r)))
         (is (= "call" ((:render-call-fn r) {})))
-        (is (= "result" ((:render-result-fn r) {} {}))))))
+        (is (= "result" ((:render-result-fn r) {} {})))))))
 
+(deftest register-tool-def-renderers-test
   (testing "projecting canonical tool-def renderers registers shared renderer entries"
     (let [ui      (ui/create-ui-state)
           call-fn (fn [_args] "call")
@@ -245,24 +246,27 @@
       (let [r (ui/get-tool-renderer ui "my-tool")]
         (is (= "my-tool" (:tool-name r)))
         (is (= "call" ((:render-call-fn r) {})))
-        (is (= "result" ((:render-result-fn r) {} {})))))
+        (is (= "result" ((:render-result-fn r) {} {})))))))
 
-    (testing "replacing canonical tool-def renderers removes stale renderer entries"
-      (let [ui      (ui/create-ui-state)
-            call-fn (fn [_args] "call")]
-        (ui/replace-tool-def-renderers! ui [{:name "my-tool"
-                                             :extension-path "/ext/a"
-                                             :render-call-fn call-fn}])
-        (is (some? (ui/get-tool-renderer ui "my-tool")))
-        (ui/replace-tool-def-renderers! ui [])
-        (is (nil? (ui/get-tool-renderer ui "my-tool"))))))
+(deftest replace-tool-def-renderers-removes-stale-entries-test
+  (testing "replacing canonical tool-def renderers removes stale renderer entries"
+    (let [ui      (ui/create-ui-state)
+          call-fn (fn [_args] "call")]
+      (ui/replace-tool-def-renderers! ui [{:name "my-tool"
+                                           :extension-path "/ext/a"
+                                           :render-call-fn call-fn}])
+      (is (some? (ui/get-tool-renderer ui "my-tool")))
+      (ui/replace-tool-def-renderers! ui [])
+      (is (nil? (ui/get-tool-renderer ui "my-tool"))))))
 
+(deftest all-tool-renderers-test
   (testing "all-tool-renderers returns all"
     (let [ui (ui/create-ui-state)]
       (ui/register-tool-renderer! ui "t1" "/ext/a" nil nil)
       (ui/register-tool-renderer! ui "t2" "/ext/b" nil nil)
-      (is (= 2 (count (ui/all-tool-renderers ui))))))
+      (is (= 2 (count (ui/all-tool-renderers ui)))))))
 
+(deftest get-tool-renderer-unknown-tool-test
   (testing "returns nil for unknown tool"
     (let [ui (ui/create-ui-state)]
       (is (nil? (ui/get-tool-renderer ui "nope"))))))

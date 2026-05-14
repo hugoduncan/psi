@@ -14,3 +14,7 @@
 - [x] Add a focused Emacs proof that a transport-safe `tool/executing` event with `:call-summary` updates the visible tool row header before any `tool/result` arrives.
 - [x] Re-run the focused Emacs/RPC proof set after adding the live `tool/executing` coverage.
 - [x] Optionally inventory whether the RPC prompt proof can be narrowed toward a more injectable/nullable dependency seam without losing the current end-to-end signal; if not, record that debt explicitly and defer it.
+- [x] Split the renderer-projection assertions in `components/tui/test/psi/tui/extension_ui_test.clj` into narrower dedicated tests so direct registration, canonical projection, stale-entry removal, and fallback behavior fail independently.
+- [x] Split the active-tool renderer replacement proof out of the broader `session-config-dispatch-test` umbrella in `components/agent-session/test/psi/agent_session/config_compaction_test.clj` so the renderer-sync behavior has its own focused test name and setup.
+- [x] Re-run the focused TUI + agent-session proof set after the test shaping split.
+- [x] Keep the broad RPC prompt proof as integration coverage, but ensure the narrower dedicated proofs remain the authoritative coverage for renderer projection behavior.

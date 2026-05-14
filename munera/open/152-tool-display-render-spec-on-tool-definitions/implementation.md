@@ -66,3 +66,18 @@
   - The new proof exercises the live remote row path directly: a `tool/executing` RPC event with `:call-summary` must render the visible header with `running` status before any `tool/result` arrives.
   - Re-ran the focused Emacs/RPC proof set after the addition.
   - Kept the RPC prompt proof-shape concern as explicit deferred test debt; no narrower injectable harness was introduced in this task.
+
+- 2026-05-14 ψ test-shaper review:
+  - Actionable shaping issue: some new proofs are still bundled into broader umbrella tests, which reduces failure locality and makes intent harder to read in place. In particular, `components/tui/test/psi/tui/extension_ui_test.clj/tool-renderer-test` now mixes direct registration, canonical projection, stale-entry replacement, and unknown-tool behavior, while `components/agent-session/test/psi/agent_session/config_compaction_test.clj/session-config-dispatch-test` continues to aggregate multiple unrelated config behaviors alongside the new active-tool renderer replacement proof.
+  - Actionable shaping issue: the RPC prompt proof remains useful high-signal integration coverage, but it still bundles several concerns at once (provider streaming progression, auth headers, tool event shaping, call-summary projection, and assistant completion). This is acceptable as retained integration coverage, but it should not become the only proof for any one of those behaviors.
+  - Follow-up expectation: split the new renderer-projection assertions into narrower dedicated tests with behavior-specific names, while keeping the existing end-to-end RPC prompt proof as broader integration coverage and explicitly treating its broad setup as deferred test debt.
+
+- 2026-05-14 ψ test-shaper follow-up:
+  - Split `components/tui/test/psi/tui/extension_ui_test.clj/tool-renderer-test` into narrower dedicated tests:
+    - `register-tool-renderer-test`
+    - `register-tool-def-renderers-test`
+    - `replace-tool-def-renderers-removes-stale-entries-test`
+    - `all-tool-renderers-test`
+    - `get-tool-renderer-unknown-tool-test`
+  - Split the active-tool renderer sync proof out of the broader agent-session config umbrella into dedicated `set-active-tools-replaces-renderer-projection-test`.
+  - Preserved the broad RPC prompt proof as integration coverage and kept narrower renderer projection proofs as the authoritative behavior-local coverage.
