@@ -46,7 +46,7 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 1. Parse `old-string` via `rewrite-clj` zipper; call `.sexpr` to get the target value. Error if the string yields more than one form or is unparseable.
 2. Parse `new-string` the same way. Error if unparseable or multi-form.
 3. Open the file. Error if not found/unreadable.
-4. Parse the file into a format-preserving zipper with position tracking.
+4. Parse the **whole file** into a format-preserving zipper with position tracking. The line range is never used to limit the parse input: a file slice may not contain complete forms, and rewrite-clj assigns positions relative to the start of whatever it was given — feeding it a slice would produce wrong positions throughout.
 5. Walk depth-first. At each node, skip if `sexpr` is not available (comments, whitespace, uneval nodes). Otherwise compare `sexpr` to target.
 6. Optionally filter candidates by line range using the node's **start row** only: a node is in-range when `start-line ≤ node-start-row ≤ end-line`. The node's end row is irrelevant — a form that begins within the range but extends past `end-line` is still considered in-range. A form that ends within the range but begins before `start-line` is excluded.
 7. Collect all matches before replacement.
@@ -99,6 +99,7 @@ ambiguous-match → {status, code, filename, match-count, matches [{line, column
    - c. A form whose end row is within the range but whose start row is before `start-line` → not matched (start-row before range).
    - d. Two identical forms both starting within the range → `ambiguous-match` (range alone cannot disambiguate; `old-string` must be made more specific).
    - e. A valid range that contains no node starts matching `old-string` → `no-match`; file unchanged.
+   - f. A small form (e.g. a symbol) nested inside a larger form that straddles the boundary (parent starts before `start-line`) → matched when the symbol's own start row is within the range, because the whole file is parsed and position metadata is file-relative throughout.
 7. Multi-form `old-string` or `new-string` returns a `parse-error`.
 8. The extension `init` registers exactly one tool named `"edit-clj"`.
 9. All unit tests pass; lint clean.
