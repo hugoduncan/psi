@@ -3,8 +3,9 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.core :as session]
-   [psi.session-state.state :as ss]
-   [psi.app-runtime.context :as app-context]))
+   [psi.app-runtime.context :as app-context]
+   [psi.app-runtime.retry-display :as retry-display]
+   [psi.session-state.state :as ss]))
 
 (def footer-query
   [:psi.agent-session/worktree-path
@@ -82,26 +83,6 @@
     (if (number? fraction)
       (str (format "%.1f" (* 100.0 fraction)) "%/" window suffix)
       (str "?/" window suffix))))
-
-(defn- format-relative-seconds
-  [ms]
-  (let [seconds (max 0 (long (Math/ceil (/ (double (max 0 ms)) 1000.0))))]
-    (str seconds "s")))
-
-(defn- retry-status-text
-  [retry now-ms]
-  (when (:active? retry)
-    (let [retry-text     (str "retry in " (format-relative-seconds (- (or (:resume-at retry) now-ms)
-                                                                      now-ms)))
-          rate-limit     (:rate-limit retry)
-          remaining-text (when (some? (:remaining rate-limit))
-                           (str "remaining "
-                                (:remaining rate-limit)
-                                (when (some? (:limit rate-limit))
-                                  (str "/" (:limit rate-limit)))))
-          reset-text     (when-let [reset-at (:reset-at rate-limit)]
-                           (str "reset in " (format-relative-seconds (- reset-at now-ms))))]
-      (str/join " · " (remove str/blank? [retry-text remaining-text reset-text])))))
 
 (defn- usage-parts
   [d context-text]
@@ -286,7 +267,7 @@
          model-text*              (model-text d)
          path-text*               (path-text d fallback-worktree-path)
          statuses*                (status-items (:psi.ui/statuses d))
-         retry-status             (retry-status-text retry now-ms)
+         retry-status             (retry-display/retry-status-text retry now-ms)
          session-activity-buckets (footer-session-activity-buckets context-sessions)
          session-activity-line    (footer-session-activity-line context-sessions)
          status-line              (->> (concat (map :status/text statuses*) [retry-status])

@@ -3,6 +3,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.message-text :as message-text]
+   [psi.app-runtime.retry-display :as retry-display]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]))
 
@@ -49,56 +50,34 @@
           (str model-label " • thinking " thinking-label)
           model-label)))))
 
-(defn- format-relative-seconds
-  [ms]
-  (let [seconds (max 0 (long (Math/ceil (/ (double (max 0 ms)) 1000.0))))]
-    (str seconds "s")))
-
-(defn- retry-summary-fragment
-  [retry now-ms]
-  (when (:active? retry)
-    (let [delay-text     (format-relative-seconds (- (or (:resume-at retry) now-ms) now-ms))
-          rate-limit     (:rate-limit retry)
-          remaining-text (when (some? (:remaining rate-limit))
-                           (str " remaining:"
-                                (:remaining rate-limit)
-                                (when (some? (:limit rate-limit))
-                                  (str "/" (:limit rate-limit)))))
-          reset-text     (when-let [reset-at (:reset-at rate-limit)]
-                           (str " reset-in:" (format-relative-seconds (- reset-at now-ms))))]
-      (str " retrying-in:" delay-text
-           " source:" (name (:delay-source retry))
-           remaining-text
-           reset-text))))
-
 (defn session-summary
   [ctx session-id]
-  (let [sd                       (ss/get-session-data-in ctx session-id)
-        model                    (:model sd)
-        thinking-level           (:thinking-level sd)
-        effective-effort         (effective-reasoning-effort model thinking-level)
-        journal-messages         (persist/messages-from-entries-in ctx session-id)
-        session-display-name     (message-text/session-display-name (:session-name sd) journal-messages)
-        pending-message-count    (+ (safe-count (:steering-messages sd))
-                                    (safe-count (:follow-up-messages sd)))
-        retry                    (:retry sd)
-        now-ms                   (.toEpochMilli (java.time.Instant/now))
-        summary                  {:session-id                 (:session-id sd)
-                                  :session-file               (:session-file sd)
-                                  :session-name               (:session-name sd)
-                                  :session-display-name       session-display-name
-                                  :phase                      (some-> (ss/sc-phase-in ctx (:session-id sd)) name)
-                                  :is-streaming               (boolean (:is-streaming sd))
-                                  :is-compacting              (boolean (:is-compacting sd))
-                                  :pending-message-count      pending-message-count
-                                  :retry-attempt              (or (:retry-attempt sd) 0)
-                                  :retry                      retry
-                                  :interrupt-pending          (boolean (:interrupt-pending sd))
-                                  :model-provider             (:provider model)
-                                  :model-id                   (:id model)
-                                  :model-reasoning            (boolean (:reasoning model))
-                                  :thinking-level             (some-> thinking-level name)
-                                  :effective-reasoning-effort effective-effort}]
+  (let [sd                    (ss/get-session-data-in ctx session-id)
+        model                 (:model sd)
+        thinking-level        (:thinking-level sd)
+        effective-effort      (effective-reasoning-effort model thinking-level)
+        journal-messages      (persist/messages-from-entries-in ctx session-id)
+        session-display-name  (message-text/session-display-name (:session-name sd) journal-messages)
+        pending-message-count (+ (safe-count (:steering-messages sd))
+                                 (safe-count (:follow-up-messages sd)))
+        retry                 (:retry sd)
+        now-ms                (.toEpochMilli (java.time.Instant/now))
+        summary               {:session-id                 (:session-id sd)
+                               :session-file               (:session-file sd)
+                               :session-name               (:session-name sd)
+                               :session-display-name       session-display-name
+                               :phase                      (some-> (ss/sc-phase-in ctx (:session-id sd)) name)
+                               :is-streaming               (boolean (:is-streaming sd))
+                               :is-compacting              (boolean (:is-compacting sd))
+                               :pending-message-count      pending-message-count
+                               :retry-attempt              (or (:retry-attempt sd) 0)
+                               :retry                      retry
+                               :interrupt-pending          (boolean (:interrupt-pending sd))
+                               :model-provider             (:provider model)
+                               :model-id                   (:id model)
+                               :model-reasoning            (boolean (:reasoning model))
+                               :thinking-level             (some-> thinking-level name)
+                               :effective-reasoning-effort effective-effort}]
     (assoc summary
            :header-model-label
            (model-label {:provider                   (:model-provider summary)
@@ -114,4 +93,4 @@
                  " compacting:" (if (:is-compacting summary) "yes" "no")
                  " pending:" (:pending-message-count summary)
                  " retry:" (:retry-attempt summary)
-                 (or (retry-summary-fragment retry now-ms) ""))))))
+                 (or (retry-display/retry-summary-fragment retry now-ms) ""))))))

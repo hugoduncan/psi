@@ -52,6 +52,10 @@
 - Existing UI mechanisms reused as designed:
   - Emacs keeps consuming `status-session-line` via existing status diagnostics projection; only payload/state storage was extended to preserve `:retry`
   - TUI keeps consuming the existing footer/status line surface; footer projection now appends retry timing and normalized rate-limit text to the canonical backend `:status-line`
+- Follow-up cleanup/review pass:
+  - removed duplicated retry display formatting logic from `session_summary.clj` and `footer.clj`
+  - extracted shared app-runtime owner `psi.app-runtime.retry-display` for relative retry/rate-limit formatting
+  - re-ran focused tests plus lint on the shared display extraction; no behavior drift observed
 - Provider-doc-grounded assumptions used for this slice:
   - treat provider docs as guidance for retryable/rate-limit behavior, but do not require any given header to be present
   - when valid retry timing headers are observed, they are treated as authoritative timing guidance
