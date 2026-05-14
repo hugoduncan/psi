@@ -39,6 +39,45 @@
    :is-error true
    :timestamp (or timestamp (java.time.Instant/now))})
 
+(defn dangling-tool-result-repairs
+  "Return synthetic error toolResult messages needed to repair dangling
+   assistant tool-call blocks.
+
+   A dangling block is an assistant message with one or more tool calls not
+   fully covered by the immediately following contiguous toolResult messages."
+  [messages]
+  (loop [remaining (seq messages)
+         repairs   []]
+    (if-let [message (first remaining)]
+      (let [tool-call-ids (seq (assistant-tool-call-ids message))]
+        (if (and (= "assistant" (:role message)) tool-call-ids)
+          (let [[tool-results tail] (split-with tool-result-message? (rest remaining))
+                present-ids         (into #{} (keep tool-result-id) tool-results)
+                missing-results     (->> tool-call-ids
+                                         (remove present-ids)
+                                         (mapv #(interrupted-tool-result % (:timestamp message))))]
+            (recur tail (into repairs missing-results)))
+          (recur (next remaining) repairs)))
+      repairs)))
+
+(defn tail-dangling-tool-result-repairs
+  "Return synthetic error toolResult messages needed to repair a dangling tail
+   tool-use before appending a later user message to the journal.
+
+   This only repairs the final assistant tool-use segment at the end of the
+   current history, preserving immediate adjacency in the persisted journal."
+  [messages]
+  (let [[trailing-tool-results reversed-prefix] (split-with tool-result-message? (rseq (vec messages)))
+        assistant-msg                           (first reversed-prefix)]
+    (if (and assistant-msg
+             (= "assistant" (:role assistant-msg))
+             (seq (assistant-tool-call-ids assistant-msg)))
+      (let [present-ids (into #{} (keep tool-result-id) trailing-tool-results)]
+        (->> (assistant-tool-call-ids assistant-msg)
+             (remove present-ids)
+             (mapv #(interrupted-tool-result % (:timestamp assistant-msg)))))
+      [])))
+
 (defn- repair-dangling-tool-uses
   "Ensure every assistant tool-call block is followed by corresponding
    contiguous toolResult messages before any later non-toolResult message.

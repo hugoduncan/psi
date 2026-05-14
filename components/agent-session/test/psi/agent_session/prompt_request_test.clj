@@ -216,3 +216,24 @@
                       (persist/message-entry later-user)])]
       (is (= ["assistant" "toolResult" "user"] (mapv :role messages)))
       (is (= "done" (get-in (second messages) [:content 0 :text]))))))
+
+(deftest tail-dangling-tool-result-repairs-test
+  (testing "returns repair for dangling trailing assistant tool call"
+    (let [assistant {:role "assistant"
+                     :content [{:type :tool-call :id "call-tail" :name "bash" :arguments "{}"}]
+                     :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+          repairs   (prompt-request/tail-dangling-tool-result-repairs [assistant])]
+      (is (= 1 (count repairs)))
+      (is (= "call-tail" (:tool-call-id (first repairs))))
+      (is (true? (:is-error (first repairs))))))
+
+  (testing "returns no repair when trailing tool result already exists"
+    (let [assistant {:role "assistant"
+                     :content [{:type :tool-call :id "call-tail" :name "bash" :arguments "{}"}]
+                     :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+          result    {:role "toolResult"
+                     :tool-call-id "call-tail"
+                     :tool-name "bash"
+                     :content [{:type :text :text "done"}]}
+          repairs   (prompt-request/tail-dangling-tool-result-repairs [assistant result])]
+      (is (= [] repairs)))))

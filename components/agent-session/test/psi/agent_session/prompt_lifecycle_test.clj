@@ -10,6 +10,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.turn]
    [psi.state-kernel.dispatch :as kernel]
+   [psi.session-persistence.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [clojure.java.io :as io]
@@ -67,6 +68,32 @@
       (is (= 3 (count effects)))
       (is (= [:session/prompt-submit :session/prompt :session/prompt-prepare-request]
              (mapv :event-type effects))))))
+
+(deftest prompt-submit-handler-adds-tail-repair-effect-before-user-message-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        assistant-msg {:role "assistant"
+                       :content [{:type :tool-call :id "tc-tail" :name "bash" :arguments "{}"}]
+                       :stop-reason :tool_use
+                       :timestamp #inst "2026-05-14T13:28:43.762-00:00"}
+        user-msg {:role "user"
+                  :content [{:type :text :text "status?"}]
+                  :timestamp (java.time.Instant/now)}]
+    (session/dispatch-in! ctx :session/append-journal-entry
+                          {:session-id session-id
+                           :entry (psi.session-persistence.core/message-entry assistant-msg)}
+                          {:origin :core})
+    (let [handler-result ((:fn (kernel/handler-entry :session/prompt-submit))
+                          ctx
+                          {:session-id session-id
+                           :user-msg user-msg})
+          effects (:effects handler-result)]
+      (is (= 2 (count effects)))
+      (is (= :runtime/dispatch-event (-> effects first :effect/type)))
+      (is (= "toolResult" (get-in (first effects) [:event-data :entry :data :message :role])))
+      (is (= "tc-tail" (get-in (first effects) [:event-data :entry :data :message :tool-call-id])))
+      (is (= :runtime/dispatch-event (-> effects second :effect/type)))
+      (is (= "user" (get-in (second effects) [:event-data :entry :data :message :role])))
+      (is (= 1 (get-in handler-result [:return :repaired-tool-result-count]))))))
 
 (deftest prompt-record-response-appends-assistant-once-test
   (let [[ctx session-id] (create-session-context {:persist? false})
@@ -350,41 +377,27 @@
 
 (deftest queued-steering-is-injected-into-continuation-prepared-request-test
   (let [[ctx session-id] (create-session-context {:persist? false})
-        assistant-msg    {:role "assistant"
-                          :content [{:type :tool-call :id "tc-1" :name "read" :arguments "{}"}]
-                          :stop-reason :stop
-                          :timestamp (java.time.Instant/now)}
-        execution-result {:execution-result/turn-id "turn-1"
-                          :execution-result/session-id session-id
-                          :execution-result/assistant-message assistant-msg
-                          :execution-result/turn-outcome :turn.outcome/tool-use
-                          :execution-result/tool-calls [{:id "tc-1" :name "read" :arguments "{}"}]
-                          :execution-result/stop-reason :stop}
-        tool-result-msg  {:role "toolResult"
-                          :tool-call-id "tc-1"
-                          :tool-name "read"
-                          :content [{:type :text :text "file body"}]
-                          :timestamp (java.time.Instant/now)}]
+        user-msg        {:role "user"
+                         :content [{:type :text :text "hi"}]
+                         :timestamp (java.time.Instant/now)}
+        assistant-msg   {:role "assistant"
+                         :content [{:type :tool-call :id "tc-1" :name "read" :arguments "{}"}]
+                         :stop-reason :stop
+                         :timestamp (java.time.Instant/now)}
+        tool-result-msg {:role "toolResult"
+                         :tool-call-id "tc-1"
+                         :tool-name "read"
+                         :content [{:type :text :text "file body"}]
+                         :timestamp (java.time.Instant/now)}]
     (session/dispatch-in! ctx :session/bootstrap-prompt-state
                           {:session-id session-id
                            :system-prompt "sys"}
                           {:origin :core})
-    (session/dispatch-in! ctx :session/prompt-submit
-                          {:session-id session-id
-                           :user-msg {:role "user"
-                                      :content [{:type :text :text "hi"}]
-                                      :timestamp (java.time.Instant/now)}}
-                          {:origin :core})
-    (with-redefs [psi.agent-session.prompt-chain/run-prompt-tools! (fn [_ctx _sid _res _pq]
-                                                                     {:continued? true :tool-call-count 1})]
-      (session/dispatch-in! ctx :session/prompt-record-response
+    (doseq [message [user-msg assistant-msg tool-result-msg]]
+      (session/dispatch-in! ctx :session/append-journal-entry
                             {:session-id session-id
-                             :execution-result execution-result}
+                             :entry (psi.session-persistence.core/message-entry message)}
                             {:origin :core}))
-    (session/dispatch-in! ctx :session/tool-record-result
-                          {:session-id session-id
-                           :shaped-result {:result-message tool-result-msg}}
-                          {:origin :core})
     (session/dispatch-in! ctx :session/enqueue-steering-message
                           {:session-id session-id
                            :text "Please be brief."}
