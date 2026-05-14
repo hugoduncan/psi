@@ -15,3 +15,6 @@
 - Defined the transport-to-session propagation contract explicitly: the retry scheduler consumes provider response headers from `:provider-error/headers` on the terminal error/result map passed to `:on-retry-triggered`.
 - Updated `plan.md` to record the resolved ambiguity decisions so implementation can proceed without reopening these questions.
 - Did not touch `steps.md` execution items per task instruction.
+
+2026-05-14 inconsistency review
+- Inconsistency: design/acceptance now require one explicit tested backend rule for numeric `RateLimit-Reset` interpretation, but plan only lists that rule as a decision to make during implementation and steps only mention implementing/documenting a rule. This leaves task intent, plan, and execution checklist out of sync on whether the rule is already fixed versus still open; resolve by choosing and recording the canonical rule in design/plan and adding proof expectations against that exact rule.
