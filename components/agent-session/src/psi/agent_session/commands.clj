@@ -399,7 +399,7 @@
                                     [:psi.agent-session/session-id
                                      :psi.agent-session/session-name
                                      :psi.agent-session/worktree-path
-                                     {:psi.agent-session/context-sessions
+                                     {:psi.runtime-session/list
                                       [:psi.session-info/id
                                        :psi.session-info/worktree-path
                                        :psi.session-info/name]}])
@@ -407,7 +407,7 @@
                           {:session-id    (:psi.session-info/id s)
                            :session-name  (:psi.session-info/name s)
                            :worktree-path (:psi.session-info/worktree-path s)})
-                        (or (:psi.agent-session/context-sessions d) []))]
+                        (or (:psi.runtime-session/list d) []))]
     (if (seq sessions0)
       sessions0
       [{:session-id    (:psi.agent-session/session-id d)

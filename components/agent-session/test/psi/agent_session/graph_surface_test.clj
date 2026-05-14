@@ -101,7 +101,12 @@
     :psi.graph/domain-coverage
     :psi.graph/resolver-index
     :psi.graph/attr-index
-    :psi.agent-session/active-session-id
+    :psi.runtime-session/active-id
+    :psi.runtime-session/count
+    :psi.runtime-session/list
+    :psi.persisted-session/list
+    :psi.persisted-session/list-all
+    :psi.agent-session/context-session-summaries
     :psi.runtime/nrepl-host
     :psi.runtime/nrepl-port
     :psi.runtime/nrepl-endpoint})
@@ -115,13 +120,22 @@
              (pr-str (vec missing))))))
 
 (deftest context-session-graph-introspection-test
-  (testing "context session attrs are discoverable in graph root attrs and edges"
+  (testing "explicit runtime and persisted session attrs are discoverable in graph root attrs and edges"
     (let [result     (q [:psi.graph/root-queryable-attrs :psi.graph/edges])
           root-attrs (:psi.graph/root-queryable-attrs result)
           edge-attrs (keep :attribute (:psi.graph/edges result))]
-      (is (graph-attr-present? root-attrs :psi.agent-session/context-session-count))
-      (is (graph-attr-present? edge-attrs :psi.agent-session/context-session-count))
-      (is (graph-attr-present? edge-attrs :psi.agent-session/context-sessions)))))
+      (is (graph-attr-present? root-attrs :psi.runtime-session/active-id))
+      (is (graph-attr-present? root-attrs :psi.runtime-session/count))
+      (is (graph-attr-present? root-attrs :psi.runtime-session/list))
+      (is (graph-attr-present? root-attrs :psi.persisted-session/list))
+      (is (graph-attr-present? root-attrs :psi.persisted-session/list-all))
+      (is (graph-attr-present? edge-attrs :psi.runtime-session/active-id))
+      (is (graph-attr-present? edge-attrs :psi.runtime-session/count))
+      (is (graph-attr-present? edge-attrs :psi.runtime-session/list))
+      (is (graph-attr-present? edge-attrs :psi.persisted-session/list))
+      (is (graph-attr-present? edge-attrs :psi.persisted-session/list-all))
+      (is (graph-attr-present? root-attrs :psi.agent-session/context-session-summaries))
+      (is (graph-attr-present? edge-attrs :psi.agent-session/context-session-summaries)))))
 
 (deftest background-jobs-graph-introspection-test
   (testing "background job attrs are discoverable in graph introspection"
@@ -154,7 +168,11 @@
           syms   (:psi.graph/resolver-syms result)]
       (is (set? syms))
       (is (every? symbol? syms))
-      (is (contains? syms 'psi.agent-session.resolvers.session/agent-session-identity)))))
+      (is (contains? syms 'psi.agent-session.resolvers.session/agent-session-identity))
+      (is (contains? syms 'psi.agent-session.resolvers.session/runtime-session-list-resolver))
+      (is (contains? syms 'psi.agent-session.resolvers.session/runtime-active-session-id-resolver))
+      (is (contains? syms 'psi.agent-session.resolvers.discovery/persisted-session-list-resolver))
+      (is (contains? syms 'psi.agent-session.resolvers.discovery/persisted-session-list-all-resolver)))))
 
 (deftest graph-bridge-mutation-syms-test
   (testing "mutation-syms is a set of symbols"
@@ -291,8 +309,14 @@
       (is (seq root-attrs))
       (is (every? keyword? root-attrs))
       (assert-canonical-graph-root-attrs root-attrs)
-      (let [result (q (vec root-attrs))]
-        (doseq [attr root-attrs]
+      ;; Query each advertised root attr independently instead of issuing one
+      ;; mega-query over the full root surface. Some graph-introspection attrs
+      ;; are large and self-descriptive; batching them all together can create
+      ;; pathological expansion/printing behavior that obscures the real
+      ;; contract we want to prove here: each root attr is individually
+      ;; resolvable from session root.
+      (doseq [attr root-attrs]
+        (let [result (q [attr])]
           (is (contains? result attr)
               (str "expected root-queryable attr to resolve: " attr)))))))
 
@@ -327,15 +351,15 @@
         (let [syms (map (comp str :psi.resolver/sym) index)]
           (is (= syms (sort syms)))))
 
-      (testing "agent-session-identity entry has context-sessions join in output"
-        (let [entry (first (filter #(= 'psi.agent-session.resolvers.session/agent-session-identity
+      (testing "runtime-session-list-resolver entry has explicit runtime-session join in output"
+        (let [entry (first (filter #(= 'psi.agent-session.resolvers.session/runtime-session-list-resolver
                                        (:psi.resolver/sym %))
                                    index))
               joins (filter map? (:psi.resolver/output entry))]
           (is entry)
-          (is (some #(contains? % :psi.agent-session/context-sessions) joins))
+          (is (some #(contains? % :psi.runtime-session/list) joins))
           (is (some #(some #{:psi.session-info/id}
-                           (get % :psi.agent-session/context-sessions []))
+                           (get % :psi.runtime-session/list []))
                     joins)))))))
 
 (deftest graph-bridge-attr-index-test
@@ -353,11 +377,11 @@
           (is (vector? (:psi.attr/produced-by v)))
           (is (map? (:psi.attr/reachable-via v)))))
 
-      (testing "psi.session-info/id is reachable via context-sessions join"
+      (testing "psi.session-info/id is reachable via explicit runtime-session joins"
         (let [entry (get index :psi.session-info/id)]
           (is entry)
           (is (contains? (:psi.attr/reachable-via entry)
-                         :psi.agent-session/context-sessions))))
+                         :psi.runtime-session/list))))
 
       (testing "flat attrs have empty reachable-via"
         (let [entry (get index :psi.agent-session/session-name)]
@@ -367,11 +391,11 @@
 (deftest resolver-detail-test
   (testing "resolver-detail resolves I/O for a known sym"
     (let [result (qe [:psi.resolver/input :psi.resolver/output]
-                     {:psi.resolver/sym 'psi.agent-session.resolvers.session/agent-session-identity})]
+                     {:psi.resolver/sym 'psi.agent-session.resolvers.session/runtime-session-list-resolver})]
       (is (vector? (:psi.resolver/input result)))
       (is (vector? (:psi.resolver/output result)))
-      (is (some #{:psi.agent-session/session-name} (:psi.resolver/output result)))
-      (is (some #(and (map? %) (contains? % :psi.agent-session/context-sessions))
+      (is (some #{:psi.runtime-session/count} (:psi.resolver/output result)))
+      (is (some #(and (map? %) (contains? % :psi.runtime-session/list))
                 (:psi.resolver/output result)))))
 
   (testing "resolver-detail returns nil attrs for unknown sym"

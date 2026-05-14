@@ -452,16 +452,16 @@
     (let [captured   (atom nil)
           update-fn  (app/make-update (stub-agent-fn ""))
           action     (ui-actions/resume-session-action
-                      {:psi.session/list [{:psi.session-info/path "/tmp/psi-test/a.ndedn"
-                                           :psi.session-info/name "Session A"
-                                           :psi.session-info/worktree-path "/tmp/psi-test"
-                                           :psi.session-info/first-message "hello"
-                                           :psi.session-info/modified (java.time.Instant/now)}
-                                          {:psi.session-info/path "/tmp/psi-test/b.ndedn"
-                                           :psi.session-info/name "Session B"
-                                           :psi.session-info/worktree-path "/tmp/psi-test"
-                                           :psi.session-info/first-message "world"
-                                           :psi.session-info/modified (java.time.Instant/now)}]})
+                      {:psi.persisted-session/list [{:psi.session-info/path "/tmp/psi-test/a.ndedn"
+                                                     :psi.session-info/name "Session A"
+                                                     :psi.session-info/worktree-path "/tmp/psi-test"
+                                                     :psi.session-info/first-message "hello"
+                                                     :psi.session-info/modified (java.time.Instant/now)}
+                                                    {:psi.session-info/path "/tmp/psi-test/b.ndedn"
+                                                     :psi.session-info/name "Session B"
+                                                     :psi.session-info/worktree-path "/tmp/psi-test"
+                                                     :psi.session-info/first-message "world"
+                                                     :psi.session-info/modified (java.time.Instant/now)}]})
           state      (init-state {:frontend-action-handler-fn! #(do (reset! captured %) nil)})
           [opened _] (app-update/handle-dispatch-result state {:type :frontend-action
                                                                :request-id "req-r1"

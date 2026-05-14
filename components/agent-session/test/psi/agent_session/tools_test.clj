@@ -116,6 +116,11 @@
         (is (true? (:is-error result)))
         (is (re-find #"requires `code`" (:content result)))))
 
+    (testing "mutate requires mutation"
+      (let [result ((:execute tool) {"action" "mutate"})]
+        (is (true? (:is-error result)))
+        (is (re-find #"requires `mutation`" (:content result)))))
+
     (testing "workflow requires valid op"
       (let [result ((:execute tool) {"action" "workflow"})]
         (is (true? (:is-error result)))
@@ -778,4 +783,5 @@
           result ((:execute tool) {"query" "[:foo/bar]" "entity" "[:not-a-map]"})]
       (is (true? (:is-error result)))
       (is (re-find #"Entity must be an EDN map" (:content result))))))
+
 

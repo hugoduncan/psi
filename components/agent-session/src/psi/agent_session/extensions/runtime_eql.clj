@@ -50,7 +50,12 @@
 
 (defn run-extension-mutation-in!
   "Execute a single EQL mutation op against `ctx` and return its payload.
-   `op-sym` must be a qualified mutation symbol."
+   `op-sym` must be a qualified mutation symbol.
+
+   `session-id` is the invoking session used for runtime seed context. For
+   session-scoped mutations, an explicit `:session-id` already present in
+   `params` remains authoritative so callers can intentionally target a
+   different session than the invoker (for example close-session admin flows)."
   [ctx session-id op-sym params]
   (let [register-resolvers! (:register-resolvers-fn ctx)
         register-mutations! (:register-mutations-fn ctx)
@@ -65,7 +70,9 @@
                                                      :git/context git-ctx)]
                               (cond
                                 (contains? session-scoped-extension-mutation-ops op-sym)
-                                (assoc base-params :session-id session-id)
+                                (if (contains? base-params :session-id)
+                                  base-params
+                                  (assoc base-params :session-id session-id))
 
                                 (contains? lifecycle-extension-mutation-param-builders op-sym)
                                 ((get lifecycle-extension-mutation-param-builders op-sym) session-id base-params)

@@ -30,8 +30,8 @@
     (is (nil? (:ui/legacy action)))))
 
 (deftest resume-session-action-wraps-query-result-test
-  (let [query-result {:psi.session/list [{:psi.session-info/path "/tmp/a.ndedn"
-                                          :psi.session-info/name "Alpha"}]}
+  (let [query-result {:psi.persisted-session/list [{:psi.session-info/path "/tmp/a.ndedn"
+                                                    :psi.session-info/name "Alpha"}]}
         action (ui-actions/resume-session-action query-result)]
     (is (= :select-resume-session (:ui/action-id action)))
     (is (= :select-resume-session (:ui/action-name action)))

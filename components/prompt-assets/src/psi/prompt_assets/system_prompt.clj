@@ -54,7 +54,7 @@
   attr-index → [:psi.graph/attr-index] | {attr {:psi.attr/produced-by [...] :psi.attr/reachable-via {join-key [...]}}}
   resolver-detail → entity({:psi.resolver/sym 'ns/name}) + [:psi.resolver/input :psi.resolver/output]
   session-targeting → entity({:psi.agent-session/session-id \"sid\"}) | ¬omit → ¬silent-wrong-session
-  child-sessions → [:psi.agent-session/context-sessions] | attrs discoverable via resolver-index ∨ attr-index
+  child-sessions → [:psi.runtime-session/list] | attrs discoverable via resolver-index ∨ attr-index
   usage → {:psi.agent-session/ usage-input usage-output usage-cache-read usage-cache-write context-tokens context-window}
   eval-split → eval[ns,form] = ψ-process ∧ loaded-ns | project-repl/eval[code] = target-worktree ∧ managed-nrepl
   reload-loop → query([:psi.agent-session/worktree-path]) → reload-code[small_ns_first ∨ worktree] → if(source_outside_worktree) then restart_psi_from(edited_worktree) ∧ ¬retarget(other_checkout)")
@@ -315,7 +315,7 @@
        "  - psi-tool(action: \"query\", query: \"[:psi.agent-session/session-name :psi.agent-session/model-id]\", entity: \"{:psi.agent-session/session-id \\\"sid\\\"}\")\n"
        "  - Always supply session-id when targeting a specific session; omitting it silently queries the wrong session.\n"
        "- Child sessions:\n"
-       "  - psi-tool(action: \"query\", query: \"[:psi.agent-session/context-sessions]\") then use attr-index or resolver-index to discover valid child attrs.\n"
+       "  - psi-tool(action: \"query\", query: \"[:psi.runtime-session/list]\") then use attr-index or resolver-index to discover valid child attrs.\n"
        "- Eval split: psi-tool(action: \"eval\", ns: \"clojure.core\", form: \"(+ 1 2)\") = in-process ψ eval in an already loaded namespace; psi-tool(action: \"project-repl\", op: \"eval\", code: \"(+ 1 2)\") = managed project nREPL eval for the target worktree.\n"
        "- Reload code:\n"
        "  - psi self-reload is worktree-authoritative: use the session worktree-path or an explicit target worktree-path\n"

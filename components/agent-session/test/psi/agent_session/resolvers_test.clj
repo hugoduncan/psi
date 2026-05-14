@@ -151,7 +151,7 @@
                      :psi.agent-session/ui-type
                      :psi.agent-session/start-time
                      :psi.agent-session/current-time
-                     :psi.agent-session/active-session-id])]
+                     :psi.runtime-session/active-id])]
       (is (integer? (:psi.agent-session/messages-count result)))
       (is (integer? (:psi.agent-session/ai-call-count result)))
       (is (integer? (:psi.agent-session/tool-call-count result)))
@@ -160,8 +160,8 @@
       (is (contains? #{:console :tui :emacs} (:psi.agent-session/ui-type result)))
       (is (instance? java.time.Instant (:psi.agent-session/start-time result)))
       (is (instance? java.time.Instant (:psi.agent-session/current-time result)))
-      (is (string? (:psi.agent-session/active-session-id result))
-          "active-session-id composes with telemetry attrs without Pathom3 conflict"))))
+      (is (string? (:psi.runtime-session/active-id result))
+          "runtime-session active-id composes with telemetry attrs without Pathom3 conflict"))))
 
 ;; ── Mixed with existing attrs (regression) ──────────────
 
@@ -188,7 +188,7 @@
 ;; ── Model selector bridge attrs ──────────────────────────
 
 (deftest multi-session-context-eql-process-and-persisted-test
-  (testing "context session attrs expose process sessions and persisted session list remains queryable"
+  (testing "runtime session attrs expose in-memory process sessions and persisted session list remains queryable"
     (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-resolvers-context-" (java.util.UUID/randomUUID))
           _                  (.mkdirs (java.io.File. cwd))
           [ctx _]            (create-session-context {:cwd cwd})
@@ -220,32 +220,65 @@
                                                            nil
                                                            [(persist/thinking-level-entry :off)
                                                             (persist/session-info-entry "beta")])
-          process-result     (q-in ctx [:psi.agent-session/context-session-count
-                                        {:psi.agent-session/context-sessions
+          process-result     (q-in ctx [:psi.runtime-session/count
+                                        {:psi.runtime-session/list
                                          [:psi.session-info/id
                                           :psi.session-info/path
                                           :psi.session-info/worktree-path
                                           :psi.session-info/name
                                           :psi.session-info/display-name
-                                          :psi.session-info/created]}])
-          persisted-result   (q-in ctx [{:psi.session/list
+                                          :psi.session-info/parent-session-id
+                                          :psi.session-info/created
+                                          :psi.session-info/updated]}
+                                        {:psi.agent-session/context-session-summaries
+                                         [:psi.session-info/id
+                                          :psi.session-info/display-name
+                                          :psi.session-info/created
+                                          :psi.session-info/updated
+                                          :psi.session-info/parent-session-id
+                                          :psi.session-info/worktree-path]}])
+          persisted-result   (q-in ctx [{:psi.persisted-session/list
                                          [:psi.session-info/id
                                           :psi.session-info/path
                                           :psi.session-info/worktree-path
                                           :psi.session-info/name
                                           :psi.session-info/message-count]}])
-          context-sessions   (:psi.agent-session/context-sessions process-result)
-          persisted          (:psi.session/list persisted-result)]
-      (is (<= 2 (:psi.agent-session/context-session-count process-result)))
-      (is (some #(= sid-1 (:psi.session-info/id %)) context-sessions))
-      (is (some #(= sid-2 (:psi.session-info/id %)) context-sessions))
-      (is (some #(= path-1 (:psi.session-info/path %)) context-sessions))
-      (is (some #(= path-2 (:psi.session-info/path %)) context-sessions))
-      (is (some #(= "alpha" (:psi.session-info/display-name %)) context-sessions))
-      (is (some #(= "beta" (:psi.session-info/display-name %)) context-sessions))
-      (is (every? #(= cwd (:psi.session-info/worktree-path %)) context-sessions))
-      (is (every? #(= cwd (:psi.session-info/worktree-path %)) context-sessions))
-      (is (every? #(instance? java.time.Instant (:psi.session-info/created %)) context-sessions))
+          runtime-sessions   (:psi.runtime-session/list process-result)
+          context-summaries  (:psi.agent-session/context-session-summaries process-result)
+          persisted          (:psi.persisted-session/list persisted-result)]
+      (is (<= 2 (:psi.runtime-session/count process-result)))
+      (is (some #(= sid-1 (:psi.session-info/id %)) runtime-sessions))
+      (is (some #(= sid-2 (:psi.session-info/id %)) runtime-sessions))
+      (is (some #(= path-1 (:psi.session-info/path %)) runtime-sessions))
+      (is (some #(= path-2 (:psi.session-info/path %)) runtime-sessions))
+      (is (some #(= "alpha" (:psi.session-info/display-name %)) runtime-sessions))
+      (is (some #(= "beta" (:psi.session-info/display-name %)) runtime-sessions))
+      (is (every? #(= cwd (:psi.session-info/worktree-path %)) runtime-sessions))
+      (is (every? #(= cwd (:psi.session-info/worktree-path %)) runtime-sessions))
+      (is (every? #(instance? java.time.Instant (:psi.session-info/created %)) runtime-sessions))
+      (is (every? #(or (nil? (:psi.session-info/updated %))
+                       (instance? java.time.Instant (:psi.session-info/updated %)))
+                  runtime-sessions))
+
+      (is (= (mapv #(select-keys % [:psi.session-info/id
+                                    :psi.session-info/display-name
+                                    :psi.session-info/created
+                                    :psi.session-info/updated
+                                    :psi.session-info/parent-session-id
+                                    :psi.session-info/worktree-path])
+                   runtime-sessions)
+             context-summaries)
+          "compact summaries preserve canonical ordering and exact trimmed field projection")
+      (is (every? #(= #{:psi.session-info/id
+                        :psi.session-info/display-name
+                        :psi.session-info/created
+                        :psi.session-info/updated
+                        :psi.session-info/parent-session-id
+                        :psi.session-info/worktree-path}
+                      (set (keys %)))
+                  context-summaries))
+      (is (every? #(not (contains? % :psi.session-info/first-message)) context-summaries))
+      (is (every? #(not (contains? % :psi.session-info/all-messages-text)) context-summaries))
 
       (is (vector? persisted))
       (is (some #(= sid-1 (:psi.session-info/id %)) persisted))
@@ -491,19 +524,18 @@
       (is (= "wake" (:psi.scheduler/message result)))
       (is (= :pending (:psi.scheduler/status result))))))
 
-;; ── :psi.agent-session/active-session-id ────────────────
+;; ── :psi.runtime-session/active-id ─────────────────────
 
-(deftest active-session-id-resolver-test
+(deftest runtime-active-session-id-resolver-test
   (testing "returns invoking session id when present and non-nil"
-    (let [[ctx session-id] (create-session-context)]
-      (is (= session-id
-             (:psi.agent-session/active-session-id
-              (session/query-in ctx session-id [:psi.agent-session/active-session-id]))))))
+    (let [[ctx session-id] (create-session-context)
+          result           (session/query-in ctx session-id [:psi.runtime-session/active-id])]
+      (is (= session-id (:psi.runtime-session/active-id result)))))
 
   (testing "returns nil when session-id is present-but-nil in the entity map"
-    (let [[ctx _] (create-session-context)]
-      (is (nil? (:psi.agent-session/active-session-id
-                 (session/query-in ctx nil [:psi.agent-session/active-session-id]))))))
+    (let [[ctx _] (create-session-context)
+          result  (session/query-in ctx nil [:psi.runtime-session/active-id])]
+      (is (nil? (:psi.runtime-session/active-id result)))))
 
   (testing "resolves via psi-tool root-seed pattern — q helper mirrors live query path"
     ;; The q helper uses test-support/create-test-session and passes session-id as
@@ -511,9 +543,9 @@
     ;; This is distinct from test 1: it uses a fresh isolated context (no shared
     ;; ctx/session-id binding) and exercises the same code path that psi-tool uses
     ;; in production — confirming the attr is reachable from standard root seeds alone.
-    (let [result (q [:psi.agent-session/active-session-id])]
-      (is (string? (:psi.agent-session/active-session-id result))
-          "active-session-id is a non-nil string via psi-tool root-seed pattern")))
+    (let [result (q [:psi.runtime-session/active-id])]
+      (is (string? (:psi.runtime-session/active-id result))
+          "runtime active-id is a non-nil string via psi-tool root-seed pattern")))
 
   (testing "resolved value is independent of session ordering — each session returns its own id"
     ;; Covers the design contract case: "does not reflect adapter focus or list ordering".
@@ -526,15 +558,15 @@
           sid-a   (:session-id sd-a)
           sd-b    (session/new-session-in! ctx sid-a {})
           sid-b   (:session-id sd-b)
-          res-a   (session/query-in ctx sid-a [:psi.agent-session/active-session-id])
-          res-b   (session/query-in ctx sid-b [:psi.agent-session/active-session-id])]
-      (is (= sid-a (:psi.agent-session/active-session-id res-a))
+          res-a   (session/query-in ctx sid-a [:psi.runtime-session/active-id])
+          res-b   (session/query-in ctx sid-b [:psi.runtime-session/active-id])]
+      (is (= sid-a (:psi.runtime-session/active-id res-a))
           "querying session A returns A's own id")
-      (is (= sid-b (:psi.agent-session/active-session-id res-b))
+      (is (= sid-b (:psi.runtime-session/active-id res-b))
           "querying session B returns B's own id")
-      (is (not= (:psi.agent-session/active-session-id res-a)
-                (:psi.agent-session/active-session-id res-b))
-          "each session returns a distinct active-session-id"))))
+      (is (not= (:psi.runtime-session/active-id res-a)
+                (:psi.runtime-session/active-id res-b))
+          "each session returns a distinct runtime active-id"))))
 
 (deftest register-resolvers-in-includes-history-resolvers-test
   (testing "register-resolvers-in! includes history resolvers so worktree attrs are resolvable

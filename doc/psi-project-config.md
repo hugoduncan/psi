@@ -9,6 +9,7 @@ Project-level configuration and runtime query conventions.
 Canonical requests are action-based:
 - `action: "query"` — read from the live EQL graph
 - `action: "eval"` — evaluate in-process Clojure in a named already-loaded namespace
+- `action: "mutate"` — invoke one registered runtime mutation with one params map
 - `action: "reload-code"` — reload already loaded namespaces by explicit namespace list or worktree scope
 
 Legacy query-only calls of the form `{query: "..."}` remain accepted as a migration compatibility alias for `action: "query"`, but canonical docs and examples use the action-based form.
@@ -49,6 +50,78 @@ Canonical discovery flow:
 3. Use root discovery attrs when needed:
    - `:psi.graph/root-seeds`
    - `:psi.graph/root-queryable-attrs`
+
+### Mutate
+
+Use mutate mode for canonical runtime writes that already exist as registered
+mutations.
+
+Contract:
+- exactly one mutation per tool call
+- `mutation` must be a qualified mutation symbol string
+- `params` must be a map/object when present
+- `entity` is query-only and is rejected for `action: "mutate"`
+- `psi-tool` reuses the canonical runtime mutation path rather than raw eval
+
+Example:
+
+```clojure
+{:action   "mutate"
+ :mutation "psi.extension/close-session"
+ :params   {:session-id "8fe9b0a6-ad8a-4373-9478-557e537499f2"}}
+```
+
+Typical success shape:
+
+```clojure
+#:psi-tool{:action :mutate
+           :mutation 'psi.extension/close-session
+           :duration-ms 4
+           :overall-status :ok
+           :result #:psi.agent-session{:close-session-closed? true
+                                       :close-session-id "8fe9b0a6-ad8a-4373-9478-557e537499f2"}}
+```
+
+Typical validation failure shape:
+
+```clojure
+#:psi-tool{:action :mutate
+           :mutation 'psi.extension/not-a-real-mutation
+           :duration-ms 0
+           :overall-status :error
+           :error {:phase :validate
+                   :message "Unknown psi-tool mutation: psi.extension/not-a-real-mutation"}}
+```
+
+Canonical session-admin flow:
+1. query `:psi.runtime-session/active-id`
+2. query `:psi.agent-session/context-session-summaries`
+3. choose explicit non-active session ids in caller logic
+4. call `action: "mutate"` with `psi.extension/close-session`
+
+Example discovery + mutate sequence:
+
+```clojure
+{:action "query"
+ :query  "[:psi.runtime-session/active-id]"}
+```
+
+```clojure
+{:action "query"
+ :query  "[{:psi.agent-session/context-session-summaries
+            [:psi.session-info/id
+             :psi.session-info/display-name
+             :psi.session-info/created
+             :psi.session-info/updated
+             :psi.session-info/parent-session-id
+             :psi.session-info/worktree-path]}]"}
+```
+
+```clojure
+{:action   "mutate"
+ :mutation "psi.extension/close-session"
+ :params   {:session-id "8fe9b0a6-ad8a-4373-9478-557e537499f2"}}
+```
 
 ### Eval
 

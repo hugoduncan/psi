@@ -134,7 +134,7 @@
 
 (defn resume-session-action
   [query-result]
-  (let [sessions (vec (or (:psi.session/list query-result) []))]
+  (let [sessions (vec (or (:psi.persisted-session/list query-result) []))]
     (select-action
      {:action-id :select-resume-session
       :action-name :select-resume-session
