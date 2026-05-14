@@ -86,6 +86,14 @@
   - result: `0 errors, 0 warnings`
 - explicit review outcome: no new actionable feedback
 
+## 2026-05-14 — follow-up execution
+
+- preloaded review result already landed the newly added actionable follow-up items before this execution pass; no remaining unchecked follow-up items were present in `steps.md`
+- verified the review-targeted proof surface is still green:
+  - `clojure -M:test --focus psi.prompt-assets.system-prompt-test --focus psi.introspection.graph-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test`
+  - result: `58 tests, 3552 assertions, 0 failures`
+- no blocking reason found; there was no additional newly added unchecked work left to execute in this pass
+
 ## 2026-05-14 — task-test-review
 
 - actionable test/doc-sync issue found: prompt-assets prose guidance still teaches the removed `:psi.agent-session/context-sessions` child-session surface in `components/prompt-assets/test/psi/prompt_assets/system_prompt_test.clj:191`, so the review proof surface fails after the explicit runtime-session migration
