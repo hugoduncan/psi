@@ -26,6 +26,7 @@
    [psi.agent-session.tool-plan :as tool-plan]
    [psi.agent-core.core :as agent-core]
    [psi.agent-session.session-runtime :as session-runtime]
+   [psi.agent-session.session-close]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.workflow-runtime.child-session-contract :as workflow-child-session-contract]
@@ -314,6 +315,9 @@
 (defn shutdown-context! [ctx]
   (doseq [{:keys [session-id]} (ss/list-context-sessions-in ctx)]
     (dispatch/dispatch! ctx :scheduler/cancel-all {:session-id session-id} {:origin :core}))
+  (doseq [{:keys [session-id]} (ss/list-context-sessions-in ctx)]
+    (when (ss/get-session-data-in ctx session-id)
+      (psi.agent-session.session-close/close-session-in! ctx session-id)))
   (dispatch-effects/cancel-all-scheduler-timers!)
   (when-let [timers* (:scheduler-timers* ctx)]
     (reset! timers* {}))
