@@ -57,6 +57,22 @@ value ErrorFrame {
     data: Map<String, Any>?
 }
 
+value RetryRateLimitPayload {
+    limit: Integer?
+    remaining: Integer?
+    reset_at: Integer?
+    reset_after_ms: Integer?
+}
+
+value RetryPayload {
+    active: Boolean
+    attempt: Integer
+    delay_ms: Integer
+    delay_source: String
+    resume_at: Integer
+    rate_limit: RetryRateLimitPayload?
+}
+
 value SessionUpdatedPayload {
     id: String
     session_display_name: String?
@@ -65,6 +81,7 @@ value SessionUpdatedPayload {
     is_compacting: Boolean
     pending_message_count: Integer
     retry_attempt: Integer
+    retry: RetryPayload?
     model_provider: String?
     model_id: String?
     model_reasoning: Boolean?
@@ -252,7 +269,7 @@ rule SessionUpdatedPayloadSpecConsistencyGuard {
     requires: frame.event = "session/updated"
 
     ensures: EventPayloadType(frame.data) = SessionUpdatedPayload
-    ensures: RequiredPayloadKeys(frame.data) = {"id", "phase", "is-streaming", "is-compacting", "pending-message-count", "retry-attempt"}
+    ensures: RequiredPayloadKeys(frame.data) = {"id", "phase", "is-streaming", "is-compacting", "pending-message-count", "retry-attempt", "retry"}
 }
 
 rule ContextUpdatedPayloadCanonicalAcrossFrontends {

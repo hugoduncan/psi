@@ -32,6 +32,12 @@
 - [x] Record the provider-doc-grounded retry/rate-limit assumptions actually used by the implementation in `implementation.md`.
 - [x] Add focused UI-facing proof that Emacs-visible status includes retry timing and rate-limit information.
 - [x] Add focused UI-facing proof that TUI/backend-visible status/footer content includes retry timing and rate-limit information.
-- [ ] Add focused `psi.session-state.model-test` coverage proving the canonical nested `:retry` field is part of the valid session shape, defaults to `nil`, and accepts the normalized retry metadata map shape when populated.
-- [ ] Extend RPC spec/test coverage so `session/updated` explicitly includes the canonical nested `:retry` payload contract rather than only legacy scalar retry fields.
-- [ ] Add a focused Emacs projection regression test that `session/updated` nested `:retry` data is preserved intentionally or that any intentional discard is documented and asserted explicitly.
+- [x] Add focused `psi.session-state.model-test` coverage proving the canonical nested `:retry` field is part of the valid session shape, defaults to `nil`, and accepts the normalized retry metadata map shape when populated.
+  - [x] Assert a fresh `initial-session` includes `:retry nil` and still validates.
+  - [x] Assert a populated canonical nested retry map validates as part of the session shape.
+- [x] Extend RPC spec/test coverage so `session/updated` explicitly includes the canonical nested `:retry` payload contract rather than only legacy scalar retry fields.
+  - [x] Update `spec/rpc-edn.allium` to model the nested `retry` payload on `SessionUpdatedPayload`.
+  - [x] Add/adjust focused RPC proof so emitted payload contract assertions include nested `:retry`.
+- [x] Add a focused Emacs projection regression test that `session/updated` nested `:retry` data is preserved intentionally or that any intentional discard is documented and asserted explicitly.
+  - [x] Assert `psi-emacs--handle-session-updated-event` stores nested retry detail in frontend state.
+  - [x] If any retry payload fields are intentionally dropped, document and assert that boundary explicitly.

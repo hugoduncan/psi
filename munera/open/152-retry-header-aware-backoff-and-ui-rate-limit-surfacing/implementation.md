@@ -70,7 +70,16 @@
 - Lint status:
   - touched files lint clean except for pre-existing warnings in `turn_runtime/core.clj` about unresolved `ai/execute-response-in` / `ai/execute-response`, with no new lint errors introduced by this slice.
 
-2026-05-14 test review
-- Actionable: retry-focused tests do not currently prove the session-state default/schema for the canonical nested `:retry` field. Add a focused `psi.session-state.model-test` assertion that a new session accepts `:retry nil` by default and validates/populates the canonical retry map shape when present.
-- Actionable: `session/updated` contract proof still only asserts the legacy required key set in `spec/rpc-edn.allium` and `components/rpc/test/psi/rpc_events_test.clj`; add proof that the canonical nested `:retry` payload is part of the emitted event contract so frontend/backend parity cannot regress silently.
-- Actionable: Emacs event-projection tests still validate only rendered `:status-session-line` text and legacy scalar fields; add a focused regression test that `psi-emacs--handle-session-updated-event` preserves the canonical nested `:retry` payload (or explicitly documents intentional discard) so the frontend contract is tested directly instead of only via preformatted text.
+2026-05-14 implementation review
+- Good shape overall: canonical backend-owned `:retry` metadata, provider-aware delay selection, and shared UI surfacing all match task intent.
+- Follow-up proof/spec gaps were valid and are now addressed.
+
+2026-05-14 implementation review follow-up execution
+- Added focused `psi.session-state.model-test` coverage proving `initial-session` defaults `:retry` to `nil`, still validates, and accepts the populated canonical nested retry metadata shape.
+- Extended `spec/rpc-edn.allium` so `SessionUpdatedPayload` models the nested canonical retry payload and the session-updated consistency guard now requires `retry` in the payload contract.
+- Kept focused RPC proof aligned with the contract by continuing to assert the nested `:retry` payload in `components/rpc/test/psi/rpc_events_test.clj`.
+- Added an Emacs regression assertion proving `psi-emacs--handle-session-updated-event` preserves nested retry detail in frontend state, not only the preformatted status line.
+- Verification:
+  - `clojure -M:test --focus psi.session-state.model-test --focus psi.rpc-events-test`
+  - `emacs -Q --batch -L components/emacs-ui -L components/emacs-ui/test -l ert -l components/emacs-ui/test/psi-streaming-runtime-test.el -f ert-run-tests-batch-and-exit`
+  - both passed cleanly.

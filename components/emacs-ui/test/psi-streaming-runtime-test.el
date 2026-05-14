@@ -282,6 +282,15 @@ the thinking block from the buffer.  Thinking is transcript and must survive."
                  (:header-model-label . "(openai) gpt-5.3-codex • thinking high")
                  (:status-session-line . "session: sess-1 phase:idle streaming:yes compacting:no pending:2 retry:1 retrying-in:8s source:retry-after remaining:0/5000 reset-in:32s")))))
     (should (eq 'streaming (psi-emacs-state-run-state psi-emacs--state)))
+    (should (equal '((:active\? . t)
+                     (:attempt . 1)
+                     (:delay-ms . 8000)
+                     (:delay-source . :retry-after)
+                     (:resume-at . 8000)
+                     (:rate-limit . ((:remaining . 0)
+                                     (:limit . 5000)
+                                     (:reset-at . 32000))))
+                   (psi-emacs-state-session-retry psi-emacs--state)))
     (should (equal "(openai) gpt-5.3-codex • thinking high"
                    (psi-emacs-state-header-model-label psi-emacs--state)))
     (should (string= "psi [disconnected/starting/streaming] tools:collapsed model:(openai) gpt-5.3-codex • thinking high"
