@@ -97,7 +97,9 @@
    'psi/logprobs {:psi/init 'extensions.logprobs/init
                   :source-policies {:installed {:local/root "extensions/logprobs"}}}
    'psi/work-on {:psi/init 'extensions.work-on/init
-                 :source-policies {:installed {:local/root "extensions/work-on"}}}})
+                 :source-policies {:installed {:local/root "extensions/work-on"}}}
+   'psi/metrics {:psi/init 'psi.metrics.extension/init
+                 :source-policies {:installed {:local/root "extensions/metrics"}}}})
 
 (defn- catalog-entry
   [lib]
