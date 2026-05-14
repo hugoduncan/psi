@@ -80,7 +80,7 @@ ambiguous-match → {status, code, filename, match-count, matches [{line, column
 ## Structures and patterns
 
 - Follow `github` for `deps.edn` structure and `work-on` for tool registration shape.
-- Core logic: `rewrite-clj.zip` for format-preserving zipper; `rewrite-clj.zip/sexpr` for equality; `rewrite-clj.zip/replace` for substitution; `rewrite-clj.zip/root-string` for serializing back to text.
+- Core logic: `rewrite-clj.zip` for format-preserving zipper; `rewrite-clj.zip/sexpr` for equality; `rewrite-clj.zip/replace` for substitution; `rewrite-clj.zip/root-string` for serializing back to text. The replacement node must be the root node of the format-preserving parse of `new-string` — never reconstructed via `sexpr`/`coerce`, which would silently drop comments and formatting.
 - Line-range filtering: use `rewrite-clj.zip/node` → `rewrite-clj.node/start-row` for candidate filtering; end-row is not consulted. rewrite-clj nodes carry `:row`/`:col` position metadata accessible via `rewrite-clj.node/meta`.
 - Error short-circuit with early returns; no exceptions for expected error paths.
 - Parameters stored as data map (not `pr-str` string) — normalized by `defs/normalize-tool-def`.
@@ -100,6 +100,7 @@ ambiguous-match → {status, code, filename, match-count, matches [{line, column
    - d. Two identical forms both starting within the range → `ambiguous-match` (range alone cannot disambiguate; `old-string` must be made more specific).
    - e. A valid range that contains no node starts matching `old-string` → `no-match`; file unchanged.
    - f. A small form (e.g. a symbol) nested inside a larger form that straddles the boundary (parent starts before `start-line`) → matched when the symbol's own start row is within the range, because the whole file is parsed and position metadata is file-relative throughout.
-7. Multi-form `old-string` or `new-string` returns a `parse-error`.
-8. The extension `init` registers exactly one tool named `"edit-clj"`.
-9. All unit tests pass; lint clean.
+7. Comments inside `new-string` are preserved verbatim in the written file. The replacement node is taken directly from the format-preserving parse of `new-string`; it must never be round-tripped through `sexpr`/`coerce`, which would drop comment nodes.
+8. Multi-form `old-string` or `new-string` returns a `parse-error`.
+9. The extension `init` registers exactly one tool named `"edit-clj"`.
+10. All unit tests pass; lint clean.
