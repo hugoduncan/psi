@@ -80,3 +80,8 @@ Clarifications locked from review:
 - the proof asserts the request succeeds via the live tool surface, closes the explicit target session, and leaves the invoking session intact, covering the v1 contract promised by design/docs
 - focused verification green:
   - `JAVA_TOOL_OPTIONS='-Xmx2g' clojure -M:test --focus psi.agent-session.psi-tool-mutate-test --reporter kaocha.report/dots --no-randomize` → `1 tests, 44 assertions, 0 failures`
+
+2026-05-13 task-test-review:
+- No new actionable test issues found after reviewing the task's mutate, resolver, graph-surface, and session-close proof surfaces against the locked design/test contract.
+- Coverage already proves the required behaviors: successful mutate invocation, structured validation failures, explicit-target preservation through the canonical runtime mutation path, exact-field compact session summaries with ordering/exclusion checks, active-session composition, and the end-to-end query → select → mutate workflow.
+- Focused verification rerun remains green across the reviewed suites: `clojure -M:test --focus psi.agent-session.psi-tool-mutate-test --focus psi.agent-session.resolvers-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.tools-test/psi-tool-integration-test --focus psi.agent-session.session-close-mutation-test --reporter kaocha.report/dots --no-randomize` → `47 tests, 2446 assertions, 0 failures`.
