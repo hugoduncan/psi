@@ -3,3 +3,11 @@
   - Actionable ambiguity: the design requires extension registration alone to drive shared display behavior, but it does not disambiguate the canonical owner/projection path for non-serializable render hooks (`tool-registry` vs UI state vs runtime projection), especially since EQL snapshots currently strip renderer fns while interactive projections preserve them.
   - Actionable ambiguity: acceptance 3 says built-in display should no longer depend on frontend hardcoded name branches "for the cases covered by this task", but the covered built-ins/tool rows are not enumerated beyond a minimum list, leaving the migration boundary unclear.
   - Actionable ambiguity: acceptance 7 permits deferring custom result rendering, but the design does not state whether the chosen minimal slice may omit `:render-result-fn` entirely or must still carry/result-project a dormant result contract.
+
+- 2026-05-14 ψ ambiguity follow-up execution:
+  - Added missing `plan.md` and `steps.md` so the task now satisfies Munera required task artifacts before implementation.
+  - Refined `design.md` to choose the render-hook shape explicitly and record the deferred declarative-display alternative.
+  - Named the canonical owner/projection path: hook fns live on the runtime registered tool definition, are projected into interactive UI-state tool renderers for live frontend execution, and remain stripped from EQL/UI snapshots.
+  - Enumerated the exact built-in migration boundary for this task: `bash`, `read`, `edit`, and `write` call-header rendering only, with existing `read`/`edit` line-range semantics preserved.
+  - Clarified result-rendering scope: the canonical registered contract includes both `:render-call-fn` and `:render-result-fn`, but built-in migration obligations in this task remain call-header-only while extension result rendering must be supported by the shared path.
+  - No blockers encountered; all newly added ambiguity design-steps completed without executing `steps.md` implementation items.

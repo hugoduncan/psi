@@ -1,5 +1,5 @@
-- [ ] Add the missing `plan.md` for task 152 so the intended implementation approach and decision sequence are reviewable before execution.
-- [ ] Add the missing `steps.md` for task 152 so execution order and checklist-level scope are reviewable.
-- [ ] Amend `design.md` to choose and name the canonical owner/projection path for tool display hooks when functions are non-serializable, explicitly covering the relationship between `tool-registry`, UI state, interactive runtime projections, and EQL snapshots.
-- [ ] Amend `design.md` to enumerate exactly which built-in tool display cases are in-scope for migration in this task, so acceptance 3 has an unambiguous boundary.
-- [ ] Amend `design.md` to state whether the minimal slice may defer result rendering entirely, or whether `:render-result-fn` must still be part of the canonical registered contract even if frontends initially only consume call rendering.
+- [x] Add the missing `plan.md` for task 152 so the intended implementation approach and decision sequence are reviewable before execution.
+- [x] Add the missing `steps.md` for task 152 so execution order and checklist-level scope are reviewable.
+- [x] Amend `design.md` to choose and name the canonical owner/projection path for tool display hooks when functions are non-serializable, explicitly covering the relationship between `tool-registry`, UI state, interactive runtime projections, and EQL snapshots.
+- [x] Amend `design.md` to enumerate exactly which built-in tool display cases are in-scope for migration in this task, so acceptance 3 has an unambiguous boundary.
+- [x] Amend `design.md` to state whether the minimal slice may defer result rendering entirely, or whether `:render-result-fn` must still be part of the canonical registered contract even if frontends initially only consume call rendering.
