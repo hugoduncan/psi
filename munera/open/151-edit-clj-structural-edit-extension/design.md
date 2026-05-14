@@ -1,0 +1,97 @@
+# 151 — edit-clj structural edit extension
+
+## Intent
+
+Add a psi extension that exposes an `edit-clj` tool to the AI agent. The tool performs structural (S-expression) replacement of a single Clojure form inside a source file using `rewrite-clj`, preserving all original formatting outside the replaced node.
+
+The tool is the structural counterpart to the existing text-based `edit` tool: where `edit` matches by exact string, `edit-clj` matches by S-expression equality, ignoring whitespace and formatting.
+
+## Problem
+
+The text-based `edit` tool requires exact whitespace matching and breaks when formatting changes. Structural editing of Clojure files — renaming a binding, swapping a function call, replacing a literal — is a common AI agent operation that deserves a format-preserving, semantics-based matching strategy.
+
+## Scope
+
+**In scope:**
+- New extension directory `extensions/edit-clj/`
+- Single tool `edit-clj` registered via `psi.extension/register-tool`
+- Core logic namespace `psi.edit-clj.core` (pure: zipper walk, match, replace)
+- Extension entry point `psi.edit-clj.extension` (calls `register-tool`)
+- Unit tests covering all result shapes (ok, file-not-found, parse-error, no-match, ambiguous-match)
+- `deps.edn` with `rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}` as runtime dep
+- Wire into `extensions/deps.edn` and `extensions/tests.edn`
+
+**Out of scope:**
+- Multi-form replacement in a single call
+- Scope-aware matching (lexical context disambiguation)
+- Dry-run / preview mode
+- Integration with nREPL or live evaluation
+- EDN-only mode or separate EDN tool
+- Formatting / pretty-printing of the replaced node's surrounding context
+
+## Overall Functionality
+
+### Tool: `edit-clj`
+
+**Parameters** (JSON Schema):
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `filename` | string | yes | Path to the Clojure source file. Relative paths resolve against `:cwd` from opts (session worktree). |
+| `old-string` | string | yes | Exactly one parseable Clojure form. Matched by `sexpr` equality. |
+| `new-string` | string | yes | Exactly one parseable Clojure form. Replaces the matched node verbatim. |
+| `start-line` | integer | no | 1-indexed first line of the match window (inclusive). |
+| `end-line` | integer | no | 1-indexed last line of the match window (inclusive). |
+
+**Matching:**
+1. Parse `old-string` via `rewrite-clj` zipper; call `.sexpr` to get the target value. Error if the string yields more than one form or is unparseable.
+2. Parse `new-string` the same way. Error if unparseable or multi-form.
+3. Open the file. Error if not found/unreadable.
+4. Parse the file into a format-preserving zipper with position tracking.
+5. Walk depth-first. At each node, skip if `sexpr` is not available (comments, whitespace, uneval nodes). Otherwise compare `sexpr` to target.
+6. Optionally filter candidates by line range (start-line ≤ node-start-line ≤ end-line).
+7. Collect all matches before replacement.
+8. Zero matches → `no-match` error; file unchanged.
+9. Two or more matches → `ambiguous-match` error with location list; file unchanged.
+10. Exactly one match → replace node with parsed `new-string` node; write file.
+
+**Output:** JSON object — see result shapes below.
+
+### Result shapes
+
+```
+ok              → {status, filename, location {line, column}, old, new}
+file-not-found  → {status, code, filename, message}
+parse-error     → {status, code, argument, message}
+no-match        → {status, code, filename, message, hint}
+ambiguous-match → {status, code, filename, match-count, matches [{line, column, text}], message, hint}
+```
+
+## Architecture alignment
+
+- Extension lives under `extensions/edit-clj/`, following the pattern of `github`, `work-on`, `hello-ext`.
+- Core logic in `psi.edit-clj.core` is a pure namespace: takes strings and file content, returns a result map. No I/O — I/O is isolated in `psi.edit-clj.extension` (file read/write).
+- The tool's `:execute` fn receives `(args opts)` where `opts` includes `:cwd` (session worktree path). Relative filenames are resolved against `:cwd`.
+- Tool registered via `(:register-tool api)` in `init`, matching the `work-on` pattern.
+- No state atom required — tool is stateless.
+- Output is a JSON string (cheshire) so it renders cleanly in the agent conversation.
+
+## Structures and patterns
+
+- Follow `github` for `deps.edn` structure and `work-on` for tool registration shape.
+- Core logic: `rewrite-clj.zip` for format-preserving zipper; `rewrite-clj.zip/sexpr` for equality; `rewrite-clj.zip/replace` for substitution; `rewrite-clj.zip/root-string` for serializing back to text.
+- Line-range filtering: use `rewrite-clj.zip/node` → `rewrite-clj.node/start-row` (or zip position metadata) for candidate filtering.
+- Error short-circuit with early returns; no exceptions for expected error paths.
+- Parameters stored as data map (not `pr-str` string) — normalized by `defs/normalize-tool-def`.
+- Result serialized to JSON string via `cheshire.core/generate-string` before returning from `:execute`.
+
+## Acceptance criteria
+
+1. `edit-clj` replaces exactly one matching S-expression in a file and writes it back; all whitespace outside the replaced node is byte-for-byte identical.
+2. When `old-string` matches zero nodes (or zero nodes in the line range), the file is unchanged and the result is `{:status "error" :code "no-match" ...}`.
+3. When `old-string` matches two or more nodes, the file is unchanged and the result is `{:status "error" :code "ambiguous-match" :matches [...] ...}`.
+4. Invalid Clojure in `old-string` or `new-string` returns `{:status "error" :code "parse-error" :argument "old-string"|"new-string" ...}`.
+5. Non-existent file returns `{:status "error" :code "file-not-found" ...}`.
+6. `start-line`/`end-line` constrains matching to the given line window; nodes outside the window are not considered.
+7. Multi-form `old-string` or `new-string` returns a `parse-error`.
+8. The extension `init` registers exactly one tool named `"edit-clj"`.
+9. All unit tests pass; lint clean.
