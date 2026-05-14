@@ -104,3 +104,15 @@
   - `clojure -M:test --focus psi.prompt-assets.system-prompt-test --focus psi.introspection.graph-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test`
   - result: `58 tests, 3552 assertions, 0 failures`
 - no blocking reason remained; both newly added task-test-review follow-up items are complete
+
+## 2026-05-14 — test-shaper
+
+- no new actionable test-shaping feedback found after reviewing the migrated runtime/persisted session proof surfaces for clarity, signal, and robustness
+- checked the key proof surfaces named by the task and prior review follow-up:
+  - runtime vs persisted behavior remains partitioned into focused resolver/introspection assertions instead of mixed broad golden checks
+  - graph discovery tests assert explicit runtime/persisted names and absence of removed ambiguous attrs, keeping failures local and explanatory
+  - prompt/introspection regression coverage now teaches only the surviving explicit runtime-session surface and no longer depends on removed names
+- review verification:
+  - `clojure -M:test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test --focus psi.prompt-assets.system-prompt-test --focus psi.introspection.graph-test`
+  - result: `58 tests, 3552 assertions, 0 failures`
+- explicit review outcome: no new actionable feedback
