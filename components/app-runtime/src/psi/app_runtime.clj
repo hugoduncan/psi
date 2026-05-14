@@ -28,7 +28,7 @@
      6. /quit or EOF exits (plain mode); TUI uses Escape interrupt/cancel,
         Ctrl+C clear-then-quit, Ctrl+D exit-when-empty
 
-   Environment variables:
+   Env:
      ANTHROPIC_API_KEY    — required for Anthropic models
      OPENAI_API_KEY       — required for OpenAI models
      PSI_MODEL            — model key override (e.g. claude-3-5-haiku, gpt-4o, gpt-5.4)
@@ -56,7 +56,6 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
-
    [psi.agent-session.extension-runtime :as extension-runtime]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.session-state.state :as ss]
@@ -89,10 +88,6 @@
    ;; [psi.tui.app :as tui-app]  ; Removed - circular dependency fix
 
   (:gen-class))
-
-;; ============================================================
-;; Live session state — accessible from nREPL
-;; ============================================================
 
 (defonce session-state
   (atom nil))
@@ -383,9 +378,11 @@ Available: " (str/join ", " (map name (keys all))))
                             :templates              templates
                             :skills                 skills
                             :extension-paths        []
-                            :extension-targets      []})
+                            :extension-targets      []
+                            :refresh-active-tools?  false})
          {:keys [summary-updates]}
          (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
+         _                (session-bootstrap/refresh-active-tools-in! ctx session-id)
          summary          (merge-startup-summary summary-base summary-updates)
          _                (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
          _                (bootstrap/register-all-domains!)

@@ -94,6 +94,8 @@
                              :source-policies {:installed {:local/root "extensions/plan-state-learning"}}}
    'psi/github {:psi/init 'psi.github.extension/init
                 :source-policies {:installed {:local/root "extensions/github"}}}
+   'psi/edit-clj {:psi/init 'psi.edit-clj.extension/init
+                  :source-policies {:installed {:local/root "extensions/edit-clj"}}}
    'psi/logprobs {:psi/init 'extensions.logprobs/init
                   :source-policies {:installed {:local/root "extensions/logprobs"}}}
    'psi/work-on {:psi/init 'extensions.work-on/init

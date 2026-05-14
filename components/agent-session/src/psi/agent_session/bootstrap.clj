@@ -75,6 +75,16 @@
        :tool-count        (count (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id))))
        :extension-results ext-results})))
 
+(defn refresh-active-tools-in!
+  [ctx session-id]
+  (let [ext-tools    (tool-registry/all-tools-in (:extension-registry ctx))
+        active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))]
+    (session/dispatch-in! ctx
+                          :session/set-active-tools
+                          {:session-id session-id
+                           :tool-maps (into (vec active-tools) ext-tools)}
+                          {:origin :core})))
+
 (defn bootstrap-in!
   "Reusable session bootstrap for CLI/TUI and tests.
 
@@ -84,7 +94,7 @@
    Steps:
    1) register base tools and set system prompt
    2) load prompts/skills/tools/extensions via EQL mutations
-   3) merge extension tools into active tools
+   3) when startup extensions were loaded here, merge extension tools into active tools
    4) persist startup summary to :startup-bootstrap in session data
 
    opts keys:
@@ -97,9 +107,10 @@
    :tools                  — tool maps (default [])
    :extension-paths        — extension file paths (default [])
    :extension-targets      — activation targets (default [])
+   :refresh-active-tools?  — when true, merge extension-registry tools into the session tool set (default true)
 
    Returns startup summary map stored at :startup-bootstrap."
-  [ctx session-id {:keys [base-tools system-prompt developer-prompt developer-prompt-source templates skills tools extension-paths extension-targets]
+  [ctx session-id {:keys [base-tools system-prompt developer-prompt developer-prompt-source templates skills tools extension-paths extension-targets refresh-active-tools?]
                    :or   {base-tools             []
                           system-prompt          ""
                           developer-prompt       ::unset
@@ -108,7 +119,8 @@
                           skills                 []
                           tools                  []
                           extension-paths        []
-                          extension-targets      []}}]
+                          extension-targets      []
+                          refresh-active-tools?  true}}]
   (let [resolved-developer-prompt (if (= developer-prompt ::unset)
                                     nil
                                     developer-prompt)
@@ -135,9 +147,8 @@
                              {:path  (:psi.extension/path r)
                               :error e}))
                          extension-results)
-        ext-tools (tool-registry/all-tools-in (:extension-registry ctx))
-        active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
-        _         (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps (into (vec active-tools) ext-tools)} {:origin :core})
+        _         (when refresh-active-tools?
+                    (refresh-active-tools-in! ctx session-id))
         summary   {:timestamp              (java.time.Instant/now)
                    :prompt-count           prompt-count
                    :skill-count            skill-count
