@@ -28,7 +28,13 @@
   - app-runtime resume selector currently shapes `:psi.session/list` results in `components/app-runtime/src/psi/app_runtime/ui_actions.clj`
   - focused graph proofs live in `components/agent-session/test/psi/agent_session/resolvers_test.clj`
 +- no blocking reason found for the ambiguity follow-up items; all newly added `design-steps.md` items are now complete
-+
-+## 2026-05-14 — inconsistency review
-+
-+- actionable inconsistency found: `plan.md` still contains literal patch markers and a duplicated/renumbered “Prove behaviour and migration compatibility” section, while `steps.md` and `implementation.md` treat the ambiguity follow-up as already resolved. Clean the task artifact so the implementation plan has one canonical ordered step list.
+
+## 2026-05-14 — inconsistency review
+
+- actionable inconsistency found: `plan.md` still contains literal patch markers and a duplicated/renumbered “Prove behaviour and migration compatibility” section, while `steps.md` and `implementation.md` treat the ambiguity follow-up as already resolved. Clean the task artifact so the implementation plan has one canonical ordered step list.
+
+## 2026-05-14 — inconsistency follow-up execution
+
+- removed the stale patch-marker artefact and duplicate plan entry from `plan.md`
+- `plan.md` now has one canonical ordered implementation sequence aligned with `steps.md` and the recorded ambiguity follow-up state in `implementation.md`
+- no blocking reason remained; the newly added inconsistency follow-up item is complete
