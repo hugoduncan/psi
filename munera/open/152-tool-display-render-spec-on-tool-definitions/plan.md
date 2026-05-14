@@ -21,7 +21,9 @@ Attach optional `:render-call-fn` and `:render-result-fn` hooks to the canonical
 4. Migrate the in-scope built-ins onto the shared registration path.
 5. Keep generic fallback rendering for tools without hooks.
 6. Update focused proofs for TUI, Emacs, and extension registration behavior.
-7. Update extension-facing docs to prefer tool-definition display hooks over imperative renderer registration.
+7. Add the canonical tool-definition normalization/registration wiring so `normalize-tool-def` and any registration/backfill path preserve and project `:render-call-fn` / `:render-result-fn` from runtime tool definitions into interactive UI renderer state.
+8. Implement and prove the concrete Emacs parity slice through the shared renderer path, or narrow scope if a shared Emacs consumption path is not actually present.
+9. Update extension-facing docs to replace primary `:register-tool-renderer` guidance with the tool-definition display path, keeping imperative renderer registration documented only as compatibility/advanced usage if it remains available.
 
 ## Constraints to preserve
 
