@@ -29,17 +29,12 @@
      - focused resolver/graph tests proving runtime vs persisted session surfaces
    - update graph-surface docs and any examples that teach session discovery/selection
    - ensure the new names appear in discoverability surfaces and examples as the obvious default
-+
-+6. Keep compact summary scope intentionally narrow
-+   - do not add a `:psi.runtime-session/*` counterpart for `:psi.agent-session/context-session-summaries` in this task
-+   - treat task 134's compact summary attr as an unchanged neighboring operational surface while this task fixes the ambiguous runtime inventory/count/active-id vs persisted listing naming split
 
--6. Prove behaviour and migration compatibility
-+7. Prove behaviour and migration compatibility
-   - add focused resolver/graph-surface tests for the new explicit attrs
-   - prove runtime attrs refer to in-memory loaded context and persisted attrs refer to on-disk session discovery
-   - prove old attrs still behave during migration
-6. Prove behaviour and migration compatibility
+6. Keep compact summary scope intentionally narrow
+   - do not add a `:psi.runtime-session/*` counterpart for `:psi.agent-session/context-session-summaries` in this task
+   - treat task 134's compact summary attr as an unchanged neighboring operational surface while this task fixes the ambiguous runtime inventory/count/active-id vs persisted listing naming split
+
+7. Prove behaviour and migration compatibility
    - add focused resolver/graph-surface tests for the new explicit attrs
    - prove runtime attrs refer to in-memory loaded context and persisted attrs refer to on-disk session discovery
    - prove old attrs still behave during migration
