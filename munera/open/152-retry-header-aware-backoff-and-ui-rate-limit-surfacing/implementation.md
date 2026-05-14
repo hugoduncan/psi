@@ -83,3 +83,24 @@
   - `clojure -M:test --focus psi.session-state.model-test --focus psi.rpc-events-test`
   - `emacs -Q --batch -L components/emacs-ui -L components/emacs-ui/test -l ert -l components/emacs-ui/test/psi-streaming-runtime-test.el -f ert-run-tests-batch-and-exit`
   - both passed cleanly.
+
+2026-05-14 test-shaper review
+- Test layering is strong across pure parsing, retry scheduling, backend projection, RPC contract, TUI footer, and Emacs projection.
+- Remaining shaping work is about clarity and failure locality, not missing behavior.
+- Actionable: split overloaded projection tests that currently prove model metadata, retry payload, pending counts, and rendered status text in one body so failures identify one contract at a time.
+- Actionable: reduce regex-heavy assertions on large status/footer strings where a smaller structured assertion plus one visible string proof would preserve intent with less brittleness.
+- Actionable: separate Emacs retry-state preservation proof from header/status rendering proof so contract regressions and presentation regressions fail independently.
+- Actionable: fold the new populated-`retry` model test into a more consistently structured `initial-session` test block for local readability.
+
+2026-05-14 test-shaper follow-up execution
+- Split the overloaded RPC `session/updated` projection proof into a model-metadata test and a retry-contract/status test so failures now localize to one contract cluster.
+- Split backend projection proof similarly:
+  - `session-summary` now has separate header/display-name proof and visible retry-status proof
+  - footer now has separate structured footer-line/model/status-item proof and visible retry-status proof
+- Reduced broad string-coupling by keeping one visible rendering assertion cluster per surface while moving non-rendering expectations back onto structured fields.
+- Split Emacs proof into one test that preserves nested retry payload in frontend state and one test that covers model/header rendering behavior.
+- Folded the populated-`retry` model-shape assertion back into the `initial-session` test for more consistent local structure.
+- Verification:
+  - `clojure -M:test --focus psi.session-state.model-test --focus psi.rpc-events-test --focus psi.app-runtime.session-summary-test --focus psi.app-runtime.footer-test`
+  - `emacs -Q --batch -L components/emacs-ui -L components/emacs-ui/test -l ert -l components/emacs-ui/test/psi-streaming-runtime-test.el -f ert-run-tests-batch-and-exit`
+  - both passed cleanly.

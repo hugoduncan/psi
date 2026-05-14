@@ -100,7 +100,6 @@
 (deftest session-updated-payload-includes-model-metadata-test
   (testing "session payload includes model metadata for frontend header projection"
     (let [[ctx sid] (support/create-session-context)
-          now-ms    (System/currentTimeMillis)
           _         (session/dispatch-in! ctx :session/set-model
                                           {:session-id sid
                                            :model {:provider "openai"
@@ -110,6 +109,19 @@
           _         (session/dispatch-in! ctx :session/set-thinking-level
                                           {:session-id sid :level :xhigh}
                                           {:origin :core})
+          payload   (rpc.events/session-updated-payload ctx sid)]
+      (is (= sid (:session-id payload)))
+      (is (= "openai" (:model-provider payload)))
+      (is (= "gpt-5.3-codex" (:model-id payload)))
+      (is (= true (:model-reasoning payload)))
+      (is (= "xhigh" (:thinking-level payload)))
+      (is (= "high" (:effective-reasoning-effort payload)))
+      (is (= "(openai) gpt-5.3-codex • thinking high" (:header-model-label payload))))))
+
+(deftest session-updated-payload-includes-retry-contract-test
+  (testing "session payload includes canonical retry payload and summary text"
+    (let [[ctx sid] (support/create-session-context)
+          now-ms    (System/currentTimeMillis)
           _         (ss/apply-root-state-update-in! ctx
                                                     (ss/session-update sid #(assoc %
                                                                                    :retry-attempt 2
@@ -127,13 +139,6 @@
           status    (:status-session-line payload)]
       (is (= #{:session-id :session-file :session-name :session-display-name :phase :is-streaming :is-compacting :pending-message-count :retry-attempt :retry :interrupt-pending :model-provider :model-id :model-reasoning :thinking-level :effective-reasoning-effort :header-model-label :status-session-line :extension-command-names :prompt-templates}
              (set (keys payload))))
-      (is (= sid (:session-id payload)))
-      (is (= "openai" (:model-provider payload)))
-      (is (= "gpt-5.3-codex" (:model-id payload)))
-      (is (= true (:model-reasoning payload)))
-      (is (= "xhigh" (:thinking-level payload)))
-      (is (= "high" (:effective-reasoning-effort payload)))
-      (is (= "(openai) gpt-5.3-codex • thinking high" (:header-model-label payload)))
       (is (= {:active? true
               :attempt 2
               :delay-ms 8000
@@ -143,14 +148,14 @@
                            :limit 5000
                            :reset-at (+ now-ms 32000)}}
              (:retry payload)))
+      (is (= 2 (:pending-message-count payload)))
+      (is (= 2 (:retry-attempt payload)))
       (is (re-find (re-pattern (str "^session: " sid " phase:idle streaming:no compacting:no pending:2 retry:2"))
                    status))
       (is (re-find #"retrying-in:[78]s" status))
       (is (re-find #"source:retry-after" status))
       (is (re-find #"remaining:0/5000" status))
-      (is (re-find #"reset-in:3[12]s" status))
-      (is (= 2 (:pending-message-count payload)))
-      (is (= 2 (:retry-attempt payload))))))
+      (is (re-find #"reset-in:3[12]s" status)))))
 
 (deftest session-updated-payload-includes-derived-session-display-name-test
   (testing "session payload includes derived display name from latest non-command user message"

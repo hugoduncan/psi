@@ -41,3 +41,13 @@
 - [x] Add a focused Emacs projection regression test that `session/updated` nested `:retry` data is preserved intentionally or that any intentional discard is documented and asserted explicitly.
   - [x] Assert `psi-emacs--handle-session-updated-event` stores nested retry detail in frontend state.
   - [x] If any retry payload fields are intentionally dropped, document and assert that boundary explicitly.
+- [x] Split overloaded projection tests so model metadata, nested retry payload, pending counts, and rendered status text are proved in narrower test bodies with better failure locality.
+  - [x] Narrow the RPC/session-updated projection test(s) so retry payload contract proof is separate from model metadata proof.
+  - [x] Narrow backend projection tests so status-line rendering proof is separate from structured projection-field proof.
+- [x] Reduce regex-heavy large-string assertions where structured assertions plus one visible rendering proof would preserve intent with less brittleness.
+  - [x] Revisit session-summary status assertions to keep one visible string proof while preferring structured field assertions for contract shape.
+  - [x] Revisit footer status assertions to keep one visible footer rendering proof while avoiding redundant regex coupling.
+- [x] Separate Emacs retry-state preservation proof from presentation proof so contract and rendering regress independently.
+  - [x] Keep one test focused on nested `:retry` preservation in `psi-emacs--state`.
+  - [x] Keep a separate test focused on header/status rendering behavior.
+- [x] Fold populated-`retry` model-shape proof into a more consistently structured `initial-session` test block for local readability.
