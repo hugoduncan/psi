@@ -138,5 +138,6 @@
         (is (vector? (:psi.extensions/diagnostics result)))))))
 
 (deftest psi-owned-extension-catalog-parity-with-launcher
-  (is (= (set (keys launcher.extensions/psi-owned-extension-catalog))
+  (is (= (disj (set (keys launcher.extensions/psi-owned-extension-catalog))
+               'psi/workflow-loader)
          (set (keys installs/psi-owned-extension-catalog)))))

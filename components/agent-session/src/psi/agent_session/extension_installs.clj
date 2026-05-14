@@ -100,8 +100,6 @@
                   :source-policies {:installed {:local/root "extensions/logprobs"}}}
    'psi/work-on {:psi/init 'extensions.work-on/init
                  :source-policies {:installed {:local/root "extensions/work-on"}}}
-   'psi/workflow-loader {:psi/init 'extensions.workflow-loader/init
-                         :source-policies {:installed {:local/root "extensions/workflow-loader"}}}
    'psi/metrics {:psi/init 'psi.metrics.extension/init
                  :source-policies {:installed {:local/root "extensions/metrics"}}}})
 
