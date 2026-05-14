@@ -67,6 +67,24 @@ Replaced synchronous persist with a dirty-flag + `writing?` CAS gate pattern: ev
 
 The store atom uses `defonce` so extension reloads preserve accumulated counters. Init re-subscribes to events but does not reset the atom.
 
+## Implementation Pass — 2026-05-13
+
+### store and writing? atoms made non-private
+
+The design specified `^:private` on the `store` and `writing?` `defonce` atoms. In practice, Clojure 1.12 enforces private var access at compile time even via `#'` in tests from a different namespace. Made both atoms non-private so tests can reset them between runs (same pattern as `auto-session-name` extension which also uses `@#'sut/state` on a private atom — but that works because it's in the same compilation unit). The logprobs extension uses `@#'logprobs/store` which works because the test and source are in the same top-level namespace. For `psi.metrics.*` multi-namespace layout, non-private is cleaner.
+
+### :register-operation not in nullable extension API
+
+The nullable extension API (`create-nullable-extension-api`) does not expose `:register-operation` as a direct key — it routes operations through the `mutate` path. The extension tests augment the nullable API with a local `ops` atom and a direct `:register-operation` fn, consistent with how logprobs tests build inline api maps. This is simpler and avoids coupling tests to the nullable API's internal mutation dispatch.
+
+### /metrics command self-tracking
+
+The command handler increments the command invocation counter for `"metrics"` on every invocation. This means there is no "empty metrics" state after the first `/metrics` call. Tests adjusted to reflect this: the "no events" case still shows the Commands section (with `metrics | 1`).
+
+### tests.edn uses kaocha v1 format
+
+Added `extensions/metrics/tests.edn` with kaocha v1 format, consistent with other extensions. `clj -M:test -m kaocha.runner -c tests.edn` runs the full suite.
+
 ## Refinement Pass — 2026-05-13
 
 ### Wiring correction: standalone extension
