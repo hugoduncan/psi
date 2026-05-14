@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.dispatch]
    [psi.agent-session.extensions]
    [psi.agent-session.prompt-chain]
    [psi.agent-session.prompt-request]
@@ -258,6 +259,24 @@
       (is (true? (:recovered? result)))
       (is (= :idle (ss/sc-phase-in ctx session-id)))
       (is (= [] (:steering-messages (ss/get-session-data-in ctx session-id)))))))
+
+(deftest abort-records-interrupted-tool-results-with-reason-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        agent-ctx        (ss/agent-ctx-in ctx session-id)
+        appended*        (atom [])]
+    (swap! (:data-atom agent-ctx) assoc :pending-tool-calls #{"tc-abort"})
+    (with-redefs [psi.agent-session.dispatch/dispatch!
+                  (let [orig psi.agent-session.dispatch/dispatch!]
+                    (fn [ctx event-type event-data opts]
+                      (when (= :session/tool-agent-record-result event-type)
+                        (swap! appended* conj (:tool-result-msg event-data)))
+                      (orig ctx event-type event-data opts)))]
+      (session/abort-in! ctx session-id))
+    (is (= 1 (count @appended*)))
+    (is (= "tc-abort" (:tool-call-id (first @appended*))))
+    (is (true? (:is-error (first @appended*))))
+    (is (= :user-abort (get-in (first @appended*) [:details :interruption :reason])))
+    (is (str/includes? (get-in (first @appended*) [:content 0 :text]) "Reason: user-abort."))))
 
 (deftest abort-cancels-active-prompt-runtime-test
   (let [[ctx session-id] (create-session-context {:persist? false})

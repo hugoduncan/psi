@@ -198,10 +198,36 @@
        :pending? (boolean (:interrupt-pending sd))
        :dropped-steering-text ""})))
 
+(defn- interrupted-tool-result-message
+  [tool-call-id reason]
+  {:role "toolResult"
+   :tool-call-id tool-call-id
+   :tool-name "interrupted"
+   :content [{:type :text
+              :text (str "Tool execution interrupted before completion."
+                         (when reason
+                           (str " Reason: " (name reason) ".")))}]
+   :is-error true
+   :details {:interruption {:reason reason}}
+   :timestamp (java.time.Instant/now)})
+
+(defn- record-pending-tool-call-interrupts!
+  [ctx session-id reason]
+  (let [agent-ctx (ss/agent-ctx-in ctx session-id)
+        pending   (vec (or (some-> agent-ctx agent/get-data-in :pending-tool-calls) #{}))]
+    (doseq [tool-call-id pending]
+      (dispatch/dispatch! ctx
+                          :session/tool-agent-record-result
+                          {:session-id session-id
+                           :tool-result-msg (interrupted-tool-result-message tool-call-id reason)}
+                          {:origin :core}))
+    pending))
+
 (defn abort-in!
   "Abort the current agent run immediately for `session-id`. Prefer
    `request-interrupt-in!` for deferred semantics."
   [ctx session-id]
+  (record-pending-tool-call-interrupts! ctx session-id :user-abort)
   (turn-runtime/abort-active-turn-in! ctx session-id)
   (dispatch/dispatch! ctx :session/abort {:session-id session-id} {:origin :core}))
 
