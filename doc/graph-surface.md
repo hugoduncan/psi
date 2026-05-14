@@ -68,6 +68,15 @@ Session-admin discovery example:
    :psi.session-info/worktree-path]}]
 ```
 
+Canonical session-admin flow:
+1. query `:psi.agent-session/active-session-id`
+2. query `:psi.agent-session/context-session-summaries`
+3. choose explicit non-active session ids in caller logic
+4. invoke `psi-tool(action: "mutate")` with `psi.extension/close-session`
+
+This keeps target selection explicit in caller logic while routing the actual write
+through the same registered mutation path the runtime already owns.
+
 Prompt lifecycle introspection example:
 
 ```clojure

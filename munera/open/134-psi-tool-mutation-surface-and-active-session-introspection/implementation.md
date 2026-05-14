@@ -85,3 +85,8 @@ Clarifications locked from review:
 - No new actionable test issues found after reviewing the task's mutate, resolver, graph-surface, and session-close proof surfaces against the locked design/test contract.
 - Coverage already proves the required behaviors: successful mutate invocation, structured validation failures, explicit-target preservation through the canonical runtime mutation path, exact-field compact session summaries with ordering/exclusion checks, active-session composition, and the end-to-end query → select → mutate workflow.
 - Focused verification rerun remains green across the reviewed suites: `clojure -M:test --focus psi.agent-session.psi-tool-mutate-test --focus psi.agent-session.resolvers-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.tools-test/psi-tool-integration-test --focus psi.agent-session.session-close-mutation-test --reporter kaocha.report/dots --no-randomize` → `47 tests, 2446 assertions, 0 failures`.
+
+2026-05-14 follow-up execution:
+- completed the newly added documentation/examples follow-up by extending `doc/graph-surface.md` with the canonical session-admin query → select → mutate workflow, alongside the existing compact session-summary discovery example
+- documented the explicit caller-side selection rule: query active session id, query compact summaries, choose non-active target ids in caller logic, then invoke `psi-tool(action: "mutate")` with `psi.extension/close-session`
+- no further code/test changes were needed for this follow-up because the live tool surface, docs in `doc/psi-project-config.md`, and focused proof already matched the locked design contract
