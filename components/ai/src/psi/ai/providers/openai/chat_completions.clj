@@ -186,11 +186,12 @@
 
 (defn- make-chat-stream-state
   []
-  {:stream-started?  (atom false)
-   :done?            (atom false)
-   :next-tool-index  (atom 0)
-   :tool-index-by-id (atom {})
-   :tool-state       (atom {})})
+  {:stream-started?      (atom false)
+   :done?                (atom false)
+   :pending-finish-reason (atom nil)
+   :next-tool-index      (atom 0)
+   :tool-index-by-id     (atom {})
+   :tool-state           (atom {})})
 
 (defn- emit-stream-start!
   [consume-fn stream-started?]
@@ -342,7 +343,7 @@
 
 (defn- finish-chat-chunk!
   [stream-state consume-fn model chunk choice]
-  (let [{:keys [stream-started? done?]} stream-state]
+  (let [{:keys [stream-started? done? pending-finish-reason]} stream-state]
     (cond
       (:usage chunk)
       (do
@@ -351,8 +352,10 @@
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
                                       done?
-                                      (keyword (get-in choice [:finish_reason] "stop"))
-                                      (completions-usage-map model (:usage chunk))))
+                                      (or @pending-finish-reason
+                                          (keyword (get-in choice [:finish_reason] "stop")))
+                                      (completions-usage-map model (:usage chunk)))
+        (reset! pending-finish-reason nil))
 
       (:finish_reason choice)
       (do
@@ -360,20 +363,26 @@
         (emit-chat-tool-ends! stream-state consume-fn)
         (when-let [logprob-tokens (extract-llama-logprob-delta chunk)]
           (consume-fn {:type :logprob-delta :tokens logprob-tokens}))
-        (emit-chat-completion-finish! consume-fn
-                                      stream-started?
-                                      done?
-                                      (keyword (:finish_reason choice))
-                                      nil)))))
+        (reset! pending-finish-reason (keyword (:finish_reason choice)))))))
+
+(defn- flush-pending-chat-finish!
+  [stream-state consume-fn]
+  (let [{:keys [stream-started? done? pending-finish-reason]} stream-state]
+    (when-let [reason @pending-finish-reason]
+      (emit-chat-completion-finish! consume-fn stream-started? done? reason nil)
+      (reset! pending-finish-reason nil))))
 
 (defn- process-chat-sse-line!
   [stream-state consume-fn model options url line]
-  (when-let [chunk (transport/parse-sse-line line)]
-    (transport/capture-response! model options :openai-completions url chunk)
-    (let [choice (first (:choices chunk))
-          delta  (:delta choice)]
-      (emit-chat-chunk! stream-state consume-fn choice delta)
-      (finish-chat-chunk! stream-state consume-fn model chunk choice))))
+  (if-let [chunk (transport/parse-sse-line line)]
+    (do
+      (transport/capture-response! model options :openai-completions url chunk)
+      (let [choice (first (:choices chunk))
+            delta  (:delta choice)]
+        (emit-chat-chunk! stream-state consume-fn choice delta)
+        (finish-chat-chunk! stream-state consume-fn model chunk choice)))
+    (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
+      (flush-pending-chat-finish! stream-state consume-fn))))
 
 (defn- non-streaming-request
   [conversation model options]
@@ -405,7 +414,8 @@
   (let [choice (first (:choices body))
         message (:message choice)
         stop-reason (keyword (or (:finish_reason choice) "stop"))
-        usage (some-> (:usage body) (completions-usage-map model))
+        usage (when-let [usage (:usage body)]
+                (completions-usage-map model usage))
         logprobs (or (extract-openai-logprob-delta choice)
                      (extract-llama-logprob-delta body))]
     {:assistant-message (cond-> {:role "assistant"
