@@ -10,7 +10,7 @@
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
     (let [home    (System/getProperty "user.home")
-          cwd     (str home "/projects/hugoduncan/psi/psi-main")
+          cwd     (str home "/projects/hugoduncan/psi/psi-main-rpc-events-test")
           [ctx session-id] (support/create-session-context {:cwd cwd})
           payload (with-redefs [session/query-in
                                 (fn [_ctx sid q]
@@ -36,7 +36,7 @@
                                    :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
                                                      {:extension-id "a" :text "Formatter\nformatter"}]})]
                     (rpc.events/footer-updated-payload ctx session-id))]
-      (is (= "~/projects/hugoduncan/psi/psi-main (master) • xhig"
+      (is (= "~/projects/hugoduncan/psi/psi-main-rpc-events-test (master) • xhig"
              (:path-line payload)))
       (is (= ["↑172k" "↓17k" "CR5.2M" "CW1.2k" "$1.444" "31.9%/272k (auto)"]
              (:usage-parts payload)))
@@ -65,7 +65,7 @@
 (deftest footer-updated-payload-prefers-session-display-name-test
   (testing "footer payload uses derived display name when explicit session name is absent"
     (let [home    (System/getProperty "user.home")
-          cwd     (str home "/projects/hugoduncan/psi/psi-main")
+          cwd     (str home "/projects/hugoduncan/psi/psi-main-rpc-events-test")
           [ctx session-id] (support/create-session-context {:cwd cwd})
           payload (with-redefs [session/query-in
                                 (fn [_ctx sid q]
@@ -90,7 +90,7 @@
                                    :psi.agent-session/effective-reasoning-effort "high"
                                    :psi.ui/statuses []})]
                     (rpc.events/footer-updated-payload ctx session-id))]
-      (is (= "~/projects/hugoduncan/psi/psi-main (master) • Investigate failing tests"
+      (is (= "~/projects/hugoduncan/psi/psi-main-rpc-events-test (master) • Investigate failing tests"
              (:path-line payload)))
       (is (= ["?/272k"]
              (:usage-parts payload)))
@@ -143,6 +143,29 @@
         (rpc.events/progress-event->rpc-event {:event-kind :thinking-delta :text "plan"})]
     (is (= "assistant/thinking-delta" event))
     (is (= "plan" (:text data)))))
+
+(deftest progress-event-tool-events-carry-transport-safe-call-summary-test
+  (testing "tool rpc events carry serializable shared call summary metadata"
+    (let [{exec-event :event exec-data :data}
+          (rpc.events/progress-event->rpc-event {:event-kind :tool-executing
+                                                 :session-id "s1"
+                                                 :tool-id "t1"
+                                                 :tool-name "bash"
+                                                 :parsed-args {"command" "pwd"}
+                                                 :call-summary "$ pwd"})
+          {result-event :event result-data :data}
+          (rpc.events/progress-event->rpc-event {:event-kind :tool-result
+                                                 :session-id "s1"
+                                                 :tool-id "t1"
+                                                 :tool-name "bash"
+                                                 :result-text "ok"
+                                                 :content []
+                                                 :is-error false
+                                                 :call-summary "$ pwd"})]
+      (is (= "tool/executing" exec-event))
+      (is (= "$ pwd" (:call-summary exec-data)))
+      (is (= "tool/result" result-event))
+      (is (= "$ pwd" (:call-summary result-data))))))
 
 (deftest footer-updated-payload-includes-model-and-thinking-when-session-reasoning-enabled-test
   (testing "footer payload includes model/thinking details from active session query"

@@ -1,12 +1,14 @@
 (ns psi.tool-registry.render
   "Shared tool-display helpers for canonical tool-definition render hooks."
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [cheshire.core :as json]))
 
 (defn parse-tool-args
   [args]
   (cond
     (map? args) args
+    (string? args) (try (json/parse-string args) (catch Exception _ nil))
     (nil? args) nil
     :else nil))
 
@@ -90,3 +92,22 @@
   []
   (fn [_result _opts]
     nil))
+
+(defn transport-call-summary
+  "Return a transport-safe shared tool call summary string from tool-name/args/details.
+   Uses the canonical built-in header semantics for migrated built-ins and nil for
+   tools that should fall back to frontend-generic rendering."
+  [tool-name args details]
+  (builtin-call-header tool-name (parse-tool-args args) details))
+
+(defn transport-progress-event
+  "Project transport-safe shared display data into a progress event for RPC use.
+   Adds `:call-summary` for current tool lifecycle payloads when derivable."
+  [progress-event]
+  (let [tool-name (:tool-name progress-event)
+        args      (or (:parsed-args progress-event) (:arguments progress-event))
+        details   (:details progress-event)]
+    (cond-> progress-event
+      (and (string? tool-name)
+           (some? (transport-call-summary tool-name args details)))
+      (assoc :call-summary (transport-call-summary tool-name args details)))))

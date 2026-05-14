@@ -62,8 +62,8 @@
 
   (testing "set-active-tools-in! routes through dispatch log"
     (let [[ctx session-id] (create-session-context)
-          _                  (kernel/clear-event-log!)
-          tool-maps  [{:name "read"} {:name "bash"}]]
+          _                (kernel/clear-event-log!)
+          tool-maps        [{:name "read"} {:name "bash"}]]
       (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-maps} {:origin :core})
       (is (= #{"read" "bash"} (:active-tools (ss/get-session-data-in ctx session-id))))
       (is (= [{:name "read" :label "read" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}
@@ -73,7 +73,20 @@
                                 (kernel/event-log-entries)))]
         (is (= :session/set-active-tools (:event-type entry)))
         (is (= :core (:origin entry)))
-        (is (= {:tool-maps tool-maps} (dissoc (:event-data entry) :session-id)))))))
+        (is (= {:tool-maps tool-maps} (dissoc (:event-data entry) :session-id)))))
+
+    (testing "set-active-tools-in! replaces renderer projection and removes stale entries"
+      (let [[ctx session-id] (create-session-context)
+            tool-a           {:name "tool-a"
+                              :render-call-fn (fn [_] "A")}
+            tool-b           {:name "tool-b"
+                              :render-call-fn (fn [_] "B")}]
+        (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps [tool-a tool-b]} {:origin :core})
+        (is (some? (get-in (ss/get-state-value-in ctx (ss/state-path :ui-state)) [:tool-renderers "tool-a"])))
+        (is (some? (get-in (ss/get-state-value-in ctx (ss/state-path :ui-state)) [:tool-renderers "tool-b"])))
+        (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps [tool-a]} {:origin :core})
+        (is (some? (get-in (ss/get-state-value-in ctx (ss/state-path :ui-state)) [:tool-renderers "tool-a"])))
+        (is (nil? (get-in (ss/get-state-value-in ctx (ss/state-path :ui-state)) [:tool-renderers "tool-b"])))))))
 
 ;; ── Context token tracking ──────────────────────────────────────────────────
 

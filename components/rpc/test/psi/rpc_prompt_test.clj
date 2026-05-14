@@ -243,7 +243,9 @@
       (is (= "bash" (get-in tool-start-evt [:data :tool-name])))
       (is (= {"command" "pwd"}
              (get-in tool-exec-evt [:data :parsed-args])))
+      (is (= "$ pwd" (get-in tool-exec-evt [:data :call-summary])))
       (is (false? (get-in tool-result-evt [:data :is-error])))
+      (is (= "$ pwd" (get-in tool-result-evt [:data :call-summary])))
       (is (string? (get-in tool-result-evt [:data :result-text])))
       (is (not (str/blank? (get-in tool-result-evt [:data :result-text]))))
       (is (= "assistant" (get-in assistant-evt [:data :role])))

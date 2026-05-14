@@ -117,6 +117,7 @@
                            :result-text  text-fallback
                            :timestamp    (java.time.Instant/now)}]
       {:tool-call        tool-call
+       :tool-args        args
        :tool-result      tool-result
        :result-message   result-msg
        :effective-policy policy})))
@@ -130,7 +131,7 @@
    - :on-agent-end!        fn [tool-call tool-result is-error?] ; optional
    - :record-result!       fn [result-message] ; optional"
   [{:keys [on-event record-output-stat! on-agent-end! record-result!]}
-   {:keys [tool-call tool-result result-message effective-policy]}]
+   {:keys [tool-call tool-args tool-result result-message effective-policy]}]
   (let [call-id     (:id tool-call)
         name        (:name tool-call)
         result-text (or (:result-text result-message)
@@ -138,6 +139,8 @@
         {:keys [content is-error details]} tool-result]
     (emit-tool-event! on-event
                       (tool-lifecycle-event :tool-result call-id name
+                                            :arguments (:arguments tool-call)
+                                            :parsed-args tool-args
                                             :content (:content result-message)
                                             :result-text result-text
                                             :details details

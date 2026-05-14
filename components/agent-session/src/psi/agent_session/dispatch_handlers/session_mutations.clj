@@ -202,13 +202,12 @@
    (fn [_ctx {:keys [session-id tool-maps]}]
      (let [tool-defs (tool-defs/normalize-tool-defs tool-maps)]
        {:root-state-update (fn [root]
-                             (let [root' ((session/session-update session-id #(assoc %
-                                                                                     :active-tools (->> tool-defs (map :name) set)
-                                                                                     :tool-defs tool-defs)) root)
-                                   ui*   (get-in root' [:ui :extension-ui])]
-                               (doseq [tool-def tool-defs]
-                                 (ui-state/register-tool-def-renderers! ui* tool-def))
-                               root'))
+                             (let [root'    ((session/session-update session-id #(assoc %
+                                                                                        :active-tools (->> tool-defs (map :name) set)
+                                                                                        :tool-defs tool-defs)) root)
+                                   ui*      (get-in root' [:ui :extension-ui])
+                                   ui-next  (:state (ui-state/replace-tool-def-renderers ui* tool-defs))]
+                               (assoc-in root' [:ui :extension-ui] ui-next)))
         :effects [{:effect/type :runtime/agent-set-tools
                    :tool-maps tool-defs}
                   {:effect/type :runtime/refresh-system-prompt

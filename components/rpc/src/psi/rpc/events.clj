@@ -205,6 +205,7 @@
                        :tool-name  (:tool-name progress-event)}
                 (some? (:arguments progress-event))   (assoc :arguments (:arguments progress-event))
                 (some? (:parsed-args progress-event)) (assoc :parsed-args (:parsed-args progress-event))
+                (some? (:call-summary progress-event)) (assoc :call-summary (:call-summary progress-event))
                 (some? (:ui-snapshot progress-event)) (assoc :ui-snapshot (:ui-snapshot progress-event)))}
 
       :tool-execution-update
@@ -226,6 +227,7 @@
                        :result-text (or (:result-text progress-event) "")
                        :details     (:details progress-event)
                        :is-error    (boolean (:is-error progress-event))}
+                (some? (:call-summary progress-event)) (assoc :call-summary (:call-summary progress-event))
                 (some? (:ui-snapshot progress-event)) (assoc :ui-snapshot (:ui-snapshot progress-event)))}
 
       nil)))

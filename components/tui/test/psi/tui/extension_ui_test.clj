@@ -245,7 +245,17 @@
       (let [r (ui/get-tool-renderer ui "my-tool")]
         (is (= "my-tool" (:tool-name r)))
         (is (= "call" ((:render-call-fn r) {})))
-        (is (= "result" ((:render-result-fn r) {} {}))))))
+        (is (= "result" ((:render-result-fn r) {} {})))))
+
+    (testing "replacing canonical tool-def renderers removes stale renderer entries"
+      (let [ui      (ui/create-ui-state)
+            call-fn (fn [_args] "call")]
+        (ui/replace-tool-def-renderers! ui [{:name "my-tool"
+                                             :extension-path "/ext/a"
+                                             :render-call-fn call-fn}])
+        (is (some? (ui/get-tool-renderer ui "my-tool")))
+        (ui/replace-tool-def-renderers! ui [])
+        (is (nil? (ui/get-tool-renderer ui "my-tool"))))))
 
   (testing "all-tool-renderers returns all"
     (let [ui (ui/create-ui-state)]

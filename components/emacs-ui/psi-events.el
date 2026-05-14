@@ -433,7 +433,11 @@ This disables completion UI sort hooks for ordered backend-owned lists such as
                 (arguments (psi-emacs--event-data-get data '(:arguments arguments)))
                 (parsed-args (psi-emacs--event-data-get data '(:parsed-args parsed-args)))
                 (is-error (psi-emacs--event-data-get data '(:is-error is-error)))
-                (details (psi-emacs--event-data-get data '(:details details)))
+                (details (let ((base (psi-emacs--event-data-get data '(:details details)))
+                               (call-summary (psi-emacs--event-data-get data '(:call-summary call-summary))))
+                           (if call-summary
+                               (append (if (listp base) base '()) `((:call-summary . ,call-summary)))
+                             base)))
                 (ui-snapshot (psi-emacs--event-data-get data '(:ui-snapshot ui-snapshot)))
                 (stage (replace-regexp-in-string "^tool/" "" event))
                 (raw-text (or (psi-emacs--event-data-get data

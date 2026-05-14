@@ -35,3 +35,23 @@
   - Updated extension docs to teach tool-definition render hooks as the primary display customization path and demote direct imperative `:register-tool-renderer` use to compatibility/advanced status.
   - Added focused tests for canonical hook preservation, registration projection, shared UI projection behavior, TUI extension call/result rendering, and Emacs shared-path call rendering.
   - Verification still pending.
+
+- 2026-05-14 ψ implementation review:
+  - Actionable issue: the new RPC/Emacs shared-renderer path is not viable as implemented. `psi.rpc.session.streams` attaches `:ui-snapshot` data to tool lifecycle events, but the RPC transport serializes frames through EDN (`psi.rpc.transport/edn-wire-safe` + `pr-str`), so function-valued `:render-call-fn` / `:render-result-fn` entries cannot cross the boundary as callable hooks. The Emacs implementation currently expects callable functions in `psi-tool-rows.el`, and the focused Emacs proof only passes because it injects local Lisp lambdas directly into test data rather than exercising the real transport shape.
+  - Actionable issue: `:session/set-active-tools` projects renderers for the new active tool set but does not remove stale renderer entries for tools that were removed or no longer carry render hooks. That lets interactive UI renderer state drift from the canonical active-tool/tool-definition set, contradicting the chosen design where UI state is a projection/cache rather than an accumulating side registry.
+  - Follow-up expectation: rework the Emacs parity path so it uses transport-safe shared display data or an explicit Emacs-local interpretation path, and tighten active-tool renderer projection so canonical removal updates the UI renderer cache as well.
+
+- 2026-05-14 ψ implementation follow-up:
+  - Replaced the RPC→Emacs executable-hook path with transport-safe shared call-summary projection:
+    - `psi.tool-registry.render/transport-progress-event` now derives canonical `:call-summary` strings for tool lifecycle events.
+    - `psi.rpc.session.streams` projects transport-safe event metadata instead of shipping executable renderer fns.
+    - `psi.rpc.events/progress-event->rpc-event` now includes `:call-summary` on `tool/executing` and `tool/result` when available.
+    - Emacs tool-row rendering now prefers transport-safe `:call-summary` metadata and only tolerates direct local functions as a non-RPC fallback.
+  - Tightened canonical renderer projection in UI state:
+    - added `clear-tool-renderer!`
+    - added `replace-tool-def-renderers!`
+    - `:session/set-active-tools` now replaces the projected renderer set instead of only accumulating registrations
+  - Updated focused proofs to cover the corrected shape:
+    - Emacs tool-row proof now exercises RPC-compatible `:call-summary` event data
+    - RPC event/progress tests assert transport-safe call-summary projection
+    - active-tool projection tests now assert stale renderer removal on replacement.

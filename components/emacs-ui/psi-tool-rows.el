@@ -231,7 +231,10 @@ For edit, derive from details.firstChangedLine and oldText span when available."
     (_ "")))
 
 (defun psi-emacs--tool-renderer-call (tool-name ui-snapshot args)
-  "Return custom call summary from UI-SNAPSHOT for TOOL-NAME, or nil."
+  "Return shared call summary from UI-SNAPSHOT for TOOL-NAME, or nil.
+
+Prefers transport-safe `:call-summary` metadata. Also tolerates direct local
+function hooks for non-RPC/local test scenarios."
   (let* ((tool-renderers (and (listp ui-snapshot)
                               (or (alist-get :tool-renderers ui-snapshot nil nil #'equal)
                                   (plist-get ui-snapshot :tool-renderers))))
@@ -240,15 +243,21 @@ For edit, derive from details.firstChangedLine and oldText span when available."
                             (alist-get (intern tool-name) tool-renderers nil nil #'equal)
                             (and (listp tool-renderers)
                                  (cdr (assoc tool-name tool-renderers))))))
-         (render-fn (and renderer
-                         (or (and (listp renderer)
-                                  (alist-get :render-call-fn renderer nil nil #'equal))
-                             (and (listp renderer)
-                                  (plist-get renderer :render-call-fn))))))
-    (when (functionp render-fn)
+         (call-summary (and (listp renderer)
+                            (or (alist-get :call-summary renderer nil nil #'equal)
+                                (plist-get renderer :call-summary))))
+         (render-fn (and (listp renderer)
+                         (or (alist-get :render-call-fn renderer nil nil #'equal)
+                             (plist-get renderer :render-call-fn)))))
+    (cond
+     ((and (stringp call-summary)
+           (not (string-empty-p (string-trim call-summary))))
+      call-summary)
+     ((functionp render-fn)
       (condition-case _
           (funcall render-fn args)
-        (error nil)))))
+        (error nil)))
+     (t nil))))
 
 (defun psi-emacs--tool-summary (tool-name parsed-args arguments tool-id &optional details ui-snapshot)
   "Return display summary for a tool row.
@@ -265,8 +274,13 @@ TOOL-ID remains fallback-only when tool name is absent."
          (args-info (psi-emacs--tool-args-map parsed-args arguments))
          (args (plist-get args-info :args))
          (invalid-args? (plist-get args-info :invalid-args-type))
-         (custom (and (not invalid-args?)
-                      (psi-emacs--tool-renderer-call name ui-snapshot args))))
+         (call-summary (and (listp details)
+                            (or (alist-get :call-summary details nil nil #'equal)
+                                (alist-get "call-summary" details nil nil #'equal))))
+         (custom (or (and (stringp call-summary)
+                          call-summary)
+                     (and (not invalid-args?)
+                          (psi-emacs--tool-renderer-call name ui-snapshot args)))))
     (psi-emacs--truncate-single-line
      (or custom
          (let* ((display-name (psi-emacs--tool-display-name name))

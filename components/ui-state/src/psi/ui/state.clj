@@ -19,7 +19,8 @@
    Headless fallback: when no TUI is active, dialog methods return defaults
    immediately (confirm → false, select → nil, input → nil).
    Fire-and-forget methods (notify, set-widget, set-status) are no-ops."
-  (:require [clojure.string :as str]
+  (:require [clojure.set :as set]
+            [clojure.string :as str]
             [psi.ui.widget-spec :as widget-spec]))
 
 ;; ============================================================
@@ -430,21 +431,43 @@
             :render-call-fn   render-call-fn
             :render-result-fn render-result-fn})))
 
+(defn clear-tool-renderer!
+  "Remove a tool renderer entry by tool-name."
+  [ui-state-atom tool-name]
+  (when (and ui-state-atom (string? tool-name))
+    (swap! ui-state-atom update :tool-renderers dissoc tool-name)))
+
 (defn register-tool-def-renderers!
   "Project canonical tool-definition render hooks into interactive UI state.
-   No-op when the tool definition carries neither render hook."
+   Removes any stale renderer entry when the tool definition carries neither hook."
   [ui-state-atom tool-def]
   (let [tool-name        (:name tool-def)
         ext-path         (or (:extension-path tool-def)
                              (:ext-path tool-def)
                              (:source tool-def))
         render-call-fn   (:render-call-fn tool-def)
-        render-result-fn (:render-result-fn tool-def)]
+        render-result-fn (:render-result-fn tool-def)
+        hook-present?    (or (contains? tool-def :render-call-fn)
+                             (contains? tool-def :render-result-fn))]
     (when (and ui-state-atom
-               (string? tool-name)
-               (or (contains? tool-def :render-call-fn)
-                   (contains? tool-def :render-result-fn)))
-      (register-tool-renderer! ui-state-atom tool-name ext-path render-call-fn render-result-fn))))
+               (string? tool-name))
+      (if hook-present?
+        (register-tool-renderer! ui-state-atom tool-name ext-path render-call-fn render-result-fn)
+        (clear-tool-renderer! ui-state-atom tool-name)))))
+
+(defn replace-tool-def-renderers!
+  "Replace the tool renderer projection with the canonical tool-def set.
+   Removes stale entries for omitted tools and projects current render hooks."
+  [ui-state-atom tool-defs]
+  (when ui-state-atom
+    (let [tool-defs*   (vec (filter map? (or tool-defs [])))
+          current-keys (set (keys (:tool-renderers @ui-state-atom)))
+          next-keys    (into #{} (keep :name) tool-defs*)
+          stale-keys   (set/difference current-keys next-keys)]
+      (doseq [tool-name stale-keys]
+        (clear-tool-renderer! ui-state-atom tool-name))
+      (doseq [tool-def tool-defs*]
+        (register-tool-def-renderers! ui-state-atom tool-def)))))
 
 (defn register-message-renderer!
   "Register a custom render fn for extension-injected messages.
@@ -551,6 +574,10 @@
 (defn register-tool-def-renderers
   [ui-state tool-def]
   (reduce-ui ui-state register-tool-def-renderers! tool-def))
+
+(defn replace-tool-def-renderers
+  [ui-state tool-defs]
+  (reduce-ui ui-state replace-tool-def-renderers! tool-defs))
 
 (defn register-message-renderer
   [ui-state custom-type ext-path render-fn]
