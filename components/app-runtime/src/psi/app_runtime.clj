@@ -58,6 +58,7 @@
    [psi.agent-session.mutations :as mutations]
 
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
@@ -383,9 +384,17 @@ Available: " (str/join ", " (map name (keys all))))
                             :templates              templates
                             :skills                 skills
                             :extension-paths        []
-                            :extension-targets      []})
+                            :extension-targets      []
+                            :refresh-active-tools?  false})
          {:keys [summary-updates]}
          (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
+         ext-tools        (ext/all-tools-in (:extension-registry ctx))
+         active-tools     (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
+         _                (session/dispatch-in! ctx
+                                                :session/set-active-tools
+                                                {:session-id session-id
+                                                 :tool-maps (into (vec active-tools) ext-tools)}
+                                                {:origin :core})
          summary          (merge-startup-summary summary-base summary-updates)
          _                (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
          _                (bootstrap/register-all-domains!)

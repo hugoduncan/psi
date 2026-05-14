@@ -13,7 +13,8 @@
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]
-   [psi.app-runtime :as app-runtime]))
+   [psi.app-runtime :as app-runtime]
+   [psi.session-state.state :as ss]))
 
 (defn- manifest-file [root rel]
   (let [f (io/file root rel)]
@@ -89,6 +90,16 @@
       (is (= 1 (:extension-loaded-count summary)))
       (is (contains? (startup-registry-paths ctx) "manifest:psi/mementum"))
       (is (= :loaded (startup-entry-status ctx 'psi/mementum))))))
+
+(deftest startup-manifest-extension-tools-enter-session-tool-defs-test
+  (testing "bootstrap startup merges manifest extension tools into session tool defs used for prompt preparation"
+    (let [{:keys [result]} (bootstrap-with-manifest
+                            {:deps {'psi/edit-clj {}}}
+                            {})
+          {:keys [ctx]} result
+          session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
+          tool-names (set (map :name (:tool-defs (ss/get-session-data-in ctx session-id))))]
+      (is (contains? tool-names "edit-clj")))))
 
 (deftest startup-persists-install-state-and-loads-manifest-extension-paths-test
   (testing "bootstrap startup computes install state and loads manifest-backed local-root extensions"
