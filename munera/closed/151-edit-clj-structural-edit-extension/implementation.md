@@ -1,5 +1,17 @@
 # Implementation Notes — 151 edit-clj structural edit extension
 
+## 2026-05-14 — code-shaper follow-up execution (S1–S6)
+
+All six shaper items executed:
+
+- **S1+S3**: `find-candidates` stores `:zloc` (not `:node`). `replace-in` uses `(z/replace (:zloc candidate) new-node)` directly — no second `z/of-string` + position-walk. `replace-failed` branch removed (was only reachable from the second walk; now structurally impossible).
+- **S2**: Removed `_old-node` first parameter from `replace-in`. New signature: `[new-node new-str candidates]`. Updated sole call site in `extension.clj` and test helper in `core_test.clj`.
+- **S4**: `replace-in` accepts `new-str` (original `new-string` argument) and returns it verbatim in `:new`. Added `ok-new-verbatim-test` asserting `(= "  :y  " (:new result))` when `new-string = "  :y  "`.
+- **S5**: Unified to `n/sexpr` for all sexpr calls in `find-candidates`: `(n/sexpr old-node)` for target; `(n/sexpr (z/node z))` for per-node comparison. Removed `z/sexpr` usage.
+- **S6**: Second subtest of `comment-in-new-string-preserved-test` now asserts `(= ":y" (n/string (:ok result)))`, documenting the known boundary: AC 7 covers comments *inside* a form; leading (top-level) comments are filtered by `n/whitespace-or-comment?` during form extraction and are not preserved.
+
+Verification: 20 tests, 78 assertions, 0 failures (local); 170 extension tests, 0 failures (top-level); lint clean.
+
 ## 2026-05-14 — code-shaper review pass 1
 
 Reviewed `core.clj`, `extension.clj`, `core_test.clj`, `extension_test.clj` against design.md.

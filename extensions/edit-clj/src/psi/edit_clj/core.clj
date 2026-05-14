@@ -49,7 +49,9 @@
    `sexpr` equals the `sexpr` of `old-node`.  Nodes where `sexpr` throws
    (comments, whitespace, uneval nodes, reader macros) are silently skipped.
 
-   Each candidate map: `{:node node :row row :col col :text text}`."
+   Each candidate map: `{:zloc zloc :row row :col col :text text}`.
+   The `:zloc` entry is the zipper location at the matched node; callers may pass
+   it directly to `z/replace` without a second traversal."
   [old-node file-content]
   (let [target-sexpr (try (n/sexpr old-node) (catch Exception _ ::uneval))
         zloc         (z/of-string file-content {:track-position? true})]
@@ -61,10 +63,9 @@
           acc
           (let [cand (when-not (n/whitespace-or-comment? (z/node z))
                        (try
-                         (let [sx        (z/sexpr z)
-                               [row col] (z/position z)]
-                           (when (= sx target-sexpr)
-                             {:node (z/node z)
+                         (when (= (n/sexpr (z/node z)) target-sexpr)
+                           (let [[row col] (z/position z)]
+                             {:zloc z
                               :row  row
                               :col  col
                               :text (z/string z)}))
@@ -88,13 +89,18 @@
 ;; ── Replacement ───────────────────────────────────────────────────────────────
 
 (defn replace-in
-  "Given already-filtered `candidates`, perform the replacement in `file-content`
-   and return a result map.  Never touches the filesystem.
+  "Given already-filtered `candidates`, perform the replacement and return a
+   result map.  Never touches the filesystem.
+
+   Parameters:
+   - `new-node`  — parsed replacement node (from `parse-single-form`)
+   - `new-str`   — original `new-string` argument verbatim (returned in `:new`)
+   - `candidates` — already-filtered maps with `:zloc`, `:row`, `:col`, `:text`
 
    On success the map contains `:content` (the updated file-content string) as
    well as `:status`, `:location`, `:old`, and `:new`.  The extension layer
    writes `:content` to disk and merges `:filename` before JSON serialisation."
-  [_old-node new-node file-content candidates]
+  [new-node new-str candidates]
   (case (count candidates)
     0
     {:status  "error"
@@ -103,24 +109,12 @@
      :hint    "Try adding or widening the `start-line`/`end-line` range, or verify that `old-string` appears in the file."}
 
     1
-    (let [{:keys [row col text]} (first candidates)
-          zloc                   (z/of-string file-content {:track-position? true})
-          target                 (loop [z zloc]
-                                   (if (z/end? z)
-                                     nil
-                                     (let [[r c] (z/position z)]
-                                       (if (and (= r row) (= c col))
-                                         z
-                                         (recur (z/next z))))))]
-      (if target
-        {:status   "ok"
-         :location {:line row :column col}
-         :old      text
-         :new      (n/string new-node)
-         :content  (z/root-string (z/replace target new-node))}
-        {:status  "error"
-         :code    "replace-failed"
-         :message "candidate found during scan but could not be located for replacement"}))
+    (let [{:keys [zloc row col text]} (first candidates)]
+      {:status   "ok"
+       :location {:line row :column col}
+       :old      text
+       :new      new-str
+       :content  (z/root-string (z/replace zloc new-node))})
 
     ;; multiple matches
     {:status      "error"

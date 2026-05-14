@@ -2,7 +2,8 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [psi.edit-clj.core :as core]))
+   [psi.edit-clj.core :as core]
+   [rewrite-clj.node :as n]))
 
 ;; ── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -21,8 +22,7 @@
                 filtered   (core/apply-line-filter candidates
                                                    {:start-line start-line
                                                     :end-line   end-line})]
-            (core/replace-in (:ok old-result) (:ok new-result)
-                             file-content filtered)))))))
+            (core/replace-in (:ok new-result) new-str filtered)))))))
 
 ;; ── AC 1 — single match replaced; content outside node unchanged ──────────────
 
@@ -35,6 +35,24 @@
       (is (= {:line 3 :column 15} (:location result)))
       (is (= "(+ x 1)" (:old result)))
       (is (= "(* x 2)" (:new result))))))
+
+;; ── S4 — ok.new is new-string argument verbatim ─────────────────────────────────
+
+(deftest ok-new-verbatim-test
+  (testing "ok.new returns the new-string argument string verbatim, not n/string of parsed node"
+    ;; If new-string has leading/trailing whitespace, n/string would strip it.
+    ;; ok.new must return the original argument string unchanged.
+    (let [content "(defn f [] :x)\n"
+          result  (edit ":x" "  :y  " content)]
+      (is (= "ok" (:status result)))
+      (is (= "  :y  " (:new result)))))
+
+  (testing "ok.new matches new-string exactly when it contains a form comment"
+    (let [content "(foo :bar)\n"
+          new-str "(foo ;; c\n  :baz)"
+          result  (edit "(foo :bar)" new-str content)]
+      (is (= "ok" (:status result)))
+      (is (= new-str (:new result))))))
 
 ;; ── AC 2 — no-match result; content string returned unchanged ─────────────────
 
@@ -181,9 +199,13 @@
       (is (= "ok" (:status result)))
       (is (str/includes? (:content result) ";; preserved comment"))))
 
-  (testing "7: comment-only prefix in new-string is treated as whitespace; form still parses"
+  (testing "7: leading comment in new-string is stripped during form extraction (known limitation)"
+    ;; parse-single-form extracts only the significant node; a leading comment is
+    ;; whitespace-equivalent in rewrite-clj and is NOT inside the form, so it is
+    ;; filtered out.  AC 7 guarantees comments INSIDE a form are preserved; it
+    ;; does not cover leading (top-level) comments.
+    ;; The `:ok` node is the `:y` keyword; the leading comment is dropped.
     (let [new-str ";; comment\n:y"
-          ;; rewrite-clj treats line comments as whitespace-equivalent;
-          ;; so ";; comment\n:y" is one form (:y) — parse must succeed
           result  (core/parse-single-form new-str "new-string")]
-      (is (nil? (:error result))))))
+      (is (nil? (:error result)))
+      (is (= ":y" (n/string (:ok result)))))))

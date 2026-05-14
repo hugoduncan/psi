@@ -46,14 +46,12 @@
                                      :filename resolved
                                      :message  (str "file not found or not readable: " resolved)})
               (let [file-content (slurp f)
-                    old-node     (:ok old-result)
                     new-node     (:ok new-result)
-                    candidates   (core/find-candidates old-node file-content)
+                    candidates   (core/find-candidates (:ok old-result) file-content)
                     filtered     (core/apply-line-filter candidates
                                                          {:start-line start-line
                                                           :end-line   end-line})
-                    result       (core/replace-in old-node new-node
-                                                  file-content filtered)]
+                    result       (core/replace-in new-node new-string filtered)]
                 (if (= "ok" (:status result))
                   (do
                     (spit f (:content result))
