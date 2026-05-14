@@ -5,3 +5,13 @@
 - Ambiguity: design requires one canonical retry-metadata surface across backend projections and RPC, but does not specify whether `session-summary`, Pathom resolvers, and RPC `session/updated` must expose the same nested shape/field names or may diverge into UI-specific flattened payloads; define one authoritative shape.
 - Ambiguity: design requires Emacs and TUI to render retry timing/rate-limit information, but does not pin the exact backend-owned TUI-visible surface (status line vs footer usage/session-activity vs other summary surface), leaving acceptance subjective.
 - Ambiguity: design requires provider headers to reach the retry scheduler, but does not identify the canonical error/result shape that must carry headers across transport → turn/runtime → session; without that contract, "preserve headers" is underspecified.
+
+2026-05-14 ambiguity follow-up execution
+- Completed all newly added ambiguity design-steps in `design-steps.md`.
+- Updated `design.md` to fix the canonical retry metadata shape as one shared nested `:retry` map, including nested normalized `:rate-limit` fields.
+- Defined projection parity explicitly: session summary, Pathom/resolvers, and RPC `session/updated` all preserve the same `:retry` shape/field naming.
+- Defined lifecycle ownership explicitly: session/runtime retry owner owns active retry metadata; `on-agent-done` and other terminal non-retrying completion paths must clear `:retry`.
+- Defined objective UI acceptance surfaces: TUI uses the existing session summary/status line surface; Emacs uses the existing session/status diagnostics surface.
+- Defined the transport-to-session propagation contract explicitly: the retry scheduler consumes provider response headers from `:provider-error/headers` on the terminal error/result map passed to `:on-retry-triggered`.
+- Updated `plan.md` to record the resolved ambiguity decisions so implementation can proceed without reopening these questions.
+- Did not touch `steps.md` execution items per task instruction.
