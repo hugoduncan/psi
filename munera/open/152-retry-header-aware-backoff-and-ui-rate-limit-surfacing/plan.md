@@ -6,12 +6,14 @@
    - confirm where provider error headers are available today
    - confirm where assistant error messages / turn results preserve or drop headers
    - confirm the narrowest owner that should normalize retry/rate-limit headers
+   - cross-check the task assumptions against the linked Anthropic/OpenAI error documentation so retry/rate-limit expectations are grounded in documented provider behavior where available
 
 2. Introduce one canonical retry-metadata normalization helper in the session/retry ownership layer.
    - support case-insensitive lookup for standard and `X-` prefixed retry/rate-limit headers
    - parse `Retry-After` / `X-Retry-After`
    - parse `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` and `X-` variants
    - normalize ambiguous reset values according to one explicit documented backend rule
+   - prefer documented provider semantics when Anthropic/OpenAI docs explicitly define them, while still handling absent or undocumented headers defensively
    - return one coherent normalized retry metadata shape suitable for session state and UI projection
 
 3. Extend the error/result propagation path just enough to preserve provider headers to the retry scheduling point when present.
@@ -79,6 +81,7 @@
 
 ## Verification
 
+- task implementation pass should note any provider-doc findings that materially constrain or confirm header expectations for Anthropic/OpenAI in `implementation.md`
 - focused unit tests for retry header lookup and normalization
 - focused session/statechart handler tests proving retry scheduling honors provider-specified delay when valid and falls back otherwise
 - focused projection/RPC tests proving retry metadata appears in `session/updated`

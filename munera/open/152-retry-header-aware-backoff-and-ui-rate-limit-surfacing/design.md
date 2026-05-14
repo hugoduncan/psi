@@ -8,6 +8,13 @@ Make session auto-retry timing provider-informed and user-visible by honoring re
 
 ψ already has bounded session auto-retry with exponential backoff and explicit retryability classification for transient provider failures. That solves whether to retry, but not how long to wait according to provider guidance, nor what the operator can see while waiting.
 
+Provider documentation should anchor this work:
+
+- Anthropic API errors: `https://platform.claude.com/docs/en/api/errors`
+- OpenAI error codes/guidance: `https://developers.openai.com/api/docs/guides/error-codes`
+
+Those docs are the authoritative product references for retryable/transient error behavior and any documented wait guidance. This task should use them to ground expectations about retry timing and rate-limit signaling, while still handling missing or undocumented headers defensively.
+
 Today, retry timing is incomplete in three ways:
 
 - the runtime does not honor `Retry-After` when providers send an explicit wait duration
@@ -19,6 +26,9 @@ This makes retry behavior less respectful of provider policy, harder to reason a
 ## Problem
 
 Provider/API failures that are already classified as retryable may include response headers that carry authoritative or useful retry guidance:
+
+- when provider docs explicitly define retry timing behavior or rate-limit signaling, that documentation should be treated as the primary product-level expectation
+- when provider docs are silent, partial, or inconsistent across providers, ψ should normalize whatever headers are actually present without requiring frontend/provider-specific parsing
 
 - `Retry-After`
 - `X-Retry-After`
@@ -82,7 +92,7 @@ When a session encounters a retryable provider failure:
 
 - adding provider-transport-local retry loops outside the canonical session retry path
 - broad retry policy redesign beyond header-aware delay selection
-- changing which failures are retryable except where necessary to preserve the existing retry path
+- changing which failures are retryable except where necessary to preserve the existing retry path; provider docs may inform later retryability refinements, but that is not the primary scope of this task
 - speculative retries for otherwise non-retryable failures
 - provider-specific UX beyond the canonical shared retry/rate-limit surface
 
@@ -171,6 +181,12 @@ Acceptance for UI surfacing is satisfied when those named surfaces visibly inclu
 
 Support both:
 
+Documented-provider rule for this task:
+
+- if Anthropic or OpenAI documentation explicitly commits to `Retry-After` semantics for relevant error classes, ψ should follow that documented meaning
+- if the docs do not guarantee the header for a given case, ψ must still treat a valid observed header as authoritative timing guidance when present
+- absence of the header must never be treated as a protocol error; it simply triggers fallback backoff behavior
+
 - `Retry-After`
 - `X-Retry-After`
 
@@ -184,6 +200,12 @@ If parsing fails, the header must be ignored and the runtime must fall back to e
 ### Rate-limit headers
 
 Support both standard and `X-` prefixed names:
+
+Documented-provider rule for this task:
+
+- if provider docs explicitly define rate-limit header names or reset semantics, that documentation should guide expectations and test fixtures for those providers
+- ψ should still normalize both standard and legacy `X-` prefixed forms because deployed gateways, proxies, and compatible endpoints may emit either form even when first-party docs emphasize only one
+- frontend/UI acceptance must depend on the canonical normalized backend shape, not on any one provider's raw header vocabulary
 
 - `RateLimit-Limit` / `X-RateLimit-Limit`
 - `RateLimit-Remaining` / `X-RateLimit-Remaining`
@@ -247,6 +269,7 @@ Preferred order:
 
 ## Acceptance
 
+- design/implementation must consult the linked Anthropic/OpenAI error documentation and keep task-local assumptions consistent with what those docs actually guarantee about transient failures, retry guidance, and rate-limit signaling
 - valid `Retry-After` causes the retry delay to follow provider guidance instead of exponential fallback
 - valid `X-Retry-After` is treated equivalently
 - missing or invalid retry-after headers fall back to the existing exponential backoff behavior
@@ -265,6 +288,7 @@ Preferred order:
   - retry scheduling uses the selected delay
   - projection/RPC payload contains the surfaced retry metadata
   - UI-facing projection content includes retry/rate-limit information
+  - provider-doc-grounded cases stay aligned with the documented Anthropic/OpenAI expectations used by the implementation for this slice
 
 ## Notes
 
