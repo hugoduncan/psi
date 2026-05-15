@@ -10,3 +10,7 @@
 - Refined `design.md` with an explicit `:on-agent-done` terminal-failure emission guard: evaluate statechart-carried `:pending-agent-event`, require `:agent-end` plus assistant `:stop-reason :error`, exclude non-provider terminal paths, and treat handler-boundary access to that pending event as a task requirement.
 - Refined `design.md` to anchor `:attempt-id == prepared-request/turn-id` to an explicit retry-flow invariant plus focused verification expectation proving retries execute with a fresh prepared request / fresh turn id.
 - Did not touch `steps.md` execution items per task instruction; this pass only resolved the newly added ambiguity design follow-ups.
+
+2026-05-14 inconsistency review
+- Inconsistency: `design.md` says terminal failed `provider_request_finished` emission at `:on-agent-done` should read the statechart-carried `:pending-agent-event` from the handler boundary data, but `plan.md` simultaneously records that the current `:on-agent-done` handler receives only `session-id`; the task files do not reconcile this required handler-boundary input change with the implementation approach or execution checklist.
+- Inconsistency: `design.md` makes a fresh retry prepared-request/turn-id proof an explicit invariant and verification expectation for the `:attempt-id` choice, and `plan.md` repeats that proof requirement, but `steps.md` has no explicit step to add or run the retry-flow proof; the execution checklist therefore omits a task-critical acceptance dependency already required by design/plan.
