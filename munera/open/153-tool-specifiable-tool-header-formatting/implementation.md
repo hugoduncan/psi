@@ -62,3 +62,9 @@
 - Read `steps.md`, `implementation.md`, `design.md`, and `plan.md` to execute newly added review follow-up work.
 - Found no unchecked follow-up items in `steps.md` and no actionable work added by the preceding review pass.
 - No task changes were required; task remains ready for judge/close decision.
+
+2026-05-14 test review
+- No new actionable test issues found.
+- Reviewed `components/tool-runtime/test/psi/tool_runtime/call_summary_test.clj`, `components/tool-registry/test/psi/tool_registry/registry_test.clj`, `components/tui/src/psi/tui/tool_render.clj`, `components/emacs-ui/psi-tool-rows.el`, and `components/tool-runtime/src/psi/tool_runtime/call_summary.clj` against the task test-review contract.
+- Current focused proof covers formatter parity and fallback behavior, registration enforcement, TUI shared-helper use, and Emacs consumption of backend `:call-summary`; no missing design-behaviour cluster was found in the reviewed test surface.
+- Explicitly no new actionable feedback from this test review pass.
