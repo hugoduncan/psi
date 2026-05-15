@@ -71,4 +71,4 @@
 - focused tests proving extension-defined formatting works without core UI changes
 - focused tests proving fallback behavior on absent/invalid/failing formatter metadata
 - focused tests proving TUI and RPC/backend display shaping use the shared helper
-- any follow-on Emacs decision documented with proof matching the chosen boundary
+- focused proof that Emacs consumes the RPC/backend-produced `:call-summary` surface in this task, with no remaining local compact-header tool-name dispatch in the canonical tool-row path

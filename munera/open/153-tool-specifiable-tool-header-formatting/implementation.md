@@ -27,3 +27,6 @@
 
 2026-05-14 inconsistency review
 - Inconsistency: design fixes Emacs migration into this task and makes RPC/backend `:call-summary` authoritative for Emacs consumption, but plan verification still says “any follow-on Emacs decision documented,” implying Emacs migration could remain undecided or deferred.
+
+2026-05-14 inconsistency follow-up
+- Updated plan verification to remove the stale follow-on wording and require proof in this task that Emacs consumes RPC/backend `:call-summary`, with no remaining local compact-header tool-name dispatch in the canonical tool-row path.
