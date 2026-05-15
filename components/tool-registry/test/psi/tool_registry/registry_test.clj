@@ -35,7 +35,7 @@
   (testing "tool names tracked"
     (let [reg (create-test-registry)]
       (register-extension-in! reg "/ext/a")
-      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :label "My Tool"})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :label "My Tool" :format-request (fn [_] "my-tool")})
       (is (contains? (tool-registry/tool-names-in reg) "my-tool"))))
 
   (testing "rejects unregistered extension paths"
@@ -65,7 +65,7 @@
   (testing "all-tools-in returns tools with extension-path"
     (let [reg (create-test-registry)]
       (register-extension-in! reg "/ext/a")
-      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :label "T" :description "d" :parameters {:type "object"}})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :label "T" :description "d" :parameters {:type "object"} :format-request (fn [_] "my-tool")})
       (let [tools (tool-registry/all-tools-in reg)]
         (is (= 1 (count tools)))
         (is (= "my-tool" (:name (first tools))))
@@ -77,8 +77,8 @@
     (let [reg (create-test-registry)]
       (register-extension-in! reg "/ext/a")
       (register-extension-in! reg "/ext/b")
-      (tool-registry/register-tool-in! reg "/ext/a" {:name "t" :label "A"})
-      (tool-registry/register-tool-in! reg "/ext/b" {:name "t" :label "B"})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "t" :label "A" :format-request (fn [_] "A")})
+      (tool-registry/register-tool-in! reg "/ext/b" {:name "t" :label "B" :format-request (fn [_] "B")})
       (let [tools (tool-registry/all-tools-in reg)]
         (is (= 1 (count tools)))
         (is (= "A" (:label (first tools))))))))
@@ -87,10 +87,18 @@
   (testing "returns tool by name"
     (let [reg (create-test-registry)]
       (register-extension-in! reg "/ext/a")
-      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :label "T"})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :label "T" :format-request (fn [_] "my-tool")})
       (let [tool (tool-registry/get-tool-in reg "my-tool")]
         (is (= "my-tool" (:name tool)))
         (is (= {:type "object" :properties {}} (:parameters tool))))))
+
+  (testing "rejects missing format-request"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"missing required :format-request"
+           (tool-registry/register-tool-in! reg "/ext/a" {:name "missing" :label "Missing"})))))
 
   (testing "returns nil for unknown tool"
     (let [reg (create-test-registry)]

@@ -19,51 +19,53 @@
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.psi-tool-workflow :as psi-tool-workflow]
    [psi.session-state.state :as session-state]
-   [psi.agent-session.tool-output :as tool-output]))
+   [psi.agent-session.tool-output :as tool-output]
+   [psi.tool-runtime.call-summary :as call-summary]))
 
 (def psi-tool
-  {:name        "psi-tool"
-   :label       "Psi Tool"
-   :description (str "Execute a live psi runtime operation. Canonical requests use `action` with one of: "
-                     "`query`, `eval`, `mutate`, `reload-code`, `project-repl`, `workflow`, or `scheduler`. `query` executes an EQL query against the live session graph; "
-                     "`eval` evaluates an in-process Clojure form in a named already-loaded namespace; "
-                     "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; omit `worktree-path` to use the invoking session worktree when available; "
-                     "`project-repl` controls the managed project REPL with explicit `op` values `status|start|attach|stop|eval|interrupt`; "
-                     "`workflow` manages deterministic workflow definitions and runs with explicit `op` values `list-definitions|create-run|execute-run|read-run|list-runs|resume-run|cancel-run`; "
-                     "`scheduler` manages one-shot delayed work for the invoking session with explicit `op` values `create|list|cancel`, including delayed same-session prompts and delayed fresh top-level session creation. "
-                     "Legacy query-only calls of the form `{query: ...}` remain accepted only as a compatibility alias for `action: \"query\"`. "
-                     "Optional `entity` seeds root attributes for explicit query targeting, e.g. entity {:psi.agent-session/session-id \"sid\"}.")
-   :parameters  {:type       "object"
-                 :properties {:action        {:type "string" :enum ["query" "eval" "mutate" "reload-code" "project-repl" "workflow" "scheduler"]
-                                              :description "Canonical psi-tool operation discriminator."}
-                              :query         {:type "string" :description "For `action: \"query\"`: EQL query vector as EDN string, e.g. \"[:psi.agent-session/phase :psi.agent-session/session-id]\""}
-                              :entity        {:type "string" :description "For `action: \"query\"`: optional EDN root entity map to seed the query, e.g. \"{:psi.agent-session/session-id \\\"sid\\\"}\" for explicit session targeting."}
-                              :mutation      {:type "string" :description "For `action: \"mutate\"`: qualified mutation symbol string, e.g. \"psi.extension/close-session\"."}
-                              :params        {:description "For `action: \"mutate\"`: mutation params map/object. String-keyed maps may be normalized to keyword keys at the top level."}
-                              :ns            {:type "string" :description "For `action: \"eval\"`: already loaded namespace string in which to evaluate `form`."}
-                              :form          {:type "string" :description "For `action: \"eval\"`: Clojure form string using full Clojure reader syntax (quote, deref, anon-fn, var) read with *read-eval* false and evaluated in the named namespace."}
-                              :namespaces    {:type "array" :items {:type "string"}
-                                              :description "For `action: \"reload-code\"` namespace mode: ordered vector of already loaded namespace names to reload."}
-                              :worktree-path {:type "string" :description "For `action: \"reload-code\"` worktree mode, and `action: \"project-repl\"`: explicit absolute target worktree path. When absent, invoking session worktree may be used; for psi self-development, that session worktree is the canonical reload target."}
-                              :op            {:type "string" :enum ["status" "start" "attach" "stop" "eval" "interrupt"]
-                                              :description "For `action: \"project-repl\"`: managed project REPL operation discriminator."}
-                              :host          {:type "string" :description "For `action: \"project-repl\"`, `op: \"attach\"`: explicit attach host override."}
-                              :port          {:type "integer" :description "For `action: \"project-repl\"`, `op: \"attach\"`: explicit attach port override."}
-                              :code          {:type "string" :description "For `action: \"project-repl\"`, `op: \"eval\"`: Clojure code to evaluate in the managed project REPL."}
-                              :definition-id {:type "string" :description "For `action: \"workflow\"`: registered workflow definition id."}
-                              :definition    {:type "string" :description "For `action: \"workflow\"`: inline workflow definition as EDN."}
-                              :workflow-input {:type "string" :description "For `action: \"workflow\"`: workflow input map as EDN."}
-                              :run-id        {:type "string" :description "For `action: \"workflow\"`: workflow run id."}
-                              :chain-name    {:type "string" :description "For `action: \"workflow\"`: legacy parameter, no longer used."}
-                              :reason        {:type "string" :description "For `action: \"workflow\"`: optional cancel reason."}
-                              :message       {:type "string" :description "For `action: \"scheduler\"`, `op: \"create\"`: prompt content to inject when the schedule fires."}
-                              :kind          {:type "string" :enum ["message" "session"] :description "For `action: \"scheduler\"`, `op: \"create\"`: explicit scheduler kind (`message` or `session`)."}
-                              :session-config {:description "For `action: \"scheduler\"`, `op: \"create\"`, `kind: \"session\"`: session config map or EDN string using the supported scheduler session-config subset."}
-                              :label         {:type "string" :description "For `action: \"scheduler\"`: optional human-readable schedule label."}
-                              :delay-ms      {:type "integer" :description "For `action: \"scheduler\"`, `op: \"create\"`: relative delay in milliseconds (1000ms to 24h)."}
-                              :at            {:type "string" :description "For `action: \"scheduler\"`, `op: \"create\"`: absolute ISO-8601 UTC instant. Past instants fire immediately."}
-                              :schedule-id   {:type "string" :description "For `action: \"scheduler\"`, `op: \"cancel\"`: schedule id to cancel."}}
-                 :required   []}})
+  {:name           "psi-tool"
+   :label          "Psi Tool"
+   :description    (str "Execute a live psi runtime operation. Canonical requests use `action` with one of: "
+                        "`query`, `eval`, `mutate`, `reload-code`, `project-repl`, `workflow`, or `scheduler`. `query` executes an EQL query against the live session graph; "
+                        "`eval` evaluates an in-process Clojure form in a named already-loaded namespace; "
+                        "`reload-code` reloads already loaded namespaces by explicit namespace list or worktree scope; omit `worktree-path` to use the invoking session worktree when available; "
+                        "`project-repl` controls the managed project REPL with explicit `op` values `status|start|attach|stop|eval|interrupt`; "
+                        "`workflow` manages deterministic workflow definitions and runs with explicit `op` values `list-definitions|create-run|execute-run|read-run|list-runs|resume-run|cancel-run`; "
+                        "`scheduler` manages one-shot delayed work for the invoking session with explicit `op` values `create|list|cancel`, including delayed same-session prompts and delayed fresh top-level session creation. "
+                        "Legacy query-only calls of the form `{query: ...}` remain accepted only as a compatibility alias for `action: \"query\"`. "
+                        "Optional `entity` seeds root attributes for explicit query targeting, e.g. entity {:psi.agent-session/session-id \"sid\"}.")
+   :format-request call-summary/psi-tool-format-request
+   :parameters     {:type       "object"
+                    :properties {:action        {:type "string" :enum ["query" "eval" "mutate" "reload-code" "project-repl" "workflow" "scheduler"]
+                                                 :description "Canonical psi-tool operation discriminator."}
+                                 :query         {:type "string" :description "For `action: \"query\"`: EQL query vector as EDN string, e.g. \"[:psi.agent-session/phase :psi.agent-session/session-id]\""}
+                                 :entity        {:type "string" :description "For `action: \"query\"`: optional EDN root entity map to seed the query, e.g. \"{:psi.agent-session/session-id \\\"sid\\\"}\" for explicit session targeting."}
+                                 :mutation      {:type "string" :description "For `action: \"mutate\"`: qualified mutation symbol string, e.g. \"psi.extension/close-session\"."}
+                                 :params        {:description "For `action: \"mutate\"`: mutation params map/object. String-keyed maps may be normalized to keyword keys at the top level."}
+                                 :ns            {:type "string" :description "For `action: \"eval\"`: already loaded namespace string in which to evaluate `form`."}
+                                 :form          {:type "string" :description "For `action: \"eval\"`: Clojure form string using full Clojure reader syntax (quote, deref, anon-fn, var) read with *read-eval* false and evaluated in the named namespace."}
+                                 :namespaces    {:type "array" :items {:type "string"}
+                                                 :description "For `action: \"reload-code\"` namespace mode: ordered vector of already loaded namespace names to reload."}
+                                 :worktree-path {:type "string" :description "For `action: \"reload-code\"` worktree mode, and `action: \"project-repl\"`: explicit absolute target worktree path. When absent, invoking session worktree may be used; for psi self-development, that session worktree is the canonical reload target."}
+                                 :op            {:type "string" :enum ["status" "start" "attach" "stop" "eval" "interrupt"]
+                                                 :description "For `action: \"project-repl\"`: managed project REPL operation discriminator."}
+                                 :host          {:type "string" :description "For `action: \"project-repl\"`, `op: \"attach\"`: explicit attach host override."}
+                                 :port          {:type "integer" :description "For `action: \"project-repl\"`, `op: \"attach\"`: explicit attach port override."}
+                                 :code          {:type "string" :description "For `action: \"project-repl\"`, `op: \"eval\"`: Clojure code to evaluate in the managed project REPL."}
+                                 :definition-id {:type "string" :description "For `action: \"workflow\"`: registered workflow definition id."}
+                                 :definition    {:type "string" :description "For `action: \"workflow\"`: inline workflow definition as EDN."}
+                                 :workflow-input {:type "string" :description "For `action: \"workflow\"`: workflow input map as EDN."}
+                                 :run-id        {:type "string" :description "For `action: \"workflow\"`: workflow run id."}
+                                 :chain-name    {:type "string" :description "For `action: \"workflow\"`: legacy parameter, no longer used."}
+                                 :reason        {:type "string" :description "For `action: \"workflow\"`: optional cancel reason."}
+                                 :message       {:type "string" :description "For `action: \"scheduler\"`, `op: \"create\"`: prompt content to inject when the schedule fires."}
+                                 :kind          {:type "string" :enum ["message" "session"] :description "For `action: \"scheduler\"`, `op: \"create\"`: explicit scheduler kind (`message` or `session`)."}
+                                 :session-config {:description "For `action: \"scheduler\"`, `op: \"create\"`, `kind: \"session\"`: session config map or EDN string using the supported scheduler session-config subset."}
+                                 :label         {:type "string" :description "For `action: \"scheduler\"`: optional human-readable schedule label."}
+                                 :delay-ms      {:type "integer" :description "For `action: \"scheduler\"`, `op: \"create\"`: relative delay in milliseconds (1000ms to 24h)."}
+                                 :at            {:type "string" :description "For `action: \"scheduler\"`, `op: \"create\"`: absolute ISO-8601 UTC instant. Past instants fire immediately."}
+                                 :schedule-id   {:type "string" :description "For `action: \"scheduler\"`, `op: \"cancel\"`: schedule id to cancel."}}
+                    :required   []}})
 
 (defn- sanitize-psi-tool-result [result]
   (walk/postwalk

@@ -9,7 +9,8 @@
    [clojure.string :as str]
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.tool-path :as tool-path])
+   [psi.agent-session.tool-path :as tool-path]
+   [psi.tool-runtime.call-summary :as call-summary])
   (:import
    [java.awt.geom AffineTransform]
    [java.awt.image AffineTransformOp BufferedImage]
@@ -22,42 +23,46 @@
 ;; ============================================================
 
 (def read-tool
-  {:name        "read"
-   :label       "Read"
-   :description "Read the contents of a file. Returns the file text."
-   :parameters  {:type       "object"
-                 :properties {:path   {:type "string" :description "File path to read"}
-                              :offset {:type "integer" :description "1-indexed line number to start reading from"}
-                              :limit  {:type "integer" :description "Maximum number of lines to read from offset"}}
-                 :required   ["path"]}})
+  {:name           "read"
+   :label          "Read"
+   :description    "Read the contents of a file. Returns the file text."
+   :parameters     {:type       "object"
+                    :properties {:path   {:type "string" :description "File path to read"}
+                                 :offset {:type "integer" :description "1-indexed line number to start reading from"}
+                                 :limit  {:type "integer" :description "Maximum number of lines to read from offset"}}
+                    :required   ["path"]}
+   :format-request call-summary/read-format-request})
 
 (def bash-tool
-  {:name        "bash"
-   :label       "Bash"
-   :description "Execute a bash command. Returns stdout and stderr combined."
-   :parameters  {:type       "object"
-                 :properties {:command {:type "string" :description "Bash command to run"}
-                              :timeout {:type "integer" :description "Timeout in seconds (default 30)"}}
-                 :required   ["command"]}})
+  {:name           "bash"
+   :label          "Bash"
+   :description    "Execute a bash command. Returns stdout and stderr combined."
+   :parameters     {:type       "object"
+                    :properties {:command {:type "string" :description "Bash command to run"}
+                                 :timeout {:type "integer" :description "Timeout in seconds (default 30)"}}
+                    :required   ["command"]}
+   :format-request call-summary/bash-format-request})
 
 (def edit-tool
-  {:name        "edit"
-   :label       "Edit"
-   :description "Replace exact text in a file. oldText must match exactly."
-   :parameters  {:type       "object"
-                 :properties {:path    {:type "string" :description "File path"}
-                              :oldText {:type "string" :description "Exact text to find"}
-                              :newText {:type "string" :description "Replacement text"}}
-                 :required   ["path" "oldText" "newText"]}})
+  {:name           "edit"
+   :label          "Edit"
+   :description    "Replace exact text in a file. oldText must match exactly."
+   :parameters     {:type       "object"
+                    :properties {:path    {:type "string" :description "File path"}
+                                 :oldText {:type "string" :description "Exact text to find"}
+                                 :newText {:type "string" :description "Replacement text"}}
+                    :required   ["path" "oldText" "newText"]}
+   :format-request call-summary/edit-format-request})
 
 (def write-tool
-  {:name        "write"
-   :label       "Write"
-   :description "Write content to a file, creating it if it does not exist."
-   :parameters  {:type       "object"
-                 :properties {:path    {:type "string" :description "File path"}
-                              :content {:type "string" :description "Content to write"}}
-                 :required   ["path" "content"]}})
+  {:name           "write"
+   :label          "Write"
+   :description    "Write content to a file, creating it if it does not exist."
+   :parameters     {:type       "object"
+                    :properties {:path    {:type "string" :description "File path"}
+                                 :content {:type "string" :description "Content to write"}}
+                    :required   ["path" "content"]}
+   :format-request call-summary/write-format-request})
 
 (def psi-tool psi-tool/psi-tool)
 

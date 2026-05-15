@@ -6,7 +6,8 @@
    - extension tool registration
    - programmatic tool chaining via `psi.extension/run-tool-plan`"
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [psi.tool-runtime.call-summary :as call-summary]))
 
 (defn- run-tool-plan!
   "Canonical helper for programmatic tool composition from an extension.
@@ -20,32 +21,34 @@
 
 (defn- upper-tool
   []
-  {:name        "hello-upper"
-   :label       "Hello Upper"
-   :description "Upper-case a text value"
-   :parameters  (pr-str {:type       "object"
-                         :properties {"text" {:type "string"}}
-                         :required   ["text"]})
-   :execute     (fn [args _opts]
-                  {:content  (str/upper-case (str (get args "text" "")))
-                   :is-error false})})
+  {:name           "hello-upper"
+   :label          "Hello Upper"
+   :description    "Upper-case a text value"
+   :parameters     (pr-str {:type       "object"
+                            :properties {"text" {:type "string"}}
+                            :required   ["text"]})
+   :format-request (call-summary/text-key-format-request "hello-upper" "text")
+   :execute        (fn [args _opts]
+                     {:content  (str/upper-case (str (get args "text" "")))
+                      :is-error false})})
 
 (defn- wrap-tool
   []
-  {:name        "hello-wrap"
-   :label       "Hello Wrap"
-   :description "Wrap text with prefix/suffix"
-   :parameters  (pr-str {:type       "object"
-                         :properties {"text"   {:type "string"}
-                                      "prefix" {:type "string"}
-                                      "suffix" {:type "string"}}
-                         :required   ["text"]})
-   :execute     (fn [args _opts]
-                  (let [text   (str (get args "text" ""))
-                        prefix (str (get args "prefix" ""))
-                        suffix (str (get args "suffix" ""))]
-                    {:content  (str prefix text suffix)
-                     :is-error false}))})
+  {:name           "hello-wrap"
+   :label          "Hello Wrap"
+   :description    "Wrap text with prefix/suffix"
+   :parameters     (pr-str {:type       "object"
+                            :properties {"text"   {:type "string"}
+                                         "prefix" {:type "string"}
+                                         "suffix" {:type "string"}}
+                            :required   ["text"]})
+   :format-request (call-summary/text-key-format-request "hello-wrap" "text")
+   :execute        (fn [args _opts]
+                     (let [text   (str (get args "text" ""))
+                           prefix (str (get args "prefix" ""))
+                           suffix (str (get args "suffix" ""))]
+                       {:content  (str prefix text suffix)
+                        :is-error false}))})
 
 (defn init [api]
   (let [mutate-fn (:mutate api)

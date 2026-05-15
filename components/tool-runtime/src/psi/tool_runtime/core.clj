@@ -4,7 +4,8 @@
    delivery."
   (:require
    [clojure.string :as str]
-   [psi.tool-runtime.args :as tool-args]))
+   [psi.tool-runtime.args :as tool-args]
+   [psi.tool-runtime.call-summary :as call-summary]))
 
 (defn- utf8-bytes [s]
   (count (.getBytes (str (or s "")) "UTF-8")))
@@ -51,11 +52,20 @@
 
 (defn start-tool-call!
   "Emit the canonical tool-start event."
-  [{:keys [on-event]} tool-call]
-  (emit-tool-event! on-event
-                    (tool-lifecycle-event :tool-start
-                                          (:id tool-call)
-                                          (:name tool-call))))
+  [{:keys [on-event tool-def-fn]} tool-call]
+  (let [tool-def (when tool-def-fn
+                   (tool-def-fn (:name tool-call)))
+        summary  (call-summary/format-call-summary {:tool tool-def
+                                                    :tool-name (:name tool-call)
+                                                    :parsed-args (:parsed-args tool-call)
+                                                    :arguments (:arguments tool-call)})]
+    (emit-tool-event! on-event
+                      (tool-lifecycle-event :tool-start
+                                            (:id tool-call)
+                                            (:name tool-call)
+                                            :arguments (:arguments tool-call)
+                                            :parsed-args (:parsed-args tool-call)
+                                            :call-summary summary))))
 
 (defn execute-tool-call!
   "Execute one tool call and return a shaped result map before recording.
@@ -69,35 +79,45 @@
    - :execute-opts       map passed to execute-tool
 
    Output: {:tool-call tc :tool-result raw :result-message msg :effective-policy policy}"
-  [{:keys [execute-tool post-process effective-policy telemetry-args-fn on-event execute-opts]}
+  [{:keys [execute-tool post-process effective-policy telemetry-args-fn on-event execute-opts tool-def-fn]}
    tool-call
    parsed-args]
-  (let [call-id (:id tool-call)
-        name    (:name tool-call)
-        args    (or parsed-args
-                    (:parsed-args tool-call)
-                    (tool-args/parse-args (:arguments tool-call)))]
+  (let [call-id        (:id tool-call)
+        name           (:name tool-call)
+        args           (or parsed-args
+                           (:parsed-args tool-call)
+                           (tool-args/parse-args (:arguments tool-call)))
+        telemetry-args (if telemetry-args-fn
+                         (telemetry-args-fn name args)
+                         args)
+        tool-def       (when tool-def-fn
+                         (tool-def-fn name))
+        summary        (call-summary/format-call-summary {:tool tool-def
+                                                          :tool-name name
+                                                          :parsed-args args
+                                                          :arguments (:arguments tool-call)})]
     (emit-tool-event! on-event
                       (tool-lifecycle-event :tool-executing call-id name
                                             :arguments (:arguments tool-call)
-                                            :parsed-args (if telemetry-args-fn
-                                                           (telemetry-args-fn name args)
-                                                           args)))
-    (let [raw-tool-result (or (execute-tool name
-                                            args
-                                            (assoc execute-opts
-                                                   :on-update
-                                                   (fn [{:keys [content details is-error]}]
-                                                     (let [content-blocks (normalize-tool-content content)
-                                                           text-fallback  (tool-content->text content)]
-                                                       (emit-tool-event! on-event
-                                                                         (tool-lifecycle-event :tool-execution-update
-                                                                                               call-id
-                                                                                               name
-                                                                                               :content content-blocks
-                                                                                               :result-text text-fallback
-                                                                                               :details details
-                                                                                               :is-error (boolean is-error)))))))
+                                            :parsed-args telemetry-args
+                                            :call-summary summary))
+    (let [raw-tool-result (or (execute-tool
+                               name
+                               args
+                               (assoc execute-opts
+                                      :on-update
+                                      (fn [{:keys [content details is-error]}]
+                                        (let [content-blocks (normalize-tool-content content)
+                                              text-fallback  (tool-content->text content)]
+                                          (emit-tool-event! on-event
+                                                            (tool-lifecycle-event :tool-execution-update
+                                                                                  call-id
+                                                                                  name
+                                                                                  :content content-blocks
+                                                                                  :result-text text-fallback
+                                                                                  :details details
+                                                                                  :is-error (boolean is-error)
+                                                                                  :call-summary summary))))))
                               {:content "Error: tool execution returned no result"
                                :is-error true})
           {:keys [content is-error details] :as tool-result}
@@ -141,7 +161,8 @@
                                             :content (:content result-message)
                                             :result-text result-text
                                             :details details
-                                            :is-error is-error))
+                                            :is-error is-error
+                                            :call-summary (:call-summary tool-call)))
     (when record-output-stat!
       (let [truncation   (:truncation details)
             limit-hit?   (boolean (:truncated truncation))
@@ -192,7 +213,8 @@
                                           :content [{:type :text :text err-text}]
                                           :result-text err-text
                                           :details details
-                                          :is-error true)))
+                                          :is-error true
+                                          :call-summary (:call-summary tool-call))))
 
 (defn execute-tool-call-prepared!
   "Generic execute phase for one tool call.
@@ -204,7 +226,14 @@
   (let [prepared-tool-call (assoc tool-call :parsed-args
                                   (or parsed-args
                                       (:parsed-args tool-call)
-                                      (tool-args/parse-args (:arguments tool-call))))]
+                                      (tool-args/parse-args (:arguments tool-call))))
+        tool-def           (when-let [tool-def-fn (:tool-def-fn services)]
+                             (tool-def-fn (:name tool-call)))
+        call-summary       (call-summary/format-call-summary {:tool tool-def
+                                                              :tool-name (:name tool-call)
+                                                              :parsed-args (:parsed-args prepared-tool-call)
+                                                              :arguments (:arguments prepared-tool-call)})
+        prepared-tool-call (assoc prepared-tool-call :call-summary call-summary)]
     (start-tool-call! services prepared-tool-call)
     (try
       (execute-tool-call! services prepared-tool-call (:parsed-args prepared-tool-call))

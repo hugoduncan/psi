@@ -7,7 +7,8 @@
   (:require
    [cheshire.core :as json]
    [clojure.java.io :as io]
-   [psi.edit-clj.core :as core]))
+   [psi.edit-clj.core :as core]
+   [psi.tool-runtime.call-summary :as call-summary]))
 
 ;; ── Path resolution ───────────────────────────────────────────────────────────
 
@@ -63,23 +64,24 @@
 ;; ── Tool definition ───────────────────────────────────────────────────────────
 
 (def ^:private tool-def
-  {:name        "edit-clj"
-   :description "Replace text in a file. old-string is matched by structural equality (whitespace does not matter); old-string and new-string must each be one complete, parseable form."
-   :parameters  {:type       "object"
-                 :properties {"filename"   {:type        "string"
-                                            :description "Path to the Clojure (.clj, .cljc, .bb .edn, etc) source file; relative paths resolve against the session worktree."}
-                              "old-string" {:type        "string"
-                                            :description "Exactly one complete Clojure form; matched against file nodes by sexpr equality."}
-                              "new-string" {:type        "string"
-                                            :description "Exactly one complete Clojure form; replaces the matched node verbatim."}
-                              "start-line" {:type        "integer"
-                                            :description "1-indexed first line of the match window (inclusive, optional)."}
-                              "end-line"   {:type        "integer"
-                                            :description "1-indexed last line of the match window (inclusive, optional)."}}
-                 :required   ["filename" "old-string" "new-string"]}
-   :execute     (fn
-                  ([args]      (execute args nil))
-                  ([args opts] (execute args opts)))})
+  {:name           "edit-clj"
+   :description    "Replace text in a file. old-string is matched by structural equality (whitespace does not matter); old-string and new-string must each be one complete, parseable form."
+   :format-request call-summary/edit-clj-format-request
+   :parameters     {:type       "object"
+                    :properties {"filename"   {:type        "string"
+                                               :description "Path to the Clojure (.clj, .cljc, .bb .edn, etc) source file; relative paths resolve against the session worktree."}
+                                 "old-string" {:type        "string"
+                                               :description "Exactly one complete Clojure form; matched against file nodes by sexpr equality."}
+                                 "new-string" {:type        "string"
+                                               :description "Exactly one complete Clojure form; replaces the matched node verbatim."}
+                                 "start-line" {:type        "integer"
+                                               :description "1-indexed first line of the match window (inclusive, optional)."}
+                                 "end-line"   {:type        "integer"
+                                               :description "1-indexed last line of the match window (inclusive, optional)."}}
+                    :required   ["filename" "old-string" "new-string"]}
+   :execute        (fn
+                     ([args]      (execute args nil))
+                     ([args opts] (execute args opts)))})
 
 ;; ── Extension entry point ─────────────────────────────────────────────────────
 

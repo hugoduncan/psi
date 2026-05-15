@@ -12,7 +12,7 @@
 (declare-function psi-emacs--dispatch-request "psi-compose" (op params &optional callback))
 (declare-function psi-emacs--reset-transcript-state "psi-lifecycle" (&optional preserve-tool-output-view-mode))
 (declare-function psi-emacs--set-run-state "psi-run-state" (state run-state))
-(declare-function psi-emacs--upsert-tool-row "psi-tool-rows" (tool-id stage text &optional tool-name arguments parsed-args is-error details))
+(declare-function psi-emacs--upsert-tool-row "psi-tool-rows" (tool-id stage text &optional tool-name arguments parsed-args is-error details call-summary))
 (declare-function psi-emacs--assistant-delta "psi-assistant-render" (text))
 (declare-function psi-emacs--assistant-content->text "psi-assistant-render" (content))
 (declare-function psi-emacs--draft-anchor-at-end-p "psi-compose")
@@ -707,13 +707,14 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
       :psi.tool-lifecycle.summary/tool-name
       :psi.tool-lifecycle.summary/arguments
       :psi.tool-lifecycle.summary/parsed-args
+      :psi.tool-lifecycle.summary/call-summary
       :psi.tool-lifecycle.summary/result-text
       :psi.tool-lifecycle.summary/is-error
       :psi.tool-lifecycle.summary/completed?]}
     :psi.turn/phase
     :psi.turn/is-streaming
     :psi.turn/text
-    {:psi.turn/tool-calls [:id :name :arguments]}
+    {:psi.turn/tool-calls [:id :name :arguments :call-summary]}
     :psi.turn/tool-call-count]")
 
 (defun psi-emacs--rehydrate-switch-extras-query ()
@@ -723,13 +724,14 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
       :psi.tool-lifecycle.summary/tool-name
       :psi.tool-lifecycle.summary/arguments
       :psi.tool-lifecycle.summary/parsed-args
+      :psi.tool-lifecycle.summary/call-summary
       :psi.tool-lifecycle.summary/result-text
       :psi.tool-lifecycle.summary/is-error
       :psi.tool-lifecycle.summary/completed?]}
     :psi.turn/phase
     :psi.turn/is-streaming
     :psi.turn/text
-    {:psi.turn/tool-calls [:id :name :arguments]}
+    {:psi.turn/tool-calls [:id :name :arguments :call-summary]}
     :psi.turn/tool-call-count]")
 
 (defun psi-emacs--rehydrate-tool-summaries (tool-summaries)
@@ -744,6 +746,8 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
                            (alist-get 'psi.tool-lifecycle.summary/arguments summary nil nil #'equal)))
             (parsed-args (or (alist-get :psi.tool-lifecycle.summary/parsed-args summary nil nil #'equal)
                              (alist-get 'psi.tool-lifecycle.summary/parsed-args summary nil nil #'equal)))
+            (call-summary (or (alist-get :psi.tool-lifecycle.summary/call-summary summary nil nil #'equal)
+                              (alist-get 'psi.tool-lifecycle.summary/call-summary summary nil nil #'equal)))
             (result-text (or (alist-get :psi.tool-lifecycle.summary/result-text summary nil nil #'equal)
                              (alist-get 'psi.tool-lifecycle.summary/result-text summary nil nil #'equal)
                              ""))
@@ -752,7 +756,7 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
             (completed? (or (alist-get :psi.tool-lifecycle.summary/completed? summary nil nil #'equal)
                             (alist-get 'psi.tool-lifecycle.summary/completed? summary nil nil #'equal))))
         (when (and tool-id completed?)
-          (psi-emacs--upsert-tool-row tool-id "result" result-text tool-name arguments parsed-args is-error nil))))))
+          (psi-emacs--upsert-tool-row tool-id "result" result-text tool-name arguments parsed-args is-error nil call-summary))))))
 
 (defun psi-emacs--rehydrate-live-turn-tool-calls (tool-calls)
   "Replay in-progress TOOL-CALLS into pending tool rows."
@@ -764,9 +768,11 @@ Returns a proper list in canonical order, or nil when missing/unreadable."
                            (alist-get 'name tool-call nil nil #'equal)))
             (arguments (or (alist-get :arguments tool-call nil nil #'equal)
                            (alist-get 'arguments tool-call nil nil #'equal)
-                           "")))
+                           ""))
+            (call-summary (or (alist-get :call-summary tool-call nil nil #'equal)
+                              (alist-get 'call-summary tool-call nil nil #'equal))))
         (when tool-id
-          (psi-emacs--upsert-tool-row tool-id "start" "" tool-name arguments nil nil nil))))))
+          (psi-emacs--upsert-tool-row tool-id "start" "" tool-name arguments nil nil nil call-summary))))))
 
 (defun psi-emacs--rehydrate-switch-state-from-query-frame (state frame)
   "Restore transcript-adjacent switch state for STATE from `query_eql` FRAME."

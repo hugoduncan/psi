@@ -30,3 +30,23 @@
 
 2026-05-14 inconsistency follow-up
 - Updated plan verification to remove the stale follow-on wording and require proof in this task that Emacs consumes RPC/backend `:call-summary`, with no remaining local compact-header tool-name dispatch in the canonical tool-row path.
+
+2026-05-15 implementation landed
+- Added lower shared owner `components/tool-runtime/src/psi/tool_runtime/call_summary.clj` for canonical compact tool-call header formatting.
+- Implemented mandatory runtime-preserved `:format-request` support in normalized tool defs and registration-time rejection for extension tool defs missing that fn.
+- Kept `:format-request` runtime-only by preserving it canonically while leaving agent-core/provider projections unchanged.
+- Migrated built-ins and owned extensions in this slice onto formatter ownership:
+  - built-ins: `read`, `edit`, `write`, `bash`, `psi-tool`, `delegate`
+  - extensions: `work-on`, `edit-clj`
+  - test/demo extension tools: `hello-upper`, `hello-wrap`
+- Implemented canonical per-tool compact header contracts for `psi-tool`, `delegate`, `work-on`, and `edit-clj` per task-local specs.
+- Moved canonical header computation into tool-runtime lifecycle emission so tool events now carry transport-safe `:call-summary` on `tool/start`, `tool/executing`, `tool/update`, and `tool/result`.
+- Wired TUI state/rendering to consume event `:call-summary` instead of built-in-only header-name dispatch.
+- Wired RPC event projection to require and emit `:call-summary` for tool lifecycle events.
+- Wired Emacs live event handling and switch-time rehydration to consume backend-provided `:call-summary`; retained local summary derivation only as compatibility fallback when summary is absent.
+- Extended tool lifecycle telemetry summaries and turn/app transcript rehydration to preserve `:call-summary`.
+- Boundary after landing: compact single-line call summaries are authoritative from tool defs/backend `:call-summary`; full custom extension renderers remain separate for expanded/custom body rendering.
+- Verification green:
+  - `clojure -M:test --focus psi.tool-registry.defs-test --focus psi.tool-registry.registry-test --focus psi.tool-runtime.call-summary-test --focus psi.tool-runtime.core-test`
+  - `clojure -M:test --focus psi.rpc.events-test --focus psi.agent-session.eql-introspection-test --focus psi.tui.app-view-runtime-test`
+  - `bb emacs:test components/emacs-ui/test/psi-rpc-test.el components/emacs-ui/test/psi-streaming-runtime-test.el components/emacs-ui/test/psi-streaming-transcript-test.el components/emacs-ui/test/psi-tool-output-mode-test.el`

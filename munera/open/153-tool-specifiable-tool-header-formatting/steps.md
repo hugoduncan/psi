@@ -1,36 +1,36 @@
 # Steps
 
-- [ ] Inventory the current compact tool-header formatting path across TUI, Emacs, RPC, and backend helpers.
-- [ ] Identify the canonical built-in tool registration sites that should own header formatter metadata.
-- [ ] Identify the extension tool normalization/registration points that must preserve header formatter metadata.
-- [ ] Document the fixed normalized tool-definition field `:format-request` and its mandatory formatter contract.
-- [ ] Preserve runtime-only `:format-request` through normalization/registration while excluding it from provider/agent-core boundary projections.
-- [ ] Add validation or registration failure for canonical tool definitions missing `:format-request`, unless a temporary migration shim is explicitly recorded.
-- [ ] Add normalized tool-definition support for the chosen formatter hook.
-- [ ] Introduce one backend-owned shared compact tool-header formatter helper under `components/tool-runtime/` (preferred namespace `psi.tool-runtime.call-summary`).
-- [ ] Migrate built-in `read` header formatting onto the new mechanism.
-- [ ] Migrate built-in `edit` header formatting onto the new mechanism.
-- [ ] Migrate built-in `write` header formatting onto the new mechanism.
-- [ ] Migrate built-in `bash` header formatting onto the new mechanism.
-- [ ] Implement `psi-tool` header formatting to match `psi-tool-format.md`.
-- [ ] Define and implement `delegate` compact header formatting around action plus primary workflow/run target to match `delegate-format.md`.
-- [ ] Implement `work-on` compact header formatting to match `work-on-format.md`.
-- [ ] Implement `edit-clj` header formatting with built-in `edit` request-summary semantics while keeping the `edit-clj` label.
-- [ ] Remove or narrow canonical built-in-name special casing from the shared display path.
-- [ ] Update TUI compact tool header rendering to use the shared helper.
-- [ ] Update RPC/backend display shaping to use the shared helper where compact tool headers are surfaced.
-- [ ] Add the preformatted compact header string to RPC tool payloads/events.
-- [ ] Wire Emacs to consume the RPC/backend-provided compact tool header surface in this task.
-- [ ] Add focused tests for built-in parity of `read`, `edit`, `write`, `bash`, `psi-tool`, and `delegate`.
-- [ ] Add focused tests proving `psi-tool` formatting matches `psi-tool-format.md`.
-- [ ] Add focused tests proving `delegate` formatting matches `delegate-format.md`.
-- [ ] Add focused tests proving `work-on` formatting matches `work-on-format.md`.
-- [ ] Add focused tests for extension-defined compact header formatting.
-- [ ] Add focused tests proving `edit-clj` uses built-in `edit` request-summary semantics while preserving the `edit-clj` label.
-- [ ] Add focused tests proving canonical tool registration rejects missing `:format-request` definitions, unless using an explicitly scoped migration shim.
-- [ ] Add focused tests for formatter-failure fallback behavior.
-- [ ] Add focused tests proving TUI uses the shared helper.
-- [ ] Add focused tests proving RPC/backend display shaping uses the shared helper.
-- [ ] Add focused tests proving RPC tool payloads carry the preformatted compact header string.
-- [ ] Add focused Emacs tests proving tool rows consume the RPC-provided compact header instead of local tool-name formatting.
-- [ ] Document the final responsibility boundary between compact header formatting and full custom extension UI renderers.
+- [x] Inventory the current compact tool-header formatting path across TUI, Emacs, RPC, and backend helpers.
+- [x] Identify the canonical built-in tool registration sites that should own header formatter metadata.
+- [x] Identify the extension tool normalization/registration points that must preserve header formatter metadata.
+- [x] Document the fixed normalized tool-definition field `:format-request` and its mandatory formatter contract.
+- [x] Preserve runtime-only `:format-request` through normalization/registration while excluding it from provider/agent-core boundary projections.
+- [x] Add validation or registration failure for canonical tool definitions missing `:format-request`, unless a temporary migration shim is explicitly recorded.
+- [x] Add normalized tool-definition support for the chosen formatter hook.
+- [x] Introduce one backend-owned shared compact tool-header formatter helper under `components/tool-runtime/` (preferred namespace `psi.tool-runtime.call-summary`).
+- [x] Migrate built-in `read` header formatting onto the new mechanism.
+- [x] Migrate built-in `edit` header formatting onto the new mechanism.
+- [x] Migrate built-in `write` header formatting onto the new mechanism.
+- [x] Migrate built-in `bash` header formatting onto the new mechanism.
+- [x] Implement `psi-tool` header formatting to match `psi-tool-format.md`.
+- [x] Define and implement `delegate` compact header formatting around action plus primary workflow/run target to match `delegate-format.md`.
+- [x] Implement `work-on` compact header formatting to match `work-on-format.md`.
+- [x] Implement `edit-clj` header formatting with built-in `edit` request-summary semantics while keeping the `edit-clj` label.
+- [x] Remove or narrow canonical built-in-name special casing from the shared display path.
+- [x] Update TUI compact tool header rendering to use the shared helper.
+- [x] Update RPC/backend display shaping to use the shared helper where compact tool headers are surfaced.
+- [x] Add the preformatted compact header string to RPC tool payloads/events.
+- [x] Wire Emacs to consume the RPC/backend-provided compact tool header surface in this task.
+- [x] Add focused tests for built-in parity of `read`, `edit`, `write`, `bash`, `psi-tool`, and `delegate`.
+- [x] Add focused tests proving `psi-tool` formatting matches `psi-tool-format.md`.
+- [x] Add focused tests proving `delegate` formatting matches `delegate-format.md`.
+- [x] Add focused tests proving `work-on` formatting matches `work-on-format.md`.
+- [x] Add focused tests for extension-defined compact header formatting.
+- [x] Add focused tests proving `edit-clj` uses built-in `edit` request-summary semantics while preserving the `edit-clj` label.
+- [x] Add focused tests proving canonical tool registration rejects missing `:format-request` definitions, unless using an explicitly scoped migration shim.
+- [x] Add focused tests for formatter-failure fallback behavior.
+- [x] Add focused tests proving TUI uses the shared helper.
+- [x] Add focused tests proving RPC/backend display shaping uses the shared helper.
+- [x] Add focused tests proving RPC tool payloads carry the preformatted compact header string.
+- [x] Add focused Emacs tests proving tool rows consume the RPC-provided compact header instead of local tool-name formatting.
+- [x] Document the final responsibility boundary between compact header formatting and full custom extension UI renderers.

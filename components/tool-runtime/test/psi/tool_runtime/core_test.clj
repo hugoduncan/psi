@@ -31,12 +31,15 @@
                  :post-process      (fn [_tool-call _args raw] raw)
                  :effective-policy  (fn [_] {:max-lines 10 :max-bytes 20})
                  :telemetry-args-fn (fn [_ args] args)
+                 :tool-def-fn       (fn [_] {:name "read"
+                                             :format-request (fn [_] "read …")})
                  :execute-opts      {}
                  :on-event          #(swap! events conj %)}
                 {:id "call-1" :name "read" :arguments "{}"}
                 {})]
     (is (= [:tool-start :tool-executing :tool-execution-update]
            (mapv :event-kind @events)))
+    (is (= "read …" (:call-summary (first @events))))
     (is (= "call-1" (get-in result [:result-message :tool-call-id])))
     (is (= [{:type :text :text "done"}] (get-in result [:result-message :content])))))
 

@@ -53,7 +53,10 @@
                                    (boolean (:enabled? tool))
                                    true)}
       (contains? tool :execute)
-      (assoc :execute (:execute tool)))))
+      (assoc :execute (:execute tool))
+
+      (contains? tool :format-request)
+      (assoc :format-request (:format-request tool)))))
 
 (defn normalize-tool-defs
   [tools]

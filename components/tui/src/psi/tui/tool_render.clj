@@ -4,6 +4,7 @@
    [cheshire.core :as json]
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
+   [psi.tool-runtime.call-summary :as call-summary]
    [psi.tui.ansi :as ansi]))
 
 (def ^:private tool-style     (charm-style/style :fg charm-style/yellow :bold true))
@@ -18,70 +19,15 @@
       (try (json/parse-string args-str)
            (catch Exception _ nil))))
 
-(defn- tool-arg-get
-  "Return first non-nil value from args map for the given key variants."
-  [args & keys]
-  (when (map? args)
-    (some #(get args %) keys)))
-
-(defn- tool-int
-  [v]
-  (cond
-    (integer? v) v
-    (number? v)  (long v)
-    (string? v)  (try (Long/parseLong v) (catch Exception _ nil))
-    :else        nil))
-
-(defn- tool-line-range-suffix
-  "Return optional :line or :start:end suffix string for read/edit tools."
-  [tool-name args details]
-  (case tool-name
-    "read"
-    (let [offset* (tool-int (tool-arg-get args "offset" :offset))
-          limit*  (tool-int (tool-arg-get args "limit"  :limit))
-          offset  (or offset* (when limit* 1))]
-      (cond
-        (and offset limit* (pos? limit*))
-        (format ":%d:%d" offset (+ offset (dec limit*)))
-        offset
-        (format ":%d" offset)
-        :else ""))
-    "edit"
-    (let [first-changed* (or (get details :firstChangedLine)
-                             (get details :first-changed-line)
-                             (get details "firstChangedLine")
-                             (get details "first-changed-line"))
-          first-changed  (tool-int first-changed*)
-          old-text       (tool-arg-get args "oldText" :oldText "old_text")
-          span           (when (string? old-text)
-                           (max 1 (count (str/split-lines old-text))))]
-      (cond
-        (and first-changed span (> span 1))
-        (format ":%d:%d" first-changed (+ first-changed (dec span)))
-        first-changed
-        (format ":%d" first-changed)
-        :else ""))
-    ""))
-
 (defn- tool-header
-  "Build the single-line header summary for a tool row.
-
-  Format: <display-name> <primary-arg><line-range-suffix>
-  Matches the Emacs psi-emacs--tool-summary format."
-  [tool-name parsed-args args-str details]
-  (let [args         (parse-tool-args parsed-args args-str)
-        display-name (case tool-name
-                       "bash"  "$"
-                       tool-name)
-        primary      (case tool-name
-                       ("read" "edit" "write") (tool-arg-get args "path" :path)
-                       "bash"                  (tool-arg-get args "command" :command)
-                       nil)
-        line-suffix  (tool-line-range-suffix tool-name args details)
-        label        (cond
-                       (seq primary) (str primary line-suffix)
-                       :else         "…")]
-    (str (charm-style/render tool-style display-name) " " label)))
+  [tool-name parsed-args args-str details call-summary]
+  (let [summary (or call-summary
+                    (call-summary/format-call-summary {:tool-name tool-name
+                                                       :parsed-args (or parsed-args
+                                                                        (parse-tool-args parsed-args args-str))
+                                                       :arguments args-str
+                                                       :details details}))]
+    (charm-style/render tool-style summary)))
 
 (defn- tool-status-indicator
   [status spinner-char]
@@ -208,7 +154,7 @@
                call-render   (extension-call-render ui-snapshot tc)
                header        (if (seq call-render)
                                call-render
-                               (tool-header (:name tc) (:parsed-args tc) (:args tc) (:details tc)))
+                               (tool-header (:name tc) (:parsed-args tc) (:args tc) (:details tc) (:call-summary tc)))
                header        (if header-avail
                                (ansi/truncate-to-width header header-avail)
                                header)
