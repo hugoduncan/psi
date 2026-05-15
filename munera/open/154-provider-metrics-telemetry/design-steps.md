@@ -1,4 +1,4 @@
-- [ ] Add missing `plan.md` that states the concrete implementation approach, ordering, decision points, and focused verification plan for this task.
-- [ ] Add and preserve `design-steps.md` as the canonical review follow-up surface for design ambiguities and inconsistencies on this task.
-- [ ] Refine `design.md` to specify the exact `:on-agent-done` guard/data source for terminal failed `provider_request_finished` emission, including how non-provider terminal paths are excluded.
-- [ ] Refine `design.md` to anchor the `:attempt-id == prepared-request/turn-id` choice to an explicit retry-flow invariant or verification expectation proving retries always get a fresh prepared request / turn id.
+- [x] Add missing `plan.md` that states the concrete implementation approach, ordering, decision points, and focused verification plan for this task.
+- [x] Add and preserve `design-steps.md` as the canonical review follow-up surface for design ambiguities and inconsistencies on this task.
+- [x] Refine `design.md` to specify the exact `:on-agent-done` guard/data source for terminal failed `provider_request_finished` emission, including how non-provider terminal paths are excluded.
+- [x] Refine `design.md` to anchor the `:attempt-id == prepared-request/turn-id` choice to an explicit retry-flow invariant or verification expectation proving retries always get a fresh prepared request / turn id.
