@@ -74,3 +74,8 @@
 - Reviewed task-local formatter specs plus `components/tool-runtime/{src,test}/psi/tool_runtime/call_summary*.clj`, `components/rpc/src/psi/rpc/events.clj`, `components/rpc/test/psi/rpc_prompt_test.clj`, and Emacs tool-row/runtime transcript tests for clarity, signal, and robustness.
 - Coverage already hits the key behavior partitions the task cares about: per-tool formatter parity, fallback on formatter failure, registration enforcement, RPC `:call-summary` transport, and Emacs preference for backend-provided summaries with compatibility fallback.
 - Explicitly no new actionable feedback from this test-shaper pass.
+
+2026-05-14 follow-up execution pass 2
+- Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` to execute newly added actionable follow-up work from the preceding review pass.
+- Found no unchecked steps and no newly added actionable follow-up items from the preloaded review result.
+- No task artifact changes were needed beyond recording this pass; task remains ready for judge/close decision.
