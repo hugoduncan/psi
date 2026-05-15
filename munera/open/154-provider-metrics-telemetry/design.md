@@ -505,7 +505,8 @@ Non-provider terminal paths excluded by this guard:
 Data source rule:
 
 - the emission guard is evaluated from the statechart-owned `data` / `:pending-agent-event` payload, not reconstructed later from reset session state
-- if implementation finds that current dispatch into `:on-agent-done` does not yet preserve this data at the handler boundary, the handler input must be narrowed or extended so the terminal provider failure proof remains explicit at the point of emission
+- the current code shows `:on-agent-done` is presently registered as `(fn [ctx {:keys [session-id]}] ...)`, so this task explicitly includes a small handler-boundary change: preserve or pass through the statechart `data` map (or at minimum `:pending-agent-event`) to that handler before terminal failed provider telemetry is implemented there
+- terminal failed provider-finish emission must not proceed via session-state reconstruction alone; the pending provider event proof remains authoritative at the handler boundary
 
 Payload derivation rule for this owner:
 

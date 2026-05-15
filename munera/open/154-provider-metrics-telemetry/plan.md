@@ -26,11 +26,12 @@ Implement in narrow slices that match the discovered canonical owners and keep t
 
 ## Ordering
 
-1. Lock down design follow-up clarifications in `design.md`.
-2. Add focused owner-side tests that pin the telemetry contracts and retry/terminal split.
+1. Lock down design follow-up clarifications in `design.md` and keep `design-steps.md`/`steps.md` aligned with any newly required proof or boundary work.
+2. Add focused owner-side tests that pin the telemetry contracts, the retry/terminal split, and the fresh prepared-request / turn-id retry invariant.
 3. Implement the core events and classifier.
-4. Implement metrics schema/counters/extension/persistence/rendering.
-5. Run focused verification for owner tests and metrics tests.
+4. Implement any required `:on-agent-done` handler-boundary input shaping so terminal failed finish emission can read the statechart-carried pending provider event explicitly at emission time.
+5. Implement metrics schema/counters/extension/persistence/rendering.
+6. Run focused verification for owner tests and metrics tests.
 
 ## Key decisions
 
@@ -41,8 +42,8 @@ Implement in narrow slices that match the discovered canonical owners and keep t
 
 ## Risks
 
-- The current `:on-agent-done` handler receives only `session-id`; terminal-failure emission may require reading statechart-carried pending event data or narrowing the event-shaping helper boundary so the terminal provider failure proof is explicit.
-- Retry-flow uniqueness for `:attempt-id` is currently an inferred runtime property; implementation must pin it with focused proof rather than relying on prose.
+- The current `:on-agent-done` handler implementation receives only `session-id`; this task therefore includes an explicit implementation slice to extend or narrow that handler boundary so the statechart-carried `:pending-agent-event` remains available where terminal failed provider telemetry is emitted.
+- Retry-flow uniqueness for `:attempt-id` is currently an inferred runtime property; this task therefore includes an explicit checklist item and focused proof for fresh prepared-request / turn-id creation across `:on-retry-triggered` → `:on-retry-resume` → next execution.
 - Metrics rendering can grow noisy if provider and model tables are both unconditional; keep rendering conditional on data presence.
 
 ## Focused verification
