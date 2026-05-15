@@ -63,6 +63,11 @@
 
 ;;; Registration
 
+(defn- compute-retry-metadata
+  [headers attempt exponential-delay-ms now-ms]
+  ((requiring-resolve 'psi.session-state.model/retry-metadata)
+   headers attempt exponential-delay-ms now-ms))
+
 (defn- retry-metadata-for
   [ctx sd event]
   (let [attempt              (:retry-attempt sd)
@@ -71,9 +76,8 @@
         exponential-delay-ms (session-model/exponential-backoff-ms attempt base-ms max-ms)
         now-fn               (or (:now-fn ctx) #(java.time.Instant/now))
         now-ms               (.toEpochMilli ^java.time.Instant (now-fn))
-        provider-headers     (:provider-error/headers event)
-        retry-metadata*      (requiring-resolve 'psi.session-state.model/retry-metadata)]
-    (retry-metadata* provider-headers attempt exponential-delay-ms now-ms)))
+        provider-headers     (:provider-error/headers event)]
+    (compute-retry-metadata provider-headers attempt exponential-delay-ms now-ms)))
 
 (defn register!
   "Register all statechart action handlers.

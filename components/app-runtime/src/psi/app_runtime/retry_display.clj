@@ -15,14 +15,18 @@
          (when (some? (:limit rate-limit))
            (str "/" (:limit rate-limit))))))
 
+(defn- retry-display-data
+  [retry now-ms]
+  (let [rate-limit (:rate-limit retry)]
+    {:delay-text (format-relative-seconds (- (or (:resume-at retry) now-ms) now-ms))
+     :remaining  (remaining-text rate-limit)
+     :reset-text (when-let [reset-at (:reset-at rate-limit)]
+                   (format-relative-seconds (- reset-at now-ms)))}))
+
 (defn retry-summary-fragment
   [retry now-ms]
   (when (:active? retry)
-    (let [rate-limit (:rate-limit retry)
-          delay-text (format-relative-seconds (- (or (:resume-at retry) now-ms) now-ms))
-          remaining  (remaining-text rate-limit)
-          reset-text (when-let [reset-at (:reset-at rate-limit)]
-                       (format-relative-seconds (- reset-at now-ms)))]
+    (let [{:keys [delay-text remaining reset-text]} (retry-display-data retry now-ms)]
       (str " retrying-in:" delay-text
            " source:" (name (:delay-source retry))
            (when remaining (str " remaining:" remaining))
@@ -31,11 +35,7 @@
 (defn retry-status-text
   [retry now-ms]
   (when (:active? retry)
-    (let [rate-limit (:rate-limit retry)
-          delay-text (format-relative-seconds (- (or (:resume-at retry) now-ms) now-ms))
-          remaining  (remaining-text rate-limit)
-          reset-text (when-let [reset-at (:reset-at rate-limit)]
-                       (format-relative-seconds (- reset-at now-ms)))]
+    (let [{:keys [delay-text remaining reset-text]} (retry-display-data retry now-ms)]
       (str/join " · "
                 (remove str/blank?
                         [(str "retry in " delay-text)

@@ -51,3 +51,13 @@
   - [x] Keep one test focused on nested `:retry` preservation in `psi-emacs--state`.
   - [x] Keep a separate test focused on header/status rendering behavior.
 - [x] Fold populated-`retry` model-shape proof into a more consistently structured `initial-session` test block for local readability.
+- [x] Isolate the reload-driven `requiring-resolve` seam in `statechart_actions.clj` behind a tiny helper so retry scheduling reads as domain logic instead of mixed domain/reload mechanics.
+  - [x] Extract a small helper that resolves or invokes canonical retry-metadata construction.
+  - [x] Leave the retry scheduling path reading in terms of domain inputs/outputs.
+- [x] Remove duplicated retry display derivation in `psi.app-runtime.retry-display` by introducing one shared intermediate display-data helper used by both renderers.
+  - [x] Compute delay/remaining/reset display fields once.
+  - [x] Keep `retry-summary-fragment` and `retry-status-text` as thin presentation wrappers.
+- [ ] If touched while evolving this task, thin `session-summary` and `footer-model-from-data` by separating base data assembly from final rendered/status augmentation.
+  - [ ] Keep any such extraction local and mechanical; avoid behavior changes.
+- [ ] If touched while evolving this task, split `psi-emacs--handle-session-updated-event` into clearer payload extraction/state mutation/run-state pieces rather than widening the one function further.
+  - [ ] Only do this if additional state fields are added or local clarity materially improves.

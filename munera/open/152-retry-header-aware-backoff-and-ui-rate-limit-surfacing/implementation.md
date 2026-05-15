@@ -104,3 +104,20 @@
   - `clojure -M:test --focus psi.session-state.model-test --focus psi.rpc-events-test --focus psi.app-runtime.session-summary-test --focus psi.app-runtime.footer-test`
   - `emacs -Q --batch -L components/emacs-ui -L components/emacs-ui/test -l ert -l components/emacs-ui/test/psi-streaming-runtime-test.el -f ert-run-tests-batch-and-exit`
   - both passed cleanly.
+
+2026-05-14 code-shaper review
+- Overall code shape is good: normalization, retry lifecycle, projection formatting, and frontend consumption stay separated by responsibility.
+- No blocking design/code issue remains, but a few local shaping opportunities would improve simplicity and local comprehensibility.
+- Actionable: isolate the reload-driven `requiring-resolve` seam in `statechart_actions.clj` behind a tiny helper so retry scheduling code reads as domain logic rather than mixed domain/reload mechanics.
+- Actionable: extract the duplicated derived display computation in `psi.app-runtime.retry-display` so both renderers share one small intermediate display-data helper.
+- Actionable: consider thinning `session-summary` and `footer-model-from-data` if they grow further by separating base data assembly from final rendered/status augmentation.
+- Actionable: if more state lands in `psi-emacs--handle-session-updated-event`, split payload extraction, state mutation, and run-state derivation so the function does not keep widening.
+
+2026-05-14 code-shaper follow-up execution
+- Isolated the reload-driven retry metadata seam in `statechart_actions.clj` behind `compute-retry-metadata`, so `retry-metadata-for` now reads in terms of domain inputs (`headers`, `attempt`, `delay`, `now`) instead of mixing inline dynamic resolution with retry scheduling flow.
+- Extracted shared derived display computation in `psi.app-runtime.retry-display` into `retry-display-data`, leaving `retry-summary-fragment` and `retry-status-text` as thin presentation wrappers over one canonical set of derived values.
+- Deferred larger thinning of `session-summary`, `footer-model-from-data`, and Emacs session-update handling because no new growth in those functions was required to realize the local simplifications above.
+- Verification:
+  - `clojure -M:test --focus psi.agent-session.statechart-actions-test --focus psi.app-runtime.session-summary-test --focus psi.app-runtime.footer-test`
+  - `bb clojure:test:unit`
+  - both passed cleanly.
