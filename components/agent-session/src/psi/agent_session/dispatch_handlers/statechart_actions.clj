@@ -4,7 +4,7 @@
    on-compacting-entered, on-compact-done, on-retry-triggered, on-retrying-entered,
    on-retry-resume."
   (:require
-   [psi.session-state.model :as session-data]
+   [psi.session-state.model :as session-model]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-state.state :as session]))
 
@@ -28,7 +28,7 @@
   (let [stop-reason (or (:stop-reason msg) (:stopReason msg))]
     (and (map? msg)
          (or (= :error stop-reason) (= "error" stop-reason))
-         (session-data/context-overflow-error? (:error-message msg)))))
+         (session-model/context-overflow-error? (:error-message msg)))))
 
 (defn- threshold-auto-compact? [session-data config]
   (let [tokens  (:context-tokens session-data)
@@ -63,6 +63,22 @@
 
 ;;; Registration
 
+(defn- compute-retry-metadata
+  [headers attempt exponential-delay-ms now-ms]
+  ((requiring-resolve 'psi.session-state.model/retry-metadata)
+   headers attempt exponential-delay-ms now-ms))
+
+(defn- retry-metadata-for
+  [ctx sd event]
+  (let [attempt              (:retry-attempt sd)
+        base-ms              (get-in ctx [:config :auto-retry-base-delay-ms] 2000)
+        max-ms               (get-in ctx [:config :auto-retry-max-delay-ms] 60000)
+        exponential-delay-ms (session-model/exponential-backoff-ms attempt base-ms max-ms)
+        now-fn               (or (:now-fn ctx) #(java.time.Instant/now))
+        now-ms               (.toEpochMilli ^java.time.Instant (now-fn))
+        provider-headers     (:provider-error/headers event)]
+    (compute-retry-metadata provider-headers attempt exponential-delay-ms now-ms)))
+
 (defn register!
   "Register all statechart action handlers.
    Called once during context creation. Handlers are context-independent."
@@ -79,6 +95,7 @@
            interruption-reason (:interrupt-reason sd)]
        {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
                                                                       :retry-attempt 0
+                                                                      :retry nil
                                                                       :interrupt-pending false
                                                                       :interrupt-requested-at nil
                                                                       :interrupt-reason nil))
@@ -94,6 +111,7 @@
    :on-abort
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
+                                                                    :retry nil
                                                                     :interrupt-pending false
                                                                     :interrupt-requested-at nil
                                                                     :interrupt-reason nil))
@@ -118,20 +136,20 @@
   (kernel/register-handler!
    :on-compact-done
    (fn [_ctx {:keys [session-id]}]
-     {:root-state-update (session/session-update session-id #(assoc % :is-compacting false))
+     {:root-state-update (session/session-update session-id #(assoc % :is-compacting false
+                                                                    :retry nil))
       :effects [{:effect/type :scheduler/drain-queue}]}))
 
   (kernel/register-handler!
    :on-retry-triggered
-   (fn [ctx {:keys [session-id]}]
-     (let [sd       (session/get-session-data-in ctx session-id)
-           attempt  (:retry-attempt sd)
-           base-ms  (get-in ctx [:config :auto-retry-base-delay-ms] 2000)
-           max-ms   (get-in ctx [:config :auto-retry-max-delay-ms] 60000)
-           delay-ms (session-data/exponential-backoff-ms attempt base-ms max-ms)]
-       {:root-state-update (session/session-update session-id #(update % :retry-attempt inc))
+   (fn [ctx {:keys [session-id] :as data}]
+     (let [sd             (session/get-session-data-in ctx session-id)
+           retry-metadata (retry-metadata-for ctx sd (:pending-agent-event data))]
+       {:root-state-update (session/session-update session-id #(-> %
+                                                                   (update :retry-attempt inc)
+                                                                   (assoc :retry retry-metadata)))
         :effects [{:effect/type :runtime/schedule-thread-sleep-send-event
-                   :delay-ms    delay-ms
+                   :delay-ms    (:delay-ms retry-metadata)
                    :event       :session/retry-done}]})))
 
   (kernel/register-handler!
@@ -141,5 +159,6 @@
 
   (kernel/register-handler!
    :on-retry-resume
-   (fn [_ctx _data]
-     {:effects [{:effect/type :runtime/agent-start-loop}]})))
+   (fn [_ctx {:keys [session-id]}]
+     {:root-state-update (session/session-update session-id #(assoc % :retry nil))
+      :effects [{:effect/type :runtime/agent-start-loop}]})))

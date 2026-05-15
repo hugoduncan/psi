@@ -3,8 +3,9 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.core :as session]
-   [psi.session-state.state :as ss]
-   [psi.app-runtime.context :as app-context]))
+   [psi.app-runtime.context :as app-context]
+   [psi.app-runtime.retry-display :as retry-display]
+   [psi.session-state.state :as ss]))
 
 (def footer-query
   [:psi.agent-session/worktree-path
@@ -19,6 +20,7 @@
    :psi.agent-session/context-fraction
    :psi.agent-session/context-window
    :psi.agent-session/auto-compaction-enabled
+   :psi.agent-session/retry
    :psi.agent-session/model-provider
    :psi.agent-session/model-id
    :psi.agent-session/model-reasoning
@@ -258,15 +260,17 @@
          context-fraction         (:psi.agent-session/context-fraction d)
          context-window           (:psi.agent-session/context-window d)
          auto-compact?            (boolean (:psi.agent-session/auto-compaction-enabled d))
+         retry                    (:psi.agent-session/retry d)
+         now-ms                   (.toEpochMilli (java.time.Instant/now))
          context-text             (footer-context-text context-fraction context-window auto-compact?)
          usage-parts*             (usage-parts d context-text)
          model-text*              (model-text d)
          path-text*               (path-text d fallback-worktree-path)
          statuses*                (status-items (:psi.ui/statuses d))
+         retry-status             (retry-display/retry-status-text retry now-ms)
          session-activity-buckets (footer-session-activity-buckets context-sessions)
          session-activity-line    (footer-session-activity-line context-sessions)
-         status-line              (->> statuses*
-                                       (map :status/text)
+         status-line              (->> (concat (map :status/text statuses*) [retry-status])
                                        (remove str/blank?)
                                        (str/join " "))
          stats-line               (str/join " " (concat usage-parts* [model-text*]))
@@ -289,6 +293,7 @@
                        :window                   context-window
                        :auto-compaction-enabled auto-compact?
                        :text                     context-text}
+      :footer/retry retry
       :footer/model {:provider                   (:psi.agent-session/model-provider d)
                      :id                         (:psi.agent-session/model-id d)
                      :reasoning                  (boolean (:psi.agent-session/model-reasoning d))

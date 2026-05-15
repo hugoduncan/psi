@@ -434,8 +434,6 @@
      :target-source-path target-source-path
      :warning (reload-warning ns-name loaded-source-path target-source-path)}))
 
-(defn- loaded-namespace? [ns-name] (boolean (some-> ns-name symbol find-ns)))
-
 (defn- validate-reload-namespaces [namespaces]
   (when-not (vector? namespaces)
     (throw (ex-info "psi-tool reload-code namespace mode requires `namespaces` vector" {:phase :validate :action "reload-code"})))
@@ -446,9 +444,6 @@
       (throw (ex-info "psi-tool reload-code namespace mode requires non-blank namespace strings" {:phase :validate :action "reload-code" :namespaces namespaces}))))
   (when-not (= (count namespaces) (count (distinct namespaces)))
     (throw (ex-info "psi-tool reload-code namespace mode rejects duplicate namespace names" {:phase :validate :action "reload-code" :namespaces namespaces})))
-  (doseq [ns-name namespaces]
-    (when-not (loaded-namespace? ns-name)
-      (throw (ex-info (str "Reload namespace is not loaded: " ns-name) {:phase :validate :action "reload-code" :namespace ns-name}))))
   namespaces)
 
 (defn- validate-reload-namespace-targeting! [namespaces worktree-path]

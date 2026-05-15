@@ -27,9 +27,32 @@
       (is (= [] (:steering-messages s)))
       (is (= [] (:follow-up-messages s)))
       (is (= 0 (:retry-attempt s)))
+      (is (nil? (:retry s)))
       (is (= {:schedules {}
               :queue []}
-             (:scheduler s))))))
+             (:scheduler s)))))
+
+  (testing "initial-session accepts canonical retry metadata shape when populated"
+    (let [s (session/initial-session {:retry {:active? true
+                                              :attempt 2
+                                              :delay-ms 8000
+                                              :delay-source :retry-after
+                                              :resume-at 18000
+                                              :rate-limit {:limit 5000
+                                                           :remaining 0
+                                                           :reset-after-ms 32000
+                                                           :reset-at 42000}}})]
+      (is (session/valid-session? s))
+      (is (= {:active? true
+              :attempt 2
+              :delay-ms 8000
+              :delay-source :retry-after
+              :resume-at 18000
+              :rate-limit {:limit 5000
+                           :remaining 0
+                           :reset-after-ms 32000
+                           :reset-at 42000}}
+             (:retry s))))))
 
 (deftest scheduler-schema-test
   (testing "schedule schema accepts canonical scheduled prompt record"

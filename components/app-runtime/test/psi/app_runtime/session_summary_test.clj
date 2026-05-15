@@ -15,8 +15,8 @@
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
 
-(deftest session-summary-builds-shared-model-and-status-fragments-test
-  (testing "session summary exposes shared header/status fragments"
+(deftest session-summary-builds-shared-header-fragments-test
+  (testing "session summary exposes session id, display name, and header model label"
     (let [[ctx sid] (create-session-context)
           _         (session/dispatch-in! ctx :session/set-model
                                           {:session-id sid
@@ -32,9 +32,30 @@
       (is (= sid (:session-id model)))
       (is (= "Investigate failures" (:session-display-name model)))
       (is (= "(openai) gpt-5.3-codex • thinking high"
-             (:header-model-label model)))
-      (is (= (str "session: " sid " phase:idle streaming:no compacting:no pending:0 retry:0")
-             (:status-session-line model))))))
+             (:header-model-label model))))))
+
+(deftest session-summary-builds-retry-status-fragments-test
+  (testing "session summary status line includes visible retry timing and rate-limit text"
+    (let [[ctx sid] (create-session-context)
+          now-ms    (System/currentTimeMillis)
+          _         (ss/apply-root-state-update-in! ctx
+                                                    (ss/session-update sid #(assoc %
+                                                                                   :retry {:active? true
+                                                                                           :attempt 1
+                                                                                           :delay-ms 8000
+                                                                                           :delay-source :retry-after
+                                                                                           :resume-at (+ now-ms 8000)
+                                                                                           :rate-limit {:remaining 0
+                                                                                                        :limit 5000
+                                                                                                        :reset-at (+ now-ms 32000)}})))
+          model     (summary/session-summary ctx sid)
+          status    (:status-session-line model)]
+      (is (re-find (re-pattern (str "^session: " sid " phase:idle streaming:no compacting:no pending:0 retry:0"))
+                   status))
+      (is (re-find #"retrying-in:[78]s" status))
+      (is (re-find #"source:retry-after" status))
+      (is (re-find #"remaining:0/5000" status))
+      (is (re-find #"reset-in:3[12]s" status)))))
 
 (deftest session-summary-tolerates-keyword-sentinel-session-values-test
   (testing "keyword sentinel values in session state are treated as absent"
