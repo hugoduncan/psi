@@ -22,6 +22,16 @@
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))
 
+(defn- apply-active-tools-with-renderer-projection
+  [session-id tool-defs root]
+  (let [root'   ((session/session-update session-id #(assoc %
+                                                            :active-tools (->> tool-defs (map :name) set)
+                                                            :tool-defs tool-defs))
+                 root)
+        ui*     (get-in root' [:ui :extension-ui])
+        ui-next (:state (ui-state/replace-tool-def-renderers ui* tool-defs))]
+    (assoc-in root' [:ui :extension-ui] ui-next)))
+
 (defn- schedule-record
   [session-data schedule-id]
   (get-in session-data [:scheduler :schedules schedule-id]))
@@ -201,13 +211,7 @@
    :session/set-active-tools
    (fn [_ctx {:keys [session-id tool-maps]}]
      (let [tool-defs (tool-defs/normalize-tool-defs tool-maps)]
-       {:root-state-update (fn [root]
-                             (let [root'    ((session/session-update session-id #(assoc %
-                                                                                        :active-tools (->> tool-defs (map :name) set)
-                                                                                        :tool-defs tool-defs)) root)
-                                   ui*      (get-in root' [:ui :extension-ui])
-                                   ui-next  (:state (ui-state/replace-tool-def-renderers ui* tool-defs))]
-                               (assoc-in root' [:ui :extension-ui] ui-next)))
+       {:root-state-update (partial apply-active-tools-with-renderer-projection session-id tool-defs)
         :effects [{:effect/type :runtime/agent-set-tools
                    :tool-maps tool-defs}
                   {:effect/type :runtime/refresh-system-prompt

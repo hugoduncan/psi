@@ -18,3 +18,7 @@
 - [x] Split the active-tool renderer replacement proof out of the broader `session-config-dispatch-test` umbrella in `components/agent-session/test/psi/agent_session/config_compaction_test.clj` so the renderer-sync behavior has its own focused test name and setup.
 - [x] Re-run the focused TUI + agent-session proof set after the test shaping split.
 - [x] Keep the broad RPC prompt proof as integration coverage, but ensure the narrower dedicated proofs remain the authoritative coverage for renderer projection behavior.
+- [x] Bind `call-summary` once inside `psi.tool-registry.render/transport-progress-event` so the helper computes the summary only once and the control flow states the intent directly.
+- [x] Extract a small Emacs helper that owns call-summary precedence (`details` first, then `ui-snapshot`, then nil) so `psi-emacs--tool-summary` reads as one clear fallback chain.
+- [x] Consider extracting a named helper for the `:session/set-active-tools` root-state update + renderer projection path if the resulting code is simpler and more locally comprehensible; otherwise document why the inline form remains preferable.
+- [x] Re-run the focused Clojure + Emacs proof set after the code-shaping follow-up.

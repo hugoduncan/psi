@@ -104,10 +104,11 @@
   "Project transport-safe shared display data into a progress event for RPC use.
    Adds `:call-summary` for current tool lifecycle payloads when derivable."
   [progress-event]
-  (let [tool-name (:tool-name progress-event)
-        args      (or (:parsed-args progress-event) (:arguments progress-event))
-        details   (:details progress-event)]
+  (let [tool-name     (:tool-name progress-event)
+        args          (or (:parsed-args progress-event) (:arguments progress-event))
+        details       (:details progress-event)
+        call-summary  (when (string? tool-name)
+                        (transport-call-summary tool-name args details))]
     (cond-> progress-event
-      (and (string? tool-name)
-           (some? (transport-call-summary tool-name args details)))
-      (assoc :call-summary (transport-call-summary tool-name args details)))))
+      (some? call-summary)
+      (assoc :call-summary call-summary))))

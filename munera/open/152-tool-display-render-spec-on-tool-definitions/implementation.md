@@ -81,3 +81,15 @@
     - `get-tool-renderer-unknown-tool-test`
   - Split the active-tool renderer sync proof out of the broader agent-session config umbrella into dedicated `set-active-tools-replaces-renderer-projection-test`.
   - Preserved the broad RPC prompt proof as integration coverage and kept narrower renderer projection proofs as the authoritative behavior-local coverage.
+
+- 2026-05-14 ψ code-shaper review:
+  - Actionable shaping issue: `psi.tool-registry.render/transport-progress-event` currently recomputes `transport-call-summary` twice in the same branch — once to decide whether to attach `:call-summary` and again to compute the value. This is small but unnecessary duplication and slightly obscures intent.
+  - Actionable shaping issue: Emacs shared-summary precedence is now spread across `psi-emacs--tool-summary`, which checks `details[:call-summary]` first and then falls back into `psi-emacs--tool-renderer-call` for `ui-snapshot` lookup. The behavior is reasonable, but the precedence rule is implicit rather than named, which makes the fallback order harder to see locally.
+  - Actionable shaping issue: active-tool canonical state update and UI renderer projection are still performed inline together in `:session/set-active-tools`. The current code is acceptable, but the cross-surface coupling is now strong enough that a named helper would improve local comprehensibility if this path changes again.
+  - Follow-up expectation: bind `call-summary` once in `transport-progress-event`, extract a small Emacs helper for call-summary precedence, and consider extracting a helper for the active-tool + renderer-projection update path.
+
+- 2026-05-14 ψ code-shaper follow-up:
+  - Bound `call-summary` once in `psi.tool-registry.render/transport-progress-event`, removing duplicate computation and making the attach-when-present control flow explicit.
+  - Extracted Emacs helper `psi-emacs--tool-call-summary` so call-summary precedence is now named and local: event details first, then shared UI-snapshot renderer summary, else nil.
+  - Extracted `apply-active-tools-with-renderer-projection` in session mutations so the canonical active-tool state update and interactive renderer projection travel together behind one named helper.
+  - Kept the helper extraction because it reduced local branching and made the cross-surface update intent more explicit rather than adding indirection without payoff.

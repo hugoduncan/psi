@@ -259,6 +259,19 @@ function hooks for non-RPC/local test scenarios."
         (error nil)))
      (t nil))))
 
+(defun psi-emacs--tool-call-summary (tool-name details ui-snapshot args invalid-args?)
+  "Return preferred shared call summary for TOOL-NAME.
+
+Precedence: event DETAILS transport-safe summary, then UI-SNAPSHOT shared
+renderer summary, else nil. INVALID-ARGS? suppresses renderer fallback."
+  (let ((detail-summary (and (listp details)
+                             (or (alist-get :call-summary details nil nil #'equal)
+                                 (alist-get "call-summary" details nil nil #'equal)))))
+    (or (and (stringp detail-summary)
+             detail-summary)
+        (and (not invalid-args?)
+             (psi-emacs--tool-renderer-call tool-name ui-snapshot args)))))
+
 (defun psi-emacs--tool-summary (tool-name parsed-args arguments tool-id &optional details ui-snapshot)
   "Return display summary for a tool row.
 
@@ -274,13 +287,7 @@ TOOL-ID remains fallback-only when tool name is absent."
          (args-info (psi-emacs--tool-args-map parsed-args arguments))
          (args (plist-get args-info :args))
          (invalid-args? (plist-get args-info :invalid-args-type))
-         (call-summary (and (listp details)
-                            (or (alist-get :call-summary details nil nil #'equal)
-                                (alist-get "call-summary" details nil nil #'equal))))
-         (custom (or (and (stringp call-summary)
-                          call-summary)
-                     (and (not invalid-args?)
-                          (psi-emacs--tool-renderer-call name ui-snapshot args)))))
+         (custom (psi-emacs--tool-call-summary name details ui-snapshot args invalid-args?)))
     (psi-emacs--truncate-single-line
      (or custom
          (let* ((display-name (psi-emacs--tool-display-name name))
