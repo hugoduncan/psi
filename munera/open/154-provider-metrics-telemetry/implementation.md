@@ -34,3 +34,6 @@
   - `clojure -M:test --focus psi.session-state.model-test --focus psi.turn-runtime.response-mode-test --focus psi.agent-session.statechart-actions-test --focus psi.agent-session.turn.handlers-test --focus psi.metrics.schema-test --focus psi.metrics.counters-test --focus psi.metrics.persistence-test --focus psi.metrics.extension-test`
   - result: `23 tests, 132 assertions, 0 failures`
 - Remaining follow-up: the explicit retry-flow proof for fresh prepared-request / turn id across retry resume is still open in `steps.md`.
+
+2026-05-14 implementation review
+- Actionable: acceptance/design still require a focused retry-flow proof that retries execute with a fresh prepared-request / turn id, but `steps.md` keeps that item open and the referenced focused verification list/results do not show a dedicated retry-flow test discharging it; the `:attempt-id == prepared-request/turn-id` uniqueness claim across retries therefore remains unproved.
