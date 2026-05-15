@@ -1,0 +1,6 @@
+- [x] Add missing `plan.md` that states the concrete implementation approach, ordering, decision points, and focused verification plan for this task.
+- [x] Add and preserve `design-steps.md` as the canonical review follow-up surface for design ambiguities and inconsistencies on this task.
+- [x] Refine `design.md` to specify the exact `:on-agent-done` guard/data source for terminal failed `provider_request_finished` emission, including how non-provider terminal paths are excluded.
+- [x] Refine `design.md` to anchor the `:attempt-id == prepared-request/turn-id` choice to an explicit retry-flow invariant or verification expectation proving retries always get a fresh prepared request / turn id.
+- [x] Reconcile the `:on-agent-done` handler-boundary contract across `design.md`, `plan.md`, and `steps.md`: either make the required `:pending-agent-event` / `data` input change an explicit implementation slice/step, or narrow the design so terminal failed provider-finish emission no longer depends on handler-boundary data that the current plan says is unavailable.
+- [x] Add an explicit retry-flow proof step to `steps.md` for the `:attempt-id == prepared-request/turn-id` invariant, covering a fresh prepared-request / turn id across `:on-retry-triggered` → `:on-retry-resume` → next execution.

@@ -10,6 +10,7 @@
                       :commands   {}
                       :operations {}
                       :tokens     {}
+                      :providers  {}
                       :updated-at nil})))
 
 (deftest valid?-accepts-populated-metrics-test
@@ -20,6 +21,20 @@
         :commands   {"metrics" {:invocations 2}}
         :operations {"metrics/summary" {:invocations 5}}
         :tokens     {"claude-sonnet-4" {:input 1000 :output 200 :cache-read 500 :cache-write 100}}
+        :providers  {"openai" {:requests 12
+                               :successes 10
+                               :failures 2
+                               :final-failures 1
+                               :retries 3
+                               :retry-backoff-ms 4000
+                               :error-types {"rate-limit" 1 "transport" 1}
+                               :models {"gpt-5.4" {:requests 12
+                                                   :successes 10
+                                                   :failures 2
+                                                   :final-failures 1
+                                                   :retries 3
+                                                   :retry-backoff-ms 4000
+                                                   :error-types {"rate-limit" 1 "transport" 1}}}}}
         :updated-at "2026-05-14T10:00:00Z"})))
 
 (deftest valid?-rejects-missing-required-key-test
@@ -28,6 +43,7 @@
                            :commands   {}
                            :operations {}
                            :tokens     {}
+                           :providers  {}
                            :updated-at nil}))))
 
 (deftest valid?-rejects-wrong-type-for-invocations-test
@@ -38,6 +54,7 @@
              :commands   {}
              :operations {}
              :tokens     {}
+             :providers  {}
              :updated-at nil}))))
 
 (deftest valid?-rejects-wrong-token-shape-test
@@ -48,6 +65,7 @@
              :commands   {}
              :operations {}
              :tokens     {"gpt-4o" {:input 100}}
+             :providers  {}
              :updated-at nil}))))
 
 (deftest explain-returns-non-nil-for-invalid-test

@@ -4,6 +4,7 @@
    on-compacting-entered, on-compact-done, on-retry-triggered, on-retrying-entered,
    on-retry-resume."
   (:require
+   [psi.agent-session.extensions :as ext]
    [psi.session-state.model :as session-model]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-state.state :as session]))
@@ -79,6 +80,55 @@
         provider-headers     (:provider-error/headers event)]
     (compute-retry-metadata provider-headers attempt exponential-delay-ms now-ms)))
 
+(defn- provider-id-for
+  [model]
+  (or (some-> model :provider name)
+      (some-> model :provider str)
+      "unknown"))
+
+(defn- model-id-for
+  [model]
+  (or (:id model) "unknown"))
+
+(defn- terminal-provider-error-event?
+  [pending-agent-event]
+  (let [assistant-msg (last-assistant-message-from-event pending-agent-event)
+        stop-reason   (or (:stop-reason assistant-msg) (:stopReason assistant-msg))]
+    (and (= :agent-end (:type pending-agent-event))
+         (map? assistant-msg)
+         (or (= :error stop-reason) (= "error" stop-reason))
+         (or (:provider-error/headers pending-agent-event)
+             (:error-message assistant-msg)
+             (:http-status assistant-msg)))))
+
+(defn- dispatch-provider-event!
+  [ctx event-name payload]
+  (when-let [reg (:extension-registry ctx)]
+    (ext/dispatch-in reg event-name (assoc payload :type event-name))))
+
+(defn- failed-provider-event-payload
+  [ctx session-id pending-agent-event retry-attempt final?]
+  (let [sd            (session/get-session-data-in ctx session-id)
+        model         (:model sd)
+        assistant-msg (last-assistant-message-from-event pending-agent-event)
+        stop-reason   (or (:stop-reason assistant-msg) (:stopReason assistant-msg))
+        error-message (:error-message assistant-msg)
+        http-status   (:http-status assistant-msg)]
+    {:session-id session-id
+     :turn-id (:turn-id (or (:last-execution-result-summary sd)
+                            (:last-prepared-request-summary sd)))
+     :attempt-id (:turn-id (or (:last-execution-result-summary sd)
+                               (:last-prepared-request-summary sd)))
+     :provider (provider-id-for model)
+     :model-id (model-id-for model)
+     :retry-attempt retry-attempt
+     :status :failed
+     :final? final?
+     :retryable? (session-model/retry-error? stop-reason error-message http-status)
+     :error-kind (session-model/provider-error-kind stop-reason error-message http-status)
+     :stop-reason stop-reason
+     :error-message error-message}))
+
 (defn register!
   "Register all statechart action handlers.
    Called once during context creation. Handlers are context-independent."
@@ -90,9 +140,15 @@
 
   (kernel/register-handler!
    :on-agent-done
-   (fn [ctx {:keys [session-id]}]
-     (let [sd                 (session/get-session-data-in ctx session-id)
-           interruption-reason (:interrupt-reason sd)]
+   (fn [ctx {:keys [session-id] :as data}]
+     (let [sd                  (session/get-session-data-in ctx session-id)
+           interruption-reason (:interrupt-reason sd)
+           pending-agent-event (:pending-agent-event data)]
+       (when (terminal-provider-error-event? pending-agent-event)
+         (dispatch-provider-event!
+          ctx
+          "provider_request_finished"
+          (failed-provider-event-payload ctx session-id pending-agent-event (:retry-attempt sd) true)))
        {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
                                                                       :retry-attempt 0
                                                                       :retry nil
@@ -143,8 +199,25 @@
   (kernel/register-handler!
    :on-retry-triggered
    (fn [ctx {:keys [session-id] :as data}]
-     (let [sd             (session/get-session-data-in ctx session-id)
-           retry-metadata (retry-metadata-for ctx sd (:pending-agent-event data))]
+     (let [sd                 (session/get-session-data-in ctx session-id)
+           pending-agent-event (:pending-agent-event data)
+           retry-metadata     (retry-metadata-for ctx sd pending-agent-event)
+           retry-attempt      (inc (:retry-attempt sd))
+           provider-event     (failed-provider-event-payload ctx session-id pending-agent-event (:retry-attempt sd) false)
+           model              (:model sd)]
+       (dispatch-provider-event! ctx "provider_request_finished" provider-event)
+       (dispatch-provider-event!
+        ctx
+        "provider_retry_scheduled"
+        {:session-id session-id
+         :turn-id (:turn-id provider-event)
+         :provider (provider-id-for model)
+         :model-id (model-id-for model)
+         :retry-attempt retry-attempt
+         :delay-ms (:delay-ms retry-metadata)
+         :delay-source (:delay-source retry-metadata)
+         :error-kind (:error-kind provider-event)
+         :retryable? true})
        {:root-state-update (session/session-update session-id #(-> %
                                                                    (update :retry-attempt inc)
                                                                    (assoc :retry retry-metadata)))

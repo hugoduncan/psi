@@ -180,7 +180,11 @@
   [session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch]
   {:effects [{:effect/type :runtime/dispatch-event
               :event-type :on-agent-done
-              :event-data {:session-id session-id}
+              :event-data {:session-id session-id
+                           :pending-agent-event {:type :agent-end
+                                                 :messages [(:execution-result/assistant-message terminal-result)]
+                                                 :turn-id turn-id
+                                                 :provider-error/headers (get-in terminal-result [:execution-result/assistant-message :provider-error/headers])}}
               :origin :core}
              {:effect/type :notify/extension-dispatch
               :event-name "session_turn_finished"

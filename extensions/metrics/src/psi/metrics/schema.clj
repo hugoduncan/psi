@@ -25,6 +25,27 @@
    [:cache-read :int]
    [:cache-write :int]])
 
+(def provider-counter-schema
+  [:map
+   [:requests :int]
+   [:successes :int]
+   [:failures :int]
+   [:final-failures :int]
+   [:retries :int]
+   [:retry-backoff-ms :int]
+   [:error-types [:map-of :string :int]]])
+
+(def provider-metrics-schema
+  [:map
+   [:requests :int]
+   [:successes :int]
+   [:failures :int]
+   [:final-failures :int]
+   [:retries :int]
+   [:retry-backoff-ms :int]
+   [:error-types [:map-of :string :int]]
+   [:models [:map-of :string provider-counter-schema]]])
+
 (def metrics-schema
   "Top-level metrics map persisted to disk and returned by metrics/summary."
   [:map
@@ -33,6 +54,7 @@
    [:commands [:map-of :string counter-schema]]
    [:operations [:map-of :string counter-schema]]
    [:tokens [:map-of :string token-totals-schema]]
+   [:providers [:map-of :string provider-metrics-schema]]
    [:updated-at [:maybe :string]]])
 
 (defn valid?

@@ -17,6 +17,7 @@
    :commands   {}
    :operations {}
    :tokens     {}
+   :providers  {}
    :updated-at nil})
 
 ;;; Tool counters
@@ -101,3 +102,80 @@
      :output      (max 0 (- cur-out prev-out))
      :cache-read  (max 0 (- cur-cr prev-cr))
      :cache-write (max 0 (- cur-cw prev-cw))}))
+
+(defn- provider-key
+  [provider]
+  (or provider "unknown"))
+
+(defn- model-key
+  [model-id]
+  (or model-id "unknown"))
+
+(defn- ensure-provider-branch
+  [metrics provider model-id]
+  (let [provider* (provider-key provider)
+        model*    (model-key model-id)]
+    (-> metrics
+        (update-in [:providers provider* :requests] (fnil identity 0))
+        (update-in [:providers provider* :successes] (fnil identity 0))
+        (update-in [:providers provider* :failures] (fnil identity 0))
+        (update-in [:providers provider* :final-failures] (fnil identity 0))
+        (update-in [:providers provider* :retries] (fnil identity 0))
+        (update-in [:providers provider* :retry-backoff-ms] (fnil identity 0))
+        (update-in [:providers provider* :error-types] (fnil identity {}))
+        (update-in [:providers provider* :models] (fnil identity {}))
+        (update-in [:providers provider* :models model* :requests] (fnil identity 0))
+        (update-in [:providers provider* :models model* :successes] (fnil identity 0))
+        (update-in [:providers provider* :models model* :failures] (fnil identity 0))
+        (update-in [:providers provider* :models model* :final-failures] (fnil identity 0))
+        (update-in [:providers provider* :models model* :retries] (fnil identity 0))
+        (update-in [:providers provider* :models model* :retry-backoff-ms] (fnil identity 0))
+        (update-in [:providers provider* :models model* :error-types] (fnil identity {})))))
+
+(defn inc-provider-request
+  [metrics provider model-id]
+  (let [provider* (provider-key provider)
+        model*    (model-key model-id)]
+    (-> (ensure-provider-branch metrics provider* model*)
+        (update-in [:providers provider* :requests] (fnil inc 0))
+        (update-in [:providers provider* :models model* :requests] (fnil inc 0))
+        (assoc :updated-at (now-str)))))
+
+(defn inc-provider-retry
+  [metrics provider model-id delay-ms]
+  (let [provider* (provider-key provider)
+        model*    (model-key model-id)
+        delay     (or delay-ms 0)]
+    (-> (ensure-provider-branch metrics provider* model*)
+        (update-in [:providers provider* :retries] (fnil inc 0))
+        (update-in [:providers provider* :retry-backoff-ms] (fnil + 0) delay)
+        (update-in [:providers provider* :models model* :retries] (fnil inc 0))
+        (update-in [:providers provider* :models model* :retry-backoff-ms] (fnil + 0) delay)
+        (assoc :updated-at (now-str)))))
+
+(defn record-provider-finish
+  [metrics provider model-id {:keys [status final? error-kind]}]
+  (let [provider*  (provider-key provider)
+        model*     (model-key model-id)
+        error-key  (some-> error-kind name)
+        success?   (= :succeeded status)
+        failure?   (= :failed status)]
+    (cond-> (ensure-provider-branch metrics provider* model*)
+      success?
+      (-> (update-in [:providers provider* :successes] (fnil inc 0))
+          (update-in [:providers provider* :models model* :successes] (fnil inc 0)))
+
+      failure?
+      (-> (update-in [:providers provider* :failures] (fnil inc 0))
+          (update-in [:providers provider* :models model* :failures] (fnil inc 0)))
+
+      (and failure? final?)
+      (-> (update-in [:providers provider* :final-failures] (fnil inc 0))
+          (update-in [:providers provider* :models model* :final-failures] (fnil inc 0)))
+
+      (and failure? error-key)
+      (-> (update-in [:providers provider* :error-types error-key] (fnil inc 0))
+          (update-in [:providers provider* :models model* :error-types error-key] (fnil inc 0)))
+
+      :always
+      (assoc :updated-at (now-str)))))

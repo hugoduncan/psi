@@ -197,7 +197,35 @@
     (is (= 8000 (session/exponential-backoff-ms 2 2000 60000))))
 
   (testing "exponential-backoff-ms caps at max"
-    (is (= 60000 (session/exponential-backoff-ms 10 2000 60000)))))
+    (is (= 60000 (session/exponential-backoff-ms 10 2000 60000))))
+
+  (testing "provider-error-kind classifies canonical auth failures"
+    (is (= :auth (session/provider-error-kind :error "401 unauthorized api key invalid" 401)))
+    (is (= :auth (session/provider-error-kind :error "forbidden" 403))))
+
+  (testing "provider-error-kind classifies rate limits"
+    (is (= :rate-limit (session/provider-error-kind :error "rate limit exceeded" 429))))
+
+  (testing "provider-error-kind classifies timeout"
+    (is (= :timeout (session/provider-error-kind :error "Timeout waiting for LLM response" nil))))
+
+  (testing "provider-error-kind classifies overloaded"
+    (is (= :overloaded (session/provider-error-kind :error "Service Overloaded" nil))))
+
+  (testing "provider-error-kind classifies invalid request"
+    (is (= :invalid-request (session/provider-error-kind :error "invalid request body" 400))))
+
+  (testing "provider-error-kind classifies provider unavailable"
+    (is (= :provider-unavailable (session/provider-error-kind :error "status 503" 503))))
+
+  (testing "provider-error-kind classifies transport"
+    (is (= :transport (session/provider-error-kind :error "Premature end of chunk coded message body: closing chunk expected" nil))))
+
+  (testing "provider-error-kind falls back to unknown"
+    (is (= :unknown (session/provider-error-kind :error "mystery failure" nil))))
+
+  (testing "provider-error-kind nil for non-error stop reason"
+    (is (nil? (session/provider-error-kind :stop "ignored" nil)))))
 
 (deftest session-entry-test
   (testing "make-entry produces valid entry"
