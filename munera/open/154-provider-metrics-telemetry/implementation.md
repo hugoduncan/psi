@@ -47,3 +47,7 @@
 2026-05-14 test review
 - No new actionable test feedback: owner-side telemetry tests cover start/success finish emission in `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj`; statechart tests cover retry scheduling, failed finish ownership, and fresh retry attempt ids in `components/agent-session/test/psi/agent_session/statechart_actions_test.clj`; metrics tests cover subscription, aggregation, schema conformance, persistence, and rendered provider sections in `extensions/metrics/test/psi/metrics/{schema,counters,persistence,extension}_test.clj`.
 - Explicitly no new follow-up items added to `steps.md`.
+
+2026-05-14 test-shaper review
+- No new actionable test feedback: provider telemetry tests stay behavior-focused and orthogonal, assert emitted event payloads and persisted metrics outcomes rather than internals, and cover the key partitions required by design (start/finish/retry events, terminal-vs-retrying failure split, retry attempt-id freshness, provider aggregation, persistence, and `/metrics` rendering).
+- Explicitly no new follow-up items added to `steps.md`.
