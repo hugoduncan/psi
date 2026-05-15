@@ -22,3 +22,15 @@
 - Added an explicit unchecked retry-flow proof item to `steps.md` covering fresh prepared-request / turn-id creation across `:on-retry-triggered` → `:on-retry-resume` → next execution.
 - Marked the two newly added inconsistency follow-up items done in `design-steps.md`.
 - Did not execute `steps.md` implementation items per task instruction.
+
+2026-05-14 implementation
+- Added shared `psi.session-state.model/provider-error-kind` canonical classifier with focused mapping proofs for auth, rate-limit, timeout, overloaded, invalid-request, provider-unavailable, transport, unknown, and non-error nil.
+- Added turn-runtime provider telemetry start/success finish emission in `psi.turn-runtime.core/execute-prepared-request!`, normalizing provider/model ids and using `retry-attempt` from session state.
+- Added statechart-owned failed finish and retry-scheduled telemetry in `psi.agent-session.dispatch-handlers.statechart-actions`, with terminal failures emitted from `:on-agent-done` and retrying failures emitted from `:on-retry-triggered`.
+- Extended `psi.agent-session.turn.handlers/prompt-finish-base-result` to pass `:pending-agent-event` through the `:on-agent-done` dispatch effect so terminal provider failure telemetry can use statechart-carried data rather than reconstruction alone.
+- Extended metrics schema/counters/extension/persistence tests to carry top-level `:providers` plus nested per-model aggregates.
+- Added provider summary and provider-model summary sections to `/metrics` output.
+- Focused verification green:
+  - `clojure -M:test --focus psi.session-state.model-test --focus psi.turn-runtime.response-mode-test --focus psi.agent-session.statechart-actions-test --focus psi.agent-session.turn.handlers-test --focus psi.metrics.schema-test --focus psi.metrics.counters-test --focus psi.metrics.persistence-test --focus psi.metrics.extension-test`
+  - result: `23 tests, 132 assertions, 0 failures`
+- Remaining follow-up: the explicit retry-flow proof for fresh prepared-request / turn id across retry resume is still open in `steps.md`.

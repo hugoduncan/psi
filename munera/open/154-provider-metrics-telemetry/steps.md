@@ -10,24 +10,24 @@
   - [x] split finish ownership is documented explicitly if failed-attempt finality cannot be known inside turn-runtime.
 - [x] Add and document one small shared `provider-error-kind` classifier helper if existing retry heuristics are insufficient as a directly emitted canonical kind.
 - [x] Decide whether failed `provider_request_finished` emits from turn-runtime, statechart boundary, or a split success/failure ownership model; document the exact rule in `design.md` and keep one-way semantics.
-- [ ] Add core extension-event emission for `provider_request_started`.
-- [ ] Add core extension-event emission for `provider_retry_scheduled`.
-- [ ] Add core extension-event emission for `provider_request_finished`.
-- [ ] Ensure emitted payloads carry normalized `provider` and `model-id`, defaulting to `"unknown"` when absent.
-- [ ] Ensure failed finished events carry canonical `:error-kind` when available and `:final?` semantics are explicit.
-- [ ] Extend `psi.metrics.schema` with top-level `:providers` and nested per-model provider metrics.
-- [ ] Extend `psi.metrics.counters` with pure provider counter update helpers.
-- [ ] Extend `psi.metrics.persistence` tests to cover provider metrics round-trip.
-- [ ] Extend `psi.metrics.extension` to subscribe to the three provider telemetry events.
-- [ ] Aggregate requests from `provider_request_started`.
-- [ ] Aggregate retries and backoff totals from `provider_retry_scheduled`.
-- [ ] Aggregate successes/failures/final-failures/error-types from `provider_request_finished`.
-- [ ] Extend `/metrics` summary rendering with a provider section.
-- [ ] Optionally add a per-model provider section if it keeps the summary readable.
-- [ ] Add focused event-emission tests at the canonical owners.
+- [x] Add core extension-event emission for `provider_request_started`.
+- [x] Add core extension-event emission for `provider_retry_scheduled`.
+- [x] Add core extension-event emission for `provider_request_finished`.
+- [x] Ensure emitted payloads carry normalized `provider` and `model-id`, defaulting to `"unknown"` when absent.
+- [x] Ensure failed finished events carry canonical `:error-kind` when available and `:final?` semantics are explicit.
+- [x] Extend `psi.metrics.schema` with top-level `:providers` and nested per-model provider metrics.
+- [x] Extend `psi.metrics.counters` with pure provider counter update helpers.
+- [x] Extend `psi.metrics.persistence` tests to cover provider metrics round-trip.
+- [x] Extend `psi.metrics.extension` to subscribe to the three provider telemetry events.
+- [x] Aggregate requests from `provider_request_started`.
+- [x] Aggregate retries and backoff totals from `provider_retry_scheduled`.
+- [x] Aggregate successes/failures/final-failures/error-types from `provider_request_finished`.
+- [x] Extend `/metrics` summary rendering with a provider section.
+- [x] Optionally add a per-model provider section if it keeps the summary readable.
+- [x] Add focused event-emission tests at the canonical owners.
 - [ ] Add focused retry-flow proof that `:on-retry-triggered` → `:on-retry-resume` → next execution yields a fresh prepared-request / turn id, validating `:attempt-id == prepared-request/turn-id` across retries.
-- [ ] Add focused counter tests for provider aggregation semantics.
-- [ ] Add schema tests for valid provider metric shapes.
-- [ ] Add extension tests proving provider metrics update and persist.
-- [ ] Add summary rendering tests for the provider section.
-- [ ] Re-run focused metrics/runtime verification.
+- [x] Add focused counter tests for provider aggregation semantics.
+- [x] Add schema tests for valid provider metric shapes.
+- [x] Add extension tests proving provider metrics update and persist.
+- [x] Add summary rendering tests for the provider section.
+- [x] Re-run focused metrics/runtime verification.
