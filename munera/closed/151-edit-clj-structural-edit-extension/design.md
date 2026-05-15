@@ -39,7 +39,7 @@ The text-based `edit` tool requires exact whitespace matching and breaks when fo
 
 **Tool description** (rendered into the agent prompt — terse, one-form contract explicit):
 
-> Replace one Clojure form in a file by S-expression equality; `old-string` and `new-string` must each be one complete, parseable form.
+> Replace text in a file. `old-string` is matched by structural equality (whitespace does not matter); `old-string` and `new-string` must each be one complete, parseable form.
 
 **Parameters** (JSON Schema):
 | Name | Type | Required | Description |
@@ -120,6 +120,6 @@ ambiguous-match → {status, code, filename, match-count, matches [{line, column
    - f. A small form (e.g. a symbol) nested inside a larger form that straddles the boundary (parent starts before `start-line`) → matched when the symbol's own start row is within the range, because the whole file is parsed and position metadata is file-relative throughout.
 7. Comments inside `new-string` are preserved verbatim in the written file. The replacement node is taken directly from the format-preserving parse of `new-string`; it must never be round-tripped through `sexpr`/`coerce`, which would drop comment nodes.
 8. Multi-form `old-string` or `new-string` returns a `parse-error`.
-9. The tool `:description` is ≤ 20 words and explicitly states that `old-string` and `new-string` must each be exactly one complete Clojure form.
+9. The tool `:description` is ≤ 25 words and explicitly states that `old-string` and `new-string` must each be exactly one complete Clojure form.
 10. The extension `init` registers exactly one tool named `"edit-clj"`.
 11. All unit tests pass; lint clean.

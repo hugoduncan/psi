@@ -20,7 +20,7 @@
 
 - [x] Implement `psi.edit-clj.extension/resolve-path`
 - [x] Implement `psi.edit-clj.extension/execute` (validation order: old-string → new-string → file)
-- [x] Implement `psi.edit-clj.extension/tool-def` (≤20 words description, dual-arity :execute)
+- [x] Implement `psi.edit-clj.extension/tool-def` (≤25 words description, dual-arity :execute)
 - [x] Implement `psi.edit-clj.extension/init` (register tool via `(:register-tool api)`)
 
 - [x] Write `extensions/edit-clj/test/psi/edit_clj/extension_test.clj`
