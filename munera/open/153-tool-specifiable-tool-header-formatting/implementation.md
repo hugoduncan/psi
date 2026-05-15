@@ -16,3 +16,7 @@
 - Added `work-on-format.md` as the authoritative task-local acceptance spec for work-on compact headers, summarizing description plus optional base branch within 80 characters.
 - User clarified that `edit-clj` should use built-in `edit` request-summary semantics while preserving its own `edit-clj` identity in the rendered header.
 - Fixed shared-helper owner: compact call-summary computation belongs under `components/tool-runtime/`, with `psi.tool-runtime.call-summary` as the preferred namespace direction.
+
+2026-05-14 ambiguity review
+- Ambiguity: mandatory `:format-request` validation is underspecified for rollout scope. Design/plan require canonical registrations to reject missing formatters, but do not say whether this task must migrate every currently registered tool or introduce a narrowly scoped compatibility allowlist/shim during transition.
+- Ambiguity: RPC/backend acceptance surface for the canonical preformatted compact header remains underspecified. Per-tool specs name transport-safe `:call-summary`, but design/plan do not identify the authoritative event/payload shape(s) that must carry it.
