@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.app-runtime.footer :as footer]))
 
-(deftest footer-model-from-data-builds-canonical-lines-test
+(deftest footer-model-from-data-builds-canonical-structured-lines-test
   (let [home  (System/getProperty "user.home")
         model (footer/footer-model-from-data
                {:psi.agent-session/worktree-path (str home "/projects/hugoduncan/psi/psi-main")
@@ -31,10 +31,35 @@
            (get-in model [:footer/usage :parts])))
     (is (= "(openai-codex) gpt-5.3-codex • thinking high"
            (get-in model [:footer/model :text])))
-    (is (= "Formatter formatter TS+ESL,Prett"
-           (get-in model [:footer/lines :status-line])))
     (is (= ["a" "b"]
            (mapv :status/extension-id (:footer/statuses model))))))
+
+(deftest footer-model-from-data-builds-visible-retry-status-line-test
+  (let [now-ms (System/currentTimeMillis)
+        model  (footer/footer-model-from-data
+                {:psi.agent-session/worktree-path "/repo/project"
+                 :psi.agent-session/context-window 272000
+                 :psi.agent-session/retry {:active? true
+                                           :attempt 2
+                                           :delay-ms 8000
+                                           :delay-source :retry-after
+                                           :resume-at (+ now-ms 8000)
+                                           :rate-limit {:remaining 0
+                                                        :limit 5000
+                                                        :reset-at (+ now-ms 32000)}}
+                 :psi.agent-session/model-provider "openai-codex"
+                 :psi.agent-session/model-id "gpt-5.3-codex"
+                 :psi.agent-session/model-reasoning true
+                 :psi.agent-session/thinking-level :xhigh
+                 :psi.agent-session/effective-reasoning-effort "high"
+                 :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
+                                   {:extension-id "a" :text "Formatter\nformatter"}]})
+        status (get-in model [:footer/lines :status-line])]
+    (is (re-find #"Formatter formatter" status))
+    (is (re-find #"retry in [78]s" status))
+    (is (re-find #"remaining 0/5000" status))
+    (is (re-find #"reset in 3[12]s" status))
+    (is (re-find #"TS\+ESL,Prett" status))))
 
 (deftest footer-model-from-data-prefers-session-display-name-test
   (testing "derived display name wins when explicit session name is absent"

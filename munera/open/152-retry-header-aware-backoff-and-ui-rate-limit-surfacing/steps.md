@@ -1,0 +1,63 @@
+# Steps
+
+- [x] Inspect the current retry/error propagation path and record the narrowest canonical owner for retry/rate-limit header normalization.
+- [x] Review the linked Anthropic and OpenAI error documentation and record any concrete retry/rate-limit guidance that should constrain this task's implementation assumptions.
+- [x] Decide and document the canonical retry metadata state shape for this task.
+- [x] Implement case-insensitive lookup for retry/rate-limit headers, covering both standard and `X-` prefixed names.
+- [x] Implement `Retry-After` / `X-Retry-After` parsing.
+  - [x] Support delta-seconds values.
+  - [x] Support HTTP-date values when parseable.
+  - [x] Ignore invalid values and fall back cleanly.
+- [x] Implement `RateLimit-Limit` / `X-RateLimit-Limit` parsing.
+- [x] Implement `RateLimit-Remaining` / `X-RateLimit-Remaining` parsing.
+- [x] Implement `RateLimit-Reset` / `X-RateLimit-Reset` parsing with one explicit documented numeric interpretation rule.
+- [x] Normalize parsed retry/rate-limit headers into one canonical backend-owned retry metadata shape.
+- [x] Preserve provider response headers through the canonical retry path up to the retry scheduling point when present.
+- [x] Extend session state/schema to store the active retry metadata.
+- [x] Update retry scheduling so valid `Retry-After` overrides exponential backoff and invalid/missing values fall back to exponential backoff.
+- [x] Record retry resume timing and delay source in session state when scheduling a retry.
+- [x] Clear or replace stale retry metadata when retry waiting ends or is superseded.
+- [x] Extend the shared backend projection / session summary surface with retry timing metadata.
+- [x] Extend the shared backend projection / session summary surface with normalized rate-limit metadata.
+- [x] Extend RPC `session/updated` payloads to include the retry/rate-limit metadata needed by frontends.
+- [x] Surface retry timing in Emacs UI status/diagnostics.
+- [x] Surface rate-limit information in Emacs UI status/diagnostics.
+- [x] Surface retry timing in the TUI status/footer/session summary.
+- [x] Surface rate-limit information in the TUI status/footer/session summary.
+- [x] Add focused tests for retry-after parsing and precedence.
+- [x] Add focused tests for exponential fallback when retry-after is missing or invalid.
+- [x] Add focused tests for standard and `X-` prefixed rate-limit header normalization.
+- [x] Add focused tests proving retry scheduling uses the selected provider-aware delay.
+- [x] Add focused tests proving `session/updated` exposes retry/rate-limit metadata.
+- [x] Record the provider-doc-grounded retry/rate-limit assumptions actually used by the implementation in `implementation.md`.
+- [x] Add focused UI-facing proof that Emacs-visible status includes retry timing and rate-limit information.
+- [x] Add focused UI-facing proof that TUI/backend-visible status/footer content includes retry timing and rate-limit information.
+- [x] Add focused `psi.session-state.model-test` coverage proving the canonical nested `:retry` field is part of the valid session shape, defaults to `nil`, and accepts the normalized retry metadata map shape when populated.
+  - [x] Assert a fresh `initial-session` includes `:retry nil` and still validates.
+  - [x] Assert a populated canonical nested retry map validates as part of the session shape.
+- [x] Extend RPC spec/test coverage so `session/updated` explicitly includes the canonical nested `:retry` payload contract rather than only legacy scalar retry fields.
+  - [x] Update `spec/rpc-edn.allium` to model the nested `retry` payload on `SessionUpdatedPayload`.
+  - [x] Add/adjust focused RPC proof so emitted payload contract assertions include nested `:retry`.
+- [x] Add a focused Emacs projection regression test that `session/updated` nested `:retry` data is preserved intentionally or that any intentional discard is documented and asserted explicitly.
+  - [x] Assert `psi-emacs--handle-session-updated-event` stores nested retry detail in frontend state.
+  - [x] If any retry payload fields are intentionally dropped, document and assert that boundary explicitly.
+- [x] Split overloaded projection tests so model metadata, nested retry payload, pending counts, and rendered status text are proved in narrower test bodies with better failure locality.
+  - [x] Narrow the RPC/session-updated projection test(s) so retry payload contract proof is separate from model metadata proof.
+  - [x] Narrow backend projection tests so status-line rendering proof is separate from structured projection-field proof.
+- [x] Reduce regex-heavy large-string assertions where structured assertions plus one visible rendering proof would preserve intent with less brittleness.
+  - [x] Revisit session-summary status assertions to keep one visible string proof while preferring structured field assertions for contract shape.
+  - [x] Revisit footer status assertions to keep one visible footer rendering proof while avoiding redundant regex coupling.
+- [x] Separate Emacs retry-state preservation proof from presentation proof so contract and rendering regress independently.
+  - [x] Keep one test focused on nested `:retry` preservation in `psi-emacs--state`.
+  - [x] Keep a separate test focused on header/status rendering behavior.
+- [x] Fold populated-`retry` model-shape proof into a more consistently structured `initial-session` test block for local readability.
+- [x] Isolate the reload-driven `requiring-resolve` seam in `statechart_actions.clj` behind a tiny helper so retry scheduling reads as domain logic instead of mixed domain/reload mechanics.
+  - [x] Extract a small helper that resolves or invokes canonical retry-metadata construction.
+  - [x] Leave the retry scheduling path reading in terms of domain inputs/outputs.
+- [x] Remove duplicated retry display derivation in `psi.app-runtime.retry-display` by introducing one shared intermediate display-data helper used by both renderers.
+  - [x] Compute delay/remaining/reset display fields once.
+  - [x] Keep `retry-summary-fragment` and `retry-status-text` as thin presentation wrappers.
+- [ ] If touched while evolving this task, thin `session-summary` and `footer-model-from-data` by separating base data assembly from final rendered/status augmentation.
+  - [ ] Keep any such extraction local and mechanical; avoid behavior changes.
+- [ ] If touched while evolving this task, split `psi-emacs--handle-session-updated-event` into clearer payload extraction/state mutation/run-state pieces rather than widening the one function further.
+  - [ ] Only do this if additional state fields are added or local clarity materially improves.

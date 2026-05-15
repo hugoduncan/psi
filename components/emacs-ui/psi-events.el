@@ -128,6 +128,7 @@ payloads can seed state before the first canonical session-targeted update."
            (retry (or (psi-emacs--event-data-get data
                                                  '(:retry-attempt retry-attempt))
                       0))
+           (retry-detail (psi-emacs--event-data-get data '(:retry retry)))
            (interrupt-pending (not (null (psi-emacs--event-data-get data
                                                                      '(:interrupt-pending interrupt-pending)))))
            (model-provider (psi-emacs--session-normalize-text
@@ -153,6 +154,7 @@ payloads can seed state before the first canonical session-targeted update."
       (setf (psi-emacs-state-session-is-compacting psi-emacs--state) is-compacting)
       (setf (psi-emacs-state-session-pending-message-count psi-emacs--state) pending)
       (setf (psi-emacs-state-session-retry-attempt psi-emacs--state) retry)
+      (setf (psi-emacs-state-session-retry psi-emacs--state) retry-detail)
       (setf (psi-emacs-state-session-interrupt-pending psi-emacs--state) interrupt-pending)
       (setf (psi-emacs-state-session-model-provider psi-emacs--state) model-provider)
       (setf (psi-emacs-state-session-model-id psi-emacs--state) model-id)

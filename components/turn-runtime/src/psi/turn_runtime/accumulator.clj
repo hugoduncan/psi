@@ -25,7 +25,8 @@
            (contains? data :content-index) (assoc :content-index (:content-index data))
            (contains? data :reason)        (assoc :reason (:reason data))
            (contains? data :http-status)   (assoc :http-status (:http-status data))
-           (contains? data :error-message) (assoc :error-message (:error-message data)))))
+           (contains? data :error-message) (assoc :error-message (:error-message data))
+           (contains? data :headers)       (assoc :headers (:headers data)))))
 
 (defn- update-content-block! [turn-data idx f]
   (swap! turn-data update :content-blocks
@@ -338,7 +339,8 @@
                          :stop-reason   stop-reason
                          :error-message err-msg
                          :timestamp     (java.time.Instant/now)}
-                  (:http-status data) (assoc :http-status (:http-status data)))]
+                  (:http-status data) (assoc :http-status (:http-status data))
+                  (:headers data) (assoc :provider-error/headers (:headers data)))]
     (note-last-provider-event! td :error data)
     (swap! td assoc :final-message final :error-message err-msg :stop-reason stop-reason)
     (deliver done-p final)))

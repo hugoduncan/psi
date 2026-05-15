@@ -203,6 +203,7 @@
   (testing "classified transport failure admits the retry guard and triggers retry effects"
     (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:auto-retry-enabled true
                                                                           :retry-attempt 0}})
+          ctx              (assoc ctx :now-fn (constantly (java.time.Instant/ofEpochMilli 0)))
           should-retry?    (resolve 'psi.agent-session.statechart/should-retry?)
           guard-data       {:ctx ctx
                             :session-id session-id
@@ -214,11 +215,21 @@
       (is (true? (should-retry? guard-data)))
       (with-registered-handlers
         ctx
-        #(let [result (invoke-handler ctx :on-retry-triggered {:session-id session-id})]
+        #(let [result (invoke-handler ctx
+                                      :on-retry-triggered
+                                      {:session-id session-id
+                                       :pending-agent-event {:provider-error/headers {"Retry-After" "8"}}})]
            (apply-root-state-update! ctx result)
            (is (= 1 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
+           (is (= {:active? true
+                   :attempt 0
+                   :delay-ms 8000
+                   :delay-source :retry-after
+                   :resume-at 8000
+                   :rate-limit nil}
+                  (:retry (session-state/get-session-data-in ctx session-id))))
            (is (= [{:effect/type :runtime/schedule-thread-sleep-send-event
-                    :delay-ms 2000
+                    :delay-ms 8000
                     :event :session/retry-done}]
                   (:effects result))))))))
 
@@ -226,13 +237,22 @@
   ;; Tests retry backoff scheduling and retry continuation effects.
   (testing "on-retry-triggered increments retry-attempt and schedules backoff with configured limits"
     (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry-attempt 2}})
-          ctx             (assoc ctx :config {:auto-retry-base-delay-ms 100
-                                              :auto-retry-max-delay-ms 250})]
+          ctx              (assoc ctx
+                                  :config {:auto-retry-base-delay-ms 100
+                                           :auto-retry-max-delay-ms 250}
+                                  :now-fn (constantly (java.time.Instant/ofEpochMilli 1000)))]
       (with-registered-handlers
         ctx
         #(let [result (invoke-handler ctx :on-retry-triggered {:session-id session-id})]
            (apply-root-state-update! ctx result)
            (is (= 3 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
+           (is (= {:active? true
+                   :attempt 2
+                   :delay-ms 250
+                   :delay-source :exponential-backoff
+                   :resume-at 1250
+                   :rate-limit nil}
+                  (:retry (session-state/get-session-data-in ctx session-id))))
            (is (= [{:effect/type :runtime/schedule-thread-sleep-send-event
                     :delay-ms 250
                     :event :session/retry-done}]
@@ -245,9 +265,16 @@
         #(is (= {:effects []}
                 (invoke-handler ctx :on-retrying-entered {}))))))
 
-  (testing "on-retry-resume emits agent-start-loop"
-    (let [[ctx _session-id] (test-support/make-session-ctx {})]
+  (testing "on-retry-resume clears retry metadata and emits agent-start-loop"
+    (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry {:active? true
+                                                                                  :attempt 1
+                                                                                  :delay-ms 1000
+                                                                                  :delay-source :retry-after
+                                                                                  :resume-at 2000}}})]
       (with-registered-handlers
         ctx
-        #(is (= {:effects [{:effect/type :runtime/agent-start-loop}]}
-                (invoke-handler ctx :on-retry-resume {})))))))
+        #(let [result (invoke-handler ctx :on-retry-resume {:session-id session-id})]
+           (apply-root-state-update! ctx result)
+           (is (nil? (:retry (session-state/get-session-data-in ctx session-id))))
+           (is (= {:effects [{:effect/type :runtime/agent-start-loop}]}
+                  (dissoc result :root-state-update))))))))

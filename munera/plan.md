@@ -20,6 +20,7 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 `munera/open/149-reload-fixup-inventory-and-safety/`
 `munera/open/150-explicit-runtime-vs-persisted-session-graph-surface/`
+`munera/open/152-retry-header-aware-backoff-and-ui-rate-limit-surfacing/`
 
 Notes:
 - `151` is complete and closed: `edit-clj` structural edit extension; `psi.edit-clj.core` (pure: parse, find-candidates, apply-line-filter, replace-in) + `psi.edit-clj.extension` (tool registration, I/O, JSON); wired into top-level `deps.edn`, `tests.edn`, and `psi-owned-extension-catalog`; `rewrite-clj/rewrite-clj 1.1.47` added to runtime+test deps; 19 tests, 73 assertions, 0 failures; 1776+169 broader suite green.

@@ -19,7 +19,8 @@
         (sc/send-event! sc-env sc-sid
                         :session/agent-event
                         {:pending-agent-event {:type     :agent-end
-                                               :messages (prompt-request/session->provider-messages ctx session-id)}}))))
+                                               :messages (prompt-request/session->provider-messages ctx session-id)
+                                               :provider-error/headers (:provider-error/headers result)}}))))
   result)
 
 (defn run-agent-loop!
@@ -49,5 +50,6 @@
                              :stop-reason   :error
                              :error-message (or (ex-message e) (.getMessage e) (str e))
                              :timestamp     (java.time.Instant/now)}
-                      (:status (ex-data e)) (assoc :http-status (:status (ex-data e))))))]
+                      (:status (ex-data e)) (assoc :http-status (:status (ex-data e)))
+                      (:headers (ex-data e)) (assoc :provider-error/headers (:headers (ex-data e))))))]
      (finish-agent-loop! ctx session-id result))))
