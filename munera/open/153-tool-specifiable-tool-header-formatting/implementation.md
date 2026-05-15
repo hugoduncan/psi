@@ -24,3 +24,6 @@
 2026-05-14 ambiguity follow-up
 - Resolved rollout scope in design/plan: this task must migrate every currently registered built-in and owned extension tool in the runtime tool catalog onto mandatory `:format-request`; only named, task-documented, temporary migration shims are allowed during in-flight rollout, and none may remain at task completion.
 - Resolved RPC/backend transport surface in design/plan: canonical tool lifecycle events/payloads carry the preformatted compact header under `:call-summary`, including pre-completion `tool/executing` and the RPC-facing tool row payloads derived from that lifecycle data.
+
+2026-05-14 inconsistency review
+- Inconsistency: design fixes Emacs migration into this task and makes RPC/backend `:call-summary` authoritative for Emacs consumption, but plan verification still says “any follow-on Emacs decision documented,” implying Emacs migration could remain undecided or deferred.
