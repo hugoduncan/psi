@@ -85,3 +85,8 @@
 - Reviewed `components/tool-runtime/src/psi/tool_runtime/call_summary.clj`, `components/tool-runtime/src/psi/tool_runtime/core.clj`, `components/tool-registry/src/psi/tool_registry/{defs,registry}.clj`, `components/rpc/src/psi/rpc/events.clj`, `components/tui/src/psi/tui/tool_render.clj`, and `components/emacs-ui/psi-tool-rows.el` against the task-local compact-header contract and the code-shaper simplicity/consistency/robustness criteria.
 - The shared call-summary owner remains locally comprehensible, fallback behavior stays defensive, backend transport keeps `:call-summary` authoritative, and the remaining Emacs-local compatibility fallback is explicitly scoped to absent backend summary rather than reintroducing canonical per-tool dispatch.
 - Explicitly no new actionable feedback from this code-shaper pass.
+
+2026-05-14 follow-up execution pass 3
+- Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` to execute newly added actionable follow-up work from the preceding review pass.
+- Found no unchecked steps in `steps.md` and no newly added actionable follow-up items in the preloaded review result.
+- No task artifact changes were needed beyond recording this pass; task remains ready for judge/close decision.
