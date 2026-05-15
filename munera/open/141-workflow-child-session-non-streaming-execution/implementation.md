@@ -172,3 +172,7 @@ Read the preloaded test-shaper review result plus task artifacts, then executed 
 - Verification remained green: `1710 tests, 12609 assertions, 0 failures`.
 - No new actionable follow-up was discovered, so task artifacts remained otherwise unchanged in this execution pass.
 
+## Review note 2026-05-15
+
+Test-shaper pass found no new actionable feedback after reading the task artifacts and the focused response-mode proofs again. Existing tests already cover the main behavioral partitions with clear signal: authored vs default `:response-mode`, child-session persistence, streaming vs non-streaming execution-path selection, and provider-capture shaping. No new follow-up steps were added.
+
