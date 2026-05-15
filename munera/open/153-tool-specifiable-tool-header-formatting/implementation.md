@@ -50,3 +50,10 @@
   - `clojure -M:test --focus psi.tool-registry.defs-test --focus psi.tool-registry.registry-test --focus psi.tool-runtime.call-summary-test --focus psi.tool-runtime.core-test`
   - `clojure -M:test --focus psi.rpc.events-test --focus psi.agent-session.eql-introspection-test --focus psi.tui.app-view-runtime-test`
   - `bb emacs:test components/emacs-ui/test/psi-rpc-test.el components/emacs-ui/test/psi-streaming-runtime-test.el components/emacs-ui/test/psi-streaming-transcript-test.el components/emacs-ui/test/psi-tool-output-mode-test.el`
+
+2026-05-15 implementation review
+- No new actionable implementation issues found.
+- Reviewed shared formatter ownership in `components/tool-runtime/src/psi/tool_runtime/call_summary.clj`, mandatory registration enforcement in `components/tool-registry/src/psi/tool_registry/{defs,registry}.clj`, backend event transport in `components/tool-runtime/src/psi/tool_runtime/core.clj` and `components/rpc/src/psi/rpc/events.clj`, plus TUI/Emacs consumption in `components/tui/src/psi/tui/tool_render.clj` and `components/emacs-ui/psi-tool-rows.el`.
+- Re-ran focused verification green:
+  - `clojure -M:test --focus psi.tool-runtime.call-summary-test --focus psi.tool-runtime.core-test --focus psi.tool-registry.defs-test --focus psi.tool-registry.registry-test --focus psi.rpc.events-test --focus psi.tui.app-view-runtime-test`
+  - `bb emacs:test components/emacs-ui/test/psi-rpc-test.el components/emacs-ui/test/psi-streaming-runtime-test.el components/emacs-ui/test/psi-streaming-transcript-test.el components/emacs-ui/test/psi-tool-output-mode-test.el`
