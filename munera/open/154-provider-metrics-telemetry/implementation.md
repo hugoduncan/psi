@@ -41,7 +41,8 @@
 2026-05-14 review follow-up execution
 - Added owner-local retry-flow proof in `components/agent-session/test/psi/agent_session/statechart_actions_test.clj` covering `:on-retry-triggered` → `:on-retry-resume` → next prepared request creation.
 - The proof observes distinct prepared-request ids across the failed and resumed attempts while session id remains stable, discharging the `:attempt-id == prepared-request/turn-id` retry uniqueness requirement in task design/plan.
-- Focused verification green: `clojure -M:test --focus psi.agent-session.statechart-actions-test` → `8 tests, 43 assertions, 0 failures`.
+- Marked the explicit retry-flow proof step done in `steps.md` because the owner-local proof now exists and focused verification is green.
+- Re-ran focused verification: `clojure -M:test --focus psi.agent-session.statechart-actions-test` → `8 tests, 43 assertions, 0 failures`.
 
 2026-05-14 test review
 - No new actionable test feedback: owner-side telemetry tests cover start/success finish emission in `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj`; statechart tests cover retry scheduling, failed finish ownership, and fresh retry attempt ids in `components/agent-session/test/psi/agent_session/statechart_actions_test.clj`; metrics tests cover subscription, aggregation, schema conformance, persistence, and rendered provider sections in `extensions/metrics/test/psi/metrics/{schema,counters,persistence,extension}_test.clj`.
