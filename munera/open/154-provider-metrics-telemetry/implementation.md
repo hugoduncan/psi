@@ -37,3 +37,8 @@
 
 2026-05-14 implementation review
 - Actionable: acceptance/design still require a focused retry-flow proof that retries execute with a fresh prepared-request / turn id, but `steps.md` keeps that item open and the referenced focused verification list/results do not show a dedicated retry-flow test discharging it; the `:attempt-id == prepared-request/turn-id` uniqueness claim across retries therefore remains unproved.
+
+2026-05-14 review follow-up execution
+- Added owner-local retry-flow proof in `components/agent-session/test/psi/agent_session/statechart_actions_test.clj` covering `:on-retry-triggered` → `:on-retry-resume` → next prepared request creation.
+- The proof observes distinct prepared-request ids across the failed and resumed attempts while session id remains stable, discharging the `:attempt-id == prepared-request/turn-id` retry uniqueness requirement in task design/plan.
+- Focused verification green: `clojure -M:test --focus psi.agent-session.statechart-actions-test` → `8 tests, 43 assertions, 0 failures`.

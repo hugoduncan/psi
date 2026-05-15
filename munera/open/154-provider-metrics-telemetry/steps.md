@@ -25,8 +25,8 @@
 - [x] Extend `/metrics` summary rendering with a provider section.
 - [x] Optionally add a per-model provider section if it keeps the summary readable.
 - [x] Add focused event-emission tests at the canonical owners.
-- [ ] Add focused retry-flow proof that `:on-retry-triggered` → `:on-retry-resume` → next execution yields a fresh prepared-request / turn id, validating `:attempt-id == prepared-request/turn-id` across retries.
-  - [ ] Cover the concrete retry path with an owner-local test that observes distinct prepared-request / turn ids across the failed attempt and the resumed retry attempt, then include that proof in the focused verification run.
+- [x] Add focused retry-flow proof that `:on-retry-triggered` → `:on-retry-resume` → next execution yields a fresh prepared-request / turn id, validating `:attempt-id == prepared-request/turn-id` across retries.
+  - [x] Cover the concrete retry path with an owner-local test that observes distinct prepared-request / turn ids across the failed attempt and the resumed retry attempt, then include that proof in the focused verification run.
 - [x] Add focused counter tests for provider aggregation semantics.
 - [x] Add schema tests for valid provider metric shapes.
 - [x] Add extension tests proving provider metrics update and persist.

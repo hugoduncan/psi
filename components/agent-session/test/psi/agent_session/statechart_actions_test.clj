@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
    [psi.agent-session.extensions :as ext]
+   [psi.agent-session.prompt-request :as prompt-request]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
@@ -320,3 +321,48 @@
          (is (= :failed (:status (first @seen))))
          (is (true? (:final? (first @seen))))
          (is (= :rate-limit (:error-kind (first @seen))))))))
+
+(deftest retry-flow-builds-fresh-prepared-request-turn-id-test
+  (testing "retry resume followed by next preparation yields a fresh prepared-request / turn id"
+    (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry-attempt 0
+                                                                          :model {:provider "openai" :id "gpt-5.4"}}})
+          first-turn-id "turn-initial"
+          second-turn-id "turn-retry"
+          first-prepared (prompt-request/build-prepared-request
+                          ctx session-id
+                          {:turn-id first-turn-id
+                           :user-message {:role "user"
+                                          :content [{:type :text :text "hello"}]}
+                           :commands []})
+          _ (session-state/update-state-value-in!
+             ctx
+             (session-state/state-path :session-data session-id)
+             assoc
+             :last-prepared-request-summary {:turn-id (:prepared-request/id first-prepared)}
+             :last-execution-result-summary {:turn-id (:prepared-request/id first-prepared)})
+          _ (with-registered-handlers
+              ctx
+              #(->> (invoke-handler ctx :on-retry-triggered {:session-id session-id
+                                                             :pending-agent-event {:type :agent-end
+                                                                                   :messages [{:role "assistant"
+                                                                                               :stop-reason :error
+                                                                                               :error-message "Premature end of chunk coded message body: closing chunk expected"}]}})
+                    (apply-root-state-update! ctx)))
+          _ (is (= 1 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
+          _ (with-registered-handlers
+              ctx
+              #(->> (invoke-handler ctx :on-retry-resume {:session-id session-id})
+                    (apply-root-state-update! ctx)))
+          second-prepared (prompt-request/build-prepared-request
+                           ctx session-id
+                           {:turn-id second-turn-id
+                            :user-message {:role "user"
+                                           :content [{:type :text :text "hello"}]}
+                            :commands []})]
+      (is (= first-turn-id (:prepared-request/id first-prepared)))
+      (is (= second-turn-id (:prepared-request/id second-prepared)))
+      (is (not= (:prepared-request/id first-prepared)
+                (:prepared-request/id second-prepared)))
+      (is (= session-id (:prepared-request/session-id first-prepared)))
+      (is (= session-id (:prepared-request/session-id second-prepared)))
+      (is (nil? (:retry (session-state/get-session-data-in ctx session-id)))))))
