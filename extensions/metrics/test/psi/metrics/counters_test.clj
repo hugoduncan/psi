@@ -13,6 +13,7 @@
     (is (= {} (:commands m)))
     (is (= {} (:operations m)))
     (is (= {} (:tokens m)))
+    (is (= {} (:providers m)))
     (is (nil? (:updated-at m)))))
 
 ;;; inc-tool-invocation
@@ -151,3 +152,29 @@
         delta (counters/compute-token-delta cur prev)]
     (is (= 0 (:input delta)))
     (is (= 0 (:output delta)))))
+
+(deftest provider-request-retry-and-finish-counters-test
+  (let [m (-> (counters/empty-metrics)
+              (counters/inc-provider-request "openai" "gpt-5.4")
+              (counters/inc-provider-retry "openai" "gpt-5.4" 2000)
+              (counters/record-provider-finish "openai" "gpt-5.4" {:status :failed :final? false :error-kind :transport})
+              (counters/inc-provider-request "openai" "gpt-5.4")
+              (counters/record-provider-finish "openai" "gpt-5.4" {:status :succeeded :final? true}))]
+    (is (= 2 (get-in m [:providers "openai" :requests])))
+    (is (= 1 (get-in m [:providers "openai" :retries])))
+    (is (= 2000 (get-in m [:providers "openai" :retry-backoff-ms])))
+    (is (= 1 (get-in m [:providers "openai" :failures])))
+    (is (= 0 (get-in m [:providers "openai" :final-failures])))
+    (is (= 1 (get-in m [:providers "openai" :successes])))
+    (is (= 1 (get-in m [:providers "openai" :error-types "transport"])))
+    (is (= 2 (get-in m [:providers "openai" :models "gpt-5.4" :requests])))))
+
+(deftest provider-final-failure-counter-test
+  (let [m (counters/record-provider-finish (counters/empty-metrics)
+                                           nil nil
+                                           {:status :failed :final? true :error-kind :rate-limit})]
+    (is (= 1 (get-in m [:providers "unknown" :failures])))
+    (is (= 1 (get-in m [:providers "unknown" :final-failures])))
+    (is (= 1 (get-in m [:providers "unknown" :models "unknown" :final-failures])))
+    (is (= 1 (get-in m [:providers "unknown" :error-types "rate-limit"])))))
+

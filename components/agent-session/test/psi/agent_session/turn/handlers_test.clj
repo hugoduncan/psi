@@ -50,3 +50,20 @@
       (is (not (contains? payload :logprobs))))
     (testing "assistant-message key absent when nil"
       (is (not (contains? payload :assistant-message))))))
+
+(deftest prompt-finish-base-result-carries-pending-agent-event-test
+  (let [assistant-msg {:role "assistant"
+                       :content [{:type :error :text "boom"}]
+                       :stop-reason :error
+                       :error-message "boom"
+                       :provider-error/headers {"retry-after" "3"}}
+        terminal-result {:execution-result/turn-id "t4"
+                         :execution-result/assistant-message assistant-msg
+                         :execution-result/turn-outcome :response}
+        result (handlers/prompt-finish-base-result "s1" "t4" terminal-result nil nil nil)
+        on-agent-done-effect (first (filter #(= :on-agent-done (:event-type %))
+                                            (:effects result)))]
+    (is (= :agent-end (get-in on-agent-done-effect [:event-data :pending-agent-event :type])))
+    (is (= [assistant-msg] (get-in on-agent-done-effect [:event-data :pending-agent-event :messages])))
+    (is (= {"retry-after" "3"}
+           (get-in on-agent-done-effect [:event-data :pending-agent-event :provider-error/headers])))))

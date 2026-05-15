@@ -7,6 +7,7 @@
   (:require
    [psi.ai.core :as ai]
    [psi.ai.models :as models]
+   [psi.agent-session.extensions :as ext]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.accumulator :as accum]
    [psi.turn-runtime.recording :as recording]
@@ -233,6 +234,25 @@
                            (filter #(= turn-id (:turn-id %)))
                            vec)})
 
+(defn- provider-id-for
+  [ai-model]
+  (or (some-> ai-model :provider name)
+      (some-> ai-model :provider str)
+      "unknown"))
+
+(defn- model-id-for
+  [ai-model]
+  (or (:id ai-model) "unknown"))
+
+(defn- retry-attempt-for
+  [ctx session-id]
+  (or (:retry-attempt (ss/get-session-data-in ctx session-id)) 0))
+
+(defn- dispatch-provider-event!
+  [ctx event-name payload]
+  (when-let [reg (:extension-registry ctx)]
+    (ext/dispatch-in reg event-name (assoc payload :type event-name))))
+
 (defn execute-prepared-request!
   "Execute one prepared request through the live turn runtime.
    Returns a shaped execution-result map."
@@ -242,8 +262,20 @@
         ai-model        (or (:prepared-request/model prepared-request)
                             (:model (ss/get-session-data-in ctx session-id))
                             (models/get-model :sonnet-4.6))
+        provider-id     (provider-id-for ai-model)
+        model-id        (model-id-for ai-model)
+        retry-attempt   (retry-attempt-for ctx session-id)
         base-ai-options (or (:prepared-request/ai-options prepared-request) {})
         response-mode   (response-mode-for ctx session-id prepared-request)
+        _               (dispatch-provider-event!
+                         ctx
+                         "provider_request_started"
+                         {:session-id session-id
+                          :turn-id turn-id
+                          :attempt-id turn-id
+                          :provider provider-id
+                          :model-id model-id
+                          :retry-attempt retry-attempt})
         {:keys [assistant-message logprobs]}
         (if (= :non-streaming response-mode)
           (execute-non-streaming-turn! ai-ctx ctx session-id
@@ -257,7 +289,19 @@
                                :base-ai-options base-ai-options
                                :progress-queue  progress-queue
                                :turn-id         turn-id}))
-        outcome         (classify-assistant-message assistant-message)]
+        outcome         (classify-assistant-message assistant-message)
+        _               (when (not= :error (:stop-reason assistant-message))
+                          (dispatch-provider-event!
+                           ctx
+                           "provider_request_finished"
+                           {:session-id session-id
+                            :turn-id turn-id
+                            :attempt-id turn-id
+                            :provider provider-id
+                            :model-id model-id
+                            :retry-attempt retry-attempt
+                            :status :succeeded
+                            :final? true}))]
     {:execution-result/turn-id             turn-id
      :execution-result/session-id          session-id
      :execution-result/prepared-request-id turn-id

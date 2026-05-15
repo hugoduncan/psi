@@ -27,6 +27,20 @@
    :commands   {}
    :operations {}
    :tokens     {"claude-3" {:input 1000 :output 200 :cache-read 500 :cache-write 50}}
+   :providers  {"openai" {:requests 3
+                          :successes 2
+                          :failures 1
+                          :final-failures 1
+                          :retries 1
+                          :retry-backoff-ms 2000
+                          :error-types {"rate-limit" 1}
+                          :models {"gpt-5.4" {:requests 3
+                                              :successes 2
+                                              :failures 1
+                                              :final-failures 1
+                                              :retries 1
+                                              :retry-backoff-ms 2000
+                                              :error-types {"rate-limit" 1}}}}}
    :updated-at "2026-05-14T10:00:00Z"})
 
 ;;; load-metrics

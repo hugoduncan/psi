@@ -374,6 +374,36 @@
    #"(?i)premature end of chunk coded message body"
    #"(?i)closing chunk expected"])
 
+(def ^:private auth-error-patterns
+  [#"(?i)unauthorized"
+   #"(?i)forbidden"
+   #"(?i)invalid api key"
+   #"(?i)authentication"])
+
+(def ^:private rate-limit-error-patterns
+  [#"(?i)rate.limit"
+   #"(?i)too.many.requests"
+   #"(?i)status[ .:_]429"])
+
+(def ^:private overloaded-error-patterns
+  [#"(?i)overloaded"])
+
+(def ^:private invalid-request-error-patterns
+  [#"(?i)invalid request"
+   #"(?i)bad request"
+   #"(?i)unprocessable"])
+
+(def ^:private transport-error-patterns
+  [#"(?i)premature end of chunk coded message body"
+   #"(?i)closing chunk expected"
+   #"(?i)connection reset"
+   #"(?i)connection refused"
+   #"(?i)broken pipe"
+   #"(?i)eof"
+   #"(?i)timed? ?out"
+   #"(?i)socket"
+   #"(?i)network"])
+
 (defn retry-error?
   ([stop-reason error-message]
    (retry-error? stop-reason error-message nil))
@@ -382,6 +412,40 @@
         (or (contains? retriable-http-statuses http-status)
             (some #(re-find % (or error-message ""))
                   retriable-error-patterns)))))
+
+(defn provider-error-kind
+  [stop-reason error-message http-status]
+  (let [message (or error-message "")]
+    (cond
+      (not= stop-reason :error)
+      nil
+
+      (or (contains? #{401 403} http-status)
+          (some #(re-find % message) auth-error-patterns))
+      :auth
+
+      (or (= 429 http-status)
+          (some #(re-find % message) rate-limit-error-patterns))
+      :rate-limit
+
+      (= "Timeout waiting for LLM response" message)
+      :timeout
+
+      (some #(re-find % message) overloaded-error-patterns)
+      :overloaded
+
+      (or (contains? #{400 404 422} http-status)
+          (some #(re-find % message) invalid-request-error-patterns))
+      :invalid-request
+
+      (contains? #{500 502 503 529} http-status)
+      :provider-unavailable
+
+      (some #(re-find % message) transport-error-patterns)
+      :transport
+
+      :else
+      :unknown)))
 
 (defn context-overflow-error?
   [error-message]

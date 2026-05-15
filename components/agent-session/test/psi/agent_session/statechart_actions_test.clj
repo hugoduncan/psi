@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
+   [psi.agent-session.extensions :as ext]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
@@ -235,15 +236,27 @@
 
 (deftest retry-handlers-test
   ;; Tests retry backoff scheduling and retry continuation effects.
-  (testing "on-retry-triggered increments retry-attempt and schedules backoff with configured limits"
-    (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry-attempt 2}})
+  (testing "on-retry-triggered increments retry-attempt, emits telemetry, and schedules backoff with configured limits"
+    (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry-attempt 2
+                                                                          :model {:provider "openai" :id "gpt-5.4"}
+                                                                          :last-execution-result-summary {:turn-id "turn-2"}}})
           ctx              (assoc ctx
                                   :config {:auto-retry-base-delay-ms 100
                                            :auto-retry-max-delay-ms 250}
-                                  :now-fn (constantly (java.time.Instant/ofEpochMilli 1000)))]
+                                  :now-fn (constantly (java.time.Instant/ofEpochMilli 1000)))
+          reg              (:extension-registry ctx)
+          seen             (atom [])]
+      (ext/register-extension-in! reg "/ext/provider-telemetry")
+      (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_request_finished" #(swap! seen conj %))
+      (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_retry_scheduled" #(swap! seen conj %))
       (with-registered-handlers
         ctx
-        #(let [result (invoke-handler ctx :on-retry-triggered {:session-id session-id})]
+        #(let [result (invoke-handler ctx :on-retry-triggered {:session-id session-id
+                                                               :pending-agent-event {:type :agent-end
+                                                                                     :messages [{:role "assistant"
+                                                                                                 :stop-reason :error
+                                                                                                 :error-message "Premature end of chunk coded message body: closing chunk expected"
+                                                                                                 :http-status nil}]}})]
            (apply-root-state-update! ctx result)
            (is (= 3 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
            (is (= {:active? true
@@ -256,7 +269,13 @@
            (is (= [{:effect/type :runtime/schedule-thread-sleep-send-event
                     :delay-ms 250
                     :event :session/retry-done}]
-                  (:effects result)))))))
+                  (:effects result)))
+           (is (= ["provider_request_finished" "provider_retry_scheduled"]
+                  (mapv :type @seen)))
+           (is (false? (:final? (first @seen))))
+           (is (= :transport (:error-kind (first @seen))))
+           (is (= 3 (:retry-attempt (second @seen))))
+           (is (= 250 (:delay-ms (second @seen))))))))
 
   (testing "on-retrying-entered returns an explicit no-op pure result because retry state was already updated"
     (let [[ctx _session-id] (test-support/make-session-ctx {})]
@@ -278,3 +297,26 @@
            (is (nil? (:retry (session-state/get-session-data-in ctx session-id))))
            (is (= {:effects [{:effect/type :runtime/agent-start-loop}]}
                   (dissoc result :root-state-update))))))))
+
+(deftest on-agent-done-emits-terminal-provider-failure-telemetry-test
+  (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:model {:provider "openai" :id "gpt-5.4"}
+                                                                        :retry-attempt 1
+                                                                        :last-execution-result-summary {:turn-id "turn-9"}}})
+        reg (:extension-registry ctx)
+        seen (atom [])]
+    (ext/register-extension-in! reg "/ext/provider-telemetry")
+    (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_request_finished" #(swap! seen conj %))
+    (with-registered-handlers
+      ctx
+      #(do
+         (invoke-handler ctx :on-agent-done {:session-id session-id
+                                             :pending-agent-event {:type :agent-end
+                                                                   :provider-error/headers {"retry-after" "2"}
+                                                                   :messages [{:role "assistant"
+                                                                               :stop-reason :error
+                                                                               :error-message "rate limit exceeded"
+                                                                               :http-status 429}]}})
+         (is (= 1 (count @seen)))
+         (is (= :failed (:status (first @seen))))
+         (is (true? (:final? (first @seen))))
+         (is (= :rate-limit (:error-kind (first @seen))))))))

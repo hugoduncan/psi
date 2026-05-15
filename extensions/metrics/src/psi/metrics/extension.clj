@@ -86,6 +86,26 @@
                         session-id ": " (ex-message e))))))
     nil))
 
+(defn- on-provider-request-started
+  [payload]
+  (update-metrics! counters/inc-provider-request (:provider payload) (:model-id payload))
+  nil)
+
+(defn- on-provider-retry-scheduled
+  [payload]
+  (update-metrics! counters/inc-provider-retry (:provider payload) (:model-id payload) (:delay-ms payload))
+  nil)
+
+(defn- on-provider-request-finished
+  [payload]
+  (update-metrics! counters/record-provider-finish
+                   (:provider payload)
+                   (:model-id payload)
+                   {:status (:status payload)
+                    :final? (:final? payload)
+                    :error-kind (:error-kind payload)})
+  nil)
+
 ;;; Formatting
 
 (defn- format-number
@@ -137,13 +157,61 @@
                           rows))
            "\n"))))
 
+(defn- format-providers-section
+  [providers]
+  (when (seq providers)
+    (let [rows (sort-by key providers)]
+      (str "### Providers (" (count rows) " tracked)\n"
+           "| Provider | Requests | Successes | Failures | Final Failures | Retries | Backoff |\n"
+           "|----------|----------|-----------|----------|----------------|---------|---------|\n"
+           (str/join "\n"
+                     (map (fn [[provider {:keys [requests successes failures final-failures retries retry-backoff-ms]}]]
+                            (str "| " provider
+                                 " | " (format-number (or requests 0))
+                                 " | " (format-number (or successes 0))
+                                 " | " (format-number (or failures 0))
+                                 " | " (format-number (or final-failures 0))
+                                 " | " (format-number (or retries 0))
+                                 " | " (format-number (or retry-backoff-ms 0)) "ms |"))
+                          rows))
+           "\n"))))
+
+(defn- provider-model-rows
+  [providers]
+  (sort-by (juxt first second)
+           (mapcat (fn [[provider {:keys [models]}]]
+                     (map (fn [[model stats]] [provider model stats]) (sort-by key models)))
+                   providers)))
+
+(defn- format-provider-models-section
+  [providers]
+  (let [rows (provider-model-rows providers)]
+    (when (seq rows)
+      (str "### Provider Models\n"
+           "| Provider | Model | Requests | Successes | Failures | Final Failures | Retries | Backoff |\n"
+           "|----------|-------|----------|-----------|----------|----------------|---------|---------|\n"
+           (str/join "\n"
+                     (map (fn [[provider model {:keys [requests successes failures final-failures retries retry-backoff-ms]}]]
+                            (str "| " provider
+                                 " | " model
+                                 " | " (format-number (or requests 0))
+                                 " | " (format-number (or successes 0))
+                                 " | " (format-number (or failures 0))
+                                 " | " (format-number (or final-failures 0))
+                                 " | " (format-number (or retries 0))
+                                 " | " (format-number (or retry-backoff-ms 0)) "ms |"))
+                          rows))
+           "\n"))))
+
 (defn- format-metrics-summary
   "Render the metrics map as a markdown string for the /metrics command."
   [metrics]
-  (let [{:keys [tools workflows commands operations tokens updated-at]} metrics
+  (let [{:keys [tools workflows commands operations tokens providers updated-at]} metrics
         sections (keep identity
                        [(format-tools-section tools)
                         (format-tokens-section tokens)
+                        (format-providers-section providers)
+                        (format-provider-models-section providers)
                         (format-simple-section "Workflows" workflows)
                         (format-simple-section "Commands" commands)
                         (format-simple-section "Operations" operations)])]
@@ -190,9 +258,12 @@
       ;; First init: load persisted metrics (or start empty).
       (let [initial (persist/load-metrics worktree-path)]
         (reset! store (persist/empty-store worktree-path initial))))
-    ((:on api) "tool_call"             on-tool-call)
-    ((:on api) "tool_result"           on-tool-result)
-    ((:on api) "session_turn_finished" (make-turn-finished-handler api))
+    ((:on api) "tool_call"                 on-tool-call)
+    ((:on api) "tool_result"               on-tool-result)
+    ((:on api) "session_turn_finished"     (make-turn-finished-handler api))
+    ((:on api) "provider_request_started"  on-provider-request-started)
+    ((:on api) "provider_retry_scheduled"  on-provider-retry-scheduled)
+    ((:on api) "provider_request_finished" on-provider-request-finished)
     ((:register-operation api)
      {:id          "metrics/summary"
       :description "Return current usage metrics for all tracked capabilities"

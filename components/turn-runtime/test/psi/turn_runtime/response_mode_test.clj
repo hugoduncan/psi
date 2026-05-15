@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.ai.core]
+   [psi.agent-session.extensions :as ext]
    [psi.ai.models :as models]
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-request :as prompt-request]
@@ -118,3 +119,39 @@
           (is (= [:called] @stream-calls*))
           (is (= [{:type :text :text "streamed"}]
                  (get-in result [:execution-result/assistant-message :content]))))))))
+
+(deftest execute-prepared-request-dispatches-provider-telemetry-test
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                 (merge (ss/get-session-data-in ctx session-id)
+                        {:model {:provider "openai" :id "gpt-5.4"}}))
+        prepared (prepared-request ctx session-id)
+        reg (:extension-registry ctx)
+        seen (atom [])]
+    (ext/register-extension-in! reg "/ext/provider-telemetry")
+    (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_request_started" #(swap! seen conj %))
+    (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_request_finished" #(swap! seen conj %))
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [_ai-ctx _ctx _session-id {:keys [turn-id ai-model]}]
+                    {:turn-id turn-id
+                     :model ai-model
+                     :ai-options {}
+                     :turn-ctx nil
+                     :assistant-message {:role "assistant"
+                                         :content [{:type :text :text "streamed"}]
+                                         :stop-reason :stop
+                                         :timestamp (java.time.Instant/now)}
+                     :logprobs nil})]
+      (turn-runtime/execute-prepared-request! {:provider-registry (atom {})} ctx session-id prepared nil))
+    (is (= ["provider_request_started" "provider_request_finished"]
+           (mapv :type @seen)))
+    (is (= {:session-id session-id
+            :turn-id "turn-1"
+            :attempt-id "turn-1"
+            :provider "openai"
+            :model-id "gpt-5.4"
+            :retry-attempt 0
+            :type "provider_request_started"}
+           (first @seen)))
+    (is (= :succeeded (:status (second @seen))))
+    (is (true? (:final? (second @seen))))))

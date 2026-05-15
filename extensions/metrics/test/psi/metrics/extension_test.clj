@@ -42,13 +42,16 @@
 
 ;;; init registration
 
-(deftest init-registers-three-event-handlers-test
-  ;; init subscribes to tool_call, tool_result, and session_turn_finished.
+(deftest init-registers-provider-and-core-event-handlers-test
+  ;; init subscribes to tool_call, tool_result, session_turn_finished, and provider telemetry events.
   (let [{:keys [api state]} (make-api)]
     (ext/init api)
     (is (seq (get-in @state [:handlers "tool_call"])))
     (is (seq (get-in @state [:handlers "tool_result"])))
-    (is (seq (get-in @state [:handlers "session_turn_finished"])))))
+    (is (seq (get-in @state [:handlers "session_turn_finished"])))
+    (is (seq (get-in @state [:handlers "provider_request_started"])))
+    (is (seq (get-in @state [:handlers "provider_retry_scheduled"])))
+    (is (seq (get-in @state [:handlers "provider_request_finished"])))))
 
 (deftest init-registers-metrics-summary-operation-test
   ;; init registers the metrics/summary deterministic operation via :register-operation.
@@ -239,6 +242,30 @@
 
 ;;; Schema conformance of returned data
 
+(deftest provider-events-update-metrics-and-render-provider-section-test
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "provider_request_started"
+                {:provider "openai" :model-id "gpt-5.4" :session-id "s1" :turn-id "t1"})
+    (fire-event state "provider_retry_scheduled"
+                {:provider "openai" :model-id "gpt-5.4" :session-id "s1" :turn-id "t1" :delay-ms 2000})
+    (fire-event state "provider_request_finished"
+                {:provider "openai" :model-id "gpt-5.4" :session-id "s1" :turn-id "t1"
+                 :status :failed :final? true :error-kind :rate-limit})
+    (let [metrics (:metrics @ext/store)
+          cmd-handler (get-in @state [:commands "metrics" :handler])]
+      (is (= 1 (get-in metrics [:providers "openai" :requests])))
+      (is (= 1 (get-in metrics [:providers "openai" :retries])))
+      (is (= 2000 (get-in metrics [:providers "openai" :retry-backoff-ms])))
+      (is (= 1 (get-in metrics [:providers "openai" :failures])))
+      (is (= 1 (get-in metrics [:providers "openai" :final-failures])))
+      (is (= 1 (get-in metrics [:providers "openai" :error-types "rate-limit"])))
+      (cmd-handler {})
+      (let [content (:content (last (:messages @state)))]
+        (is (str/includes? content "### Providers"))
+        (is (str/includes? content "### Provider Models"))
+        (is (str/includes? content "openai"))))))
+
 (deftest summary-data-conforms-to-schema-after-events-test
   ;; After processing several events the metrics map still conforms to schema.
   (let [{:keys [api ops state]} (make-api)]
@@ -246,6 +273,11 @@
     (fire-event state "tool_call" {:tool-name "bash" :tool-call-id "c1" :input {}})
     (fire-event state "tool_result" {:tool-name "bash" :tool-call-id "c1"
                                      :is-error true :content "fail"})
+    (fire-event state "provider_request_started"
+                {:provider "openai" :model-id "gpt-5.4" :session-id "s1" :turn-id "t1"})
+    (fire-event state "provider_request_finished"
+                {:provider "openai" :model-id "gpt-5.4" :session-id "s1" :turn-id "t1"
+                 :status :succeeded :final? true})
     (let [op-handler (:handler (first (filter #(= "metrics/summary" (:id %)) @ops)))
           result (op-handler {:args {}})]
       (is (schema/valid? (:data result))))))
