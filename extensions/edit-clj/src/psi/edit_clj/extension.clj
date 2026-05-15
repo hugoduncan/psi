@@ -64,7 +64,7 @@
 
 (def ^:private tool-def
   {:name        "edit-clj"
-   :description "Replace text in a file. old-string is matched by structural equality (whitespace does not matter); old-string and new-string must each be one complete, parseable form."
+   :description "Replace text in a file by structural equality; old-string and new-string must each be one complete, parseable form."
    :parameters  {:type       "object"
                  :properties {"filename"   {:type        "string"
                                             :description "Path to the Clojure (.clj, .cljc, .bb .edn, etc) source file; relative paths resolve against the session worktree."}
