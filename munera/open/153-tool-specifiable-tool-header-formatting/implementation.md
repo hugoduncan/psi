@@ -20,3 +20,7 @@
 2026-05-14 ambiguity review
 - Ambiguity: mandatory `:format-request` validation is underspecified for rollout scope. Design/plan require canonical registrations to reject missing formatters, but do not say whether this task must migrate every currently registered tool or introduce a narrowly scoped compatibility allowlist/shim during transition.
 - Ambiguity: RPC/backend acceptance surface for the canonical preformatted compact header remains underspecified. Per-tool specs name transport-safe `:call-summary`, but design/plan do not identify the authoritative event/payload shape(s) that must carry it.
+
+2026-05-14 ambiguity follow-up
+- Resolved rollout scope in design/plan: this task must migrate every currently registered built-in and owned extension tool in the runtime tool catalog onto mandatory `:format-request`; only named, task-documented, temporary migration shims are allowed during in-flight rollout, and none may remain at task completion.
+- Resolved RPC/backend transport surface in design/plan: canonical tool lifecycle events/payloads carry the preformatted compact header under `:call-summary`, including pre-completion `tool/executing` and the RPC-facing tool row payloads derived from that lifecycle data.

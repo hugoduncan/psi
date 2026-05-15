@@ -165,6 +165,8 @@ That means:
 
 - built-in tools and extension tools use the same definition-level mechanism
 - canonical tool definitions must include formatter metadata; absence is invalid for this surface after migration
+- rollout scope for this task is all canonical registered tools participating in the runtime tool catalog; this task must migrate every currently registered built-in and owned extension tool to `:format-request` rather than relying on an open-ended compatibility allowlist
+- if implementation discovers a legacy compatibility shim is required briefly to land the migration safely, that shim must be explicitly scoped to named tools, documented in task artifacts, and removed before this task can be considered complete
 - the registration path for tools must preserve whatever formatter metadata is needed to invoke the behavior later
 - the mechanism must be explicit in normalized tool definitions rather than inferred only from special tool names
 
@@ -328,7 +330,8 @@ Boundary rule:
 
 - TUI must use the shared helper for canonical compact tool headers
 - RPC/backend display shaping must use the same helper wherever it emits or computes compact tool header summaries
-- RPC tool events/payloads must carry the resulting preformatted compact header string
+- the authoritative transport field for this task is `:call-summary` on canonical tool lifecycle events/payloads that already carry tool-call metadata, including the pre-completion `tool/executing` path and the corresponding RPC-facing tool row payloads derived from it
+- RPC tool events/payloads must carry the resulting preformatted compact header string under `:call-summary`
 - Emacs must consume that RPC/backend-produced compact header string rather than keeping separate local tool-name dispatch, because Emacs cannot invoke the Clojure formatter directly
 
 ## Inventory required before mechanism choice

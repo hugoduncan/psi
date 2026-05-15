@@ -11,7 +11,8 @@
 2. Realize the fixed tool-definition formatter mechanism.
    - require executable `:format-request` on canonical normalized tool definitions
    - preserve it through built-in and extension registration paths
-   - validate/reject missing formatter metadata during registration unless a temporary migration shim is explicitly recorded
+   - migrate every currently registered built-in and owned extension tool in the runtime catalog onto the contract in this task
+   - reject missing formatter metadata during registration; only a named, task-documented, temporary shim is allowed during in-flight migration and it must be removed before task completion
    - keep it runtime-only and out of provider/agent-core boundary projections
    - implement the agreed single-map formatter contract and defensive fallback rules
 
@@ -36,8 +37,8 @@
 6. Update display consumers.
    - TUI compact tool header rendering uses the shared helper
    - RPC/backend display shaping uses the shared helper where it exposes tool header lines or summaries
-   - RPC carries a preformatted compact header string in tool payloads for frontend reuse
-   - Emacs migrates in this task to consume that RPC/backend-produced compact header surface
+   - canonical tool lifecycle payloads/events carry the preformatted compact header string under `:call-summary`, including the pre-completion `tool/executing` path and RPC-facing tool row payloads derived from it
+   - Emacs migrates in this task to consume that RPC/backend-produced `:call-summary` surface
 
 7. Add focused proof.
    - built-in parity for current formatted headers
