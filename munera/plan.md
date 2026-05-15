@@ -41,4 +41,5 @@ Notes:
 - `070` tracks the `/delegate` slash-command UX gap so delegated workflow completion comes back into the originating conversation transcript.
 - Tasks `089`, `091`, `092`, `093`, and `094` are now complete and live under `munera/closed/`.
 - `140` adds a runtime behavioural flag for logprob collection on the OpenAI chat-completions endpoint: session flag → options projection → request builder → `:logprobs-delta` stream event.
+- `154` is complete and closed: canonical provider telemetry events (`provider_request_started`, `provider_retry_scheduled`, `provider_request_finished`), shared `provider-error-kind` classification, metrics provider/per-model aggregation, persistence/schema coverage, and `/metrics` provider summaries are implemented; focused verification green including retry-attempt fresh prepared-request/turn-id proof.
 - Close or replace tasks as scope sharpens; do not merge task contents.
