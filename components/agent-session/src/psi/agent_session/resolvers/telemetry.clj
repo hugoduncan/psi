@@ -180,11 +180,12 @@
    :psi.tool-lifecycle/content    (:content event)
    :psi.tool-lifecycle/result-text (:result-text event)
    :psi.tool-lifecycle/arguments  (:arguments event)
-   :psi.tool-lifecycle/parsed-args (:parsed-args event)})
+   :psi.tool-lifecycle/parsed-args (:parsed-args event)
+   :psi.tool-lifecycle/call-summary (:call-summary event)})
 (defn- tool-lifecycle-summaries
   [agent-session-ctx session-id]
   (->> (tool-lifecycle-events agent-session-ctx session-id)
-       (reduce (fn [acc {:keys [tool-id tool-name event-kind timestamp is-error result-text arguments parsed-args]}]
+       (reduce (fn [acc {:keys [tool-id tool-name event-kind timestamp is-error result-text arguments parsed-args call-summary]}]
                  (let [k   tool-id
                        cur (get acc k {:psi.tool-lifecycle.summary/tool-id k
                                        :psi.tool-lifecycle.summary/tool-name tool-name
@@ -196,7 +197,8 @@
                                        :psi.tool-lifecycle.summary/is-error false
                                        :psi.tool-lifecycle.summary/result-text nil
                                        :psi.tool-lifecycle.summary/arguments nil
-                                       :psi.tool-lifecycle.summary/parsed-args nil})]
+                                       :psi.tool-lifecycle.summary/parsed-args nil
+                                       :psi.tool-lifecycle.summary/call-summary nil})]
                    (assoc acc k
                           (-> cur
                               (assoc :psi.tool-lifecycle.summary/tool-name
@@ -214,7 +216,9 @@
                               (update :psi.tool-lifecycle.summary/arguments
                                       #(or % arguments))
                               (update :psi.tool-lifecycle.summary/parsed-args
-                                      #(or % parsed-args))))))
+                                      #(or % parsed-args))
+                              (update :psi.tool-lifecycle.summary/call-summary
+                                      #(or % call-summary))))))
                {})
        vals
        (sort-by (juxt :psi.tool-lifecycle.summary/started-at
@@ -236,7 +240,8 @@
       :psi.tool-lifecycle/content
       :psi.tool-lifecycle/result-text
       :psi.tool-lifecycle/arguments
-      :psi.tool-lifecycle/parsed-args]}
+      :psi.tool-lifecycle/parsed-args
+      :psi.tool-lifecycle/call-summary]}
     {:psi.agent-session/tool-lifecycle-summaries
      [:psi.tool-lifecycle.summary/tool-id
       :psi.tool-lifecycle.summary/tool-name
@@ -248,7 +253,8 @@
       :psi.tool-lifecycle.summary/is-error
       :psi.tool-lifecycle.summary/result-text
       :psi.tool-lifecycle.summary/arguments
-      :psi.tool-lifecycle.summary/parsed-args]}]}
+      :psi.tool-lifecycle.summary/parsed-args
+      :psi.tool-lifecycle.summary/call-summary]}]}
   (let [events    (mapv tool-lifecycle-event->eql
                         (tool-lifecycle-events agent-session-ctx session-id))
         summaries (tool-lifecycle-summaries agent-session-ctx session-id)]
@@ -272,7 +278,8 @@
       :psi.tool-lifecycle.summary/is-error
       :psi.tool-lifecycle.summary/result-text
       :psi.tool-lifecycle.summary/arguments
-      :psi.tool-lifecycle.summary/parsed-args]}]}
+      :psi.tool-lifecycle.summary/parsed-args
+      :psi.tool-lifecycle.summary/call-summary]}]}
   {:psi.agent-session/tool-lifecycle-summary-for-tool-id
    (some (fn [summary]
            (when (= lookup-tool-id (:psi.tool-lifecycle.summary/tool-id summary))

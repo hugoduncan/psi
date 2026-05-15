@@ -510,6 +510,7 @@
         [(-> state'
              (assoc-in [:tool-calls ui-id :name] (:tool-name event))
              (assoc-in [:tool-calls ui-id :args] (or (:arguments event) ""))
+             (assoc-in [:tool-calls ui-id :call-summary] (:call-summary event))
              (assoc-in [:tool-calls ui-id :status]
                        (if (= :end (:phase event)) :pending :assembling))
              (assoc-in [:active-turn-items ui-id :item-kind] :tool)
@@ -522,6 +523,7 @@
       (let [[state' ui-id] (ensure-tool-row state {:tool-id (:tool-id event)
                                                    :tool-name (:tool-name event)})]
         [(-> state'
+             (assoc-in [:tool-calls ui-id :call-summary] (:call-summary event))
              (assoc-in [:tool-calls ui-id :status] :pending)
              (assoc-in [:active-turn-items ui-id :item-kind] :tool)
              (assoc-in [:active-turn-items ui-id :tool-id] ui-id)
@@ -539,6 +541,7 @@
       (let [[state' ui-id] (ensure-tool-row state {:tool-id (:tool-id event)
                                                    :tool-name (:tool-name event)})]
         [(-> state'
+             (assoc-in [:tool-calls ui-id :call-summary] (:call-summary event))
              (assoc-in [:tool-calls ui-id :status] :running)
              (assoc-in [:tool-calls ui-id :parsed-args]
                        (:parsed-args event))
@@ -552,6 +555,7 @@
             [state' ui-id] (ensure-tool-row state {:tool-id (:tool-id event)
                                                    :tool-name (:tool-name event)})]
         [(-> state'
+             (assoc-in [:tool-calls ui-id :call-summary] (:call-summary event))
              (assoc-in [:tool-calls ui-id :status] :running)
              (assoc-in [:tool-calls ui-id :content] (:content event))
              (assoc-in [:tool-calls ui-id :details] (:details event))
@@ -568,6 +572,7 @@
             [state' ui-id] (ensure-tool-row state {:tool-id (:tool-id event)
                                                    :tool-name (:tool-name event)})]
         [(-> state'
+             (assoc-in [:tool-calls ui-id :call-summary] (:call-summary event))
              (assoc-in [:tool-calls ui-id :status] status)
              (assoc-in [:tool-calls ui-id :content] (:content event))
              (assoc-in [:tool-calls ui-id :details] (:details event))

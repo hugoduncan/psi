@@ -42,6 +42,11 @@
                        :tool-name tool-name
                        :pattern   (str tool-name-pattern)})))
     (let [tool* (defs/normalize-tool-def (assoc tool :source :extension :ext-path ext-path))]
+      (when-not (fn? (:format-request tool*))
+        (throw (ex-info (str "Tool definition missing required :format-request fn: " (pr-str tool-name))
+                        {:ext-path ext-path
+                         :tool-name tool-name
+                         :reason :missing-format-request})))
       (swap! (:state reg)
              assoc-in [:extensions ext-path :tools tool-name] tool*)
       reg)))

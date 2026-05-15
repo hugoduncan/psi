@@ -1,6 +1,7 @@
 (ns extensions.work-on
   (:require
    [clojure.string :as str]
+   [psi.tool-runtime.call-summary :as call-summary]
    [psi.history.git :as git]))
 
 (defonce ^:private state
@@ -640,15 +641,16 @@
                (refresh-default-branch-cache!)
                nil))
   ((:register-tool api)
-   {:name        "work-on"
-    :label       "Work On"
-    :description "Create a layout-derived git worktree + branch and continue there"
-    :parameters  {:type       "object"
-                  :properties {"description" {:type "string"
-                                              :description "Description of the work to create a branch/worktree for"}
-                               "base_branch" {:type "string"
-                                              :description "Optional base branch to use when creating a new branch/worktree"}}
-                  :required   ["description"]}
+   {:name           "work-on"
+    :label          "Work On"
+    :description    "Create a layout-derived git worktree + branch and continue there"
+    :format-request call-summary/work-on-format-request
+    :parameters     {:type       "object"
+                     :properties {"description" {:type "string"
+                                                 :description "Description of the work to create a branch/worktree for"}
+                                  "base_branch" {:type "string"
+                                                 :description "Optional base branch to use when creating a new branch/worktree"}}
+                     :required   ["description"]}
     :execute     (fn
                    ([args] (work-on-tool-result
                             (execute-work-on! {:description (get args "description")

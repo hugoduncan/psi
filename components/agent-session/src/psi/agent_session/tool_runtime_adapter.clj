@@ -7,6 +7,7 @@
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.tool-output :as tool-output]
+   [psi.agent-session.tool-plan :as tool-plan]
    [psi.session-state.state :as session]
    [psi.tool-runtime.args :as tool-args]
    [psi.tool-runtime.batch :as tool-runtime.batch]
@@ -63,6 +64,8 @@
      :execute-opts      {:cwd          (session/session-worktree-path-in ctx session-id)
                          :overrides    overrides
                          :session-id   session-id}
+     :tool-def-fn       (fn [tool-name]
+                          (#'tool-plan/find-tool-def ctx session-id tool-name))
      :on-event          (partial on-tool-event ctx session-id progress-queue)}))
 
 (defn execute-tool-call!

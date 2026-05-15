@@ -229,42 +229,45 @@ For edit, derive from details.firstChangedLine and oldText span when available."
         (t ""))))
     (_ "")))
 
-(defun psi-emacs--tool-summary (tool-name parsed-args arguments tool-id &optional details)
+(defun psi-emacs--tool-summary (tool-name parsed-args arguments tool-id &optional details call-summary)
   "Return display summary for a tool row.
 
-Prefers TOOL-NAME + key call argument (path/command) over internal TOOL-ID.
-For read/edit, appends optional line-number suffix when derivable.
-TOOL-ID remains fallback-only when tool name is absent."
-  (let* ((name-raw (or tool-name
-                       (psi-emacs--tool-display-id tool-id)
-                       "tool"))
-         (name (if (symbolp name-raw)
-                   (symbol-name name-raw)
-                 (format "%s" name-raw)))
-         (display-name (psi-emacs--tool-display-name name))
-         (args-info (psi-emacs--tool-args-map parsed-args arguments))
-         (args (plist-get args-info :args))
-         (invalid-args? (plist-get args-info :invalid-args-type))
-         (known-tool? (member name '("read" "edit" "write" "bash")))
-         (primary-value (pcase name
-                          ((or "read" "edit" "write")
-                           (psi-emacs--tool-arg-get args '("path" :path path)))
-                          ("bash"
-                           (psi-emacs--tool-arg-get args '("command" :command command)))
-                          (_ nil)))
-         (primary-text (psi-emacs--tool-primary-text name primary-value))
-         (line-range-suffix (if (member name '("read" "edit"))
-                                (psi-emacs--tool-line-range-suffix name args details)
-                              ""))
-         (summary (cond
-                   (invalid-args?
-                    (format "%s [invalid arg]" display-name))
-                   ((and known-tool? primary-text)
-                    (format "%s %s%s" display-name primary-text line-range-suffix))
-                   (known-tool?
-                    (format "%s …" display-name))
-                   (t
-                    display-name))))
+Prefers backend-provided CALL-SUMMARY when present; otherwise falls back to a
+local best-effort summary for compatibility."
+  (let ((summary
+         (if (and (stringp call-summary)
+                  (not (string-empty-p (string-trim call-summary))))
+             call-summary
+           (let* ((name-raw (or tool-name
+                                (psi-emacs--tool-display-id tool-id)
+                                "tool"))
+                  (name (if (symbolp name-raw)
+                            (symbol-name name-raw)
+                          (format "%s" name-raw)))
+                  (display-name (psi-emacs--tool-display-name name))
+                  (args-info (psi-emacs--tool-args-map parsed-args arguments))
+                  (args (plist-get args-info :args))
+                  (invalid-args? (plist-get args-info :invalid-args-type))
+                  (known-tool? (member name '("read" "edit" "write" "bash")))
+                  (primary-value (pcase name
+                                   ((or "read" "edit" "write")
+                                    (psi-emacs--tool-arg-get args '("path" :path path)))
+                                   ("bash"
+                                    (psi-emacs--tool-arg-get args '("command" :command command)))
+                                   (_ nil)))
+                  (primary-text (psi-emacs--tool-primary-text name primary-value))
+                  (line-range-suffix (if (member name '("read" "edit"))
+                                         (psi-emacs--tool-line-range-suffix name args details)
+                                       "")))
+             (cond
+              (invalid-args?
+               (format "%s [invalid arg]" display-name))
+              ((and known-tool? primary-text)
+               (format "%s %s%s" display-name primary-text line-range-suffix))
+              (known-tool?
+               (format "%s …" display-name))
+              (t
+               display-name))))))
     (psi-emacs--truncate-single-line summary psi-emacs--tool-header-max-chars)))
 
 (defun psi-emacs--tool-status-label (stage is-error)
@@ -409,7 +412,7 @@ MODE nil is treated as collapsed (default)."
       (psi-emacs--tool-row-string tool-summary status (or accumulated-text ""))
     (psi-emacs--tool-row-header-string tool-summary status)))
 
-(defun psi-emacs--upsert-tool-row (tool-id stage text &optional tool-name arguments parsed-args is-error details)
+(defun psi-emacs--upsert-tool-row (tool-id stage text &optional tool-name arguments parsed-args is-error details call-summary)
   "Create or update TOOL-ID row for lifecycle STAGE.
 
 TEXT represents tool execution output snapshots.
@@ -436,8 +439,12 @@ Rows are rendered according to global tool-output-view-mode."
                          (plist-get row :details)
                        details))
            (status (psi-emacs--tool-status-label stage is-error*))
+           (call-summary* (if (and (stringp call-summary)
+                                   (not (string-empty-p (string-trim call-summary))))
+                              call-summary
+                            (plist-get row :call-summary)))
            (accumulated (psi-emacs--tool-next-accumulated-text row stage text arguments))
-           (tool-summary (psi-emacs--tool-summary tool-name* parsed-args* arguments* tool-id details*))
+           (tool-summary (psi-emacs--tool-summary tool-name* parsed-args* arguments* tool-id details* call-summary*))
            (rendered (psi-emacs--render-tool-row tool-summary status accumulated view-mode)))
       (if (and (markerp start)
                (markerp end)
@@ -488,6 +495,7 @@ Rows are rendered according to global tool-output-view-mode."
                                  :status status
                                  :text text
                                  :tool-summary tool-summary
+                                 :call-summary call-summary*
                                  :accumulated-text accumulated
                                  :start start
                                  :end end)))
@@ -542,6 +550,7 @@ Rows are rendered according to global tool-output-view-mode."
                                          :status status
                                          :text text
                                          :tool-summary tool-summary
+                                         :call-summary call-summary*
                                          :accumulated-text accumulated
                                          :start new-start
                                          :end new-end)))
@@ -566,6 +575,7 @@ Rows are rendered according to global tool-output-view-mode."
                                      :status status
                                      :text text
                                      :tool-summary tool-summary
+                                     :call-summary call-summary*
                                      :accumulated-text accumulated
                                      :start new-start
                                      :end new-end)))
@@ -602,7 +612,8 @@ This command is valid even when no tool rows exist."
                                              (plist-get row* :parsed-args)
                                              (plist-get row* :arguments)
                                              tool-id
-                                             (plist-get row* :details))))
+                                             (plist-get row* :details)
+                                             (plist-get row* :call-summary))))
                           (status (or (plist-get row* :status)
                                       (psi-emacs--tool-status-label
                                        (plist-get row* :stage)

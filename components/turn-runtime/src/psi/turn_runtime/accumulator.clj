@@ -137,7 +137,7 @@
         thinking-parts (thinking-blocks-in-order thinking-blocks)
         text-blocks    (cond-> [] (seq text-buffer) (conj {:type :text :text text-buffer}))
         error-blocks   (mapv (fn [inv] {:type :error :text (:message inv)}) invalids)
-        tool-blocks    (mapv (fn [tc] {:type :tool-call :id (:id tc) :name (:name tc) :arguments (:arguments tc)})
+        tool-blocks    (mapv (fn [tc] {:type :tool-call :id (:id tc) :name (:name tc) :arguments (:arguments tc) :call-summary (:call-summary tc)})
                              valid-calls)]
     (-> thinking-parts (into text-blocks) (into error-blocks) (into tool-blocks))))
 

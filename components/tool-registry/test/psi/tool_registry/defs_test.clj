@@ -18,8 +18,10 @@
 
   (testing "runtime execute fns are preserved canonically"
     (let [exec-fn    (fn [_args _opts] {:content "ok" :is-error false})
-          normalized (tool-defs/normalize-tool-def {:name "x" :execute exec-fn})]
-      (is (identical? exec-fn (:execute normalized)))))
+          format-fn  (fn [_] "x")
+          normalized (tool-defs/normalize-tool-def {:name "x" :execute exec-fn :format-request format-fn})]
+      (is (identical? exec-fn (:execute normalized)))
+      (is (identical? format-fn (:format-request normalized)))))
 
   (testing "EDN string parameters are parsed into canonical data when possible"
     (let [tool {:name "x"

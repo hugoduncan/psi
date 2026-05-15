@@ -58,10 +58,10 @@
    "assistant/delta" #{:text}
    "assistant/thinking-delta" #{:text}
    "assistant/message" #{:role :content}
-   "tool/start" #{:tool-id :tool-name}
-   "tool/executing" #{:tool-id :tool-name}
-   "tool/update" #{:tool-id :tool-name :content :result-text :is-error}
-   "tool/result" #{:tool-id :tool-name :content :result-text :is-error}
+   "tool/start" #{:tool-id :tool-name :call-summary}
+   "tool/executing" #{:tool-id :tool-name :call-summary}
+   "tool/update" #{:tool-id :tool-name :content :result-text :is-error :call-summary}
+   "tool/result" #{:tool-id :tool-name :content :result-text :is-error :call-summary}
    "ui/dialog-requested" #{:dialog-id :kind :title}
    "ui/frontend-action-requested" #{:request-id :ui/action}
    "ui/widgets-updated" #{:widgets}
@@ -193,39 +193,43 @@
 
       :tool-start
       {:event "tool/start"
-       :data  (cond-> {:session-id (:session-id progress-event)
-                       :tool-id    (:tool-id progress-event)
-                       :tool-name  (:tool-name progress-event)}
+       :data  (cond-> {:session-id   (:session-id progress-event)
+                       :tool-id      (:tool-id progress-event)
+                       :tool-name    (:tool-name progress-event)
+                       :call-summary (:call-summary progress-event)}
                 (some? (:arguments progress-event))   (assoc :arguments (:arguments progress-event))
                 (some? (:parsed-args progress-event)) (assoc :parsed-args (:parsed-args progress-event)))}
 
       :tool-executing
       {:event "tool/executing"
-       :data  (cond-> {:session-id (:session-id progress-event)
-                       :tool-id    (:tool-id progress-event)
-                       :tool-name  (:tool-name progress-event)}
+       :data  (cond-> {:session-id   (:session-id progress-event)
+                       :tool-id      (:tool-id progress-event)
+                       :tool-name    (:tool-name progress-event)
+                       :call-summary (:call-summary progress-event)}
                 (some? (:arguments progress-event))   (assoc :arguments (:arguments progress-event))
                 (some? (:parsed-args progress-event)) (assoc :parsed-args (:parsed-args progress-event)))}
 
       :tool-execution-update
       {:event "tool/update"
-       :data  {:session-id  (:session-id progress-event)
-               :tool-id     (:tool-id progress-event)
-               :tool-name   (:tool-name progress-event)
-               :content     (or (:content progress-event) [])
-               :result-text (or (:result-text progress-event) "")
-               :details     (:details progress-event)
-               :is-error    (boolean (:is-error progress-event))}}
+       :data  {:session-id   (:session-id progress-event)
+               :tool-id      (:tool-id progress-event)
+               :tool-name    (:tool-name progress-event)
+               :call-summary (:call-summary progress-event)
+               :content      (or (:content progress-event) [])
+               :result-text  (or (:result-text progress-event) "")
+               :details      (:details progress-event)
+               :is-error     (boolean (:is-error progress-event))}}
 
       :tool-result
       {:event "tool/result"
-       :data  {:session-id  (:session-id progress-event)
-               :tool-id     (:tool-id progress-event)
-               :tool-name   (:tool-name progress-event)
-               :content     (or (:content progress-event) [])
-               :result-text (or (:result-text progress-event) "")
-               :details     (:details progress-event)
-               :is-error    (boolean (:is-error progress-event))}}
+       :data  {:session-id   (:session-id progress-event)
+               :tool-id      (:tool-id progress-event)
+               :tool-name    (:tool-name progress-event)
+               :call-summary (:call-summary progress-event)
+               :content      (or (:content progress-event) [])
+               :result-text  (or (:result-text progress-event) "")
+               :details      (:details progress-event)
+               :is-error     (boolean (:is-error progress-event))}}
 
       nil)))
 

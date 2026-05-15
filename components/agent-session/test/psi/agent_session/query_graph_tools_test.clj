@@ -60,6 +60,7 @@
       (tool-registry/register-tool-in! reg "/ext/a" {:name "ext-tool"
                                                      :description "extension tool"
                                                      :parameters {:type "object"}
+                                                     :format-request (fn [_] "ext-tool")
                                                      :execute exec-fn})
       ;; Simulate the agent-core runtime projection stripping :execute while the
       ;; canonical extension registry still retains the executable fn.

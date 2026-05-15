@@ -276,7 +276,7 @@
     (let [reg (ext/create-registry)]
       (ext/register-extension-in! reg "/ext/a")
       (ext/register-handler-in! reg "/ext/a" "e" (fn [_] nil))
-      (tool-registry/register-tool-in! reg "/ext/a" {:name "t1"})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "t1" :format-request (fn [_] "t1")})
       (let [s (ext/summary-in reg)]
         (is (= 1 (:extension-count s)))
         (is (= 1 (:handler-count s)))
@@ -450,7 +450,7 @@
       (ext/register-extension-in! reg "/ext/a")
       (ext/register-handler-in! reg "/ext/a" "tool_call" (fn [_] nil))
       (ext/register-handler-in! reg "/ext/a" "tool_result" (fn [_] nil))
-      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool"})
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "my-tool" :format-request (fn [_] "my-tool")})
       (ext/register-command-in! reg "/ext/a" {:name "cmd"})
       (ext/register-flag-in! reg "/ext/a" {:name "f1" :type :boolean})
       (let [d (ext/extension-detail-in reg "/ext/a")]
@@ -547,7 +547,7 @@
     (let [reg (ext/create-registry)
           _   (ext/register-extension-in! reg "/ext/test")
           api (ext/create-extension-api reg "/ext/test" {})]
-      ((:register-tool api) {:name "ext-tool" :label "ET" :description "test"})
+      ((:register-tool api) {:name "ext-tool" :label "ET" :description "test" :format-request (fn [_] "ext-tool")})
       (is (contains? (tool-registry/tool-names-in reg) "ext-tool"))))
 
   (testing "API :register-command registers commands"

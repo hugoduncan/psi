@@ -60,6 +60,7 @@
   ((:register-tool api) {:name \"runtime-tool\"
                          :label \"Runtime Tool\"
                          :description \"Runtime-added test tool\"
+                         :format-request (fn [_] \"runtime-tool\")
                          :parameters {:type \"object\"}}))")
         (let [result (ext-rt/add-extension-in! ctx session-id (.getAbsolutePath ext-file))]
           (is (= {:loaded? true
@@ -180,7 +181,7 @@
           reg (ext/create-registry)]
       (ext/register-extension-in! reg "/ext/a")
       (ext/register-handler-in! reg "/ext/a" "tool_call" (fn [_] nil))
-      (ext/register-tool-in! reg "/ext/a" {:name "ext-read" :label "R" :description "ext read"})
+      (ext/register-tool-in! reg "/ext/a" {:name "ext-read" :label "R" :description "ext read" :format-request (fn [_] "ext-read")})
       (ext/register-command-in! reg "/ext/a" {:name "greet" :description "Say hi"})
       (ext/register-flag-in! reg "/ext/a" {:name "debug" :type :boolean :default false})
       ;; Test the inspection functions that resolvers will call

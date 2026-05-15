@@ -35,11 +35,12 @@
 
 (defn- normalize-tool-call-block
   [block]
-  {:id        (block-attr block :id)
-   :name      (block-attr block :name)
-   :arguments (or (block-attr block :arguments)
-                  (some-> (block-attr block :input) pr-str)
-                  "")})
+  {:id           (block-attr block :id)
+   :name         (block-attr block :name)
+   :arguments    (or (block-attr block :arguments)
+                     (some-> (block-attr block :input) pr-str)
+                     "")
+   :call-summary (block-attr block :call-summary)})
 
 (defn- content-blocks
   "Normalize assistant message content to a flat sequence of block maps.
@@ -93,12 +94,14 @@
                          (tool-call-block? block)
                          (let [nb (normalize-tool-call-block block)
                                id (:id nb)
-                               tc {:name      (:name nb)
-                                   :args      (or (:arguments nb) "")
-                                   :status    :pending
-                                   :result    nil
-                                   :is-error  false
-                                   :expanded? false}]
+                               tc {:name         (:name nb)
+                                   :args         (or (:arguments nb) "")
+                                   :call-summary (or (:call-summary nb)
+                                                     (:name nb))
+                                   :status       :pending
+                                   :result       nil
+                                   :is-error     false
+                                   :expanded?    false}]
                            (-> a
                                (update :tool-calls #(if (contains? % id) % (assoc % id tc)))
                                (update :tool-order #(if (some #{id} %) % (conj % id)))
