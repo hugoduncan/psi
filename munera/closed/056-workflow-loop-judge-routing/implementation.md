@@ -76,3 +76,7 @@ All 8 slices landed in sequential commits:
 - `components/agent-session/test/psi/agent_session/workflow_progression_test.clj` — +6 judge progression tests
 - `components/agent-session/test/psi/agent_session/workflow_execution_test.clj` — +2 judge execution tests
 - `components/agent-session/test/psi/agent_session/workflow_file_compiler_test.clj` — +4 compiler tests
+
+## 2026-05-15 task-test-review
+
+- Review note: tests cover transition-local `:on` loop bounds and exhaustion, but I did not find a test proving whether step-level `:max-iterations` is runtime-enforced or intentionally compile-only/documentary.

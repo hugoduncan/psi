@@ -82,6 +82,7 @@
 - [x] Extract shared `step-result-map` helper in `workflow_execution.clj` — reduces 3 result-map constructions to `assoc` on shared base
 - [x] Replace `(some #{goto} step-order)` with `(contains? (set step-order) goto)` in `resolve-goto-target` for idiomatic membership check
 - [x] Run full suite green after fixes (1398 unit tests / 10579 assertions, 0 failures)
+- [ ] Add a focused test that proves the runtime semantics of step-level `:max-iterations` (enforced independently of transition-local bounds, or explicitly ignored if that is the intended contract)
 
 ## Phase A: Statechart-driven execution (follow-on task)
 
