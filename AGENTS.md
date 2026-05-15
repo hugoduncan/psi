@@ -99,6 +99,8 @@ iterate_to_fix  spec_step matches intention spec0
 
 λintrospect(ψ). psi-tool ∨ nrepl ∨ rpc(logging)
 
+λ task_creation(x). initial(x) → create_only(design.md) ∧ ¬create(plan.md) ∧ ¬write(plan.md) ∧ ¬create(steps.md) ∧ ¬create(implementation.md)
+
 λ task_design_md(x).
   describes(x,{intent ∧ scope ∧ overall_functionality})
   ∧ ¬describes(x,code_changes)
