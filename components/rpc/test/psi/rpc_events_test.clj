@@ -10,7 +10,7 @@
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
     (let [home    (System/getProperty "user.home")
-          cwd     (str home "/projects/hugoduncan/psi/psi-main")
+          cwd     (str home "/tmp/psi-rpc-events-footer-default")
           [ctx session-id] (support/create-session-context {:cwd cwd})
           payload (with-redefs [session/query-in
                                 (fn [_ctx sid q]
@@ -36,7 +36,7 @@
                                    :psi.ui/statuses [{:extension-id "b" :text "TS+ESL,Prett"}
                                                      {:extension-id "a" :text "Formatter\nformatter"}]})]
                     (rpc.events/footer-updated-payload ctx session-id))]
-      (is (= "~/projects/hugoduncan/psi/psi-main (master) • xhig"
+      (is (= "~/tmp/psi-rpc-events-footer-default (master) • xhig"
              (:path-line payload)))
       (is (= ["↑172k" "↓17k" "CR5.2M" "CW1.2k" "$1.444" "31.9%/272k (auto)"]
              (:usage-parts payload)))
@@ -65,7 +65,7 @@
 (deftest footer-updated-payload-prefers-session-display-name-test
   (testing "footer payload uses derived display name when explicit session name is absent"
     (let [home    (System/getProperty "user.home")
-          cwd     (str home "/projects/hugoduncan/psi/psi-main")
+          cwd     (str home "/tmp/psi-rpc-events-footer-display-name")
           [ctx session-id] (support/create-session-context {:cwd cwd})
           payload (with-redefs [session/query-in
                                 (fn [_ctx sid q]
@@ -90,7 +90,7 @@
                                    :psi.agent-session/effective-reasoning-effort "high"
                                    :psi.ui/statuses []})]
                     (rpc.events/footer-updated-payload ctx session-id))]
-      (is (= "~/projects/hugoduncan/psi/psi-main (master) • Investigate failing tests"
+      (is (= "~/tmp/psi-rpc-events-footer-display-name (master) • Investigate failing tests"
              (:path-line payload)))
       (is (= ["?/272k"]
              (:usage-parts payload)))

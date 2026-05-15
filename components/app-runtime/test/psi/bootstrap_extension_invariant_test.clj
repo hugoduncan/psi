@@ -37,6 +37,7 @@
           _                (tool-registry/register-tool-in! reg ext-path {:name "delegate"
                                                                           :label "Delegate"
                                                                           :description "Run workflows"
+                                                                          :format-request (fn [_] "delegate")
                                                                           :parameters {:type "object"}})
           _                (command-registry/register-command-in! reg ext-path {:name "delegate" :description "Run a workflow"})
           _                (((ext/create-extension-api reg ext-path runtime-fns)
