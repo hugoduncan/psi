@@ -64,10 +64,10 @@
 
 (def ^:private tool-def
   {:name        "edit-clj"
-   :description "Replace one Clojure form in a file by S-expression equality; old-string and new-string must each be one complete, parseable form."
+   :description "Replace text in a file. old-string is matched by structural equality (whitespace does not matter); old-string and new-string must each be one complete, parseable form."
    :parameters  {:type       "object"
                  :properties {"filename"   {:type        "string"
-                                            :description "Path to the Clojure source file; relative paths resolve against the session worktree."}
+                                            :description "Path to the Clojure (.clj, .cljc, .bb .edn, etc) source file; relative paths resolve against the session worktree."}
                               "old-string" {:type        "string"
                                             :description "Exactly one complete Clojure form; matched against file nodes by sexpr equality."}
                               "new-string" {:type        "string"

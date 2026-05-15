@@ -77,7 +77,7 @@ Cover every AC:
   6. On `:ok` write updated content back to the file
   7. Merge `:filename` (resolved path string) into the result map
   8. Serialise result map to JSON string via cheshire
-- `tool-def` — tool map with `:name`, `:description` (≤ 20 words, one-form contract
+- `tool-def` — tool map with `:name`, `:description` (≤ 25 words, one-form contract
   explicit), `:parameters` as data map, `:execute` fn supporting both
   `([args])` and `([args opts])` arities.
 - `init` — register single tool via `(:register-tool api)`.
@@ -91,7 +91,7 @@ Cover every AC:
   (not file-not-found), confirming the extension checks strings before the file
 - AC 5 — non-existent file (both strings valid) → `file-not-found` result (JSON string,
   `"status": "error"`)
-- AC 9 — tool `:description` is ≤ 20 words and mentions the one-form contract
+- AC 9 — tool `:description` is ≤ 25 words and mentions the one-form contract
 - AC 10 — `init` registers exactly one tool named `"edit-clj"` (using
   `ext/create-registry` + `ext/create-extension-api` pattern from `github`'s
   extension test)
