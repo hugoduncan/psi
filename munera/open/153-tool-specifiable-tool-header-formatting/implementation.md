@@ -68,3 +68,9 @@
 - Reviewed `components/tool-runtime/test/psi/tool_runtime/call_summary_test.clj`, `components/tool-registry/test/psi/tool_registry/registry_test.clj`, `components/tui/src/psi/tui/tool_render.clj`, `components/emacs-ui/psi-tool-rows.el`, and `components/tool-runtime/src/psi/tool_runtime/call_summary.clj` against the task test-review contract.
 - Current focused proof covers formatter parity and fallback behavior, registration enforcement, TUI shared-helper use, and Emacs consumption of backend `:call-summary`; no missing design-behaviour cluster was found in the reviewed test surface.
 - Explicitly no new actionable feedback from this test review pass.
+
+2026-05-14 test-shaper review
+- No new actionable test-shaping issues found.
+- Reviewed task-local formatter specs plus `components/tool-runtime/{src,test}/psi/tool_runtime/call_summary*.clj`, `components/rpc/src/psi/rpc/events.clj`, `components/rpc/test/psi/rpc_prompt_test.clj`, and Emacs tool-row/runtime transcript tests for clarity, signal, and robustness.
+- Coverage already hits the key behavior partitions the task cares about: per-tool formatter parity, fallback on formatter failure, registration enforcement, RPC `:call-summary` transport, and Emacs preference for backend-provided summaries with compatibility fallback.
+- Explicitly no new actionable feedback from this test-shaper pass.
