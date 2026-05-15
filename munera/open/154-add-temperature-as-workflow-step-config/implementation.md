@@ -1,5 +1,21 @@
 # Implementation notes
 
+## 2026-05-15 — follow-up execution after preloaded review
+
+Verified the preloaded review result against task artifacts and referenced code/tests/docs.
+
+Completed/confirmed as already landed:
+- docs/changelog follow-ups present: `CHANGELOG.md`, `doc/workflow-grammar.md`, `doc/workflow-ir.md`
+- IR validation coverage present in `components/workflow-runtime/test/psi/workflow_runtime/ir_test.clj`
+- pipeline tests present for step-session-config, prompt-request, child-session-state, child-session-contract, target-ir-compiler, session-state model
+- provider-layer temperature tests present for both OpenAI and Anthropic
+
+Verification:
+- `clojure -M:test --focus psi.workflow-runtime.ir-test --focus psi.workflow-step-session-config.core-test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.child-session-state-test --focus psi.workflow-runtime.child-session-contract-test --focus psi.workflow-runtime.target-ir-compiler-test --focus psi.session-state.model-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test`
+- Result: 102 tests, 534 assertions, 0 failures
+
+No newly added unchecked actionable steps remained to execute from the preceding review pass.
+
 ## 2026-05-15 — task-implementation-review pass 2
 
 **Overall**: Re-reviewed task artifacts plus referenced code/tests/docs. All previously recorded implementation, test, and documentation follow-ups are present and complete. No new actionable implementation-quality issues found.
