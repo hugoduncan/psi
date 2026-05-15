@@ -33,6 +33,14 @@ Added `anthropic-temperature-explicit-override-test` (new deftest after `build-r
 - `testing "absent temperature uses provider default (0.7)"` — no `:temperature` in options → body `:temperature` = 0.7
 1 test, 2 assertions, 0 failures. Symmetric with `openai-temperature-defaults-to-zero-test` explicit-override block.
 
+## 2026-05-15 — code-shaper review pass 2
+
+**Overall**: Re-read task artifacts plus referenced workflow max-iterations code/tests/docs. No new actionable code-shaping issues found. The user-supplied task path `fix-workflow-max-iterations` still does not resolve in this worktree; reviewed the extant max-iterations implementation surfaces directly.
+
+### Issues found
+
+None. No new actionable feedback.
+
 ## 2026-05-15 — code-shaper review pass 1
 
 **Overall**: Implementation is clean across all 8 pipeline layers. Guard-style asymmetry (`contains?` vs `some?`) is intentional and correct. One new provider-layer test gap found.
