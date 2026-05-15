@@ -16,6 +16,8 @@ Verification:
 
 No newly added unchecked actionable steps remained to execute from the preceding review pass.
 
+Also confirmed the user-provided task path `fix-workflow-max-iterations` does not resolve to any Munera task directory in this worktree. Used the preloaded review result plus current open-task inventory to identify the intended reviewed task as `munera/open/154-add-temperature-as-workflow-step-config`, whose newly added follow-up items were already complete before this pass.
+
 ## 2026-05-15 — task-implementation-review pass 2
 
 **Overall**: Re-reviewed task artifacts plus referenced code/tests/docs. All previously recorded implementation, test, and documentation follow-ups are present and complete. No new actionable implementation-quality issues found.
