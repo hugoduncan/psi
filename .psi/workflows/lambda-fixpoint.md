@@ -4,6 +4,7 @@ description: Iterate a lambda expression to a fixpoint by decompiling and recomp
 ---
 {:steps [{:name "decompile"
           :type :delegate
+          :temperature 0
           :target "lambda-decompiler"
           :skills ["lambda-compiler"]
           :prompt-string {:type :template
@@ -14,6 +15,7 @@ description: Iterate a lambda expression to a fixpoint by decompiling and recomp
                      :from :workflow-original}]}
          {:name "compile"
           :type :delegate
+          :temperature 0
           :target "lambda-compiler"
           :skills ["lambda-compiler"]
           :prompt-string {:type :template
@@ -46,6 +48,7 @@ description: Iterate a lambda expression to a fixpoint by decompiling and recomp
                "CHANGED" {:goto "iterate-decompile" :max-iterations 10}}}
          {:name "iterate-decompile"
           :type :delegate
+          :temperature 0
           :target "lambda-decompiler"
           :skills ["lambda-compiler"]
           :prompt-string {:type :template
@@ -55,6 +58,7 @@ description: Iterate a lambda expression to a fixpoint by decompiling and recomp
                      :from :workflow-original}]}
          {:name "iterate-compile"
           :type :delegate
+          :temperature 0
           :target "lambda-compiler"
           :skills ["lambda-compiler"]
           :prompt-string {:type :template

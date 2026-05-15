@@ -388,3 +388,28 @@
           result (workflow-ir/validate-workflow-ir ir)]
       (is (= {:valid? true :structural-errors nil :semantic-errors []}
              result)))))
+
+;; ── Temperature schema validation ──────────────────────────────────────────
+
+(def ^:private base-session-spec
+  {:contributions [{:type :template :text "hello" :vars {}}]})
+
+(deftest session-spec-schema-temperature-validation-test
+  (testing "session-spec-schema accepts temperature within [0.0, 2.0]"
+    (is (m/validate workflow-ir/session-spec-schema (assoc base-session-spec :temperature 0.0)))
+    (is (m/validate workflow-ir/session-spec-schema (assoc base-session-spec :temperature 1.0)))
+    (is (m/validate workflow-ir/session-spec-schema (assoc base-session-spec :temperature 2.0))))
+
+  (testing "session-spec-schema accepts nil temperature (opt-in; absent = provider default)"
+    (is (m/validate workflow-ir/session-spec-schema (assoc base-session-spec :temperature nil))))
+
+  (testing "session-spec-schema accepts spec with no :temperature key"
+    (is (m/validate workflow-ir/session-spec-schema base-session-spec)))
+
+  (testing "session-spec-schema rejects temperature below 0.0"
+    (is (not (m/validate workflow-ir/session-spec-schema
+                         (assoc base-session-spec :temperature -0.1)))))
+
+  (testing "session-spec-schema rejects temperature above 2.0"
+    (is (not (m/validate workflow-ir/session-spec-schema
+                         (assoc base-session-spec :temperature 2.1))))))

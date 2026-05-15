@@ -112,6 +112,35 @@
     (testing "skills are filtered coherently"
       (is (= [] (:skills child-sd))))))
 
+(deftest child-session-base-state-temperature-test
+  (testing "non-nil temperature is stored in child session state"
+    (let [child-sd (child-session-state/child-session-base-state
+                    (parent-session-data)
+                    {:child-session-id "child-temp-1"
+                     :temperature 0.7})]
+      (is (= 0.7 (:temperature child-sd)))))
+
+  (testing "explicit 0.0 temperature is stored (falsy double must flow through)"
+    (let [child-sd (child-session-state/child-session-base-state
+                    (parent-session-data)
+                    {:child-session-id "child-temp-2"
+                     :temperature 0.0})]
+      (is (= 0.0 (:temperature child-sd)))
+      (is (contains? child-sd :temperature))))
+
+  (testing "nil temperature is absent from child session state"
+    (let [child-sd (child-session-state/child-session-base-state
+                    (parent-session-data)
+                    {:child-session-id "child-temp-3"
+                     :temperature nil})]
+      (is (not (contains? child-sd :temperature)))))
+
+  (testing "absent temperature key leaves temperature absent from child session state"
+    (let [child-sd (child-session-state/child-session-base-state
+                    (parent-session-data)
+                    {:child-session-id "child-temp-4"})]
+      (is (not (contains? child-sd :temperature))))))
+
 (deftest initialize-child-session-state-initializes-persistence-slots-test
   (let [messages [{:role "user" :content [{:type :text :text "hello"}]}]
         state1   (child-session-state/initialize-child-session-state

@@ -97,6 +97,9 @@
                        (contains? step-config :top-logprobs)
                        (assoc :top-logprobs (:top-logprobs step-config))
 
+                       (contains? step-config :temperature)
+                       (assoc :temperature (:temperature step-config))
+
                        (:model step-config)
                        (assoc :model (:model step-config))
 

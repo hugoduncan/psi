@@ -67,6 +67,24 @@
            #"Missing Anthropic API key"
            (#'anthropic/build-request convo model {}))))))
 
+(deftest anthropic-temperature-explicit-override-test
+  (testing "explicit temperature override flows through to request body"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (conv/create "sys")
+          req   (#'anthropic/build-request convo model {:api-key "test-key"
+                                                        :temperature 1.0})
+          body  (json/parse-string (:body req) true)]
+      (is (= 1.0 (:temperature body))
+          "explicit temperature 1.0 must appear in request body")))
+
+  (testing "absent temperature uses provider default (0.7)"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (conv/create "sys")
+          req   (#'anthropic/build-request convo model {:api-key "test-key"})
+          body  (json/parse-string (:body req) true)]
+      (is (= 0.7 (:temperature body))
+          "absent temperature must fall back to provider default 0.7"))))
+
 (deftest anthropic-request-schema-validation-fails-fast-test
   (testing "invalid provider request body is rejected with shape diagnostics"
     (let [invalid-body {:model "claude-sonnet-4-6"

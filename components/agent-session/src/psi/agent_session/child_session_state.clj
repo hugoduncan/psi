@@ -54,7 +54,7 @@
      :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}))
 
 (defn child-session-base-state
-  [parent-sd {:keys [child-session-id session-name thinking-level model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
+  [parent-sd {:keys [child-session-id session-name thinking-level temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
   (let [{:keys [prompt-component-selection tool-defs skills system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state parent-sd child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
@@ -91,7 +91,10 @@
                     :created-at                 ts
                     :updated-at                 ts}
              (some? top-logprobs)
-             (assoc :top-logprobs top-logprobs)))))
+             (assoc :top-logprobs top-logprobs)
+
+             (some? temperature)
+             (assoc :temperature temperature)))))
 
 (defn initialize-child-session-state
   [state* parent-sd {:keys [child-session-id preloaded-messages] :as child-opts}]

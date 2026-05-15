@@ -426,3 +426,53 @@
                                           :workflow-input {:input "plan it"}})
           config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
       (is (= ["missing-tool"] (mapv :name (:tool-defs config)))))))
+
+(deftest resolve-step-session-config-omits-temperature-when-absent-test
+  (testing "workflow child sessions omit temperature from config when not authored"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          workflow-run (workflow-run-for ctx
+                                         [support/single-step-definition-with-meta]
+                                         {:definition-id "planner"
+                                          :run-id "run-temp-absent"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (not (contains? config :temperature))))))
+
+(deftest resolve-step-session-config-explicit-temperature-test
+  (testing "workflow child sessions carry explicit temperature from authored step session config"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          definition {:definition-id "planner-temp"
+                      :name "planner-temp"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :temperature 0.0
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-temp"
+                                          :run-id "run-temp-explicit"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= 0.0 (:temperature config)))))
+
+  (testing "workflow child sessions carry non-zero temperature from authored step session config"
+    (let [[ctx _] (support/create-session-context {:persist? false})
+          definition {:definition-id "planner-temp-nonzero"
+                      :name "planner-temp-nonzero"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :temperature 1.5
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+                      :workflow-file-meta {:system-prompt "You are a planner."}}
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "planner-temp-nonzero"
+                                          :run-id "run-temp-nonzero"
+                                          :workflow-input {:input "plan it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= 1.5 (:temperature config))))))

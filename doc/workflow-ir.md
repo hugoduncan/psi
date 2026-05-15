@@ -516,6 +516,7 @@ invoke-spec ::= {:operation operation-id
 session-spec ::= {:model? model-selection-spec
                   :tools? [tool-id*]
                   :skills? [skill-id*]
+                  :temperature? double           ;; optional, range [0.0, 2.0]; absent = provider default
                   :contributions [contribution+]
                   session-extension*}
 
@@ -536,6 +537,7 @@ llm-judge ::= {:type :llm
 judge-session-spec ::= {:model? model-selection-spec
                         :tools? [tool-id*]
                         :skills? [skill-id*]
+                        :temperature? double     ;; optional, range [0.0, 2.0]; absent = provider default
                         :contributions [contribution+]}
 
 invoke-judge ::= {:type :invoke

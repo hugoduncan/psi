@@ -611,6 +611,13 @@
         (is (nil? (:chat_template_kwargs body)))))))
 
 (deftest openai-temperature-defaults-to-zero-test
+  (testing "chat completions defaults temperature to zero when absent"
+    (let [model (models/get-model :gpt-5)
+          convo (-> (conv/create "sys") (conv/add-user-message "hi"))
+          req  (#'openai/build-request convo model {:api-key "sk-test"})
+          body (json/parse-string (:body req) true)]
+      (is (= 0 (:temperature body)))))
+
   (testing "chat completions respects explicit temperature override"
     (let [model (models/get-model :gpt-5)
           convo (-> (conv/create "sys") (conv/add-user-message "hi"))

@@ -112,7 +112,7 @@
 
 (defn- create-workflow-child-session!
   [ctx parent-session-id request]
-  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level model skills
+  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level temperature model skills
                 developer-prompt developer-prompt-source preloaded-messages
                 cache-breakpoints prompt-component-selection
                 workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}
@@ -135,6 +135,7 @@
                           (some? response-mode) (assoc :response-mode response-mode)
                           (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
                           (some? top-logprobs) (assoc :top-logprobs top-logprobs)
+                          (some? temperature) (assoc :temperature temperature)
                           (some? model) (assoc :model model)
                           (some? skills) (assoc :skills skills)
                           (some? preloaded-messages) (assoc :preloaded-messages preloaded-messages)
