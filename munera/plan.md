@@ -8,6 +8,7 @@ Backlog:
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
 `munera/open/136-built-in-registration-path-for-workflow/`
+`munera/open/153-tool-specifiable-tool-header-formatting/`
 `munera/open/141-workflow-child-session-non-streaming-execution/`
 `munera/open/144-workflow-model-query-execution-fallback/`
 `munera/open/147-workflow-child-session-creation-contract/`
