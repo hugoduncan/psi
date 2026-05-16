@@ -11,6 +11,37 @@
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
 
+(defn- terminal-outcome-error-message
+  "Extract a human-readable error message from a workflow run's terminal-outcome."
+  [terminal-outcome]
+  (when terminal-outcome
+    (case (:reason terminal-outcome)
+      :iteration-limit-reached
+      (str "Iteration limit reached at step '" (:step-id terminal-outcome) "'"
+           " after " (:iteration-count terminal-outcome)
+           " of " (:max-iterations terminal-outcome) " iterations"
+           (when-let [signal (:last-judge-signal terminal-outcome)]
+             (str " (last signal: " signal ")"))
+           (when-let [text (not-empty (:last-result-text terminal-outcome))]
+             (str "\n\nLast result:\n"
+                  (if (> (count text) 2000)
+                    (str (subs text 0 2000) "\n... [truncated]")
+                    text))))
+      :judge-no-match
+      (str "Judge signal did not match any route at step '" (:step-id terminal-outcome) "'"
+           (when-let [output (:judge-output terminal-outcome)]
+             (str ": " output)))
+      ;; generic fallback
+      (str "Workflow failed: " (some-> (:reason terminal-outcome) name)
+           " at step '" (:step-id terminal-outcome) "'"))))
+
+(defn- run-failure-error
+  "Extract an error message for a failed workflow run, checking step errors first,
+   then terminal-outcome."
+  [exec-result final-run]
+  (or (some :error (:steps-executed exec-result))
+      (terminal-outcome-error-message (:terminal-outcome final-run))))
+
 (pco/defmutation register-workflow-definition
   "Register a canonical workflow definition into root state."
   [_ {:keys [psi/agent-session-ctx definition]}]
@@ -117,7 +148,7 @@
        :psi.workflow/blocked? (:blocked? exec-result)
        :psi.workflow/result result-text
        :psi.workflow/error (when (= :failed (:status exec-result))
-                             (some :error (:steps-executed exec-result)))})
+                             (run-failure-error exec-result final-run))})
     (catch Exception e
       {:psi.workflow/run-id run-id
        :psi.workflow/status nil
@@ -148,14 +179,15 @@
             (workflow-runtime/update-run-workflow-input @(:state* agent-session-ctx) run-id workflow-input)]
         (reset! (:state* agent-session-ctx) new-state)))
     (let [resume-fn (:resume-and-execute-workflow-run-fn agent-session-ctx)
-          exec-result (resume-fn agent-session-ctx session-id run-id)]
+          exec-result (resume-fn agent-session-ctx session-id run-id)
+          final-run (workflow-runtime/workflow-run-in @(:state* agent-session-ctx) run-id)]
       {:psi.workflow/run-id run-id
        :psi.workflow/status (:status exec-result)
        :psi.workflow/steps-executed (:steps-executed exec-result)
        :psi.workflow/terminal? (:terminal? exec-result)
        :psi.workflow/blocked? (:blocked? exec-result)
        :psi.workflow/error (when (= :failed (:status exec-result))
-                             (some :error (:steps-executed exec-result)))})
+                             (run-failure-error exec-result final-run))})
     (catch Exception e
       {:psi.workflow/run-id run-id
        :psi.workflow/status nil
