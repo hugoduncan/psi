@@ -146,6 +146,35 @@
               {:outcome :ok
                :outputs {:handoff {:issue_number "12"}}}))))))
 
+(deftest compile-temperature-preserved-through-session-step-test
+  (testing ":temperature is preserved through session step IR compilation"
+    (let [ir (target-compiler/compile-workflow-definition
+              {:steps [{:name "run"
+                        :type :session
+                        :temperature 0.3
+                        :contributions [{:type :source :from :workflow-original}]}]})]
+      (is (= 0.3 (get-in ir [:steps 0 :session :temperature])))))
+
+  (testing ":temperature is preserved through judge session IR compilation"
+    (let [ir (target-compiler/compile-workflow-definition
+              {:steps [{:name "build"
+                        :type :session
+                        :contributions [{:type :source :from :workflow-original}]
+                        :judge {:type :llm
+                                :temperature 1.2
+                                :contributions [{:type :template
+                                                 :text "APPROVED or REVISE?"
+                                                 :vars {}}]}
+                        :on {"APPROVED" {:goto :done}}}]})]
+      (is (= 1.2 (get-in ir [:steps 0 :judge :session :temperature])))))
+
+  (testing "absent :temperature is absent from compiled session spec"
+    (let [ir (target-compiler/compile-workflow-definition
+              {:steps [{:name "run"
+                        :type :session
+                        :contributions [{:type :source :from :workflow-original}]}]})]
+      (is (not (contains? (get-in ir [:steps 0 :session]) :temperature))))))
+
 (deftest target-authored-workflow-definition?-alias-test
   (testing "agent-session compiler alias matches lower shared authored-shape predicate"
     (is (true? (target-compiler/target-authored-workflow-definition?

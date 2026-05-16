@@ -14,6 +14,12 @@ Bootstrapped on 2026-04-02.
 - `AGENTS.md` — bootstrap/system instructions
 
 ## Current work state
+- Fixed workflow max-iterations exhaustion bug (branch `fix-workflow-max-iterations`):
+  - Three interconnected bugs: (1) `judged-routing-transition` compared vector `[:failed]` against keyword `:failed`, always falling through to the non-failed `judge/record` path; (2) `:terminal/record` action was a no-op with no terminal-outcome recording; (3) execute-run mutation only extracted step-level errors, missing iteration exhaustion
+  - Added `:iteration/exhausted` action on the exhaustion transition with correct vector-or-keyword target comparison
+  - New handler in `statechart_runtime.clj` records `terminal-outcome` with `:reason :iteration-limit-reached`, step-id, counts, last-judge-signal, and last-result-text
+  - Extracted `terminal-outcome-error-message` and `run-failure-error` helpers in `canonical_workflows.clj`; both execute-run and resume-run mutations now surface iteration exhaustion details
+  - 56 focused tests, 310 assertions, 0 failures; lint clean
 - Task 125 workflow-runtime core component extraction is now landed locally with follow-up decomposition, Kaocha wiring, and test-shaping polish complete:
   - added lower component `components/workflow-runtime/` with authoritative namespaces under `psi.workflow-runtime.*`
   - moved canonical workflow runtime owners out of `components/agent-session/src/psi/agent_session/`: model, IR, target IR compiler, statechart, source resolution, runtime core, progression recording, attempts, terminal contract, statechart runtime, and bounded turn execution contract

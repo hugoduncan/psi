@@ -2,6 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [com.fulcrologic.statecharts :as sc]
+   [com.fulcrologic.statecharts.data-model.working-memory-data-model :as wmdm]
+   [com.fulcrologic.statecharts.events :as evts]
    [com.fulcrologic.statecharts.protocols :as sp]
    [com.fulcrologic.statecharts.simple :as simple]
    [psi.workflow-runtime.statechart :as workflow-sc]))
@@ -68,3 +70,126 @@
     (is (workflow-sc/terminal-run-status? :failed))
     (is (workflow-sc/terminal-run-status? :cancelled))
     (is (not (workflow-sc/terminal-run-status? :running)))))
+
+;; --- Hierarchical chart iteration-exhaustion tests ---
+
+(def judged-looping-definition
+  "A minimal definition with a judged step that loops up to 2 iterations."
+  {:definition-id "loop-test"
+   :step-order ["produce" "check"]
+   :steps {"produce" {:name "produce"
+                      :type :session
+                      :executor {:type :agent}
+                      :result-schema [:map]
+                      :retry-policy {:max-attempts 1 :retry-on #{}}}
+           "check"   {:name "check"
+                      :type :session
+                      :judge {:type :llm}
+                      :on {"DONE"    {:goto :done}
+                           "CHANGED" {:goto "produce" :max-iterations 2}}
+                      :executor {:type :agent}
+                      :result-schema [:map]
+                      :retry-policy {:max-attempts 1 :retry-on #{}}}}})
+
+(defn- hierarchical-chart-run
+  "Run a compiled hierarchical chart through a sequence of events, collecting
+   action dispatches. Returns {:configuration ... :actions [...]}."
+  [definition events]
+  (let [actions* (atom [])
+        actions-fn (fn [action-kw data]
+                     (swap! actions* conj {:action action-kw
+                                           :step-id (:step-id data)})
+                     nil)
+        chart (workflow-sc/compile-hierarchical-chart definition)
+        env (simple/simple-env)
+        session-id (java.util.UUID/randomUUID)]
+    (simple/register! env :workflow-run chart)
+    (let [initial-data {:actions-fn actions-fn
+                        :iteration-counts {}
+                        :attempt-counts {}
+                        :actor-retry-limits {"produce" 1 "check" 1}}
+          wm0 (sp/start! (::sc/processor env) env :workflow-run
+                         {::sc/session-id session-id
+                          ::wmdm/data-model initial-data})
+          wmN (reduce (fn [wm {:keys [event data]}]
+                        (let [merged (assoc wm ::wmdm/data-model
+                                            (merge (::wmdm/data-model wm) data {:actions-fn actions-fn}))]
+                          (sp/process-event! (::sc/processor env) env merged
+                                             (evts/new-event {:name event :data (or data {})}))))
+                      wm0
+                      events)]
+      {:configuration (::sc/configuration wmN)
+       :actions @actions*})))
+
+(deftest iteration-exhaustion-fires-action-test
+  (testing "judge signal CHANGED when iteration count >= max-iterations transitions to :failed with :iteration/exhausted action"
+    (let [{:keys [configuration actions]}
+          (hierarchical-chart-run
+           judged-looping-definition
+           [{:event :workflow/start :data {}}
+            ;; produce step completes
+            {:event :actor/done :data {:iteration-counts {"produce" 1} :attempt-counts {"produce" 1}}}
+            ;; check step completes, enters judging
+            {:event :actor/done :data {:iteration-counts {"check" 1} :attempt-counts {"check" 1}}}
+            ;; judge says CHANGED, iteration count for "produce" is already at max
+            {:event :judge/signal :data {:signal "CHANGED"
+                                         :iteration-counts {"produce" 2 "check" 1}
+                                         :attempt-counts {"produce" 2 "check" 1}}}])]
+      (is (contains? configuration :failed)
+          "Chart should be in :failed state after iteration exhaustion")
+      (is (some #(= {:action :iteration/exhausted :step-id "check"} %)
+                actions)
+          ":iteration/exhausted action should fire for the judging step")))
+
+  (testing "judge signal CHANGED when iteration count < max-iterations loops back normally"
+    (let [{:keys [configuration actions]}
+          (hierarchical-chart-run
+           judged-looping-definition
+           [{:event :workflow/start :data {}}
+            {:event :actor/done :data {:iteration-counts {"produce" 1} :attempt-counts {"produce" 1}}}
+            {:event :actor/done :data {:iteration-counts {"check" 1} :attempt-counts {"check" 1}}}
+            ;; judge says CHANGED, iteration count for "produce" is below max
+            {:event :judge/signal :data {:signal "CHANGED"
+                                         :iteration-counts {"produce" 1 "check" 1}
+                                         :attempt-counts {"produce" 1 "check" 1}}}])]
+      (is (not (contains? configuration :failed))
+          "Chart should NOT be in :failed state when iterations remain")
+      (is (not (some #(= :iteration/exhausted (:action %)) actions))
+          ":iteration/exhausted action should NOT fire when iterations remain")))
+
+  (testing "judge signal DONE always goes to :completed regardless of iteration count"
+    (let [{:keys [configuration actions]}
+          (hierarchical-chart-run
+           judged-looping-definition
+           [{:event :workflow/start :data {}}
+            {:event :actor/done :data {:iteration-counts {"produce" 1} :attempt-counts {"produce" 1}}}
+            {:event :actor/done :data {:iteration-counts {"check" 1} :attempt-counts {"check" 1}}}
+            {:event :judge/signal :data {:signal "DONE"
+                                         :iteration-counts {"produce" 10 "check" 1}}}])]
+      (is (contains? configuration :completed)
+          "DONE signal should reach :completed")
+      (is (not (some #(= :iteration/exhausted (:action %)) actions))
+          ":iteration/exhausted should not fire for DONE signal"))))
+
+(deftest judged-routing-transition-vector-failed-target-test
+  (testing "both :failed and [:failed] are normalized onto the failed transition path"
+    (let [jrt #'workflow-sc/judged-routing-transition
+          keyword-result (jrt {:target :failed :cond (fn [_ _] true)} "step-a")
+          vector-result (jrt {:target [:failed] :cond (fn [_ _] true)} "step-a")]
+      (is (= [:failed] (:target keyword-result))
+          "Keyword :failed should compile to the canonical vector target form")
+      (is (= [:failed] (:target vector-result))
+          "Vector [:failed] should remain on the canonical vector target form")
+      (is (= :judge/signal (:event keyword-result) (:event vector-result))
+          "Both forms should produce the same judge event")
+      (is (= 1 (count (:children keyword-result)) (count (:children vector-result)))
+          "Both forms should attach exactly one script action")))
+
+  (testing "non-failed target preserves its target shape and still carries one script action"
+    (let [jrt #'workflow-sc/judged-routing-transition
+          result (jrt {:target :step.produce.acting :cond (fn [_ _] true)} "step-a")]
+      (is (= [:step.produce.acting] (:target result))
+          "Non-failed target should be preserved in canonical vector target form")
+      (is (= :judge/signal (:event result)))
+      (is (= 1 (count (:children result)))
+          "Non-failed route should still carry exactly one script action"))))

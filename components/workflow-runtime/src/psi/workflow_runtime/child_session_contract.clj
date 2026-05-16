@@ -14,6 +14,7 @@
    [:response-mode {:optional true} [:maybe keyword?]]
    [:tool-defs {:optional true} [:maybe [:vector :map]]]
    [:thinking-level {:optional true} [:maybe keyword?]]
+   [:temperature {:optional true} [:maybe number?]]
    [:model {:optional true} [:maybe :map]]
    [:skills {:optional true} [:maybe [:vector :map]]]
    [:developer-prompt {:optional true} [:maybe :string]]

@@ -54,6 +54,30 @@
                            :reset-at 42000}}
              (:retry s))))))
 
+(deftest agent-session-schema-temperature-test
+  (testing "agent-session-schema accepts optional :temperature"
+    (is (session/valid-session?
+         (session/initial-session {:temperature 1.0}))))
+
+  (testing "agent-session-schema accepts 0.0 temperature"
+    (is (session/valid-session?
+         (session/initial-session {:temperature 0.0}))))
+
+  (testing "agent-session-schema accepts 2.0 temperature (upper bound)"
+    (is (session/valid-session?
+         (session/initial-session {:temperature 2.0}))))
+
+  (testing "agent-session-schema accepts absent temperature"
+    (is (session/valid-session? (session/initial-session))))
+
+  (testing "agent-session-schema rejects temperature below 0.0"
+    (is (not (session/valid-session?
+              (assoc (session/initial-session) :temperature -0.1)))))
+
+  (testing "agent-session-schema rejects temperature above 2.0"
+    (is (not (session/valid-session?
+              (assoc (session/initial-session) :temperature 2.1))))))
+
 (deftest scheduler-schema-test
   (testing "schedule schema accepts canonical scheduled prompt record"
     (is (session/valid-schedule?

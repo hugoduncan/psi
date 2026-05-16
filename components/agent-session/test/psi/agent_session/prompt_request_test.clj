@@ -237,3 +237,34 @@
                      :content [{:type :text :text "done"}]}
           repairs   (prompt-request/tail-dangling-tool-result-repairs [assistant result])]
       (is (= [] repairs)))))
+
+;; ── Temperature projection ──────────────────────────────────────────────────
+
+(deftest session->request-options-temperature-absent-test
+  (testing "temperature key absent from options when not set on session"
+    (let [sd   {:model {:provider "openai" :id "gpt-4.1"} :thinking-level :off}
+          opts (prompt-request/session->request-options {} sd {})]
+      (is (not (contains? opts :temperature))))))
+
+(deftest session->request-options-temperature-nil-test
+  (testing "nil :temperature key present in session-data does not inject :temperature into request options"
+    (let [sd   {:model {:provider "openai" :id "gpt-4.1"}
+                :thinking-level :off
+                :temperature nil}
+          opts (prompt-request/session->request-options {} sd {})]
+      (is (not (contains? opts :temperature))))))
+
+(deftest session->request-options-temperature-present-test
+  (testing "explicit temperature projected into request options"
+    (let [sd   {:model {:provider "openai" :id "gpt-4.1"}
+                :thinking-level :off
+                :temperature 0.0}
+          opts (prompt-request/session->request-options {} sd {})]
+      (is (= 0.0 (:temperature opts)))))
+
+  (testing "non-zero temperature projected into request options"
+    (let [sd   {:model {:provider "openai" :id "gpt-4.1"}
+                :thinking-level :off
+                :temperature 1.5}
+          opts (prompt-request/session->request-options {} sd {})]
+      (is (= 1.5 (:temperature opts))))))

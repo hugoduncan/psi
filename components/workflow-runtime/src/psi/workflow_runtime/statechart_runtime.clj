@@ -35,6 +35,17 @@
 (def queue-event! queue/queue-event!)
 (def terminal-configuration? state/terminal-configuration?)
 
+(defn- clear-pending-judge-state!
+  "Clear pending judge/routing fields from working memory after a judge cycle
+   completes (used by both :judge/record and :iteration/exhausted)."
+  [working-memory*]
+  (swap! working-memory*
+         (fn [wm]
+           (-> wm
+               (assoc :pending-judge-result nil
+                      :pending-routing nil
+                      :updated-at (state/now))))))
+
 (defn make-workflow-actions
   "Create the Phase A workflow actions dispatcher.
 
@@ -96,6 +107,9 @@
 
                        (contains? step-config :top-logprobs)
                        (assoc :top-logprobs (:top-logprobs step-config))
+
+                       (contains? step-config :temperature)
+                       (assoc :temperature (:temperature step-config))
 
                        (:model step-config)
                        (assoc :model (:model step-config))
@@ -292,12 +306,7 @@
                                                                 :step-id step-id
                                                                 :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
                                                                 :judge-output (:judge-output judge-result)})))))))
-          (swap! working-memory*
-                 (fn [wm]
-                   (-> wm
-                       (assoc :pending-judge-result nil
-                              :pending-routing nil
-                              :updated-at (state/now)))))
+          (clear-pending-judge-state! working-memory*)
           nil)
 
         :step/block
@@ -308,6 +317,35 @@
                        (assoc :blocked-step-id step-id
                               :current-step-id step-id
                               :updated-at (state/now)))))
+          nil)
+
+        :iteration/exhausted
+        (let [iteration-count (get-in @working-memory* [:iteration-counts step-id] 0)
+              workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
+              step-def (state/runtime-step-def workflow-run step-id)
+              last-judge-result (get-in @working-memory* [:judge-results step-id])
+              last-step-output (get-in @working-memory* [:step-outputs step-id])
+              last-judge-signal (:judge-event last-judge-result)]
+          ;; Record judge result for the final iteration before recording terminal outcome
+          (when last-judge-result
+            (swap! (:state* ctx)
+                   workflow-progression-recording/record-judge-result run-id step-id last-judge-result))
+          (swap! (:state* ctx)
+                 (fn [state-map]
+                   (update-in state-map [:workflows :runs run-id]
+                              (fn [wf-run]
+                                (-> wf-run
+                                    (assoc :status :failed
+                                           :finished-at (or (:finished-at wf-run) (state/now))
+                                           :terminal-outcome
+                                           {:outcome :failed
+                                            :reason :iteration-limit-reached
+                                            :step-id step-id
+                                            :iteration-count iteration-count
+                                            :max-iterations (get-in step-def [:on last-judge-signal :max-iterations])
+                                            :last-judge-signal last-judge-signal
+                                            :last-result-text (get-in last-step-output [:outputs :final-llm-reply])}))))))
+          (clear-pending-judge-state! working-memory*)
           nil)
 
         :terminal/record

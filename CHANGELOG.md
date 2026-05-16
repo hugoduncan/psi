@@ -7,6 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Added
+- Workflow session steps now accept an optional `:temperature` field (range `[0.0, 2.0]`). When set, the value is threaded through to the AI provider request. When absent, the provider default applies. Applies to both `:type :session` steps and `:type :llm` judge specs.
 - `psi-tool` now supports `action: "mutate"` for invoking registered runtime mutations with structured success/error reports.
 - The live graph now exposes explicit session-surface attrs: `:psi.runtime-session/active-id`, `:psi.runtime-session/list`, `:psi.runtime-session/count`, `:psi.persisted-session/list`, and `:psi.persisted-session/list-all`.
 - The live graph now exposes `:psi.agent-session/context-session-summaries`, a compact session inventory for operational selection, alongside the explicit runtime-session root attrs.

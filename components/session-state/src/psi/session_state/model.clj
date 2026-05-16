@@ -210,6 +210,7 @@
                                                               [:max-lines {:optional true} [:maybe :int]]
                                                               [:max-bytes {:optional true} [:maybe :int]]]]]
    [:scheduler {:optional true} scheduler-state-schema]
+   [:temperature {:optional true} [:maybe [:double {:min 0.0 :max 2.0}]]]
    [:logprobs-enabled {:optional true} :boolean]
    [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
    [:last-turn-logprobs {:optional true} [:maybe [:vector :map]]]])

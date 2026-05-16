@@ -198,5 +198,9 @@
        :model resolved-model
        :prompt-component-selection (:prompt-component-selection session-spec)}
       (resolved-logprob-config session-spec))
+
+      (contains? session-spec :temperature)
+      (assoc :temperature (:temperature session-spec))
+
       model-fallback
       (assoc :model-fallback model-fallback))))

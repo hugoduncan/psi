@@ -302,11 +302,14 @@
 
 (defn- judged-routing-transition
   [transition step-id]
-  (let [target (:target transition)]
-    (if (= target :failed)
+  (let [target (:target transition)
+        failed? (or (= target :failed)
+                    (= target [:failed]))]
+    (if failed?
       (ele/transition (cond-> {:event :judge/signal
                                :target :failed}
-                        (:cond transition) (assoc :cond (:cond transition))))
+                        (:cond transition) (assoc :cond (:cond transition)))
+                      (dispatch-action :iteration/exhausted step-id))
       (ele/transition (cond-> {:event :judge/signal
                                :target target}
                         (:cond transition) (assoc :cond (:cond transition)))

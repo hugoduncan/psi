@@ -27,6 +27,24 @@
                  :workflow-attempt-id "attempt-1"
                  :workflow-owned? true})))))
 
+;; The child-session contract schema uses [:maybe number?] for :temperature — no range constraint.
+;; Range [0.0, 2.0] is enforced upstream at the IR layer (session-spec-schema).
+;; The contract is intentionally permissive: it validates shape/presence, not domain range.
+(deftest request-contract-accepts-temperature-test
+  (testing "request-schema accepts optional :temperature"
+    (is (true? (contract/valid-request?
+                {:child-session-id "child-1"
+                 :temperature 1.0}))))
+
+  (testing "request-schema accepts nil :temperature"
+    (is (true? (contract/valid-request?
+                {:child-session-id "child-1"
+                 :temperature nil}))))
+
+  (testing "request-schema accepts absent :temperature"
+    (is (true? (contract/valid-request?
+                {:child-session-id "child-1"})))))
+
 (deftest request-contract-rejects-unknown-fields-test
   (testing "unknown request fields fail clearly"
     (let [ex (try

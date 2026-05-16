@@ -219,3 +219,118 @@
           result (cwf-mutations/list-workflow-runs {} {:psi/agent-session-ctx ctx})]
       (is (= 1 (:psi.workflow/run-count result)))
       (is (= ["run-1"] (mapv :run-id (:psi.workflow/runs result)))))))
+
+(deftest terminal-outcome-error-message-test
+  (testing "iteration-limit-reached produces actionable error with step, counts, signal, and last result"
+    (let [outcome {:outcome :failed
+                   :reason :iteration-limit-reached
+                   :step-id "compare"
+                   :iteration-count 10
+                   :max-iterations 10
+                   :last-judge-signal "CHANGED"
+                   :last-result-text "λx.prefer(compose(transducers))"}
+          msg (#'cwf-mutations/terminal-outcome-error-message outcome)]
+      (is (string? msg))
+      (is (re-find #"Iteration limit reached" msg))
+      (is (re-find #"compare" msg))
+      (is (re-find #"10 of 10" msg))
+      (is (re-find #"CHANGED" msg))
+      (is (re-find #"Last result" msg))
+      (is (re-find #"transducers" msg))))
+
+  (testing "iteration-limit-reached without optional fields"
+    (let [outcome {:outcome :failed
+                   :reason :iteration-limit-reached
+                   :step-id "check"
+                   :iteration-count 5
+                   :max-iterations 5}
+          msg (#'cwf-mutations/terminal-outcome-error-message outcome)]
+      (is (string? msg))
+      (is (re-find #"Iteration limit reached" msg))
+      (is (not (re-find #"signal" msg)))
+      (is (not (re-find #"Last result" msg)))))
+
+  (testing "judge-no-match produces actionable error"
+    (let [outcome {:outcome :failed
+                   :reason :judge-no-match
+                   :step-id "review"
+                   :judge-output "MAYBE"}
+          msg (#'cwf-mutations/terminal-outcome-error-message outcome)]
+      (is (re-find #"did not match" msg))
+      (is (re-find #"review" msg))
+      (is (re-find #"MAYBE" msg))))
+
+  (testing "unknown failure reason uses generic fallback"
+    (let [outcome {:outcome :failed
+                   :reason :some-other-reason
+                   :step-id "build"}
+          msg (#'cwf-mutations/terminal-outcome-error-message outcome)]
+      (is (re-find #"some-other-reason" msg))
+      (is (re-find #"build" msg))))
+
+  (testing "nil terminal-outcome returns nil"
+    (is (nil? (#'cwf-mutations/terminal-outcome-error-message nil))))
+
+  (testing "terminal-outcome with nil :reason uses defensive fallback without NPE"
+    (let [outcome {:outcome :failed
+                   :reason nil
+                   :step-id "build"}
+          msg (#'cwf-mutations/terminal-outcome-error-message outcome)]
+      (is (string? msg))
+      (is (re-find #"build" msg))
+      (is (not (re-find #"null" (str msg))))))
+
+  (testing "run-failure-error falls through to terminal-outcome when no step errors"
+    (let [exec-result {:status :failed :steps-executed [{:step-id "a" :error nil}]}
+          final-run {:terminal-outcome {:outcome :failed
+                                        :reason :iteration-limit-reached
+                                        :step-id "a"
+                                        :iteration-count 3
+                                        :max-iterations 3}}
+          msg (#'cwf-mutations/run-failure-error exec-result final-run)]
+      (is (re-find #"Iteration limit reached" msg))))
+
+  (testing "empty-string last-result-text produces no Last result header"
+    (let [outcome {:outcome :failed
+                   :reason :iteration-limit-reached
+                   :step-id "check"
+                   :iteration-count 3
+                   :max-iterations 3
+                   :last-result-text ""}
+          msg (#'cwf-mutations/terminal-outcome-error-message outcome)]
+      (is (string? msg))
+      (is (not (re-find #"Last result" msg))
+          "Empty last-result-text should not produce a dangling 'Last result:' header")))
+
+  (testing "long last-result-text is truncated with marker"
+    (let [long-text (apply str (repeat 3000 "x"))
+          outcome {:outcome :failed
+                   :reason :iteration-limit-reached
+                   :step-id "check"
+                   :iteration-count 3
+                   :max-iterations 3
+                   :last-result-text long-text}
+          msg (#'cwf-mutations/terminal-outcome-error-message outcome)]
+      (is (string? msg))
+      (is (re-find #"Last result" msg))
+      (is (re-find #"\[truncated\]" msg)
+          "Long text should be truncated with [truncated] marker")
+      (is (<= (count msg) (+ 2200 100))
+          "Total message length should be bounded (2000 chars of text + overhead)")))
+
+  (testing "run-failure-error returns nil when no step errors and no terminal-outcome"
+    (let [exec-result {:status :failed :steps-executed [{:step-id "a" :error nil}]}
+          final-run {}
+          msg (#'cwf-mutations/run-failure-error exec-result final-run)]
+      (is (nil? msg)
+          "Documents current behaviour: :judge/no-match path produces no terminal-outcome, so run-failure-error returns nil")))
+
+  (testing "run-failure-error prefers step errors over terminal-outcome"
+    (let [exec-result {:status :failed :steps-executed [{:step-id "a" :error "step blew up"}]}
+          final-run {:terminal-outcome {:outcome :failed
+                                        :reason :iteration-limit-reached
+                                        :step-id "a"
+                                        :iteration-count 3
+                                        :max-iterations 3}}
+          msg (#'cwf-mutations/run-failure-error exec-result final-run)]
+      (is (= "step blew up" msg)))))

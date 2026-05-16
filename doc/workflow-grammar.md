@@ -113,11 +113,13 @@ arg-map ::= {keyword (literal | source-spec)}*
 session-config-entry ::= :model model-selection-spec
                        | :tools [tool-id*]
                        | :skills [skill-id*]
+                       | :temperature double   ;; optional, range [0.0, 2.0]; absent = provider default
                        | session-config-extension
 
 judge-session-config-entry ::= :model model-selection-spec
                              | :tools [tool-id*]
                              | :skills [skill-id*]
+                             | :temperature double   ;; optional, range [0.0, 2.0]; absent = provider default
                              | judge-session-config-extension
 
 model-selection-spec ::= external-nonterminal-defined-in-doc-model-selection-grammar
