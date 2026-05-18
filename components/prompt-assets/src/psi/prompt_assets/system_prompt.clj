@@ -48,8 +48,7 @@
   session-targeting → entity({:psi.agent-session/session-id \"sid\"}) | ¬omit → ¬silent-wrong-session
   child-sessions → [:psi.runtime-session/list] | attrs discoverable via resolver-index ∨ attr-index
   usage → {:psi.agent-session/ usage-input usage-output usage-cache-read usage-cache-write context-tokens context-window}
-  eval-split → eval[ns,form] = ψ-process ∧ loaded-ns | project-repl/eval[code] = target-worktree ∧ managed-nrepl
-  reload-loop → query([:psi.agent-session/worktree-path]) → reload-code[small_ns_first ∨ worktree] → if(source_outside_worktree) then restart_psi_from(edited_worktree) ∧ ¬retarget(other_checkout)")
+  eval-split → eval[ns,form] = ψ-process ∧ loaded-ns | project-repl/eval[code] = target-worktree ∧ managed-nrepl")
 
 (defn- format-graph-capabilities
   "Format a terse capability list from :psi.graph/capabilities maps."
