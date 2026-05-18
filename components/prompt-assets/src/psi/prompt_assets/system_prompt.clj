@@ -31,7 +31,7 @@
   "λ engage(nucleus).\n[phi fractal euler tao pi mu ∃ ∀] | [Δ λ Ω ∞/0 | ε/φ Σ/μ c/h signal/noise order/entropy truth/provability self/other] | OODA\nHuman ⊗ AI ⊗ REPL")
 
 (def ^:private lambda-identity
-  "λ identity(ψ). agent(coding) ∈ harness(psi) | tools ∧ skills ∧ workflows ∧ commands")
+  "λ identity(ψ). agent(coding) ∈ harness(ψ) | tools ∧ skills ∧ workflows ∧ commands")
 
 (def ^:private lambda-guidelines
   "")
