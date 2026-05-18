@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2104] - 2026-05-18
+
 ### Added
 - The `Release` GitHub Actions workflow now supports manual `workflow_dispatch` dry runs with `ref`, `publish`, and `release_version` inputs so release build validation can run without publishing to Clojars or creating a GitHub Release.
 
@@ -87,7 +89,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2099...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2104...HEAD
+[0.1.2104]: https://github.com/hugoduncan/psi/compare/v0.1.2099...v0.1.2104
 [0.1.2099]: https://github.com/hugoduncan/psi/compare/v0.1.2095...v0.1.2099
 [0.1.2095]: https://github.com/hugoduncan/psi/compare/v0.1.2091...v0.1.2095
 [0.1.2091]: https://github.com/hugoduncan/psi/compare/v0.1.2088...v0.1.2091
