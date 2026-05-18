@@ -33,6 +33,6 @@
   - [x] Update `components/agent-session/src/psi/agent_session/tools.clj` `make-tools-with-cwd` and `make-read-only-tools-with-cwd` to project from the canonical built-in tool maps instead of hand-rebuilding partial maps.
   - [x] Ensure cwd-scoped built-in tool defs retain `:lambda-description` so child/session-scoped prompt surfaces cannot lose the uniform tool-description contract.
   - [x] Add a focused test proving cwd-scoped tool defs preserve canonical prompt-description fields.
-- [ ] Add focused proof that `:session/refresh-system-prompt` rebuilds from live session `:tool-defs` and `:skills`, not stale placeholder values inside stored `:system-prompt-build-opts`.
-  - [ ] Cover the registration-driven refresh path exercised by `components/agent-session/test/psi/agent_session/config_compaction_test.clj/register-skill refreshes the system prompt so newly added skills appear`.
-  - [ ] Fix the refresh rebuild contract so prompt refresh after skill/tool registration keeps the live tool section and skills section even when stored build opts contain `:skills []` or omit `:tool-defs`.
+- [x] Add focused proof that `:session/refresh-system-prompt` rebuilds from live session `:tool-defs` and `:skills`, not stale placeholder values inside stored `:system-prompt-build-opts`.
+  - [x] Cover the registration-driven refresh path exercised by `components/agent-session/test/psi/agent_session/config_compaction_test.clj/register-skill refreshes the system prompt so newly added skills appear`.
+  - [x] Fix the refresh rebuild contract so prompt refresh after skill/tool registration keeps the live tool section and skills section even when stored build opts contain `:skills []` or omit `:tool-defs`.
