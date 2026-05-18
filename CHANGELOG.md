@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2109] - 2026-05-18
+
 ### Added
 - Release verification now smoke-tests the installed `bbin` launcher entrypoint for published artifacts, covering the released launcher path in addition to direct `psi.main` startup.
 
@@ -97,7 +99,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2104...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2109...HEAD
+[0.1.2109]: https://github.com/hugoduncan/psi/compare/v0.1.2104...v0.1.2109
 [0.1.2104]: https://github.com/hugoduncan/psi/compare/v0.1.2099...v0.1.2104
 [0.1.2099]: https://github.com/hugoduncan/psi/compare/v0.1.2095...v0.1.2099
 [0.1.2095]: https://github.com/hugoduncan/psi/compare/v0.1.2091...v0.1.2095
