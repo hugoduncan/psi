@@ -1,0 +1,2 @@
+- [ ] Make the task's review/output surface explicit in the task artifacts: update `design.md` and/or `plan.md` so `implementation.md` is the append-only review/decision log and `design-steps.md` is the actionable ambiguity follow-up surface.
+- [ ] Record the settled authoritative built-in tool definition owner map for `read`, `bash`, `edit`, `write`, and `psi-tool`, with a brief rationale for each placement, in a task artifact before moving prompt descriptions out of `psi.prompt-assets.system-prompt`.
