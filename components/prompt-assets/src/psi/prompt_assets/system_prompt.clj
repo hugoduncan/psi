@@ -16,8 +16,14 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [psi.agent-session.psi-tool :as psi-tool]
+   [psi.agent-session.tools :as builtins]
    [psi.prompt-assets.skills :as skills]
    [psi.tool-registry.defs :as tool-defs]))
+
+(def ^:private default-tool-defs
+  (tool-defs/normalize-tool-defs
+   (conj (vec builtins/all-tools) psi-tool/psi-tool)))
 
 ;;; Lambda mode constants
 
@@ -402,22 +408,7 @@
          include-runtime-meta?  (if (contains? #{true false} include-runtime-metadata?) include-runtime-metadata? true)
          include-context-files? (if (contains? #{true false} include-context-files?) include-context-files? true)
          normalized-tool-defs   (tool-defs/normalize-tool-defs
-                                 (or tool-defs
-                                     [{:name "read"
-                                       :description "Read file contents"
-                                       :lambda-description "λf. content(f)"}
-                                      {:name "bash"
-                                       :description "Execute bash commands (ls, grep, find, etc.)"
-                                       :lambda-description "λcmd. shell(cmd) | {ls grep find …}"}
-                                      {:name "edit"
-                                       :description "Make surgical edits to files (find exact text and replace)"
-                                       :lambda-description "λf. find(exact) → replace"}
-                                      {:name "write"
-                                       :description "Create or overwrite files"
-                                       :lambda-description "λf. create(f) ∨ overwrite(f)"}
-                                      {:name "psi-tool"
-                                       :description "Execute live psi runtime operations: action-based graph query, in-process ψ eval, explicit code reload, and managed project REPL control."
-                                       :lambda-description "λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"}]))
+                                 (or tool-defs default-tool-defs))
          filtered-tool-defs     (if (some? selected-tools)
                                   (filter-tool-defs normalized-tool-defs {:tool-names selected-tools})
                                   normalized-tool-defs)

@@ -160,8 +160,8 @@
       (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir" :prompt-mode :prose})]
         (is (str/includes? prompt "You are ψ (Psi)"))
         (is (str/includes? prompt "Available tools:"))
-        (is (str/includes? prompt "read: Read file contents"))
-        (is (str/includes? prompt "psi-tool: Execute live psi runtime operations: action-based graph query, in-process ψ eval, explicit code reload, and managed project REPL control."))
+        (is (str/includes? prompt "read: Read the contents of a file. Returns the file text."))
+        (is (str/includes? prompt "psi-tool: Execute a live psi runtime operation. Canonical requests use `action` with one of:"))
         (is (str/includes? prompt "Guidelines:"))
         (is (str/includes? prompt "Capability graph (EQL discovery):"))
         (is (not (str/includes? prompt "λ engage(nucleus).")))))

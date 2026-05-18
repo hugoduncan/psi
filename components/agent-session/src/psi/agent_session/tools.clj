@@ -38,7 +38,7 @@
   {:name               "bash"
    :label              "Bash"
    :description        "Execute a bash command. Returns stdout and stderr combined."
-   :lambda-description "λcmd. shell(cmd) | {ls grep find …}"
+   :lambda-description "λcmd. shell(cmd)"
    :parameters         {:type       "object"
                         :properties {:command {:type "string" :description "Bash command to run"}
                                      :timeout {:type "integer" :description "Timeout in seconds (default 30)"}}
