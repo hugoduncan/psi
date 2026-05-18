@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Fixed
+- CI now serializes build-artifact smoke tests that share `target/psi-unreleased.jar`, preventing release/test races where one smoke test rebuilt `target/` while another was inspecting the jar.
+
 ## [0.1.2091] - 2026-05-18
 
 ### Fixed
