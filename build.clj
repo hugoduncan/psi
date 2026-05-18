@@ -106,6 +106,24 @@
     (println (str "       " class-dir "/META-INF/maven/" (namespace psi-lib) "/" (name psi-lib) "/pom.xml"))
     jar))
 
+(defn install-local
+  "Build the library jar and install it into the current local Maven repo.
+   Intended for local/CI smoke tests that exercise bbin installation against an
+   isolated HOME/XDG environment."
+  [opts]
+  (let [version (version-string)
+        jar     (lib-jar-file version)]
+    (when-not (.exists (io/file jar))
+      (println (str "Library jar not found — building first ..."))
+      (lib opts))
+    (println (str "Installing " jar " to local Maven repo as " psi-lib " " version " ..."))
+    (b/install {:class-dir class-dir
+                :lib       psi-lib
+                :version   version
+                :basis     @basis
+                :jar-file  jar})
+    (println "Done.")))
+
 (defn deploy
   "Deploy the library jar to Clojars.
    Builds the library jar first if it is not already present.
