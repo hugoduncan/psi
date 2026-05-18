@@ -60,7 +60,11 @@
     (is (= :psi/release-version
            (get-in ext/psi-owned-extension-catalog ['psi/mementum :source-policies :jar :mvn/version])))
     (is (= :psi/release-version
-           (get-in ext/psi-owned-extension-catalog ['psi/workflow-loader :source-policies :jar :mvn/version])))))
+           (get-in ext/psi-owned-extension-catalog ['psi/workflow-loader :source-policies :jar :mvn/version])))
+    (is (= :psi/release-version
+           (get-in ext/psi-owned-extension-catalog ['psi/github :source-policies :jar :mvn/version])))
+    (is (= :psi/release-version
+           (get-in ext/psi-owned-extension-catalog ['psi/edit-clj :source-policies :jar :mvn/version])))))
 
 (deftest expand-entry-test
   (testing "recognized psi-owned entry expands from minimal syntax"
@@ -83,6 +87,14 @@
     (is (= '{:local/root "extensions/github"
              :psi/init psi.github.extension/init}
            (ext/expand-entry 'psi/github {}))))
+  (testing "psi/github jar policy expands to release-version placeholder"
+    (is (= {:mvn/version :psi/release-version
+            :psi/init 'psi.github.extension/init}
+           (ext/expand-entry 'psi/github {} {:policy :jar}))))
+  (testing "psi/edit-clj jar policy expands to release-version placeholder"
+    (is (= {:mvn/version :psi/release-version
+            :psi/init 'psi.edit-clj.extension/init}
+           (ext/expand-entry 'psi/edit-clj {} {:policy :jar}))))
   (testing "unrecognized libs do not receive psi-owned defaults"
     (is (= '{:mvn/version "1.2.3"}
            (ext/expand-entry 'third-party/ext {:mvn/version "1.2.3"}))))
