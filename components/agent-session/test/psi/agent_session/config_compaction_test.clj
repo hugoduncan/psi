@@ -128,12 +128,38 @@
 
   (testing "register-skill refreshes the system prompt so newly added skills appear"
     (let [[ctx session-id] (create-session-context)
+          tool-defs [{:name "read"
+                      :label "Read"
+                      :description "Read files"
+                      :lambda-description "λf. content(f)"
+                      :parameters {:type "object" :properties {} :required ["path"]}}
+                     {:name "bash"
+                      :label "Bash"
+                      :description "Run shell commands"
+                      :lambda-description "λcmd. shell(cmd)"
+                      :parameters {:type "object" :properties {} :required ["command"]}}
+                     {:name "edit"
+                      :label "Edit"
+                      :description "Edit files"
+                      :lambda-description "λf. find(exact) → replace"
+                      :parameters {:type "object" :properties {} :required ["path" "oldText" "newText"]}}
+                     {:name "write"
+                      :label "Write"
+                      :description "Write files"
+                      :lambda-description "λf. create(f) ∨ overwrite(f)"
+                      :parameters {:type "object" :properties {} :required ["path" "content"]}}
+                     {:name "psi-tool"
+                      :label "psi-tool"
+                      :description "Query Psi state"
+                      :lambda-description "λquery. graph(psi)"
+                      :parameters {:type "object" :properties {} :required ["action"]}}]
           skill {:name "coding"
                  :description "Use coding guidance"
                  :file-path "/tmp/SKILL.md"
                  :base-dir "/tmp"
                  :source :project
                  :disable-model-invocation false}]
+      (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-defs} {:origin :test})
       (session/dispatch-in! ctx :session/set-system-prompt-build-opts
                             {:session-id session-id
                              :opts {:cwd "/tmp"
@@ -142,20 +168,48 @@
                             {:origin :test})
       (session/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :test})
       (let [before-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
+        (is (str/includes? (or before-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (not (str/includes? (or before-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md"))))
       (let [result (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})]
         (is (= {:added? true :changed? true :count 1} result)))
       (let [after-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
+        (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (str/includes? (or after-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md")))))
 
   (testing "duplicate register-skill leaves skills and prompt unchanged"
     (let [[ctx session-id] (create-session-context)
+          tool-defs [{:name "read"
+                      :label "Read"
+                      :description "Read files"
+                      :lambda-description "λf. content(f)"
+                      :parameters {:type "object" :properties {} :required ["path"]}}
+                     {:name "bash"
+                      :label "Bash"
+                      :description "Run shell commands"
+                      :lambda-description "λcmd. shell(cmd)"
+                      :parameters {:type "object" :properties {} :required ["command"]}}
+                     {:name "edit"
+                      :label "Edit"
+                      :description "Edit files"
+                      :lambda-description "λf. find(exact) → replace"
+                      :parameters {:type "object" :properties {} :required ["path" "oldText" "newText"]}}
+                     {:name "write"
+                      :label "Write"
+                      :description "Write files"
+                      :lambda-description "λf. create(f) ∨ overwrite(f)"
+                      :parameters {:type "object" :properties {} :required ["path" "content"]}}
+                     {:name "psi-tool"
+                      :label "psi-tool"
+                      :description "Query Psi state"
+                      :lambda-description "λquery. graph(psi)"
+                      :parameters {:type "object" :properties {} :required ["action"]}}]
           skill {:name "coding"
                  :description "Use coding guidance"
                  :file-path "/tmp/SKILL.md"
                  :base-dir "/tmp"
                  :source :project
                  :disable-model-invocation false}]
+      (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-defs} {:origin :test})
       (session/dispatch-in! ctx :session/set-system-prompt-build-opts
                             {:session-id session-id
                              :opts {:cwd "/tmp"
@@ -172,6 +226,7 @@
             event-types   (mapv :event-type (kernel/event-log-entries))]
         (is (= {:added? false :changed? false :count 1} result))
         (is (= before-prompt after-prompt))
+        (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (= [skill] (:skills sd)))
         (is (= [:session/register-skill] event-types))))))
 

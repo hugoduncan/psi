@@ -398,74 +398,75 @@
 
   ;; Register delegate tool
   ((:register-tool api)
-   {:name           "delegate"
-    :label          "Delegate"
-    :description    "Run, list, continue, or remove workflow-based delegations. `continue` pushes a stopped run forward with a new prompt; `remove` deletes a run. Covers single-step agent profiles and multi-step orchestrations."
-    :format-request call-summary/delegate-format-request
-    :parameters     {:type       "object"
-                     :properties {"action"                   {:type "string"
-                                                              :enum ["run" "list" "continue" "remove"]
-                                                              :description "Operation: run (default when omitted), list, continue, remove"}
-                                  "workflow"                 {:type "string"
-                                                              :description "Workflow name to run (action=run)"}
-                                  "prompt"                   {:type "string"
-                                                              :description "Input/request text (action=run, action=continue)"}
-                                  "name"                     {:type "string"
-                                                              :description "Optional label for this run (action=run)"}
-                                  "id"                       {:type "string"
-                                                              :description "Run id (action=continue, action=remove)"}
-                                  "mode"                     {:type "string"
-                                                              :enum ["sync" "async"]
-                                                              :description "Execution mode (default async)"}
-                                  "fork_session"             {:type "boolean"
-                                                              :description "When true, child session starts from a fork of the parent conversation"}
-                                  "include_result_in_context" {:type "boolean"
-                                                               :description "When true, inject result into the originating parent session context"}
-                                  "timeout_ms"               {:type "integer"
-                                                              :description "Sync mode timeout in milliseconds (default 300000)"}}}
-    :execute     (fn
-                   ([args] (execute-delegate-tool args nil))
-                   ([args opts]
-                    (runtime-fns/with-active-extension-session-id
-                      (:session-id opts)
-                      #(binding [runtime-state/*active-workflow-session-id* (:session-id opts)]
-                         (execute-delegate-tool args opts)))))})
+   {:name               "delegate"
+    :label              "Delegate"
+    :description        "Run, list, continue, or remove workflow-based delegations. `continue` pushes a stopped run forward with a new prompt; `remove` deletes a run. Covers single-step agent profiles and multi-step orchestrations."
+    :lambda-description "λ{action id workflow prompt mode name fork_session timeout_ms include_result_in_context}. manage_delegation(action, id, workflow, prompt, mode, name, fork_session, timeout_ms, include_result_in_context) | action ∈ {run list continue remove} ∧ continue(id, prompt) → push_stopped_run_forward ∧ remove(id) → delete_run ∧ covers(single_step_agents ∨ multi_step_orchestrations)"
+    :format-request     call-summary/delegate-format-request
+    :parameters         {:type       "object"
+                         :properties {"action"                    {:type        "string"
+                                                                   :enum        ["run" "list" "continue" "remove"]
+                                                                   :description "Operation: run (default when omitted), list, continue, remove"}
+                                      "workflow"                  {:type        "string"
+                                                                   :description "Workflow name to run (action=run)"}
+                                      "prompt"                    {:type        "string"
+                                                                   :description "Input/request text (action=run, action=continue)"}
+                                      "name"                      {:type        "string"
+                                                                   :description "Optional label for this run (action=run)"}
+                                      "id"                        {:type        "string"
+                                                                   :description "Run id (action=continue, action=remove)"}
+                                      "mode"                      {:type        "string"
+                                                                   :enum        ["sync" "async"]
+                                                                   :description "Execution mode (default async)"}
+                                      "fork_session"              {:type        "boolean"
+                                                                   :description "When true, child session starts from a fork of the parent conversation"}
+                                      "include_result_in_context" {:type        "boolean"
+                                                                   :description "When true, inject result into the originating parent session context"}
+                                      "timeout_ms"                {:type        "integer"
+                                                                   :description "Sync mode timeout in milliseconds (default 300000)"}}}
+    :execute            (fn
+                          ([args] (execute-delegate-tool args nil))
+                          ([args opts]
+                           (runtime-fns/with-active-extension-session-id
+                             (:session-id opts)
+                             #(binding [runtime-state/*active-workflow-session-id* (:session-id opts)]
+                                (execute-delegate-tool args opts)))))})
 
   ;; Register /delegate command
   ((:register-command api) "delegate"
                            {:description "Delegate to a workflow: /delegate [list|<workflow> [<prompt>]]"
-                            :handler (fn [args]
-                                       (let [{:keys [workflow prompt]} (text/parse-delegate-command args)]
-                                         (cond
-                                           (nil? workflow)
-                                           (str "Available workflows:\n"
-                                                (text/available-workflows-text
-                                                 (runtime-state/loaded-definitions)))
+                            :handler     (fn [args]
+                                           (let [{:keys [workflow prompt]} (text/parse-delegate-command args)]
+                                             (cond
+                                               (nil? workflow)
+                                               (str "Available workflows:\n"
+                                                    (text/available-workflows-text
+                                                     (runtime-state/loaded-definitions)))
 
-                                           (= "list" workflow)
-                                           (delegate-list)
+                                               (= "list" workflow)
+                                               (delegate-list)
 
-                                           :else
-                                           ;; Slash-command delegation is conversational: successful final
-                                           ;; results should be posted back into the originating chat.
-                                           (let [result (delegate-run {:workflow workflow
-                                                                       :prompt prompt
-                                                                       :mode "async"
-                                                                       :include_result_in_context true})]
-                                             (if (:error result)
-                                               (str "Error: " (:error result))
-                                               (str "Delegated to " workflow " — run " (:run-id result)))))))})
+                                               :else
+                       ;; Slash-command delegation is conversational: successful final
+                       ;; results should be posted back into the originating chat.
+                                               (let [result (delegate-run {:workflow                  workflow
+                                                                           :prompt                    prompt
+                                                                           :mode                      "async"
+                                                                           :include_result_in_context true})]
+                                                 (if (:error result)
+                                                   (str "Error: " (:error result))
+                                                   (str "Delegated to " workflow " — run " (:run-id result)))))))})
 
   ;; Register /delegate-reload command
   ((:register-command api) "delegate-reload"
                            {:description "Reload workflow definitions from disk and retire removed definitions"
-                            :handler (fn [_args]
-                                       (let [{:keys [registered-count retired-definition-ids errors]} (reload-definitions!)]
-                                         (log! (str "Reloaded: " registered-count " workflows"
-                                                    (when (seq retired-definition-ids)
-                                                      (str ", retired " (count retired-definition-ids) " definition(s)"))
-                                                    (when (seq errors)
-                                                      (str ", " (count errors) " errors"))))))})
+                            :handler     (fn [_args]
+                                           (let [{:keys [registered-count retired-definition-ids errors]} (reload-definitions!)]
+                                             (log! (str "Reloaded: " registered-count " workflows"
+                                                        (when (seq retired-definition-ids)
+                                                          (str ", retired " (count retired-definition-ids) " definition(s)"))
+                                                        (when (seq errors)
+                                                          (str ", " (count errors) " errors"))))))})
 
   ;; Session lifecycle cleanup
   ((:on api) "session_switch"
@@ -473,4 +474,3 @@
                (runtime-state/assoc-state! :current-session-id session-id)
                (reload-definitions!)
                nil)))
-

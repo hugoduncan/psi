@@ -71,21 +71,28 @@
         (is (not (str/includes? prompt "You are ψ (Psi)"))
             "prose identity absent")))
 
-    (testing "includes all lambda-compiled sections"
+    (testing "includes non-empty lambda-compiled sections"
       (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"})]
         (is (str/includes? prompt "λ engage(nucleus)."))
         (is (str/includes? prompt "λ identity(ψ)"))
         (is (str/includes? prompt "λ tools."))
-        (is (str/includes? prompt "λ guide."))
-        (is (str/includes? prompt "λ graph(eql)."))))
+        (is (str/includes? prompt "λ graph(eql)."))
+        (is (not (str/includes? prompt "λ guide.")))))
 
     (testing "includes lambda tool descriptions"
       (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"})]
-        (is (str/includes? prompt "read → λf. content(f)"))
-        (is (str/includes? prompt "bash → λcmd. shell(cmd)"))
-        (is (str/includes? prompt "edit → λf. find(exact) → replace"))
-        (is (str/includes? prompt "write → λf. create(f) ∨ overwrite(f)"))
+        (is (str/includes? prompt "read → λpath. content(path)"))
+        (is (str/includes? prompt "bash → λcommand. shell(command)"))
+        (is (str/includes? prompt "edit → λ{path oldText newText}. find_exact(path, oldText) → replace(path, oldText, newText)"))
+        (is (str/includes? prompt "write → λ{path content}. create(path,content) ∨ overwrite(path, content)"))
         (is (str/includes? prompt "psi-tool → λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"))))
+
+    (testing "built-in tool falls back to prose when no lambda description"
+      (let [prompt (sys-prompt/build-system-prompt
+                    {:cwd "/test"
+                     :tool-defs [{:name "read"
+                                  :description "Read prose only"}]})]
+        (is (str/includes? prompt "read → Read prose only"))))
 
     (testing "includes graph capabilities data"
       (let [prompt (sys-prompt/build-system-prompt
@@ -105,16 +112,16 @@
     (testing "extension tool falls back to prose when no lambda description"
       (let [prompt (sys-prompt/build-system-prompt
                     {:cwd "/test"
-                     :extension-tool-descriptions [{:name "my-ext-tool"
-                                                    :description "Prose desc"}]})]
+                     :tool-defs [{:name "my-ext-tool"
+                                  :description "Prose desc"}]})]
         (is (str/includes? prompt "my-ext-tool → Prose desc"))))
 
     (testing "extension tool uses lambda description when available"
       (let [prompt (sys-prompt/build-system-prompt
                     {:cwd "/test"
-                     :extension-tool-descriptions [{:name "my-ext-tool"
-                                                    :description "Prose desc"
-                                                    :lambda-description "λt. ext(t)"}]})]
+                     :tool-defs [{:name "my-ext-tool"
+                                  :description "Prose desc"
+                                  :lambda-description "λt. ext(t)"}]})]
         (is (str/includes? prompt "my-ext-tool → λt. ext(t)"))
         (is (not (str/includes? prompt "Prose desc")))))
 
@@ -150,12 +157,11 @@
   ;; Prose mode preserves the original natural-language prompt.
   (testing "build-system-prompt in prose mode"
     (testing "includes prose identity and tools"
-      (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"
-                                                    :prompt-mode :prose})]
+      (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir" :prompt-mode :prose})]
         (is (str/includes? prompt "You are ψ (Psi)"))
         (is (str/includes? prompt "Available tools:"))
-        (is (str/includes? prompt "read: Read file contents"))
-        (is (str/includes? prompt "psi-tool: Execute live psi runtime operations: action-based graph query, in-process ψ eval, explicit code reload, and managed project REPL control."))
+        (is (str/includes? prompt "read: Read the contents of a file. Returns the file text."))
+        (is (str/includes? prompt "psi-tool: Execute a live psi runtime operation. Canonical requests use `action` with one of:"))
         (is (str/includes? prompt "Guidelines:"))
         (is (str/includes? prompt "Capability graph (EQL discovery):"))
         (is (not (str/includes? prompt "λ engage(nucleus).")))))
@@ -196,8 +202,20 @@
     (testing "excludes graph discovery when psi-tool not available"
       (let [prompt (sys-prompt/build-system-prompt
                     {:prompt-mode :prose
+                     :tool-defs [{:name "read" :description "Read"}
+                                 {:name "bash" :description "Bash"}
+                                 {:name "edit" :description "Edit"}
+                                 {:name "write" :description "Write"}]
                      :selected-tools ["read" "bash" "edit" "write"]})]
-        (is (not (str/includes? prompt "Capability graph (EQL discovery):")))))))
+        (is (not (str/includes? prompt "Capability graph (EQL discovery):")))))
+
+    (testing "renders extension tool descriptions from provided tool defs"
+      (let [prompt (sys-prompt/build-system-prompt
+                    {:prompt-mode :prose
+                     :tool-defs [{:name "read" :description "Read the contents of a file. Returns the file text."}
+                                 {:name "edit-clj"
+                                  :description "Replace text in a file. old-string is matched by structural equality (whitespace does not matter); old-string and new-string must each be one complete, parseable form."}]})]
+        (is (str/includes? prompt "edit-clj: Replace text in a file."))))))
 
 ;;; Mode-independent tests
 
@@ -207,7 +225,7 @@
     (testing "includes session creation time"
       (let [instant (java.time.Instant/parse "2026-01-15T10:30:00Z")
             prompt  (sys-prompt/build-system-prompt {:session-instant instant})]
-        (is (str/includes? prompt "Current date and time:"))
+        (is (str/includes? prompt "Session start time:"))
         (is (str/includes? prompt "January 15, 2026"))))
 
     (testing "includes context files"
@@ -233,6 +251,9 @@
                      :source :user :disable-model-invocation false}]
             prompt (sys-prompt/build-system-prompt
                     {:skills skills
+                     :tool-defs [{:name "bash" :description "Bash"}
+                                 {:name "edit" :description "Edit"}
+                                 {:name "write" :description "Write"}]
                      :selected-tools ["bash" "edit" "write"]})]
         (is (not (str/includes? prompt "<available_skills>")))))
 
@@ -266,18 +287,18 @@
                      :append-prompt "Helper prompt."})]
         (is (= "Helper prompt." prompt))))
 
-    (testing "includes worktree directory metadata"
+    (testing "does not include working-directory metadata"
       (let [prompt (sys-prompt/build-system-prompt
                     {:cwd "/tmp/worktree-demo"})]
-        (is (str/includes? prompt "Current working directory: /tmp/worktree-demo"))
-        (is (str/includes? prompt "Current worktree directory: /tmp/worktree-demo"))))
+        (is (not (str/includes? prompt "Current working directory:")))
+        (is (not (str/includes? prompt "Current worktree directory:")))))
 
     (testing "runtime metadata follows context files"
       (let [prompt (sys-prompt/build-system-prompt
                     {:cwd "/tmp/demo"
                      :context-files [{:path "/A.md" :content "Ctx"}]})
             ctx-idx  (.indexOf prompt "# Project Context")
-            time-idx (.indexOf prompt "Current date and time:")]
+            time-idx (.indexOf prompt "Session start time:")]
         (is (pos? ctx-idx))
         (is (> time-idx ctx-idx))))
 

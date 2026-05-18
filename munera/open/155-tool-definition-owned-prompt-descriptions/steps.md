@@ -1,0 +1,38 @@
+# Steps
+
+- [x] Inventory the current tool-description ownership and rendering surfaces before changing code.
+  - [x] Identify the authoritative built-in tool definition owner(s) for `read`, `bash`, `edit`, `write`, and `psi-tool`.
+  - [x] Confirm where canonical normalization preserves `:description` and `:lambda-description` today.
+  - [x] Identify prompt-rendering call paths that currently operate on built-in tool names instead of normalized tool definition maps.
+  - [x] Inspect whether any session-state, compaction, introspection, or projection surfaces unintentionally drop `:lambda-description`.
+- [x] Record the settled contract and fallback rule in `implementation.md` before changing prompt assembly.
+  - [x] Keep the flat tool-definition fields `:description` and optional `:lambda-description`.
+  - [x] Preserve the shared fallback rule: prose → `:description`; lambda → `:lambda-description` or fallback to `:description`.
+  - [x] Record why a nested prompt-description map was rejected for this slice unless implementation uncovers a concrete blocker.
+- [x] Move built-in prompt descriptions onto the authoritative built-in tool definition maps.
+  - [x] Add canonical prose descriptions to the built-in tool maps.
+  - [x] Add canonical lambda descriptions to the built-in tool maps where they currently exist in the built-in-only prompt table.
+  - [x] Preserve existing wording where practical so the change is ownership convergence first.
+- [x] Switch system-prompt tool rendering to use normalized tool definition maps.
+  - [x] Remove the built-in-only description table from `psi.prompt-assets.system-prompt`.
+  - [x] Update tool-section rendering so built-in and extension tools follow one shared description-selection path.
+  - [x] Keep deterministic tool ordering and existing prompt-mode behavior.
+- [x] Tighten focused proofs for the converged ownership model.
+  - [x] Add or update tool-definition normalization tests to prove preservation of `:description` and `:lambda-description`.
+  - [x] Add or update system-prompt tests to prove built-in tools render from their tool definitions.
+  - [x] Add or update system-prompt tests to prove extension tools render through the same path.
+  - [x] Add or update tests to prove lambda-mode fallback to prose is uniform for built-in and extension tools.
+- [x] Strengthen explicit schema or projection surfaces only if needed to keep the canonical contract visible and testable.
+  - [x] If a schema/projection surface is tightened, keep the field shape aligned with `:description` + optional `:lambda-description`.
+  - [x] Avoid broadening into a general session-state or tool-registry redesign.
+- [x] Verify the final state.
+  - [x] No built-in-only prompt description table remains in prompt assembly.
+  - [x] Built-in and extension tool descriptions are rendered through one shared path.
+  - [x] Focused tests covering normalization and prompt rendering are green.
+- [x] Preserve canonical prompt-description fields in cwd-scoped built-in tool helpers.
+  - [x] Update `components/agent-session/src/psi/agent_session/tools.clj` `make-tools-with-cwd` and `make-read-only-tools-with-cwd` to project from the canonical built-in tool maps instead of hand-rebuilding partial maps.
+  - [x] Ensure cwd-scoped built-in tool defs retain `:lambda-description` so child/session-scoped prompt surfaces cannot lose the uniform tool-description contract.
+  - [x] Add a focused test proving cwd-scoped tool defs preserve canonical prompt-description fields.
+- [x] Add focused proof that `:session/refresh-system-prompt` rebuilds from live session `:tool-defs` and `:skills`, not stale placeholder values inside stored `:system-prompt-build-opts`.
+  - [x] Cover the registration-driven refresh path exercised by `components/agent-session/test/psi/agent_session/config_compaction_test.clj/register-skill refreshes the system prompt so newly added skills appear`.
+  - [x] Fix the refresh rebuild contract so prompt refresh after skill/tool registration keeps the live tool section and skills section even when stored build opts contain `:skills []` or omit `:tool-defs`.

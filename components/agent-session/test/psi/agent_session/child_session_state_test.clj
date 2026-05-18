@@ -27,6 +27,9 @@
             :developer-prompt "parent-dev"
             :developer-prompt-source :memory
             :system-prompt-build-opts {:context-files [{:path "/AGENTS.md" :content "Context text"}]
+                                       :tool-defs [{:name "read" :description "Read"}
+                                                   {:name "bash" :description "Bash"}
+                                                   {:name "psi-tool" :description "Psi tool"}]
                                        :selected-tools ["read" "bash" "psi-tool"]}
             :base-system-prompt "parent-base"
             :system-prompt "parent-system"})

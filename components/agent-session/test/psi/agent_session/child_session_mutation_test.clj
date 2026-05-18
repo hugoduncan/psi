@@ -239,7 +239,8 @@
             child-sd (ss/get-session-data-in ctx child-id)]
         (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
         (is (str/includes? (:base-system-prompt child-sd) "skill-a"))
-        (is (str/includes? (:base-system-prompt child-sd) "Current working directory:"))))))
+        (is (str/includes? (:base-system-prompt child-sd) "Session start time:"))
+        (is (not (str/includes? (:base-system-prompt child-sd) "Current working directory:")))))))
 
 (deftest create-child-session-selection-rebuilds-minimal-base-prompt-and-filters-tools-test
   (testing "child selection can rebuild a reduced base prompt and align prompt-visible tools"

@@ -41,14 +41,20 @@
            ;; request preparation and introspection can observe the split.
            selection (:prompt-component-selection sd)
            base    (if-let [build-opts (:system-prompt-build-opts sd)]
-                     (let [selected-tools (or (some->> (:tool-defs sd) seq (mapv :name))
-                                              (:selected-tools build-opts))]
+                     (let [live-tool-defs (vec (or (:tool-defs sd) []))
+                           selected-tools (or (some->> live-tool-defs seq (mapv :name))
+                                              (:selected-tools build-opts))
+                           live-skills    (vec (or (:skills sd) []))]
                        (sys-prompt/build-system-prompt
-                        (assoc build-opts
-                               :prompt-mode (:prompt-mode sd :lambda)
-                               :selected-tools selected-tools
-                               :skills (vec (or (:skills sd) []))
-                               :prompt-contributions nil)))
+                        (cond-> (assoc build-opts
+                                       :prompt-mode (:prompt-mode sd :lambda)
+                                       :selected-tools selected-tools
+                                       :prompt-contributions nil)
+                          (seq live-tool-defs)
+                          (assoc :tool-defs live-tool-defs)
+
+                          (seq live-skills)
+                          (assoc :skills live-skills))))
                      (or (:base-system-prompt sd) (:system-prompt sd) ""))
            prompt  (effective-prompt base contrib selection)]
        {:root-state-update (session/session-update session-id #(assoc %

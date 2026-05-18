@@ -53,10 +53,10 @@
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
    [psi.agent-session.bootstrap :as session-bootstrap]
-   [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.agent-session.extensions :as extensions]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
@@ -65,6 +65,7 @@
    [psi.app-runtime.background-job-ui :as background-job-ui]
    [psi.app-runtime.context :as app-context]
    [psi.app-runtime.context-summary :as context-summary]
+   [psi.app-runtime.cli :as cli]
    [psi.app-runtime.footer :as footer]
    [psi.app-runtime.nrepl-runtime :as app-nrepl]
    [psi.app-runtime.output :as output]
@@ -353,21 +354,22 @@ Available: " (str/join ", " (map name (keys all))))
          sd               (ss/get-session-data-in ctx session-id)
          prompt-mode      (or (:prompt-mode sd) :lambda)
          prelude-override (:nucleus-prelude-override sd)
-         base-prompt-opts {:cwd                      cwd
-                           :session-instant          (:started-at ctx)
-                           :prompt-mode              prompt-mode
-                           :nucleus-prelude-override prelude-override
-                           :context-files            ctx-files
-                           :skills                   skills}
-         base-prompt      (sys-prompt/build-system-prompt base-prompt-opts)
-         developer-prompt (developer-prompt-from-env)
-         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
          psi-tool         (tools/make-psi-tool (fn
                                                  ([q] (session/query-in ctx session-id q))
                                                  ([q entity] (session/query-in ctx q entity)))
                                                {:ctx ctx
                                                 :session-id session-id
                                                 :cwd cwd})
+         base-prompt-opts {:cwd                      cwd
+                           :session-instant          (:started-at ctx)
+                           :prompt-mode              prompt-mode
+                           :nucleus-prelude-override prelude-override
+                           :context-files            ctx-files
+                           :skills                   skills
+                           :tool-defs                (conj (vec tools/all-tools) psi-tool)}
+         base-prompt      (sys-prompt/build-system-prompt base-prompt-opts)
+         developer-prompt (developer-prompt-from-env)
+         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
          summary-base     (session-bootstrap/bootstrap-in!
                            ctx session-id
                            {:register-global-query? false
@@ -382,12 +384,26 @@ Available: " (str/join ", " (map name (keys all))))
                             :refresh-active-tools?  false})
          {:keys [summary-updates]}
          (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
-         _                (session-bootstrap/refresh-active-tools-in! ctx session-id)
+         ext-tools        (extensions/all-tools-in (:extension-registry ctx))
+         refreshed-tool-defs (->> (concat (conj (vec tools/all-tools) psi-tool)
+                                          ext-tools)
+                                  (reduce (fn [acc tool]
+                                            (if (some #(= (:name tool) (:name %)) acc)
+                                              acc
+                                              (conj acc tool)))
+                                          []))
+         _                (session/dispatch-in! ctx
+                                                :session/set-active-tools
+                                                {:session-id session-id
+                                                 :tool-maps refreshed-tool-defs}
+                                                {:origin :core})
          summary          (merge-startup-summary summary-base summary-updates)
          _                (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
          _                (bootstrap/register-all-domains!)
          graph-caps       (graph-capabilities-in ctx session-id)
-         build-opts       (assoc base-prompt-opts :graph-capabilities graph-caps)
+         build-opts       (assoc base-prompt-opts
+                                 :graph-capabilities graph-caps
+                                 :tool-defs refreshed-tool-defs)
          system-prompt    (sys-prompt/build-system-prompt build-opts)
          _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
          _                (session/dispatch-in! ctx :session/set-system-prompt-build-opts
@@ -412,111 +428,6 @@ Available: " (str/join ", " (map name (keys all))))
 ;; Main prompt loop
 ;; ============================================================
 
-(defn- complete-cli-login!
-  [oauth-ctx {:keys [provider url login-state uses-callback-server]}]
-  (println "\n── OAuth Login ────────────────────────")
-  (println (str "  Open: " url "\n"))
-  (if uses-callback-server
-    (do
-      (println "  Waiting for browser callback…")
-      (try
-        (oauth/complete-login! oauth-ctx (:id provider) nil login-state)
-        (println (str "\n  ✓ Logged in to " (:name provider) "\n"))
-        (catch Exception e
-          (println (str "\n  ✗ Login failed: " (ex-message e) "\n")))))
-    (do
-      (print "  Paste authorization code: ")
-      (flush)
-      (when-let [code (try (read-line) (catch Exception _ nil))]
-        (try
-          (oauth/complete-login! oauth-ctx (:id provider) (str/trim code) login-state)
-          (println (str "\n  ✓ Logged in to " (:name provider) "\n"))
-          (catch Exception e
-            (println (str "\n  ✗ Login failed: " (ex-message e) "\n"))))))))
-
-(defn- run-cli-prompt! [ctx sid ai-ctx ai-model trimmed]
-  (try
-    (run-prompt! ctx sid ai-ctx ai-model trimmed)
-    (catch Exception e
-      (println (str "\n[Error: " (ex-message e) "]\n")))))
-
-(defn- handle-cli-command-result!
-  [oauth-ctx result]
-  (case (:type result)
-    :quit false
-    :resume (do (output/print-command-message! "  /resume is only available in TUI mode (--tui).") true)
-    (:text :new-session :logout)
-    (do
-      (when (= :new-session (:type result))
-        (output/print-initial-transcript! (:rehydrate result)))
-      (output/print-command-message! (:message result))
-      true)
-    :login-start (do (complete-cli-login! oauth-ctx result) true)
-    :login-error (do (output/print-command-message! (str "  " (:message result))) true)
-    :extension-cmd
-    (do
-      (try
-        (when-let [handler (:handler result)]
-          (let [result*  (atom nil)
-                captured (with-out-str
-                           (reset! result* (handler (:args result))))
-                returned @result*]
-            (cond
-              (and (string? returned) (not (str/blank? returned)))
-              (output/print-command-message! returned)
-
-              (and (map? returned)
-                   (string? (:message returned))
-                   (not (str/blank? (:message returned))))
-              (output/print-command-message! (:message returned))
-
-              (not (str/blank? captured))
-              (output/print-command-message! (str/trimr captured)))))
-        (catch Exception e
-          (println (str "\n[Command error: " (ex-message e) "]\n"))))
-      true)
-    (do
-      (output/print-command-message! result)
-      true)))
-
-(defn- cli-command-opts
-  [ctx cli-focus* ai-ctx ai-model oauth-ctx]
-  {:oauth-ctx oauth-ctx
-   :ai-model ai-model
-   :supports-session-tree? false
-   :on-new-session! (fn [_source-session-id]
-                      (let [source-session-id @cli-focus*
-                            result             (start-new-session-with-startup! ctx source-session-id ai-ctx ai-model)]
-                        (reset! cli-focus* (:session-id result))
-                        result))})
-
-(defn- run-cli-loop!
-  [ctx cli-focus* ai-ctx ai-model oauth-ctx cmd-opts]
-  (loop []
-    (print "刀: ")
-    (flush)
-    (when-let [line (try (read-line) (catch Exception _ nil))]
-      (let [trimmed (str/trim line)
-            sid     @cli-focus*
-            result  (when-not (str/blank? trimmed)
-                      (commands/dispatch-in ctx sid trimmed cmd-opts))]
-        (when result
-          (runtime/journal-user-message-in! ctx sid trimmed nil))
-        (cond
-          (str/blank? trimmed)
-          (recur)
-
-          (nil? result)
-          (do
-            (run-cli-prompt! ctx sid ai-ctx ai-model trimmed)
-            (recur))
-
-          (handle-cli-command-result! oauth-ctx result)
-          (recur)
-
-          :else
-          (println "\nψ: Goodbye.\n"))))))
-
 (defn run-session
   "Create a session and enter the interactive prompt loop.
   Returns when the user exits.
@@ -539,13 +450,13 @@ Available: " (str/join ", " (map name (keys all))))
          {:keys [templates skills startup-rehydrate]}
          (bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts})
          cli-focus* (atom session-id)
-         cmd-opts   (cli-command-opts ctx cli-focus* ai-ctx ai-model oauth-ctx)]
+         cmd-opts   (cli/cli-command-opts start-new-session-with-startup! ctx cli-focus* ai-ctx ai-model oauth-ctx)]
      (reset! session-state {:ctx ctx :ai-ctx ai-ctx :ai-model ai-model
                             :oauth-ctx oauth-ctx
                             :nrepl-runtime-atom nrepl-runtime})
      (output/print-banner ai-model templates skills ctx)
      (output/print-initial-transcript! startup-rehydrate)
-     (run-cli-loop! ctx cli-focus* ai-ctx ai-model oauth-ctx cmd-opts))))
+     (cli/run-cli-loop! run-prompt! runtime/journal-user-message-in! ctx cli-focus* ai-ctx ai-model oauth-ctx cmd-opts))))
 
 ;; TUI session (charm.clj Elm Architecture)
 ;; ============================================================

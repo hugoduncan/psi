@@ -640,6 +640,22 @@
       (is (re-find #"api-errors" (:content result)))
       (is (not (re-find #":psi/agent-session-ctx" (:content result)))))))
 
+(deftest cwd-scoped-tools-preserve-prompt-description-fields-test
+  (let [cwd "/tmp/psi-tools"
+        tools-with-cwd (tools/make-tools-with-cwd cwd)
+        read-only-tools (tools/make-read-only-tools-with-cwd cwd)
+        read-with-cwd (first tools-with-cwd)
+        bash-with-cwd (second tools-with-cwd)]
+    (testing "cwd-scoped tools project canonical description fields"
+      (is (= (:description tools/read-tool) (:description read-with-cwd)))
+      (is (= (:lambda-description tools/read-tool) (:lambda-description read-with-cwd)))
+      (is (= (:description tools/bash-tool) (:description bash-with-cwd)))
+      (is (= (:lambda-description tools/bash-tool) (:lambda-description bash-with-cwd))))
+
+    (testing "read-only cwd-scoped tools preserve lambda descriptions"
+      (is (= (:description tools/read-tool) (:description (first read-only-tools))))
+      (is (= (:lambda-description tools/read-tool) (:lambda-description (first read-only-tools)))))))
+
 (deftest execute-tool-dispatch-test
   (testing "built-in dispatch handles read/bash/edit/write"
     (let [tmp (java.io.File/createTempFile "psi-dispatch-test" "")]
