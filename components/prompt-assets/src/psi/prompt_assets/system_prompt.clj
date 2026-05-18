@@ -34,7 +34,7 @@
   "λ identity(ψ). agent(coding) ∈ harness(psi) | read ∧ exec ∧ edit ∧ write")
 
 (def ^:private lambda-guidelines
-  "λ guide.\n  bash → {ls rg find} | file_ops\n  read → pre(edit) | ¬cat ¬sed\n  edit → precise(old ≡ match → new)\n  write → new_file ∨ full_rewrite\n  output → plaintext | ¬cat ¬bash\n  style → concise ∧ show(paths)")
+  "")
 
 (def ^:private lambda-graph-discovery
   "λ graph(eql).

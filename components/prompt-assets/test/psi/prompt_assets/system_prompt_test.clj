@@ -71,13 +71,13 @@
         (is (not (str/includes? prompt "You are ψ (Psi)"))
             "prose identity absent")))
 
-    (testing "includes all lambda-compiled sections"
+    (testing "includes non-empty lambda-compiled sections"
       (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"})]
         (is (str/includes? prompt "λ engage(nucleus)."))
         (is (str/includes? prompt "λ identity(ψ)"))
         (is (str/includes? prompt "λ tools."))
-        (is (str/includes? prompt "λ guide."))
-        (is (str/includes? prompt "λ graph(eql)."))))
+        (is (str/includes? prompt "λ graph(eql)."))
+        (is (not (str/includes? prompt "λ guide.")))))
 
     (testing "includes lambda tool descriptions"
       (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"})]
