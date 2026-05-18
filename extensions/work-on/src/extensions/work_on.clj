@@ -641,33 +641,34 @@
                (refresh-default-branch-cache!)
                nil))
   ((:register-tool api)
-   {:name           "work-on"
-    :label          "Work On"
-    :description    "Create a layout-derived git worktree + branch and continue there"
-    :format-request call-summary/work-on-format-request
-    :parameters     {:type       "object"
-                     :properties {"description" {:type "string"
-                                                 :description "Description of the work to create a branch/worktree for"}
-                                  "base_branch" {:type "string"
-                                                 :description "Optional base branch to use when creating a new branch/worktree"}}
-                     :required   ["description"]}
-    :execute     (fn
-                   ([args] (work-on-tool-result
-                            (execute-work-on! {:description (get args "description")
-                                               :base-branch (get args "base_branch")})))
-                   ([args _opts] (work-on-tool-result
-                                  (execute-work-on! {:description (get args "description")
-                                                     :base-branch (get args "base_branch")}))))})
+   {:name               "work-on"
+    :label              "Work On"
+    :description        "Create a layout-derived git worktree + branch and continue there"
+    :lambda-description "λ{description base_branch?}. create_worktree_branch(description, base_branch) → continue_there"
+    :format-request     call-summary/work-on-format-request
+    :parameters         {:type       "object"
+                         :properties {"description" {:type        "string"
+                                                     :description "Description of the work to create a branch/worktree for"}
+                                      "base_branch" {:type        "string"
+                                                     :description "Optional base branch to use when creating a new branch/worktree"}}
+                         :required   ["description"]}
+    :execute            (fn
+                          ([args] (work-on-tool-result
+                                   (execute-work-on! {:description (get args "description")
+                                                      :base-branch (get args "base_branch")})))
+                          ([args _opts] (work-on-tool-result
+                                         (execute-work-on! {:description (get args "description")
+                                                            :base-branch (get args "base_branch")}))))})
   ((:register-command api) "work-on"
                            {:description "Create a layout-derived git worktree + branch and continue there"
-                            :handler handle-work-on-command})
+                            :handler     handle-work-on-command})
   ((:register-command api) "work-done"
                            {:description "Finish current worktree onto the default branch and clean up"
-                            :handler handle-work-done-command})
+                            :handler     handle-work-done-command})
   ((:register-command api) "work-rebase"
                            {:description "Rebase current worktree branch onto main"
-                            :handler handle-work-rebase-command})
+                            :handler     handle-work-rebase-command})
   ((:register-command api) "work-status"
                            {:description "Show active worktree overview"
-                            :handler handle-work-status-command})
+                            :handler     handle-work-status-command})
   (refresh-default-branch-cache!))
