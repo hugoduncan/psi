@@ -209,10 +209,35 @@
   [code]
   (System/exit code))
 
+(defn- print-help!
+  []
+  (println "Usage:")
+  (println "  psi [--tui] [--rpc-edn] [--model MODEL] [--thinking-level LEVEL]")
+  (println "      [--log-level LEVEL] [--nrepl [PORT]] [--version] [--help]")
+  (println)
+  (println "Modes:")
+  (println "  default   Start the console session")
+  (println "  --tui     Start the terminal UI")
+  (println "  --rpc-edn Start the RPC EDN runtime")
+  (println)
+  (println "Common flags:")
+  (println "  --model MODEL")
+  (println "  --thinking-level LEVEL")
+  (println "  --log-level LEVEL")
+  (println "  --nrepl [PORT]")
+  (println "  --version")
+  (println "  --help")
+  (println)
+  (println "Interactive sessions also support /help for commands."))
+
 (defn -main
   [& args]
   (when (has-flag? args "--version")
     (println (str "psi " (version/version-string)))
+    (System/exit 0))
+  (when (or (has-flag? args "--help")
+            (has-flag? args "-h"))
+    (print-help!)
     (System/exit 0))
   (set-log-level! (log-level-from-args args))
   (let [tui?     (has-flag? args "--tui")

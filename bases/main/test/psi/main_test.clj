@@ -15,6 +15,20 @@
       (is (= [:console ["--model" "sonnet-4.6"]] @called))
       (is (= 0 @exited)))))
 
+(deftest main-help-exits-without-starting-runtime-test
+  (let [called (atom nil)
+        exited (atom nil)
+        output (with-out-str
+                 (with-redefs [main/run-console-session! (fn [_args] (reset! called :console))
+                               main/run-rpc-session! (fn [_args] (reset! called :rpc))
+                               main/run-tui-session! (fn [_args] (reset! called :tui))
+                               main/exit! (fn [code] (reset! exited code))]
+                   (main/-main "--help")))]
+    (is (nil? @called))
+    (is (= 0 @exited))
+    (is (.contains output "Usage:"))
+    (is (.contains output "/help for commands"))))
+
 (deftest main-routes-rpc-mode-test
   (let [called (atom nil)
         exited (atom nil)]
