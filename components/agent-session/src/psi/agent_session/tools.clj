@@ -584,6 +584,10 @@
 ;; CWD-scoped tools
 ;; ============================================================
 
+(defn- with-execute
+  [tool execute-fn]
+  (assoc tool :execute execute-fn))
+
 (defn make-tools-with-cwd
   "Return the four standard tool maps (read, bash, edit, write) with :execute
    fns that resolve relative paths and run commands in `cwd`.
@@ -592,37 +596,17 @@
    to a specific working directory without redefining tool wrappers."
   [cwd]
   (let [opts {:cwd cwd}]
-    [{:name        (:name read-tool)
-      :label       (:label read-tool)
-      :description (:description read-tool)
-      :parameters  (:parameters read-tool)
-      :execute     (fn [args] (execute-read args opts))}
-     {:name        (:name bash-tool)
-      :label       (:label bash-tool)
-      :description (:description bash-tool)
-      :parameters  (:parameters bash-tool)
-      :execute     (fn [args] (execute-bash args opts))}
-     {:name        (:name edit-tool)
-      :label       (:label edit-tool)
-      :description (:description edit-tool)
-      :parameters  (:parameters edit-tool)
-      :execute     (fn [args] (execute-edit args opts))}
-     {:name        (:name write-tool)
-      :label       (:label write-tool)
-      :description (:description write-tool)
-      :parameters  (:parameters write-tool)
-      :execute     (fn [args] (execute-write args opts))}]))
+    [(with-execute read-tool (fn [args] (execute-read args opts)))
+     (with-execute bash-tool (fn [args] (execute-bash args opts)))
+     (with-execute edit-tool (fn [args] (execute-edit args opts)))
+     (with-execute write-tool (fn [args] (execute-write args opts)))]))
 
 (defn make-read-only-tools-with-cwd
   "Return read-only tools scoped to cwd.
    Backward-compatible helper for callers that only need file reads."
   [cwd]
   (let [opts {:cwd cwd}]
-    [{:name        (:name read-tool)
-      :label       (:label read-tool)
-      :description (:description read-tool)
-      :parameters  (:parameters read-tool)
-      :execute     (fn [args] (execute-read args opts))}]))
+    [(with-execute read-tool (fn [args] (execute-read args opts)))]))
 
 ;; ============================================================
 ;; Dispatch
