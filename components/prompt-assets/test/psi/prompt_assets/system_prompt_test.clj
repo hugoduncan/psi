@@ -217,7 +217,7 @@
     (testing "includes session creation time"
       (let [instant (java.time.Instant/parse "2026-01-15T10:30:00Z")
             prompt  (sys-prompt/build-system-prompt {:session-instant instant})]
-        (is (str/includes? prompt "Current date and time:"))
+        (is (str/includes? prompt "Session start time:"))
         (is (str/includes? prompt "January 15, 2026"))))
 
     (testing "includes context files"
@@ -290,7 +290,7 @@
                     {:cwd "/tmp/demo"
                      :context-files [{:path "/A.md" :content "Ctx"}]})
             ctx-idx  (.indexOf prompt "# Project Context")
-            time-idx (.indexOf prompt "Current date and time:")]
+            time-idx (.indexOf prompt "Session start time:")]
         (is (pos? ctx-idx))
         (is (> time-idx ctx-idx))))
 
