@@ -57,6 +57,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.agent-session.extensions :as extensions]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
@@ -383,12 +384,22 @@ Available: " (str/join ", " (map name (keys all))))
                             :refresh-active-tools?  false})
          {:keys [summary-updates]}
          (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
-         _                (session-bootstrap/refresh-active-tools-in! ctx session-id)
+         ext-tools        (extensions/all-tools-in (:extension-registry ctx))
+         active-tools     (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
+         refreshed-tool-defs (into (vec active-tools) ext-tools)
+         _                (session/dispatch-in! ctx
+                                                :session/set-active-tools
+                                                {:session-id session-id
+                                                 :tool-maps refreshed-tool-defs}
+                                                {:origin :core})
+         refreshed-sd     (ss/get-session-data-in ctx session-id)
          summary          (merge-startup-summary summary-base summary-updates)
          _                (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
          _                (bootstrap/register-all-domains!)
          graph-caps       (graph-capabilities-in ctx session-id)
-         build-opts       (assoc base-prompt-opts :graph-capabilities graph-caps)
+         build-opts       (assoc base-prompt-opts
+                                 :graph-capabilities graph-caps
+                                 :tool-defs (:tool-defs refreshed-sd))
          system-prompt    (sys-prompt/build-system-prompt build-opts)
          _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
          _                (session/dispatch-in! ctx :session/set-system-prompt-build-opts

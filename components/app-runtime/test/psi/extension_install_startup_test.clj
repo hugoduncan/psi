@@ -43,22 +43,27 @@
                                        {:description (str "hello from " cmd-name)
                                         :handler (fn [_] nil)})))))
 
-(defn- startup-bootstrap-bindings [cwd home]
-  {#'installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
-   #'installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))
-   #'oauth/create-context (fn [] nil)
-   #'pt/discover-templates (fn [] [])
-   #'skills/discover-skills (fn [] {:skills [] :diagnostics []})
-   #'sys-prompt/discover-context-files (fn [_] [])
-   #'sys-prompt/build-system-prompt (fn [_] "")})
+(defn- startup-bootstrap-bindings
+  [cwd home {:keys [stub-build-system-prompt?]
+             :or   {stub-build-system-prompt? true}}]
+  (cond-> {#'installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
+           #'installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))
+           #'oauth/create-context (fn [] nil)
+           #'pt/discover-templates (fn [] [])
+           #'skills/discover-skills (fn [] {:skills [] :diagnostics []})
+           #'sys-prompt/discover-context-files (fn [_] [])}
+    stub-build-system-prompt?
+    (assoc #'sys-prompt/build-system-prompt (fn [_] ""))))
 
 (defn- bootstrap-runtime-session-for-test
-  [cwd home]
-  (with-redefs-fn (startup-bootstrap-bindings cwd home)
-    (fn []
-      (let [result (app-runtime/bootstrap-runtime-session! {:provider :anthropic :id "claude-sonnet-4-6" :supports-reasoning true} {:cwd cwd})]
-        (model-registry/init! {:user-models-path nil :project-models-path nil})
-        result))))
+  ([cwd home]
+   (bootstrap-runtime-session-for-test cwd home {}))
+  ([cwd home opts]
+   (with-redefs-fn (startup-bootstrap-bindings cwd home opts)
+     (fn []
+       (let [result (app-runtime/bootstrap-runtime-session! {:provider :anthropic :id "claude-sonnet-4-6" :supports-reasoning true} {:cwd cwd})]
+         (model-registry/init! {:user-models-path nil :project-models-path nil})
+         result)))))
 
 (defn- startup-registry-paths [ctx]
   (set (map str (ext/extensions-in (:extension-registry ctx)))))
@@ -68,12 +73,13 @@
           [:psi.extensions/effective :entries-by-lib lib :status]))
 
 (defn- bootstrap-with-manifest
-  [manifest {:keys [cwd home sync-deps]}]
+  [manifest {:keys [cwd home sync-deps stub-build-system-prompt?]
+             :or   {stub-build-system-prompt? true}}]
   (let [cwd  (or cwd (test-support/temp-cwd))
         home (or home (test-support/temp-cwd))
         bootstrap! #(do
                       (spit (manifest-file cwd ".psi/extensions.edn") (pr-str manifest))
-                      (bootstrap-runtime-session-for-test cwd home))]
+                      (bootstrap-runtime-session-for-test cwd home {:stub-build-system-prompt? stub-build-system-prompt?}))]
     {:cwd cwd
      :home home
      :result (if sync-deps
@@ -100,6 +106,17 @@
           session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
           tool-names (set (map :name (:tool-defs (ss/get-session-data-in ctx session-id))))]
       (is (contains? tool-names "edit-clj")))))
+
+(deftest startup-manifest-extension-tools-appear-in-final-system-prompt-test
+  (testing "bootstrap startup rebuilds the final system prompt from refreshed session tool defs"
+    (let [{:keys [result]} (bootstrap-with-manifest
+                            {:deps {'psi/edit-clj {}}}
+                            {:stub-build-system-prompt? false})
+          {:keys [ctx]} result
+          session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
+          system-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
+      (is (string? system-prompt))
+      (is (str/includes? system-prompt "edit-clj →")))))
 
 (deftest startup-persists-install-state-and-loads-manifest-extension-paths-test
   (testing "bootstrap startup computes install state and loads manifest-backed local-root extensions"

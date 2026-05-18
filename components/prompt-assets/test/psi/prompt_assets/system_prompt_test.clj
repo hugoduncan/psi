@@ -207,7 +207,15 @@
                                  {:name "edit" :description "Edit"}
                                  {:name "write" :description "Write"}]
                      :selected-tools ["read" "bash" "edit" "write"]})]
-        (is (not (str/includes? prompt "Capability graph (EQL discovery):")))))))
+        (is (not (str/includes? prompt "Capability graph (EQL discovery):")))))
+
+    (testing "renders extension tool descriptions from provided tool defs"
+      (let [prompt (sys-prompt/build-system-prompt
+                    {:prompt-mode :prose
+                     :tool-defs [{:name "read" :description "Read the contents of a file. Returns the file text."}
+                                 {:name "edit-clj"
+                                  :description "Replace text in a file. old-string is matched by structural equality (whitespace does not matter); old-string and new-string must each be one complete, parseable form."}]})]
+        (is (str/includes? prompt "edit-clj: Replace text in a file."))))))
 
 ;;; Mode-independent tests
 
