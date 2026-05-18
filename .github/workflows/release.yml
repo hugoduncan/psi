@@ -304,6 +304,14 @@ jobs:
           cli: latest
           bb: latest
 
+      - name: Install bbin
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL https://raw.githubusercontent.com/babashka/bbin/v0.2.5/bbin -o "$HOME/.local/bin/bbin"
+          chmod +x "$HOME/.local/bin/bbin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/bbin" version
+
       - name: Extract version from tag
         id: version
         env:
