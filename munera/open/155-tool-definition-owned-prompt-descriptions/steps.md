@@ -29,3 +29,7 @@
   - [x] No built-in-only prompt description table remains in prompt assembly.
   - [x] Built-in and extension tool descriptions are rendered through one shared path.
   - [x] Focused tests covering normalization and prompt rendering are green.
+- [ ] Preserve canonical prompt-description fields in cwd-scoped built-in tool helpers.
+  - [ ] Update `components/agent-session/src/psi/agent_session/tools.clj` `make-tools-with-cwd` and `make-read-only-tools-with-cwd` to project from the canonical built-in tool maps instead of hand-rebuilding partial maps.
+  - [ ] Ensure cwd-scoped built-in tool defs retain `:lambda-description` so child/session-scoped prompt surfaces cannot lose the uniform tool-description contract.
+  - [ ] Add a focused test proving cwd-scoped tool defs preserve canonical prompt-description fields.
