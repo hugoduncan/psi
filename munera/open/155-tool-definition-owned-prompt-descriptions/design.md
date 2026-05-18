@@ -173,13 +173,26 @@ and instead operate on one canonical model:
 
 - normalized tool definition maps
 
-That means implementation must inspect all prompt-rendering call paths that currently pass only tool names and decide the smallest clean change that lets prompt assembly render from tool definitions rather than from a built-in name table.
+Implementation inventory on 2026-05-18 found that the split is still present at the `psi.prompt-assets.system-prompt/build-system-prompt` boundary:
+
+- `build-system-prompt` currently accepts `:selected-tools` as tool-name strings for built-ins
+- it separately accepts `:extension-tool-descriptions` as partial tool maps for extension-contributed tools
+- internal rendering then combines those two inputs with a built-in-only name table
+
+That boundary shape is inconsistent with this task's ownership goal because prompt assembly can still render built-ins without receiving their canonical tool definition maps.
+
+For this task, prompt assembly must converge to one canonical rendering input:
+
+- `build-system-prompt` should receive normalized tool definition maps via `:tool-defs`
+- `:selected-tools` may remain only as a deterministic selection/filtering aid where needed by higher callers
+- rendering must happen from the selected normalized tool definition maps rather than from a built-in name table or a separate extension-only description list
 
 The preferred outcome is:
 
 - system-prompt assembly receives tool definition maps
 - filtering/selection still happens by tool name where appropriate
 - rendering happens from the selected normalized tool definition maps
+- callers that already carry session or child-session `:tool-defs` continue to pass those canonical maps through instead of re-splitting them into names plus prompt-only extension description data
 
 ## Schema and projection guidance
 

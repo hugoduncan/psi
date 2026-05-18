@@ -33,8 +33,9 @@ Implement this as one ownership-convergence vertical slice: identify the authori
 
 4. **Switch system-prompt assembly to definition-driven rendering**
    - remove the built-in-only description table from `psi.prompt-assets.system-prompt`
-   - change tool-section rendering to operate on normalized tool definition maps rather than a split model of built-in tool names plus extension tool maps
-   - keep filtering/selection deterministic, but render descriptions from the selected tool definitions
+   - converge the `build-system-prompt` boundary onto normalized `:tool-defs` inputs instead of the current split `:selected-tools` plus `:extension-tool-descriptions`
+   - allow `:selected-tools` to remain only as a deterministic selector when higher callers need allowlist filtering, not as the prompt-rendering source of truth
+   - change tool-section rendering to operate on the selected normalized tool definition maps for both built-ins and extensions
    - preserve existing prompt-mode behavior except for the ownership/path convergence
 
 5. **Tighten proofs and only strengthen schemas where needed**
