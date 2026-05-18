@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2091] - 2026-05-18
+
 ### Fixed
 - Library jar packaging now derives its bundled runtime source/resource paths from the authoritative `:psi` launcher alias, preventing installed `psi` releases from omitting extracted runtime components such as `state-kernel`.
 
@@ -69,7 +71,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2088...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2091...HEAD
+[0.1.2091]: https://github.com/hugoduncan/psi/compare/v0.1.2088...v0.1.2091
 [0.1.2088]: https://github.com/hugoduncan/psi/compare/v0.1.2067...v0.1.2088
 [0.1.2067]: https://github.com/hugoduncan/psi/compare/v0.1.2049...v0.1.2067
 [0.1.2049]: https://github.com/hugoduncan/psi/compare/v0.1.2034...v0.1.2049
