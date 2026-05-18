@@ -6,6 +6,12 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- The `Release` GitHub Actions workflow now supports manual `workflow_dispatch` dry runs with `ref`, `publish`, and `release_version` inputs so release build validation can run without publishing to Clojars or creating a GitHub Release.
+
+### Fixed
+- Release smoke verification now inspects the actual built library jar path derived from the stamped version resource, instead of assuming `target/psi-unreleased.jar`.
+
 ## [0.1.2099] - 2026-05-18
 
 ### Fixed
