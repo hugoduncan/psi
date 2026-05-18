@@ -6,6 +6,12 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- Release verification now smoke-tests the installed `bbin` launcher entrypoint for published artifacts, covering the released launcher path in addition to direct `psi.main` startup.
+
+### Fixed
+- Released `psi` launcher installs now resolve `psi/github` and `psi/edit-clj` correctly under `:jar` policy, preventing startup failure from missing psi-owned source-policy defaults.
+
 ## [0.1.2104] - 2026-05-18
 
 ### Added
