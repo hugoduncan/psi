@@ -27,11 +27,19 @@
                        :err err})))
     {:out out :err err}))
 
+(defn- version-string
+  []
+  (-> "bases/main/resources/psi/version.edn" slurp read-string :version))
+
+(defn- lib-jar-path
+  []
+  (str "target/psi-" (version-string) ".jar"))
+
 (deftest ^:integration build-lib-jar-includes-runtime-packaging-regression-entries
   (testing "the built library jar contains runtime namespaces required by installed psi"
     (support/with-build-lock
       (build-lib!)
-      (let [entries (jar-entries "target/psi-unreleased.jar")]
+      (let [entries (jar-entries (lib-jar-path))]
         (is (contains? entries "psi/main.clj"))
         (is (contains? entries "hugoduncan/psi.clj"))
         (is (contains? entries "psi/agent_session/dispatch.clj"))
