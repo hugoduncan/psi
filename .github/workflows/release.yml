@@ -369,6 +369,28 @@ jobs:
           echo "ERROR: expected '$EXPECTED' after $MAX_ATTEMPTS attempts, last output: '$OUTPUT'" >&2
           exit 1
 
+      - name: Smoke-test released launcher entrypoint via bbin
+        if: github.event_name == 'push' || inputs.publish
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TMP_ROOT="$(mktemp -d)"
+          HOME_DIR="$TMP_ROOT/home"
+          XDG_DATA_HOME="$TMP_ROOT/data"
+          XDG_CACHE_HOME="$TMP_ROOT/cache"
+          XDG_CONFIG_HOME="$TMP_ROOT/config"
+          BBIN_BIN_DIR="$TMP_ROOT/bin"
+          mkdir -p "$HOME_DIR" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$BBIN_BIN_DIR"
+          export HOME="$HOME_DIR"
+          export XDG_DATA_HOME XDG_CACHE_HOME XDG_CONFIG_HOME
+          export BABASHKA_BBIN_BIN_DIR="$BBIN_BIN_DIR"
+          export PATH="$BBIN_BIN_DIR:$PATH"
+          printf '{:paths []}\n' > "$TMP_ROOT/deps.edn"
+          pushd "$TMP_ROOT" >/dev/null
+          bbin install org.hugoduncan/psi --as psi --mvn/version "$VERSION"
+          test "$(psi --version)" = "psi $VERSION"
+          psi --help >/dev/null
+          popd >/dev/null
+
       - name: Build uberjar (GitHub Release asset)
         run: bb build:jar
 

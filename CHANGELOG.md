@@ -10,6 +10,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ### Added
 - The `Release` GitHub Actions workflow now supports manual `workflow_dispatch` dry runs with `ref`, `publish`, and `release_version` inputs so release build validation can run without publishing to Clojars or creating a GitHub Release.
+- Release verification now smoke-tests the installed `bbin` launcher entrypoint for published artifacts, not just direct `psi.main` startup.
 
 ### Fixed
 - Released `psi` launcher installs now resolve `psi/github` and `psi/edit-clj` in `:jar` policy correctly; their psi-owned catalog entries now include Maven defaults instead of failing at startup with `Psi-owned catalog entry is missing source policy defaults`.

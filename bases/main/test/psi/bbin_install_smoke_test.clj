@@ -55,8 +55,12 @@
         (sh! env "clojure" "-T:build" "install-local")
         (sh! env "bbin" "install" "org.hugoduncan/psi" "--as" "psi-smoke" "--mvn/version" (version-string))
         (let [installed (str (get env "BABASHKA_BBIN_BIN_DIR") "/psi-smoke")
-              {:keys [exit out err]} (apply shell/sh (concat [installed "--cwd" cwd "--version" :env env :dir cwd]))]
+              version-result (apply shell/sh (concat [installed "--cwd" cwd "--version" :env env :dir cwd]))
+              help-result    (apply shell/sh (concat [installed "--cwd" cwd "--help" :env env :dir cwd]))]
           (is (.exists (io/file installed)))
-          (is (= 0 exit) err)
+          (is (= 0 (:exit version-result)) (:err version-result))
           (is (= expected
-                 (str/trim out))))))))
+                 (str/trim (:out version-result))))
+          (is (= 0 (:exit help-result)) (:err help-result))
+          (is (or (str/includes? (:out help-result) "Usage:")
+                  (str/includes? (:out help-result) "/help for commands"))))))))
