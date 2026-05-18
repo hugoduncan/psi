@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2099] - 2026-05-18
+
 ### Fixed
 - Build-artifact smoke tests now share an explicit in-process build lock during CI/release verification, preventing parallel test execution from deleting `target/psi-unreleased.jar` while another smoke test is inspecting it.
 
@@ -79,7 +81,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2095...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2099...HEAD
+[0.1.2099]: https://github.com/hugoduncan/psi/compare/v0.1.2095...v0.1.2099
 [0.1.2095]: https://github.com/hugoduncan/psi/compare/v0.1.2091...v0.1.2095
 [0.1.2091]: https://github.com/hugoduncan/psi/compare/v0.1.2088...v0.1.2091
 [0.1.2088]: https://github.com/hugoduncan/psi/compare/v0.1.2067...v0.1.2088
