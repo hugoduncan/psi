@@ -179,6 +179,17 @@ Pushing the tag triggers `.github/workflows/release.yml`, which:
 - Builds the uberjar.
 - Creates a GitHub Release with the changelog body and jar assets attached.
 
+The same workflow also supports manual dry-run testing via `workflow_dispatch`
+without publishing anything publicly. Use GitHub Actions → `Release` → `Run workflow`
+with:
+- `publish = false` to validate the release build path only
+- optional `ref` to test a branch/commit instead of the current ref
+- optional `release_version` to force a specific version label for the dry-run
+
+Dry-run mode stamps `bases/main/resources/psi/version.edn` inside the runner,
+builds the library jar and uberjar, and skips Clojars deploy, post-deploy jar
+smoke, changelog extraction, and GitHub Release creation.
+
 ### Partial-failure recovery
 
 `bb release` and `bb release:tag` are re-entrant:

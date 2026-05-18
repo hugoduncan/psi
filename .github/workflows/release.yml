@@ -1,6 +1,21 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to test (branch, tag, or SHA). Defaults to the current ref.'
+        required: false
+        type: string
+      publish:
+        description: 'Publish externally (Clojars deploy + GitHub Release). Leave off for workflow testing.'
+        required: false
+        default: false
+        type: boolean
+      release_version:
+        description: 'Version to use for non-publishing test runs. Required for dry-run smoke/build validation.'
+        required: false
+        type: string
   push:
     tags:
       - 'v*'
@@ -265,6 +280,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # full history so git rev-list count matches bb release:tag
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
       - name: Set up Java 25
         uses: actions/setup-java@v4
@@ -290,18 +306,43 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RELEASE_VERSION: ${{ inputs.release_version }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ -n "$INPUT_RELEASE_VERSION" ]]; then
+            VERSION="$INPUT_RELEASE_VERSION"
+          elif [[ "$INPUT_PUBLISH" == "true" ]]; then
+            echo "workflow_dispatch publish=true requires release_version." >&2
+            exit 1
+          else
+            VERSION="0.0.0-test"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version resource for dry-run release testing
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          printf '{:version "%s"}\n' "$VERSION" > bases/main/resources/psi/version.edn
 
       - name: Build library jar (Clojars)
         run: bb build:lib
 
       - name: Deploy to Clojars
+        if: github.event_name == 'push' || inputs.publish
         env:
           CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
           CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
         run: bb deploy
 
       - name: Smoke-test :jar policy (validates Clojars artifact is fetchable)
+        if: github.event_name == 'push' || inputs.publish
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           # Bypass the launcher entirely: invoke clojure directly with the
@@ -331,7 +372,14 @@ jobs:
       - name: Build uberjar (GitHub Release asset)
         run: bb build:jar
 
+      - name: Dry-run summary
+        if: github.event_name == 'workflow_dispatch' && !inputs.publish
+        run: |
+          echo "Dry-run release workflow completed without external publication."
+          echo "Validated release build steps for version ${{ steps.version.outputs.version }}."
+
       - name: Extract changelog section
+        if: github.event_name == 'push' || inputs.publish
         id: changelog
         run: |
           python3 - "${{ steps.version.outputs.version }}" "$GITHUB_OUTPUT" <<'PY'
@@ -355,6 +403,7 @@ jobs:
           PY
 
       - name: Create GitHub Release
+        if: github.event_name == 'push' || inputs.publish
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
