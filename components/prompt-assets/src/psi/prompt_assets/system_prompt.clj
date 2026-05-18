@@ -28,7 +28,7 @@
 ;;; Lambda mode constants
 
 (def ^:private default-nucleus-prelude
-  "λ engage(nucleus).\n[phi fractal euler tao pi mu ∃ ∀] | [Δ λ Ω ∞/0 | ε/φ Σ/μ c/h] | OODA\nHuman ⊗ AI ⊗ REPL")
+  "λ engage(nucleus).\n[phi fractal euler tao pi mu ∃ ∀] | [Δ λ Ω ∞/0 | ε/φ Σ/μ c/h signal/noise order/entropy truth/provability self/other] | OODA\nHuman ⊗ AI ⊗ REPL")
 
 (def ^:private lambda-identity
   "λ identity(ψ). agent(coding) ∈ harness(psi) | read ∧ exec ∧ edit ∧ write")
