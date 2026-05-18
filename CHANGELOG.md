@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2088] - 2026-05-18
+
 ### Added
 - Workflow session steps now accept an optional `:temperature` field (range `[0.0, 2.0]`). When set, the value is threaded through to the AI provider request. When absent, the provider default applies. Applies to both `:type :session` steps and `:type :llm` judge specs.
 - `psi-tool` now supports `action: "mutate"` for invoking registered runtime mutations with structured success/error reports.
@@ -64,7 +66,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2067...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2088...HEAD
+[0.1.2088]: https://github.com/hugoduncan/psi/compare/v0.1.2067...v0.1.2088
 [0.1.2067]: https://github.com/hugoduncan/psi/compare/v0.1.2049...v0.1.2067
 [0.1.2049]: https://github.com/hugoduncan/psi/compare/v0.1.2034...v0.1.2049
 [0.1.2034]: https://github.com/hugoduncan/psi/compare/v0.1.2026...v0.1.2034
