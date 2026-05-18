@@ -23,46 +23,50 @@
 ;; ============================================================
 
 (def read-tool
-  {:name           "read"
-   :label          "Read"
-   :description    "Read the contents of a file. Returns the file text."
-   :parameters     {:type       "object"
-                    :properties {:path   {:type "string" :description "File path to read"}
-                                 :offset {:type "integer" :description "1-indexed line number to start reading from"}
-                                 :limit  {:type "integer" :description "Maximum number of lines to read from offset"}}
-                    :required   ["path"]}
-   :format-request call-summary/read-format-request})
+  {:name               "read"
+   :label              "Read"
+   :description        "Read the contents of a file. Returns the file text."
+   :lambda-description "λf. content(f)"
+   :parameters         {:type       "object"
+                        :properties {:path   {:type "string" :description "File path to read"}
+                                     :offset {:type "integer" :description "1-indexed line number to start reading from"}
+                                     :limit  {:type "integer" :description "Maximum number of lines to read from offset"}}
+                        :required   ["path"]}
+   :format-request     call-summary/read-format-request})
 
 (def bash-tool
-  {:name           "bash"
-   :label          "Bash"
-   :description    "Execute a bash command. Returns stdout and stderr combined."
-   :parameters     {:type       "object"
-                    :properties {:command {:type "string" :description "Bash command to run"}
-                                 :timeout {:type "integer" :description "Timeout in seconds (default 30)"}}
-                    :required   ["command"]}
-   :format-request call-summary/bash-format-request})
+  {:name               "bash"
+   :label              "Bash"
+   :description        "Execute a bash command. Returns stdout and stderr combined."
+   :lambda-description "λcmd. shell(cmd) | {ls grep find …}"
+   :parameters         {:type       "object"
+                        :properties {:command {:type "string" :description "Bash command to run"}
+                                     :timeout {:type "integer" :description "Timeout in seconds (default 30)"}}
+                        :required   ["command"]}
+   :format-request     call-summary/bash-format-request})
 
 (def edit-tool
-  {:name           "edit"
-   :label          "Edit"
-   :description    "Replace exact text in a file. oldText must match exactly."
-   :parameters     {:type       "object"
-                    :properties {:path    {:type "string" :description "File path"}
-                                 :oldText {:type "string" :description "Exact text to find"}
-                                 :newText {:type "string" :description "Replacement text"}}
-                    :required   ["path" "oldText" "newText"]}
-   :format-request call-summary/edit-format-request})
+  {:name               "edit"
+   :label              "Edit"
+   :description        "Replace exact text in a file. oldText must match exactly."
+   :lambda-description "λf. find(exact) → replace"
+   :parameters         {:type       "object"
+                        :properties {:path    {:type "string" :description "File path"}
+                                     :oldText {:type "string" :description "Exact text to find"}
+                                     :newText {:type "string" :description "Replacement text"}}
+                        :required   ["path" "oldText" "newText"]}
+   :format-request     call-summary/edit-format-request})
 
 (def write-tool
-  {:name           "write"
-   :label          "Write"
-   :description    "Write content to a file, creating it if it does not exist."
-   :parameters     {:type       "object"
-                    :properties {:path    {:type "string" :description "File path"}
-                                 :content {:type "string" :description "Content to write"}}
-                    :required   ["path" "content"]}
-   :format-request call-summary/write-format-request})
+  {:name               "write"
+   :label              "Write"
+   :description        "Write content to a file, creating it if it does not exist."
+   :lambda-description "λf. create(f) ∨ overwrite(f)"
+   :parameters         {:type       "object"
+                        :properties {:path    {:type "string" :description "File path"}
+                                     :content {:type "string" :description "Content to write"}}
+                        :required   ["path" "content"]}
+   :format-request     call-summary/write-format-request})
 
 (def psi-tool psi-tool/psi-tool)
 
@@ -571,26 +575,10 @@
    Use this when registering tools into agent state.
    Note: psi-tool is excluded — it requires a session context.
    Use `make-psi-tool` to create it with a query-fn."
-  [{:name        (:name read-tool)
-    :label       (:label read-tool)
-    :description (:description read-tool)
-    :parameters  (:parameters read-tool)
-    :execute     execute-read}
-   {:name        (:name bash-tool)
-    :label       (:label bash-tool)
-    :description (:description bash-tool)
-    :parameters  (:parameters bash-tool)
-    :execute     execute-bash}
-   {:name        (:name edit-tool)
-    :label       (:label edit-tool)
-    :description (:description edit-tool)
-    :parameters  (:parameters edit-tool)
-    :execute     execute-edit}
-   {:name        (:name write-tool)
-    :label       (:label write-tool)
-    :description (:description write-tool)
-    :parameters  (:parameters write-tool)
-    :execute     execute-write}])
+  [(assoc read-tool :execute execute-read)
+   (assoc bash-tool :execute execute-bash)
+   (assoc edit-tool :execute execute-edit)
+   (assoc write-tool :execute execute-write)])
 
 ;; ============================================================
 ;; CWD-scoped tools

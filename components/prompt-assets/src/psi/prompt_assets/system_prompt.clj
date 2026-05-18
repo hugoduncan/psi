@@ -16,22 +16,8 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.prompt-assets.skills :as skills]))
-
-;;; Tool descriptions (built-in)
-
-(def ^:private tool-description-pairs
-  "Built-in tools carry both prose and lambda descriptions."
-  {"read"           {:prose  "Read file contents"
-                     :lambda "λf. content(f)"}
-   "bash"           {:prose  "Execute bash commands (ls, grep, find, etc.)"
-                     :lambda "λcmd. shell(cmd) | {ls grep find …}"}
-   "edit"           {:prose  "Make surgical edits to files (find exact text and replace)"
-                     :lambda "λf. find(exact) → replace"}
-   "write"          {:prose  "Create or overwrite files"
-                     :lambda "λf. create(f) ∨ overwrite(f)"}
-   "psi-tool"       {:prose  "Execute live psi runtime operations: action-based graph query, in-process ψ eval, explicit code reload, and managed project REPL control."
-                     :lambda "λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"}})
+   [psi.prompt-assets.skills :as skills]
+   [psi.tool-registry.defs :as tool-defs]))
 
 ;;; Lambda mode constants
 
@@ -267,31 +253,27 @@
        (assoc :cache-control {:type :ephemeral}))]))
 
 (defn- tool-description-for-mode
-  "Return the description string for a tool in the given mode.
-   Built-in tools use the pairs map. Extension tools use :lambda-description
-   if present in lambda mode, otherwise fall back to :description."
-  [tool-name mode ext-tool-map]
-  (if-let [pair (get tool-description-pairs tool-name)]
-    (get pair mode)
-    ;; Extension tool — fallback to prose when lambda not available
-    (if (and (= mode :lambda) (:lambda-description ext-tool-map))
-      (:lambda-description ext-tool-map)
-      (:description ext-tool-map))))
+  "Return the prompt-visible description string for `tool-def` in the given mode.
+   Lambda mode prefers non-blank :lambda-description and otherwise falls back
+   to :description. Prose mode always uses :description."
+  [tool-def mode]
+  (let [tool-def* (tool-defs/normalize-tool-def tool-def)
+        prose     (:description tool-def*)
+        lambda    (some-> (:lambda-description tool-def*) str not-empty)]
+    (if (= mode :lambda)
+      (or lambda prose)
+      prose)))
 
 (defn- format-tools-section
-  "Format the tool list section for the given mode.
-   Built-in tools come first, then extension tools not already listed."
-  [tool-names mode extension-tool-descriptions]
-  (let [ext-by-name  (into {} (map (juxt :name identity)) (or extension-tool-descriptions []))
-        builtin-set  (set tool-names)
-        ext-only     (remove #(builtin-set (:name %)) (or extension-tool-descriptions []))
-        all-tools    (into (vec (distinct tool-names)) (map :name ext-only))
-        lines        (keep (fn [tn]
-                             (when-let [desc (tool-description-for-mode tn mode (get ext-by-name tn))]
-                               (if (= mode :lambda)
-                                 (str tn " → " desc)
-                                 (str "- " tn ": " desc))))
-                           all-tools)]
+  "Format the tool list section for the given mode from normalized tool defs."
+  [tool-defs mode]
+  (let [lines (keep (fn [tool-def]
+                      (when-let [tool-def* (tool-defs/normalize-tool-def tool-def)]
+                        (when-let [desc (tool-description-for-mode tool-def* mode)]
+                          (if (= mode :lambda)
+                            (str (:name tool-def*) " → " desc)
+                            (str "- " (:name tool-def*) ": " desc)))))
+                    tool-defs)]
     (if (seq lines)
       (str/join "\n" lines)
       "(none)")))
@@ -357,8 +339,8 @@
 
 (defn- build-prose-preamble
   "Build the psi-authored preamble sections in prose mode."
-  [tool-names has-app-query? loaded-caps extension-tool-descriptions]
-  (let [tools-section      (format-tools-section tool-names :prose extension-tool-descriptions)
+  [tool-defs tool-names has-app-query? loaded-caps]
+  (let [tools-section      (format-tools-section tool-defs :prose)
         guidelines-section (str/join "\n" (map #(str "- " %) (prose-guidelines tool-names)))
         graph-section      (when has-app-query?
                              (str "\n\n" prose-graph-discovery
@@ -373,9 +355,9 @@
 
 (defn- build-lambda-preamble
   "Build the psi-authored preamble sections in lambda mode."
-  [tool-names has-app-query? loaded-caps nucleus-prelude extension-tool-descriptions]
+  [tool-defs has-app-query? loaded-caps nucleus-prelude]
   (let [prelude       (or nucleus-prelude default-nucleus-prelude)
-        tools-section (format-tools-section tool-names :lambda extension-tool-descriptions)
+        tools-section (format-tools-section tool-defs :lambda)
 
         graph-section
         (when has-app-query?
@@ -402,8 +384,8 @@
      :append-prompt               — text appended after the standard prompt layers
      :include-preamble?           — include psi-authored identity/tools/guidelines preamble (default true)
      :include-runtime-metadata?   — include time/worktree metadata tail (default true)
-     :selected-tools              — tool name strings
-     :extension-tool-descriptions — [{:name :description :lambda-description}]
+     :tool-defs                   — normalized or normalizable tool definition maps
+     :selected-tools              — optional tool-name allowlist used only to filter :tool-defs
      :context-files               — [{:path :content}] pre-loaded context files
      :skills                      — [Skill] pre-loaded skills
      :graph-capabilities          — [{:domain :operation-count ...}]
@@ -412,19 +394,39 @@
   ([] (build-system-prompt {}))
   ([{:keys [cwd session-instant prompt-mode nucleus-prelude-override
             custom-prompt append-prompt include-preamble? include-runtime-metadata? include-context-files?
-            selected-tools extension-tool-descriptions context-files skills graph-capabilities]}]
+            tool-defs selected-tools context-files skills graph-capabilities]}]
    (let [resolved-cwd           (or cwd (System/getProperty "user.dir"))
          resolved-instant       (or session-instant (java.time.Instant/now))
          mode                   (or prompt-mode :lambda)
          include-preamble?      (if (contains? #{true false} include-preamble?) include-preamble? true)
          include-runtime-meta?  (if (contains? #{true false} include-runtime-metadata?) include-runtime-metadata? true)
          include-context-files? (if (contains? #{true false} include-context-files?) include-context-files? true)
-         tool-names             (or selected-tools ["read" "bash" "edit" "write" "psi-tool"])
-         has-read?             (some #(= "read" %) tool-names)
-         has-app-query?        (some #(= "psi-tool" %) tool-names)
-         loaded-skills         (or skills [])
-         loaded-ctx            (or context-files [])
-         loaded-caps           (or graph-capabilities [])
+         normalized-tool-defs   (tool-defs/normalize-tool-defs
+                                 (or tool-defs
+                                     [{:name "read"
+                                       :description "Read file contents"
+                                       :lambda-description "λf. content(f)"}
+                                      {:name "bash"
+                                       :description "Execute bash commands (ls, grep, find, etc.)"
+                                       :lambda-description "λcmd. shell(cmd) | {ls grep find …}"}
+                                      {:name "edit"
+                                       :description "Make surgical edits to files (find exact text and replace)"
+                                       :lambda-description "λf. find(exact) → replace"}
+                                      {:name "write"
+                                       :description "Create or overwrite files"
+                                       :lambda-description "λf. create(f) ∨ overwrite(f)"}
+                                      {:name "psi-tool"
+                                       :description "Execute live psi runtime operations: action-based graph query, in-process ψ eval, explicit code reload, and managed project REPL control."
+                                       :lambda-description "λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"}]))
+         filtered-tool-defs     (if (some? selected-tools)
+                                  (filter-tool-defs normalized-tool-defs {:tool-names selected-tools})
+                                  normalized-tool-defs)
+         tool-names             (mapv :name filtered-tool-defs)
+         has-read?              (some #(= "read" %) tool-names)
+         has-app-query?         (some #(= "psi-tool" %) tool-names)
+         loaded-skills          (or skills [])
+         loaded-ctx             (or context-files [])
+         loaded-caps            (or graph-capabilities [])
 
          ;; Context files section
          context-section
@@ -451,10 +453,9 @@
 
            include-preamble?
            (if (= mode :lambda)
-             (build-lambda-preamble tool-names has-app-query? loaded-caps
-                                    nucleus-prelude-override extension-tool-descriptions)
-             (build-prose-preamble tool-names has-app-query? loaded-caps
-                                   extension-tool-descriptions))
+             (build-lambda-preamble filtered-tool-defs has-app-query? loaded-caps
+                                    nucleus-prelude-override)
+             (build-prose-preamble filtered-tool-defs tool-names has-app-query? loaded-caps))
 
            :else
            "")

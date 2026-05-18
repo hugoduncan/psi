@@ -87,6 +87,13 @@
         (is (str/includes? prompt "write → λf. create(f) ∨ overwrite(f)"))
         (is (str/includes? prompt "psi-tool → λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"))))
 
+    (testing "built-in tool falls back to prose when no lambda description"
+      (let [prompt (sys-prompt/build-system-prompt
+                    {:cwd "/test"
+                     :tool-defs [{:name "read"
+                                  :description "Read prose only"}]})]
+        (is (str/includes? prompt "read → Read prose only"))))
+
     (testing "includes graph capabilities data"
       (let [prompt (sys-prompt/build-system-prompt
                     {:graph-capabilities [{:domain :agent-session
@@ -105,16 +112,16 @@
     (testing "extension tool falls back to prose when no lambda description"
       (let [prompt (sys-prompt/build-system-prompt
                     {:cwd "/test"
-                     :extension-tool-descriptions [{:name "my-ext-tool"
-                                                    :description "Prose desc"}]})]
+                     :tool-defs [{:name "my-ext-tool"
+                                  :description "Prose desc"}]})]
         (is (str/includes? prompt "my-ext-tool → Prose desc"))))
 
     (testing "extension tool uses lambda description when available"
       (let [prompt (sys-prompt/build-system-prompt
                     {:cwd "/test"
-                     :extension-tool-descriptions [{:name "my-ext-tool"
-                                                    :description "Prose desc"
-                                                    :lambda-description "λt. ext(t)"}]})]
+                     :tool-defs [{:name "my-ext-tool"
+                                  :description "Prose desc"
+                                  :lambda-description "λt. ext(t)"}]})]
         (is (str/includes? prompt "my-ext-tool → λt. ext(t)"))
         (is (not (str/includes? prompt "Prose desc")))))
 
@@ -150,8 +157,7 @@
   ;; Prose mode preserves the original natural-language prompt.
   (testing "build-system-prompt in prose mode"
     (testing "includes prose identity and tools"
-      (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"
-                                                    :prompt-mode :prose})]
+      (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir" :prompt-mode :prose})]
         (is (str/includes? prompt "You are ψ (Psi)"))
         (is (str/includes? prompt "Available tools:"))
         (is (str/includes? prompt "read: Read file contents"))
@@ -196,6 +202,10 @@
     (testing "excludes graph discovery when psi-tool not available"
       (let [prompt (sys-prompt/build-system-prompt
                     {:prompt-mode :prose
+                     :tool-defs [{:name "read" :description "Read"}
+                                 {:name "bash" :description "Bash"}
+                                 {:name "edit" :description "Edit"}
+                                 {:name "write" :description "Write"}]
                      :selected-tools ["read" "bash" "edit" "write"]})]
         (is (not (str/includes? prompt "Capability graph (EQL discovery):")))))))
 
@@ -233,6 +243,9 @@
                      :source :user :disable-model-invocation false}]
             prompt (sys-prompt/build-system-prompt
                     {:skills skills
+                     :tool-defs [{:name "bash" :description "Bash"}
+                                 {:name "edit" :description "Edit"}
+                                 {:name "write" :description "Write"}]
                      :selected-tools ["bash" "edit" "write"]})]
         (is (not (str/includes? prompt "<available_skills>")))))
 

@@ -46,6 +46,7 @@
                        (sys-prompt/build-system-prompt
                         (assoc build-opts
                                :prompt-mode (:prompt-mode sd :lambda)
+                               :tool-defs (vec (or (:tool-defs sd) []))
                                :selected-tools selected-tools
                                :skills (vec (or (:skills sd) []))
                                :prompt-contributions nil)))

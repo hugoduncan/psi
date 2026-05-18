@@ -353,21 +353,22 @@ Available: " (str/join ", " (map name (keys all))))
          sd               (ss/get-session-data-in ctx session-id)
          prompt-mode      (or (:prompt-mode sd) :lambda)
          prelude-override (:nucleus-prelude-override sd)
-         base-prompt-opts {:cwd                      cwd
-                           :session-instant          (:started-at ctx)
-                           :prompt-mode              prompt-mode
-                           :nucleus-prelude-override prelude-override
-                           :context-files            ctx-files
-                           :skills                   skills}
-         base-prompt      (sys-prompt/build-system-prompt base-prompt-opts)
-         developer-prompt (developer-prompt-from-env)
-         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
          psi-tool         (tools/make-psi-tool (fn
                                                  ([q] (session/query-in ctx session-id q))
                                                  ([q entity] (session/query-in ctx q entity)))
                                                {:ctx ctx
                                                 :session-id session-id
                                                 :cwd cwd})
+         base-prompt-opts {:cwd                      cwd
+                           :session-instant          (:started-at ctx)
+                           :prompt-mode              prompt-mode
+                           :nucleus-prelude-override prelude-override
+                           :context-files            ctx-files
+                           :skills                   skills
+                           :tool-defs                (conj (vec tools/all-tools) psi-tool)}
+         base-prompt      (sys-prompt/build-system-prompt base-prompt-opts)
+         developer-prompt (developer-prompt-from-env)
+         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
          summary-base     (session-bootstrap/bootstrap-in!
                            ctx session-id
                            {:register-global-query? false

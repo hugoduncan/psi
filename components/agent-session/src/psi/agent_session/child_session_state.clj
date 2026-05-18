@@ -15,6 +15,7 @@
         base-opts (merge {:cwd                       cwd
                           :context-files             (when cwd
                                                        (psi.prompt-assets.system-prompt/discover-context-files cwd))
+                          :tool-defs                 resolved-tool-defs
                           :selected-tools            (mapv :name resolved-tool-defs)
                           :skills                    resolved-skills
                           :prompt-mode               (:prompt-mode parent-sd :lambda)

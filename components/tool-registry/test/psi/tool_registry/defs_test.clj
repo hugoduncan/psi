@@ -23,6 +23,13 @@
       (is (identical? exec-fn (:execute normalized)))
       (is (identical? format-fn (:format-request normalized)))))
 
+  (testing "lambda descriptions are preserved canonically"
+    (let [normalized (tool-defs/normalize-tool-def {:name "x"
+                                                    :description "desc"
+                                                    :lambda-description "λx. desc(x)"})]
+      (is (= "desc" (:description normalized)))
+      (is (= "λx. desc(x)" (:lambda-description normalized)))))
+
   (testing "EDN string parameters are parsed into canonical data when possible"
     (let [tool {:name "x"
                 :label "X"
