@@ -279,11 +279,11 @@
                      :append-prompt "Helper prompt."})]
         (is (= "Helper prompt." prompt))))
 
-    (testing "includes worktree directory metadata"
+    (testing "does not include working-directory metadata"
       (let [prompt (sys-prompt/build-system-prompt
                     {:cwd "/tmp/worktree-demo"})]
-        (is (str/includes? prompt "Current working directory: /tmp/worktree-demo"))
-        (is (str/includes? prompt "Current worktree directory: /tmp/worktree-demo"))))
+        (is (not (str/includes? prompt "Current working directory:")))
+        (is (not (str/includes? prompt "Current worktree directory:")))))
 
     (testing "runtime metadata follows context files"
       (let [prompt (sys-prompt/build-system-prompt

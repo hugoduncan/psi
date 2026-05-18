@@ -242,10 +242,8 @@
 (defn runtime-metadata-tail
   "Return the runtime metadata suffix for the system prompt.
    Pure function — uses the provided instant, not the wall clock."
-  [cwd instant]
-  (str "\nCurrent date and time: " (format-instant instant)
-       "\nCurrent working directory: " cwd
-       "\nCurrent worktree directory: " cwd))
+  [_cwd instant]
+  (str "\nCurrent date and time: " (format-instant instant)))
 
 (defn system-prompt-blocks
   "Return Anthropic-compatible system prompt blocks.
