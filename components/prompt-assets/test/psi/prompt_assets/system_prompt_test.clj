@@ -81,10 +81,10 @@
 
     (testing "includes lambda tool descriptions"
       (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"})]
-        (is (str/includes? prompt "read → λf. content(f)"))
-        (is (str/includes? prompt "bash → λcmd. shell(cmd)"))
-        (is (str/includes? prompt "edit → λf. find(exact) → replace"))
-        (is (str/includes? prompt "write → λf. create(f) ∨ overwrite(f)"))
+        (is (str/includes? prompt "read → λpath. content(path)"))
+        (is (str/includes? prompt "bash → λcommand. shell(command)"))
+        (is (str/includes? prompt "edit → λ{path oldText newText}. find_exact(path, oldText) → replace(path, oldText, newText)"))
+        (is (str/includes? prompt "write → λ{path content}. create(path,content) ∨ overwrite(path, content)"))
         (is (str/includes? prompt "psi-tool → λaction. runtime(query ∨ eval[ψ,in-process] ∨ reload-code ∨ project-repl[worktree,nrepl]) → {graph ∨ value ∨ reload-report ∨ project-repl-report}"))))
 
     (testing "built-in tool falls back to prose when no lambda description"

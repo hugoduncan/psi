@@ -26,7 +26,7 @@
   {:name               "read"
    :label              "Read"
    :description        "Read the contents of a file. Returns the file text."
-   :lambda-description "λf. content(f)"
+   :lambda-description "λpath. content(path)"
    :parameters         {:type       "object"
                         :properties {:path   {:type "string" :description "File path to read"}
                                      :offset {:type "integer" :description "1-indexed line number to start reading from"}
@@ -38,7 +38,7 @@
   {:name               "bash"
    :label              "Bash"
    :description        "Execute a bash command. Returns stdout and stderr combined."
-   :lambda-description "λcmd. shell(cmd)"
+   :lambda-description "λcommand. shell(command)"
    :parameters         {:type       "object"
                         :properties {:command {:type "string" :description "Bash command to run"}
                                      :timeout {:type "integer" :description "Timeout in seconds (default 30)"}}
@@ -49,7 +49,7 @@
   {:name               "edit"
    :label              "Edit"
    :description        "Replace exact text in a file. oldText must match exactly."
-   :lambda-description "λf. find(exact) → replace"
+   :lambda-description "λ{path oldText newText}. find_exact(path, oldText) → replace(path, oldText, newText)"
    :parameters         {:type       "object"
                         :properties {:path    {:type "string" :description "File path"}
                                      :oldText {:type "string" :description "Exact text to find"}
@@ -61,7 +61,7 @@
   {:name               "write"
    :label              "Write"
    :description        "Write content to a file, creating it if it does not exist."
-   :lambda-description "λf. create(f) ∨ overwrite(f)"
+   :lambda-description "λ{path content}. create(path,content) ∨ overwrite(path, content)"
    :parameters         {:type       "object"
                         :properties {:path    {:type "string" :description "File path"}
                                      :content {:type "string" :description "Content to write"}}
