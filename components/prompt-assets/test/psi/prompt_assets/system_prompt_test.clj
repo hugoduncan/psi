@@ -74,7 +74,7 @@
     (testing "includes non-empty lambda-compiled sections"
       (let [prompt (sys-prompt/build-system-prompt {:cwd "/test/dir"})]
         (is (str/includes? prompt "λ engage(nucleus)."))
-        (is (str/includes? prompt "λ identity(ψ)"))
+        (is (str/includes? prompt "λ identity(ψ). agent(coding) ∈ harness(ψ) | tools ∧ skills ∧ workflows ∧ commands | precise | introspect-able"))
         (is (str/includes? prompt "λ tools."))
         (is (str/includes? prompt "λ graph(eql)."))
         (is (not (str/includes? prompt "λ guide.")))))
