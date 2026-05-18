@@ -334,6 +334,10 @@ jobs:
       - name: Build library jar (Clojars)
         run: bb build:lib
 
+      - name: Install library jar into local Maven repo for dry-run launcher smoke
+        if: github.event_name == 'workflow_dispatch' && !inputs.publish
+        run: bb build:install-local
+
       - name: Deploy to Clojars
         if: github.event_name == 'push' || inputs.publish
         env:
@@ -341,16 +345,21 @@ jobs:
           CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
         run: bb deploy
 
-      - name: Smoke-test :jar policy (validates Clojars artifact is fetchable)
-        if: github.event_name == 'push' || inputs.publish
+      - name: Smoke-test :jar policy against published or local release artifact
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Bypass the launcher entirely: invoke clojure directly with the
-          # just-deployed Clojars coord.  This avoids the launcher's version
-          # resource (which is "unreleased" post-tag-reset) and tests that
-          # the Maven artifact resolves and psi.main boots correctly.
           DEPS="{:deps {org.hugoduncan/psi {:mvn/version \"$VERSION\"}}}"
           EXPECTED="psi $VERSION"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.publish }}" != "true" ]]; then
+            echo "Dry-run mode: smoke-testing :jar policy against the locally installed Maven artifact."
+            OUTPUT=$(clojure -Sdeps "$DEPS" -M -m psi.main --version 2>/dev/null || true)
+            echo "  output: $OUTPUT"
+            test "$OUTPUT" = "$EXPECTED"
+            exit 0
+          fi
+
+          # Published release mode: wait for Clojars propagation.
           MAX_ATTEMPTS=8
           SLEEP_SEC=30
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
@@ -370,7 +379,6 @@ jobs:
           exit 1
 
       - name: Smoke-test released launcher entrypoint via bbin
-        if: github.event_name == 'push' || inputs.publish
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           TMP_ROOT="$(mktemp -d)"

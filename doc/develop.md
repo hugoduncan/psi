@@ -182,13 +182,16 @@ Pushing the tag triggers `.github/workflows/release.yml`, which:
 The same workflow also supports manual dry-run testing via `workflow_dispatch`
 without publishing anything publicly. Use GitHub Actions → `Release` → `Run workflow`
 with:
-- `publish = false` to validate the release build path only
+- `publish = false` to validate the release build path without external publication
 - optional `ref` to test a branch/commit instead of the current ref
 - optional `release_version` to force a specific version label for the dry-run
 
-Dry-run mode stamps `bases/main/resources/psi/version.edn` inside the runner,
-builds the library jar and uberjar, and skips Clojars deploy, post-deploy jar
-smoke, changelog extraction, and GitHub Release creation.
+Dry-run mode now stamps `bases/main/resources/psi/version.edn` inside the runner,
+builds the library jar, installs that jar into the runner's local Maven repo,
+smoke-tests both the `:jar` policy and the released `bbin` launcher entrypoint
+against that locally installed artifact, builds the uberjar, and still skips
+external publication steps such as Clojars deploy, changelog extraction, and
+GitHub Release creation.
 
 ### Partial-failure recovery
 
