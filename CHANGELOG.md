@@ -14,6 +14,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - The live graph now exposes explicit session-surface attrs: `:psi.runtime-session/active-id`, `:psi.runtime-session/list`, `:psi.runtime-session/count`, `:psi.persisted-session/list`, and `:psi.persisted-session/list-all`.
 - The live graph now exposes `:psi.agent-session/context-session-summaries`, a compact session inventory for operational selection, alongside the explicit runtime-session root attrs.
 - New `edit-clj` extension and tool: structural Clojure/EDN form replacement by S-expression equality, preserving surrounding file formatting and supporting optional line-range filtering.
+- Library jar packaging now derives its bundled runtime source/resource paths from the authoritative `:psi` launcher alias, preventing installed `psi` releases from omitting extracted runtime components such as `state-kernel`.
 
 ### Fixed
 - `psi-tool` mutation execution now preserves an explicitly supplied business `:session-id` for session-scoped mutations like `psi.extension/close-session`, instead of silently retargeting them to the invoking session.

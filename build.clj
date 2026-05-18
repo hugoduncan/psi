@@ -10,7 +10,8 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [clojure.tools.build.api :as b]))
+   [clojure.tools.build.api :as b]
+   [psi.build-manifest :as build-manifest]))
 
 ;; ---------------------------------------------------------------------------
 ;; Config
@@ -37,28 +38,11 @@
       (or "unreleased")))
 
 ;; ---------------------------------------------------------------------------
-;; Source paths — mirror :run alias exactly
+;; Source paths — derive from the authoritative runtime alias
 ;; ---------------------------------------------------------------------------
 
 (def src-dirs
-  ["bases/main/src"
-   "bases/main/resources"
-   "components/app-runtime/src"
-   "components/agent-session/src"
-   "components/agent-core/src"
-   "components/ai/src"
-   "components/engine/src"
-   "components/query/src"
-   "components/tui/src"
-   "components/rpc/src"
-   "extensions/auto-session-name/src"
-   "extensions/commit-checks/src"
-   "extensions/hello-ext/src"
-   "extensions/mcp-tasks-run/src"
-   "extensions/mementum/src"
-   "extensions/munera/src"
-   "extensions/plan-state-learning/src"
-   "extensions/work-on/src"])
+  (build-manifest/build-lib-src-dirs))
 
 ;; ---------------------------------------------------------------------------
 ;; Tasks
