@@ -3,7 +3,8 @@
    [clojure.java.io :as io]
    [clojure.java.shell :as shell]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]))
+   [clojure.test :refer [deftest is testing]]
+   [psi.build-smoke-support :as support]))
 
 (defn- sh!
   [env & args]
@@ -47,14 +48,15 @@
 
 (deftest ^:integration bbin-install-smoke-test
   (testing "bbin can install the locally built psi library artifact and launch it"
-    (let [tmp-root (temp-dir! "psi-bbin-smoke-")
-          {:keys [env cwd]} (isolated-env tmp-root)
-          expected (str "psi " (version-string))]
-      (sh! env "clojure" "-T:build" "install-local")
-      (sh! env "bbin" "install" "org.hugoduncan/psi" "--as" "psi-smoke" "--mvn/version" (version-string))
-      (let [installed (str (get env "BABASHKA_BBIN_BIN_DIR") "/psi-smoke")
-            {:keys [exit out err]} (apply shell/sh (concat [installed "--cwd" cwd "--version" :env env :dir cwd]))]
-        (is (.exists (io/file installed)))
-        (is (= 0 exit) err)
-        (is (= expected
-               (str/trim out)))))))
+    (support/with-build-lock
+      (let [tmp-root (temp-dir! "psi-bbin-smoke-")
+            {:keys [env cwd]} (isolated-env tmp-root)
+            expected (str "psi " (version-string))]
+        (sh! env "clojure" "-T:build" "install-local")
+        (sh! env "bbin" "install" "org.hugoduncan/psi" "--as" "psi-smoke" "--mvn/version" (version-string))
+        (let [installed (str (get env "BABASHKA_BBIN_BIN_DIR") "/psi-smoke")
+              {:keys [exit out err]} (apply shell/sh (concat [installed "--cwd" cwd "--version" :env env :dir cwd]))]
+          (is (.exists (io/file installed)))
+          (is (= 0 exit) err)
+          (is (= expected
+                 (str/trim out))))))))

@@ -2,7 +2,8 @@
   (:require
    [clojure.java.shell :as shell]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]))
+   [clojure.test :refer [deftest is testing]]
+   [psi.build-smoke-support :as support]))
 
 (defn- jar-entries
   [jar-path]
@@ -28,12 +29,13 @@
 
 (deftest ^:integration build-lib-jar-includes-runtime-packaging-regression-entries
   (testing "the built library jar contains runtime namespaces required by installed psi"
-    (build-lib!)
-    (let [entries (jar-entries "target/psi-unreleased.jar")]
-      (is (contains? entries "psi/main.clj"))
-      (is (contains? entries "hugoduncan/psi.clj"))
-      (is (contains? entries "psi/agent_session/dispatch.clj"))
-      (is (contains? entries "psi/state_kernel/dispatch.clj"))
-      (is (contains? entries "psi/edit_clj/extension.clj"))
-      (is (contains? entries "psi/github/extension.clj"))
-      (is (contains? entries "extensions/logprobs.clj")))))
+    (support/with-build-lock
+      (build-lib!)
+      (let [entries (jar-entries "target/psi-unreleased.jar")]
+        (is (contains? entries "psi/main.clj"))
+        (is (contains? entries "hugoduncan/psi.clj"))
+        (is (contains? entries "psi/agent_session/dispatch.clj"))
+        (is (contains? entries "psi/state_kernel/dispatch.clj"))
+        (is (contains? entries "psi/edit_clj/extension.clj"))
+        (is (contains? entries "psi/github/extension.clj"))
+        (is (contains? entries "extensions/logprobs.clj"))))))
