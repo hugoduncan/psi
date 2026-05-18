@@ -121,15 +121,25 @@ jobs:
           sudo apt-get install -y tmux
           tmux -V
 
+      - name: Install bbin
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL https://raw.githubusercontent.com/babashka/bbin/v0.2.5/bbin -o "$HOME/.local/bin/bbin"
+          chmod +x "$HOME/.local/bin/bbin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/bbin" version
+
       - name: Install psi launcher shim
         run: |
           mkdir -p "$HOME/.local/bin"
           BB_BIN="$(command -v bb)"
           echo "BB=$BB_BIN" >> "$GITHUB_ENV"
           echo "PSI_LAUNCHER_POLICY=development" >> "$GITHUB_ENV"
+          echo "BBIN_REPO_ROOT=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
           cat > "$HOME/.local/bin/psi" <<EOF
           #!/usr/bin/env bash
           export PSI_LAUNCHER_POLICY=development
+          export BBIN_REPO_ROOT="$GITHUB_WORKSPACE"
           exec "$BB_BIN" bb/psi.clj -- "\$@"
           EOF
           chmod +x "$HOME/.local/bin/psi"
@@ -178,15 +188,25 @@ jobs:
           sudo apt-get install -y tmux
           tmux -V
 
+      - name: Install bbin
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL https://raw.githubusercontent.com/babashka/bbin/v0.2.5/bbin -o "$HOME/.local/bin/bbin"
+          chmod +x "$HOME/.local/bin/bbin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/bbin" version
+
       - name: Install psi launcher shim
         run: |
           mkdir -p "$HOME/.local/bin"
           BB_BIN="$(command -v bb)"
           echo "BB=$BB_BIN" >> "$GITHUB_ENV"
           echo "PSI_LAUNCHER_POLICY=development" >> "$GITHUB_ENV"
+          echo "BBIN_REPO_ROOT=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
           cat > "$HOME/.local/bin/psi" <<EOF
           #!/usr/bin/env bash
           export PSI_LAUNCHER_POLICY=development
+          export BBIN_REPO_ROOT="$GITHUB_WORKSPACE"
           exec "$BB_BIN" bb/psi.clj -- "\$@"
           EOF
           chmod +x "$HOME/.local/bin/psi"
