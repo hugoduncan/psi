@@ -44,7 +44,10 @@
 
 (defn- read-script
   []
-  (read-edn-env "PSI_TUI_DEMO_SCRIPT"))
+  (or (when-let [path (System/getenv "PSI_TUI_DEMO_SCRIPT_FILE")]
+        (when-not (str/blank? path)
+          (edn/read-string (slurp path))))
+      (read-edn-env "PSI_TUI_DEMO_SCRIPT")))
 
 (defn- noop-agent-fn
   "Agent fn used when no script is configured."

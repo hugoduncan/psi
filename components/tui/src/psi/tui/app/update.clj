@@ -33,11 +33,36 @@
           (shared/set-input-model (text-input/reset (:input state))))
       nil])))
 
+(defn- normalize-restored-message
+  [message]
+  (let [role (some-> (:role message) name keyword)]
+    (cond
+      (contains? message :text)
+      [(cond-> {:text (:text message)} role (assoc :role role))]
+
+      (and (= role :user) (contains? message :content))
+      [{:role :user :text (message-text/content-text (:content message))}]
+
+      (and (= role :assistant) (contains? message :content))
+      (let [content (:content message)
+            thinking-msgs (->> (if (sequential? content) content [])
+                               (keep (fn [block]
+                                       (when (= :thinking (:type block))
+                                         (when-let [text (not-empty (:text block))]
+                                           {:role :thinking :text text})))))
+            assistant-text (not-empty (message-text/content-text content))]
+        (cond-> (vec thinking-msgs)
+          assistant-text (conj {:role :assistant :text assistant-text})))
+
+      :else
+      [])))
+
 (defn restored-session-payload
   [restored]
   (let [rehydration (or (:nav/rehydration restored)
-                        restored)]
-    {:messages   (vec (or (if (map? rehydration) (:messages rehydration) rehydration) []))
+                        restored)
+        messages    (or (if (map? rehydration) (:messages rehydration) rehydration) [])]
+    {:messages   (->> messages (mapcat normalize-restored-message) vec)
      :tool-calls (or (when (map? rehydration) (:tool-calls rehydration)) {})
      :tool-order (vec (or (when (map? rehydration) (:tool-order rehydration)) []))}))
 

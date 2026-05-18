@@ -13,8 +13,17 @@
 
 (defn- edn-str [v] (pr-str v))
 
-(defn- demo-launch-command []
-  "exec clojure -M:tui-demo")
+(defn- demo-launch-command
+  [script-file]
+  (str "PSI_TUI_DEMO_SCRIPT_FILE=" (pr-str script-file) " exec clojure -M:tui-demo"))
+
+(defn- write-script-file!
+  [working-dir script]
+  (let [dir  (io/file working-dir ".tmp")
+        _    (.mkdirs dir)
+        file (io/file dir (str "psi-tui-demo-" (System/currentTimeMillis) ".edn"))]
+    (spit file script)
+    (.getAbsolutePath file)))
 
 (defn- failure
   [target reason]
@@ -86,13 +95,13 @@
                              :done {:role "assistant"
                                     :content [{:type :text :text "Done."}]}}])
             session-name* (or session-name (tmux/unique-session-name))
-            launch        (or launch-command (demo-launch-command))]
+            script-file   (write-script-file! working-dir script)
+            launch        (or launch-command (demo-launch-command script-file))]
         (try
           (let [target (tmux/start-session!
                         {:session-name   session-name*
                          :working-dir    working-dir
-                         :launch-command (str "PSI_TUI_DEMO_SCRIPT=" (pr-str script)
-                                              " " launch)})
+                         :launch-command launch})
                 result (cond
                          (not (tmux/wait-for-any-marker target ready-markers startup-timeout-ms))
                          (failure target :startup-timeout)
@@ -144,4 +153,6 @@
                           :pane-snapshot (tmux/sanitize-pane-text (tmux/capture-pane target))}]
               (when-not keep-session-on-failure?
                 (tmux/kill-session-if-exists! session-name*))
-              result)))))))
+              result))
+          (finally
+            (.delete (io/file script-file))))))))
