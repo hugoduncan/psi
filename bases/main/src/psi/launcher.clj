@@ -4,6 +4,7 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [psi.build-manifest :as build-manifest]
    [psi.launcher.extensions :as extensions]
    [psi.version :as version]))
 
@@ -89,6 +90,22 @@
   [launcher-root]
   (read-edn-file (io/file launcher-root "deps.edn")))
 
+(defn release-basis-config
+  []
+  (if-let [resource (io/resource build-manifest/release-deps-resource-path)]
+    (try
+      (-> resource slurp edn/read-string)
+      (catch Exception e
+        (throw (ex-info "Malformed jar-owned release deps metadata"
+                        {:stage :basis-construction
+                         :policy :jar
+                         :resource-path build-manifest/release-deps-resource-path}
+                        e))))
+    (throw (ex-info "Missing jar-owned release deps metadata"
+                    {:stage :basis-construction
+                     :policy :jar
+                     :resource-path build-manifest/release-deps-resource-path}))))
+
 (defn- release-version
   "Return the baked version string, or nil if running unreleased."
   []
@@ -118,20 +135,22 @@
    :paths []})
 
 (defn- psi-jar-basis
-  "For :jar policy: single mvn coord replaces all psi local/root self-deps."
-  [version]
-  {:deps {extensions/psi-mvn-lib {:mvn/version version}
-          'nrepl/nrepl            {:mvn/version "1.5.1"}}
-   :paths []})
+  "For :jar policy: the published psi jar is the shipped code base and the
+   packaged release-deps metadata provides the external runtime dependency
+   closure required to start it."
+  []
+  (let [release-config (release-basis-config)]
+    {:deps  (:deps release-config)
+     :paths []}))
 
 (defn psi-self-basis
   [launcher-root policy]
   (if (= :jar policy)
-    (let [v (release-version)]
-      (when-not v
+    (do
+      (when-not (release-version)
         (throw (ex-info ":jar policy requires a stamped release version (not 'unreleased')"
                         {:stage :basis-construction :policy policy})))
-      (psi-jar-basis v))
+      (psi-jar-basis))
     (-> (repo-basis-config launcher-root)
         (psi-self-basis-from-repo-config launcher-root policy)
         (update :deps assoc 'nrepl/nrepl {:mvn/version "1.5.1"}))))
@@ -172,13 +191,6 @@
         (assoc dep :local/root (.getAbsolutePath (io/file base-dir local-root)))))
     dep))
 
-(defn- basis-deps
-  [dep-map]
-  (into {}
-        (map (fn [[lib dep]]
-               [lib (dissoc dep :psi/init :psi/enabled)]))
-        dep-map))
-
 (defn- resolve-release-version-placeholder
   "Replace the :psi/release-version sentinel with the actual version string."
   [dep version]
@@ -208,7 +220,7 @@
 
 (defn startup-basis
   [launcher-root cwd policy]
-  (let [self-basis       (update (psi-self-basis launcher-root policy) :deps basis-deps)
+  (let [self-basis       (psi-self-basis launcher-root policy)
         manifest-info0   (manifest-state launcher-root cwd policy)
         expanded-deps    (->> (get-in manifest-info0 [:expanded-manifest :deps])
                               (remove (fn [[lib _dep]]

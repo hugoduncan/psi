@@ -51,7 +51,7 @@
      "PATH" path}))
 
 (deftest ^:integration stamped-release-bbin-help-smoke-test
-  (testing "stamped release artifact installs via bbin and prints non-interactive help"
+  (testing "stamped release artifact installs via bbin and prints non-interactive help without repo layout"
     (support/with-build-lock
       (let [original-version (read-version-string)
             stamped-version  "0.1.2115-packaging-smoke"

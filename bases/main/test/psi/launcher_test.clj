@@ -1,5 +1,6 @@
 (ns psi.launcher-test
   (:require
+   [clojure.java.io]
    [clojure.test :refer [deftest is testing]]
    [psi.launcher :as launcher]
    [psi.launcher.extensions :as extensions]))
@@ -64,10 +65,14 @@
                nrepl/nrepl {:mvn/version "1.5.1"}}
              (:deps (with-redefs [launcher/repo-basis-config (constantly repo-config)]
                       (launcher/psi-self-basis "/repo/psi" :installed))))))
-    (testing "jar policy emits single mvn coord for the release version"
-      (is (= '{org.hugoduncan/psi {:mvn/version "0.1.42"}
-               nrepl/nrepl {:mvn/version "1.5.1"}}
-             (:deps (with-redefs [launcher/release-version (constantly "0.1.42")]
+    (testing "jar policy reads external runtime deps from jar-owned release metadata"
+      (is (= '{nrepl/nrepl {:mvn/version "1.5.1"}
+               io.github.timokramer/charm.clj {:git/tag "v0.2.71"
+                                               :git/sha "38e6823"}}
+             (:deps (with-redefs [launcher/release-version (constantly "0.1.42")
+                                  launcher/release-basis-config (constantly '{:deps {nrepl/nrepl {:mvn/version "1.5.1"}
+                                                                                     io.github.timokramer/charm.clj {:git/tag "v0.2.71"
+                                                                                                                     :git/sha "38e6823"}}})]
                       (launcher/psi-self-basis "/repo/psi" :jar))))))
     (testing "jar policy throws when version resource is unreleased"
       (let [ex (try
@@ -122,11 +127,9 @@
                          :defaulted-libs ['psi/mementum 'psi/workflow-loader]
                          :inferred-init-libs ['psi/mementum 'psi/workflow-loader]}
           result (with-redefs [launcher/release-version (constantly "0.1.42")
+                               launcher/release-basis-config (constantly '{:deps {nrepl/nrepl {:mvn/version "1.5.1"}}})
                                launcher/manifest-state (fn [_ _ _] manifest-info)]
                    (launcher/startup-basis "/repo/psi" "/repo/project" :jar))]
-      ;; psi self-dep is the single mvn coord
-      (is (= {:mvn/version "0.1.42"}
-             (get-in result [:basis :deps 'org.hugoduncan/psi])))
       ;; psi-owned extensions are NOT added as separate Maven artifacts
       (is (nil? (get-in result [:basis :deps 'psi/mementum])))
       (is (nil? (get-in result [:basis :deps 'psi/workflow-loader])))))
@@ -142,10 +145,13 @@
                          :defaulted-libs []
                          :inferred-init-libs []}
           result (with-redefs [launcher/release-version (constantly "0.1.42")
+                               launcher/release-basis-config (constantly '{:deps {nrepl/nrepl {:mvn/version "1.5.1"}}})
                                launcher/manifest-state (fn [_ _ _] manifest-info)]
                    (launcher/startup-basis "/repo/psi" "/repo/project" :jar))]
       (is (= {:mvn/version "2.0.0"}
-             (get-in result [:basis :deps 'third-party/ext])))))
+             (get-in result [:basis :deps 'third-party/ext])))
+      (is (= {:mvn/version "1.5.1"}
+             (get-in result [:basis :deps 'nrepl/nrepl])))))
   (testing "jar policy throws when version resource is unreleased"
     (let [manifest-info {:user-path "/tmp/user.edn"
                          :project-path "/tmp/project/.psi/extensions.edn"
@@ -159,6 +165,7 @@
                          :inferred-init-libs []}
           ex (try
                (with-redefs [launcher/release-version (constantly nil)
+                             launcher/release-basis-config (constantly '{:deps {nrepl/nrepl {:mvn/version "1.5.1"}}})
                              launcher/manifest-state (fn [_ _ _] manifest-info)]
                  (launcher/startup-basis "/repo/psi" "/repo/project" :jar))
                nil
@@ -188,6 +195,17 @@
            (get-in result [:basis :deps 'psi/workflow-loader])))
     ;; :psi/init is also stripped from manifest-info expanded-manifest (same expanded-deps map)
     (is (nil? (get-in result [:manifest-info :expanded-manifest :deps 'psi/workflow-loader :psi/init])))))
+
+(deftest release-basis-config-test
+  (testing "missing jar-owned release metadata fails clearly"
+    (let [ex (try
+               (with-redefs [clojure.java.io/resource (constantly nil)]
+                 (launcher/release-basis-config))
+               nil
+               (catch clojure.lang.ExceptionInfo e e))]
+      (is (some? ex))
+      (is (= :basis-construction (-> ex ex-data :stage)))
+      (is (= :jar (-> ex ex-data :policy))))))
 
 (deftest launch-plan-test
   (let [basis-state {:basis {:deps {'foo/bar {:mvn/version "1.0.0"}}}

@@ -96,6 +96,12 @@
     (b/copy-file {:src    "bb.edn"
                   :target (str class-dir "/bb.edn")})
 
+    ;; 3c. Write release-owned runtime dep metadata for jar policy launcher startup
+    (println "  Writing release deps metadata ...")
+    (let [release-deps-target (io/file class-dir build-manifest/release-deps-resource-path)]
+      (io/make-parents release-deps-target)
+      (spit release-deps-target (build-manifest/release-deps-edn)))
+
     ;; 4. Build thin jar (no AOT)
     (println "  Assembling library jar ...")
     (b/jar {:class-dir class-dir

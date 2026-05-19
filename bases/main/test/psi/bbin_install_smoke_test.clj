@@ -47,7 +47,7 @@
      :cwd root}))
 
 (deftest ^:integration bbin-install-smoke-test
-  (testing "bbin can install the locally built psi library artifact and launch it"
+  (testing "bbin can install the locally built psi library artifact and launch it from an isolated environment without repo-local startup assumptions"
     (support/with-build-lock
       (let [tmp-root (temp-dir! "psi-bbin-smoke-")
             {:keys [env cwd]} (isolated-env tmp-root)
