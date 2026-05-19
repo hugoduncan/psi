@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Fixed
+- Released `psi` launcher packaging now includes the full stamped-runtime component surface and required runtime dependencies, so installed `bbin` releases can start and print `--help` successfully under release-tag `:jar` policy.
+
 ## [0.1.2115] - 2026-05-18
 
 ### Fixed
