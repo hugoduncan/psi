@@ -268,7 +268,8 @@ Available: " (str/join ", " (map name (keys all))))
            :session-id sid)))
 
 (defn create-runtime-session-context
-  "Create a live session context with runtime/session state prepared, but not bootstrapped.
+  "Create a live runtime/session context with runtime state prepared, but without
+   creating the initial session.
 
    Options:
    - :event-queue optional TUI/RPC event queue
@@ -295,43 +296,144 @@ Available: " (str/join ", " (map name (keys all))))
                                   {:reasoning (:supports-reasoning effective-model)})
         effective-prompt-mode    (config-res/resolved-prompt-mode cfg)
         nucleus-prelude-override (config-res/resolved-nucleus-prelude-override cfg)
-        ctx                    (session/create-context
-                                {:session-defaults {:model {:provider  (name (:provider effective-model))
-                                                            :id        (:id effective-model)
-                                                            :reasoning (:supports-reasoning effective-model)}
-                                                    :thinking-level effective-thinking-level
-                                                    :prompt-mode              effective-prompt-mode
-                                                    :nucleus-prelude-override nucleus-prelude-override
-                                                    :ui-type                  (or ui-type :console)}
-                                 :config session-config
-                                 :event-queue event-queue
-                                 :oauth-ctx oauth-ctx
-                                 :nrepl-runtime-atom nrepl-runtime
-                                 :persist? (if (some? persist?) persist? true)
-                                 :session-root session-root
-                                 :ui-type ui-type
-                                 :mutations mutations/all-mutations})
+        ctx                      (session/create-context
+                                  {:session-defaults {:model {:provider  (name (:provider effective-model))
+                                                              :id        (:id effective-model)
+                                                              :reasoning (:supports-reasoning effective-model)}
+                                                      :thinking-level           effective-thinking-level
+                                                      :prompt-mode              effective-prompt-mode
+                                                      :nucleus-prelude-override nucleus-prelude-override
+                                                      :ui-type                  (or ui-type :console)}
+                                   :config session-config
+                                   :event-queue event-queue
+                                   :oauth-ctx oauth-ctx
+                                   :nrepl-runtime-atom nrepl-runtime
+                                   :persist? (if (some? persist?) persist? true)
+                                   :session-root session-root
+                                   :ui-type ui-type
+                                   :mutations mutations/all-mutations})
         recursion-ctx            (recursion/create-hosted-context ctx (ss/state-path :recursion))
         ctx                      (assoc ctx :recursion-ctx recursion-ctx)
         _                        (when-not (sa/recursion-state-in ctx)
-                                   (sa/set-recursion-state-in! ctx nil (recursion/initial-state)))
-        sd                       (session/new-session-in! ctx nil {})
-        session-id               (:session-id sd)]
-    {:ctx        ctx
-     :oauth-ctx  oauth-ctx
-     :cwd        cwd
-     :session-id session-id}))
+                                   (sa/set-recursion-state-in! ctx nil (recursion/initial-state)))]
+    {:ctx       ctx
+     :oauth-ctx oauth-ctx
+     :cwd       cwd}))
+
+(defn- build-startup-plan
+  "Assemble pre-session startup inputs without creating or mutating a live session."
+  [ctx {:keys [cwd]}]
+  (let [templates                   (pt/discover-templates)
+        {:keys [skills diagnostics]} (skills/discover-skills)
+        context-files               (sys-prompt/discover-context-files cwd)
+        developer-prompt            (developer-prompt-from-env)
+        {:keys [prompt-mode nucleus-prelude-override]} (:session-defaults ctx)
+        base-tools                  (vec tools/all-tools)]
+    {:cwd                      cwd
+     :templates                templates
+     :skills                   skills
+     :diagnostics              diagnostics
+     :context-files            context-files
+     :developer-prompt         developer-prompt
+     :developer-prompt-source  (if developer-prompt :env :fallback)
+     :prompt-mode              (or prompt-mode :lambda)
+     :nucleus-prelude-override nucleus-prelude-override
+     :base-tools               base-tools}))
+
+(defn- create-initial-startup-session!
+  [ctx]
+  (:session-id (session/new-session-in! ctx nil {})))
+
+(defn- adopt-startup-plan-into-session!
+  [ctx session-id ai-model startup-plan {:keys [memory-runtime-opts]}]
+  (let [{:keys [cwd templates skills context-files developer-prompt developer-prompt-source
+                prompt-mode nucleus-prelude-override base-tools]} startup-plan
+        _                  (background-job-ui/install-background-job-ui-refresh! ctx)
+        _                  (workflow-bootstrap/init-built-in! ctx session-id)
+        psi-tool           (tools/make-psi-tool (fn
+                                                  ([q] (session/query-in ctx session-id q))
+                                                  ([q entity] (session/query-in ctx q entity)))
+                                                {:ctx ctx
+                                                 :session-id session-id
+                                                 :cwd cwd})
+        base-tool-defs     (conj base-tools psi-tool)
+        base-prompt-opts   {:cwd                      cwd
+                            :session-instant          (:started-at ctx)
+                            :prompt-mode              prompt-mode
+                            :nucleus-prelude-override nucleus-prelude-override
+                            :context-files            context-files
+                            :skills                   skills
+                            :tool-defs                base-tool-defs}
+        base-prompt        (sys-prompt/build-system-prompt base-prompt-opts)
+        _                  (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
+        summary-base       (session-bootstrap/bootstrap-in!
+                            ctx session-id
+                            {:register-global-query? false
+                             :base-tools             base-tool-defs
+                             :system-prompt          base-prompt
+                             :developer-prompt       developer-prompt
+                             :developer-prompt-source developer-prompt-source
+                             :templates              templates
+                             :skills                 skills
+                             :extension-paths        []
+                             :extension-targets      []
+                             :refresh-active-tools?  false})
+        {:keys [summary-updates]}
+        (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
+        ext-tools          (extensions/all-tools-in (:extension-registry ctx))
+        refreshed-tool-defs (->> (concat base-tool-defs ext-tools)
+                                 (reduce (fn [acc tool]
+                                           (if (some #(= (:name tool) (:name %)) acc)
+                                             acc
+                                             (conj acc tool)))
+                                         []))
+        _                  (session/dispatch-in! ctx
+                                                 :session/set-active-tools
+                                                 {:session-id session-id
+                                                  :tool-maps refreshed-tool-defs}
+                                                 {:origin :core})
+        summary            (merge-startup-summary summary-base summary-updates)
+        _                  (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
+        _                  (bootstrap/register-all-domains!)
+        graph-caps         (graph-capabilities-in ctx session-id)
+        build-opts         (assoc base-prompt-opts
+                                  :graph-capabilities graph-caps
+                                  :tool-defs refreshed-tool-defs)
+        system-prompt      (sys-prompt/build-system-prompt build-opts)
+        _                  (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
+        _                  (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                                                 {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
+                                                 {:origin :core})
+        _                  (memory-runtime/sync-memory-layer! (merge {:cwd cwd}
+                                                                     (or memory-runtime-opts {})))
+        _                  (runtime/register-extension-run-fn-in! ctx session-id nil ai-model)
+        startup-rehydrate  (startup-rehydrate-from-current-session! ctx session-id nil ai-model)]
+    (doseq [{:keys [path error]} (:extension-errors summary)]
+      (timbre/warn "Extension error:" path error))
+    (when (pos? (:extension-loaded-count summary))
+      (timbre/debug "Extensions loaded:" (:extension-loaded-count summary)))
+    {:ctx               ctx
+     :session-id        session-id
+     :templates         templates
+     :skills            skills
+     :summary           summary
+     :startup-plan      startup-plan
+     :startup-rehydrate startup-rehydrate
+     :cwd               cwd}))
 
 (defn bootstrap-runtime-session!
   "Bootstrap a live session context shared by CLI/TUI/RPC modes.
 
    Calling forms:
    - (bootstrap-runtime-session! ai-model opts)
-       creates a fresh runtime session context, bootstraps it, and returns result map
+       creates a fresh runtime session context, builds a pre-session startup
+       plan, creates the initial session, and adopts the startup plan into it
    - (bootstrap-runtime-session! ctx ai-model)
-       bootstraps an existing ctx with default opts
+       bootstraps an existing runtime ctx with default opts
    - (bootstrap-runtime-session! ctx ai-model opts)
-       bootstraps an existing ctx with explicit opts
+       bootstraps an existing runtime ctx with explicit opts
+   - (bootstrap-runtime-session! ctx session-id ai-model opts)
+       compatibility form for adopting startup into an already-created session
 
    Options:
    - :memory-runtime-opts optional memory/runtime sync opts
@@ -340,97 +442,30 @@ Available: " (str/join ", " (map name (keys all))))
    - :session-root optional explicit persisted session root (primarily for tests)"
   ([x y]
    (if (:state* x)
-     (bootstrap-runtime-session! x nil y {})
+     (bootstrap-runtime-session! x y {})
      (let [ai-model x
            opts     y
-           {:keys [ctx oauth-ctx cwd session-id]} (create-runtime-session-context ai-model {:cwd (:cwd opts)
-                                                                                            :session-config (:session-config opts)
-                                                                                            :ui-type (or (:ui-type opts) :console)
-                                                                                            :persist? (:persist? opts)
-                                                                                            :session-root (:session-root opts)})
-           result (bootstrap-runtime-session! ctx session-id ai-model opts)]
-       (assoc result :ctx ctx :oauth-ctx oauth-ctx :cwd cwd :session-id session-id))))
-  ([ctx session-id ai-model {:keys [memory-runtime-opts cwd]}]
-   (let [templates        (pt/discover-templates)
-         {:keys [skills diagnostics]} (skills/discover-skills)
-         _                (doseq [d diagnostics]
-                            (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))
-         cwd              (or cwd (System/getProperty "user.dir"))
-         _                (background-job-ui/install-background-job-ui-refresh! ctx)
-         _                (workflow-bootstrap/init-built-in! ctx session-id)
-         ctx-files        (sys-prompt/discover-context-files cwd)
-         sd               (ss/get-session-data-in ctx session-id)
-         prompt-mode      (or (:prompt-mode sd) :lambda)
-         prelude-override (:nucleus-prelude-override sd)
-         psi-tool         (tools/make-psi-tool (fn
-                                                 ([q] (session/query-in ctx session-id q))
-                                                 ([q entity] (session/query-in ctx q entity)))
-                                               {:ctx ctx
-                                                :session-id session-id
-                                                :cwd cwd})
-         base-prompt-opts {:cwd                      cwd
-                           :session-instant          (:started-at ctx)
-                           :prompt-mode              prompt-mode
-                           :nucleus-prelude-override prelude-override
-                           :context-files            ctx-files
-                           :skills                   skills
-                           :tool-defs                (conj (vec tools/all-tools) psi-tool)}
-         base-prompt      (sys-prompt/build-system-prompt base-prompt-opts)
-         developer-prompt (developer-prompt-from-env)
-         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
-         summary-base     (session-bootstrap/bootstrap-in!
-                           ctx session-id
-                           {:register-global-query? false
-                            :base-tools             (conj (vec tools/all-tools) psi-tool)
-                            :system-prompt          base-prompt
-                            :developer-prompt       developer-prompt
-                            :developer-prompt-source (if developer-prompt :env :fallback)
-                            :templates              templates
-                            :skills                 skills
-                            :extension-paths        []
-                            :extension-targets      []
-                            :refresh-active-tools?  false})
-         {:keys [summary-updates]}
-         (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
-         ext-tools        (extensions/all-tools-in (:extension-registry ctx))
-         refreshed-tool-defs (->> (concat (conj (vec tools/all-tools) psi-tool)
-                                          ext-tools)
-                                  (reduce (fn [acc tool]
-                                            (if (some #(= (:name tool) (:name %)) acc)
-                                              acc
-                                              (conj acc tool)))
-                                          []))
-         _                (session/dispatch-in! ctx
-                                                :session/set-active-tools
-                                                {:session-id session-id
-                                                 :tool-maps refreshed-tool-defs}
-                                                {:origin :core})
-         summary          (merge-startup-summary summary-base summary-updates)
-         _                (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
-         _                (bootstrap/register-all-domains!)
-         graph-caps       (graph-capabilities-in ctx session-id)
-         build-opts       (assoc base-prompt-opts
-                                 :graph-capabilities graph-caps
-                                 :tool-defs refreshed-tool-defs)
-         system-prompt    (sys-prompt/build-system-prompt build-opts)
-         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
-         _                (session/dispatch-in! ctx :session/set-system-prompt-build-opts
-                                                {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
-                                                {:origin :core})
-         _                (memory-runtime/sync-memory-layer! (merge {:cwd cwd}
-                                                                    (or memory-runtime-opts {})))
-         _                (runtime/register-extension-run-fn-in! ctx session-id nil ai-model)
-         startup-rehydrate (startup-rehydrate-from-current-session! ctx session-id nil ai-model)]
-     (doseq [{:keys [path error]} (:extension-errors summary)]
-       (timbre/warn "Extension error:" path error))
-     (when (pos? (:extension-loaded-count summary))
-       (timbre/debug "Extensions loaded:" (:extension-loaded-count summary)))
-     {:ctx               ctx
-      :templates         templates
-      :skills            skills
-      :summary           summary
-      :startup-rehydrate startup-rehydrate
-      :cwd               cwd})))
+           {:keys [ctx oauth-ctx cwd]} (create-runtime-session-context ai-model {:cwd (:cwd opts)
+                                                                                 :session-config (:session-config opts)
+                                                                                 :ui-type (or (:ui-type opts) :console)
+                                                                                 :persist? (:persist? opts)
+                                                                                 :session-root (:session-root opts)
+                                                                                 :thinking-level-override (:thinking-level-override opts)})
+           result (bootstrap-runtime-session! ctx ai-model (assoc opts :cwd cwd))]
+       (assoc result :ctx ctx :oauth-ctx oauth-ctx :cwd cwd))))
+  ([ctx ai-model opts]
+   (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
+         startup-plan (build-startup-plan ctx {:cwd cwd})
+         _            (doseq [d (:diagnostics startup-plan)]
+                        (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))
+         session-id   (create-initial-startup-session! ctx)]
+     (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts)))
+  ([ctx session-id ai-model opts]
+   (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
+         startup-plan (build-startup-plan ctx {:cwd cwd})
+         _            (doseq [d (:diagnostics startup-plan)]
+                        (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))]
+     (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts))))
 
 ;; ============================================================
 ;; Main prompt loop
@@ -451,13 +486,13 @@ Available: " (str/join ", " (map name (keys all))))
   ([model-key memory-runtime-opts session-config startup-opts]
    (let [ai-model   (resolve-model model-key)
          ai-ctx     nil
-         {:keys [ctx oauth-ctx session-id]}
+         {:keys [ctx oauth-ctx]}
          (create-runtime-session-context ai-model {:session-config          session-config
                                                    :ui-type                 :console
                                                    :persist?                false
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
-         {:keys [templates skills startup-rehydrate]}
-         (bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts})
+         {:keys [templates skills startup-rehydrate session-id]}
+         (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts})
          cli-focus* (atom session-id)
          cmd-opts   (cli/cli-command-opts start-new-session-with-startup! ctx cli-focus* ai-ctx ai-model oauth-ctx)]
      (reset! session-state {:ctx ctx :ai-ctx ai-ctx :ai-model ai-model
@@ -492,7 +527,7 @@ Available: " (str/join ", " (map name (keys all))))
    (let [ai-model    (resolve-model model-key)
          ai-ctx      nil
          event-queue (java.util.concurrent.LinkedBlockingQueue.)
-         {:keys [ctx oauth-ctx cwd session-id]}
+         {:keys [ctx oauth-ctx cwd]}
          (create-runtime-session-context ai-model {:event-queue             event-queue
                                                    :session-config          session-config
                                                    :ui-type                 :tui
@@ -512,9 +547,9 @@ Available: " (str/join ", " (map name (keys all))))
                            :execution-result/tool-calls []
                            :execution-result/stop-reason :stop})))
                ctx)
-         {:keys [startup-rehydrate]}
-         (bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts
-                                                              :cwd cwd})
+         {:keys [startup-rehydrate session-id]}
+         (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
+                                                   :cwd cwd})
 
          ;; TUI-local focus atom — tracks active session-id
          tui-focus* (atom session-id)

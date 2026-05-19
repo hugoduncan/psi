@@ -78,34 +78,53 @@
                   {:extension-errors [] :extension-loaded-count 0})]
     (f)))
 
-(deftest create-runtime-session-context-creates-single-initial-session-test
+(deftest create-runtime-session-context-does-not-create-initial-session-test
   (with-main-bootstrap-stubs
     (fn []
-      (let [{:keys [ctx session-id]} (app-runtime/create-runtime-session-context
-                                      {:provider           :anthropic
-                                       :id                 "test-model"
-                                       :name               "Test Model"
-                                       :supports-reasoning false
-                                       :context-window     200000}
-                                      {:ui-type :emacs
-                                       :persist? false})
+      (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
+                           {:provider           :anthropic
+                            :id                 "test-model"
+                            :name               "Test Model"
+                            :supports-reasoning false
+                            :context-window     200000}
+                           {:ui-type :emacs
+                            :persist? false})
             sessions (ss/list-context-sessions-in ctx)]
-        (is (= 1 (count sessions)))
-        (is (= session-id (:session-id (first sessions))))))))
+        (is (empty? sessions))))))
+
+(deftest build-startup-plan-does-not-require-live-session-test
+  (with-main-bootstrap-stubs
+    (fn []
+      (let [{:keys [ctx cwd]} (app-runtime/create-runtime-session-context
+                               {:provider           :anthropic
+                                :id                 "test-model"
+                                :name               "Test Model"
+                                :supports-reasoning false
+                                :context-window     200000}
+                               {:ui-type :emacs
+                                :persist? false})
+            plan (#'app-runtime/build-startup-plan ctx {:cwd cwd})]
+        (is (map? plan))
+        (is (= cwd (:cwd plan)))
+        (is (= [] (ss/list-context-sessions-in ctx)))
+        (is (contains? plan :templates))
+        (is (contains? plan :skills))
+        (is (contains? plan :base-tools))))))
 
 (deftest start-tui-runtime-extension-command-after-new-targets-new-session-test
   (let [orig-state @app-runtime/session-state]
     (try
       (with-main-bootstrap-stubs
         (fn []
-          (let [{:keys [ctx session-id]} (app-runtime/create-runtime-session-context
-                                          {:provider           :anthropic
-                                           :id                 "test-model"
-                                           :name               "Test Model"
-                                           :supports-reasoning false
-                                           :context-window     200000}
-                                          {:ui-type :tui
-                                           :persist? false})
+          (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
+                               {:provider           :anthropic
+                                :id                 "test-model"
+                                :name               "Test Model"
+                                :supports-reasoning false
+                                :context-window     200000}
+                               {:ui-type :tui
+                                :persist? false})
+                session-id             (:session-id (session/new-session-in! ctx nil {}))
                 reg                    (:extension-registry ctx)
                 ext-path               "/ext/which-session"
                 runtime-fns*           (runtime-fns/make-extension-runtime-fns ctx session-id ext-path)
@@ -127,14 +146,21 @@
                           (fn [_ai-model opts]
                             {:ctx ctx
                              :oauth-ctx nil
-                             :cwd (or (:cwd opts) (System/getProperty "user.dir"))
-                             :session-id session-id})
+                             :cwd (or (:cwd opts) (System/getProperty "user.dir"))})
                           app-runtime/bootstrap-runtime-session!
-                          (fn [_ctx sid _ai-model _opts]
-                            {:ctx _ctx
-                             :templates []
-                             :skills []
-                             :startup-rehydrate ((resolve 'psi.app-runtime/startup-rehydrate-from-current-session!) ctx sid nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})})]
+                          (fn
+                            ([_ctx _ai-model _opts]
+                             {:ctx _ctx
+                              :session-id session-id
+                              :templates []
+                              :skills []
+                              :startup-rehydrate ((resolve 'psi.app-runtime/startup-rehydrate-from-current-session!) ctx session-id nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})})
+                            ([_ctx sid _ai-model _opts]
+                             {:ctx _ctx
+                              :session-id sid
+                              :templates []
+                              :skills []
+                              :startup-rehydrate ((resolve 'psi.app-runtime/startup-rehydrate-from-current-session!) ctx sid nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})}))]
               (is (= :ok (app-runtime/start-tui-runtime! tui-start! :ignored)))
               (let [dispatch-fn   (:dispatch-fn @tui-opts*)
                     query-fn      (:query-fn @tui-opts*)
