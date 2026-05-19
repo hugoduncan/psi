@@ -12,7 +12,8 @@ Reusable harness helpers live at:
 
 What it validates:
 1. start psi TUI in detached tmux using the resolved launcher command
-   - prefers canonical installed command: `exec psi --tui`
+   - for unreleased worktree testing, prefers the repo-local launcher so the harness proves the current checkout rather than a stale installed `psi` on `PATH`
+   - otherwise prefers canonical installed command: `exec psi --tui`
    - falls back to repo-local launcher when `psi` is not on `PATH`: `exec bb bb/psi.clj -- --tui`
 2. wait until prompt is ready (`刀:` / `Type a message`)
 3. send `/help` and assert help output marker appears
