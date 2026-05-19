@@ -22,7 +22,7 @@
   ([]
    (create-session-context {}))
   ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
+   (let [ctx (session/create-context (test-support/safe-context-opts (merge {:persist? false} opts)))
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
 
@@ -108,25 +108,31 @@
       (is (contains? session-keys session-id))))
 
   (testing "ensure-session-loaded-in! resumes by context session id"
-    (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-context-load-" (java.util.UUID/randomUUID))
-          _                  (.mkdirs (java.io.File. cwd))
-          [ctx _session-id] (create-session-context {:cwd cwd})
-          sd1                (session/new-session-in! ctx nil {})
-          sid1               (:session-id sd1)
-          path1              (:session-file sd1)
-          _                  (journal-store/flush-journal! (java.io.File. path1)
-                                                           sid1
-                                                           cwd
-                                                           nil
-                                                           nil
-                                                           [(persist/thinking-level-entry :off)])
-          sd2                (session/new-session-in! (retarget ctx sd1) sid1 {})
-          sid2               (:session-id sd2)
-          sd1*               (session/ensure-session-loaded-in! (retarget ctx sd2) sid2 sid1)
-          ctx                (retarget ctx sd1*)]
-      (is (not= sid1 sid2))
-      (is (= sid1 (:session-id (ss/get-session-data-in ctx sid1))))
-      (is (= sid1 (:session-id (ss/get-session-data-in ctx sid1))))))
+    (test-support/with-temp-session-root
+      (fn [session-root]
+        (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-context-load-" (java.util.UUID/randomUUID))
+              _                  (.mkdirs (java.io.File. cwd))
+              [ctx _session-id] (let [ctx (session/create-context (test-support/safe-context-opts {:cwd cwd
+                                                                                                   :persist? true
+                                                                                                   :session-root session-root}))
+                                      sd  (session/new-session-in! ctx nil {})]
+                                  [ctx (:session-id sd)])
+              sd1                (session/new-session-in! ctx nil {})
+              sid1               (:session-id sd1)
+              path1              (:session-file sd1)
+              _                  (journal-store/flush-journal! (java.io.File. path1)
+                                                               sid1
+                                                               cwd
+                                                               nil
+                                                               nil
+                                                               [(persist/thinking-level-entry :off)])
+              sd2                (session/new-session-in! (retarget ctx sd1) sid1 {})
+              sid2               (:session-id sd2)
+              sd1*               (session/ensure-session-loaded-in! (retarget ctx sd2) sid2 sid1)
+              ctx                (retarget ctx sd1*)]
+          (is (not= sid1 sid2))
+          (is (= sid1 (:session-id (ss/get-session-data-in ctx sid1))))
+          (is (= sid1 (:session-id (ss/get-session-data-in ctx sid1))))))))
 
   (testing "explicit session-id selects the parent when creating another session"
     (let [[ctx session-id] (create-session-context)
@@ -272,35 +278,42 @@
       (is (nil? (:error agent-data))))))
 
 (deftest fork-session-persists-child-file-with-parent-lineage-test
-  (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-fork-" (java.util.UUID/randomUUID))
-        _                  (.mkdirs (java.io.File. cwd))
-        [ctx _session-id] (create-session-context {:cwd cwd})
-        parent-sd          (session/new-session-in! ctx nil {})
-        parent-id          (:session-id parent-sd)
-        ctx                (retarget ctx parent-sd)
-        parent-file        (:session-file parent-sd)
-        entry-id           (:id (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "user"
-                                                                                                   :content [{:type :text :text "branch-here"}]
-                                                                                                   :timestamp (java.time.Instant/now)})))
-        _                  (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "assistant"
-                                                                                              :content [{:type :text :text "reply-here"}]
-                                                                                              :timestamp (java.time.Instant/now)}))
-        child-sd           (session/fork-session-in! ctx parent-id entry-id)
-        child-id           (:session-id child-sd)
-        ctx                (retarget ctx child-sd)
-        child-sd           (ss/get-session-data-in ctx child-id)
-        child-file         (:session-file child-sd)
-        loaded-child       (journal-store/load-session-file child-file)]
-    (is (string? child-file))
-    (is (.exists (java.io.File. child-file)))
-    (is (= parent-file (get-in loaded-child [:header :parent-session])))
-    (is (= parent-id (get-in loaded-child [:header :parent-session-id])))
-    (is (= child-id (get-in loaded-child [:header :id])))
-    (is (= (count (persist/all-entries-in ctx child-id)) (count (:entries loaded-child))))
-    (is (= ["user" "assistant"]
-           (->> (:entries loaded-child)
-                (filter #(= :message (:kind %)))
-                (mapv #(get-in % [:data :message :role])))))))
+  (test-support/with-temp-session-root
+    (fn [session-root]
+      (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-fork-" (java.util.UUID/randomUUID))
+            _                  (.mkdirs (java.io.File. cwd))
+            [ctx _session-id] (let [ctx (session/create-context (test-support/safe-context-opts {:cwd cwd
+                                                                                                 :persist? true
+                                                                                                 :session-root session-root}))
+                                    sd  (session/new-session-in! ctx nil {})]
+                                [ctx (:session-id sd)])
+            parent-sd          (session/new-session-in! ctx nil {})
+            parent-id          (:session-id parent-sd)
+            ctx                (retarget ctx parent-sd)
+            parent-file        (:session-file parent-sd)
+            entry-id           (:id (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "user"
+                                                                                                       :content [{:type :text :text "branch-here"}]
+                                                                                                       :timestamp (java.time.Instant/now)})))
+            _                  (ss/append-journal-entry-in! ctx parent-id (persist/message-entry {:role "assistant"
+                                                                                                  :content [{:type :text :text "reply-here"}]
+                                                                                                  :timestamp (java.time.Instant/now)}))
+            child-sd           (session/fork-session-in! ctx parent-id entry-id)
+            child-id           (:session-id child-sd)
+            ctx                (retarget ctx child-sd)
+            child-sd           (ss/get-session-data-in ctx child-id)
+            child-file         (:session-file child-sd)
+            loaded-child       (journal-store/load-session-file child-file)]
+        (is (string? child-file))
+        (is (.exists (java.io.File. child-file)))
+        (is (.startsWith child-file session-root))
+        (is (= parent-file (get-in loaded-child [:header :parent-session])))
+        (is (= parent-id (get-in loaded-child [:header :parent-session-id])))
+        (is (= child-id (get-in loaded-child [:header :id])))
+        (is (= (count (persist/all-entries-in ctx child-id)) (count (:entries loaded-child))))
+        (is (= ["user" "assistant"]
+               (->> (:entries loaded-child)
+                    (filter #(= :message (:kind %)))
+                    (mapv #(get-in % [:data :message :role])))))))))
 
 (deftest fork-session-includes-selected-user-reply-turn-test
   (let [[ctx _session-id] (test-support/make-session-ctx {})

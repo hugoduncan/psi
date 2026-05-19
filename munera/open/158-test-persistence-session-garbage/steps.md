@@ -1,38 +1,38 @@
 # Steps
 
-- [ ] Inventory the current test persistence leak paths before changing helpers.
-  - [ ] Identify non-persistence tests that still create real persisted sessions from temp cwd/worktree paths.
-  - [ ] Identify explicit persistence tests whose assertions intentionally require real session-file/journal behavior on disk.
-  - [ ] Confirm the main shared seam(s), especially app-runtime/runtime-bootstrap helper paths.
-- [ ] Converge non-persistence defaults for ordinary tests.
-  - [ ] Update shared runtime/bootstrap test helpers to pass `:persist? false` when persistence is not under test.
-  - [ ] Align app-runtime test helpers with the existing `psi.agent-session.test-support` non-persisting discipline.
-  - [ ] Patch any remaining direct non-helper test call sites only where a shared seam cannot cover them cleanly.
-- [ ] Standardize isolated temporary session root setup for explicit persistence tests.
-  - [ ] Introduce or refine a shared helper/pattern for tests that intentionally require persistence.
-  - [ ] Ensure the helper allocates an isolated temporary session root instead of using `~/.psi/agent/sessions/`.
-  - [ ] Prefer per-test helper-owned isolated temporary session roots unless broader fixture scope is justified.
-  - [ ] Keep explicit persistence tests clear at the call site about persistence being intentionally enabled.
-  - [ ] Ensure explicit persistence tests can inspect files in the isolated temporary session root before helper-owned cleanup runs when needed for assertions.
-- [ ] Add cleanup ownership for explicit persistence tests.
-  - [ ] Make the helper or standardized pattern clean up the isolated temporary session root after the test-owned lifecycle completes.
-  - [ ] Avoid leaving cleanup as an implicit manual responsibility in individual test bodies.
-  - [ ] Confirm the cleanup approach is robust for repeated local test runs and test failure paths.
-- [ ] Add guardrails for unsafe persisted test contexts.
-  - [ ] Fail fast when a test attempts persistence against the real default session store without an explicit isolated temporary session root.
-  - [ ] Preserve an explicit isolated opt-in path for true persistence tests.
-  - [ ] Keep the guardrail test-only so production runtime behavior is unchanged.
-- [ ] Record the explicit implementation decisions.
-  - [ ] Record the exact seam used to select an isolated temporary session root.
-  - [ ] Record the exact helper or lifecycle owner responsible for cleanup.
-  - [ ] Record the exact fail-fast condition for unsafe persisted test contexts.
-  - [ ] Record the first shared helper/namespace chosen to converge app-runtime/bootstrap tests onto non-persisting defaults.
-- [ ] Tighten focused proofs for both ordinary and explicit persistence cases.
-  - [ ] Add or update focused tests proving ordinary temp-cwd/bootstrap tests do not allocate persisted session artifacts in the real user session store.
-  - [ ] Add or update focused tests proving explicit persistence tests can still create session files under isolated temporary session roots.
-  - [ ] Add or update focused tests proving explicit persistence tests can inspect files before helper-owned cleanup runs when needed.
-  - [ ] Add or update focused tests proving the isolated temporary session roots are cleaned up by the standardized helper/pattern.
-  - [ ] Add or update focused tests proving persisted test contexts targeting the real default session store fail fast.
+- [x] Inventory the current test persistence leak paths before changing helpers.
+  - [x] Identify non-persistence tests that still create real persisted sessions from temp cwd/worktree paths.
+  - [x] Identify explicit persistence tests whose assertions intentionally require real session-file/journal behavior on disk.
+  - [x] Confirm the main shared seam(s), especially app-runtime/runtime-bootstrap helper paths.
+- [x] Converge non-persistence defaults for ordinary tests.
+  - [x] Update shared runtime/bootstrap test helpers to pass `:persist? false` when persistence is not under test.
+  - [x] Align app-runtime test helpers with the existing `psi.agent-session.test-support` non-persisting discipline.
+  - [x] Patch any remaining direct non-helper test call sites only where a shared seam cannot cover them cleanly.
+- [x] Standardize isolated temporary session root setup for explicit persistence tests.
+  - [x] Introduce or refine a shared helper/pattern for tests that intentionally require persistence.
+  - [x] Ensure the helper allocates an isolated temporary session root instead of using `~/.psi/agent/sessions/`.
+  - [x] Prefer per-test helper-owned isolated temporary session roots unless broader fixture scope is justified.
+  - [x] Keep explicit persistence tests clear at the call site about persistence being intentionally enabled.
+  - [x] Ensure explicit persistence tests can inspect files in the isolated temporary session root before helper-owned cleanup runs when needed for assertions.
+- [x] Add cleanup ownership for explicit persistence tests.
+  - [x] Make the helper or standardized pattern clean up the isolated temporary session root after the test-owned lifecycle completes.
+  - [x] Avoid leaving cleanup as an implicit manual responsibility in individual test bodies.
+  - [x] Confirm the cleanup approach is robust for repeated local test runs and test failure paths.
+- [x] Add guardrails for unsafe persisted test contexts.
+  - [x] Fail fast when a test attempts persistence against the real default session store without an explicit isolated temporary session root.
+  - [x] Preserve an explicit isolated opt-in path for true persistence tests.
+  - [x] Keep the guardrail test-only so production runtime behavior is unchanged.
+- [x] Record the explicit implementation decisions.
+  - [x] Record the exact seam used to select an isolated temporary session root.
+  - [x] Record the exact helper or lifecycle owner responsible for cleanup.
+  - [x] Record the exact fail-fast condition for unsafe persisted test contexts.
+  - [x] Record the first shared helper/namespace chosen to converge app-runtime/bootstrap tests onto non-persisting defaults.
+- [x] Tighten focused proofs for both ordinary and explicit persistence cases.
+  - [x] Add or update focused tests proving ordinary temp-cwd/bootstrap tests do not allocate persisted session artifacts in the real user session store.
+  - [x] Add or update focused tests proving explicit persistence tests can still create session files under isolated temporary session roots.
+  - [x] Add or update focused tests proving explicit persistence tests can inspect files before helper-owned cleanup runs when needed.
+  - [x] Add or update focused tests proving the isolated temporary session roots are cleaned up by the standardized helper/pattern.
+  - [x] Add or update focused tests proving persisted test contexts targeting the real default session store fail fast.
 - [ ] Verify the final state.
   - [ ] Focused affected test namespaces are green.
   - [ ] No incidental `--var-folders-*` or `--private-var-folders-*` directories are created under the real `~/.psi/agent/sessions/` during the focused test run.

@@ -152,7 +152,7 @@
       (finally
         (reset! app-runtime/session-state orig-state)))))
 
-(deftest run-session-initializes-session-file-test
+(deftest run-session-starts-non-persisting-console-session-test
   (let [orig-state @app-runtime/session-state]
     (try
       (with-main-bootstrap-stubs
@@ -167,7 +167,7 @@
                   session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
                   sd         (ss/get-session-data-in ctx session-id)]
               (is (some? ctx))
-              (is (string? (:session-file sd)))
+              (is (nil? (:session-file sd)))
               (is (= :console (:ui-type sd)))))))
       (finally
         (reset! app-runtime/session-state orig-state)))))
@@ -205,7 +205,7 @@
                                   (reset! captured opts)
                                   :ok)]
             (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {})))
-            (is (string? (:current-session-file @captured)))
+            (is (nil? (:current-session-file @captured)))
             (is (fn? (:dispatch-fn @captured)))
             (is (fn? (:on-interrupt-fn! @captured)))
             (let [ctx (:ctx @app-runtime/session-state)

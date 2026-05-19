@@ -234,7 +234,7 @@
    :all-mutations mutations
    :all-mutations-atom (atom mutations)})
 
-(defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
+(defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? session-root event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
                                 create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn
                                 get-session-data-fn list-context-sessions-fn find-skill-fn
                                 resolve-workflow-step-session-config-fn materialize-workflow-step-session-conversation-fn
@@ -261,6 +261,7 @@
                      :event-queue event-queue
                      :cwd resolved-cwd
                      :persist? persist?
+                     :session-root session-root
                      :oauth-ctx oauth-ctx
                      :recursion-ctx recursion-ctx
                      :compaction-fn (or compaction-fn compaction/stub-compaction-fn)
