@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2123] - 2026-05-19
+
 ### Fixed
 - Released `psi --tui` startup now resolves its shipped runtime dependency closure from jar-owned release metadata packaged at `psi/release-deps.edn`, so release-tag `:jar` policy no longer misses TUI runtime dependencies such as `charm.clj`.
 - Released psi packaging now carries authoritative jar-owned runtime dependency metadata plus the shipped psi-owned runtime source/resource trees, and release smoke coverage proves isolated install/package startup through the artifact-shaped launcher path.
@@ -107,7 +109,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2119...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2123...HEAD
+[0.1.2123]: https://github.com/hugoduncan/psi/compare/v0.1.2119...v0.1.2123
 [0.1.2119]: https://github.com/hugoduncan/psi/compare/v0.1.2115...v0.1.2119
 [0.1.2115]: https://github.com/hugoduncan/psi/compare/v0.1.2109...v0.1.2115
 [0.1.2109]: https://github.com/hugoduncan/psi/compare/v0.1.2104...v0.1.2109
