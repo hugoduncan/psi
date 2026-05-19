@@ -33,7 +33,7 @@
   - [x] Add or update focused tests proving explicit persistence tests can inspect files before helper-owned cleanup runs when needed.
   - [x] Add or update focused tests proving the isolated temporary session roots are cleaned up by the standardized helper/pattern.
   - [x] Add or update focused tests proving persisted test contexts targeting the real default session store fail fast.
-- [ ] Verify the final state.
-  - [ ] Focused affected test namespaces are green.
-  - [ ] No incidental `--var-folders-*` or `--private-var-folders-*` directories are created under the real `~/.psi/agent/sessions/` during the focused test run.
-  - [ ] Explicit persistence coverage remains intact and isolated.
+- [x] Verify the final state.
+  - [x] Focused affected test namespaces are green.
+  - [x] No incidental `--var-folders-*` or `--private-var-folders-*` directories are created under the real `~/.psi/agent/sessions/` during the focused test run.
+  - [x] Explicit persistence coverage remains intact and isolated.

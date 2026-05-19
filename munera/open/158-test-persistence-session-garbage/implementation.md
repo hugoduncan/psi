@@ -7,3 +7,8 @@
 - Updated agent-session lifecycle persistence path creation to honor `(:session-root ctx)` for both new-session and fork-session persisted file creation.
 - Narrowed `session_lifecycle_test` helper default to `:persist? false`, then kept explicit persistence coverage by moving the fork persistence proof onto `with-temp-session-root` + `:persist? true` + explicit `:session-root`.
 - Updated app-runtime proof to assert non-persisting default (`:session-file nil`) for ordinary console runtime tests.
+- Broadened verification beyond the initial focused pair to cover representative app-runtime, rpc, system-bootstrap, workflow-runtime, and model-dispatch surfaces; observed `0` delta in real `~/.psi/agent/sessions/--var-folders-*` / `--private-var-folders-*` directory counts during that run.
+- Verification snapshot:
+  - focused lint: `clj-kondo --lint components/agent-session/src components/agent-session/test components/app-runtime/src components/app-runtime/test`
+  - focused tests: `30 tests, 191 assertions, 0 failures`
+  - broader representative test run: `69 tests, 477 assertions, 0 failures`, home-store temp-dir count delta `0`
