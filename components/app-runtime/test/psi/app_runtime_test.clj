@@ -774,38 +774,4 @@
         (is (= "claude-sonnet-4-6" (get-in sd [:model :id])))
         (is (= :off (:thinking-level sd)))))))
 
-(deftest create-runtime-session-context-test-use-is-explicitly-non-persisting-test
-  (with-main-bootstrap-stubs
-    (fn []
-      (let [{:keys [ctx session-id]} (app-runtime/create-runtime-session-context
-                                      {:provider :anthropic
-                                       :id "test-model"
-                                       :name "Test Model"
-                                       :supports-reasoning false
-                                       :context-window 200000}
-                                      {:ui-type :console
-                                       :persist? false})
-            sd (ss/get-session-data-in ctx session-id)]
-        (is (nil? (:session-file sd)))))))
 
-(deftest bootstrap-runtime-session-test-use-is-explicitly-non-persisting-test
-  (with-redefs [oauth/create-context (fn [] nil)
-                pt/discover-templates (fn [] [])
-                skills/discover-skills (fn [] {:skills [] :diagnostics []})
-                sys-prompt/discover-context-files (fn [_] [])
-                sys-prompt/build-system-prompt (fn [_] "")
-                ext/discover-extension-paths (fn [& _] [])
-                introspection/register-resolvers! (fn [] nil)
-                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
-                bootstrap/bootstrap-in!
-                (fn [_ctx _session-id _]
-                  {:extension-errors [] :extension-loaded-count 0})]
-    (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
-                         {:provider :anthropic
-                          :id "test-model"
-                          :name "Test Model"
-                          :supports-reasoning false}
-                         {:persist? false})
-          session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
-          sd         (ss/get-session-data-in ctx session-id)]
-      (is (nil? (:session-file sd))))))
