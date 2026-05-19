@@ -307,6 +307,7 @@
                            :execution-result/stop-reason :stop})]
             (app-runtime/run-session :ignored)
             (let [ctx (:ctx @app-runtime/session-state)
+                  sync-calls-before (count @sync-calls)
                   session-id (-> @app-runtime/session-state
                                  :ctx
                                  ss/list-context-sessions-in
@@ -319,7 +320,7 @@
                "hello"
                nil
                {:sync-on-git-head-change? true})
-              (is (= [session-id] @sync-calls)
+              (is (= [session-id] (subvec (vec @sync-calls) sync-calls-before))
                   "submit-prompt-in! runs git-head sync once after a successful prompt turn")))))
       (finally
         (reset! app-runtime/session-state orig-state)))))

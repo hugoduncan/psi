@@ -21,7 +21,7 @@
   ([opts]
    (test-support/create-test-session
     (merge {:persist? false
-            :cwd (System/getProperty "user.dir")
+            :session-defaults {:worktree-path (System/getProperty "user.dir")}
             :mutations mutations/all-mutations}
            opts))))
 
