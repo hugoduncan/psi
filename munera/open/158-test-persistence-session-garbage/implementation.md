@@ -26,3 +26,9 @@
   - added focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast with the expected guardrail error and opts shape
   - added a narrow intentional-persisting bootstrap proof that the convenience two-arity `bootstrap-runtime-session!` seam forwards an explicit isolated `:session-root` when persistence is intentionally enabled
   - focused verification: `psi.agent-session.session-lifecycle-test`, `psi.app-runtime-test`, and `psi.rpc-real-delegate-command-test` green (`35 tests, 213 assertions, 0 failures`); focused lint clean
+- Test-shaper review note: no substantive coverage gap remains, but the newest persistence/guardrail tests could be shaped for clarity and signal: split the grouped helper/guardrail test into separate single-contract tests, tighten local naming in the cleanup proof, and make the bootstrap root-forwarding failure output slightly more explicit.
+- Test-shaper follow-up implemented:
+  - split the grouped helper/guardrail persistence review proof into separate single-contract tests for cleanup and fail-fast guardrails
+  - tightened cleanup proof local naming from broader capture names to shorter, intent-revealing bindings while preserving post-lifecycle verification
+  - improved the intentional persisted bootstrap root-forwarding proof with explicit `session-id` / `session-file` bindings and clearer assertion messages for isolated-root failures
+  - focused verification: `psi.agent-session.session-lifecycle-test`, `psi.app-runtime-test`, and `psi.rpc-real-delegate-command-test` green (`36 tests, 213 assertions, 0 failures`); focused lint clean

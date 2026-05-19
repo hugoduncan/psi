@@ -753,9 +753,13 @@
                 {:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
                                {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false}
                                {:cwd cwd :persist? true :session-root session-root})
-                session-file (some-> (ss/list-context-sessions-in ctx) first :session-id (ss/get-session-data-in ctx) :session-file)]
-            (is (string? session-file))
-            (is (.startsWith session-file session-root))))))))
+                session-id   (-> (ss/list-context-sessions-in ctx) first :session-id)
+                session-file (:session-file (ss/get-session-data-in ctx session-id))]
+            (is (string? session-file) "intentional persisted bootstrap should allocate a session file")
+            (is (.startsWith session-file session-root)
+                (str "expected persisted bootstrap session-file under isolated session-root\n"
+                     "session-root: " session-root "\n"
+                     "session-file: " session-file))))))))
 
 (deftest bootstrap-runtime-session-invalid-project-model-falls-back-test
   (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-main-project-prefs-" (java.util.UUID/randomUUID))

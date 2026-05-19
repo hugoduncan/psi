@@ -90,28 +90,27 @@
 
 ;; ── Session lifecycle ───────────────────────────────────────────────────────
 
-(deftest test-support-persistence-guardrails-test
-  (testing "with-temp-session-root cleans up the helper-owned temp root after the body returns"
-    (let [captured-root* (atom nil)
-          root-existed-in-body?* (atom false)]
-      (test-support/with-temp-session-root
-        (fn [session-root]
-          (reset! captured-root* session-root)
-          (reset! root-existed-in-body?* (.exists (java.io.File. session-root)))))
-      (is (true? @root-existed-in-body?*))
-      (is (string? @captured-root*))
-      (is (false? (.exists (java.io.File. @captured-root*))))))
+(deftest with-temp-session-root-cleans-up-after-body-test
+  (let [root* (atom nil)
+        existed-during-body?* (atom false)]
+    (test-support/with-temp-session-root
+      (fn [session-root]
+        (reset! root* session-root)
+        (reset! existed-during-body?* (.exists (java.io.File. session-root)))))
+    (is (true? @existed-during-body?*))
+    (is (string? @root*))
+    (is (false? (.exists (java.io.File. @root*))))))
 
-  (testing "create-test-session fails fast when persisted test use omits isolated session-root"
-    (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-create-test-session-" (java.util.UUID/randomUUID))]
-      (.mkdirs (java.io.File. cwd))
-      (try
-        (test-support/create-test-session {:cwd cwd :persist? true})
-        (is false "expected persisted create-test-session without :session-root to fail")
-        (catch clojure.lang.ExceptionInfo e
-          (is (= "Unsafe persisted test context missing isolated :session-root" (ex-message e)))
-          (is (= true (get-in (ex-data e) [:opts :persist?])))
-          (is (nil? (get-in (ex-data e) [:opts :session-root]))))))))
+(deftest create-test-session-persisting-without-session-root-fails-fast-test
+  (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-create-test-session-" (java.util.UUID/randomUUID))]
+    (.mkdirs (java.io.File. cwd))
+    (try
+      (test-support/create-test-session {:cwd cwd :persist? true})
+      (is false "expected persisted create-test-session without :session-root to fail")
+      (catch clojure.lang.ExceptionInfo e
+        (is (= "Unsafe persisted test context missing isolated :session-root" (ex-message e)))
+        (is (= true (get-in (ex-data e) [:opts :persist?])))
+        (is (nil? (get-in (ex-data e) [:opts :session-root])))))))
 
 (deftest context-index-registry-test
   (testing "create-context starts with an empty context session index"

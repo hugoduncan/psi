@@ -49,3 +49,8 @@
   - [x] Add a focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast.
   - [x] Optionally strengthen the convenience bootstrap seam proof by covering intentional persisted test use with explicit `:session-root`, if that stays narrow and clearer than relying on implementation inspection alone.
   - [x] Re-run focused verification for the added test coverage and confirm the remaining test-review gaps are closed.
+- [x] Shape the newest persistence tests for clarity and signal.
+  - [x] Split the grouped helper/guardrail test in `session_lifecycle_test.clj` into separate single-contract `deftest`s.
+  - [x] Tighten local naming in the temp-root cleanup proof to reduce incidental ceremony while preserving post-lifecycle verification.
+  - [x] Make the bootstrap root-forwarding proof emit clearer failure signal, e.g. by binding expected/actual names or adding explicit assertion messages around the isolated-root path check.
+  - [x] Re-run the focused persistence test set and confirm the shaping changes preserve coverage and improve readability.
