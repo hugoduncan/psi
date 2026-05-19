@@ -44,3 +44,8 @@
   - [x] Tighten `psi.agent-session.test-support/create-test-session` so persisted test usage is guardrailed by code, not only by docstring guidance.
   - [x] Add or update focused proofs that the remaining app-runtime/rpc direct test seams do not persist into the real default session store unless given an explicit isolated `:session-root`.
   - [x] Re-run focused verification and confirm the review gaps are closed before marking the task ready to close.
+- [x] Close the remaining test-quality gaps found in test review.
+  - [x] Add a focused proof that `with-temp-session-root` removes the temporary session root after the helper-owned lifecycle completes.
+  - [x] Add a focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast.
+  - [x] Optionally strengthen the convenience bootstrap seam proof by covering intentional persisted test use with explicit `:session-root`, if that stays narrow and clearer than relying on implementation inspection alone.
+  - [x] Re-run focused verification for the added test coverage and confirm the remaining test-review gaps are closed.

@@ -20,3 +20,9 @@
   - added focused proofs that direct app-runtime and rpc test seams now produce `:session-file nil` when used as non-persisting test contexts
   - focused verification: `psi.app-runtime-test`, `psi.rpc-real-delegate-command-test`, `psi.agent-session.session-lifecycle-test` green (`35 tests, 207 assertions, 0 failures`); focused lint clean
   - while re-running an unrelated broader namespace, observed pre-existing event-log sensitivity in `psi.agent-session.model-dispatch-test/projection-and-transition-helper-dispatch-test` (`:session/ui-clear-widget` noise before `:session/record-tool-output-stat`); unrelated to task 158 changes
+- Test review note: tests are strong overall but not yet closure-complete. Remaining gaps: no focused proof that `with-temp-session-root` removes the temp root after the helper-owned lifecycle completes, and no focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast.
+- Test review follow-up implemented:
+  - added focused proof that `with-temp-session-root` exposes a real temp root during the body and removes it after the helper-owned lifecycle returns
+  - added focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast with the expected guardrail error and opts shape
+  - added a narrow intentional-persisting bootstrap proof that the convenience two-arity `bootstrap-runtime-session!` seam forwards an explicit isolated `:session-root` when persistence is intentionally enabled
+  - focused verification: `psi.agent-session.session-lifecycle-test`, `psi.app-runtime-test`, and `psi.rpc-real-delegate-command-test` green (`35 tests, 213 assertions, 0 failures`); focused lint clean
