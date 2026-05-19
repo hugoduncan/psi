@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2115] - 2026-05-18
+
 ### Fixed
 - Released `psi` launcher installs now resolve `psi/github` and `psi/edit-clj` correctly under `:jar` policy, preventing startup failure from missing psi-owned source-policy defaults.
 - `psi --help` now prints non-interactive CLI usage and exits successfully instead of starting an interactive session.
@@ -95,7 +97,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2109...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2115...HEAD
+[0.1.2115]: https://github.com/hugoduncan/psi/compare/v0.1.2109...v0.1.2115
 [0.1.2109]: https://github.com/hugoduncan/psi/compare/v0.1.2104...v0.1.2109
 [0.1.2104]: https://github.com/hugoduncan/psi/compare/v0.1.2099...v0.1.2104
 [0.1.2099]: https://github.com/hugoduncan/psi/compare/v0.1.2095...v0.1.2099
