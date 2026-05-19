@@ -107,10 +107,11 @@
                      :resource-path build-manifest/release-deps-resource-path}))))
 
 (defn- release-version
-  "Return the baked version string, or nil if running unreleased."
+  "Return the baked version string used for jar-policy resolution.
+   This may be a stamped release version or the local unreleased version string
+   installed into a local Maven repo for smoke testing."
   []
-  (let [v (version/version-string)]
-    (when (not= "unreleased" v) v)))
+  (version/version-string))
 
 (defn- materialize-self-dep
   [launcher-root policy dep]
@@ -135,22 +136,19 @@
    :paths []})
 
 (defn- psi-jar-basis
-  "For :jar policy: the published psi jar is the shipped code base and the
+  "For :jar policy: the published psi jar remains the shipped code base and the
    packaged release-deps metadata provides the external runtime dependency
    closure required to start it."
-  []
+  [version]
   (let [release-config (release-basis-config)]
-    {:deps  (:deps release-config)
+    {:deps  (merge {extensions/psi-mvn-lib {:mvn/version version}}
+                   (:deps release-config))
      :paths []}))
 
 (defn psi-self-basis
   [launcher-root policy]
   (if (= :jar policy)
-    (do
-      (when-not (release-version)
-        (throw (ex-info ":jar policy requires a stamped release version (not 'unreleased')"
-                        {:stage :basis-construction :policy policy})))
-      (psi-jar-basis))
+    (psi-jar-basis (release-version))
     (-> (repo-basis-config launcher-root)
         (psi-self-basis-from-repo-config launcher-root policy)
         (update :deps assoc 'nrepl/nrepl {:mvn/version "1.5.1"}))))

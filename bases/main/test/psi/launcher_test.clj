@@ -65,8 +65,9 @@
                nrepl/nrepl {:mvn/version "1.5.1"}}
              (:deps (with-redefs [launcher/repo-basis-config (constantly repo-config)]
                       (launcher/psi-self-basis "/repo/psi" :installed))))))
-    (testing "jar policy reads external runtime deps from jar-owned release metadata"
-      (is (= '{nrepl/nrepl {:mvn/version "1.5.1"}
+    (testing "jar policy reads external runtime deps from jar-owned release metadata and retains the psi artifact coord"
+      (is (= '{org.hugoduncan/psi {:mvn/version "0.1.42"}
+               nrepl/nrepl {:mvn/version "1.5.1"}
                io.github.timokramer/charm.clj {:git/tag "v0.2.71"
                                                :git/sha "38e6823"}}
              (:deps (with-redefs [launcher/release-version (constantly "0.1.42")
@@ -74,14 +75,14 @@
                                                                                      io.github.timokramer/charm.clj {:git/tag "v0.2.71"
                                                                                                                      :git/sha "38e6823"}}})]
                       (launcher/psi-self-basis "/repo/psi" :jar))))))
-    (testing "jar policy throws when version resource is unreleased"
-      (let [ex (try
-                 (with-redefs [launcher/release-version (constantly nil)]
+    (testing "jar policy accepts the baked version string, including local unreleased smoke installs"
+      (is (= '{org.hugoduncan/psi {:mvn/version "unreleased"}
+               nrepl/nrepl {:mvn/version "1.5.1"}}
+             (-> (with-redefs [launcher/release-version (constantly "unreleased")
+                               launcher/release-basis-config (constantly '{:deps {nrepl/nrepl {:mvn/version "1.5.1"}}})]
                    (launcher/psi-self-basis "/repo/psi" :jar))
-                 nil
-                 (catch clojure.lang.ExceptionInfo e e))]
-        (is (some? ex))
-        (is (= :basis-construction (-> ex ex-data :stage)))))))
+                 :deps
+                 (select-keys '[org.hugoduncan/psi nrepl/nrepl])))))))
 
 (deftest build-deps-clj-args-test
   (let [args (launcher/build-deps-clj-args {:basis-file "/tmp/psi-basis-123.edn"
@@ -151,27 +152,9 @@
       (is (= {:mvn/version "2.0.0"}
              (get-in result [:basis :deps 'third-party/ext])))
       (is (= {:mvn/version "1.5.1"}
-             (get-in result [:basis :deps 'nrepl/nrepl])))))
-  (testing "jar policy throws when version resource is unreleased"
-    (let [manifest-info {:user-path "/tmp/user.edn"
-                         :project-path "/tmp/project/.psi/extensions.edn"
-                         :user-present? false
-                         :project-present? false
-                         :user-manifest {:deps {}}
-                         :project-manifest {:deps {}}
-                         :merged-manifest {:deps {}}
-                         :expanded-manifest {:deps {}}
-                         :defaulted-libs []
-                         :inferred-init-libs []}
-          ex (try
-               (with-redefs [launcher/release-version (constantly nil)
-                             launcher/release-basis-config (constantly '{:deps {nrepl/nrepl {:mvn/version "1.5.1"}}})
-                             launcher/manifest-state (fn [_ _ _] manifest-info)]
-                 (launcher/startup-basis "/repo/psi" "/repo/project" :jar))
-               nil
-               (catch clojure.lang.ExceptionInfo e e))]
-      (is (some? ex))
-      (is (= :basis-construction (-> ex ex-data :stage))))))
+             (get-in result [:basis :deps 'nrepl/nrepl])))
+      (is (= {:mvn/version "0.1.42"}
+             (get-in result [:basis :deps 'org.hugoduncan/psi]))))))
 
 (deftest startup-basis-expands-recognized-psi-owned-minimal-manifest-entry-into-basis-deps
   (let [repo-config {:deps {'psi/main {:local/root "bases/main"}

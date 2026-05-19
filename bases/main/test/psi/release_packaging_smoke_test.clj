@@ -47,7 +47,6 @@
      "XDG_CACHE_HOME" xdg-cache
      "XDG_CONFIG_HOME" xdg-config
      "BABASHKA_BBIN_BIN_DIR" bbin-bin
-     "BBIN_REPO_ROOT" (.getAbsolutePath (io/file "."))
      "PATH" path}))
 
 (deftest ^:integration stamped-release-bbin-help-smoke-test
@@ -63,8 +62,9 @@
           (sh! env "clojure" "-T:build" "install-local")
           (sh! env "bbin" "install" "org.hugoduncan/psi" "--as" "psi-release-smoke" "--mvn/version" stamped-version)
           (let [installed (str (get env "BABASHKA_BBIN_BIN_DIR") "/psi-release-smoke")
-                version-result (apply shell/sh (concat [installed "--cwd" tmp-root "--version" :env env :dir tmp-root]))
-                help-result    (apply shell/sh (concat [installed "--cwd" tmp-root "--help" :env env :dir tmp-root]))]
+                run-env (assoc env "PSI_LAUNCHER_POLICY" "jar")
+                version-result (apply shell/sh (concat [installed "--cwd" tmp-root "--version" :env run-env :dir tmp-root]))
+                help-result    (apply shell/sh (concat [installed "--cwd" tmp-root "--help" :env run-env :dir tmp-root]))]
             (is (.exists (io/file installed)))
             (is (= 0 (:exit version-result)) (:err version-result))
             (is (= (str "psi " stamped-version)

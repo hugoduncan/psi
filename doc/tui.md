@@ -39,6 +39,10 @@ psi --tui --nrepl 8888
 
 Development/non-canonical alternatives may still use repo-local `clojure -M:run ...`
 paths, but the launcher-owned `psi` command is now the primary operator path.
+For released installs, that path now depends on the jar-owned release metadata
+packaged inside the published psi artifact, so `--tui` smoke coverage should run
+through the installed/package-shaped launcher path rather than only through
+repo-local startup.
 
 ## OAuth Login (no env var needed)
 

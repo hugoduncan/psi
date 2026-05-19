@@ -7,22 +7,6 @@
    [psi.launcher :as launcher]
    [psi.version :as version]))
 
-(defn- explicit-policy
-  "Resolve launcher policy from PSI_LAUNCHER_POLICY env var.
-   Defaults to :jar when running a stamped release, :installed otherwise."
-  []
-  (case (System/getenv "PSI_LAUNCHER_POLICY")
-    "development" :development
-    "installed"   :installed
-    "jar"         :jar
-    nil           (if (not= "unreleased" (version/version-string))
-                    :jar
-                    :installed)
-    (throw (ex-info "Invalid PSI_LAUNCHER_POLICY"
-                    {:env "PSI_LAUNCHER_POLICY"
-                     :value (System/getenv "PSI_LAUNCHER_POLICY")
-                     :expected #{"development" "installed" "jar"}}))))
-
 (defn- resource-root
   "Returns the repo root when running from source (file: URL), nil from a jar."
   []
@@ -31,6 +15,23 @@
       (some-> (.getPath url)
               (str/replace #"/bases/main/src/psi/launcher_main\.clj$" "")
               not-empty))))
+
+(defn- explicit-policy
+  "Resolve launcher policy from PSI_LAUNCHER_POLICY env var.
+   Defaults to :jar when running from a packaged artifact (no repo resource
+   root), :installed when running from source/repo layout."
+  []
+  (case (System/getenv "PSI_LAUNCHER_POLICY")
+    "development" :development
+    "installed"   :installed
+    "jar"         :jar
+    nil            (if (resource-root)
+                     :installed
+                     :jar)
+    (throw (ex-info "Invalid PSI_LAUNCHER_POLICY"
+                    {:env "PSI_LAUNCHER_POLICY"
+                     :value (System/getenv "PSI_LAUNCHER_POLICY")
+                     :expected #{"development" "installed" "jar"}}))))
 
 (defn- launcher-root
   []

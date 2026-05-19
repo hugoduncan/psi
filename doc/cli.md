@@ -12,6 +12,12 @@ The launcher constructs startup basis data before `psi.main` starts.
 That means user/project extension manifests participate in classpath and
 extension availability before the JVM launches.
 
+Under `jar` policy, the launcher reads psi's shipped runtime dependency closure
+from jar-owned release metadata packaged inside `org.hugoduncan/psi`, rather
+than reconstructing psi's own runtime basis from repo-local component layout.
+Psi-owned runtime source/resource trees are packaged in the published jar, while
+user/project extension manifests layer additively on top.
+
 Launcher realization policy controls how psi and psi-owned extensions are
 resolved at startup. Three policies exist:
 
@@ -21,9 +27,9 @@ resolved at startup. Three policies exist:
 | `installed` | Default for unreleased/git installs | Local paths relative to the launcher root (git checkout) |
 | `development` | Contributor/repo-local flows | Local paths relative to the launcher root (source tree) |
 
-Auto-detection: when `psi/version.edn` contains a release semver (not
-`"unreleased"`), the launcher defaults to `:jar` policy. An unreleased build
-defaults to `:installed`.
+Auto-detection: when running from a packaged artifact (no source-tree resource
+root), the launcher defaults to `:jar` policy. When running from source/repo
+layout, it defaults to `:installed`.
 
 Override with `PSI_LAUNCHER_POLICY`:
 
