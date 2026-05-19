@@ -31,14 +31,14 @@ bbin install org.hugoduncan/psi --as psi --mvn/version LATEST
 Install a specific release (recommended for reproducible environments):
 
 ```bash
-bbin install org.hugoduncan/psi --as psi --mvn/version 0.1.1987
+bbin install org.hugoduncan/psi --as psi --mvn/version 0.1.2119
 ```
 
 Check the installed version:
 
 ```bash
 psi --version
-# psi 0.1.1987
+# psi 0.1.2119
 ```
 
 Upgrade to the latest release:
