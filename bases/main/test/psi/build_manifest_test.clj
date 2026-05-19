@@ -14,19 +14,38 @@
 (deftest build-lib-src-dirs-include-state-kernel-and-runtime-extracted-components
   (testing "recent runtime component extractions stay packaged in the library jar"
     (let [src-dirs (set (sut/build-lib-src-dirs))]
-      (is (contains? src-dirs "components/state-kernel/src"))
-      (is (contains? src-dirs "components/provider-auth/src"))
-      (is (contains? src-dirs "components/turn-statechart/src"))
-      (is (contains? src-dirs "components/turn-runtime/src"))
-      (is (contains? src-dirs "components/tool-runtime/src"))
-      (is (contains? src-dirs "components/session-journal/src"))
-      (is (contains? src-dirs "components/session-persistence/src"))
-      (is (contains? src-dirs "components/shared-config/src"))
-      (is (contains? src-dirs "components/project-nrepl/src"))
-      (is (contains? src-dirs "components/workflow-loader/src"))
-      (is (contains? src-dirs "components/workflow-step-materialization/src"))
-      (is (contains? src-dirs "components/workflow-step-session-config/src"))
-      (is (contains? src-dirs "extensions/github/src"))
-      (is (contains? src-dirs "extensions/edit-clj/src"))
-      (is (contains? src-dirs "extensions/logprobs/src"))
-      (is (contains? src-dirs "extensions/metrics/src")))))
+      (doseq [path ["components/state-kernel/src"
+                    "components/session-state/src"
+                    "components/provider-auth/src"
+                    "components/turn-statechart/src"
+                    "components/turn-runtime/src"
+                    "components/tool-runtime/src"
+                    "components/session-journal/src"
+                    "components/session-persistence/src"
+                    "components/shared-config/src"
+                    "components/project-nrepl/src"
+                    "components/graph/src"
+                    "components/history/src"
+                    "components/introspection/src"
+                    "components/memory/src"
+                    "components/recursion/src"
+                    "components/ui-state/src"
+                    "components/system-bootstrap/src"
+                    "components/prompt-assets/src"
+                    "components/prompt-registry/src"
+                    "components/skill-registry/src"
+                    "components/command-registry/src"
+                    "components/tool-registry/src"
+                    "components/deterministic-operation-registry/src"
+                    "components/deterministic-operation-runtime/src"
+                    "components/workflow-registry/src"
+                    "components/workflow-judge/src"
+                    "components/workflow-runtime/src"
+                    "components/workflow-loader/src"
+                    "components/workflow-step-materialization/src"
+                    "components/workflow-step-session-config/src"
+                    "extensions/github/src"
+                    "extensions/edit-clj/src"
+                    "extensions/logprobs/src"
+                    "extensions/metrics/src"]]
+        (is (contains? src-dirs path) path)))))

@@ -2,6 +2,13 @@
         com.fulcrologic/statecharts                   {:mvn/version "1.2.25"}
         ;; Query + Graph: EQL interface to everything
         com.wsscode/pathom3                           {:mvn/version "2025.01.16-alpha"}
+        ;; Runtime dependencies required by packaged components in the published library jar
+        metosin/malli                                 {:mvn/version "0.16.4"}
+        cheshire/cheshire                             {:mvn/version "5.13.0"}
+        clj-http/clj-http                             {:mvn/version "3.13.0"}
+        org.clojure/core.async                        {:mvn/version "1.6.681"}
+        com.taoensso/timbre                           {:mvn/version "6.8.0"}
+        org.commonmark/commonmark                     {:mvn/version "0.24.0"}
         ;; API: OpenAPI specs -> callable clients
         com.github.oliyh/martian-babashka-http-client {:mvn/version "0.2.1"}
         org.clojure/clojure                           {:mvn/version "1.12.4"}
@@ -93,21 +100,38 @@
                         "components/turn-runtime/src"
                         "components/tool-runtime/src"
                         "components/state-kernel/src"
+                        "components/session-state/src"
                         "components/session-journal/src"
                         "components/session-persistence/src"
                         "components/shared-config/src"
                         "components/project-nrepl/src"
-                        "components/workflow-loader/src"
-                        "components/workflow-step-materialization/src"
-                        "components/workflow-step-session-config/src"
-                        "components/turn-statechart/src"
-                        "components/turn-runtime/src"
                         "components/agent-core/src"
                         "components/ai/src"
                         "components/engine/src"
                         "components/query/src"
+                        "components/graph/src"
+                        "components/history/src"
+                        "components/introspection/src"
+                        "components/memory/src"
+                        "components/recursion/src"
                         "components/tui/src"
                         "components/rpc/src"
+                        "components/ui-state/src"
+                        "components/system-bootstrap/src"
+                        "components/prompt-assets/src"
+                        "components/prompt-registry/src"
+                        "components/skill-registry/src"
+                        "components/command-registry/src"
+                        "components/tool-registry/src"
+                        "components/deterministic-operation-registry/src"
+                        "components/deterministic-operation-runtime/src"
+                        "components/workflow-registry/src"
+                        "components/workflow-judge/src"
+                        "components/workflow-runtime/src"
+                        "components/workflow-loader/src"
+                        "components/workflow-step-materialization/src"
+                        "components/workflow-step-session-config/src"
+                        "components/turn-statechart/src"
                         "extensions/auto-session-name/src"
                         "extensions/commit-checks/src"
                         "extensions/hello-ext/src"
