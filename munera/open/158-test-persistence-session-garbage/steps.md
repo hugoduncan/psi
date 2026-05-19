@@ -54,3 +54,5 @@
   - [x] Tighten local naming in the temp-root cleanup proof to reduce incidental ceremony while preserving post-lifecycle verification.
   - [x] Make the bootstrap root-forwarding proof emit clearer failure signal, e.g. by binding expected/actual names or adding explicit assertion messages around the isolated-root path check.
   - [x] Re-run the focused persistence test set and confirm the shaping changes preserve coverage and improve readability.
+- [x] Optional code-shaping polish if this seam grows further.
+  - [x] Consider adding a brief internal doc cue that `safe-context-opts` is the authoritative persisted-test guardrail seam, but only if more test-entry helpers or persisted-test patterns accumulate and the extra explanation earns its keep.

@@ -32,3 +32,7 @@
   - tightened cleanup proof local naming from broader capture names to shorter, intent-revealing bindings while preserving post-lifecycle verification
   - improved the intentional persisted bootstrap root-forwarding proof with explicit `session-id` / `session-file` bindings and clearer assertion messages for isolated-root failures
   - focused verification: `psi.agent-session.session-lifecycle-test`, `psi.app-runtime-test`, and `psi.rpc-real-delegate-command-test` green (`36 tests, 213 assertions, 0 failures`); focused lint clean
+- Code-shaper review note: code looks closure-ready. No substantive code-shaping gap remains; at most, future polish could add a brief doc cue that `safe-context-opts` is the authoritative persisted-test guardrail seam if this pattern grows.
+- Code-shaper follow-up implemented:
+  - added a brief doc cue on `safe-context-opts` marking it as the authoritative persisted-test guardrail seam shared by test context helpers
+  - verification: focused lint on `psi.agent-session.test-support` clean

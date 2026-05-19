@@ -73,6 +73,9 @@
    the resolved cwd targets the repo root/user.dir. Tests may override :cwd,
    but never to the process cwd.
 
+   This is the authoritative persisted-test guardrail seam shared by test
+   context helpers.
+
    When persistence is enabled, tests must also provide an explicit isolated
    :session-root rather than falling through to the real default user-home
    session store."
