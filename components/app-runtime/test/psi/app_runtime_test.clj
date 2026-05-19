@@ -746,32 +746,16 @@
 (deftest bootstrap-runtime-session-intentional-persisting-test-root-is-forwarded-test
   (test-support/with-temp-session-root
     (fn [session-root]
-      (with-redefs [oauth/create-context (fn [] nil)
-                    pt/discover-templates (fn [] [])
-                    skills/discover-skills (fn [] {:skills [] :diagnostics []})
-                    sys-prompt/discover-context-files (fn [_] [])
-                    sys-prompt/build-system-prompt (fn [_] "")
-                    ext/discover-extension-paths (fn [& _] [])
-                    introspection/register-resolvers! (fn [] nil)
-                    memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
-                    bootstrap/bootstrap-in!
-                    (fn [_ctx _session-id _]
-                      {:extension-errors [] :extension-loaded-count 0})]
-        (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (java.util.UUID/randomUUID))
-              _   (.mkdirs (java.io.File. cwd))
-              {:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
-                             {:provider :anthropic
-                              :id "test-model"
-                              :name "Test Model"
-                              :supports-reasoning false}
-                             {:cwd cwd
-                              :persist? true
-                              :session-root session-root})
-              session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
-              sd         (ss/get-session-data-in ctx session-id)
-              session-file (:session-file sd)]
-          (is (string? session-file))
-          (is (.startsWith session-file session-root)))))))
+      (with-main-bootstrap-stubs
+        (fn []
+          (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (java.util.UUID/randomUUID))
+                _   (.mkdirs (java.io.File. cwd))
+                {:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+                               {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false}
+                               {:cwd cwd :persist? true :session-root session-root})
+                session-file (some-> (ss/list-context-sessions-in ctx) first :session-id (ss/get-session-data-in ctx) :session-file)]
+            (is (string? session-file))
+            (is (.startsWith session-file session-root))))))))
 
 (deftest bootstrap-runtime-session-invalid-project-model-falls-back-test
   (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-main-project-prefs-" (java.util.UUID/randomUUID))
