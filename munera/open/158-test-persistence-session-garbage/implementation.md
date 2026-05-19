@@ -1,0 +1,38 @@
+# Implementation log
+
+- Decided to use `:session-root` on the agent-session context as the explicit seam for isolated persisted test storage. Production callers keep default nil behavior, which still resolves to the normal user-home store.
+- Tightened `psi.agent-session.test-support/safe-context-opts` so persisted tests must provide an explicit isolated `:session-root`; otherwise helper-based test contexts fail fast before creating persisted session files.
+- Standardized helper-owned lifecycle for persistence tests with `with-temp-session-root`, which allocates a per-test temp root and deletes it in `finally`.
+- Chosen first shared seam for ordinary non-persisting runtime/bootstrap tests: `psi.app-runtime/create-runtime-session-context` callers in `run-session` and `start-tui-runtime!` now pass `:persist? false`, preventing incidental temp-cwd runtime tests from writing into the real default session store.
+- Updated agent-session lifecycle persistence path creation to honor `(:session-root ctx)` for both new-session and fork-session persisted file creation.
+- Narrowed `session_lifecycle_test` helper default to `:persist? false`, then kept explicit persistence coverage by moving the fork persistence proof onto `with-temp-session-root` + `:persist? true` + explicit `:session-root`.
+- Updated app-runtime proof to assert non-persisting default (`:session-file nil`) for ordinary console runtime tests.
+- Broadened verification beyond the initial focused pair to cover representative app-runtime, rpc, system-bootstrap, workflow-runtime, and model-dispatch surfaces; observed `0` delta in real `~/.psi/agent/sessions/--var-folders-*` / `--private-var-folders-*` directory counts during that run.
+- Verification snapshot:
+  - focused lint: `clj-kondo --lint components/agent-session/src components/agent-session/test components/app-runtime/src components/app-runtime/test`
+  - focused tests: `30 tests, 191 assertions, 0 failures`
+  - broader representative test run: `69 tests, 477 assertions, 0 failures`, home-store temp-dir count delta `0`
+- Review note: not ready to close. Remaining shared-seam gap: some app-runtime test/bootstrap entrypoints still default to real persistence when tests call `create-runtime-session-context` or the convenience `bootstrap-runtime-session!` path directly; `create-test-session` also documents but does not itself enforce the persisted-test guardrail.
+- Review follow-up implemented:
+  - tightened `psi.agent-session.test-support/create-test-session` to apply `safe-context-opts` itself, so persisted test use is guardrailed by code rather than docstring discipline alone
+  - patched remaining direct non-persisting test call sites using `psi.app-runtime/create-runtime-session-context` to pass `:persist? false`
+  - fixed the convenience two-arity `psi.app-runtime/bootstrap-runtime-session!` path to forward test-only `:persist?` and `:session-root` into runtime-session context creation instead of silently falling back to real persistence
+  - added focused proofs that direct app-runtime and rpc test seams now produce `:session-file nil` when used as non-persisting test contexts
+  - focused verification: `psi.app-runtime-test`, `psi.rpc-real-delegate-command-test`, `psi.agent-session.session-lifecycle-test` green (`35 tests, 207 assertions, 0 failures`); focused lint clean
+  - while re-running an unrelated broader namespace, observed pre-existing event-log sensitivity in `psi.agent-session.model-dispatch-test/projection-and-transition-helper-dispatch-test` (`:session/ui-clear-widget` noise before `:session/record-tool-output-stat`); unrelated to task 158 changes
+- Test review note: tests are strong overall but not yet closure-complete. Remaining gaps: no focused proof that `with-temp-session-root` removes the temp root after the helper-owned lifecycle completes, and no focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast.
+- Test review follow-up implemented:
+  - added focused proof that `with-temp-session-root` exposes a real temp root during the body and removes it after the helper-owned lifecycle returns
+  - added focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast with the expected guardrail error and opts shape
+  - added a narrow intentional-persisting bootstrap proof that the convenience two-arity `bootstrap-runtime-session!` seam forwards an explicit isolated `:session-root` when persistence is intentionally enabled
+  - focused verification: `psi.agent-session.session-lifecycle-test`, `psi.app-runtime-test`, and `psi.rpc-real-delegate-command-test` green (`35 tests, 213 assertions, 0 failures`); focused lint clean
+- Test-shaper review note: no substantive coverage gap remains, but the newest persistence/guardrail tests could be shaped for clarity and signal: split the grouped helper/guardrail test into separate single-contract tests, tighten local naming in the cleanup proof, and make the bootstrap root-forwarding failure output slightly more explicit.
+- Test-shaper follow-up implemented:
+  - split the grouped helper/guardrail persistence review proof into separate single-contract tests for cleanup and fail-fast guardrails
+  - tightened cleanup proof local naming from broader capture names to shorter, intent-revealing bindings while preserving post-lifecycle verification
+  - improved the intentional persisted bootstrap root-forwarding proof with explicit `session-id` / `session-file` bindings and clearer assertion messages for isolated-root failures
+  - focused verification: `psi.agent-session.session-lifecycle-test`, `psi.app-runtime-test`, and `psi.rpc-real-delegate-command-test` green (`36 tests, 213 assertions, 0 failures`); focused lint clean
+- Code-shaper review note: code looks closure-ready. No substantive code-shaping gap remains; at most, future polish could add a brief doc cue that `safe-context-opts` is the authoritative persisted-test guardrail seam if this pattern grows.
+- Code-shaper follow-up implemented:
+  - added a brief doc cue on `safe-context-opts` marking it as the authoritative persisted-test guardrail seam shared by test context helpers
+  - verification: focused lint on `psi.agent-session.test-support` clean

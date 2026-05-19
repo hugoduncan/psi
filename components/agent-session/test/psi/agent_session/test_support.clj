@@ -44,18 +44,56 @@
     (.mkdirs (java.io.File. p))
     p))
 
+(defn temp-session-root []
+  (let [p (str (java.nio.file.Files/createTempDirectory
+                "psi-agent-session-store-"
+                (make-array java.nio.file.attribute.FileAttribute 0)))]
+    (.mkdirs (java.io.File. p))
+    p))
+
+(defn delete-recursively!
+  [path]
+  (let [f (java.io.File. (str path))]
+    (when (.exists f)
+      (doseq [child (reverse (file-seq f))]
+        (.delete ^java.io.File child)))))
+
+(defn with-temp-session-root
+  "Run f with a test-owned temporary session root. Cleans it up in finally.
+   Passes the root path string to f."
+  [f]
+  (let [root (temp-session-root)]
+    (try
+      (f root)
+      (finally
+        (delete-recursively! root)))))
+
 (defn safe-context-opts
   "Merge test-safe defaults into session/create-context opts and fail fast if
    the resolved cwd targets the repo root/user.dir. Tests may override :cwd,
-   but never to the process cwd."
+   but never to the process cwd.
+
+   This is the authoritative persisted-test guardrail seam shared by test
+   context helpers.
+
+   When persistence is enabled, tests must also provide an explicit isolated
+   :session-root rather than falling through to the real default user-home
+   session store."
   [opts]
-  (let [opts*         (merge {:cwd (temp-cwd)} opts)
+  (let [opts*         (merge {:cwd (temp-cwd)
+                              :persist? false}
+                             opts)
         cwd-path      (.getCanonicalPath (java.io.File. (str (:cwd opts*))))
         user-dir-path (.getCanonicalPath (java.io.File. (System/getProperty "user.dir")))]
     (when (= cwd-path user-dir-path)
       (throw (ex-info "Unsafe test context cwd resolves to process user.dir"
                       {:cwd cwd-path
                        :user-dir user-dir-path
+                       :opts opts*})))
+    (when (and (not= false (:persist? opts*))
+               (nil? (:session-root opts*)))
+      (throw (ex-info "Unsafe persisted test context missing isolated :session-root"
+                      {:cwd cwd-path
                        :opts opts*})))
     opts*))
 
@@ -236,19 +274,10 @@
    Accepts the same options as `session/create-context`. The :session-defaults
    overrides flow through into the first real session.
 
-   Guard: when persistence is enabled, tests must not target process user.dir."
+   Persisted test usage is guardrailed here via `safe-context-opts`, so tests
+   cannot silently fall through to the real default user-home session store."
   ([] (create-test-session {:persist? false}))
   ([opts]
-   (let [persist? (not= false (:persist? opts))
-         _        (when persist?
-                    (let [cwd-path      (.getCanonicalPath (java.io.File. (str (or (:cwd opts)
-                                                                                   (System/getProperty "user.dir")))))
-                          user-dir-path (.getCanonicalPath (java.io.File. (System/getProperty "user.dir")))]
-                      (when (= cwd-path user-dir-path)
-                        (throw (ex-info "Unsafe persisted test context cwd resolves to process user.dir"
-                                        {:cwd cwd-path
-                                         :user-dir user-dir-path
-                                         :opts opts})))))
-         ctx      (session-core/create-context opts)
-         sd       (session-core/new-session-in! ctx nil {})]
+   (let [ctx (session-core/create-context (safe-context-opts opts))
+         sd  (session-core/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))

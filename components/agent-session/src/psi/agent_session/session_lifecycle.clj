@@ -21,7 +21,7 @@
                            (:worktree-path (:session-defaults ctx))
                            (:cwd ctx))
         session-file   (when (:persist? ctx)
-                         (let [session-dir (journal-store/session-dir-for worktree-path)
+                         (let [session-dir (journal-store/session-dir-for (:session-root ctx) worktree-path)
                                file        (journal-store/new-session-file-path session-dir new-session-id)]
                            (str file)))]
     (dispatch/dispatch! ctx
@@ -210,7 +210,8 @@
           branch-entries      (fork-branch-entries ctx parent-session-id entry-id)
           messages            (compaction/rebuild-messages-from-journal-entries branch-entries)
           session-file        (when (:persist? ctx)
-                                (let [session-dir (journal-store/session-dir-for (session/session-worktree-path-in ctx parent-session-id))
+                                (let [session-dir (journal-store/session-dir-for (:session-root ctx)
+                                                                                 (session/session-worktree-path-in ctx parent-session-id))
                                       file        (journal-store/new-session-file-path session-dir new-session-id)]
                                   (str file)))]
       (dispatch/dispatch! ctx

@@ -14,6 +14,7 @@
    [psi.session-persistence.core :as persist]
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
+   [psi.agent-session.test-support :as test-support]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.prompt-assets.prompt-templates :as pt]
    [psi.shared-config.project :as project-prefs]
@@ -86,7 +87,8 @@
                                        :name               "Test Model"
                                        :supports-reasoning false
                                        :context-window     200000}
-                                      {:ui-type :emacs})
+                                      {:ui-type :emacs
+                                       :persist? false})
             sessions (ss/list-context-sessions-in ctx)]
         (is (= 1 (count sessions)))
         (is (= session-id (:session-id (first sessions))))))))
@@ -102,7 +104,8 @@
                                            :name               "Test Model"
                                            :supports-reasoning false
                                            :context-window     200000}
-                                          {:ui-type :tui})
+                                          {:ui-type :tui
+                                           :persist? false})
                 reg                    (:extension-registry ctx)
                 ext-path               "/ext/which-session"
                 runtime-fns*           (runtime-fns/make-extension-runtime-fns ctx session-id ext-path)
@@ -152,7 +155,7 @@
       (finally
         (reset! app-runtime/session-state orig-state)))))
 
-(deftest run-session-initializes-session-file-test
+(deftest run-session-starts-non-persisting-console-session-test
   (let [orig-state @app-runtime/session-state]
     (try
       (with-main-bootstrap-stubs
@@ -167,7 +170,7 @@
                   session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
                   sd         (ss/get-session-data-in ctx session-id)]
               (is (some? ctx))
-              (is (string? (:session-file sd)))
+              (is (nil? (:session-file sd)))
               (is (= :console (:ui-type sd)))))))
       (finally
         (reset! app-runtime/session-state orig-state)))))
@@ -205,7 +208,7 @@
                                   (reset! captured opts)
                                   :ok)]
             (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {})))
-            (is (string? (:current-session-file @captured)))
+            (is (nil? (:current-session-file @captured)))
             (is (fn? (:dispatch-fn @captured)))
             (is (fn? (:on-interrupt-fn! @captured)))
             (let [ctx (:ctx @app-runtime/session-state)
@@ -304,6 +307,7 @@
                            :execution-result/stop-reason :stop})]
             (app-runtime/run-session :ignored)
             (let [ctx (:ctx @app-runtime/session-state)
+                  sync-calls-before (count @sync-calls)
                   session-id (-> @app-runtime/session-state
                                  :ctx
                                  ss/list-context-sessions-in
@@ -316,7 +320,7 @@
                "hello"
                nil
                {:sync-on-git-head-change? true})
-              (is (= [session-id] @sync-calls)
+              (is (= [session-id] (subvec (vec @sync-calls) sync-calls-before))
                   "submit-prompt-in! runs git-head sync once after a successful prompt turn")))))
       (finally
         (reset! app-runtime/session-state orig-state)))))
@@ -539,7 +543,7 @@
                           :id "test-model"
                           :name "Test Model"
                           :supports-reasoning false}
-                         {})
+                         {:persist? false})
           session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
           sd         (ss/get-session-data-in ctx session-id)
           sessions   (ss/get-sessions-map-in ctx)]
@@ -567,7 +571,8 @@
                             :id "test-model"
                             :name "Test Model"
                             :supports-reasoning false}
-                           {:memory-runtime-opts {:store-provider "in-memory"
+                           {:persist? false
+                            :memory-runtime-opts {:store-provider "in-memory"
                                                   :retention-snapshots 22
                                                   :retention-deltas 44}
                             :session-config {:llm-stream-idle-timeout-ms 54321}})]
@@ -593,7 +598,7 @@
                           :id "test-model"
                           :name "Test Model"
                           :supports-reasoning false}
-                         {})
+                         {:persist? false})
           sid    (-> (ss/list-context-sessions-in ctx) first :session-id)
           prompt (:psi.agent-session/system-prompt
                   (session/query-in ctx sid [:psi.agent-session/system-prompt]))]
@@ -623,7 +628,7 @@
                               :id "test-model"
                               :name "Test Model"
                               :supports-reasoning false}
-                             {})
+                             {:persist? false})
               result (session/query-in ctx [:psi.runtime/nrepl-host
                                             :psi.runtime/nrepl-port
                                             :psi.runtime/nrepl-endpoint])]
@@ -731,12 +736,31 @@
                             :id "claude-sonnet-4-6"
                             :name "Claude Sonnet 4.6"
                             :supports-reasoning true}
-                           {:cwd cwd})
+                           {:cwd cwd
+                            :persist? false})
             session-id      (-> (ss/list-context-sessions-in ctx) first :session-id)
             sd              (ss/get-session-data-in ctx session-id)]
         (is (= "openai" (get-in sd [:model :provider])))
         (is (= "gpt-5.3-codex" (get-in sd [:model :id])))
         (is (= :high (:thinking-level sd)))))))
+
+(deftest bootstrap-runtime-session-intentional-persisting-test-root-is-forwarded-test
+  (test-support/with-temp-session-root
+    (fn [session-root]
+      (with-main-bootstrap-stubs
+        (fn []
+          (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (java.util.UUID/randomUUID))
+                _   (.mkdirs (java.io.File. cwd))
+                {:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+                               {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false}
+                               {:cwd cwd :persist? true :session-root session-root})
+                session-id   (-> (ss/list-context-sessions-in ctx) first :session-id)
+                session-file (:session-file (ss/get-session-data-in ctx session-id))]
+            (is (string? session-file) "intentional persisted bootstrap should allocate a session file")
+            (is (.startsWith session-file session-root)
+                (str "expected persisted bootstrap session-file under isolated session-root\n"
+                     "session-root: " session-root "\n"
+                     "session-file: " session-file))))))))
 
 (deftest bootstrap-runtime-session-invalid-project-model-falls-back-test
   (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-main-project-prefs-" (java.util.UUID/randomUUID))
@@ -762,9 +786,12 @@
                             :id "claude-sonnet-4-6"
                             :name "Claude Sonnet 4.6"
                             :supports-reasoning false}
-                           {:cwd cwd})
+                           {:cwd cwd
+                            :persist? false})
             session-id      (-> (ss/list-context-sessions-in ctx) first :session-id)
             sd              (ss/get-session-data-in ctx session-id)]
         (is (= "anthropic" (get-in sd [:model :provider])))
         (is (= "claude-sonnet-4-6" (get-in sd [:model :id])))
         (is (= :off (:thinking-level sd)))))))
+
+

@@ -1,0 +1,58 @@
+# Steps
+
+- [x] Inventory the current test persistence leak paths before changing helpers.
+  - [x] Identify non-persistence tests that still create real persisted sessions from temp cwd/worktree paths.
+  - [x] Identify explicit persistence tests whose assertions intentionally require real session-file/journal behavior on disk.
+  - [x] Confirm the main shared seam(s), especially app-runtime/runtime-bootstrap helper paths.
+- [x] Converge non-persistence defaults for ordinary tests.
+  - [x] Update shared runtime/bootstrap test helpers to pass `:persist? false` when persistence is not under test.
+  - [x] Align app-runtime test helpers with the existing `psi.agent-session.test-support` non-persisting discipline.
+  - [x] Patch any remaining direct non-helper test call sites only where a shared seam cannot cover them cleanly.
+- [x] Standardize isolated temporary session root setup for explicit persistence tests.
+  - [x] Introduce or refine a shared helper/pattern for tests that intentionally require persistence.
+  - [x] Ensure the helper allocates an isolated temporary session root instead of using `~/.psi/agent/sessions/`.
+  - [x] Prefer per-test helper-owned isolated temporary session roots unless broader fixture scope is justified.
+  - [x] Keep explicit persistence tests clear at the call site about persistence being intentionally enabled.
+  - [x] Ensure explicit persistence tests can inspect files in the isolated temporary session root before helper-owned cleanup runs when needed for assertions.
+- [x] Add cleanup ownership for explicit persistence tests.
+  - [x] Make the helper or standardized pattern clean up the isolated temporary session root after the test-owned lifecycle completes.
+  - [x] Avoid leaving cleanup as an implicit manual responsibility in individual test bodies.
+  - [x] Confirm the cleanup approach is robust for repeated local test runs and test failure paths.
+- [x] Add guardrails for unsafe persisted test contexts.
+  - [x] Fail fast when a test attempts persistence against the real default session store without an explicit isolated temporary session root.
+  - [x] Preserve an explicit isolated opt-in path for true persistence tests.
+  - [x] Keep the guardrail test-only so production runtime behavior is unchanged.
+- [x] Record the explicit implementation decisions.
+  - [x] Record the exact seam used to select an isolated temporary session root.
+  - [x] Record the exact helper or lifecycle owner responsible for cleanup.
+  - [x] Record the exact fail-fast condition for unsafe persisted test contexts.
+  - [x] Record the first shared helper/namespace chosen to converge app-runtime/bootstrap tests onto non-persisting defaults.
+- [x] Tighten focused proofs for both ordinary and explicit persistence cases.
+  - [x] Add or update focused tests proving ordinary temp-cwd/bootstrap tests do not allocate persisted session artifacts in the real user session store.
+  - [x] Add or update focused tests proving explicit persistence tests can still create session files under isolated temporary session roots.
+  - [x] Add or update focused tests proving explicit persistence tests can inspect files before helper-owned cleanup runs when needed.
+  - [x] Add or update focused tests proving the isolated temporary session roots are cleaned up by the standardized helper/pattern.
+  - [x] Add or update focused tests proving persisted test contexts targeting the real default session store fail fast.
+- [x] Verify the final state.
+  - [x] Focused affected test namespaces are green.
+  - [x] No incidental `--var-folders-*` or `--private-var-folders-*` directories are created under the real `~/.psi/agent/sessions/` during the focused test run.
+  - [x] Explicit persistence coverage remains intact and isolated.
+- [x] Close the remaining shared-seam persistence gaps found in review.
+  - [x] Audit direct test call sites that use `psi.app-runtime/create-runtime-session-context` and classify each as non-persisting or explicit persistence.
+  - [x] Make non-persisting app-runtime test entrypoints explicit at the remaining direct call sites, or introduce a shared test-safe runtime helper if that is the clearer seam.
+  - [x] Cover the convenience `psi.app-runtime/bootstrap-runtime-session!` path so test use cannot silently fall through to the real default session store.
+  - [x] Tighten `psi.agent-session.test-support/create-test-session` so persisted test usage is guardrailed by code, not only by docstring guidance.
+  - [x] Add or update focused proofs that the remaining app-runtime/rpc direct test seams do not persist into the real default session store unless given an explicit isolated `:session-root`.
+  - [x] Re-run focused verification and confirm the review gaps are closed before marking the task ready to close.
+- [x] Close the remaining test-quality gaps found in test review.
+  - [x] Add a focused proof that `with-temp-session-root` removes the temporary session root after the helper-owned lifecycle completes.
+  - [x] Add a focused regression proof that persisted `create-test-session` use without explicit isolated `:session-root` fails fast.
+  - [x] Optionally strengthen the convenience bootstrap seam proof by covering intentional persisted test use with explicit `:session-root`, if that stays narrow and clearer than relying on implementation inspection alone.
+  - [x] Re-run focused verification for the added test coverage and confirm the remaining test-review gaps are closed.
+- [x] Shape the newest persistence tests for clarity and signal.
+  - [x] Split the grouped helper/guardrail test in `session_lifecycle_test.clj` into separate single-contract `deftest`s.
+  - [x] Tighten local naming in the temp-root cleanup proof to reduce incidental ceremony while preserving post-lifecycle verification.
+  - [x] Make the bootstrap root-forwarding proof emit clearer failure signal, e.g. by binding expected/actual names or adding explicit assertion messages around the isolated-root path check.
+  - [x] Re-run the focused persistence test set and confirm the shaping changes preserve coverage and improve readability.
+- [x] Optional code-shaping polish if this seam grows further.
+  - [x] Consider adding a brief internal doc cue that `safe-context-opts` is the authoritative persisted-test guardrail seam, but only if more test-entry helpers or persisted-test patterns accumulate and the extra explanation earns its keep.

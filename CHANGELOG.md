@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Fixed
+- Project test runs no longer leak temporary persisted session artifacts into the default `~/.psi/agent/sessions/` store; non-persistence is now explicit at shared test/runtime seams and persistence tests use isolated temporary session roots.
+
 ## [0.1.2123] - 2026-05-19
 
 ### Fixed

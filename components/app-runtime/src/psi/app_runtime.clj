@@ -275,8 +275,10 @@ Available: " (str/join ", " (map name (keys all))))
    - :session-config optional session config overrides (merged with defaults)
    - :cwd optional cwd override (primarily for tests)
    - :ui-type runtime UI type hint (:console | :tui | :emacs)
-   - :thinking-level-override explicit thinking level (CLI/env); overrides config when set"
-  [ai-model {:keys [event-queue session-config cwd ui-type thinking-level-override]}]
+   - :thinking-level-override explicit thinking level (CLI/env); overrides config when set
+   - :persist? optional persistence toggle (defaults true; primarily for tests)
+   - :session-root optional explicit persisted session root (primarily for tests)"
+  [ai-model {:keys [event-queue session-config cwd ui-type thinking-level-override persist? session-root]}]
   (let [cwd                      (or cwd (System/getProperty "user.dir"))
         ;; Initialize model registry with user-global + project-local custom models
         _                        (model-registry/init!
@@ -305,6 +307,8 @@ Available: " (str/join ", " (map name (keys all))))
                                  :event-queue event-queue
                                  :oauth-ctx oauth-ctx
                                  :nrepl-runtime-atom nrepl-runtime
+                                 :persist? (if (some? persist?) persist? true)
+                                 :session-root session-root
                                  :ui-type ui-type
                                  :mutations mutations/all-mutations})
         recursion-ctx            (recursion/create-hosted-context ctx (ss/state-path :recursion))
@@ -331,7 +335,9 @@ Available: " (str/join ", " (map name (keys all))))
 
    Options:
    - :memory-runtime-opts optional memory/runtime sync opts
-   - :cwd optional cwd override (primarily for tests)"
+   - :cwd optional cwd override (primarily for tests)
+   - :persist? optional persistence toggle (primarily for tests)
+   - :session-root optional explicit persisted session root (primarily for tests)"
   ([x y]
    (if (:state* x)
      (bootstrap-runtime-session! x nil y {})
@@ -339,7 +345,9 @@ Available: " (str/join ", " (map name (keys all))))
            opts     y
            {:keys [ctx oauth-ctx cwd session-id]} (create-runtime-session-context ai-model {:cwd (:cwd opts)
                                                                                             :session-config (:session-config opts)
-                                                                                            :ui-type (or (:ui-type opts) :console)})
+                                                                                            :ui-type (or (:ui-type opts) :console)
+                                                                                            :persist? (:persist? opts)
+                                                                                            :session-root (:session-root opts)})
            result (bootstrap-runtime-session! ctx session-id ai-model opts)]
        (assoc result :ctx ctx :oauth-ctx oauth-ctx :cwd cwd :session-id session-id))))
   ([ctx session-id ai-model {:keys [memory-runtime-opts cwd]}]
@@ -446,6 +454,7 @@ Available: " (str/join ", " (map name (keys all))))
          {:keys [ctx oauth-ctx session-id]}
          (create-runtime-session-context ai-model {:session-config          session-config
                                                    :ui-type                 :console
+                                                   :persist?                false
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
          {:keys [templates skills startup-rehydrate]}
          (bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts})
@@ -487,6 +496,7 @@ Available: " (str/join ", " (map name (keys all))))
          (create-runtime-session-context ai-model {:event-queue             event-queue
                                                    :session-config          session-config
                                                    :ui-type                 :tui
+                                                   :persist?                false
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
          nullable-execution-mode (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty)
          ctx (if (= "deterministic" nullable-execution-mode)
