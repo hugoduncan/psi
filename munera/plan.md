@@ -4,7 +4,6 @@ Open tasks in suggested execution order:
 
 Backlog:
 
-`munera/open/159-in-process-bootstrap-simplification/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`

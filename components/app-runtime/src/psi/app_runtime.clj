@@ -344,28 +344,76 @@ Available: " (str/join ", " (map name (keys all))))
   [ctx]
   (:session-id (session/new-session-in! ctx nil {})))
 
+(defn- log-startup-plan-diagnostics!
+  [startup-plan]
+  (doseq [d (:diagnostics startup-plan)]
+    (timbre/warn "Skill" (:type d) ":" (:message d) (:path d))))
+
+(defn- make-session-scoped-psi-tool
+  [ctx session-id cwd]
+  (tools/make-psi-tool (fn
+                         ([q] (session/query-in ctx session-id q))
+                         ([q entity] (session/query-in ctx q entity)))
+                       {:ctx ctx
+                        :session-id session-id
+                        :cwd cwd}))
+
+(defn- startup-base-prompt-opts
+  [ctx {:keys [cwd prompt-mode nucleus-prelude-override context-files skills]} tool-defs]
+  {:cwd                      cwd
+   :session-instant          (:started-at ctx)
+   :prompt-mode              prompt-mode
+   :nucleus-prelude-override nucleus-prelude-override
+   :context-files            context-files
+   :skills                   skills
+   :tool-defs                tool-defs})
+
+(defn- merge-tool-defs-by-name
+  [base-tool-defs ext-tools]
+  (->> (concat base-tool-defs ext-tools)
+       (reduce (fn [acc tool]
+                 (if (some #(= (:name tool) (:name %)) acc)
+                   acc
+                   (conj acc tool)))
+               [])))
+
+(defn- persist-system-prompt!
+  [ctx session-id prompt]
+  (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt prompt} {:origin :core}))
+
+(defn- finalize-startup-system-prompt!
+  [ctx session-id base-prompt-opts refreshed-tool-defs]
+  (bootstrap/register-all-domains!)
+  (let [graph-caps    (graph-capabilities-in ctx session-id)
+        build-opts    (assoc base-prompt-opts
+                             :graph-capabilities graph-caps
+                             :tool-defs refreshed-tool-defs)
+        system-prompt (sys-prompt/build-system-prompt build-opts)]
+    (persist-system-prompt! ctx session-id system-prompt)
+    (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                          {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
+                          {:origin :core})))
+
+(defn- log-startup-summary!
+  [summary]
+  (doseq [{:keys [path error]} (:extension-errors summary)]
+    (timbre/warn "Extension error:" path error))
+  (when (pos? (:extension-loaded-count summary))
+    (timbre/debug "Extensions loaded:" (:extension-loaded-count summary))))
+
 (defn- adopt-startup-plan-into-session!
   [ctx session-id ai-model startup-plan {:keys [memory-runtime-opts]}]
-  (let [{:keys [cwd templates skills context-files developer-prompt developer-prompt-source
-                prompt-mode nucleus-prelude-override base-tools]} startup-plan
+  (let [{:keys [cwd templates skills developer-prompt developer-prompt-source base-tools]} startup-plan
         _                  (background-job-ui/install-background-job-ui-refresh! ctx)
         _                  (workflow-bootstrap/init-built-in! ctx session-id)
-        psi-tool           (tools/make-psi-tool (fn
-                                                  ([q] (session/query-in ctx session-id q))
-                                                  ([q entity] (session/query-in ctx q entity)))
-                                                {:ctx ctx
-                                                 :session-id session-id
-                                                 :cwd cwd})
+        psi-tool           (make-session-scoped-psi-tool ctx session-id cwd)
         base-tool-defs     (conj base-tools psi-tool)
-        base-prompt-opts   {:cwd                      cwd
-                            :session-instant          (:started-at ctx)
-                            :prompt-mode              prompt-mode
-                            :nucleus-prelude-override nucleus-prelude-override
-                            :context-files            context-files
-                            :skills                   skills
-                            :tool-defs                base-tool-defs}
+        base-prompt-opts   (startup-base-prompt-opts ctx startup-plan base-tool-defs)
+        ;; Intentional two-stage prompt build: persist a base prompt before
+        ;; session bootstrap, then rebuild after graph-capability and active-tool
+        ;; refresh so the final persisted prompt reflects the live session state.
         base-prompt        (sys-prompt/build-system-prompt base-prompt-opts)
-        _                  (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
+        _                  (persist-system-prompt! ctx session-id base-prompt)
         summary-base       (session-bootstrap/bootstrap-in!
                             ctx session-id
                             {:register-global-query? false
@@ -380,13 +428,9 @@ Available: " (str/join ", " (map name (keys all))))
                              :refresh-active-tools?  false})
         {:keys [summary-updates]}
         (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
-        ext-tools          (extensions/all-tools-in (:extension-registry ctx))
-        refreshed-tool-defs (->> (concat base-tool-defs ext-tools)
-                                 (reduce (fn [acc tool]
-                                           (if (some #(= (:name tool) (:name %)) acc)
-                                             acc
-                                             (conj acc tool)))
-                                         []))
+        refreshed-tool-defs (merge-tool-defs-by-name
+                             base-tool-defs
+                             (extensions/all-tools-in (:extension-registry ctx)))
         _                  (session/dispatch-in! ctx
                                                  :session/set-active-tools
                                                  {:session-id session-id
@@ -394,24 +438,12 @@ Available: " (str/join ", " (map name (keys all))))
                                                  {:origin :core})
         summary            (merge-startup-summary summary-base summary-updates)
         _                  (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
-        _                  (bootstrap/register-all-domains!)
-        graph-caps         (graph-capabilities-in ctx session-id)
-        build-opts         (assoc base-prompt-opts
-                                  :graph-capabilities graph-caps
-                                  :tool-defs refreshed-tool-defs)
-        system-prompt      (sys-prompt/build-system-prompt build-opts)
-        _                  (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
-        _                  (session/dispatch-in! ctx :session/set-system-prompt-build-opts
-                                                 {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
-                                                 {:origin :core})
+        _                  (finalize-startup-system-prompt! ctx session-id base-prompt-opts refreshed-tool-defs)
         _                  (memory-runtime/sync-memory-layer! (merge {:cwd cwd}
                                                                      (or memory-runtime-opts {})))
         _                  (runtime/register-extension-run-fn-in! ctx session-id nil ai-model)
         startup-rehydrate  (startup-rehydrate-from-current-session! ctx session-id nil ai-model)]
-    (doseq [{:keys [path error]} (:extension-errors summary)]
-      (timbre/warn "Extension error:" path error))
-    (when (pos? (:extension-loaded-count summary))
-      (timbre/debug "Extensions loaded:" (:extension-loaded-count summary)))
+    (log-startup-summary! summary)
     {:ctx               ctx
      :session-id        session-id
      :templates         templates
@@ -456,15 +488,13 @@ Available: " (str/join ", " (map name (keys all))))
   ([ctx ai-model opts]
    (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
          startup-plan (build-startup-plan ctx {:cwd cwd})
-         _            (doseq [d (:diagnostics startup-plan)]
-                        (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))
+         _            (log-startup-plan-diagnostics! startup-plan)
          session-id   (create-initial-startup-session! ctx)]
      (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts)))
   ([ctx session-id ai-model opts]
    (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
          startup-plan (build-startup-plan ctx {:cwd cwd})
-         _            (doseq [d (:diagnostics startup-plan)]
-                        (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))]
+         _            (log-startup-plan-diagnostics! startup-plan)]
      (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts))))
 
 ;; ============================================================

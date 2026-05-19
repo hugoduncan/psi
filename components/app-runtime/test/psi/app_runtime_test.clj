@@ -110,6 +110,60 @@
         (is (contains? plan :skills))
         (is (contains? plan :base-tools))))))
 
+(deftest bootstrap-runtime-session-creates-initial-session-after-startup-plan-test
+  (with-main-bootstrap-stubs
+    (fn []
+      (let [{:keys [ctx cwd]} (app-runtime/create-runtime-session-context
+                               {:provider           :anthropic
+                                :id                 "test-model"
+                                :name               "Test Model"
+                                :supports-reasoning false
+                                :context-window     200000}
+                               {:ui-type :emacs
+                                :persist? false})
+            calls             (atom [])
+            startup-plan      {:cwd cwd :diagnostics []}]
+        (with-redefs [app-runtime/build-startup-plan
+                      (fn [ctx* opts]
+                        (swap! calls conj {:step :build-startup-plan
+                                           :sessions (count (ss/list-context-sessions-in ctx*))
+                                           :cwd (:cwd opts)})
+                        startup-plan)
+                      app-runtime/create-initial-startup-session!
+                      (fn [ctx*]
+                        (swap! calls conj {:step :create-initial-startup-session!
+                                           :sessions (count (ss/list-context-sessions-in ctx*))})
+                        (:session-id (session/new-session-in! ctx* nil {})))
+                      app-runtime/adopt-startup-plan-into-session!
+                      (fn [ctx* session-id _ai-model startup-plan* _opts]
+                        (swap! calls conj {:step :adopt-startup-plan-into-session!
+                                           :sessions (count (ss/list-context-sessions-in ctx*))
+                                           :session-id session-id
+                                           :startup-plan startup-plan*})
+                        {:ctx ctx*
+                         :session-id session-id
+                         :startup-plan startup-plan*})]
+          (let [result (app-runtime/bootstrap-runtime-session!
+                        ctx
+                        {:provider           :anthropic
+                         :id                 "test-model"
+                         :name               "Test Model"
+                         :supports-reasoning false}
+                        {:cwd cwd})
+                steps  (mapv :step @calls)]
+            (is (= [:build-startup-plan
+                    :create-initial-startup-session!
+                    :adopt-startup-plan-into-session!]
+                   steps))
+            (is (= 0 (:sessions (first @calls)))
+                "startup-plan assembly must run before any live session exists")
+            (is (= 0 (:sessions (second @calls)))
+                "initial-session creation point must be reached before any session exists")
+            (is (= 1 (:sessions (nth @calls 2)))
+                "startup-plan adoption should see the created initial session")
+            (is (= startup-plan (:startup-plan result)))
+            (is (= 1 (count (ss/list-context-sessions-in ctx))))))))))
+
 (deftest start-tui-runtime-extension-command-after-new-targets-new-session-test
   (let [orig-state @app-runtime/session-state]
     (try
