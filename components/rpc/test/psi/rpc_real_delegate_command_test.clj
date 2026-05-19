@@ -4,6 +4,7 @@
    [psi.app-runtime :as app]
    [psi.agent-session.context :as context]
    [psi.app-runtime.messages :as app-messages]
+   [psi.session-state.state :as ss]
    [psi.rpc :as rpc]
    [psi.rpc-test-support :as support]))
 
@@ -13,7 +14,8 @@
   ([execute-prepared-request-fn]
    (let [ai-model (app/resolve-model :gpt-5.4)
          {:keys [ctx session-id cwd]} (app/create-runtime-session-context ai-model {:event-queue (java.util.concurrent.LinkedBlockingQueue.)
-                                                                                    :ui-type :rpc})
+                                                                                    :ui-type :rpc
+                                                                                    :persist? false})
          ctx (cond-> ctx
                execute-prepared-request-fn (assoc :execute-prepared-request-fn execute-prepared-request-fn))]
      (app/bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts {} :cwd cwd})
@@ -166,4 +168,12 @@
           (future-cancel loop-future)
           (try (.close in-writer) (catch Exception _ nil))
           (try (.close in-reader) (catch Exception _ nil))
+          (context/shutdown-context! ctx))))))
+
+(deftest create-runtime-like-context-test-use-is-explicitly-non-persisting-test
+  (testing "rpc runtime-like test context does not allocate a persisted session file"
+    (let [[ctx session-id] (create-runtime-like-context)]
+      (try
+        (is (nil? (:session-file (ss/get-session-data-in ctx session-id))))
+        (finally
           (context/shutdown-context! ctx))))))

@@ -12,3 +12,11 @@
   - focused lint: `clj-kondo --lint components/agent-session/src components/agent-session/test components/app-runtime/src components/app-runtime/test`
   - focused tests: `30 tests, 191 assertions, 0 failures`
   - broader representative test run: `69 tests, 477 assertions, 0 failures`, home-store temp-dir count delta `0`
+- Review note: not ready to close. Remaining shared-seam gap: some app-runtime test/bootstrap entrypoints still default to real persistence when tests call `create-runtime-session-context` or the convenience `bootstrap-runtime-session!` path directly; `create-test-session` also documents but does not itself enforce the persisted-test guardrail.
+- Review follow-up implemented:
+  - tightened `psi.agent-session.test-support/create-test-session` to apply `safe-context-opts` itself, so persisted test use is guardrailed by code rather than docstring discipline alone
+  - patched remaining direct non-persisting test call sites using `psi.app-runtime/create-runtime-session-context` to pass `:persist? false`
+  - fixed the convenience two-arity `psi.app-runtime/bootstrap-runtime-session!` path to forward test-only `:persist?` and `:session-root` into runtime-session context creation instead of silently falling back to real persistence
+  - added focused proofs that direct app-runtime and rpc test seams now produce `:session-file nil` when used as non-persisting test contexts
+  - focused verification: `psi.app-runtime-test`, `psi.rpc-real-delegate-command-test`, `psi.agent-session.session-lifecycle-test` green (`35 tests, 207 assertions, 0 failures`); focused lint clean
+  - while re-running an unrelated broader namespace, observed pre-existing event-log sensitivity in `psi.agent-session.model-dispatch-test/projection-and-transition-helper-dispatch-test` (`:session/ui-clear-widget` noise before `:session/record-tool-output-stat`); unrelated to task 158 changes

@@ -335,7 +335,9 @@ Available: " (str/join ", " (map name (keys all))))
 
    Options:
    - :memory-runtime-opts optional memory/runtime sync opts
-   - :cwd optional cwd override (primarily for tests)"
+   - :cwd optional cwd override (primarily for tests)
+   - :persist? optional persistence toggle (primarily for tests)
+   - :session-root optional explicit persisted session root (primarily for tests)"
   ([x y]
    (if (:state* x)
      (bootstrap-runtime-session! x nil y {})
@@ -343,7 +345,9 @@ Available: " (str/join ", " (map name (keys all))))
            opts     y
            {:keys [ctx oauth-ctx cwd session-id]} (create-runtime-session-context ai-model {:cwd (:cwd opts)
                                                                                             :session-config (:session-config opts)
-                                                                                            :ui-type (or (:ui-type opts) :console)})
+                                                                                            :ui-type (or (:ui-type opts) :console)
+                                                                                            :persist? (:persist? opts)
+                                                                                            :session-root (:session-root opts)})
            result (bootstrap-runtime-session! ctx session-id ai-model opts)]
        (assoc result :ctx ctx :oauth-ctx oauth-ctx :cwd cwd :session-id session-id))))
   ([ctx session-id ai-model {:keys [memory-runtime-opts cwd]}]

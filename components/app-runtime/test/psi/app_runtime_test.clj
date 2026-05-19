@@ -86,7 +86,8 @@
                                        :name               "Test Model"
                                        :supports-reasoning false
                                        :context-window     200000}
-                                      {:ui-type :emacs})
+                                      {:ui-type :emacs
+                                       :persist? false})
             sessions (ss/list-context-sessions-in ctx)]
         (is (= 1 (count sessions)))
         (is (= session-id (:session-id (first sessions))))))))
@@ -102,7 +103,8 @@
                                            :name               "Test Model"
                                            :supports-reasoning false
                                            :context-window     200000}
-                                          {:ui-type :tui})
+                                          {:ui-type :tui
+                                           :persist? false})
                 reg                    (:extension-registry ctx)
                 ext-path               "/ext/which-session"
                 runtime-fns*           (runtime-fns/make-extension-runtime-fns ctx session-id ext-path)
@@ -539,7 +541,7 @@
                           :id "test-model"
                           :name "Test Model"
                           :supports-reasoning false}
-                         {})
+                         {:persist? false})
           session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
           sd         (ss/get-session-data-in ctx session-id)
           sessions   (ss/get-sessions-map-in ctx)]
@@ -567,7 +569,8 @@
                             :id "test-model"
                             :name "Test Model"
                             :supports-reasoning false}
-                           {:memory-runtime-opts {:store-provider "in-memory"
+                           {:persist? false
+                            :memory-runtime-opts {:store-provider "in-memory"
                                                   :retention-snapshots 22
                                                   :retention-deltas 44}
                             :session-config {:llm-stream-idle-timeout-ms 54321}})]
@@ -593,7 +596,7 @@
                           :id "test-model"
                           :name "Test Model"
                           :supports-reasoning false}
-                         {})
+                         {:persist? false})
           sid    (-> (ss/list-context-sessions-in ctx) first :session-id)
           prompt (:psi.agent-session/system-prompt
                   (session/query-in ctx sid [:psi.agent-session/system-prompt]))]
@@ -623,7 +626,7 @@
                               :id "test-model"
                               :name "Test Model"
                               :supports-reasoning false}
-                             {})
+                             {:persist? false})
               result (session/query-in ctx [:psi.runtime/nrepl-host
                                             :psi.runtime/nrepl-port
                                             :psi.runtime/nrepl-endpoint])]
@@ -731,7 +734,8 @@
                             :id "claude-sonnet-4-6"
                             :name "Claude Sonnet 4.6"
                             :supports-reasoning true}
-                           {:cwd cwd})
+                           {:cwd cwd
+                            :persist? false})
             session-id      (-> (ss/list-context-sessions-in ctx) first :session-id)
             sd              (ss/get-session-data-in ctx session-id)]
         (is (= "openai" (get-in sd [:model :provider])))
@@ -762,9 +766,46 @@
                             :id "claude-sonnet-4-6"
                             :name "Claude Sonnet 4.6"
                             :supports-reasoning false}
-                           {:cwd cwd})
+                           {:cwd cwd
+                            :persist? false})
             session-id      (-> (ss/list-context-sessions-in ctx) first :session-id)
             sd              (ss/get-session-data-in ctx session-id)]
         (is (= "anthropic" (get-in sd [:model :provider])))
         (is (= "claude-sonnet-4-6" (get-in sd [:model :id])))
         (is (= :off (:thinking-level sd)))))))
+
+(deftest create-runtime-session-context-test-use-is-explicitly-non-persisting-test
+  (with-main-bootstrap-stubs
+    (fn []
+      (let [{:keys [ctx session-id]} (app-runtime/create-runtime-session-context
+                                      {:provider :anthropic
+                                       :id "test-model"
+                                       :name "Test Model"
+                                       :supports-reasoning false
+                                       :context-window 200000}
+                                      {:ui-type :console
+                                       :persist? false})
+            sd (ss/get-session-data-in ctx session-id)]
+        (is (nil? (:session-file sd)))))))
+
+(deftest bootstrap-runtime-session-test-use-is-explicitly-non-persisting-test
+  (with-redefs [oauth/create-context (fn [] nil)
+                pt/discover-templates (fn [] [])
+                skills/discover-skills (fn [] {:skills [] :diagnostics []})
+                sys-prompt/discover-context-files (fn [_] [])
+                sys-prompt/build-system-prompt (fn [_] "")
+                ext/discover-extension-paths (fn [& _] [])
+                introspection/register-resolvers! (fn [] nil)
+                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
+                bootstrap/bootstrap-in!
+                (fn [_ctx _session-id _]
+                  {:extension-errors [] :extension-loaded-count 0})]
+    (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+                         {:provider :anthropic
+                          :id "test-model"
+                          :name "Test Model"
+                          :supports-reasoning false}
+                         {:persist? false})
+          session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
+          sd         (ss/get-session-data-in ctx session-id)]
+      (is (nil? (:session-file sd))))))

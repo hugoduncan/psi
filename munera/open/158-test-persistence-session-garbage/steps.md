@@ -37,3 +37,10 @@
   - [x] Focused affected test namespaces are green.
   - [x] No incidental `--var-folders-*` or `--private-var-folders-*` directories are created under the real `~/.psi/agent/sessions/` during the focused test run.
   - [x] Explicit persistence coverage remains intact and isolated.
+- [x] Close the remaining shared-seam persistence gaps found in review.
+  - [x] Audit direct test call sites that use `psi.app-runtime/create-runtime-session-context` and classify each as non-persisting or explicit persistence.
+  - [x] Make non-persisting app-runtime test entrypoints explicit at the remaining direct call sites, or introduce a shared test-safe runtime helper if that is the clearer seam.
+  - [x] Cover the convenience `psi.app-runtime/bootstrap-runtime-session!` path so test use cannot silently fall through to the real default session store.
+  - [x] Tighten `psi.agent-session.test-support/create-test-session` so persisted test usage is guardrailed by code, not only by docstring guidance.
+  - [x] Add or update focused proofs that the remaining app-runtime/rpc direct test seams do not persist into the real default session store unless given an explicit isolated `:session-root`.
+  - [x] Re-run focused verification and confirm the review gaps are closed before marking the task ready to close.

@@ -271,10 +271,10 @@
    Accepts the same options as `session/create-context`. The :session-defaults
    overrides flow through into the first real session.
 
-   Guard: persisted tests must use `safe-context-opts` so they provide an
-   isolated :session-root rather than the real default user-home store."
+   Persisted test usage is guardrailed here via `safe-context-opts`, so tests
+   cannot silently fall through to the real default user-home session store."
   ([] (create-test-session {:persist? false}))
   ([opts]
-   (let [ctx (session-core/create-context opts)
+   (let [ctx (session-core/create-context (safe-context-opts opts))
          sd  (session-core/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
