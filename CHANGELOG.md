@@ -6,6 +6,11 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Fixed
+- Released `psi --tui` startup now resolves its shipped runtime dependency closure from jar-owned release metadata packaged at `psi/release-deps.edn`, so release-tag `:jar` policy no longer misses TUI runtime dependencies such as `charm.clj`.
+- Released psi packaging now carries authoritative jar-owned runtime dependency metadata plus the shipped psi-owned runtime source/resource trees, and release smoke coverage proves isolated install/package startup through the artifact-shaped launcher path.
+- Unreleased tmux TUI smoke now prefers the current worktree launcher over a stale installed `psi` on `PATH`, preventing local smoke runs from silently proving an older installed release instead of the checkout under test.
+
 ## [0.1.2119] - 2026-05-18
 
 ### Fixed

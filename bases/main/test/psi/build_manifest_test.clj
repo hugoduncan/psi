@@ -49,3 +49,26 @@
                     "extensions/logprobs/src"
                     "extensions/metrics/src"]]
         (is (contains? src-dirs path) path)))))
+
+(deftest release-deps-resource-path-test
+  (testing "release deps metadata lives at a stable named jar resource path"
+    (is (= "psi/release-deps.edn"
+           sut/release-deps-resource-path))))
+
+(deftest release-deps-map-includes-authoritative-runtime-extra-deps
+  (testing "release deps map includes :psi alias extra-deps and nested runtime deps"
+    (let [deps (sut/release-deps-map)]
+      (is (= {:mvn/version "1.5.1"}
+             (get-in deps [:deps 'nrepl/nrepl])))
+      (is (= {:git/tag "v0.2.71"
+              :git/sha "38e6823"}
+             (get-in deps [:deps 'io.github.timokramer/charm.clj])))
+      (is (= {:mvn/version "1.1.47"}
+             (get-in deps [:deps 'rewrite-clj/rewrite-clj]))))))
+
+(deftest release-deps-map-excludes-psi-owned-local-roots
+  (testing "release deps metadata carries only external deps, not repo local/root deps"
+    (let [deps (sut/release-deps-map)]
+      (is (nil? (get-in deps [:deps 'psi/tui])))
+      (is (nil? (get-in deps [:deps 'psi/main])))
+      (is (nil? (get-in deps [:deps 'psi/app-runtime]))))))

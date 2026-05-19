@@ -193,6 +193,12 @@ against that locally installed artifact, builds the uberjar, and still skips
 external publication steps such as Clojars deploy, changelog extraction, and
 GitHub Release creation.
 
+The released jar now carries jar-owned runtime dependency metadata at
+`psi/release-deps.edn`. Release launcher startup under `:jar` policy reads that
+artifact-owned payload to construct psi's shipped runtime basis, while the jar
+itself carries the packaged psi-owned runtime source/resource trees. User and
+project extension manifests remain additive over that base.
+
 ### Partial-failure recovery
 
 `bb release` and `bb release:tag` are re-entrant:

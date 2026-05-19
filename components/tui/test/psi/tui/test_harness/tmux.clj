@@ -59,12 +59,32 @@
   [cmd]
   (zero? (:exit (run-sh (format "command -v %s >/dev/null 2>&1" cmd)))))
 
+(defn- current-worktree-unreleased?
+  []
+  (try
+    (= "unreleased"
+       (-> "bases/main/resources/psi/version.edn"
+           slurp
+           read-string
+           :version))
+    (catch Exception _
+      false)))
+
 (defn launcher-command
-  "Resolve the best available TUI launch command, preferring the installed
-   canonical `psi` binary when available.  For scenarios that need to exercise
-   code in the current worktree, use [[worktree-launch-command]] instead."
+  "Resolve the best available TUI launch command.
+
+   For local worktree testing, prefer the repo-local launcher when the current
+   worktree is an unreleased checkout. This avoids accidentally exercising a
+   stale installed `psi` on PATH that may not match the current source tree.
+   Otherwise prefer the canonical installed `psi` binary when available. For
+   scenarios that need to exercise code in the current worktree explicitly, use
+   [[worktree-launch-command]] instead."
   []
   (cond
+    (and (current-worktree-unreleased?)
+         (command-available? "bb"))
+    (repo-local-launch-command-abs)
+
     (command-available? "psi")
     canonical-launch-command
 

@@ -59,10 +59,12 @@ Releases are tagged `vMAJOR.MINOR.PATCH` on the
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
 Each release is also published to [Clojars](https://clojars.org/org.hugoduncan/psi)
-as `org.hugoduncan/psi`. The launcher auto-detects released versions and
-resolves psi from the Maven cache instead of re-fetching from git — no action
-required. Force a specific resolution strategy with `PSI_LAUNCHER_POLICY`
-(`jar` | `installed` | `development`); see [`doc/cli.md`](doc/cli.md).
+as `org.hugoduncan/psi`. Released startup now uses jar-owned release metadata
+packaged inside that artifact to construct psi’s shipped runtime basis, instead
+of reconstructing psi’s own runtime closure from repo-local component layout.
+Extensions still layer additively on top. Force a specific resolution strategy
+with `PSI_LAUNCHER_POLICY` (`jar` | `installed` | `development`); see
+[`doc/cli.md`](doc/cli.md).
 
 Then run psi directly:
 

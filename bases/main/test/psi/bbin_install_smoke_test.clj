@@ -18,10 +18,6 @@
   [prefix]
   (str (java.nio.file.Files/createTempDirectory prefix (make-array java.nio.file.attribute.FileAttribute 0))))
 
-(defn- repo-root
-  []
-  (.getAbsolutePath (io/file ".")))
-
 (defn- version-string
   []
   (-> "bases/main/resources/psi/version.edn" slurp read-string :version))
@@ -42,12 +38,11 @@
            "XDG_CACHE_HOME" xdg-cache
            "XDG_CONFIG_HOME" xdg-config
            "BABASHKA_BBIN_BIN_DIR" bbin-bin
-           "BBIN_REPO_ROOT" (repo-root)
            "PATH" path}
      :cwd root}))
 
 (deftest ^:integration bbin-install-smoke-test
-  (testing "bbin can install the locally built psi library artifact and launch it"
+  (testing "bbin can install the locally built psi library artifact and launch it from an isolated environment without repo-local startup assumptions"
     (support/with-build-lock
       (let [tmp-root (temp-dir! "psi-bbin-smoke-")
             {:keys [env cwd]} (isolated-env tmp-root)
@@ -55,8 +50,9 @@
         (sh! env "clojure" "-T:build" "install-local")
         (sh! env "bbin" "install" "org.hugoduncan/psi" "--as" "psi-smoke" "--mvn/version" (version-string))
         (let [installed (str (get env "BABASHKA_BBIN_BIN_DIR") "/psi-smoke")
-              version-result (apply shell/sh (concat [installed "--cwd" cwd "--version" :env env :dir cwd]))
-              help-result    (apply shell/sh (concat [installed "--cwd" cwd "--help" :env env :dir cwd]))]
+              run-env (assoc env "PSI_LAUNCHER_POLICY" "jar")
+              version-result (apply shell/sh (concat [installed "--cwd" cwd "--version" :env run-env :dir cwd]))
+              help-result    (apply shell/sh (concat [installed "--cwd" cwd "--help" :env run-env :dir cwd]))]
           (is (.exists (io/file installed)))
           (is (= 0 (:exit version-result)) (:err version-result))
           (is (= expected

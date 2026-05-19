@@ -2,7 +2,7 @@
  :deps {org.clojure/clojure         {:mvn/version "1.12.0"}
         babashka/process            {:mvn/version "0.6.23"}
         com.fulcrologic/statecharts {:mvn/version "1.2.25"}
-        taoensso/timbre             {:mvn/version "6.5.0"}
+        com.taoensso/timbre         {:mvn/version "6.5.0"}
         psi/ai                      {:local/root "../../components/ai"}
         psi/agent-core              {:local/root "../../components/agent-core"}
         psi/agent-session           {:local/root "../../components/agent-session"}}
