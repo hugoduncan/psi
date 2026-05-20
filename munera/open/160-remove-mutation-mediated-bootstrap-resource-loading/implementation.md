@@ -37,3 +37,11 @@ Both design-steps completed:
 ## Review: implementation review (pre-execution)
 
 1. **Extension-path return key mismatch.** `bootstrap-in!` reads extension results using namespaced keys (`:psi.extension/loaded?`, `:psi.extension/path`, `:psi.extension/error`) — see lines 146–148 and 156. The mutation `add-extension` returns these namespaced keys. But `ext-rt/add-extension-in!` returns **unnamespaced** keys (`{:loaded? ... :path ... :error ...}`). Step 1 replaces the mutation call with direct `ext-rt/add-extension-in!` but doesn't address the key translation. The init-var path already manually constructs namespaced keys (lines 68–70), so it's unaffected. The extension-path replacement must either: (a) wrap `ext-rt/add-extension-in!` results to produce namespaced keys matching the init-var path shape, or (b) normalize both paths to unnamespaced keys and update `bootstrap-in!` to read unnamespaced keys. Option (a) is simpler and consistent with the existing init-var pattern.
+
+## Follow-up execution: implementation review step 6
+
+Resolved extension-path return key mismatch:
+- Chose option (a): wrap `ext-rt/add-extension-in!` result to namespaced keys in step 1's extension-path replacement
+- Pattern matches both the init-var path (lines 68–70) and the mutation it replaces (`mutations/extensions.clj` `add-extension`)
+- Key detail: mutation uses input `path` param for `:psi.extension/path`, not result `:path` (which is the extension object); step 1 sub-item updated to use input `p`
+- Updated: steps.md step 1 (extension-path sub-item with key translation), steps.md step 6 (marked done), plan.md (new decision bullet)
