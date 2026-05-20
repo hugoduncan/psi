@@ -545,13 +545,11 @@
         (is (contains? event-types :session/add-tool)
             "tool addition event in log")
         (testing "all resource registration events have expected origin"
-          ;; Current: :mutations (via EQL mutation wrappers).
-          ;; After step 1 (direct dispatch): update to :core.
           (let [resource-events (filter #(#{:session/register-prompt-template
                                             :session/register-skill
                                             :session/add-tool} (:event-type %))
                                         entries)]
             (is (pos? (count resource-events)))
             (doseq [e resource-events]
-              (is (= :mutations (:origin e))
-                  (str (:event-type e) " should have :origin :mutations")))))))))
+              (is (= :core (:origin e))
+                  (str (:event-type e) " should have :origin :core")))))))))

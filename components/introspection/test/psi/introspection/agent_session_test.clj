@@ -186,10 +186,8 @@
                 :psi.startup/skill-count
                 :psi.startup/tool-count
                 :psi.startup/extension-loaded-count
-                :psi.startup/extension-error-count
-                :psi.startup/mutations])]
+                :psi.startup/extension-error-count])]
         (is (= 1 (:psi.startup/prompt-count r)))
         (is (= 0 (:psi.startup/skill-count r)))
         (is (= 0 (:psi.startup/tool-count r)))
-        (is (= 0 (:psi.startup/extension-loaded-count r)))
-        (is (vector? (:psi.startup/mutations r)))))))
+        (is (= 0 (:psi.startup/extension-loaded-count r)))))))

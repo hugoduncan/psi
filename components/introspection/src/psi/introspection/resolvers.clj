@@ -44,8 +44,7 @@
      :psi.startup/tool-count             — tools loaded during bootstrap
      :psi.startup/extension-loaded-count — successful extension loads
      :psi.startup/extension-error-count  — failed extension loads
-     :psi.startup/extension-errors       — [{:path :error}] failures
-     :psi.startup/mutations              — mutation symbols used"
+     :psi.startup/extension-errors       — [{:path :error}] failures"
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.engine.core :as engine]
@@ -175,8 +174,7 @@
                  :psi.startup/tool-count
                  :psi.startup/extension-loaded-count
                  :psi.startup/extension-error-count
-                 :psi.startup/extension-errors
-                 :psi.startup/mutations]}
+                 :psi.startup/extension-errors]}
   (let [sd      (or (get-in @(:state* agent-session-ctx) [:agent-session :active-session])
                     (some->> @(:state* agent-session-ctx)
                              :agent-session
@@ -192,8 +190,7 @@
      :psi.startup/tool-count             (:tool-count summary 0)
      :psi.startup/extension-loaded-count (:extension-loaded-count summary 0)
      :psi.startup/extension-error-count  (:extension-error-count summary 0)
-     :psi.startup/extension-errors       (:extension-errors summary [])
-     :psi.startup/mutations              (:mutations summary [])}))
+     :psi.startup/extension-errors       (:extension-errors summary [])}))
 
 (def all-resolvers
   [engine-all-engines

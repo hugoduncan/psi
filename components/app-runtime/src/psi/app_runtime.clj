@@ -416,8 +416,7 @@ Available: " (str/join ", " (map name (keys all))))
         _                  (persist-system-prompt! ctx session-id base-prompt)
         summary-base       (session-bootstrap/bootstrap-in!
                             ctx session-id
-                            {:register-global-query? false
-                             :base-tools             base-tool-defs
+                            {:base-tools             base-tool-defs
                              :system-prompt          base-prompt
                              :developer-prompt       developer-prompt
                              :developer-prompt-source developer-prompt-source

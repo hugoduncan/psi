@@ -5,24 +5,15 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
-   [psi.session-state.state :as ss]
+   [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
-   [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
-   [psi.agent-session.mutations :as mutations]
-   [psi.query.core :as query]))
+   [psi.session-state.state :as ss]
+   [psi.tool-registry.registry :as tool-registry]))
 
-(defn- run-mutation-in!
-  "Execute a registered mutation op in `qctx` with `params`.
-   `op-sym` must be the qualified mutation symbol.
-   Returns the mutation payload map (value under op-sym key)."
-  [qctx op-sym params]
-  (get (query/query-in qctx {}
-                       [(list op-sym params)])
-       op-sym))
-
-(defn load-startup-resources-via-mutations-in!
-  "Load startup prompt templates, skills, tools, and extensions.
+(defn load-startup-resources-in!
+  "Load startup prompt templates, skills, tools, and extensions via direct
+   dispatch calls and runtime extension loading.
 
    opts keys:
    :templates          — vector of prompt template maps
@@ -34,46 +25,40 @@
    Returns {:prompt-count int :skill-count int :tool-count int :extension-results [result-map ...]}."
   [ctx session-id {:keys [templates skills tools extension-paths extension-targets]
                    :or   {templates [] skills [] tools [] extension-paths [] extension-targets []}}]
-  (let [qctx (query/create-query-context)
-        _    (session/register-resolvers-in! qctx false)
-        _    (session/register-mutations-in! qctx mutations/all-mutations true)]
-    (doseq [t templates]
-      (run-mutation-in! qctx 'psi.extension/add-prompt-template
-                        {:psi/agent-session-ctx ctx
-                         :session-id           session-id
-                         :template             t}))
-    (doseq [s skills]
-      (run-mutation-in! qctx 'psi.extension/add-skill
-                        {:psi/agent-session-ctx ctx
-                         :session-id           session-id
-                         :skill                s}))
-    (doseq [tool tools]
-      (run-mutation-in! qctx 'psi.extension/add-tool
-                        {:psi/agent-session-ctx ctx
-                         :session-id           session-id
-                         :tool                 tool}))
-    (let [runtime-fns  (extension-runtime-fns/make-extension-runtime-fns ctx session-id nil)
-          path-results (mapv (fn [p]
-                               (run-mutation-in! qctx 'psi.extension/add-extension
-                                                 {:psi/agent-session-ctx ctx
-                                                  :session-id           session-id
-                                                  :path                 p}))
-                             extension-paths)
-          init-results (mapv (fn [{:keys [id init-var]}]
-                               (let [{:keys [extension error]}
-                                     (ext/load-extension-init-in! (:extension-registry ctx)
-                                                                  id
-                                                                  init-var
-                                                                  runtime-fns)]
-                                 {:psi.extension/loaded? (some? extension)
-                                  :psi.extension/path    id
-                                  :psi.extension/error   error}))
-                             (filter #(= :init-var (:kind %)) extension-targets))
-          ext-results (vec (concat path-results init-results))]
-      {:prompt-count      (count (:prompt-templates (ss/get-session-data-in ctx session-id)))
-       :skill-count       (count (:skills (ss/get-session-data-in ctx session-id)))
-       :tool-count        (count (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id))))
-       :extension-results ext-results})))
+  (doseq [t templates]
+    (session/dispatch-in! ctx :session/register-prompt-template
+                          {:session-id session-id :template t}
+                          {:origin :core}))
+  (doseq [s skills]
+    (session/dispatch-in! ctx :session/register-skill
+                          {:session-id session-id :skill s}
+                          {:origin :core}))
+  (doseq [tool tools]
+    (session/dispatch-in! ctx :session/add-tool
+                          {:session-id session-id :tool tool}
+                          {:origin :core}))
+  (let [path-results (mapv (fn [p]
+                             (let [{:keys [loaded? error]} (ext-rt/add-extension-in! ctx session-id p)]
+                               {:psi.extension/loaded? loaded?
+                                :psi.extension/path    p
+                                :psi.extension/error   error}))
+                           extension-paths)
+        runtime-fns  (extension-runtime-fns/make-extension-runtime-fns ctx session-id nil)
+        init-results (mapv (fn [{:keys [id init-var]}]
+                             (let [{:keys [extension error]}
+                                   (ext/load-extension-init-in! (:extension-registry ctx)
+                                                                id
+                                                                init-var
+                                                                runtime-fns)]
+                               {:psi.extension/loaded? (some? extension)
+                                :psi.extension/path    id
+                                :psi.extension/error   error}))
+                           (filter #(= :init-var (:kind %)) extension-targets))
+        ext-results  (vec (concat path-results init-results))]
+    {:prompt-count      (count (:prompt-templates (ss/get-session-data-in ctx session-id)))
+     :skill-count       (count (:skills (ss/get-session-data-in ctx session-id)))
+     :tool-count        (count (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id))))
+     :extension-results ext-results}))
 
 (defn refresh-active-tools-in!
   "Merge extension-registry tools into the session's active tool set.
@@ -95,8 +80,8 @@
    session branch.
 
    Steps:
-   1) register base tools and set system prompt
-   2) load prompts/skills/tools/extensions via EQL mutations
+   1) register base tools and set system prompt via dispatch
+   2) load prompts/skills/tools/extensions via direct dispatch and runtime calls
    3) when startup extensions were loaded here, merge extension tools into active tools
    4) persist startup summary to :startup-bootstrap in session data
 
@@ -139,7 +124,7 @@
     (session/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core}))
   (let [startup-tools (into (vec base-tools) (vec tools))
         {:keys [prompt-count skill-count tool-count extension-results]}
-        (load-startup-resources-via-mutations-in!
+        (load-startup-resources-in!
          ctx session-id {:templates templates
                          :skills skills
                          :tools startup-tools
@@ -158,10 +143,6 @@
                    :tool-count             tool-count
                    :extension-loaded-count (count (filter :psi.extension/loaded? extension-results))
                    :extension-error-count  (count ext-errors)
-                   :extension-errors       (vec ext-errors)
-                   :mutations              ['psi.extension/add-prompt-template
-                                            'psi.extension/add-skill
-                                            'psi.extension/add-tool
-                                            'psi.extension/add-extension]}]
+                   :extension-errors       (vec ext-errors)}]
     (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
     summary))
