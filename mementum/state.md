@@ -153,11 +153,21 @@ Bootstrapped on 2026-04-02.
   - 19 extension tests, 73 assertions; 1776+169 broader suite green; lint clean
 
 ## Suggested next step
-- For bootstrap simplification follow-on, strongest next candidate is `136-built-in-registration-path-for-workflow` because canonical startup still installs built-in workflow through pseudo-extension mechanics (`ext/register-extension-in!` + `ext/create-extension-api`) and still refreshes active tools from that path.
+- Task `136-built-in-registration-path-for-workflow` is complete. Bootstrap simplification follow-on strongest candidates are: remove mutation-shaped startup resource loading in `psi.agent-session.bootstrap/load-startup-resources-via-mutations-in!`, unify startup active-tool assembly to one authoritative post-registration write, and consider a narrower pre-session manifest-extension discovery/plan phase.
 - After `136`, the next likely bootstrap simplifications are: remove mutation-shaped startup resource loading in `psi.agent-session.bootstrap/load-startup-resources-via-mutations-in!`, unify startup active-tool assembly to one authoritative post-registration write, and consider a narrower pre-session manifest-extension discovery/plan phase.
 - `149-reload-fixup-inventory-and-safety` remains important but is reload correctness, not bootstrap simplification.
 
 ## Latest session notes
+- Task 136 built-in-registration-path-for-workflow is now complete and closed:
+  - added `register-built-in-tool-in!` / `register-built-in-command-in!` to shared registries; stored under `:built-in-tools` / `:built-in-commands` keys (separate from `:extensions` to prevent same-name collision between commands and tools)
+  - all shared read paths (get-tool-in, tool-names-in, all-tools-in, get-command-in, command-names-in, all-commands-in) now merge built-ins and extensions; built-ins listed first
+  - `built-in-lifecycle-callbacks` defonce atom + `register-built-in-lifecycle-callback!` / `invoke-built-in-lifecycle!` in `workflow/runtime_state.clj`
+  - `workflow/bootstrap.clj` rewritten: `make-built-in-api` builds minimal API map without extension identity seeding or extension API wrapper; `built-in:workflow` retained only as provenance-id
+  - `session_lifecycle.clj` calls `invoke-built-in-lifecycle! "session_switch"` after each extension session_switch dispatch
+  - session_switch lifecycle callback guards against nil query-fn to prevent stale-from-reload NPE
+  - test migrations: `workflow_built_in_targeting_test.clj` uses `tool-registry/get-tool-in`; `gordian_launcher_manifest_runtime_boundary_test.clj` asserts command/tool availability instead of extension-registry identity; others pass unchanged via merged read paths
+  - 6 focused commits; lint clean; 9 workflow behavior tests, 0 failures; all pre-existing failures remain pre-existing
+
 - Closed and committed the remaining app-runtime nREPL bootstrap test split as part of task `159`:
   - commit `c255eace` — `⚒ 159: split app-runtime nREPL bootstrap tests`
   - focused verification green: `clojure -M:test --focus psi.app-runtime-test --focus psi.app-runtime-nrepl-test` → `25 tests, 102 assertions, 0 failures`

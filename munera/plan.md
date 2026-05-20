@@ -7,7 +7,7 @@ Backlog:
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
-`munera/open/136-built-in-registration-path-for-workflow/`
+
 `munera/open/141-workflow-child-session-non-streaming-execution/`
 `munera/open/144-workflow-model-query-execution-fallback/`
 `munera/open/147-workflow-child-session-creation-contract/`
@@ -24,6 +24,9 @@ Backlog:
 `munera/open/156-tui-resume-session-discovery-follow-up/`
 
 Notes:
+- `136` is complete and closed: built-in workflow now installs via explicit built-in paths — `register-built-in-tool-in!` / `register-built-in-command-in!` in the shared registries, direct `:session/register-prompt-contribution` dispatch for prompt contributions, and `register-built-in-lifecycle-callback!` / `invoke-built-in-lifecycle!` for session_switch; `ext/register-extension-in!` and `ext/create-extension-api` removed from bootstrap; `built-in:workflow` retained only as stable provenance identifier; 6 commits, lint clean, all affected workflow tests pass.
+
+
 - `151` is complete and closed: `edit-clj` structural edit extension; `psi.edit-clj.core` (pure: parse, find-candidates, apply-line-filter, replace-in) + `psi.edit-clj.extension` (tool registration, I/O, JSON); wired into top-level `deps.edn`, `tests.edn`, and `psi-owned-extension-catalog`; `rewrite-clj/rewrite-clj 1.1.47` added to runtime+test deps; 19 tests, 73 assertions, 0 failures; 1776+169 broader suite green.
 - `140-workflow-ir-compilation-errors-actionable` is complete and closed: `"invalid value"` fallback test added to `format-structural-errors-test`; all 4 AC and 8 verification expectations met; 16 formatter tests, 63 assertions, 0 failures.
 - `141` is open: workflow-scoped child-session execution-mode support so workflow-owned child sessions can request `:response-mode :non-streaming`; intentionally narrower than a full session-wide streaming toggle.
