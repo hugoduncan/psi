@@ -198,19 +198,13 @@
                              :oauth-ctx nil
                              :cwd (or (:cwd opts) (System/getProperty "user.dir"))})
                           app-runtime/bootstrap-runtime-session!
-                          (fn
-                            ([_ctx _ai-model _opts]
-                             {:ctx _ctx
-                              :session-id session-id
-                              :templates []
-                              :skills []
-                              :startup-rehydrate ((resolve 'psi.app-runtime/startup-rehydrate-from-current-session!) ctx session-id nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})})
-                            ([_ctx sid _ai-model _opts]
-                             {:ctx _ctx
-                              :session-id sid
-                              :templates []
-                              :skills []
-                              :startup-rehydrate ((resolve 'psi.app-runtime/startup-rehydrate-from-current-session!) ctx sid nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})}))]
+                          (fn [_ctx _ai-model _opts]
+                            (let [sid (or (:session-id _opts) session-id)]
+                              {:ctx _ctx
+                               :session-id sid
+                               :templates []
+                               :skills []
+                               :startup-rehydrate ((resolve 'psi.app-runtime/startup-rehydrate-from-current-session!) ctx sid nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})}))]
               (is (= :ok (app-runtime/start-tui-runtime! tui-start! :ignored)))
               (let [dispatch-fn   (:dispatch-fn @tui-opts*)
                     query-fn      (:query-fn @tui-opts*)

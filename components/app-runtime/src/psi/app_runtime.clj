@@ -520,14 +520,11 @@ Available: " (str/join ", " (map name (keys all))))
    - (bootstrap-runtime-session! ai-model opts)
        creates a fresh runtime session context, builds a pre-session startup
        plan, creates the initial session, and adopts the startup plan into it
-   - (bootstrap-runtime-session! ctx ai-model)
-       bootstraps an existing runtime ctx with default opts
    - (bootstrap-runtime-session! ctx ai-model opts)
        bootstraps an existing runtime ctx with explicit opts
-   - (bootstrap-runtime-session! ctx session-id ai-model opts)
-       compatibility form for adopting startup into an already-created session
 
    Options:
+   - :session-id optional pre-created session-id (defaults to creating a new one)
    - :memory-runtime-opts optional memory/runtime sync opts
    - :cwd optional cwd override (primarily for tests)
    - :persist? optional persistence toggle (primarily for tests)
@@ -549,13 +546,7 @@ Available: " (str/join ", " (map name (keys all))))
    (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
          startup-plan (build-startup-plan ctx {:cwd cwd})
          _            (log-startup-plan-diagnostics! startup-plan)
-         session-id   (create-initial-startup-session! ctx)]
-     (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts)))
-  ([ctx session-id ai-model opts]
-   (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
-         startup-plan (build-startup-plan ctx {:cwd cwd})
-         _            (log-startup-plan-diagnostics! startup-plan)
-         session-id   (or session-id (create-initial-startup-session! ctx))]
+         session-id   (or (:session-id opts) (create-initial-startup-session! ctx))]
      (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts))))
 
 ;; ============================================================
