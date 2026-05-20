@@ -130,3 +130,13 @@ Applied test-shaper skill (clarity ∧ signal ∧ robustness ∧ economical) to 
 1. **`bootstrap-resource-registration-test` summary assertions incomplete.** Step 10 added assertions for `prompt-count`, `skill-count`, `tool-count` and claims to "close return-shape coverage gap". But the summary contains 7 fields; `extension-loaded-count`, `extension-error-count`, and `extension-errors` remain unasserted. Since the test passes `extension-paths []`, asserting `(= 0 (:extension-loaded-count summary))`, `(= 0 (:extension-error-count summary))`, `(= [] (:extension-errors summary))` is trivial and completes the return-shape contract. Without these, a regression that breaks extension summary construction goes undetected at the bootstrap level.
 
 2. **`startup-bootstrap-introspection-test` queries `extension-error-count` but never asserts it.** The test queries 5 fields (`prompt-count`, `skill-count`, `tool-count`, `extension-loaded-count`, `extension-error-count`) but only asserts 4 — `extension-error-count` is silently dropped. Adding `(is (= 0 (:psi.startup/extension-error-count r)))` completes the query contract.
+
+## Follow-up execution: test-shaper pass 2 steps 16 and 17
+
+Both steps completed:
+
+1. **Step 16 — extension summary fields in `bootstrap-resource-registration-test`**: added 3 assertions for `extension-loaded-count` (= 0), `extension-error-count` (= 0), `extension-errors` (= []). Completes the return-shape contract — all 7 summary fields now asserted.
+
+2. **Step 17 — `extension-error-count` in `startup-bootstrap-introspection-test`**: added `(is (= 0 (:psi.startup/extension-error-count r)))`. All 5 queried fields now asserted.
+
+Both tests green (11 assertions in bootstrap-resource-registration, 5 in startup-bootstrap-introspection). Lint clean.

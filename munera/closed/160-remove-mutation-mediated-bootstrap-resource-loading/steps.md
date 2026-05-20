@@ -78,10 +78,10 @@
 - [x] 15. Add docstring to `refresh-active-tools-in!` (from code-shaper review)
   - Every other public fn in `bootstrap.clj` has a docstring; add one for consistency
 
-- [ ] 16. Assert extension summary fields in `bootstrap-resource-registration-test` (from test-shaper pass 2)
+- [x] 16. Assert extension summary fields in `bootstrap-resource-registration-test` (from test-shaper pass 2)
   - Add `(is (= 0 (:extension-loaded-count summary)))`, `(is (= 0 (:extension-error-count summary)))`, `(is (= [] (:extension-errors summary)))` to the return summary assertions block
   - Completes the return-shape contract that step 10 partially addressed
 
-- [ ] 17. Assert `extension-error-count` in `startup-bootstrap-introspection-test` (from test-shaper pass 2)
+- [x] 17. Assert `extension-error-count` in `startup-bootstrap-introspection-test` (from test-shaper pass 2)
   - Add `(is (= 0 (:psi.startup/extension-error-count r)))` after the existing `extension-loaded-count` assertion
   - Closes the silent gap where the field is queried but never asserted

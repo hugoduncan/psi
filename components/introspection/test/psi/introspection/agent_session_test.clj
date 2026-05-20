@@ -190,4 +190,5 @@
         (is (= 1 (:psi.startup/prompt-count r)))
         (is (= 0 (:psi.startup/skill-count r)))
         (is (= 0 (:psi.startup/tool-count r)))
-        (is (= 0 (:psi.startup/extension-loaded-count r)))))))
+        (is (= 0 (:psi.startup/extension-loaded-count r)))
+        (is (= 0 (:psi.startup/extension-error-count r)))))))
