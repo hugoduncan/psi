@@ -12,6 +12,19 @@
 (def workflow-extensions-cwd
   "/Users/duncan/projects/hugoduncan/psi/workflow-extensions")
 
+(defn poll-until
+  "Poll `pred-fn` every `interval-ms` milliseconds until it returns truthy or
+  `timeout-ms` elapses.  Returns the last value of `pred-fn`."
+  ([pred-fn] (poll-until pred-fn 3000 50))
+  ([pred-fn timeout-ms interval-ms]
+   (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
+     (loop []
+       (let [v (pred-fn)]
+         (if (or v (>= (System/currentTimeMillis) deadline))
+           v
+           (do (Thread/sleep ^long interval-ms)
+               (recur))))))))
+
 (defn create-tui-context+session
   [mutations]
   (let [ctx (session/create-context {:persist? false

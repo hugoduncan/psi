@@ -76,11 +76,18 @@
   [reg]
   (let [state (state-in reg)
         seen  (volatile! #{})
-        built-in-items (for [[_ cmds] (:built-in-commands state)
-                             [name cmd] cmds
-                             :when (not (contains? @seen name))
-                             :let [_ (vswap! seen conj name)]]
-                         cmd)]
+        built-in-items (reduce
+                        (fn [items [_ cmds]]
+                          (reduce-kv
+                           (fn [items name cmd]
+                             (if (contains? @seen name)
+                               items
+                               (do (vswap! seen conj name)
+                                   (conj items cmd))))
+                           items
+                           cmds))
+                        []
+                        (:built-in-commands state))]
     (reduce
      (fn [items path]
        (reduce-kv
@@ -92,7 +99,7 @@
               (conj items (assoc item :extension-path path)))))
         items
         (or (get-in state [:extensions path :commands]) {})))
-     (vec built-in-items)
+     built-in-items
      (:registration-order state))))
 
 (defn get-command-in
@@ -122,7 +129,7 @@
                        :reason        :invalid-command-name})))
     (swap! (:state reg)
            assoc-in [:built-in-commands provenance-id command-name]
-           (assoc cmd :source :built-in))
+           (assoc cmd :source :built-in :ext-path provenance-id))
     reg))
 
 (defn all-built-in-commands-in

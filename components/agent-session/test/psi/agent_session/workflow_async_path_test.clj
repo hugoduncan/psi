@@ -10,19 +10,6 @@
    [psi.command-registry.registry :as command-registry]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
-(defn- poll-until
-  "Poll `pred-fn` every `interval-ms` milliseconds until it returns truthy or
-  `timeout-ms` elapses.  Returns the last value of `pred-fn`."
-  ([pred-fn] (poll-until pred-fn 3000 50))
-  ([pred-fn timeout-ms interval-ms]
-   (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
-     (loop []
-       (let [v (pred-fn)]
-         (if (or v (>= (System/currentTimeMillis) deadline))
-           v
-           (do (Thread/sleep ^long interval-ms)
-               (recur))))))))
-
 (deftest delegate-async-path-avoids-keyword-contains-error-test
   (testing "built-in workflow delegate async path no longer produces the keyword contains? failure in a TUI-like context"
     (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
@@ -39,10 +26,10 @@
                               (let [jobs (:psi.agent-session/background-jobs
                                           ((:query-fn rt) [:psi.agent-session/background-jobs]))]
                                 (filter #(= "delegate" (:psi.background-job/tool-name %)) jobs)))
-                _             (poll-until #(seq (filter (fn [j]
-                                                          (#{:failed :completed}
-                                                           (:psi.background-job/status j)))
-                                                        (query-jobs))))
+                _             (workflow-test-support/poll-until #(seq (filter (fn [j]
+                                                                                (#{:failed :completed}
+                                                                                 (:psi.background-job/status j)))
+                                                                              (query-jobs))))
                 all-delegate-jobs (query-jobs)
                 failed-job  (first (filter #(= :failed (:psi.background-job/status %)) all-delegate-jobs))]
             (is (seq all-delegate-jobs))

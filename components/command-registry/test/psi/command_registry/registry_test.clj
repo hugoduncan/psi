@@ -130,11 +130,12 @@
       (is (= "delegate"
              (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :name])))))
 
-  (testing "stored command carries :source :built-in"
+  (testing "stored command carries :source :built-in and :ext-path provenance-id"
     (let [reg (create-test-registry)]
       (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "run workflow"})
-      (is (= :built-in
-             (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :source])))))
+      (let [stored (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate"])]
+        (is (= :built-in (:source stored)))
+        (is (= "built-in:workflow" (:ext-path stored))))))
 
   (testing "does not require prior extension registration"
     (let [reg (create-test-registry)]

@@ -80,11 +80,18 @@
   [reg]
   (let [state (state-in reg)
         seen  (volatile! #{})
-        built-in-items (for [[_ tools] (:built-in-tools state)
-                             [name tool] tools
-                             :when (not (contains? @seen name))
-                             :let [_ (vswap! seen conj name)]]
-                         tool)]
+        built-in-items (reduce
+                        (fn [items [_ tools]]
+                          (reduce-kv
+                           (fn [items name tool]
+                             (if (contains? @seen name)
+                               items
+                               (do (vswap! seen conj name)
+                                   (conj items tool))))
+                           items
+                           tools))
+                        []
+                        (:built-in-tools state))]
     (reduce
      (fn [items path]
        (reduce-kv
@@ -96,7 +103,7 @@
               (conj items (assoc item :extension-path path)))))
         items
         (or (get-in state [:extensions path :tools]) {})))
-     (vec built-in-items)
+     built-in-items
      (:registration-order state))))
 
 (defn get-tool-in

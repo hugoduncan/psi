@@ -105,6 +105,9 @@
 
 ## code-shaper follow-ups (2026-05-20)
 
-- [ ] Extract `poll-until` from `workflow_async_path_test.clj` and `workflow_tui_repro_test.clj` into `workflow-test-support.clj`; both namespaces already require that ns and the helper is identical in both files
-- [ ] Add `:ext-path provenance-id` to the stored command map in `register-built-in-command-in!` so built-in command items carry the same provenance path field that built-in tool items carry (tools get `:ext-path` via `normalize-tool-def`; commands currently only get `:source :built-in`)
-- [ ] Fix `all-commands-in` (and symmetrically `all-tools-in`): replace the lazy `for` comprehension with `:let [_ (vswap! seen conj name)]` side-effect with an eager `reduce`/`into` collection for the built-in items pass, to avoid fragile mutation inside a lazy sequence
+- [x] Extract `poll-until` from `workflow_async_path_test.clj` and `workflow_tui_repro_test.clj` into `workflow-test-support.clj`; both namespaces already require that ns and the helper is identical in both files
+  - moved `poll-until` to `workflow_test_support.clj`; both test files now call `workflow-test-support/poll-until`; private definitions removed
+- [x] Add `:ext-path provenance-id` to the stored command map in `register-built-in-command-in!` so built-in command items carry the same provenance path field that built-in tool items carry (tools get `:ext-path` via `normalize-tool-def`; commands currently only get `:source :built-in`)
+  - `register-built-in-command-in!` now stores `(assoc cmd :source :built-in :ext-path provenance-id)`; registry test updated to assert both `:source` and `:ext-path` on the stored map
+- [x] Fix `all-commands-in` (and symmetrically `all-tools-in`): replace the lazy `for` comprehension with `:let [_ (vswap! seen conj name)]` side-effect with an eager `reduce`/`into` collection for the built-in items pass, to avoid fragile mutation inside a lazy sequence
+  - both `all-commands-in` and `all-tools-in` now collect built-in items with an outer `reduce` over provenance groups and an inner `reduce-kv` over names; `vswap!` only appears inside `reduce-kv` (eager); no lazy `for` with side-effects remains
