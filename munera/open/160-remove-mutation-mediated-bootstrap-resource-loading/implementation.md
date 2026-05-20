@@ -45,3 +45,17 @@ Resolved extension-path return key mismatch:
 - Pattern matches both the init-var path (lines 68–70) and the mutation it replaces (`mutations/extensions.clj` `add-extension`)
 - Key detail: mutation uses input `path` param for `:psi.extension/path`, not result `:path` (which is the extension object); step 1 sub-item updated to use input `p`
 - Updated: steps.md step 1 (extension-path sub-item with key translation), steps.md step 6 (marked done), plan.md (new decision bullet)
+
+## Review: task-test-review (pre-execution)
+
+Reviewed existing tests against design acceptance criteria. Key findings:
+
+1. **No test exercises skill or tool registration through `bootstrap-in!`.** The only test that calls `bootstrap-in!` with non-empty resources is `startup-bootstrap-introspection-test` — it passes 1 template but `:skills []` and `:tools []` (via `:base-tools []`). After the mechanism change from mutation-mediated to direct dispatch, a shape mismatch in `:session/register-skill` or `:session/add-tool` dispatch event params would go undetected. The `model_dispatch_test` calls `bootstrap-in!` with no templates/skills/tools at all.
+
+2. **No test asserts dispatch events for resource registration during bootstrap.** `interrupt-and-bootstrap-prompt-dispatch-test` checks the event log for `:session/bootstrap-prompt-state` but not for `:session/register-prompt-template`, `:session/register-skill`, or `:session/add-tool`. After the change, verifying that bootstrap produces the expected dispatch events (with `:origin :core`) would confirm the mechanism replacement works correctly.
+
+3. **Step 3 test updates are necessary but insufficient.** Removing `:psi.startup/mutations` from the introspection test query/assertion is correct. But step 3 only removes — it doesn't add coverage for the new mechanism. The introspection test should continue to assert prompt-count = 1, and ideally also exercise non-zero skill-count and tool-count.
+
+4. **Extension-path bootstrap path remains untested.** Design acknowledges production passes `extension-paths []`. The key translation wrapper (step 6 fix) is untested through bootstrap. The `extensions_io_test.clj` tests `ext-rt/add-extension-in!` directly but not the namespaced-key wrapping in the bootstrap path. Low priority given production usage, but noted.
+
+5. **`bootstrap-in!` return shape not tested.** No test asserts on the return value of `bootstrap-in!`. The `:mutations` key removal from the return map (AC3) is only indirectly tested via the introspection resolver reading from session-data. The `app_runtime_bootstrap_test.clj` stubs `bootstrap-in!` entirely. Callers (`adopt-startup-plan-into-session!`) use `merge-startup-summary` — if the return shape changes unexpectedly, no test catches it at the bootstrap level.

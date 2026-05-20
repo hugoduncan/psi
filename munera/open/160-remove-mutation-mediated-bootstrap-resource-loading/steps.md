@@ -36,4 +36,16 @@
 - [x] 6. Fix extension-path return key mismatch (from implementation review)
   - `ext-rt/add-extension-in!` returns unnamespaced `{:loaded? :path :error}` but `bootstrap-in!` reads namespaced `:psi.extension/loaded?`, `:psi.extension/path`, `:psi.extension/error`
   - Decision: wrap result in step 1's extension-path replacement — same pattern as init-var path (lines 68–70) and the mutation it replaces
-  - Updated step 1 extension-path sub-item to include key translation: destructure `{:keys [loaded? error]}`, produce `{:psi.extension/loaded? loaded? :psi.extension/path p :psi.extension/error error}` (use input `p`, not result `:path` which is the extension object)
+  - Updated step 1 extension-path sub-item to include key translation: destructure `{:keys [loaded? error]}`, produce `{:psi.extension/loaded? loaded? :psi.parameter/path p :psi.extension/error error}` (use input `p`, not result `:path` which is the extension object)
+
+- [ ] 7. Add test: `bootstrap-in!` with non-empty skills and tools (from test review)
+  - Call `bootstrap-in!` with ≥1 skill and ≥1 tool (plus ≥1 template for existing coverage)
+  - Assert `skill-count`, `tool-count`, `prompt-count` all > 0 in session-data after bootstrap
+  - Assert the resources appear in session-data (`:skills`, `:tools`, `:prompt-templates`)
+  - This covers AC2: skills and tools registered via direct dispatch produce the same session-data outcome as mutation-mediated path
+
+- [ ] 8. Add test: dispatch event log contains resource registration events during bootstrap (from test review)
+  - Call `bootstrap-in!` with ≥1 template, ≥1 skill, ≥1 tool after `kernel/clear-event-log!`
+  - Assert event log contains `:session/register-prompt-template`, `:session/register-skill`, `:session/add-tool` events
+  - Assert all have `:origin :core`
+  - This verifies the mechanism change: direct dispatch events appear in the log with correct origin
