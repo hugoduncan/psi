@@ -1,5 +1,20 @@
 # 162 — Implementation Notes
 
+## Implementation review — pass (2026-05-20)
+
+All 7 acceptance criteria verified against code. No actionable issues found.
+
+- Single arity `(ctx ai-model opts)` confirmed; no residual multi-arity or type-sniffing dispatch
+- Test helper `bootstrap-fresh-session!` correctly splits opts between `create-runtime-session-context` and `bootstrap-runtime-session!`, forwards full opts map
+- All 5 test files migrated to helper; no stale `psi.app-runtime` requires remain
+- `main.clj` `:bootstrap-fn!` correctly passes `:session-id` and `:cwd` in opts
+- `start-tui-runtime!` test mock updated to single 3-arity handling `:session-id` via opts
+- `rpc_real_delegate_command_test` unchanged (already used target form)
+- 301 bb tests + lint clean
+- No new patterns duplicating existing ones; no unnecessary abstractions; no structural performance issues
+
+**Pre-existing observation (out of scope):** `run-session` and `main.clj` `:bootstrap-fn!` reference `(:cwd ctx)` but `ctx` never contains `:cwd` — `create-runtime-session-context` returns `cwd` as a sibling, not inside `ctx`. Falls through harmlessly to `System/getProperty "user.dir"` but is fragile. Not introduced by this task.
+
 ## Design review — inconsistency follow-up (2026-05-20)
 
 Executed 3 design-steps from inconsistency review:
