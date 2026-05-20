@@ -25,3 +25,8 @@
   - Replaced 3 identical 7-line `with-redefs` blocks; removed 6 now-unused requires from test ns
 - [x] Test-shaper: Replace manual temp dir construction in `app_runtime_bootstrap_test.clj` with `test-support/temp-cwd`
   - All 3 tests now use `(test-support/temp-cwd)` from `psi.agent-session.test-support`
+- [ ] Code-shaper: Unify infrastructure nulling in `app_runtime_test.clj` bootstrap tests
+  - 4 inline `with-redefs` blocks (lines 601, 624, 651, 677) should use `bootstrap-stub-bindings` from test-support
+  - Add `ext/discover-extension-paths` to `bootstrap-stub-bindings` if needed by these tests, or compose it alongside
+  - Remove duplicate requires from `app_runtime_test.clj` after migration
+- [ ] Code-shaper: Replace manual temp dir in `app_runtime_test.clj` persisting test (line 705) with `test-support/temp-cwd`

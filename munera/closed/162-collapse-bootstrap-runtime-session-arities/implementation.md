@@ -1,5 +1,18 @@
 # 162 — Implementation Notes
 
+## Code-shaper review (2026-05-20)
+
+**Simplicity**: ✓ `bootstrap-runtime-session!` is clean single-responsibility. Test helper cleanly separates ctx creation from bootstrapping. No issues.
+
+**Consistency — infrastructure nulling not unified in `app_runtime_test.clj` (consistency/fixtures).**
+4 bootstrap tests in `app_runtime_test.clj` (lines 601, 624, 651, 677) still use inline `with-redefs` with 8 bindings (includes `ext/discover-extension-paths`). `bootstrap-stub-bindings` in test-support has 7 bindings (lacks `ext/discover-extension-paths`). `with-main-bootstrap-stubs` in the same file has yet another set (includes `ext/discover-extension-paths` + `resolve-model`, lacks `introspection/register-resolvers!` + `memory-runtime/sync-memory-layer!`). Three different approaches to infrastructure nulling in one file. The 4 inline blocks should use `bootstrap-stub-bindings` (extended to include `ext/discover-extension-paths` if needed).
+
+**Consistency — manual temp dir in `app_runtime_test.clj` persisting test (consistency/fixtures).**
+`bootstrap-runtime-session-intentional-persisting-test-root-is-forwarded-test` (line 705) still constructs temp dir manually with `(str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (UUID/randomUUID))` + `.mkdirs`. The test-shaper already fixed this exact pattern in `app_runtime_bootstrap_test.clj` — this instance was missed.
+
+**Robustness — `(:cwd ctx)` dead fallback in `bootstrap-runtime-session!` (robustness/dead-code).**
+Already noted as pre-existing. The fallback `(or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))` has a permanently-nil middle term — `create-runtime-session-context` returns `cwd` as a sibling of `ctx`, never inside it. Same issue in `main.clj` `:bootstrap-fn!` which passes `(:cwd ctx)` as the opts `:cwd`. Both work by accident (falls through to `user.dir`). Not introduced by this task but now more visible.
+
 ## Test-shaper review (2026-05-19)
 
 **Duplicated infrastructure nulling across bootstrap test files (consistency/fixtures).**
