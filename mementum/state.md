@@ -15,55 +15,26 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- Task 160 remove-mutation-mediated-bootstrap-resource-loading is now genuinely complete and closed:
-  - Core rewrite executed: `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!`
-  - Templates, skills, tools registered via direct `session/dispatch-in!` calls (`:origin :core`)
-  - Extension-path loading via direct `ext-rt/add-extension-in!` (no Pathom round-trip)
-  - Removed `run-mutation-in!`, throwaway query-context setup, `psi.agent-session.mutations` and `psi.query.core` requires
-  - `:mutations` key removed from bootstrap summary, session-state schema, session resolver, introspection resolver
-  - Stale `:register-global-query?` option removed from app-runtime caller
-  - Tests updated: dispatch event log origin `:mutations` → `:core`, introspection `:psi.startup/mutations` removed
-  - EQL mutations themselves preserved for external consumers
+- Task 160 remove-mutation-mediated-bootstrap-resource-loading is complete and closed:
+  - Core rewrite: `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!`
+  - Direct `session/dispatch-in!` for templates, skills, tools; direct `ext-rt/add-extension-in!` for extensions
+  - Removed throwaway query-context, `run-mutation-in!`, requires for `mutations` and `query.core`
+  - `:mutations` key removed from summary, schema, resolvers; tests updated
+  - Review-implementation confirmed: no remaining actionable feedback; two unchecked steps (18, 19) are optional refactoring follow-ons (not correctness)
   - 61 focused tests, 397 assertions, 0 failures; lint clean
 
-- Task 159 app-runtime nREPL bootstrap test split is complete and closed:
-  - commit `c255eace` — `⚒ 159: split app-runtime nREPL bootstrap tests`
-  - focused verification green: `25 tests, 102 assertions, 0 failures`
-
-- Task 151 edit-clj structural edit extension is complete and closed:
-  - `psi.edit-clj.core` (pure: parse, find-candidates, apply-line-filter, replace-in) + `psi.edit-clj.extension` (tool registration, I/O, JSON)
-  - 19 tests, 73 assertions; broader suite green; lint clean
-
-- Task 145 logprobs-out-of-band-extension is complete and closed:
-  - logprob data moved out-of-band into `extensions.logprobs`; synthetic projection removed
-  - `logprobs/perplexity` deterministic operation surface added
-
-- Task 140 logprobs-openai-completions-flag is complete and closed
-
-- Task 139 active-session-id root attr is complete and closed
-
-- Task 138 github extension label ops and workflow adoption is complete and closed
-
-- Task 136 built-in-registration-path-for-workflow is complete and closed
-
-- Task 134 psi-tool mutation surface and active-session/session-summary introspection is complete and closed
-
-- Task 130 workflow step materialization component extraction is complete and closed
-
-- Task 128 workflow execution adapter seam is complete and closed
-
-- Task 125 workflow-runtime core component extraction is complete and closed
-
-- Local OpenAI-compatible chat-completions requests now project `/thinking off` onto `chat_template_kwargs.enable_thinking=false` for models marked `:locality :local`
+- Tasks 159, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 are complete and closed
 
 ## Suggested next step
-- Bootstrap analysis after `160`: the main remaining complexity is concentrated in `psi.app-runtime/adopt-startup-plan-into-session!`
-  - Biggest simplification opportunities: unify the two-stage system-prompt build (tools/extensions/graph-capability inputs settle late), collapse duplicate startup active-tool refresh/composition paths
-  - Consider a narrower pre-session manifest-extension discovery/plan phase
-- `149-reload-fixup-inventory-and-safety` remains important but is reload correctness, not bootstrap simplification
-- `124-turn-execution-contract-extraction` continues the component extraction map
-- `147-workflow-child-session-creation-contract` and `141-workflow-child-session-non-streaming-execution` are the next workflow-architecture items
+- Bootstrap simplification continues — main remaining complexity in `psi.app-runtime/adopt-startup-plan-into-session!`:
+  - Two-stage system-prompt build (base prompt persisted, then rebuilt after graph-capability + extension tool refresh)
+  - Duplicate active-tool composition: `bootstrap-in!` has `refresh-active-tools-in!` (disabled), then `adopt-startup-plan-into-session!` does its own `merge-tool-defs-by-name` + `set-active-tools` dispatch
+  - `bootstrap-in!` and `adopt-startup-plan-into-session!` overlap on startup-summary persistence
+  - Consider: can `adopt-startup-plan-into-session!` delegate more to `bootstrap-in!` or be simplified now that bootstrap uses direct dispatch?
+- `149-reload-fixup-inventory-and-safety` — reload correctness
+- `124-turn-execution-contract-extraction` — component extraction
+- `141`, `144`, `147` — workflow architecture items
 
 ## Latest session notes
-- Closed task 160 after review-implementation workflow found no remaining actionable follow-up
-- All review-originated steps (6–15) checked off; remaining unchecked steps (1–5, 12, 14) are planned implementation work gated on the core rewrite (step 1), not independently actionable
+- Reopened task 160, executed the core rewrite (steps 1–5, 12, 14) that had been left undone
+- Review-implementation workflow confirmed completion — no new actionable issues
