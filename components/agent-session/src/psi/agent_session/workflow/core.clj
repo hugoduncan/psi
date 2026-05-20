@@ -469,8 +469,12 @@
                                                           (str ", " (count errors) " errors"))))))})
 
   ;; Session lifecycle cleanup
+  ;; Guard against nil state: if the built-in workflow runtime has been reset
+  ;; (e.g. between tests or after a hard reset), skip the reload rather than
+  ;; propagating a NPE from nil mutate-fn.
   ((:on api) "session_switch"
              (fn [{:keys [session-id]}]
-               (runtime-state/assoc-state! :current-session-id session-id)
-               (reload-definitions!)
+               (when (runtime-state/query-fn)
+                 (runtime-state/assoc-state! :current-session-id session-id)
+                 (reload-definitions!))
                nil)))
