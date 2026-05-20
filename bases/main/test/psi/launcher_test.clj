@@ -108,7 +108,30 @@
         (is (= ['psi/mementum]
                (:defaulted-libs (launcher/manifest-state "/repo/psi" "/repo/project" :installed))))
         (is (= ['psi/mementum]
-               (:inferred-init-libs (launcher/manifest-state "/repo/psi" "/repo/project" :installed))))))))
+               (:inferred-init-libs (launcher/manifest-state "/repo/psi" "/repo/project" :installed)))))))
+  (testing "project-local explicit local/root resolves against project cwd"
+    (let [project-manifest {:deps {'third-party/ext {:local/root "extensions/local-ext"
+                                                     :psi/init 'third.party.ext/init}}}
+          result (with-redefs [launcher/user-manifest-path (constantly "/tmp/user.edn")
+                               launcher/project-manifest-path (constantly "/tmp/project/.psi/extensions.edn")
+                               extensions/read-manifest-file (fn [path]
+                                                               (case path
+                                                                 "/tmp/user.edn" {:deps {}}
+                                                                 "/tmp/project/.psi/extensions.edn" project-manifest))]
+                   (launcher/manifest-state "/repo/psi" "/tmp/project" :installed))]
+      (is (= "/tmp/project/extensions/local-ext"
+             (get-in result [:expanded-manifest :deps 'third-party/ext :local/root])))))
+  (testing "psi-owned defaulted local/root resolves against launcher root"
+    (let [project-manifest {:deps {'psi/mementum {}}}
+          result (with-redefs [launcher/user-manifest-path (constantly "/tmp/user.edn")
+                               launcher/project-manifest-path (constantly "/tmp/project/.psi/extensions.edn")
+                               extensions/read-manifest-file (fn [path]
+                                                               (case path
+                                                                 "/tmp/user.edn" {:deps {}}
+                                                                 "/tmp/project/.psi/extensions.edn" project-manifest))]
+                   (launcher/manifest-state "/repo/psi" "/tmp/project" :installed))]
+      (is (= "/repo/psi/extensions/mementum"
+             (get-in result [:expanded-manifest :deps 'psi/mementum :local/root]))))))
 
 (deftest startup-basis-jar-policy-omits-psi-owned-extensions
   (testing "jar policy drops psi-owned extensions from basis — already bundled in org.hugoduncan/psi"

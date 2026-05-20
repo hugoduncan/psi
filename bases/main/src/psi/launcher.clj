@@ -153,6 +153,32 @@
         (psi-self-basis-from-repo-config launcher-root policy)
         (update :deps assoc 'nrepl/nrepl {:mvn/version "1.5.1"}))))
 
+(defn- manifest-entry-base-dir
+  [{:keys [defaulted-fields]} launcher-root manifest-base-dir dep]
+  (cond
+    (and (contains? dep :local/root)
+         (not (some #{:local/root} defaulted-fields)))
+    manifest-base-dir
+
+    (some #{:local/root} defaulted-fields)
+    launcher-root
+
+    :else
+    nil))
+
+(defn- expand-manifest-for-source
+  [manifest {:keys [policy launcher-root manifest-base-dir]}]
+  (reduce-kv (fn [{:keys [deps reports]} lib dep]
+               (let [report (extensions/expand-entry-report lib dep {:policy policy})
+                     base-dir (manifest-entry-base-dir report launcher-root manifest-base-dir dep)
+                     expanded-dep (cond-> (:expanded report)
+                                    base-dir (#(absolutize-local-root base-dir %)))]
+                 {:deps (assoc deps lib expanded-dep)
+                  :reports (assoc reports lib (assoc report :expanded expanded-dep))}))
+             {:deps {}
+              :reports {}}
+             (:deps manifest)))
+
 (defn manifest-state
   [launcher-root cwd policy]
   (let [home               (System/getProperty "user.home")
@@ -160,15 +186,18 @@
         project-path       (project-manifest-path cwd)
         user-manifest      (extensions/read-manifest-file user-path)
         project-manifest   (extensions/read-manifest-file project-path)
+        user-base-dir      (.getParent (io/file user-path))
+        user-expanded      (expand-manifest-for-source user-manifest
+                                                       {:policy policy
+                                                        :launcher-root launcher-root
+                                                        :manifest-base-dir user-base-dir})
+        project-expanded   (expand-manifest-for-source project-manifest
+                                                       {:policy policy
+                                                        :launcher-root launcher-root
+                                                        :manifest-base-dir cwd})
         merged-manifest    (extensions/merge-manifests user-manifest project-manifest)
-        expansion-report   (extensions/manifest-expansion-report merged-manifest {:policy policy})
-        expanded-manifest0 (:expanded-manifest expansion-report)
-        expanded-manifest  (update expanded-manifest0 :deps
-                                   (fn [deps]
-                                     (into {}
-                                           (map (fn [[lib dep]]
-                                                  [lib (absolutize-local-root launcher-root dep)]))
-                                           deps)))]
+        expanded-manifest  {:deps (merge (:deps user-expanded) (:deps project-expanded))}
+        winning-reports    (merge (:reports user-expanded) (:reports project-expanded))]
     {:user-path          user-path
      :project-path       project-path
      :user-present?      (.exists (io/file user-path))
@@ -177,8 +206,16 @@
      :project-manifest   project-manifest
      :merged-manifest    merged-manifest
      :expanded-manifest  expanded-manifest
-     :defaulted-libs     (:defaulted-libs expansion-report)
-     :inferred-init-libs (:inferred-init-libs expansion-report)}))
+     :defaulted-libs     (->> winning-reports
+                              (keep (fn [[lib report]]
+                                      (when (:defaulted? report)
+                                        lib)))
+                              vec)
+     :inferred-init-libs (->> winning-reports
+                              (keep (fn [[lib report]]
+                                      (when (:inferred-init? report)
+                                        lib)))
+                              vec)}))
 
 (defn- absolutize-local-root-dep
   [base-dir dep]

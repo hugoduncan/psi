@@ -8,7 +8,8 @@
    [psi.agent-session.extensions :as ext]
    [psi.tool-registry.registry :as tool-registry]
    [psi.agent-session.mutations :as mutations]
-   [psi.agent-session.test-support :as test-support]))
+   [psi.agent-session.test-support :as test-support]
+   [psi.session-state.state :as ss]))
 
 ;; ── Extension loading from file ─────────────────────────────────────────────
 
@@ -75,6 +76,37 @@
         (finally
           (.delete ext-file)
           (.delete tmp-dir))))))
+
+(deftest activate-manifest-extensions-refreshes-session-tool-defs-test
+  (testing "manifest activation refreshes session tool defs so newly registered tools become active"
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false
+                                                              :cwd (test-support/temp-cwd)
+                                                              :mutations mutations/all-mutations})
+          reg (:extension-registry ctx)
+          ns-sym 'psi.test-extensions.runtime-manifest-ext]
+      (create-ns ns-sym)
+      (binding [*ns* (the-ns ns-sym)]
+        (clojure.core/refer 'clojure.core)
+        (intern *ns* 'init
+                (fn [api]
+                  ((:register-tool api) {:name "manifest-runtime-tool"
+                                         :label "Manifest Runtime Tool"
+                                         :description "Tool from manifest activation"
+                                         :format-request (fn [_] "manifest-runtime-tool")
+                                         :parameters {:type "object"}}))))
+      (let [result (ext-rt/activate-manifest-extensions-in!
+                    ctx
+                    session-id
+                    {:local-activation-entries []
+                     :entries-by-lib {'psi/test-manifest-ext {:dep {:mvn/version "1.0.0"
+                                                                    :psi/init 'psi.test-extensions.runtime-manifest-ext/init}
+                                                              :extension? true
+                                                              :enabled? true}}}
+                    {:deps-realized? true})
+            tool-names (set (map :name (:tool-defs (ss/get-session-data-in ctx session-id))))]
+        (is (= ["manifest:psi/test-manifest-ext"] (:loaded result)))
+        (is (contains? (tool-registry/tool-names-in reg) "manifest-runtime-tool"))
+        (is (contains? tool-names "manifest-runtime-tool"))))))
 
 (deftest load-extension-missing-file-test
   (testing "returns error for missing file"
