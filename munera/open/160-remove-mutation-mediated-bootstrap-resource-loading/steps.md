@@ -1,6 +1,6 @@
 # 160 — Steps
 
-- [ ] 1. Rewrite `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!` in `bootstrap.clj`
+- [x] 1. Rewrite `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!` in `bootstrap.clj`
   - Replace template loop: `session/dispatch-in!` ctx `:session/register-prompt-template` per template, `{:origin :core}`
   - Replace skill loop: `session/dispatch-in!` ctx `:session/register-skill` per skill, `{:origin :core}`
   - Replace tool loop: `session/dispatch-in!` ctx `:session/add-tool` per tool, `{:origin :core}`
@@ -13,17 +13,17 @@
   - No new dispatch require needed: `session/dispatch-in!` uses existing `psi.agent-session.core` (already required as `session`)
   - Rename call site in `bootstrap-in!`
 
-- [ ] 2. Remove `:mutations` from bootstrap summary
+- [x] 2. Remove `:mutations` from bootstrap summary
   - `bootstrap-in!`: drop `:mutations` key from the summary map
   - `session_state/model.clj`: remove `:mutations` from `:startup-bootstrap` schema
   - `resolvers/session.clj` (`startup-bootstrap-resolver`): remove `:psi.startup/mutations` from output + body
   - `introspection/resolvers.clj` (`startup-bootstrap-summary`): remove `:psi.startup/mutations` from output + body
 
-- [ ] 3. Update tests
+- [x] 3. Update tests
   - `introspection/agent_session_test.clj`: remove `:psi.startup/mutations` query + assertion
   - Scan for any other test asserting `:mutations` in startup summary
 
-- [ ] 4. Verify
+- [x] 4. Verify
   - `clj-kondo --lint components/agent-session/src/psi/agent_session/bootstrap.clj`
   - Focused test: `clojure -M:test --focus psi.agent-session.model-dispatch-test`
   - Focused test: `clojure -M:test --focus psi.introspection.agent-session-test`
@@ -31,7 +31,7 @@
   - Broader: `clojure -M:test --focus psi.app-runtime-bootstrap-test`
   - Lint full: `clj-kondo --lint src components/*/src components/*/test`
 
-- [ ] 5. Commit: `⚒ 160: replace mutation-mediated bootstrap with direct dispatch`
+- [x] 5. Commit: `⚒ 160: replace mutation-mediated bootstrap with direct dispatch`
 
 - [x] 6. Fix extension-path return key mismatch (from implementation review)
   - `ext-rt/add-extension-in!` returns unnamespaced `{:loaded? :path :error}` but `bootstrap-in!` reads namespaced `:psi.extension/loaded?`, `:psi.extension/path`, `:psi.extension/error`
@@ -63,7 +63,7 @@
 - [x] 11. Add explicit step: update `bootstrap-dispatch-event-log-test` origin assertion from `:mutations` to `:core` (from test-shaper review)
   - Added as step 12 below
 
-- [ ] 12. Update `bootstrap-dispatch-event-log-test` origin assertion from `:mutations` to `:core` (after step 1)
+- [x] 12. Update `bootstrap-dispatch-event-log-test` origin assertion from `:mutations` to `:core` (after step 1)
   - In `model_dispatch_test.clj`, change `:origin :mutations` assertions to `:origin :core` and update test message strings
   - Must be done as part of or immediately after step 1 (direct dispatch conversion)
   - Step 3's `:mutations` scan targets the summary key, not dispatch event origins — this is a separate concern
@@ -71,7 +71,7 @@
 - [x] 13. Fix typo in steps.md step 6 done-note: `:psi.parameter/path` → `:psi.extension/path` (from code-shaper review)
   - The step 6 done-note records the wrong namespace for the path key; verify step 1 sub-item text is correct (it is) and fix the step 6 note to prevent copy-paste propagation
 
-- [ ] 14. Update `bootstrap-in!` docstring after rewrite (from code-shaper review)
+- [x] 14. Update `bootstrap-in!` docstring after rewrite (from code-shaper review)
   - Step 2 in the docstring says "load prompts/skills/tools/extensions via EQL mutations" — change to reflect direct dispatch/runtime calls
   - Do as part of or immediately after step 1
 
