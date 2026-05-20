@@ -1,7 +1,7 @@
 (ns psi.app-runtime-bootstrap-test
   (:require
    [clojure.test :refer [deftest is]]
-   [psi.agent-session.bootstrap :as bootstrap]
+
    [psi.app-runtime :as app-runtime]
    [psi.introspection.core :as introspection]
    [psi.memory.runtime :as memory-runtime]
@@ -26,10 +26,7 @@
                   sys-prompt/discover-context-files (fn [_] [])
                   sys-prompt/build-system-prompt (fn [_] "")
                   introspection/register-resolvers! (fn [] nil)
-                  memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
-                  bootstrap/bootstrap-in!
-                  (fn [_ctx _session-id _]
-                    {:extension-errors [] :extension-loaded-count 0})]
+                  memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
       (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
                            {:provider :anthropic
                             :id "claude-sonnet-4-6"
@@ -57,10 +54,7 @@
                   sys-prompt/discover-context-files (fn [_] [])
                   sys-prompt/build-system-prompt (fn [_] "")
                   introspection/register-resolvers! (fn [] nil)
-                  memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
-                  bootstrap/bootstrap-in!
-                  (fn [_ctx _session-id _]
-                    {:extension-errors [] :extension-loaded-count 0})]
+                  memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
       (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
                            {:provider :anthropic
                             :id "claude-sonnet-4-6"

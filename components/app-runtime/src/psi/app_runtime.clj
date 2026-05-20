@@ -381,18 +381,8 @@ Available: " (str/join ", " (map name (keys all))))
   [ctx session-id prompt]
   (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt prompt} {:origin :core}))
 
-(defn- finalize-startup-system-prompt!
-  [ctx session-id base-prompt-opts refreshed-tool-defs]
-  (bootstrap/register-all-domains!)
-  (let [graph-caps    (graph-capabilities-in ctx session-id)
-        build-opts    (assoc base-prompt-opts
-                             :graph-capabilities graph-caps
-                             :tool-defs refreshed-tool-defs)
-        system-prompt (sys-prompt/build-system-prompt build-opts)]
-    (persist-system-prompt! ctx session-id system-prompt)
-    (session/dispatch-in! ctx :session/set-system-prompt-build-opts
-                          {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
-                          {:origin :core})))
+;; finalize-startup-system-prompt! removed — prompt build inlined into
+;; adopt-startup-plan-into-session! (task 161: single-pass startup)
 
 (defn- log-startup-summary!
   [summary]
@@ -401,43 +391,115 @@ Available: " (str/join ", " (map name (keys all))))
   (when (pos? (:extension-loaded-count summary))
     (timbre/debug "Extensions loaded:" (:extension-loaded-count summary))))
 
+(defn- build-startup-summary
+  "Build a startup summary from resource-loading counts and extension results."
+  [ctx session-id extension-results]
+  (let [sd          (ss/get-session-data-in ctx session-id)
+        ext-errors  (keep (fn [r]
+                            (when-let [e (:psi.extension/error r)]
+                              {:path  (:psi.extension/path r)
+                               :error e}))
+                          extension-results)]
+    {:timestamp              (java.time.Instant/now)
+     :prompt-count           (count (:prompt-templates sd))
+     :skill-count            (count (:skills sd))
+     :tool-count             0   ;; tools not yet set at summary-build time
+     :extension-loaded-count (count (filter :psi.extension/loaded? extension-results))
+     :extension-error-count  (count ext-errors)
+     :extension-errors       (vec ext-errors)}))
+
 (defn- adopt-startup-plan-into-session!
+  "Adopt a startup plan into an already-created session.
+
+   Single-pass startup: each concern (prompt build, tool composition, summary
+   persistence) happens exactly once. See task 161 design for the full rationale.
+
+   Ordering:
+   1. Infrastructure (background-job UI, built-in workflows, psi-tool)
+   2. Seed developer-prompt into session state
+   3. Load templates + skills (no tools — set-active-tools overwrites the full set)
+   4. Bootstrap manifest extensions
+   5. Compose final tool set (base + extension)
+   6. Register domains + query graph-capabilities
+   7. Build system prompt (once, with all inputs)
+   8. Persist prompt, build-opts
+   9. Set active tools (after build-opts so side-effect refresh rebuilds correctly)
+   10. Build + persist summary (once)
+   11. Memory sync, extension run fn, rehydrate"
   [ctx session-id ai-model startup-plan {:keys [memory-runtime-opts]}]
   (let [{:keys [cwd templates skills developer-prompt developer-prompt-source base-tools]} startup-plan
+        ;; 1. Infrastructure
         _                  (background-job-ui/install-background-job-ui-refresh! ctx)
         _                  (workflow-bootstrap/init-built-in! ctx session-id)
         psi-tool           (make-session-scoped-psi-tool ctx session-id cwd)
         base-tool-defs     (conj base-tools psi-tool)
-        base-prompt-opts   (startup-base-prompt-opts ctx startup-plan base-tool-defs)
-        ;; Intentional two-stage prompt build: persist a base prompt before
-        ;; session bootstrap, then rebuild after graph-capability and active-tool
-        ;; refresh so the final persisted prompt reflects the live session state.
-        base-prompt        (sys-prompt/build-system-prompt base-prompt-opts)
-        _                  (persist-system-prompt! ctx session-id base-prompt)
-        summary-base       (session-bootstrap/bootstrap-in!
+
+        ;; 2. Seed developer-prompt + developer-prompt-source into session state.
+        ;; System-prompt is empty here — the real prompt is built once below after
+        ;; all inputs (graph-caps, extension tools) are known.
+        _                  (session/dispatch-in! ctx
+                                                 :session/bootstrap-prompt-state
+                                                 {:session-id              session-id
+                                                  :system-prompt           ""
+                                                  :developer-prompt        developer-prompt
+                                                  :developer-prompt-source developer-prompt-source}
+                                                 {:origin :core})
+
+        ;; 3. Load templates + skills only. Tools are excluded because
+        ;; :session/set-active-tools (step 9) replaces the full set, making
+        ;; individual :session/add-tool dispatches redundant.
+        _                  (session-bootstrap/load-startup-resources-in!
                             ctx session-id
-                            {:base-tools             base-tool-defs
-                             :system-prompt          base-prompt
-                             :developer-prompt       developer-prompt
-                             :developer-prompt-source developer-prompt-source
-                             :templates              templates
-                             :skills                 skills
-                             :extension-paths        []
-                             :extension-targets      []
-                             :refresh-active-tools?  false})
+                            {:templates templates
+                             :skills    skills})
+
+        ;; 4. Bootstrap manifest extensions
         {:keys [summary-updates]}
         (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
+
+        ;; 5. Compose final tool set (base + extension, once)
         refreshed-tool-defs (merge-tool-defs-by-name
                              base-tool-defs
                              (extensions/all-tools-in (:extension-registry ctx)))
+
+        ;; 6. Register domains + query graph-capabilities
+        _                  (bootstrap/register-all-domains!)
+        graph-caps         (graph-capabilities-in ctx session-id)
+
+        ;; 7. Build system prompt (once, with all inputs)
+        base-prompt-opts   (startup-base-prompt-opts ctx startup-plan base-tool-defs)
+        build-opts         (assoc base-prompt-opts
+                                  :graph-capabilities graph-caps
+                                  :tool-defs refreshed-tool-defs)
+        system-prompt      (sys-prompt/build-system-prompt build-opts)
+
+        ;; 8. Persist prompt + build-opts
+        _                  (persist-system-prompt! ctx session-id system-prompt)
+        _                  (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                                                 {:session-id session-id
+                                                  :opts (dissoc build-opts :prompt-mode)}
+                                                 {:origin :core})
+
+        ;; 9. Set active tools — placed AFTER prompt build + build-opts persist
+        ;; so the side-effect :runtime/refresh-system-prompt finds build-opts in
+        ;; session state and rebuilds an equivalent prompt (not an empty one).
         _                  (session/dispatch-in! ctx
                                                  :session/set-active-tools
                                                  {:session-id session-id
                                                   :tool-maps refreshed-tool-defs}
                                                  {:origin :core})
+
+        ;; 10. Build + persist summary (once)
+        ;; build-startup-summary provides prompt/skill counts from session state;
+        ;; manifest summary-updates provides extension-loaded/error counts.
+        ;; merge-startup-summary combines them (scalars overwritten, seqs concatenated).
+        summary-base       (build-startup-summary ctx session-id [])
         summary            (merge-startup-summary summary-base summary-updates)
-        _                  (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
-        _                  (finalize-startup-system-prompt! ctx session-id base-prompt-opts refreshed-tool-defs)
+        _                  (session/dispatch-in! ctx :session/set-startup-bootstrap-summary
+                                                 {:session-id session-id :summary summary}
+                                                 {:origin :core})
+
+        ;; 11. Memory sync, extension run fn, rehydrate
         _                  (memory-runtime/sync-memory-layer! (merge {:cwd cwd}
                                                                      (or memory-runtime-opts {})))
         _                  (runtime/register-extension-run-fn-in! ctx session-id nil ai-model)

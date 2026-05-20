@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
-   [psi.agent-session.bootstrap :as bootstrap]
+
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -71,10 +71,7 @@
                 skills/discover-skills (fn [] {:skills [] :diagnostics []})
                 sys-prompt/discover-context-files (fn [_] [])
                 sys-prompt/build-system-prompt (fn [_] "")
-                ext/discover-extension-paths (fn [& _] [])
-                bootstrap/bootstrap-in!
-                (fn [_ctx _session-id _]
-                  {:extension-errors [] :extension-loaded-count 0})]
+                ext/discover-extension-paths (fn [& _] [])]
     (f)))
 
 (deftest create-runtime-session-context-does-not-create-initial-session-test
@@ -613,10 +610,7 @@
                 sys-prompt/build-system-prompt (fn [_] "")
                 ext/discover-extension-paths (fn [& _] [])
                 introspection/register-resolvers! (fn [] nil)
-                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
-                bootstrap/bootstrap-in!
-                (fn [_ctx _session-id _]
-                  {:extension-errors [] :extension-loaded-count 0})]
+                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
     (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
                          {:provider :anthropic
                           :id "test-model"
@@ -641,10 +635,7 @@
                   introspection/register-resolvers! (fn [] nil)
                   memory-runtime/sync-memory-layer! (fn [opts]
                                                       (reset! captured opts)
-                                                      {:ok? true})
-                  bootstrap/bootstrap-in!
-                  (fn [_ctx _session-id _]
-                    {:extension-errors [] :extension-loaded-count 0})]
+                                                      {:ok? true})]
       (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
                            {:provider :anthropic
                             :id "test-model"
@@ -668,10 +659,7 @@
                 sys-prompt/discover-context-files (fn [_] [])
                 ext/discover-extension-paths (fn [& _] [])
                 introspection/register-resolvers! (fn [] nil)
-                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
-                bootstrap/bootstrap-in!
-                (fn [_ctx _session-id _]
-                  {:extension-errors [] :extension-loaded-count 0})]
+                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
     (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
                          {:provider :anthropic
                           :id "test-model"
@@ -698,10 +686,7 @@
                     sys-prompt/build-system-prompt (fn [_] "")
                     ext/discover-extension-paths (fn [& _] [])
                     introspection/register-resolvers! (fn [] nil)
-                    memory-runtime/sync-memory-layer! (fn [_] {:ok? true})
-                    bootstrap/bootstrap-in!
-                    (fn [_ctx _session-id _]
-                      {:extension-errors [] :extension-loaded-count 0})]
+                    memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
         (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
                              {:provider :anthropic
                               :id "test-model"
