@@ -15,26 +15,20 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- Task 161 collapse-startup-prompt-and-tool-composition is complete and closed:
-  - Rewrote `adopt-startup-plan-into-session!` to single-pass startup
-  - System prompt built once (after graph-caps + extension tools known), persisted once via `:session/set-system-prompt`
-  - Tool set composed and dispatched once via `:session/set-active-tools` (placed after build-opts persist so side-effect `refresh-system-prompt` rebuilds correctly)
-  - Summary built and persisted once with complete information
-  - Removed `finalize-startup-system-prompt!` (logic inlined)
-  - Removed `bootstrap-in!` call from startup flow; retained as test-oriented convenience
-  - Removed 6 now-inert `bootstrap-in!` redefs from test files + unused requires
-  - Dispatch counts verified per acceptance criteria
-  - 301 tests, 0 failures; lint clean
+- Task 162 collapse-bootstrap-runtime-session-arities created (design.md written):
+  - `bootstrap-runtime-session!` has 3 arities (2, 3, 4) conflating two responsibilities
+  - 2-arity sniffs `(:state* x)` to decide if arg is ctx or model — confusing
+  - 3-arity and 4-arity near-identical (differ only by session-id creation)
+  - Plan: merge 3+4 into single `(ctx ai-model opts)` with optional `:session-id` in opts; extract 2-arity to test helper
 
+- Task 161 complete and closed: single-pass startup, `bootstrap-in!` and `refresh-active-tools-in!` removed
 - Tasks 160, 159, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 are complete and closed
 
 ## Suggested next step
-- Bootstrap simplification continues — remaining areas:
-  - `bootstrap-in!` itself is now only used by tests; consider whether it should be slimmed or removed
-  - `refresh-active-tools-in!` in bootstrap.clj is unused in startup (tools excluded from `load-startup-resources-in!` call); may be dead code
-- `149-reload-fixup-inventory-and-safety` — reload correctness
-- `124-turn-execution-contract-extraction` — component extraction
-- `141`, `144`, `147` — workflow architecture items
+- Execute task 162: collapse `bootstrap-runtime-session!` arities
+- Then: `app_runtime.clj` (788 lines) has further extraction targets: `start-tui-runtime!` monolith, model resolution fns
+- Backlog: `149-reload-fixup-inventory-and-safety`, `124-turn-execution-contract-extraction`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
-- Implemented task 161: single-pass startup that collapses 4 prompt persists → 1+1 side-effect, 2 tool paths → 1, 2 summary persists → 1
+- Oriented on bootstrap simplification branch; identified `bootstrap-runtime-session!` arity overload as next target
+- 301 tests, 0 failures; `bootstrap.clj` down to 64 lines with single fn `load-startup-resources-in!`
