@@ -113,3 +113,13 @@ Executed 2 test-shaper follow-up items:
 2. **`temp-cwd` adopted**: Replaced 3 manual `(str (System/getProperty "java.io.tmpdir") "/psi-..." (UUID/randomUUID))` + `.mkdirs` constructions with `(test-support/temp-cwd)` from `psi.agent-session.test-support`. Added require for `psi.agent-session.test-support`.
 
 301 tests pass, lint clean.
+
+## Code-shaper follow-up — fixture unification + temp-cwd (2026-05-20)
+
+Executed 2 code-shaper follow-up items:
+
+1. **Infrastructure nulling unified in `app_runtime_test.clj`**: 4 inline `with-redefs` blocks (8 bindings each) replaced with `(with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings) {#'ext/discover-extension-paths ...}) ...)`. `ext/discover-extension-paths` composed alongside rather than added to shared fixture — keeps `bootstrap-stub-bindings` focused on the 7 core infrastructure bindings. Test 2 overrides `memory-runtime/sync-memory-layer!` via merge for capture. Test 3 dissocs `sys-prompt/build-system-prompt` to let real prompt building run. Removed unused `psi.introspection.core` require.
+
+2. **`temp-cwd` adopted**: Replaced manual `(str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (UUID/randomUUID))` + `.mkdirs` with `(test-support/temp-cwd)` in the persisting test.
+
+301 tests pass, lint clean.

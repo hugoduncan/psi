@@ -19,7 +19,6 @@
    [psi.prompt-assets.prompt-templates :as pt]
    [psi.prompt-assets.skills :as skills]
    [psi.prompt-assets.system-prompt :as sys-prompt]
-   [psi.introspection.core :as introspection]
    [psi.memory.runtime :as memory-runtime]
    [psi.app-runtime.test-support :as app-test-support]
    #_[psi.tui.app :as tui-app]))
@@ -598,75 +597,63 @@
     (is (nil? (#'app-runtime/rpc-trace-file-from-args []))))
 
 (deftest bootstrap-runtime-session-initial-context-index-has-single-session-test
-  (with-redefs [oauth/create-context (fn [] nil)
-                pt/discover-templates (fn [] [])
-                skills/discover-skills (fn [] {:skills [] :diagnostics []})
-                sys-prompt/discover-context-files (fn [_] [])
-                sys-prompt/build-system-prompt (fn [_] "")
-                ext/discover-extension-paths (fn [& _] [])
-                introspection/register-resolvers! (fn [] nil)
-                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-    (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                         {:provider :anthropic
-                          :id "test-model"
-                          :name "Test Model"
-                          :supports-reasoning false}
-                         {:persist? false})
-          session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
-          sd         (ss/get-session-data-in ctx session-id)
-          sessions   (ss/get-sessions-map-in ctx)]
-      (is (= 1 (count sessions)))
-      (is (= session-id (:session-id sd)))
-      (is (= [session-id] (vec (keys sessions)))))))
-
-(deftest bootstrap-runtime-session-passes-memory-runtime-opts-to-sync-test
-  (let [captured (atom nil)]
-    (with-redefs [oauth/create-context (fn [] nil)
-                  pt/discover-templates (fn [] [])
-                  skills/discover-skills (fn [] {:skills [] :diagnostics []})
-                  sys-prompt/discover-context-files (fn [_] [])
-                  sys-prompt/build-system-prompt (fn [_] "")
-                  ext/discover-extension-paths (fn [& _] [])
-                  introspection/register-resolvers! (fn [] nil)
-                  memory-runtime/sync-memory-layer! (fn [opts]
-                                                      (reset! captured opts)
-                                                      {:ok? true})]
+  (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                         {#'ext/discover-extension-paths (fn [& _] [])})
+    (fn []
       (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                            {:provider :anthropic
                             :id "test-model"
                             :name "Test Model"
                             :supports-reasoning false}
-                           {:persist? false
-                            :memory-runtime-opts {:store-provider "in-memory"
-                                                  :retention-snapshots 22
-                                                  :retention-deltas 44}
-                            :session-config {:llm-stream-idle-timeout-ms 54321}})]
-        (is (= "in-memory" (:store-provider @captured)))
-        (is (= 22 (:retention-snapshots @captured)))
-        (is (= 44 (:retention-deltas @captured)))
-        (is (string? (:cwd @captured)))
-        (is (= 54321 (get-in ctx [:config :llm-stream-idle-timeout-ms])))))))
+                           {:persist? false})
+            session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
+            sd         (ss/get-session-data-in ctx session-id)
+            sessions   (ss/get-sessions-map-in ctx)]
+        (is (= 1 (count sessions)))
+        (is (= session-id (:session-id sd)))
+        (is (= [session-id] (vec (keys sessions))))))))
+
+(deftest bootstrap-runtime-session-passes-memory-runtime-opts-to-sync-test
+  (let [captured (atom nil)]
+    (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                           {#'ext/discover-extension-paths (fn [& _] [])
+                            #'memory-runtime/sync-memory-layer! (fn [opts]
+                                                                  (reset! captured opts)
+                                                                  {:ok? true})})
+      (fn []
+        (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
+                             {:provider :anthropic
+                              :id "test-model"
+                              :name "Test Model"
+                              :supports-reasoning false}
+                             {:persist? false
+                              :memory-runtime-opts {:store-provider "in-memory"
+                                                    :retention-snapshots 22
+                                                    :retention-deltas 44}
+                              :session-config {:llm-stream-idle-timeout-ms 54321}})]
+          (is (= "in-memory" (:store-provider @captured)))
+          (is (= 22 (:retention-snapshots @captured)))
+          (is (= 44 (:retention-deltas @captured)))
+          (is (string? (:cwd @captured)))
+          (is (= 54321 (get-in ctx [:config :llm-stream-idle-timeout-ms]))))))))
 
 (deftest bootstrap-runtime-session-enriches-system-prompt-with-capabilities-test
-  (with-redefs [oauth/create-context (fn [] nil)
-                pt/discover-templates (fn [] [])
-                skills/discover-skills (fn [] {:skills [] :diagnostics []})
-                sys-prompt/discover-context-files (fn [_] [])
-                ext/discover-extension-paths (fn [& _] [])
-                introspection/register-resolvers! (fn [] nil)
-                memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-    (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                         {:provider :anthropic
-                          :id "test-model"
-                          :name "Test Model"
-                          :supports-reasoning false}
-                         {:persist? false})
-          sid    (-> (ss/list-context-sessions-in ctx) first :session-id)
-          prompt (:psi.agent-session/system-prompt
-                  (session/query-in ctx sid [:psi.agent-session/system-prompt]))]
-      ;; Lambda mode is default — graph capabilities appear after lambda graph discovery
-      (is (str/includes? prompt "λ graph(eql)."))
-      (is (str/includes? prompt "- agent-session (ops=")))))
+  (with-redefs-fn (merge (dissoc (app-test-support/bootstrap-stub-bindings)
+                                 #'sys-prompt/build-system-prompt)
+                         {#'ext/discover-extension-paths (fn [& _] [])})
+    (fn []
+      (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
+                           {:provider :anthropic
+                            :id "test-model"
+                            :name "Test Model"
+                            :supports-reasoning false}
+                           {:persist? false})
+            sid    (-> (ss/list-context-sessions-in ctx) first :session-id)
+            prompt (:psi.agent-session/system-prompt
+                    (session/query-in ctx sid [:psi.agent-session/system-prompt]))]
+        ;; Lambda mode is default — graph capabilities appear after lambda graph discovery
+        (is (str/includes? prompt "λ graph(eql)."))
+        (is (str/includes? prompt "- agent-session (ops="))))))
 
 (deftest bootstrap-runtime-session-wires-nrepl-runtime-atom-test
   (let [orig @app-runtime/nrepl-runtime]
@@ -674,26 +661,21 @@
       (reset! app-runtime/nrepl-runtime {:host "localhost"
                                          :port 8999
                                          :endpoint "localhost:8999"})
-      (with-redefs [oauth/create-context (fn [] nil)
-                    pt/discover-templates (fn [] [])
-                    skills/discover-skills (fn [] {:skills [] :diagnostics []})
-                    sys-prompt/discover-context-files (fn [_] [])
-                    sys-prompt/build-system-prompt (fn [_] "")
-                    ext/discover-extension-paths (fn [& _] [])
-                    introspection/register-resolvers! (fn [] nil)
-                    memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-        (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                             {:provider :anthropic
-                              :id "test-model"
-                              :name "Test Model"
-                              :supports-reasoning false}
-                             {:persist? false})
-              result (session/query-in ctx [:psi.runtime/nrepl-host
-                                            :psi.runtime/nrepl-port
-                                            :psi.runtime/nrepl-endpoint])]
-          (is (= "localhost" (:psi.runtime/nrepl-host result)))
-          (is (= 8999 (:psi.runtime/nrepl-port result)))
-          (is (= "localhost:8999" (:psi.runtime/nrepl-endpoint result)))))
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
+                               {:provider :anthropic
+                                :id "test-model"
+                                :name "Test Model"
+                                :supports-reasoning false}
+                               {:persist? false})
+                result (session/query-in ctx [:psi.runtime/nrepl-host
+                                              :psi.runtime/nrepl-port
+                                              :psi.runtime/nrepl-endpoint])]
+            (is (= "localhost" (:psi.runtime/nrepl-host result)))
+            (is (= 8999 (:psi.runtime/nrepl-port result)))
+            (is (= "localhost:8999" (:psi.runtime/nrepl-endpoint result))))))
       (finally
         (reset! app-runtime/nrepl-runtime orig)))))
 
@@ -702,8 +684,7 @@
     (fn [session-root]
       (with-main-bootstrap-stubs
         (fn []
-          (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (java.util.UUID/randomUUID))
-                _   (.mkdirs (java.io.File. cwd))
+          (let [cwd (test-support/temp-cwd)
                 {:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                                {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false}
                                {:cwd cwd :persist? true :session-root session-root})
