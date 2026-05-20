@@ -20,7 +20,8 @@
 - [x] Test review follow-up: Add test exercising `:session-id` reuse path through real `bootstrap-runtime-session!`
   - Pre-create a session via `session/new-session-in!`, pass its id as `:session-id` in opts to the real `bootstrap-runtime-session!`, assert the returned session-id matches and no extra session was created
   - Added `bootstrap-runtime-session-reuses-pre-created-session-test` in `app_runtime_bootstrap_test.clj`
-- [ ] Test-shaper: Extract shared infrastructure nulling fixture in `app_runtime_bootstrap_test.clj`
-  - Replace 3 identical 7-line `with-redefs` blocks with a shared helper (either reuse `with-main-bootstrap-stubs` from `app_runtime_test.clj` or extract a common fixture into `app-runtime.test-support`)
-- [ ] Test-shaper: Replace manual temp dir construction in `app_runtime_bootstrap_test.clj` with `test-support/temp-cwd`
-  - 3 tests manually build `(str (System/getProperty "java.io.tmpdir") "/psi-..." (UUID/randomUUID))` — use existing `test-support/temp-cwd` for consistency
+- [x] Test-shaper: Extract shared infrastructure nulling fixture in `app_runtime_bootstrap_test.clj`
+  - Extracted `bootstrap-stub-bindings` into `psi.app-runtime.test-support` — returns var→fn map for `with-redefs-fn`
+  - Replaced 3 identical 7-line `with-redefs` blocks; removed 6 now-unused requires from test ns
+- [x] Test-shaper: Replace manual temp dir construction in `app_runtime_bootstrap_test.clj` with `test-support/temp-cwd`
+  - All 3 tests now use `(test-support/temp-cwd)` from `psi.agent-session.test-support`

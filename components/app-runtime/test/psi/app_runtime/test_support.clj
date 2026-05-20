@@ -2,7 +2,26 @@
   "Test helper wrapping create-runtime-session-context + bootstrap-runtime-session!
    for the common 'create everything from ai-model + opts' pattern."
   (:require
-   [psi.app-runtime :as app-runtime]))
+   [psi.app-runtime :as app-runtime]
+   [psi.introspection.core :as introspection]
+   [psi.memory.runtime :as memory-runtime]
+   [psi.prompt-assets.prompt-templates :as pt]
+   [psi.prompt-assets.skills :as skills]
+   [psi.prompt-assets.system-prompt :as sys-prompt]
+   [psi.provider-auth.oauth.core :as oauth]))
+
+(defn bootstrap-stub-bindings
+  "Returns a map of var→fn bindings that null out infrastructure side effects
+   (oauth, templates, skills, system-prompt, introspection, memory-runtime).
+   Use with `with-redefs-fn` in bootstrap tests."
+  []
+  {#'oauth/create-context              (fn [] nil)
+   #'pt/discover-templates             (fn [] [])
+   #'skills/discover-skills            (fn [] {:skills [] :diagnostics []})
+   #'sys-prompt/discover-context-files (fn [_] [])
+   #'sys-prompt/build-system-prompt    (fn [_] "")
+   #'introspection/register-resolvers! (fn [] nil)
+   #'memory-runtime/sync-memory-layer! (fn [_] {:ok? true})})
 
 (def ^:private ctx-keys
   "Keys extracted from opts and forwarded to create-runtime-session-context."

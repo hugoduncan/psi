@@ -90,3 +90,13 @@ Design.md updated with "Design decisions" section and refined ACs. All design-st
 5. **4-arity `main.clj` caller: opts key name**: The 4-arity `(ctx session-id ai-model opts)` in `main.clj` will become `(ctx ai-model (assoc opts :session-id session-id))`. The design should confirm the opts key is literally `:session-id` (matching the existing `session-id` binding in the 4-arity body).
 
 6. **No 2-arity `(ctx ai-model)` callers exist in production or tests**: The `(:state* x)` → true branch (interpreting 2-arity as ctx+ai-model) is documented but has zero callers. Every 2-arity call passes an ai-model map as first arg. The design correctly identifies this as dead code but could note that no migration of `(ctx ai-model)` callers is needed — only the `(ai-model opts)` callers need the test helper.
+
+## Test-shaper follow-up — fixture extraction + temp-cwd (2026-05-20)
+
+Executed 2 test-shaper follow-up items:
+
+1. **Shared fixture extracted**: Added `bootstrap-stub-bindings` to `psi.app-runtime.test-support` — returns a var→fn map nulling oauth, templates, skills, system-prompt, introspection, and memory-runtime. All 3 tests in `app_runtime_bootstrap_test.clj` now use `(with-redefs-fn (app-test-support/bootstrap-stub-bindings) (fn [] ...))` instead of 7-line inline `with-redefs` blocks. Removed 6 unused requires from the test ns.
+
+2. **`temp-cwd` adopted**: Replaced 3 manual `(str (System/getProperty "java.io.tmpdir") "/psi-..." (UUID/randomUUID))` + `.mkdirs` constructions with `(test-support/temp-cwd)` from `psi.agent-session.test-support`. Added require for `psi.agent-session.test-support`.
+
+301 tests pass, lint clean.
