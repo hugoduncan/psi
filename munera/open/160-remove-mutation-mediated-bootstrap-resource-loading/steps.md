@@ -1,13 +1,15 @@
 # 160 — Steps
 
 - [ ] 1. Rewrite `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!` in `bootstrap.clj`
-  - Replace template loop: `dispatch/dispatch!` ctx `:session/register-prompt-template` per template
-  - Replace skill loop: `dispatch/dispatch!` ctx `:session/register-skill` per skill
-  - Replace tool loop: `dispatch/dispatch!` ctx `:session/add-tool` per tool
+  - Replace template loop: `dispatch/dispatch!` ctx `:session/register-prompt-template` per template, `{:origin :core}`
+  - Replace skill loop: `dispatch/dispatch!` ctx `:session/register-skill` per skill, `{:origin :core}`
+  - Replace tool loop: `dispatch/dispatch!` ctx `:session/add-tool` per tool, `{:origin :core}`
+  - Replace extension-path loop: `ext-rt/add-extension-in!` ctx session-id path (direct, no dispatch)
   - Keep extension init-var path unchanged (already direct)
+  - Discard dispatch return values via `doseq` (counts read from session-data after all loops)
   - Remove `run-mutation-in!` private helper
   - Remove requires: `psi.agent-session.mutations`, `psi.query.core`
-  - Add require: `psi.agent-session.dispatch`
+  - Add require: `psi.agent-session.dispatch` (if not already present)
   - Rename call site in `bootstrap-in!`
 
 - [ ] 2. Remove `:mutations` from bootstrap summary

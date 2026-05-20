@@ -1,6 +1,10 @@
 # 160 — Design follow-up steps
 
-- [ ] Clarify in design.md whether `extension-paths` mutation loading is converted to direct `ext-rt/add-extension-in!` or left as-is (production passes `[]`; code path exists but is untested through bootstrap)
-- [ ] Correct design.md framing: `add-extension` mutation calls `ext-rt/add-extension-in!` directly, not `dispatch!` — it's a Pathom round-trip to a direct runtime call, not a dispatch round-trip
-- [ ] Specify in plan.md the `:origin` value for the replacement direct dispatch calls (`:core` or `:bootstrap`)
-- [ ] Confirm in plan.md that dispatch return values are intentionally discarded (current code uses `doseq`; final counts read from session-data)
+- [x] Clarify in design.md whether `extension-paths` mutation loading is converted to direct `ext-rt/add-extension-in!` or left as-is (production passes `[]`; code path exists but is untested through bootstrap)
+  - Converted: design.md scope item 2 now specifies direct `ext-rt/add-extension-in!` calls; constraints updated; plan.md documents the decision
+- [x] Correct design.md framing: `add-extension` mutation calls `ext-rt/add-extension-in!` directly, not `dispatch!` — it's a Pathom round-trip to a direct runtime call, not a dispatch round-trip
+  - Corrected: design.md Intent now distinguishes template/skill/tool (dispatch round-trip) from extension-path (direct runtime call via Pathom)
+- [x] Specify in plan.md the `:origin` value for the replacement direct dispatch calls (`:core` or `:bootstrap`)
+  - Specified: `:origin :core` — consistent with existing bootstrap dispatch calls; documented in plan.md Decisions
+- [x] Confirm in plan.md that dispatch return values are intentionally discarded (current code uses `doseq`; final counts read from session-data)
+  - Confirmed: plan.md Decisions documents intentional discard via `doseq`; steps.md updated to note this

@@ -11,3 +11,12 @@
 3. **`:origin` for new direct dispatch calls is unspecified.** Mutations currently pass `{:origin :mutations}` to `dispatch!`. The replacement direct calls need an `:origin` value. Existing bootstrap dispatch calls use `{:origin :core}`. Plan should specify `:origin :core` (or `:bootstrap`) for the replacement calls.
 
 4. **Dispatch return values are discarded — confirm intentional.** The current code uses `doseq` for template/skill/tool loops, discarding `run-mutation-in!` return values. The dispatch handlers return `{:return {:added? ... :count ...}}`. Plan should confirm the replacement direct dispatch calls also discard returns (they're only used for the final count read from session-data).
+
+## Follow-up execution: ambiguity design-steps
+
+All 4 design-steps completed:
+
+1. **Extension-paths → direct `ext-rt/add-extension-in!`**: design.md scope item 2 added; constraints updated; plan.md Decisions documents rationale. The `add-extension` mutation wraps `ext-rt/add-extension-in!` with no dispatch — replacement calls the same function directly.
+2. **Framing corrected**: design.md Intent now distinguishes template/skill/tool mutations (Pathom→dispatch round-trip) from `add-extension` mutation (Pathom→direct runtime call).
+3. **`:origin :core`**: plan.md Decisions specifies `:origin :core` for replacement dispatch calls, consistent with existing bootstrap dispatch calls in `bootstrap-in!`.
+4. **Return discard confirmed**: plan.md Decisions documents intentional `doseq` discard; steps.md step 1 updated with explicit note.

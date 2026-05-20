@@ -2,7 +2,7 @@
 
 ## Intent
 
-`load-startup-resources-via-mutations-in!` creates a throwaway Pathom query context, registers all resolvers and mutations into it, then calls `add-prompt-template`, `add-skill`, and `add-tool` EQL mutations in loops — each of which simply dispatches a session event (`:session/register-prompt-template`, `:session/register-skill`, `:session/add-tool`). This is a heavy indirection: the bootstrap code round-trips through the entire Pathom graph layer to perform what are direct dispatch calls.
+`load-startup-resources-via-mutations-in!` creates a throwaway Pathom query context, registers all resolvers and mutations into it, then calls `add-prompt-template`, `add-skill`, `add-tool`, and `add-extension` EQL mutations in loops. The template, skill, and tool mutations each simply dispatch a session event (`:session/register-prompt-template`, `:session/register-skill`, `:session/add-tool`) — a heavy indirection where bootstrap round-trips through the Pathom graph layer to perform what are direct dispatch calls. The `add-extension` mutation is different: it calls `ext-rt/add-extension-in!` directly (not dispatch), making it a Pathom round-trip to a direct runtime call rather than a dispatch round-trip.
 
 ## Goal
 
@@ -13,11 +13,12 @@ Replace the mutation-mediated resource loading with direct dispatch calls during
 ### In scope
 
 1. Replace the body of `load-startup-resources-via-mutations-in!` with direct `dispatch/dispatch!` calls for templates, skills, and tools
-2. Remove the throwaway query-context setup (`query/create-query-context`, `register-resolvers-in!`, `register-mutations-in!`) from bootstrap
-3. Simplify the init-var extension loading path — it already uses `ext/load-extension-init-in!` directly, not mutations
-4. Update or rename the function to reflect it no longer uses mutations
-5. Update the summary map emitted by `bootstrap-in!` to drop the `:mutations` key (it listed mutation symbols as provenance; no longer applicable)
-6. Update tests that assert on the mutation-mediated path or the `:mutations` summary key
+2. Replace the `extension-paths` loop with direct `ext-rt/add-extension-in!` calls — the `add-extension` mutation is just a Pathom wrapper around this same call, so the replacement is a direct runtime call (not dispatch). Production currently passes `extension-paths []`, so this path is untested through bootstrap, but the code path exists and should be converted for consistency.
+3. Remove the throwaway query-context setup (`query/create-query-context`, `register-resolvers-in!`, `register-mutations-in!`) from bootstrap
+4. Simplify the init-var extension loading path — it already uses `ext/load-extension-init-in!` directly, not mutations
+5. Update or rename the function to reflect it no longer uses mutations
+6. Update the summary map emitted by `bootstrap-in!` to drop the `:mutations` key (it listed mutation symbols as provenance; no longer applicable)
+7. Update tests that assert on the mutation-mediated path or the `:mutations` summary key
 
 ### Out of scope
 
@@ -30,7 +31,8 @@ Replace the mutation-mediated resource loading with direct dispatch calls during
 
 - The dispatch events `:session/register-prompt-template`, `:session/register-skill`, `:session/add-tool` are the authoritative state owners — they must be called, not bypassed
 - Return shape of `bootstrap-in!` must remain compatible with its callers (`adopt-startup-plan-into-session!` in app-runtime, tests)
-- Extension loading via `ext/load-extension-init-in!` is already direct — preserve that path unchanged
+- Extension init-var loading via `ext/load-extension-init-in!` is already direct — preserve that path unchanged
+- Extension-path loading converts from mutation-mediated `add-extension` to direct `ext-rt/add-extension-in!` — same runtime call the mutation wraps
 
 ## Acceptance criteria
 
