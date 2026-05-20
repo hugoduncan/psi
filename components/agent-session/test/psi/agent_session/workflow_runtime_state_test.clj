@@ -38,15 +38,16 @@
 
 ;; ── invoke-built-in-lifecycle! ─────────────────────────────────────────────
 
-(deftest invoke-built-in-lifecycle-invokes-handler-test
+(deftest invoke-built-in-lifecycle-delivers-payload-test
   (testing "invokes registered handler with event payload"
     (let [received (atom nil)]
       (runtime-state/register-built-in-lifecycle-callback!
        "session_switch"
        (fn [event] (reset! received event) :invoked))
       (runtime-state/invoke-built-in-lifecycle! "session_switch" {:reason :new})
-      (is (= {:reason :new} @received))))
+      (is (= {:reason :new} @received)))))
 
+(deftest invoke-built-in-lifecycle-returns-handler-value-test
   (testing "returns handler return value"
     (runtime-state/register-built-in-lifecycle-callback!
      "session_switch"

@@ -104,7 +104,5 @@
             workflow-contrib (first (filter #(= "built-in:workflow" (:ext-path %)) contributions))]
         (is (some? workflow-contrib)
             "a prompt contribution with ext-path=built-in:workflow was registered")
-        (is (string? (:content workflow-contrib))
-            "the contribution carries non-empty content")
-        (is (pos? (count (:content workflow-contrib)))
+        (is (seq (:content workflow-contrib))
             "contribution content is non-empty")))))

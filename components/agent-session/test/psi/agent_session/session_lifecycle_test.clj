@@ -539,9 +539,10 @@
                                             (swap! log-data conj (:vargs data))))}}}
         (session/new-session-in! ctx nil {}))
       (is (seq @log-data) "a warn-level log entry was emitted")
-      (is (some (fn [vargs]
-                  (some (fn [a]
-                          (and (map? a) (= "lifecycle boom" (:error a))))
-                        vargs))
-                @log-data)
-          "warning vargs include a map with :error key matching the exception message"))))
+      (let [error-entry (first (for [vargs @log-data
+                                     a     vargs
+                                     :when (and (map? a) (= "lifecycle boom" (:error a)))]
+                                 a))]
+        (is (some? error-entry)
+            (str "expected a warn vargs entry carrying {:error \"lifecycle boom\"}, captured: "
+                 (pr-str @log-data)))))))

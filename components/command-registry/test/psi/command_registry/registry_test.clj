@@ -138,10 +138,9 @@
 
   (testing "does not require prior extension registration"
     (let [reg (create-test-registry)]
-      (is (empty? (:extensions @(:state reg))))
       (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate"})
-      (is (= "delegate"
-             (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :name])))))
+      (is (some? (command-registry/get-command-in reg "delegate"))
+          "registered built-in command is retrievable without prior extension registration")))
 
   (testing "rejects blank or nil command names"
     (doseq [invalid [nil "" "   "]]

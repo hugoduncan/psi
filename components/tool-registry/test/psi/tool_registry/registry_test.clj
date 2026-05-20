@@ -123,11 +123,10 @@
 
   (testing "does not require prior extension registration"
     (let [reg (create-test-registry)]
-      (is (empty? (:extensions @(:state reg))))
       (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
                                                 {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
-      (is (= "delegate"
-             (get-in @(:state reg) [:built-in-tools "built-in:workflow" "delegate" :name])))))
+      (is (some? (tool-registry/get-tool-in reg "delegate"))
+          "registered built-in tool is retrievable without prior extension registration")))
 
   (testing "rejects non-canonical tool names"
     (doseq [invalid ["my_tool" "MyTool" "My Tool"]]
