@@ -76,3 +76,11 @@
 - [x] Update docs/implementation notes to reflect the new residual status
 - [x] Verify preserved user-facing behavior for `delegate`, `/delegate`, `/delegate-reload`, reload behavior, and prompt contribution surfacing
   - verified: 9 workflow behavior tests (targeting, reload, async-path, tui-repro) pass; 0 failures
+- [ ] Add unit tests for built-in registration APIs in registry component tests
+  - `command-registry/registry_test.clj`: cover `register-built-in-command-in!`, `all-built-in-commands-in`, `built-in-command-names-in`, and merged read paths (`command-names-in`, `all-commands-in`, `get-command-in`) returning built-in entries
+  - `tool-registry/registry_test.clj`: cover `register-built-in-tool-in!`, `all-built-in-tools-in`, `built-in-tool-names-in`, and merged read paths (`tool-names-in`, `all-tools-in`, `get-tool-in`) returning built-in entries
+- [ ] Add unit tests for built-in lifecycle registration/invocation path
+  - test `register-built-in-lifecycle-callback!` and `invoke-built-in-lifecycle!` in isolation (e.g. in a `runtime-state` or `session-lifecycle` test)
+  - assert that `new-session-in!` invokes the registered built-in `session_switch` callback
+  - assert that `resume-session-in!` invokes the registered built-in `session_switch` callback
+- [ ] Rename `ext-tools` to `all-tools` (or `registry-tools`) in `refresh-active-tools!` in `bootstrap.clj` — the binding holds built-in + extension tools since `all-tools-in` now merges both
