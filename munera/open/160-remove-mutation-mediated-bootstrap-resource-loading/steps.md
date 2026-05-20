@@ -38,14 +38,16 @@
   - Decision: wrap result in step 1's extension-path replacement — same pattern as init-var path (lines 68–70) and the mutation it replaces
   - Updated step 1 extension-path sub-item to include key translation: destructure `{:keys [loaded? error]}`, produce `{:psi.extension/loaded? loaded? :psi.parameter/path p :psi.extension/error error}` (use input `p`, not result `:path` which is the extension object)
 
-- [ ] 7. Add test: `bootstrap-in!` with non-empty skills and tools (from test review)
+- [x] 7. Add test: `bootstrap-in!` with non-empty skills and tools (from test review)
   - Call `bootstrap-in!` with ≥1 skill and ≥1 tool (plus ≥1 template for existing coverage)
   - Assert `skill-count`, `tool-count`, `prompt-count` all > 0 in session-data after bootstrap
   - Assert the resources appear in session-data (`:skills`, `:tools`, `:prompt-templates`)
   - This covers AC2: skills and tools registered via direct dispatch produce the same session-data outcome as mutation-mediated path
+  - Added as `bootstrap-resource-registration-test` in `model_dispatch_test.clj`
 
-- [ ] 8. Add test: dispatch event log contains resource registration events during bootstrap (from test review)
+- [x] 8. Add test: dispatch event log contains resource registration events during bootstrap (from test review)
   - Call `bootstrap-in!` with ≥1 template, ≥1 skill, ≥1 tool after `kernel/clear-event-log!`
   - Assert event log contains `:session/register-prompt-template`, `:session/register-skill`, `:session/add-tool` events
-  - Assert all have `:origin :core`
+  - Currently asserts `:origin :mutations` (via EQL mutation wrappers); update to `:origin :core` after step 1 converts to direct dispatch
   - This verifies the mechanism change: direct dispatch events appear in the log with correct origin
+  - Added as `bootstrap-dispatch-event-log-test` in `model_dispatch_test.clj`

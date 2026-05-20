@@ -4,6 +4,7 @@
   (:require
    [clojure.edn :as edn]
    [clojure.test :refer [deftest testing is]]
+   [psi.agent-core.core :as agent]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
@@ -490,3 +491,62 @@
       (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
       (session/cycle-thinking-level-in! ctx session-id)
       (is (= :off (:thinking-level (ss/get-session-data-in ctx session-id)))))))
+
+(deftest bootstrap-resource-registration-test
+  (testing "bootstrap-in! with non-empty templates, skills, and tools registers all resources"
+    (let [[ctx session-id] (create-session-context)
+          template {:name "greet" :description "Greeting" :content "Hello" :source :project :file-path "/tmp/greet.md"}
+          skill    {:name "test-skill" :description "A test skill" :lambda "λtest" :entrypoint "SKILL.md"}
+          tool     {:name "test-tool" :description "A test tool" :parameters {:type "object" :properties {}}}]
+      (bootstrap/bootstrap-in!
+       ctx session-id
+       {:base-tools      [tool]
+        :system-prompt   "sys"
+        :templates       [template]
+        :skills          [skill]
+        :extension-paths []})
+      (let [sd         (ss/get-session-data-in ctx session-id)
+            agent-data (agent/get-data-in (ss/agent-ctx-in ctx session-id))]
+        (is (= 1 (count (:prompt-templates sd)))
+            "one template registered in session-data")
+        (is (= 1 (count (:skills sd)))
+            "one skill registered in session-data")
+        (is (pos? (count (:tools agent-data)))
+            "at least one tool registered in agent-ctx")
+        (is (= "greet" (:name (first (:prompt-templates sd)))))
+        (is (= "test-skill" (:name (first (:skills sd)))))
+        (is (some #(= "test-tool" (:name %)) (:tools agent-data)))))))
+
+(deftest bootstrap-dispatch-event-log-test
+  (testing "bootstrap-in! produces dispatch events for resource registration"
+    (let [[ctx session-id] (create-session-context)
+          template {:name "greet" :description "Greeting" :content "Hello" :source :project :file-path "/tmp/greet.md"}
+          skill    {:name "test-skill" :description "A test skill" :lambda "λtest" :entrypoint "SKILL.md"}
+          tool     {:name "test-tool" :description "A test tool" :parameters {:type "object" :properties {}}}]
+      (kernel/clear-event-log!)
+      (bootstrap/bootstrap-in!
+       ctx session-id
+       {:base-tools      [tool]
+        :system-prompt   "sys"
+        :templates       [template]
+        :skills          [skill]
+        :extension-paths []})
+      (let [entries    (kernel/event-log-entries)
+            event-types (set (map :event-type entries))]
+        (is (contains? event-types :session/register-prompt-template)
+            "template registration event in log")
+        (is (contains? event-types :session/register-skill)
+            "skill registration event in log")
+        (is (contains? event-types :session/add-tool)
+            "tool addition event in log")
+        (testing "all resource registration events have expected origin"
+          ;; Current: :mutations (via EQL mutation wrappers).
+          ;; After step 1 (direct dispatch): update to :core.
+          (let [resource-events (filter #(#{:session/register-prompt-template
+                                            :session/register-skill
+                                            :session/add-tool} (:event-type %))
+                                        entries)]
+            (is (pos? (count resource-events)))
+            (doseq [e resource-events]
+              (is (= :mutations (:origin e))
+                  (str (:event-type e) " should have :origin :mutations")))))))))

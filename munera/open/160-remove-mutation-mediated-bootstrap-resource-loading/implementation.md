@@ -59,3 +59,13 @@ Reviewed existing tests against design acceptance criteria. Key findings:
 4. **Extension-path bootstrap path remains untested.** Design acknowledges production passes `extension-paths []`. The key translation wrapper (step 6 fix) is untested through bootstrap. The `extensions_io_test.clj` tests `ext-rt/add-extension-in!` directly but not the namespaced-key wrapping in the bootstrap path. Low priority given production usage, but noted.
 
 5. **`bootstrap-in!` return shape not tested.** No test asserts on the return value of `bootstrap-in!`. The `:mutations` key removal from the return map (AC3) is only indirectly tested via the introspection resolver reading from session-data. The `app_runtime_bootstrap_test.clj` stubs `bootstrap-in!` entirely. Callers (`adopt-startup-plan-into-session!`) use `merge-startup-summary` — if the return shape changes unexpectedly, no test catches it at the bootstrap level.
+
+## Follow-up execution: task-test-review steps 7 and 8
+
+Both tests added to `model_dispatch_test.clj`:
+
+1. **`bootstrap-resource-registration-test`** (step 7): calls `bootstrap-in!` with 1 template, 1 skill, 1 tool. Asserts all three appear in session-data/agent-ctx after bootstrap — prompt-templates, skills, and agent tools. Verifies resources by name. Covers the skill/tool registration gap identified in review finding 1.
+
+2. **`bootstrap-dispatch-event-log-test`** (step 8): clears event log, calls `bootstrap-in!` with all three resource types, asserts `:session/register-prompt-template`, `:session/register-skill`, `:session/add-tool` events appear in the dispatch event log. Currently asserts `:origin :mutations` (matching current mutation-mediated path). Comment notes the origin should be updated to `:origin :core` after step 1 converts to direct dispatch. Covers review finding 2.
+
+Both tests green, lint clean.
