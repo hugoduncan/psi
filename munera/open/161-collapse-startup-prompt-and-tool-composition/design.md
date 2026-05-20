@@ -113,15 +113,23 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
   ├─ bootstrap-manifest-extensions-in!
   │
   ├─ compose final tool set (base + extension, once)
-  ├─ DISPATCH :session/set-active-tools (once)
   │
   ├─ register-all-domains!
   ├─ query graph-capabilities
-  ├─ BUILD system prompt (once, with all inputs)
+  ├─ BUILD system prompt (once, with all inputs including composed tool-defs)
   ├─ DISPATCH :session/set-system-prompt (once)
   │    — uses :session/set-system-prompt (not :session/bootstrap-prompt-state)
   │      so that extension prompt contributions are applied via effective-prompt
-  ├─ PERSIST build-opts
+  ├─ PERSIST build-opts (via :session/set-system-prompt-build-opts)
+  │
+  ├─ DISPATCH :session/set-active-tools (once)
+  │    — placed AFTER prompt build + build-opts persist so that the
+  │      side-effect :runtime/refresh-system-prompt (which always fires
+  │      from set-active-tools) finds build-opts in session state and
+  │      rebuilds an equivalent prompt, rather than pushing an empty prompt
+  │    — this means 2 prompt state-writes occur (set-system-prompt +
+  │      side-effect refresh-system-prompt), but both produce the same
+  │      correct prompt content
   │
   ├─ build + PERSIST summary (once)
   │
@@ -158,7 +166,7 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
 ## Acceptance criteria
 
 1. The system prompt is built exactly once during startup — after graph-capabilities and extension tools are known
-2. The system prompt is persisted exactly once via a single dispatch path
+2. The system prompt is intentionally persisted exactly once via `:session/set-system-prompt`. A second equivalent prompt state-write occurs as a side effect of `:session/set-active-tools` (which always emits `:runtime/refresh-system-prompt`); this is acceptable because `set-active-tools` is dispatched after build-opts are stored, so the side-effect rebuild produces the same correct prompt
 3. The active tool set is composed and dispatched exactly once
 4. The startup summary is persisted exactly once with complete information (base + extension results)
 5. No dead-code tool-refresh paths remain in the startup flow
@@ -170,6 +178,7 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
 - Count dispatches of `:session/set-system-prompt` during startup — should be 1
 - Count dispatches of `:session/bootstrap-prompt-state` during startup — should be 1 (developer-prompt seeding only)
 - Count dispatches of `:session/set-active-tools` during startup — should be 1
+- Count dispatches of `:session/refresh-system-prompt` during startup — should be 1 (side effect of `set-active-tools`; produces equivalent prompt because build-opts are already stored)
 - Count dispatches of `:session/set-startup-bootstrap-summary` during startup — should be 1
 - The final system prompt contains graph-capabilities and extension tool names
 - Session state after bootstrap has correct `:base-system-prompt`, `:system-prompt`, `:developer-prompt`, `:tool-defs`
@@ -182,4 +191,4 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
 - `components/app-runtime/test/psi/app_runtime_bootstrap_test.clj`
 - `components/app-runtime/test/psi/extension_install_startup_test.clj`
 - `components/app-runtime/test/psi/bootstrap_extension_invariant_test.clj`
-- `components/agent-session/test/psi/agent_session/bootstrap_test.clj`
+- `components/agent-session/test/psi/agent_session/model_dispatch_test.clj`

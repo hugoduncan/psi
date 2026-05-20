@@ -71,3 +71,10 @@ Note: this same side effect exists in the current flow, but there `:base-system-
 ### IC2 — Hotspot file doesn't exist
 
 "Likely hotspots" lists `components/agent-session/test/psi/agent_session/bootstrap_test.clj` — this file doesn't exist. The relevant bootstrap tests in agent-session are in `components/agent-session/test/psi/agent_session/model_dispatch_test.clj`.
+
+## Design review: inconsistency follow-up resolutions (2026-05-19)
+
+Both inconsistency items (IC1–IC2) resolved. Design.md updated:
+
+- **IC1**: Reordered target flow — `set-active-tools` now dispatched after prompt build, `set-system-prompt`, and build-opts persist. This ensures the side-effect `refresh-system-prompt` (always emitted by `set-active-tools`) finds build-opts in session state and rebuilds an equivalent prompt, rather than pushing an empty prompt. Acceptance criterion #2 updated to acknowledge the side-effect write as acceptable (same correct content). Verification expectations updated to include `refresh-system-prompt` dispatch count.
+- **IC2**: Replaced non-existent `bootstrap_test.clj` with `model_dispatch_test.clj` in Likely hotspots.
