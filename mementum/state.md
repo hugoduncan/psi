@@ -153,4 +153,15 @@ Bootstrapped on 2026-04-02.
   - 19 extension tests, 73 assertions; 1776+169 broader suite green; lint clean
 
 ## Suggested next step
-- Next candidates from backlog: `108-project-nrepl-testing-without-mocks`, `136-built-in-registration-path-for-workflow`, `149-reload-fixup-inventory-and-safety`.
+- For bootstrap simplification follow-on, strongest next candidate is `136-built-in-registration-path-for-workflow` because canonical startup still installs built-in workflow through pseudo-extension mechanics (`ext/register-extension-in!` + `ext/create-extension-api`) and still refreshes active tools from that path.
+- After `136`, the next likely bootstrap simplifications are: remove mutation-shaped startup resource loading in `psi.agent-session.bootstrap/load-startup-resources-via-mutations-in!`, unify startup active-tool assembly to one authoritative post-registration write, and consider a narrower pre-session manifest-extension discovery/plan phase.
+- `149-reload-fixup-inventory-and-safety` remains important but is reload correctness, not bootstrap simplification.
+
+## Latest session notes
+- Closed and committed the remaining app-runtime nREPL bootstrap test split as part of task `159`:
+  - commit `c255eace` — `⚒ 159: split app-runtime nREPL bootstrap tests`
+  - focused verification green: `clojure -M:test --focus psi.app-runtime-test --focus psi.app-runtime-nrepl-test` → `25 tests, 102 assertions, 0 failures`
+- Bootstrap analysis after `159`:
+  - the main remaining complexity is concentrated in `psi.app-runtime/adopt-startup-plan-into-session!`
+  - biggest simplification opportunities are built-in workflow de-pseudo-extensioning, removing mutation-based startup resource loading, and collapsing duplicate startup active-tool refresh/composition paths
+  - current startup still does a two-stage system-prompt build because tools/extensions/graph-capability inputs settle late; revisit that only after workflow/tool ownership is cleaner

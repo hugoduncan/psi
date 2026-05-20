@@ -11,6 +11,7 @@
   - use a small higher-core built-in registration layer owned beside workflow bootstrap/runtime-state that exposes built-in-specific registration entrypoints for tools, commands, prompt contributions, and lifecycle hooks while reusing existing shared command/tool/prompt storage behind those entrypoints
 - [x] Decide whether shared registries gain built-in-specific entrypoints/provenance or whether any surface needs a small dedicated built-in store
   - commands and tools should reuse shared registries through built-in-specific provenance-aware entrypoints; prompt contributions should keep using shared session prompt-contribution storage through a built-in-specific registration path; lifecycle hooks need a small dedicated built-in lifecycle store/invocation path because that surface cannot stay extension-event-shaped
+  - do not split registry generalization into a precursor task; implement shared provenance-aware command/tool registry support as the first internal phase of `136`
 - [x] Make the built-in lifecycle invocation path explicit
   - [x] runtime/session/reload ownership named
     - built-in lifecycle ownership should live in higher-core workflow bootstrap/runtime-state support, with session lifecycle invocation from `psi.agent-session.session-lifecycle` and reload-time reinstallation from the built-in bootstrap path
@@ -37,6 +38,10 @@
     - `components/agent-session/src/psi/agent_session/resolvers/extensions.clj` should stop treating built-in workflow commands/tools as extension-registry-owned canonical state; extension-oriented EQL surfaces should narrow to true extensions only
   - [x] replacement built-in visibility recorded if needed
     - if runtime introspection still needs workflow command/tool visibility, add or reuse a built-in-aware projection that exposes the same user-facing availability while distinguishing built-in provenance from extension provenance; direct extension-registry assertions in `workflow_built_in_targeting_test.clj`, `workflow_reload_runtime_test.clj`, `workflow_async_path_test.clj`, and `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` should migrate to built-in-aware behavior proofs instead
+- [ ] Generalize the existing command/tool registries locally for built-in provenance-aware registration and lookup
+  - [ ] add built-in-specific registration entrypoints or equivalent provenance-aware insertion paths to the existing command/tool registries
+  - [ ] update authoritative command/tool read paths to resolve built-in + extension surfaces without requiring extension identity seeding
+  - [ ] keep this change local to the existing registries; do not extract a new common/shared registry substrate in this task
 - [ ] Move built-in workflow bootstrap off `ext/register-extension-in!`
 - [ ] Move built-in workflow bootstrap off `ext/create-extension-api`
 - [ ] Move built-in workflow tool registration to the built-in path

@@ -56,6 +56,8 @@ This task should:
 - changing lower workflow loader/runtime/registry/judge/materialization/session-config ownership
 - changing user-facing workflow behavior
 - broad architectural cleanup unrelated to built-in workflow registration
+- extracting a new common/shared registry framework beneath the existing command/tool registries
+- refactoring command/tool registries for generic reuse beyond the local provenance-aware changes needed to support built-in workflow
 
 ## Preferred target shape
 
@@ -87,9 +89,21 @@ This task does not require every registry implementation in the system to split 
 
 Prefer the smallest implementation that satisfies the success criteria above:
 
-- first choice: existing shared tool/command/prompt/lifecycle registries gain explicit built-in registration entrypoints or provenance-aware insertion paths
-- second choice: small dedicated built-in registries if shared registries cannot accept built-in ownership cleanly
+- first choice: existing shared tool/command registries gain explicit built-in registration entrypoints or provenance-aware insertion paths
+- prompt contributions should continue to use the existing shared session prompt-contribution store through a built-in-specific registration path
+- lifecycle should use a tiny built-in `session_switch` callback path rather than extension event registration
+- second choice: small dedicated built-in registries only where a shared registry cannot accept built-in ownership cleanly
 - avoid introducing parallel built-in infrastructure unless shared-registry reuse would keep pseudo-extension modeling in place
+
+### Chosen design direction for this task
+
+The chosen design direction for `136` is:
+
+- **commands/tools:** reuse the existing registries as shared provenance-aware registries rather than splitting out separate built-in command/tool stores
+- **prompt contributions:** continue using the shared session prompt-contribution store; do not introduce a separate built-in prompt-contribution registry
+- **lifecycle:** add only the smallest dedicated built-in lifecycle surface needed for workflow's `session_switch` callback
+
+This task does **not** split out a precursor registry-generalization task. The registry generalization exists only to support removing pseudo-extension workflow bootstrap, so it should be implemented as the first internal phase of `136` rather than as a separately orchestrated task.
 
 ## Design constraints
 
