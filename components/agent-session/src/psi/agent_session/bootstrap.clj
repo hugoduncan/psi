@@ -76,6 +76,9 @@
        :extension-results ext-results})))
 
 (defn refresh-active-tools-in!
+  "Merge extension-registry tools into the session's active tool set.
+   Called after resource loading to ensure extension-contributed tools
+   are included alongside base and startup tools."
   [ctx session-id]
   (let [ext-tools    (tool-registry/all-tools-in (:extension-registry ctx))
         active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))]

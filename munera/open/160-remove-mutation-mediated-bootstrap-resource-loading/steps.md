@@ -36,7 +36,7 @@
 - [x] 6. Fix extension-path return key mismatch (from implementation review)
   - `ext-rt/add-extension-in!` returns unnamespaced `{:loaded? :path :error}` but `bootstrap-in!` reads namespaced `:psi.extension/loaded?`, `:psi.extension/path`, `:psi.extension/error`
   - Decision: wrap result in step 1's extension-path replacement — same pattern as init-var path (lines 68–70) and the mutation it replaces
-  - Updated step 1 extension-path sub-item to include key translation: destructure `{:keys [loaded? error]}`, produce `{:psi.extension/loaded? loaded? :psi.parameter/path p :psi.extension/error error}` (use input `p`, not result `:path` which is the extension object)
+  - Updated step 1 extension-path sub-item to include key translation: destructure `{:keys [loaded? error]}`, produce `{:psi.extension/loaded? loaded? :psi.extension/path p :psi.extension/error error}` (use input `p`, not result `:path` which is the extension object)
 
 - [x] 7. Add test: `bootstrap-in!` with non-empty skills and tools (from test review)
   - Call `bootstrap-in!` with ≥1 skill and ≥1 tool (plus ≥1 template for existing coverage)
@@ -68,12 +68,12 @@
   - Must be done as part of or immediately after step 1 (direct dispatch conversion)
   - Step 3's `:mutations` scan targets the summary key, not dispatch event origins — this is a separate concern
 
-- [ ] 13. Fix typo in steps.md step 6 done-note: `:psi.parameter/path` → `:psi.extension/path` (from code-shaper review)
+- [x] 13. Fix typo in steps.md step 6 done-note: `:psi.parameter/path` → `:psi.extension/path` (from code-shaper review)
   - The step 6 done-note records the wrong namespace for the path key; verify step 1 sub-item text is correct (it is) and fix the step 6 note to prevent copy-paste propagation
 
 - [ ] 14. Update `bootstrap-in!` docstring after rewrite (from code-shaper review)
   - Step 2 in the docstring says "load prompts/skills/tools/extensions via EQL mutations" — change to reflect direct dispatch/runtime calls
   - Do as part of or immediately after step 1
 
-- [ ] 15. Add docstring to `refresh-active-tools-in!` (from code-shaper review)
+- [x] 15. Add docstring to `refresh-active-tools-in!` (from code-shaper review)
   - Every other public fn in `bootstrap.clj` has a docstring; add one for consistency

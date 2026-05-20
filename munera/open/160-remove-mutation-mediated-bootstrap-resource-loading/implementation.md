@@ -99,3 +99,9 @@ Applied code-shaper skill (simplicity ∧ consistency ∧ robustness) to bootstr
 2. **`bootstrap-in!` docstring stale after rewrite.** The docstring step 2 says "load prompts/skills/tools/extensions via EQL mutations" — after the change this is wrong. No step addresses updating the docstring. Consistency requires the docstring to match the mechanism.
 
 3. **`refresh-active-tools-in!` missing docstring.** Every other public fn in `bootstrap.clj` has a docstring. Pre-existing but the task rewrites this file — natural opportunity to add one for consistency.
+
+## Follow-up execution: code-shaper steps 13, 14, 15
+
+- **Step 13 — typo fix**: corrected `:psi.parameter/path` → `:psi.extension/path` in step 6 done-note. Prevents copy-paste propagation into step 1 implementation.
+- **Step 14 — docstring update**: blocked — step 1 (the rewrite) has not executed yet; the current docstring accurately describes the current code. Must be done as part of or immediately after step 1.
+- **Step 15 — `refresh-active-tools-in!` docstring**: added. Describes merging extension-registry tools into the active tool set. Lint clean.
