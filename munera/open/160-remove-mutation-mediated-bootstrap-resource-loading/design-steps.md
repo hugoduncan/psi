@@ -8,3 +8,5 @@
   - Specified: `:origin :core` — consistent with existing bootstrap dispatch calls; documented in plan.md Decisions
 - [x] Confirm in plan.md that dispatch return values are intentionally discarded (current code uses `doseq`; final counts read from session-data)
   - Confirmed: plan.md Decisions documents intentional discard via `doseq`; steps.md updated to note this
+- [ ] Fix dispatch function inconsistency: plan.md and steps.md specify `dispatch/dispatch!` + adding `psi.agent-session.dispatch` require, but `bootstrap-in!` uses `session/dispatch-in!` throughout. Update plan and steps to use `session/dispatch-in!` and remove the `psi.agent-session.dispatch` require addition.
+- [ ] Add missing `psi.agent-session.extension-runtime` require to steps.md step 1: needed for `ext-rt/add-extension-in!` calls. Currently omitted from the require changes list.

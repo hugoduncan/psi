@@ -20,3 +20,9 @@ All 4 design-steps completed:
 2. **Framing corrected**: design.md Intent now distinguishes template/skill/tool mutations (Pathom→dispatch round-trip) from `add-extension` mutation (Pathom→direct runtime call).
 3. **`:origin :core`**: plan.md Decisions specifies `:origin :core` for replacement dispatch calls, consistent with existing bootstrap dispatch calls in `bootstrap-in!`.
 4. **Return discard confirmed**: plan.md Decisions documents intentional `doseq` discard; steps.md step 1 updated with explicit note.
+
+## Review: inconsistency pass (design/plan/steps)
+
+1. **Dispatch function mismatch: `dispatch/dispatch!` vs `session/dispatch-in!`.** Plan says "direct `dispatch/dispatch!` calls" and steps say to add require `psi.agent-session.dispatch`. But `bootstrap-in!` exclusively uses `session/dispatch-in!` (from `psi.agent-session.core`, already required as `session`). The existing calls in `bootstrap-in!` — `:session/bootstrap-prompt-state`, `:session/refresh-system-prompt`, `:session/set-active-tools`, `:session/set-startup-bootstrap-summary` — all go through `session/dispatch-in!`. Using `dispatch/dispatch!` directly for the new template/skill/tool calls would be inconsistent with the same function's existing pattern. Plan/steps should specify `session/dispatch-in!` and drop the `psi.agent-session.dispatch` require addition.
+
+2. **Missing require for `ext-rt`.** Steps say "Replace extension-path loop: `ext-rt/add-extension-in!`" but `bootstrap.clj` does not require `psi.agent-session.extension-runtime`. Steps list removing `psi.agent-session.mutations` and `psi.query.core`, and adding `psi.agent-session.dispatch`, but omit adding `psi.agent-session.extension-runtime` (as `ext-rt`). This require is needed for the extension-path replacement to compile.
