@@ -122,3 +122,11 @@ Reviewed final test suite against design acceptance criteria and skill dimension
 **Known gap (pre-existing, already documented):** extension-path bootstrap path untested through `bootstrap-in!` — production passes `extension-paths []`, low priority.
 
 **No new actionable feedback.** Previous review passes (task-test-review pre-execution, test-shaper, code-shaper) identified and resolved all significant gaps.
+
+## Review: test-shaper pass 2
+
+Applied test-shaper skill (clarity ∧ signal ∧ robustness ∧ economical) to all bootstrap tests post-execution.
+
+1. **`bootstrap-resource-registration-test` summary assertions incomplete.** Step 10 added assertions for `prompt-count`, `skill-count`, `tool-count` and claims to "close return-shape coverage gap". But the summary contains 7 fields; `extension-loaded-count`, `extension-error-count`, and `extension-errors` remain unasserted. Since the test passes `extension-paths []`, asserting `(= 0 (:extension-loaded-count summary))`, `(= 0 (:extension-error-count summary))`, `(= [] (:extension-errors summary))` is trivial and completes the return-shape contract. Without these, a regression that breaks extension summary construction goes undetected at the bootstrap level.
+
+2. **`startup-bootstrap-introspection-test` queries `extension-error-count` but never asserts it.** The test queries 5 fields (`prompt-count`, `skill-count`, `tool-count`, `extension-loaded-count`, `extension-error-count`) but only asserts 4 — `extension-error-count` is silently dropped. Adding `(is (= 0 (:psi.startup/extension-error-count r)))` completes the query contract.
