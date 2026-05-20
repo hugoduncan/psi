@@ -2,6 +2,8 @@
   (:require
    [clojure.test :refer [deftest is]]
 
+   [psi.agent-session.core :as session]
+   [psi.app-runtime :as app-runtime]
    [psi.app-runtime.test-support :as app-test-support]
    [psi.introspection.core :as introspection]
    [psi.memory.runtime :as memory-runtime]
@@ -67,3 +69,36 @@
         (is (= "anthropic" (get-in sd [:model :provider])))
         (is (= "claude-sonnet-4-6" (get-in sd [:model :id])))
         (is (= :off (:thinking-level sd)))))))
+
+(deftest bootstrap-runtime-session-reuses-pre-created-session-test
+  (let [cwd (str (System/getProperty "java.io.tmpdir")
+                 "/psi-bootstrap-reuse-" (java.util.UUID/randomUUID))
+        _   (.mkdirs (java.io.File. cwd))
+        ai-model {:provider           :anthropic
+                  :id                 "test-model"
+                  :name               "Test Model"
+                  :supports-reasoning false
+                  :context-window     200000}]
+    (with-redefs [oauth/create-context (fn [] nil)
+                  pt/discover-templates (fn [] [])
+                  skills/discover-skills (fn [] {:skills [] :diagnostics []})
+                  sys-prompt/discover-context-files (fn [_] [])
+                  sys-prompt/build-system-prompt (fn [_] "")
+                  introspection/register-resolvers! (fn [] nil)
+                  memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
+      (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
+                           ai-model
+                           {:ui-type  :console
+                            :persist? false
+                            :cwd      cwd})
+            ;; Pre-create a session — simulates what main.clj does
+            pre-created-id (:session-id (session/new-session-in! ctx nil {}))
+            _              (is (= 1 (count (ss/list-context-sessions-in ctx)))
+                               "exactly one session before bootstrap")
+            result         (app-runtime/bootstrap-runtime-session!
+                            ctx ai-model {:session-id pre-created-id :cwd cwd})
+            sessions-after (ss/list-context-sessions-in ctx)]
+        (is (= pre-created-id (:session-id result))
+            "bootstrap must reuse the pre-created session-id")
+        (is (= 1 (count sessions-after))
+            "no extra session created — still exactly one")))))

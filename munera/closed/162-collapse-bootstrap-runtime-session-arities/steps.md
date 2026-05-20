@@ -17,5 +17,6 @@
   - [x] Update docstring
   - [x] Remove unused `app-runtime` requires from migrated test files
   - [x] Run tests, commit (084bad42)
-- [ ] Test review follow-up: Add test exercising `:session-id` reuse path through real `bootstrap-runtime-session!`
+- [x] Test review follow-up: Add test exercising `:session-id` reuse path through real `bootstrap-runtime-session!`
   - Pre-create a session via `session/new-session-in!`, pass its id as `:session-id` in opts to the real `bootstrap-runtime-session!`, assert the returned session-id matches and no extra session was created
+  - Added `bootstrap-runtime-session-reuses-pre-created-session-test` in `app_runtime_bootstrap_test.clj`

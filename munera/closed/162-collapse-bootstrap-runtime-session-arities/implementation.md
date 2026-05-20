@@ -1,5 +1,9 @@
 # 162 — Implementation Notes
 
+## Test review follow-up — session-id reuse test (2026-05-20)
+
+Added `bootstrap-runtime-session-reuses-pre-created-session-test` in `app_runtime_bootstrap_test.clj`. Test pre-creates a session via `session/new-session-in!`, passes its id as `:session-id` in opts to the real `bootstrap-runtime-session!`, asserts the returned session-id matches and no extra session was created. 301 tests pass, lint clean.
+
 ## Test review (2026-05-19)
 
 **Coverage gap — `:session-id` reuse path untested with real function.**
