@@ -102,3 +102,9 @@
 - [x] Collapse redundant content assertions in `init-built-in-registers-prompt-contribution-with-built-in-provenance-test`: replace `(is (string? ...))` + `(is (pos? (count ...)))` with `(is (seq (:content workflow-contrib)) "contribution content is non-empty")`
 - [x] Split `invoke-built-in-lifecycle-invokes-handler-test` into two `deftest`s in `workflow_runtime_state_test.clj`: one for payload delivery to the handler, one for return value propagation; each tests a single behavior
   - renamed to `invoke-built-in-lifecycle-delivers-payload-test` and `invoke-built-in-lifecycle-returns-handler-value-test`
+
+## code-shaper follow-ups (2026-05-20)
+
+- [ ] Extract `poll-until` from `workflow_async_path_test.clj` and `workflow_tui_repro_test.clj` into `workflow-test-support.clj`; both namespaces already require that ns and the helper is identical in both files
+- [ ] Add `:ext-path provenance-id` to the stored command map in `register-built-in-command-in!` so built-in command items carry the same provenance path field that built-in tool items carry (tools get `:ext-path` via `normalize-tool-def`; commands currently only get `:source :built-in`)
+- [ ] Fix `all-commands-in` (and symmetrically `all-tools-in`): replace the lazy `for` comprehension with `:let [_ (vswap! seen conj name)]` side-effect with an eager `reduce`/`into` collection for the built-in items pass, to avoid fragile mutation inside a lazy sequence
