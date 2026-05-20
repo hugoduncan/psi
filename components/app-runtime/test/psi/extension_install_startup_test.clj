@@ -13,7 +13,7 @@
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]
-   [psi.app-runtime :as app-runtime]
+   [psi.app-runtime.test-support :as app-test-support]
    [psi.session-state.state :as ss]))
 
 (defn- manifest-file [root rel]
@@ -61,7 +61,7 @@
   ([cwd home opts]
    (with-redefs-fn (startup-bootstrap-bindings cwd home opts)
      (fn []
-       (let [result (app-runtime/bootstrap-runtime-session! {:provider :anthropic :id "claude-sonnet-4-6" :supports-reasoning true} {:cwd cwd})]
+       (let [result (app-test-support/bootstrap-fresh-session! {:provider :anthropic :id "claude-sonnet-4-6" :supports-reasoning true} {:cwd cwd})]
          (model-registry/init! {:user-models-path nil :project-models-path nil})
          result)))))
 

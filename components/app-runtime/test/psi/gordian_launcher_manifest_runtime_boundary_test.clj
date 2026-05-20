@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
-   [psi.app-runtime :as app-runtime]))
+   [psi.app-runtime.test-support :as app-test-support]))
 
 (def gordian-cwd
   "/Users/duncan/projects/hugoduncan/gordian/gordian-master")
@@ -13,7 +13,7 @@
   (testing "runtime bootstrap proves built-in workflow wiring when launcher-owned classpath is already present"
     (if-not (.exists (io/file gordian-cwd))
       (is true "Skipping local Gordian runtime-boundary proof because the external Gordian checkout is absent.")
-      (let [{:keys [ctx summary]} (app-runtime/bootstrap-runtime-session!
+      (let [{:keys [ctx summary]} (app-test-support/bootstrap-fresh-session!
                                    {:provider :anthropic
                                     :id "claude-sonnet-4-6"
                                     :supports-reasoning true}

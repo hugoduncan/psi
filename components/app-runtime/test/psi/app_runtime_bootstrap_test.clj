@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is]]
 
-   [psi.app-runtime :as app-runtime]
+   [psi.app-runtime.test-support :as app-test-support]
    [psi.introspection.core :as introspection]
    [psi.memory.runtime :as memory-runtime]
    [psi.prompt-assets.prompt-templates :as pt]
@@ -27,7 +27,7 @@
                   sys-prompt/build-system-prompt (fn [_] "")
                   introspection/register-resolvers! (fn [] nil)
                   memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-      (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+      (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                            {:provider :anthropic
                             :id "claude-sonnet-4-6"
                             :name "Claude Sonnet 4.6"
@@ -55,7 +55,7 @@
                   sys-prompt/build-system-prompt (fn [_] "")
                   introspection/register-resolvers! (fn [] nil)
                   memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-      (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+      (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                            {:provider :anthropic
                             :id "claude-sonnet-4-6"
                             :name "Claude Sonnet 4.6"

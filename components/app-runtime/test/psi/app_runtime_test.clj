@@ -21,6 +21,7 @@
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.introspection.core :as introspection]
    [psi.memory.runtime :as memory-runtime]
+   [psi.app-runtime.test-support :as app-test-support]
    #_[psi.tui.app :as tui-app]))
 
 (deftest select-login-provider-test
@@ -605,7 +606,7 @@
                 ext/discover-extension-paths (fn [& _] [])
                 introspection/register-resolvers! (fn [] nil)
                 memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-    (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+    (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                          {:provider :anthropic
                           :id "test-model"
                           :name "Test Model"
@@ -630,7 +631,7 @@
                   memory-runtime/sync-memory-layer! (fn [opts]
                                                       (reset! captured opts)
                                                       {:ok? true})]
-      (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+      (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                            {:provider :anthropic
                             :id "test-model"
                             :name "Test Model"
@@ -654,7 +655,7 @@
                 ext/discover-extension-paths (fn [& _] [])
                 introspection/register-resolvers! (fn [] nil)
                 memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-    (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+    (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                          {:provider :anthropic
                           :id "test-model"
                           :name "Test Model"
@@ -681,7 +682,7 @@
                     ext/discover-extension-paths (fn [& _] [])
                     introspection/register-resolvers! (fn [] nil)
                     memory-runtime/sync-memory-layer! (fn [_] {:ok? true})]
-        (let [{:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+        (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                              {:provider :anthropic
                               :id "test-model"
                               :name "Test Model"
@@ -703,7 +704,7 @@
         (fn []
           (let [cwd (str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (java.util.UUID/randomUUID))
                 _   (.mkdirs (java.io.File. cwd))
-                {:keys [ctx]} (#'app-runtime/bootstrap-runtime-session!
+                {:keys [ctx]} (app-test-support/bootstrap-fresh-session!
                                {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false}
                                {:cwd cwd :persist? true :session-root session-root})
                 session-id   (-> (ss/list-context-sessions-in ctx) first :session-id)
