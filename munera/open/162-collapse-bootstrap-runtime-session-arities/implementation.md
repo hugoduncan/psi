@@ -1,5 +1,15 @@
 # 162 — Implementation Notes
 
+## Design review — inconsistency follow-up (2026-05-20)
+
+Executed 3 design-steps from inconsistency review:
+
+1. **AC4 narrowed**: Now states only `main.clj` needs updating; `run-session`/`start-tui-runtime!` explicitly noted as already conforming.
+2. **Scope reconciled**: Production callers list distinguishes `main.clj` (4-arity, needs change) from `run-session`/`start-tui-runtime!` (already 3-arity target form, no change).
+3. **Mock noted in design**: New design decision documents that the `start-tui-runtime!` test mock (~line 200) covers both arities and needs updating — the change is in the mock, not in `start-tui-runtime!` itself.
+
+All 3 items completed and marked done in design-steps.md. Design.md now internally consistent on which callers need changes.
+
 ## Design review — inconsistency pass (2026-05-20)
 
 Three inconsistencies found between design.md claims and actual codebase:

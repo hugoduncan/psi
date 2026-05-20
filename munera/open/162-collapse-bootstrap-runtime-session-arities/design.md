@@ -20,7 +20,7 @@ The type-sniffing 2-arity is confusing and couples test convenience into product
 ### In scope
 
 - `bootstrap-runtime-session!` in `psi.app-runtime`
-- All production callers: `run-session`, `start-tui-runtime!`, `main.clj` RPC bootstrap-fn
+- Production callers: `main.clj` RPC bootstrap-fn (4-arity → needs `:session-id` in opts). `run-session` and `start-tui-runtime!` already call the target 3-arity form and need no changes.
 - All test callers across `app_runtime_test`, `app_runtime_bootstrap_test`, `extension_install_startup_test`, `gordian_launcher_manifest_runtime_boundary_test`, `rpc_real_delegate_command_test`
 - New test helper (e.g. `psi.app-runtime.test-support/bootstrap-fresh-session!`) in the test tree
 
@@ -58,6 +58,10 @@ This test already calls `(bootstrap-runtime-session! ctx ai-model opts)` — the
 
 The 4-arity `(ctx session-id ai-model opts)` caller in `main.clj` will become `(ctx ai-model (assoc opts :session-id session-id))`. The opts key is literally `:session-id`, matching the existing binding name in the 4-arity body.
 
+### `start-tui-runtime!` test mock needs updating — not `start-tui-runtime!` itself
+
+The `start-tui-runtime!` test in `app_runtime_test.clj` (~line 200) mocks `bootstrap-runtime-session!` with both 3-arity and 4-arity forms. After the refactor, this mock must be updated to a single arity (3-arg `ctx ai-model opts`) handling `:session-id` via opts. The change is in the mock, not in `start-tui-runtime!` itself — `start-tui-runtime!` already uses the target 3-arity form.
+
 ### No `(ctx ai-model)` callers exist — no migration needed
 
 Every 2-arity call passes an ai-model map as the first arg (hitting the `(:state* x)` → false branch). Zero callers pass a ctx as the first arg with ai-model as second. The `(:state* x)` → true branch is dead code. No migration of `(ctx ai-model)` callers is needed — only the `(ai-model opts)` callers need the test helper.
@@ -67,7 +71,7 @@ Every 2-arity call passes an ai-model map as the first arg (hitting the `(:state
 1. `bootstrap-runtime-session!` has exactly one public arity: `(ctx ai-model opts)` where opts may contain `:session-id` — no convenience 2-arg form
 2. No `(:state* x)` type dispatch exists in `bootstrap-runtime-session!`
 3. A test-tree helper in `components/app-runtime/test/psi/app_runtime/test_support.clj` wraps `create-runtime-session-context` + `bootstrap-runtime-session!` for the "create everything" use case, accepting the full opts map
-4. All production callers (`run-session`, `start-tui-runtime!`, `main.clj`) updated
+4. `main.clj` production caller updated to pass `:session-id` in opts (`run-session` and `start-tui-runtime!` already use the target 3-arity form — no changes needed)
 5. All test callers updated to use the test helper or the new single-arity form
 6. `rpc_real_delegate_command_test` requires no change (already uses the target 3-arity form)
 7. 301 tests, 0 failures

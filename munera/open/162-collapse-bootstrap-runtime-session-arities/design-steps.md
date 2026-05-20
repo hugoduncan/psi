@@ -1,8 +1,11 @@
 # 162 — Design Follow-up Steps
 
-- [ ] Narrow AC4 to reflect that only `main.clj` needs updating — `run-session` and `start-tui-runtime!` already use the target 3-arity form
-- [ ] Reconcile scope "All production callers" list with the reality that `run-session` and `start-tui-runtime!` need zero changes (same logic as AC6 for RPC test)
-- [ ] Note in design that the `start-tui-runtime!` test mock (app_runtime_test.clj ~line 200) mocks both 3-arity and 4-arity and needs updating after refactor — the change is in the mock, not in `start-tui-runtime!` itself
+- [x] Narrow AC4 to reflect that only `main.clj` needs updating — `run-session` and `start-tui-runtime!` already use the target 3-arity form
+  - Done: AC4 now says `main.clj` only, notes `run-session`/`start-tui-runtime!` already conform.
+- [x] Reconcile scope "All production callers" list with the reality that `run-session` and `start-tui-runtime!` need zero changes (same logic as AC6 for RPC test)
+  - Done: Scope section now distinguishes `main.clj` (needs change) from `run-session`/`start-tui-runtime!` (already target form).
+- [x] Note in design that the `start-tui-runtime!` test mock (app_runtime_test.clj ~line 200) mocks both 3-arity and 4-arity and needs updating after refactor — the change is in the mock, not in `start-tui-runtime!` itself
+  - Done: Added "start-tui-runtime! test mock needs updating" design decision section.
 - [x] Clarify AC1: should the collapsed function offer a 2-arg `(ctx ai-model)` convenience arity or require `opts` always?
   - Decision: strictly one arity `(ctx ai-model opts)`, no convenience form. Zero callers use `(ctx ai-model)` today.
 - [x] Specify which opts the test helper accepts (full opts map vs curated subset like `#{:cwd :persist? :session-root}`)
