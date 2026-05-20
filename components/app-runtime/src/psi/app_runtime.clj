@@ -64,15 +64,11 @@
    [psi.provider-auth.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
    [psi.app-runtime.cli :as cli]
-   [psi.app-runtime.footer :as footer]
    [psi.app-runtime.nrepl-runtime :as app-nrepl]
    [psi.app-runtime.output :as output]
-   [psi.app-runtime.projections :as projections]
-   [psi.app-runtime.selectors :as selectors]
    [psi.app-runtime.transcript :as transcript]
-   [psi.app-runtime.tui-frontend-actions :as tui-frontend-actions]
    [psi.app-runtime.tui-session-nav :as tui-session-nav]
-   [psi.app-runtime.ui-actions :as ui-actions]
+   [psi.app-runtime.tui-wiring :as tui-wiring]
    [psi.prompt-assets.prompt-templates :as pt]
    [psi.shared-config.resolution :as config-res]
    [psi.prompt-assets.skills :as skills]
@@ -578,6 +574,10 @@ Available: " (str/join ", " (map name (keys all))))
   "Create a session and run it with a provided TUI interface function.
    The caller supplies resolved runtime config; this namespace stays CLI-free.
 
+   Runtime setup (model resolution, context creation, session bootstrap) happens
+   here; TUI callback construction and options assembly are delegated to
+   `psi.app-runtime.tui-wiring`.
+
    startup-opts:
    - :thinking-level-override explicit thinking level keyword (overrides config)"
   ([tui-start-fn! model-key]
@@ -623,19 +623,10 @@ Available: " (str/join ", " (map name (keys all))))
                                           :nrepl-runtime-atom nrepl-runtime
                                           :tui-focus* tui-focus*})
 
-         ;; Helper: put an immediate assistant message on the TUI queue.
-         reply!    (fn [^java.util.concurrent.LinkedBlockingQueue queue text]
-                     (.put queue {:kind :done
-                                  :result {:role    "assistant"
-                                           :content [{:type :text :text text}]}}))
-
-         current-context-widget
-         (partial tui-session-nav/current-context-widget ctx)
-
          context-event!
          (partial tui-session-nav/context-event! ctx event-queue)
 
-         ;; Resume callback used by the TUI /resume selector.
+         ;; Session navigation callbacks
          resume-fn!         (tui-session-nav/resume-fn! ctx tui-focus* event-queue)
          switch-session-fn! (tui-session-nav/switch-session-fn! ctx tui-focus* event-queue)
          fork-session-fn!   (tui-session-nav/fork-session-fn! ctx tui-focus* event-queue)
@@ -650,111 +641,37 @@ Available: " (str/join ", " (map name (keys all))))
                                          (context-event! (:session-id result))
                                          result))}
 
-         ;; dispatch-fn — called synchronously by the TUI on submit.
-         ;; Returns a command result map, or nil if not a command.
-         ;; When a login is pending (waiting for auth code), returns nil
-         ;; so the input falls through to run-agent-fn! which handles it.
-         frontend-action-handler-fn!
-         (fn [action-result]
-           (tui-frontend-actions/handle-action-result
-            {:ctx ctx
-             :sid @tui-focus*
-             :action-result action-result
-             :resolve-model-by-provider+id resolve-model-by-provider+id
-             :switch-session-fn! switch-session-fn!
-             :fork-session-fn! fork-session-fn!
-             :set-focus! #(reset! tui-focus* %)}))
+         ;; Build TUI callbacks via tui-wiring
+         wiring-deps {:ctx ctx
+                      :tui-focus* tui-focus*
+                      :session-state session-state
+                      :ai-model ai-model
+                      :oauth-ctx oauth-ctx
+                      :resolve-model-by-provider+id resolve-model-by-provider+id
+                      :switch-session-fn! switch-session-fn!
+                      :fork-session-fn! fork-session-fn!
+                      :submit-prompt-fn! submit-prompt-in!
+                      :cmd-opts cmd-opts}
 
-         dispatch-fn (fn [text]
-                       (if (:pending-login @session-state)
-                         nil  ;; fall through to run-agent-fn! for login code
-                         (let [sid    @tui-focus*
-                               result (tui-frontend-actions/command-result
-                                       {:ctx ctx
-                                        :sid sid
-                                        :text text
-                                        :cmd-opts cmd-opts})]
-                           (tui-frontend-actions/journal-command-result!
-                            {:ctx ctx :sid sid :text text :result result})
-                           (when (= :login-start (:type result))
-                             (if (:uses-callback-server result)
-                               nil
-                               (swap! session-state assoc :pending-login
-                                      {:provider-id   (get-in result [:provider :id])
-                                       :provider-name (get-in result [:provider :name])
-                                       :login-state   (:login-state result)})))
-                           result)))
+         dispatch-fn                 (tui-wiring/make-dispatch-fn wiring-deps)
+         run-agent-fn                (tui-wiring/make-run-agent-fn wiring-deps)
+         on-interrupt-fn!            (tui-wiring/make-on-interrupt-fn wiring-deps)
+         frontend-action-handler-fn! (tui-wiring/make-frontend-action-handler-fn wiring-deps)
 
-         ;; Called by TUI Escape during active work.
-         on-interrupt-fn! (fn [_state]
-                            (let [sid @tui-focus*]
-                              (session/abort-in! ctx sid)
-                              {:queued-text (session/consume-queued-input-text-in! ctx sid)
-                               :message "Interrupted active work."}))
+         tui-opts (tui-wiring/build-tui-opts
+                   {:ctx ctx
+                    :tui-focus* tui-focus*
+                    :event-queue event-queue
+                    :cwd cwd
+                    :startup-rehydrate startup-rehydrate
+                    :dispatch-fn dispatch-fn
+                    :run-agent-fn run-agent-fn
+                    :on-interrupt-fn! on-interrupt-fn!
+                    :frontend-action-handler-fn! frontend-action-handler-fn!
+                    :resume-fn! resume-fn!
+                    :switch-session-fn! switch-session-fn!
+                    :fork-session-fn! fork-session-fn!
+                    :current-context-widget (tui-session-nav/current-context-widget ctx session-id)})]
 
-         ;; run-agent-fn! — called by the TUI for non-command input.
-         ;; Handles pending-login step 2 and agent execution.
-         run-agent-fn! (fn [text ^java.util.concurrent.LinkedBlockingQueue queue]
-                         (let [trimmed (str/trim text)
-                               pending (:pending-login @session-state)]
-                           (cond
-                             ;; Step 2: pending login — this input IS the auth code
-                             pending
-                             (future
-                               (try
-                                 (let [{:keys [provider-id provider-name login-state]} pending]
-                                   (swap! session-state dissoc :pending-login)
-                                   (oauth/complete-login! oauth-ctx provider-id trimmed login-state)
-                                   (reply! queue (str "✓ Logged in to " provider-name)))
-                                 (catch Exception e
-                                   (swap! session-state dissoc :pending-login)
-                                   (reply! queue (str "✗ Login failed: " (ex-message e))))))
-
-                             ;; Everything else — send to agent
-                             :else
-                             (future
-                               (try
-                                 (let [sid @tui-focus*
-                                       {:keys [assistant-message]}
-                                       (submit-prompt-in! ctx sid ai-model text nil
-                                                          {:progress-queue queue
-                                                           :sync-on-git-head-change? true})]
-                                   (.put queue {:kind :done :result assistant-message}))
-                                 (catch Exception e
-                                   (.put queue {:kind :error :message (ex-message e)})))))))]
-
-     (tui-start-fn! run-agent-fn!
-                    {:query-fn             (fn [q] (session/query-in ctx @tui-focus* q))
-                     :footer-model-fn      (fn [] (footer/footer-model ctx @tui-focus*))
-                     :session-selector-fn  (fn [] (ui-actions/context-session-action
-                                                   (selectors/context-session-selector ctx @tui-focus*)))
-                     :initial-context-session-tree-widget (current-context-widget @tui-focus*)
-                     :ui-read-fn       (fn [] (projections/extension-ui-snapshot ctx))
-                     :ui-dispatch-fn   (fn [event-type payload]
-                                         (session/dispatch-in! ctx event-type payload {:origin :tui}))
-                     :frontend-action-handler-fn! frontend-action-handler-fn!
-                     :dispatch-fn          dispatch-fn
-                     :on-interrupt-fn!     on-interrupt-fn!
-                     :on-queue-input-fn!   (fn [text _state]
-                                             (let [sid @tui-focus*]
-                                               (if (= :streaming (ss/sc-phase-in ctx sid))
-                                                 (do
-                                                   (session/queue-while-streaming-in! ctx sid text :steer)
-                                                   {:message "Queued steering message."})
-                                                 (do
-                                                   (session/queue-while-streaming-in! ctx sid text :queue)
-                                                   {:message "Queued follow-up message."}))))
-                     :double-press-window-ms 500
-                     :double-escape-action :none
-                     :cwd                  cwd
-                     :focus-session-id     @tui-focus*
-                     :current-session-file (:session-file (ss/get-session-data-in ctx @tui-focus*))
-                     :initial-messages     (vec (or (:messages startup-rehydrate) []))
-                     :initial-tool-calls   (or (:tool-calls startup-rehydrate) {})
-                     :initial-tool-order   (vec (or (:tool-order startup-rehydrate) []))
-                     :resume-fn!           resume-fn!
-                     :switch-session-fn!   switch-session-fn!
-                     :fork-session-fn!     fork-session-fn!
-                     :event-queue          event-queue
-                     :alt-screen           false}))))
+     (tui-start-fn! run-agent-fn tui-opts))))
 ;; RPC runtime moved to psi.rpc.
