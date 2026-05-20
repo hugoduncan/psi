@@ -90,6 +90,21 @@ All 6 design-steps from ambiguity review resolved by code analysis:
 
 Design.md updated with "Design decisions" section and refined ACs. All design-steps marked done.
 
+## Task-implementation-review — pass (2026-05-19)
+
+All 7 acceptance criteria verified against current code (post tui-wiring extraction and fixture unification commits). No new actionable issues found.
+
+- **AC1–AC2**: Single arity `(ctx ai-model opts)` confirmed; no residual multi-arity, no `:state*` type-sniffing
+- **AC3**: Test helper `bootstrap-fresh-session!` correctly splits opts, forwards full map
+- **AC4**: `main.clj` passes `:session-id` and `:cwd` in opts
+- **AC5**: All test callers migrated; remaining `bootstrap-runtime-session!` references are correct 3-arity calls (ordering test, mock in start-tui test, session-id reuse test)
+- **AC6**: `rpc_real_delegate_command_test` unchanged
+- **AC7**: All tests pass
+
+**Architecture alignment**: `bootstrap-runtime-session!` is a clean single-responsibility function. Test helper correctly separates ctx creation from bootstrapping. `bootstrap-stub-bindings` vs `with-main-bootstrap-stubs` serve legitimately different purposes (direct bootstrap vs full runtime entry point). No new patterns duplicating existing ones; no unnecessary abstractions; no structural performance issues.
+
+**Pre-existing observations already documented**: `(:cwd ctx)` dead fallback (line 523), `run-session` not threading `cwd` explicitly, bootstrap tests split across two files. All correctly scoped as out-of-task.
+
 ## Design review — ambiguity pass (2026-05-19)
 
 1. **AC1 "exactly one public arity" vs convenience 2-arg form**: AC1 says the single arity is `(ctx ai-model opts)` (3 args). Currently `(ctx ai-model)` (2 args, when `:state*` present) delegates to `(ctx ai-model {})`. Should the collapsed function also offer a 2-arg `(ctx ai-model)` convenience arity, or must callers always pass `{}`? If strictly one arity, the design should say so explicitly and note that `opts` is required.
