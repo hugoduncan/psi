@@ -1,5 +1,18 @@
 # 162 — Implementation Notes
 
+## Design review — ambiguity follow-up (2026-05-19)
+
+All 6 design-steps from ambiguity review resolved by code analysis:
+
+- **AC1 convenience arity**: No — strictly `(ctx ai-model opts)`. Zero `(ctx ai-model)` callers exist; every 2-arity call is `(ai-model opts)`.
+- **Test helper opts**: Full opts map, not curated subset. Callers already pass varied subsets (`{:cwd}`, `{:persist? false}`, `{:memory-runtime-opts ...}`, etc.).
+- **Test helper location**: `components/app-runtime/test/psi/app_runtime/test_support.clj`. Gordian test already has `app-runtime` dep.
+- **RPC test**: No change needed — already uses 3-arity target form.
+- **Session-id opts key**: `:session-id` — matches existing 4-arity binding.
+- **Dead code**: `(:state* x)` → true branch has zero callers. No migration path needed.
+
+Design.md updated with "Design decisions" section and refined ACs. All design-steps marked done.
+
 ## Design review — ambiguity pass (2026-05-19)
 
 1. **AC1 "exactly one public arity" vs convenience 2-arg form**: AC1 says the single arity is `(ctx ai-model opts)` (3 args). Currently `(ctx ai-model)` (2 args, when `:state*` present) delegates to `(ctx ai-model {})`. Should the collapsed function also offer a 2-arg `(ctx ai-model)` convenience arity, or must callers always pass `{}`? If strictly one arity, the design should say so explicitly and note that `opts` is required.
