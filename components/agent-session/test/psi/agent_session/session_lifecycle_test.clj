@@ -2,7 +2,7 @@
   "Tests for context creation, isolation, and session lifecycle
   (new / fork / resume / index)."
   (:require
-   [clojure.test :refer [deftest testing is]]
+   [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.agent-core.core]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
@@ -11,9 +11,16 @@
    [psi.turn-runtime.core]
    [psi.session-journal.store :as journal-store]
    [psi.session-state.state :as ss]
-   [psi.agent-session.test-support :as test-support])
+   [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state])
   (:import
    (java.io File)))
+
+(defn- reset-built-in-lifecycle-fixture
+  [f]
+  (reset! workflow-runtime-state/built-in-lifecycle-callbacks {})
+  (f)
+  (reset! workflow-runtime-state/built-in-lifecycle-callbacks {}))
 
 (defn- retarget
   [ctx _sid-or-sd]
@@ -459,3 +466,60 @@
       (is (= [] (persist/all-entries-in ctx session-id)))
       (is (= :core (:origin entry)))
       (is (= {:session-path f} (dissoc (:event-data entry) :session-id))))))
+
+;; ── Built-in lifecycle invocation through session transitions ──────────────
+
+(use-fixtures :each reset-built-in-lifecycle-fixture)
+
+(deftest new-session-invokes-built-in-session-switch-test
+  (testing "new-session-in! invokes registered built-in session_switch callback"
+    (let [received    (atom nil)
+          [ctx _sid] (create-session-context)]
+      (workflow-runtime-state/register-built-in-lifecycle-callback!
+       "session_switch"
+       (fn [event] (reset! received event)))
+      (session/new-session-in! ctx nil {})
+      (is (some? @received) "session_switch callback was invoked")
+      (is (= :new (:reason @received)))))
+
+  (testing "new-session-in! does not invoke built-in callback when extension cancels"
+    (reset! workflow-runtime-state/built-in-lifecycle-callbacks {})
+    (let [received    (atom nil)
+          [ctx _sid] (create-session-context)
+          reg         (:extension-registry ctx)]
+      (ext/register-extension-in! reg "/ext/cancel-new")
+      (ext/register-handler-in! reg "/ext/cancel-new" "session_before_switch"
+                                (fn [_] {:cancel true}))
+      (workflow-runtime-state/register-built-in-lifecycle-callback!
+       "session_switch"
+       (fn [event] (reset! received event)))
+      (session/new-session-in! ctx nil {})
+      (is (nil? @received) "session_switch callback must not fire when cancelled"))))
+
+(deftest resume-session-invokes-built-in-session-switch-test
+  (testing "resume-session-in! (loaded) invokes registered built-in session_switch callback"
+    (let [received    (atom nil)
+          [ctx sid]  (create-session-context)
+          f           (File/createTempFile "psi-resume-lifecycle" ".ndedn")]
+      (.deleteOnExit f)
+      (journal-store/flush-journal! f "sess-lifecycle" "/tmp/project" nil
+                                    [(persist/thinking-level-entry :off)])
+      (workflow-runtime-state/register-built-in-lifecycle-callback!
+       "session_switch"
+       (fn [event] (reset! received event)))
+      (session/resume-session-in! ctx sid (.getAbsolutePath f))
+      (is (some? @received) "session_switch callback was invoked on resume")
+      (is (= :resume (:reason @received)))))
+
+  (testing "resume-session-in! (missing file) invokes registered built-in session_switch callback"
+    (reset! workflow-runtime-state/built-in-lifecycle-callbacks {})
+    (let [received    (atom nil)
+          missing     (str (System/getProperty "java.io.tmpdir") "/psi-missing-lifecycle-"
+                           (java.util.UUID/randomUUID) ".ndedn")
+          [ctx sid]  (create-session-context)]
+      (workflow-runtime-state/register-built-in-lifecycle-callback!
+       "session_switch"
+       (fn [event] (reset! received event)))
+      (session/resume-session-in! ctx sid missing)
+      (is (some? @received) "session_switch callback was invoked on missing-file resume")
+      (is (= :resume (:reason @received))))))

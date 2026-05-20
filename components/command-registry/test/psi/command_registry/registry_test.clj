@@ -120,3 +120,99 @@
       (command-registry/register-command-in! reg "/ext/b" {:name "hello" :description "from b"})
       (is (= "from a"
              (:description (command-registry/get-command-in reg "hello")))))))
+
+;;; Built-in command registration
+
+(deftest register-built-in-command-in-test
+  (testing "registers command under :built-in-commands keyed by provenance-id"
+    (let [reg (create-test-registry)]
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "run workflow"})
+      (is (= "delegate"
+             (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :name])))))
+
+  (testing "does not require prior extension registration"
+    (let [reg (create-test-registry)]
+      (is (empty? (:extensions @(:state reg))))
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate"})
+      (is (= "delegate"
+             (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :name])))))
+
+  (testing "rejects blank or nil command names"
+    (doseq [invalid [nil "" "   "]]
+      (let [reg (create-test-registry)]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Invalid built-in command name"
+             (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name invalid}))))))
+
+  (testing "repeated registration for same name replaces prior entry"
+    (let [reg (create-test-registry)]
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "first"})
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "second"})
+      (is (= "second"
+             (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :description]))))))
+
+(deftest all-built-in-commands-in-test
+  (testing "returns all built-in commands across provenance ids"
+    (let [reg (create-test-registry)]
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate"})
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate-reload"})
+      (command-registry/register-built-in-command-in! reg "built-in:other" {:name "other-cmd"})
+      (let [cmds (command-registry/all-built-in-commands-in reg)]
+        (is (= 3 (count cmds)))
+        (is (= #{"delegate" "delegate-reload" "other-cmd"}
+               (set (map :name cmds)))))))
+
+  (testing "returns empty vector when no built-ins registered"
+    (let [reg (create-test-registry)]
+      (is (= [] (command-registry/all-built-in-commands-in reg))))))
+
+(deftest built-in-command-names-in-test
+  (testing "returns set of built-in command names"
+    (let [reg (create-test-registry)]
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate"})
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate-reload"})
+      (is (= #{"delegate" "delegate-reload"}
+             (command-registry/built-in-command-names-in reg)))))
+
+  (testing "returns empty set when no built-ins registered"
+    (let [reg (create-test-registry)]
+      (is (= #{} (command-registry/built-in-command-names-in reg))))))
+
+(deftest built-in-commands-merged-read-paths-test
+  (testing "command-names-in includes built-in names"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (command-registry/register-command-in! reg "/ext/a" {:name "ext-cmd"})
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate"})
+      (is (contains? (command-registry/command-names-in reg) "delegate"))
+      (is (contains? (command-registry/command-names-in reg) "ext-cmd"))))
+
+  (testing "all-commands-in includes built-in commands, built-ins listed first"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (command-registry/register-command-in! reg "/ext/a" {:name "ext-cmd" :description "from ext"})
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "built-in"})
+      (let [cmds (command-registry/all-commands-in reg)]
+        (is (= 2 (count cmds)))
+        (is (= "delegate" (:name (first cmds))) "built-in listed first")
+        (is (= "ext-cmd" (:name (second cmds)))))))
+
+  (testing "get-command-in returns built-in command by name"
+    (let [reg (create-test-registry)]
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "built-in"})
+      (is (= "delegate" (:name (command-registry/get-command-in reg "delegate"))))
+      (is (= "built-in" (:description (command-registry/get-command-in reg "delegate"))))))
+
+  (testing "get-command-in prefers built-in over extension when names collide"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (command-registry/register-command-in! reg "/ext/a" {:name "delegate" :description "from ext"})
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "from built-in"})
+      (is (= "from built-in"
+             (:description (command-registry/get-command-in reg "delegate"))))))
+
+  (testing "get-command-in returns nil for unknown name"
+    (let [reg (create-test-registry)]
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate"})
+      (is (nil? (command-registry/get-command-in reg "nope"))))))

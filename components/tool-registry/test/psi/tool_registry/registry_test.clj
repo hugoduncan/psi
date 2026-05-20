@@ -103,3 +103,122 @@
   (testing "returns nil for unknown tool"
     (let [reg (create-test-registry)]
       (is (nil? (tool-registry/get-tool-in reg "nope"))))))
+
+;;; Built-in tool registration
+
+(deftest register-built-in-tool-in-test
+  (testing "registers tool under :built-in-tools keyed by provenance-id"
+    (let [reg (create-test-registry)]
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (is (= "delegate"
+             (get-in @(:state reg) [:built-in-tools "built-in:workflow" "delegate" :name])))))
+
+  (testing "stored tool carries :source :built-in"
+    (let [reg (create-test-registry)]
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (is (= :built-in
+             (get-in @(:state reg) [:built-in-tools "built-in:workflow" "delegate" :source])))))
+
+  (testing "does not require prior extension registration"
+    (let [reg (create-test-registry)]
+      (is (empty? (:extensions @(:state reg))))
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (is (= "delegate"
+             (get-in @(:state reg) [:built-in-tools "built-in:workflow" "delegate" :name])))))
+
+  (testing "rejects non-canonical tool names"
+    (doseq [invalid ["my_tool" "MyTool" "My Tool"]]
+      (let [reg (create-test-registry)]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Invalid built-in tool name"
+             (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                       {:name invalid :label "T" :format-request (fn [_] "t")}))))))
+
+  (testing "rejects missing format-request"
+    (let [reg (create-test-registry)]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"missing required :format-request"
+           (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                     {:name "delegate" :label "Delegate"}))))))
+
+(deftest all-built-in-tools-in-test
+  (testing "returns all built-in tools across provenance ids"
+    (let [reg (create-test-registry)]
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (tool-registry/register-built-in-tool-in! reg "built-in:other"
+                                                {:name "other-tool" :label "Other" :format-request (fn [_] "other")})
+      (let [tools (tool-registry/all-built-in-tools-in reg)]
+        (is (= 2 (count tools)))
+        (is (= #{"delegate" "other-tool"}
+               (set (map :name tools)))))))
+
+  (testing "returns empty vector when no built-ins registered"
+    (let [reg (create-test-registry)]
+      (is (= [] (tool-registry/all-built-in-tools-in reg))))))
+
+(deftest built-in-tool-names-in-test
+  (testing "returns set of built-in tool names"
+    (let [reg (create-test-registry)]
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (is (= #{"delegate"} (tool-registry/built-in-tool-names-in reg)))))
+
+  (testing "returns empty set when no built-ins registered"
+    (let [reg (create-test-registry)]
+      (is (= #{} (tool-registry/built-in-tool-names-in reg))))))
+
+(deftest built-in-tools-merged-read-paths-test
+  (testing "tool-names-in includes built-in names"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "ext-tool" :label "Ext" :format-request (fn [_] "ext")})
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (is (contains? (tool-registry/tool-names-in reg) "delegate"))
+      (is (contains? (tool-registry/tool-names-in reg) "ext-tool"))))
+
+  (testing "all-tools-in includes built-in tools, built-ins listed first"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "ext-tool" :label "Ext" :format-request (fn [_] "ext")})
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (let [tools (tool-registry/all-tools-in reg)]
+        (is (= 2 (count tools)))
+        (is (= "delegate" (:name (first tools))) "built-in listed first")
+        (is (= "ext-tool" (:name (second tools)))))))
+
+  (testing "all-tools-in built-in entry carries :source :built-in"
+    (let [reg (create-test-registry)]
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (let [tools (tool-registry/all-tools-in reg)]
+        (is (= :built-in (:source (first tools)))))))
+
+  (testing "get-tool-in returns built-in tool by name"
+    (let [reg (create-test-registry)]
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (is (= "delegate" (:name (tool-registry/get-tool-in reg "delegate"))))
+      (is (= :built-in (:source (tool-registry/get-tool-in reg "delegate"))))))
+
+  (testing "get-tool-in prefers built-in over extension when names collide"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (tool-registry/register-tool-in! reg "/ext/a" {:name "delegate" :label "From Ext" :format-request (fn [_] "ext")})
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "From Built-in" :format-request (fn [_] "built-in")})
+      (is (= "From Built-in"
+             (:label (tool-registry/get-tool-in reg "delegate"))))))
+
+  (testing "get-tool-in returns nil for unknown name"
+    (let [reg (create-test-registry)]
+      (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
+                                                {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
+      (is (nil? (tool-registry/get-tool-in reg "nope"))))))

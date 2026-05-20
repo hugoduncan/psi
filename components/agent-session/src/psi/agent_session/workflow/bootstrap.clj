@@ -28,11 +28,11 @@
 (defn- refresh-active-tools!
   [ctx session-id]
   (let [active-tools (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id)))
-        ext-tools    (tool-registry/all-tools-in (:extension-registry ctx))]
+        all-tools    (tool-registry/all-tools-in (:extension-registry ctx))]
     (session/dispatch-in! ctx
                           :session/set-active-tools
                           {:session-id session-id
-                           :tool-maps (into (vec active-tools) ext-tools)}
+                           :tool-maps (into (vec active-tools) all-tools)}
                           {:origin :core})))
 
 (defn- make-prompt-contribution-fn
