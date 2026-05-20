@@ -105,3 +105,20 @@ Applied code-shaper skill (simplicity ∧ consistency ∧ robustness) to bootstr
 - **Step 13 — typo fix**: corrected `:psi.parameter/path` → `:psi.extension/path` in step 6 done-note. Prevents copy-paste propagation into step 1 implementation.
 - **Step 14 — docstring update**: blocked — step 1 (the rewrite) has not executed yet; the current docstring accurately describes the current code. Must be done as part of or immediately after step 1.
 - **Step 15 — `refresh-active-tools-in!` docstring**: added. Describes merging extension-registry tools into the active tool set. Lint clean.
+
+## Review: task-test-review (post-execution)
+
+Reviewed final test suite against design acceptance criteria and skill dimensions (well-formed, behaviour coverage, infra deps).
+
+**All ACs covered:**
+- AC1 (no Pathom/mutations): structural — verified by code inspection; `load-startup-resources-in!` has no Pathom references
+- AC2 (direct dispatch): `bootstrap-resource-registration-test` (session-data), `bootstrap-dispatch-event-log-test` (event types + `:origin :core`)
+- AC3 (`:mutations` removed): schema enforces absence; introspection test queries without it; return summary asserted in `bootstrap-resource-registration-test`
+- AC4 (existing tests pass): 11 tests, 130 assertions, 0 failures in model_dispatch_test; 5 tests, 30 assertions in introspection
+- AC5 (lint clean): 0 errors, 0 warnings
+
+**Infra deps:** all bootstrap tests use real dispatch with `{:persist? false}` — no mocks/stubs in bootstrap-specific tests. `with-redefs` in model_dispatch_test only touches user-config persistence (unrelated to this task).
+
+**Known gap (pre-existing, already documented):** extension-path bootstrap path untested through `bootstrap-in!` — production passes `extension-paths []`, low priority.
+
+**No new actionable feedback.** Previous review passes (task-test-review pre-execution, test-shaper, code-shaper) identified and resolved all significant gaps.
