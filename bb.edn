@@ -6,6 +6,7 @@
   :init (do
           (load-file "bb/dispatch_architecture_check.clj")
           (load-file "bb/release.clj")
+          (load-file "bb/kaocha_runner.clj")
           (def chiasmus-home
             (str (System/getProperty "user.home") "/src/chiasmus"))
 
@@ -188,12 +189,18 @@
    :task (System/exit (bb.dispatch-architecture-check/run! *command-line-args*))}
 
   clojure:test:unit
-  {:doc  "Run Clojure unit tests (Kaocha :unit suite)."
-   :task (shell "clojure -M:test --focus unit")}
+  {:doc  "Run Clojure unit tests (Kaocha :unit suite).
+         Uses documentation reporter so errors are named, not buried in dots.
+         Scans output for ERROR/FAIL markers — exits non-zero even when
+         StackOverflowError corrupts Kaocha's result tree."
+   :task (System/exit (bb.kaocha-runner/run! ["--focus" "unit"]))}
 
   clojure:test:extensions
-  {:doc  "Run Clojure extension tests (Kaocha :extensions suite)."
-   :task (shell "clojure -M:test --focus extensions")}
+  {:doc  "Run Clojure extension tests (Kaocha :extensions suite).
+         Uses documentation reporter so errors are named, not buried in dots.
+         Scans output for ERROR/FAIL markers — exits non-zero even when
+         StackOverflowError corrupts Kaocha's result tree."
+   :task (System/exit (bb.kaocha-runner/run! ["--focus" "extensions"]))}
 
   clojure:test:integration
   {:doc  "Run Clojure integration tests (slow, requires tmux etc)."

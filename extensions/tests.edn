@@ -11,4 +11,5 @@
   :reporter [kaocha.report/dots]
   :plugins [:kaocha.plugin/hooks]
   :cloverage/opts {:ns-exclude-regex [".*-test$"]}
-  :kaocha.hooks/pre-run [psi.test-hooks/pre-run]}
+  :kaocha.hooks/pre-run [psi.test-hooks/pre-run]
+  :kaocha.hooks/post-summary [psi.test-hooks/post-summary]}

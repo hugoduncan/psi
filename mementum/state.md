@@ -20,12 +20,25 @@ Bootstrapped on 2026-04-02.
 - Task 161 complete and closed: single-pass startup, `bootstrap-in!` and `refresh-active-tools-in!` removed
 - Tasks 160, 159, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 are complete and closed
 
+## Test health
+
+301 bb tests ✅, ~1062 Kaocha tests with **5 real errors** (exit 0 — Kaocha treats errors as non-fatal):
+
+### NPE trio (`:session-file` nil → `File.<init>` NPE)
+Tests need persistence for `flush-journal!`/`/resume` but context defaults to `:persist? false` via `safe-context-opts`:
+- `resolvers_test/multi-session-context-eql-process-and-persisted-test` (line 202)
+- `rpc_anthropic_regression_test/rpc-resume-session-rehydrates-agent-messages-not-tui-projection-test` (line 44)
+- `rpc_session_navigation_test/rpc-session-resume-and-rehydrate-events-test` (line 101)
+Fix: pass `{:cwd cwd :persist? true :session-root cwd}` to context helpers.
+
+### StackOverflow duo
+- `resolvers_test/git-history-commits-query-test` — queries `:git.repo/commits` against real repo; commit data overflows on print
+- `graph_surface_test/root-queryable-attrs-contract-test` — per-attr root query hits a graph-introspection attr with pathological expansion
+
 ## Suggested next step
+- Fix the 5 test errors (two distinct bugs: persistence opt-in, stack overflow on graph data)
 - `app_runtime.clj` further extraction targets: `start-tui-runtime!` monolith, model resolution fns
 - Backlog: `149-reload-fixup-inventory-and-safety`, `124-turn-execution-contract-extraction`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
-- 162 implemented in 3 steps: (1) collapse 3+4 arities, (2) create test helper, (3) migrate 2-arity callers and remove 2-arity
-- 301 bb tests + 171 Kaocha tests, 0 failures throughout
-- `bootstrap-runtime-session!` is now a clean single-arity fn: `(ctx ai-model opts)`
-- `bootstrap.clj` remains at 64 lines
+- 2026-05-19: oriented, ran full suite, diagnosed 5 test errors across 2 root causes
