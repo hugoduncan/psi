@@ -54,3 +54,20 @@ All six ambiguity items (A1–A6) resolved. Design.md updated:
 - **A4**: `bootstrap-in!` retained as test-oriented convenience. Startup responsibilities inlined into `adopt-startup-plan-into-session!`. Tests that redef `bootstrap-in!` are unaffected (they stub the function entirely).
 - **A5**: `load-startup-resources-in!` called with templates + skills only. Tools excluded (composed separately via `set-active-tools`). Extension-paths/targets excluded (handled by `bootstrap-manifest-extensions-in!`).
 - **A6**: Confirmed. Target flow explicitly dispatches `:session/bootstrap-prompt-state` with developer-prompt and developer-prompt-source before the prompt build. Now shown in target flow diagram.
+
+## Design review: inconsistency pass (2026-05-19)
+
+### IC1 — `set-active-tools` side effect contradicts "persisted exactly once" acceptance criteria
+
+The `:session/set-active-tools` handler produces a `:runtime/refresh-system-prompt` effect, which dispatches `:session/refresh-system-prompt`. In the target flow, this happens *before* `:session/set-system-prompt` and *before* build-opts are stored. The `:session/refresh-system-prompt` handler falls back to `:base-system-prompt` when no build-opts exist — and at that point `:base-system-prompt` is empty (set by the earlier `:session/bootstrap-prompt-state` with empty system-prompt). This means:
+
+1. The target flow has 3 prompt state-writes, not 1: `:session/bootstrap-prompt-state` (empty), side-effect `:session/refresh-system-prompt` (empty), and `:session/set-system-prompt` (correct final).
+2. The side-effect-triggered `:session/refresh-system-prompt` produces a `:runtime/agent-set-system-prompt` effect that pushes an empty prompt to the AI agent, immediately before the correct prompt overwrites it.
+3. Acceptance criterion #2 ("The system prompt is persisted exactly once via a single dispatch path") is violated.
+4. Verification expectation "Count dispatches of `:session/set-system-prompt` during startup — should be 1" is technically true but misleading — `:session/refresh-system-prompt` is also dispatched as a side effect.
+
+Note: this same side effect exists in the current flow, but there `:base-system-prompt` is the base prompt (not empty), so the intermediate push is less harmful. The design should either: (a) suppress the `refresh-system-prompt` effect during startup (e.g., by not dispatching `set-active-tools` until after the prompt build, or by adding a startup-mode flag), (b) reorder the target flow to build+persist the prompt before `set-active-tools`, or (c) accept the intermediate empty prompt and update acceptance criteria/verification expectations accordingly.
+
+### IC2 — Hotspot file doesn't exist
+
+"Likely hotspots" lists `components/agent-session/test/psi/agent_session/bootstrap_test.clj` — this file doesn't exist. The relevant bootstrap tests in agent-session are in `components/agent-session/test/psi/agent_session/model_dispatch_test.clj`.
