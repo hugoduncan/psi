@@ -133,6 +133,22 @@
       (is (some #(re-find #"startup_ext.clj" %) (startup-registry-paths ctx)))
       (is (= :loaded (startup-entry-status ctx 'psi/test-startup-ext))))))
 
+(deftest startup-local-root-manifest-extension-tools-enter-session-tool-defs-test
+  (testing "bootstrap startup merges local-root manifest extension tools into session tool defs"
+    (let [ext-root (test-support/temp-cwd)
+          _        (write-local-extension! ext-root
+                                           'psi.test.startup-local-tool-ext
+                                           "(ns psi.test.startup-local-tool-ext)\n\n(defn init [api]\n  ((:register-tool api) {:name \"startup-local-tool\"\n                         :description \"tool from startup local-root manifest\"\n                         :format-request (fn [_] \"startup-local-tool\")\n                         :parameters {:type \"object\"}}))\n")
+          {:keys [result]} (bootstrap-with-manifest
+                            {:deps {'psi/test-startup-local-tool-ext {:local/root ext-root
+                                                                      :psi/init 'psi.test.startup-local-tool-ext/init}}}
+                            {})
+          {:keys [ctx summary]} result
+          session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
+          tool-names (set (map :name (:tool-defs (ss/get-session-data-in ctx session-id))))]
+      (is (= 1 (:extension-loaded-count summary)))
+      (is (contains? tool-names "startup-local-tool")))))
+
 (deftest startup-loads-non-local-manifest-extension-via-init-var-test
   (testing "bootstrap startup loads non-local manifest extensions through :psi/init"
     (let [ns-sym 'psi.test.startup-remote-ext

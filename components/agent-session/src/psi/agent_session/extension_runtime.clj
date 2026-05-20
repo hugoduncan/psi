@@ -13,13 +13,15 @@
    registration change."
   (:require
    [clojure.repl.deps :as repl.deps]
+   [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-installs :as installs]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-delivery :as runtime-delivery]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.extensions.runtime-ui :as runtime-ui]
-   [psi.session-state.state :as ss]))
+   [psi.session-state.state :as ss]
+   [psi.tool-registry.registry :as tool-registry]))
 
 (defn load-extensions-in!
   "Discover and load all extensions into this session's registry.
@@ -107,6 +109,17 @@
       (update :errors into (:errors manifest-result))
       (merge (select-keys manifest-result [:deps-realized? :deps-restart-required? :deps-realize-error]))))
 
+(defn- refresh-active-tools-in!
+  [ctx session-id]
+  (let [agent-ctx     (ss/agent-ctx-in ctx session-id)
+        current-tools (or (:tools (agent/get-data-in agent-ctx)) [])
+        ext-tools     (tool-registry/all-tools-in (:extension-registry ctx))]
+    (dispatch/dispatch! ctx
+                        :session/set-active-tools
+                        {:session-id session-id
+                         :tool-maps  (into (vec current-tools) ext-tools)}
+                        {:origin :core})))
+
 (defn activate-manifest-extensions-in!
   "Activate manifest-aware extensions through one shared abstraction.
 
@@ -122,6 +135,8 @@
         activation-result (ext/activate-extensions-in! (:extension-registry ctx)
                                                        runtime-fns*
                                                        (activation-entries (assoc plan :deps-realized? (:deps-realized? deps-result))))]
+    (when (seq (:loaded activation-result))
+      (refresh-active-tools-in! ctx session-id))
     (merge-extension-results activation-result deps-result)))
 
 (defn bootstrap-manifest-extensions-in!
