@@ -497,25 +497,30 @@
     (let [[ctx session-id] (create-session-context)
           template {:name "greet" :description "Greeting" :content "Hello" :source :project :file-path "/tmp/greet.md"}
           skill    {:name "test-skill" :description "A test skill" :lambda "λtest" :entrypoint "SKILL.md"}
-          tool     {:name "test-tool" :description "A test tool" :parameters {:type "object" :properties {}}}]
-      (bootstrap/bootstrap-in!
-       ctx session-id
-       {:base-tools      [tool]
-        :system-prompt   "sys"
-        :templates       [template]
-        :skills          [skill]
-        :extension-paths []})
-      (let [sd         (ss/get-session-data-in ctx session-id)
-            agent-data (agent/get-data-in (ss/agent-ctx-in ctx session-id))]
-        (is (= 1 (count (:prompt-templates sd)))
-            "one template registered in session-data")
-        (is (= 1 (count (:skills sd)))
-            "one skill registered in session-data")
-        (is (pos? (count (:tools agent-data)))
-            "at least one tool registered in agent-ctx")
-        (is (= "greet" (:name (first (:prompt-templates sd)))))
-        (is (= "test-skill" (:name (first (:skills sd)))))
-        (is (some #(= "test-tool" (:name %)) (:tools agent-data)))))))
+          tool     {:name "test-tool" :description "A test tool" :parameters {:type "object" :properties {}}}
+          summary  (bootstrap/bootstrap-in!
+                    ctx session-id
+                    {:base-tools      [tool]
+                     :system-prompt   "sys"
+                     :templates       [template]
+                     :skills          [skill]
+                     :extension-paths []})
+          sd         (ss/get-session-data-in ctx session-id)
+          agent-data (agent/get-data-in (ss/agent-ctx-in ctx session-id))]
+      (testing "return summary counts match registered resources"
+        (is (= 1 (:prompt-count summary))
+            "summary prompt-count = 1")
+        (is (= 1 (:skill-count summary))
+            "summary skill-count = 1")
+        (is (pos? (:tool-count summary))
+            "summary tool-count ≥ 1"))
+      (is (= 1 (count (:prompt-templates sd)))
+          "one template registered in session-data")
+      (is (= 1 (count (:skills sd)))
+          "one skill registered in session-data")
+      (is (= "greet" (:name (first (:prompt-templates sd)))))
+      (is (= "test-skill" (:name (first (:skills sd)))))
+      (is (some #(= "test-tool" (:name %)) (:tools agent-data))))))
 
 (deftest bootstrap-dispatch-event-log-test
   (testing "bootstrap-in! produces dispatch events for resource registration"

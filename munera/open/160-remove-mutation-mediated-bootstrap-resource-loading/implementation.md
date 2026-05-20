@@ -79,3 +79,13 @@ Applied test-shaper skill (clarity ∧ signal ∧ robustness ∧ economical) to 
 2. **`bootstrap-resource-registration-test` doesn't assert return summary counts.** The test verifies resources exist in session-data but discards `bootstrap-in!`'s return value. Adding `(let [summary (bootstrap/bootstrap-in! ...)] (is (= 1 (:prompt-count summary))) ...)` would close the return-shape coverage gap with minimal effort. This partially addresses the existing finding 5 (return shape untested) at the bootstrap level rather than only through introspection resolvers.
 
 3. **Missing step: update `bootstrap-dispatch-event-log-test` origin from `:mutations` to `:core`.** Step 8 documents the intent ("update to `:origin :core` after step 1") but no unchecked step exists to perform the update. Step 3 scans for `:mutations` in the startup summary key — that won't catch the dispatch event `:origin :mutations` assertion. Without an explicit step, the test will fail after step 1 converts to direct dispatch (good — it's a mechanism-change detector) but the fix could be missed or done ad-hoc.
+
+## Follow-up execution: test-shaper steps 9, 10, 11
+
+All three steps completed in `bootstrap-resource-registration-test`:
+
+1. **Step 9 — removed redundant weak assertion**: `(is (pos? (count (:tools agent-data))) ...)` removed; subsumed by the `(some #(= "test-tool" ...) ...)` assertion. Also flattened nested `let` into a single binding block (eliminated kondo redundant-let warning).
+
+2. **Step 10 — return summary count assertions**: captured `bootstrap-in!` return value as `summary`; added three assertions: `(:prompt-count summary)` = 1, `(:skill-count summary)` = 1, `(:tool-count summary)` ≥ 1. Closes return-shape coverage gap at bootstrap level.
+
+3. **Step 11 — explicit origin update step**: added step 12 to steps.md — update `bootstrap-dispatch-event-log-test` origin from `:mutations` to `:core` after step 1 executes. Separate from step 3's `:mutations` summary key scan.
