@@ -43,3 +43,14 @@ Should `load-startup-resources-in!` still be called? With which subset of its cu
 ### A6 — `developer-prompt` delivery path in target flow
 
 Currently `developer-prompt` and `developer-prompt-source` reach session state via `bootstrap-in!` → `:session/bootstrap-prompt-state`. The target flow removes `bootstrap-in!` but shows `:session/bootstrap-prompt-state` which does carry these fields. This is consistent — but only if the target flow passes `developer-prompt` into the `:session/bootstrap-prompt-state` dispatch payload. The target flow diagram doesn't show this explicitly. Minor, but worth confirming the intent.
+
+## Design review: ambiguity follow-up resolutions (2026-05-19)
+
+All six ambiguity items (A1–A6) resolved. Design.md updated:
+
+- **A1**: Intent corrected to "four times" (2 builds, 4 persists). PERSIST #3 annotation fixed: no build-opts exist at that point, handler falls back to re-persisting base-system-prompt as-is.
+- **A2**: Target flow uses `:session/set-system-prompt` for the single prompt persist (applies prompt contributions via `effective-prompt`). `:session/bootstrap-prompt-state` used only once at start to seed developer-prompt + developer-prompt-source.
+- **A3**: Individual `:session/add-tool` dispatches removed from startup. Both `add-tool` and `set-active-tools` produce `:runtime/agent-set-tools` effects; `set-active-tools` replaces the full set, making prior `add-tool` dispatches redundant.
+- **A4**: `bootstrap-in!` retained as test-oriented convenience. Startup responsibilities inlined into `adopt-startup-plan-into-session!`. Tests that redef `bootstrap-in!` are unaffected (they stub the function entirely).
+- **A5**: `load-startup-resources-in!` called with templates + skills only. Tools excluded (composed separately via `set-active-tools`). Extension-paths/targets excluded (handled by `bootstrap-manifest-extensions-in!`).
+- **A6**: Confirmed. Target flow explicitly dispatches `:session/bootstrap-prompt-state` with developer-prompt and developer-prompt-source before the prompt build. Now shown in target flow diagram.

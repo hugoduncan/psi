@@ -1,8 +1,8 @@
 # Design review follow-ups — 161
 
-- [ ] A1: Fix Intent section — correct "three times" to match actual count (2 builds, 4 persists); fix "rebuilds from build-opts" annotation on PERSIST #3 (no build-opts exist at that point)
-- [ ] A2: Decide prompt-contribution application strategy — target flow uses `:session/bootstrap-prompt-state` which skips prompt contributions; clarify whether to use `:session/set-system-prompt`, add a `:session/refresh-system-prompt` after, or another approach
-- [ ] A3: Decide whether individual `:session/add-tool` dispatches in `load-startup-resources-in!` are kept or removed when `:session/set-active-tools` overwrites the full set
-- [ ] A4: Decide the fate of `bootstrap-in!` — keep as test-oriented subset, eliminate and update 7 test redefs, or restructure; state the choice in design
-- [ ] A5: Clarify what "load resources" means in the target flow — which parameters of `load-startup-resources-in!` are used, and whether tools/extension-paths/extension-targets are included or excluded
-- [ ] A6: Confirm that `developer-prompt` and `developer-prompt-source` are explicitly passed in the target flow's `:session/bootstrap-prompt-state` dispatch
+- [x] A1: Fix Intent section — correct "three times" to match actual count (2 builds, 4 persists); fix "rebuilds from build-opts" annotation on PERSIST #3 (no build-opts exist at that point)
+- [x] A2: Decide prompt-contribution application strategy — target flow uses `:session/set-system-prompt` (applies contributions via `effective-prompt`); `:session/bootstrap-prompt-state` used only to seed developer-prompt at start
+- [x] A3: Decide whether individual `:session/add-tool` dispatches in `load-startup-resources-in!` are kept or removed — removed; `set-active-tools` replaces the full set, making prior `add-tool` dispatches redundant
+- [x] A4: Decide the fate of `bootstrap-in!` — retained as test-oriented convenience; startup responsibilities inlined into `adopt-startup-plan-into-session!`; tests that redef it are unaffected
+- [x] A5: Clarify what "load resources" means in the target flow — `load-startup-resources-in!` called with templates + skills only; tools excluded (composed via `set-active-tools`); extension-paths/targets excluded (handled by `bootstrap-manifest-extensions-in!`)
+- [x] A6: Confirm that `developer-prompt` and `developer-prompt-source` are explicitly passed — yes, via an explicit `:session/bootstrap-prompt-state` dispatch at the start of the target flow, before the prompt build

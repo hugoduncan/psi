@@ -2,16 +2,17 @@
 
 ## Intent
 
-`adopt-startup-plan-into-session!` builds and persists the system prompt three times during startup, and has two independent tool-composition mechanisms. This task collapses both to single-pass operations.
+`adopt-startup-plan-into-session!` builds and persists the system prompt four times during startup (two builds, four persists), and has two independent tool-composition mechanisms. This task collapses both to single-pass operations.
 
 ## Why
 
 Task 159 introduced the four-phase bootstrap split. Task 160 removed mutation-mediated resource loading. The remaining complexity in `adopt-startup-plan-into-session!` is redundant layering left over from those earlier shapes:
 
-1. The system prompt is built/persisted three times:
-   - `adopt-startup-plan-into-session!` builds `base-prompt` via `build-system-prompt` and calls `persist-system-prompt!` (first persist)
-   - `bootstrap-in!` receives that same prompt, dispatches `:session/bootstrap-prompt-state` (second persist — sets `:base-system-prompt` and `:system-prompt`) then dispatches `:session/refresh-system-prompt` (rebuilds from build-opts, third persist)
-   - `finalize-startup-system-prompt!` rebuilds with graph-capabilities + refreshed tool-defs and persists again (fourth persist, the only one that produces the correct final prompt)
+1. The system prompt is built twice and persisted four times:
+   - BUILD #1 + PERSIST #1: `adopt-startup-plan-into-session!` builds `base-prompt` via `build-system-prompt` and calls `persist-system-prompt!` (`:session/set-system-prompt`)
+   - PERSIST #2: `bootstrap-in!` dispatches `:session/bootstrap-prompt-state` — sets `:base-system-prompt` and `:system-prompt` to the same value (state mutation, no build, no prompt contributions applied)
+   - PERSIST #3: `bootstrap-in!` dispatches `:session/refresh-system-prompt` — at this point no `:system-prompt-build-opts` exist in session data, so the handler falls back to re-persisting `:base-system-prompt` without calling `build-system-prompt` (a no-op re-persist, not a rebuild)
+   - BUILD #2 + PERSIST #4: `finalize-startup-system-prompt!` rebuilds with graph-capabilities + refreshed tool-defs and persists via `:session/set-system-prompt` (the only persist that produces the correct final prompt)
 
    Only the last persist produces the correct prompt. The first three are wasted work.
 
@@ -36,7 +37,7 @@ The current startup flow performs redundant prompt builds, redundant tool-set di
 1. Eliminate redundant system-prompt builds — the prompt should be built and persisted once, after all inputs (graph-capabilities, extension tools, skills, prompt contributions) are known
 2. Unify tool composition — one path that assembles the final tool set from base tools + extension tools
 3. Collapse startup-summary persistence — one persist with the complete summary
-4. Simplify the `bootstrap-in!` / `adopt-startup-plan-into-session!` boundary — either inline `bootstrap-in!`'s remaining responsibilities into `adopt-startup-plan-into-session!`, or restructure `bootstrap-in!` so it no longer performs work that its caller immediately overrides
+4. Simplify the `bootstrap-in!` / `adopt-startup-plan-into-session!` boundary — inline `bootstrap-in!`'s startup responsibilities into `adopt-startup-plan-into-session!` (developer-prompt seeding, resource loading, summary building). Retain `bootstrap-in!` as a self-contained test-oriented bootstrap; tests that redef it are unaffected since they stub the function entirely
 
 ### Out of scope
 
@@ -62,7 +63,7 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
   │
   ├─ bootstrap-in!(ctx, session-id, ...)
   │    ├─ PERSIST #2: :session/bootstrap-prompt-state    ◄── wasted
-  │    ├─ PERSIST #3: :session/refresh-system-prompt     ◄── wasted (rebuilds from build-opts)
+  │    ├─ PERSIST #3: :session/refresh-system-prompt     ◄── wasted (no build-opts exist yet; re-persists base-system-prompt as-is)
   │    ├─ load resources (templates, skills, tools, extensions)
   │    ├─ refresh-active-tools? = false                  ◄── disabled
   │    ├─ PERSIST summary #1                             ◄── overwritten
@@ -98,7 +99,16 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
   ├─ make session-scoped psi-tool
   ├─ base-tool-defs = startup-plan.base-tools + psi-tool
   │
-  ├─ load resources (templates, skills, extensions via direct dispatch)
+  ├─ set developer-prompt + developer-prompt-source in session state
+  │    (DISPATCH :session/bootstrap-prompt-state with developer-prompt,
+  │     developer-prompt-source, and empty system-prompt — state seeding only)
+  │
+  ├─ load resources (templates, skills via direct dispatch)
+  │    — uses load-startup-resources-in! with templates + skills only
+  │    — does NOT pass tools (individual :session/add-tool dispatches are
+  │      redundant because :session/set-active-tools overwrites the full set)
+  │    — does NOT pass extension-paths or extension-targets (handled by
+  │      bootstrap-manifest-extensions-in! below)
   │
   ├─ bootstrap-manifest-extensions-in!
   │
@@ -108,7 +118,9 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
   ├─ register-all-domains!
   ├─ query graph-capabilities
   ├─ BUILD system prompt (once, with all inputs)
-  ├─ DISPATCH :session/bootstrap-prompt-state (once)
+  ├─ DISPATCH :session/set-system-prompt (once)
+  │    — uses :session/set-system-prompt (not :session/bootstrap-prompt-state)
+  │      so that extension prompt contributions are applied via effective-prompt
   ├─ PERSIST build-opts
   │
   ├─ build + PERSIST summary (once)
@@ -117,6 +129,21 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
   ├─ register extension run fn
   └─ capture startup rehydrate
 ```
+
+### Target flow design decisions
+
+**Prompt dispatch**: The target uses `:session/set-system-prompt` for the single prompt persist because it applies extension prompt contributions via `effective-prompt`. `:session/bootstrap-prompt-state` is used only once at the start to seed `developer-prompt` and `developer-prompt-source` into session state (with an empty system-prompt that will be overwritten).
+
+**Tool registration**: Individual `:session/add-tool` dispatches from `load-startup-resources-in!` are eliminated for base tools. Both `:session/add-tool` and `:session/set-active-tools` produce `:runtime/agent-set-tools` effects, and `set-active-tools` replaces the full set, making prior `add-tool` dispatches redundant. Tools are excluded from the `load-startup-resources-in!` call.
+
+**`load-startup-resources-in!` scope**: Called with templates and skills only. Tools are excluded (composed separately via `set-active-tools`). Extension-paths and extension-targets are excluded (handled by `bootstrap-manifest-extensions-in!`).
+
+**`bootstrap-in!` fate**: `bootstrap-in!` is eliminated from the startup flow. Its responsibilities are inlined into `adopt-startup-plan-into-session!`:
+- Developer-prompt seeding → explicit `:session/bootstrap-prompt-state` dispatch
+- Resource loading → direct call to `load-startup-resources-in!` (templates + skills only)
+- Summary persistence → single dispatch at the end
+
+`bootstrap-in!` itself is retained as a test-oriented convenience function. Its interface is unchanged; tests that redef it continue to work because they stub out the function entirely. Tests that call it directly still get the self-contained bootstrap behaviour it provides.
 
 ## Constraints
 
@@ -140,7 +167,8 @@ adopt-startup-plan-into-session!(ctx, session-id, ai-model, startup-plan, opts)
 
 ## Verification expectations
 
-- Count dispatches of `:session/set-system-prompt` or `:session/bootstrap-prompt-state` during startup — should be 1
+- Count dispatches of `:session/set-system-prompt` during startup — should be 1
+- Count dispatches of `:session/bootstrap-prompt-state` during startup — should be 1 (developer-prompt seeding only)
 - Count dispatches of `:session/set-active-tools` during startup — should be 1
 - Count dispatches of `:session/set-startup-bootstrap-summary` during startup — should be 1
 - The final system prompt contains graph-capabilities and extension tool names
