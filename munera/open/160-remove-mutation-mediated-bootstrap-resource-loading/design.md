@@ -37,7 +37,7 @@ Replace the mutation-mediated resource loading with direct dispatch calls during
 ## Acceptance criteria
 
 1. `load-startup-resources-via-mutations-in!` (or its replacement) performs no Pathom query-context setup and calls no EQL mutations
-2. Templates, skills, and tools are registered via direct `dispatch/dispatch!` calls to the same event types the mutations dispatched
+2. Templates, skills, and tools are registered via direct `session/dispatch-in!` calls to the same event types the mutations dispatched
 3. The `:mutations` key is removed from the bootstrap summary map
 4. All existing bootstrap tests pass with no behavioural change in registered resources
 5. Lint clean, focused test verification green

@@ -1,15 +1,16 @@
 # 160 — Steps
 
 - [ ] 1. Rewrite `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!` in `bootstrap.clj`
-  - Replace template loop: `dispatch/dispatch!` ctx `:session/register-prompt-template` per template, `{:origin :core}`
-  - Replace skill loop: `dispatch/dispatch!` ctx `:session/register-skill` per skill, `{:origin :core}`
-  - Replace tool loop: `dispatch/dispatch!` ctx `:session/add-tool` per tool, `{:origin :core}`
+  - Replace template loop: `session/dispatch-in!` ctx `:session/register-prompt-template` per template, `{:origin :core}`
+  - Replace skill loop: `session/dispatch-in!` ctx `:session/register-skill` per skill, `{:origin :core}`
+  - Replace tool loop: `session/dispatch-in!` ctx `:session/add-tool` per tool, `{:origin :core}`
   - Replace extension-path loop: `ext-rt/add-extension-in!` ctx session-id path (direct, no dispatch)
   - Keep extension init-var path unchanged (already direct)
   - Discard dispatch return values via `doseq` (counts read from session-data after all loops)
   - Remove `run-mutation-in!` private helper
   - Remove requires: `psi.agent-session.mutations`, `psi.query.core`
-  - Add require: `psi.agent-session.dispatch` (if not already present)
+  - Add require: `psi.agent-session.extension-runtime` (as `ext-rt`) — needed for `ext-rt/add-extension-in!`
+  - No new dispatch require needed: `session/dispatch-in!` uses existing `psi.agent-session.core` (already required as `session`)
   - Rename call site in `bootstrap-in!`
 
 - [ ] 2. Remove `:mutations` from bootstrap summary

@@ -2,7 +2,7 @@
 
 ## Approach
 
-Direct replacement: the three mutation loops in `load-startup-resources-via-mutations-in!` each create a Pathom query context and call an EQL mutation that does nothing more than `dispatch/dispatch!` to the corresponding session event. We replace those loops with direct dispatch calls, eliminating the Pathom round-trip entirely.
+Direct replacement: the three mutation loops in `load-startup-resources-via-mutations-in!` each create a Pathom query context and call an EQL mutation that does nothing more than dispatch to the corresponding session event. We replace those loops with direct `session/dispatch-in!` calls (the same function used by all existing dispatch calls in `bootstrap-in!`), eliminating the Pathom round-trip entirely.
 
 The `:mutations` key in the startup-bootstrap summary schema and resolvers is vestigial provenance — it records *which mutations were used*. With direct dispatch, it has no meaning and is removed from the summary, the session-data schema, and the two resolvers that project it.
 
@@ -11,6 +11,8 @@ The `:mutations` key in the startup-bootstrap summary schema and resolvers is ve
 - **Rename** `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!` to reflect the mechanism change. Keep the same signature and return shape so callers (`bootstrap-in!`) need only a call-site rename.
 - **Remove** the `run-mutation-in!` helper — it becomes dead code.
 - **Remove** `psi.agent-session.mutations` and `psi.query.core` from the bootstrap ns requires — they become unused.
+- **Add** `psi.agent-session.extension-runtime` (as `ext-rt`) to the bootstrap ns requires — needed for direct `ext-rt/add-extension-in!` calls in the extension-path replacement.
+- **Use `session/dispatch-in!`** for all replacement dispatch calls — consistent with every existing dispatch call in `bootstrap-in!` (`session/dispatch-in!` is the public agent-session dispatch entrypoint, wrapping `dispatch/dispatch!`). No new require needed: `psi.agent-session.core` is already required as `session`.
 - **`:mutations` key removal** cascades through: session-data schema, `bootstrap-in!` summary construction, `startup-bootstrap-resolver` (agent-session), `startup-bootstrap-summary` (introspection), and the introspection test.
 - **`:origin :core`** for all replacement direct dispatch calls. The mutations currently pass `{:origin :mutations}`, but bootstrap is core infrastructure — `:origin :core` is consistent with the other direct dispatch calls already in `bootstrap-in!` (e.g. `:session/bootstrap-prompt-state`, `:session/refresh-system-prompt`, `:session/set-active-tools`).
 - **Dispatch return values are intentionally discarded.** The current code uses `doseq` for template/skill/tool loops, discarding `run-mutation-in!` return values. The dispatch handlers return `{:return {:added? ... :count ...}}` but the final counts are read from session-data after all loops complete. The replacement direct dispatch calls also discard returns via `doseq`.
