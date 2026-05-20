@@ -219,8 +219,12 @@
    :scheduler-run-after-delay-fn (fn [ctx delay-ms f]
                                    ((:daemon-thread-fn ctx)
                                     (fn []
-                                      (Thread/sleep ^long delay-ms)
-                                      (f))))
+                                      (try
+                                        (Thread/sleep ^long delay-ms)
+                                        (f)
+                                        (catch InterruptedException _
+                                          ;; cancelled via scheduler-cancel-delay-fn — exit silently
+                                          nil)))))
    :scheduler-cancel-delay-fn (fn [_ctx handle]
                                 (when (instance? Thread handle)
                                   (.interrupt ^Thread handle)))
