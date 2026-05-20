@@ -11,7 +11,17 @@
    [psi.agent-session.session-runtime :as runtime]
    [psi.session-state.state :as session]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
-   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]))
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [taoensso.timbre :as timbre]))
+
+(defn- invoke-built-in-lifecycle-logged!
+  "Invoke built-in lifecycle callback and log any error map returned."
+  [event-name event]
+  (let [result (workflow-runtime-state/invoke-built-in-lifecycle! event-name event)]
+    (when (and (map? result) (contains? result :error))
+      (timbre/warn "Built-in lifecycle handler error"
+                   {:event-name event-name :event event :error (:error result)}))
+    result))
 
 (defn- initialize-top-level-session!
   [ctx source-session-id {:keys [dispatch-event session-name worktree-path scheduled-origin-session-id scheduled-from-schedule-id scheduled-from-label]}]
@@ -81,7 +91,7 @@
                                                                      :session-name (:session-name opts)
                                                                      :worktree-path (:worktree-path opts)})]
         (ext/dispatch-in reg "session_switch" {:reason :new})
-        (workflow-runtime-state/invoke-built-in-lifecycle! "session_switch" {:reason :new})
+        (invoke-built-in-lifecycle-logged! "session_switch" {:reason :new})
         sd))))
 
 (defn create-top-level-session-in!
@@ -113,7 +123,7 @@
                                  :session-path session-path}
                                 {:origin :core})
             (ext/dispatch-in reg "session_switch" {:reason :resume})
-            (workflow-runtime-state/invoke-built-in-lifecycle! "session_switch" {:reason :resume})
+            (invoke-built-in-lifecycle-logged! "session_switch" {:reason :resume})
             (session/get-session-data-in ctx source-session-id))
           (let [{:keys [header entries]} loaded
                 session-id             (:id header)
@@ -165,7 +175,7 @@
             (dispatch/dispatch! ctx :session/ensure-base-system-prompt {:session-id session-id} {:origin :core})
             (dispatch/dispatch! ctx :session/retarget-runtime-prompt-metadata {:session-id session-id} {:origin :core})
             (ext/dispatch-in reg "session_switch" {:reason :resume})
-            (workflow-runtime-state/invoke-built-in-lifecycle! "session_switch" {:reason :resume})
+            (invoke-built-in-lifecycle-logged! "session_switch" {:reason :resume})
             (session/get-session-data-in ctx session-id)))))))
 
 (defn- fork-branch-entries

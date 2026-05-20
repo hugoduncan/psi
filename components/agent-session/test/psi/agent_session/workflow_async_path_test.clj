@@ -17,6 +17,7 @@
       (try
         (workflow-test-support/load-all-workflow-definitions! ctx)
         (let [cmd (command-registry/get-command-in (:extension-registry ctx) "delegate")
+              _ (is (= :built-in (:source cmd)) "delegate command carries :source :built-in provenance")
               result ((:handler cmd) "lambda-build simple code is good code")]
           (is (string? result))
           (is (.contains ^String result "Delegated to lambda-build — run "))

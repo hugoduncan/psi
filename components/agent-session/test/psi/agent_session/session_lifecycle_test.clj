@@ -12,7 +12,8 @@
    [psi.session-journal.store :as journal-store]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state])
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [taoensso.timbre :as timbre])
   (:import
    (java.io File)))
 
@@ -523,3 +524,24 @@
       (session/resume-session-in! ctx sid missing)
       (is (some? @received) "session_switch callback was invoked on missing-file resume")
       (is (= :resume (:reason @received))))))
+
+(deftest new-session-built-in-lifecycle-error-is-logged-test
+  (testing "new-session-in! logs a warning when the built-in session_switch handler throws"
+    (let [log-data    (atom [])
+          [ctx _sid] (create-session-context)]
+      (workflow-runtime-state/register-built-in-lifecycle-callback!
+       "session_switch"
+       (fn [_] (throw (Exception. "lifecycle boom"))))
+      (timbre/with-merged-config
+        {:appenders {:test-capture {:enabled? true
+                                    :fn (fn [data]
+                                          (when (= :warn (:level data))
+                                            (swap! log-data conj (:vargs data))))}}}
+        (session/new-session-in! ctx nil {}))
+      (is (seq @log-data) "a warn-level log entry was emitted")
+      (is (some (fn [vargs]
+                  (some (fn [a]
+                          (and (map? a) (= "lifecycle boom" (:error a))))
+                        vargs))
+                @log-data)
+          "warning vargs include a map with :error key matching the exception message"))))

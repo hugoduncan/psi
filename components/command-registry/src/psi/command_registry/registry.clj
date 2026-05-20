@@ -121,7 +121,8 @@
                        :command-name  command-name
                        :reason        :invalid-command-name})))
     (swap! (:state reg)
-           assoc-in [:built-in-commands provenance-id command-name] cmd)
+           assoc-in [:built-in-commands provenance-id command-name]
+           (assoc cmd :source :built-in))
     reg))
 
 (defn all-built-in-commands-in
