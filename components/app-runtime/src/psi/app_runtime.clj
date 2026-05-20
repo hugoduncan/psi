@@ -494,7 +494,8 @@ Available: " (str/join ", " (map name (keys all))))
   ([ctx session-id ai-model opts]
    (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
          startup-plan (build-startup-plan ctx {:cwd cwd})
-         _            (log-startup-plan-diagnostics! startup-plan)]
+         _            (log-startup-plan-diagnostics! startup-plan)
+         session-id   (or session-id (create-initial-startup-session! ctx))]
      (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts))))
 
 ;; ============================================================
