@@ -30,6 +30,10 @@ Already noted as pre-existing. The fallback `(or (:cwd opts) (:cwd ctx) (System/
 
 Added `bootstrap-runtime-session-reuses-pre-created-session-test` in `app_runtime_bootstrap_test.clj`. Test pre-creates a session via `session/new-session-in!`, passes its id as `:session-id` in opts to the real `bootstrap-runtime-session!`, asserts the returned session-id matches and no extra session was created. 301 tests pass, lint clean.
 
+## Task-test-review — fragile `resolve` in mock (2026-05-19)
+
+**`resolve` for private fn in mock (robustness/fragility).** `start-tui-runtime-extension-command-after-new-targets-new-session-test` (line 207) uses `(resolve 'psi.app-runtime/startup-rehydrate-from-current-session!)` inside the `bootstrap-runtime-session!` mock. If the private fn is renamed or removed, `resolve` returns `nil` silently, causing an NPE at runtime rather than a clear compile-time failure. Should use `#'psi.app-runtime/startup-rehydrate-from-current-session!` (var reference) which fails at compile time if the var doesn't exist. Pre-existing pattern but the mock was modified during this task (collapsed from 2-arity to 1-arity).
+
 ## Test review (2026-05-19)
 
 **Coverage gap — `:session-id` reuse path untested with real function.**
