@@ -132,6 +132,7 @@
    (mapv session-info->eql
          (journal-store/list-sessions
           (journal-store/session-dir-for
+           (:session-root agent-session-ctx)
            (support/session-worktree-path agent-session-ctx session-id))))})
 
 (defn- persisted-session-list-all-payload

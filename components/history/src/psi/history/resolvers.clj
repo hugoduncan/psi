@@ -35,22 +35,27 @@
    Accepts optional EQL params:
      :n    — number of commits (default 50)
      :grep — filter by message text
-     :path — restrict to a file/directory"
+     :path — restrict to a file/directory
+
+   Returns empty results when the git context is not inside a repository."
   [env {:keys [git/context]}]
   {::pco/input  [:git/context]
    ::pco/output [:git.repo/commits
                  :git.repo/has-history]}
   (let [params  (pco/params env)
-        commits (vec (git/log context params))]
+        commits (try (vec (git/log context params))
+                     (catch Exception _ []))]
     {:git.repo/commits     commits
      :git.repo/has-history (pos? (count commits))}))
 
 (pco/defresolver git-repo-files
-  "Resolve :git.repo/files — seq of tracked file path strings."
+  "Resolve :git.repo/files — seq of tracked file path strings.
+   Returns empty when the git context is not inside a repository."
   [{:keys [git/context]}]
   {::pco/input  [:git/context]
    ::pco/output [:git.repo/files]}
-  {:git.repo/files (vec (git/ls-files context))})
+  {:git.repo/files (try (vec (git/ls-files context))
+                        (catch Exception _ []))})
 
 ;;; GitCommit resolvers
 
@@ -103,11 +108,13 @@
 
 (pco/defresolver git-learning-commits
   "Resolve :git.repo/learning-commits — commits containing the λ symbol.
-   Implements the QueryHistory surface from the Allium spec."
+   Implements the QueryHistory surface from the Allium spec.
+   Returns empty when the git context is not inside a repository."
   [{:keys [git/context]}]
   {::pco/input  [:git/context]
    ::pco/output [:git.repo/learning-commits]}
-  {:git.repo/learning-commits (vec (git/log context {:grep "λ"}))})
+  {:git.repo/learning-commits (try (vec (git/log context {:grep "λ"}))
+                                   (catch Exception _ []))})
 
 ;;; Git worktree resolvers
 

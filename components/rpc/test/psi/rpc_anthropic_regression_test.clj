@@ -37,7 +37,7 @@
   (testing "resume emits canonical agent messages from the journal"
     (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-rpc-anthropic-resume-" (java.util.UUID/randomUUID))
           _                  (.mkdirs (java.io.File. cwd))
-          [ctx _]      (support/create-session-context {:cwd cwd})
+          [ctx _]      (support/create-session-context {:cwd cwd :persist? true :session-root cwd})
           sd1                (session/new-session-in! ctx nil {})
           session-id         (:session-id sd1)
           path1              (:session-file sd1)

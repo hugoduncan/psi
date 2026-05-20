@@ -94,7 +94,7 @@
   (testing "command /resume <path> emits session/resumed and session/rehydrated canonical events"
     (let [cwd                 (str (System/getProperty "java.io.tmpdir") "/psi-rpc-resume-" (java.util.UUID/randomUUID))
           _                   (.mkdirs (java.io.File. cwd))
-          [ctx _]             (support/create-session-context {:cwd cwd})
+          [ctx _]             (support/create-session-context {:cwd cwd :persist? true :session-root cwd})
           sd1                 (session/new-session-in! ctx nil {})
           session-id          (:session-id sd1)
           path1               (:session-file sd1)
@@ -126,7 +126,7 @@
   (testing "command /tree <session-id> emits session/resumed and session/rehydrated canonical events"
     (let [cwd                 (str (System/getProperty "java.io.tmpdir") "/psi-rpc-tree-" (java.util.UUID/randomUUID))
           _                   (.mkdirs (java.io.File. cwd))
-          [ctx _]             (support/create-session-context {:cwd cwd})
+          [ctx _]             (support/create-session-context {:cwd cwd :persist? true :session-root cwd})
           sd1                 (session/new-session-in! ctx nil {})
           sid1                (:session-id sd1)
           path1               (:session-file sd1)
@@ -159,7 +159,7 @@
   (testing "command /tree emits frontend selector payload with backend-owned order"
     (let [cwd                 (str (System/getProperty "java.io.tmpdir") "/psi-rpc-tree-picker-" (java.util.UUID/randomUUID))
           _                   (.mkdirs (java.io.File. cwd))
-          [ctx session-id]    (support/create-session-context {:cwd cwd})
+          [ctx session-id]    (support/create-session-context {:cwd cwd :persist? true :session-root cwd})
           child-sd            (session/new-session-in! ctx session-id {})
           child-id            (:session-id child-sd)
           _                   (ss/update-state-value-in! ctx
