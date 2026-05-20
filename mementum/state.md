@@ -15,26 +15,26 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- Task 160 remove-mutation-mediated-bootstrap-resource-loading is complete and closed:
-  - Core rewrite: `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!`
-  - Direct `session/dispatch-in!` for templates, skills, tools; direct `ext-rt/add-extension-in!` for extensions
-  - Removed throwaway query-context, `run-mutation-in!`, requires for `mutations` and `query.core`
-  - `:mutations` key removed from summary, schema, resolvers; tests updated
-  - Review-implementation confirmed: no remaining actionable feedback; two unchecked steps (18, 19) are optional refactoring follow-ons (not correctness)
-  - 61 focused tests, 397 assertions, 0 failures; lint clean
+- Task 161 collapse-startup-prompt-and-tool-composition is complete and closed:
+  - Rewrote `adopt-startup-plan-into-session!` to single-pass startup
+  - System prompt built once (after graph-caps + extension tools known), persisted once via `:session/set-system-prompt`
+  - Tool set composed and dispatched once via `:session/set-active-tools` (placed after build-opts persist so side-effect `refresh-system-prompt` rebuilds correctly)
+  - Summary built and persisted once with complete information
+  - Removed `finalize-startup-system-prompt!` (logic inlined)
+  - Removed `bootstrap-in!` call from startup flow; retained as test-oriented convenience
+  - Removed 6 now-inert `bootstrap-in!` redefs from test files + unused requires
+  - Dispatch counts verified per acceptance criteria
+  - 301 tests, 0 failures; lint clean
 
-- Tasks 159, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 are complete and closed
+- Tasks 160, 159, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 are complete and closed
 
 ## Suggested next step
-- Bootstrap simplification continues — main remaining complexity in `psi.app-runtime/adopt-startup-plan-into-session!`:
-  - Two-stage system-prompt build (base prompt persisted, then rebuilt after graph-capability + extension tool refresh)
-  - Duplicate active-tool composition: `bootstrap-in!` has `refresh-active-tools-in!` (disabled), then `adopt-startup-plan-into-session!` does its own `merge-tool-defs-by-name` + `set-active-tools` dispatch
-  - `bootstrap-in!` and `adopt-startup-plan-into-session!` overlap on startup-summary persistence
-  - Consider: can `adopt-startup-plan-into-session!` delegate more to `bootstrap-in!` or be simplified now that bootstrap uses direct dispatch?
+- Bootstrap simplification continues — remaining areas:
+  - `bootstrap-in!` itself is now only used by tests; consider whether it should be slimmed or removed
+  - `refresh-active-tools-in!` in bootstrap.clj is unused in startup (tools excluded from `load-startup-resources-in!` call); may be dead code
 - `149-reload-fixup-inventory-and-safety` — reload correctness
 - `124-turn-execution-contract-extraction` — component extraction
 - `141`, `144`, `147` — workflow architecture items
 
 ## Latest session notes
-- Reopened task 160, executed the core rewrite (steps 1–5, 12, 14) that had been left undone
-- Review-implementation workflow confirmed completion — no new actionable issues
+- Implemented task 161: single-pass startup that collapses 4 prompt persists → 1+1 side-effect, 2 tool paths → 1, 2 summary persists → 1
