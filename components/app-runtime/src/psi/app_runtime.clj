@@ -665,7 +665,6 @@ Available: " (str/join ", " (map name (keys all))))
                     :cwd cwd
                     :startup-rehydrate startup-rehydrate
                     :dispatch-fn dispatch-fn
-                    :run-agent-fn run-agent-fn
                     :on-interrupt-fn! on-interrupt-fn!
                     :frontend-action-handler-fn! frontend-action-handler-fn!
                     :resume-fn! resume-fn!

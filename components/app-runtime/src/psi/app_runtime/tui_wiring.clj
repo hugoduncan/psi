@@ -122,11 +122,11 @@
            frontend-action-handler-fn!
            resume-fn! switch-session-fn! fork-session-fn!
            current-context-widget]}]
-  (let [sid @tui-focus*]
-    {:query-fn             (fn [q] (session/query-in ctx sid q))
-     :footer-model-fn      (fn [] (footer/footer-model ctx sid))
+  (let [initial-sid @tui-focus*]
+    {:query-fn             (fn [q] (session/query-in ctx @tui-focus* q))
+     :footer-model-fn      (fn [] (footer/footer-model ctx @tui-focus*))
      :session-selector-fn  (fn [] (ui-actions/context-session-action
-                                   (selectors/context-session-selector ctx sid)))
+                                   (selectors/context-session-selector ctx @tui-focus*)))
      :initial-context-session-tree-widget current-context-widget
      :ui-read-fn       (fn [] (projections/extension-ui-snapshot ctx))
      :ui-dispatch-fn   (fn [event-type payload]
@@ -135,18 +135,19 @@
      :dispatch-fn          dispatch-fn
      :on-interrupt-fn!     on-interrupt-fn!
      :on-queue-input-fn!   (fn [text _state]
-                             (if (= :streaming (ss/sc-phase-in ctx sid))
-                               (do
-                                 (session/queue-while-streaming-in! ctx sid text :steer)
-                                 {:message "Queued steering message."})
-                               (do
-                                 (session/queue-while-streaming-in! ctx sid text :queue)
-                                 {:message "Queued follow-up message."})))
+                             (let [sid @tui-focus*]
+                               (if (= :streaming (ss/sc-phase-in ctx sid))
+                                 (do
+                                   (session/queue-while-streaming-in! ctx sid text :steer)
+                                   {:message "Queued steering message."})
+                                 (do
+                                   (session/queue-while-streaming-in! ctx sid text :queue)
+                                   {:message "Queued follow-up message."}))))
      :double-press-window-ms 500
      :double-escape-action :none
      :cwd                  cwd
-     :focus-session-id     sid
-     :current-session-file (:session-file (ss/get-session-data-in ctx sid))
+     :focus-session-id     initial-sid
+     :current-session-file (:session-file (ss/get-session-data-in ctx initial-sid))
      :initial-messages     (vec (or (:messages startup-rehydrate) []))
      :initial-tool-calls   (or (:tool-calls startup-rehydrate) {})
      :initial-tool-order   (vec (or (:tool-order startup-rehydrate) []))
