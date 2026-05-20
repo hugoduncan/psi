@@ -89,3 +89,13 @@ All three steps completed in `bootstrap-resource-registration-test`:
 2. **Step 10 — return summary count assertions**: captured `bootstrap-in!` return value as `summary`; added three assertions: `(:prompt-count summary)` = 1, `(:skill-count summary)` = 1, `(:tool-count summary)` ≥ 1. Closes return-shape coverage gap at bootstrap level.
 
 3. **Step 11 — explicit origin update step**: added step 12 to steps.md — update `bootstrap-dispatch-event-log-test` origin from `:mutations` to `:core` after step 1 executes. Separate from step 3's `:mutations` summary key scan.
+
+## Review: code-shaper pass (pre-execution)
+
+Applied code-shaper skill (simplicity ∧ consistency ∧ robustness) to bootstrap.clj, task artifacts, and referenced code.
+
+1. **Typo in steps.md step 6 done-note: `:psi.parameter/path` should be `:psi.extension/path`.** The done-note for step 6 records `{:psi.extension/loaded? loaded? :psi.parameter/path p :psi.extension/error error}` — the middle key uses the wrong namespace `:psi.parameter` instead of `:psi.extension`. Plan.md correctly specifies `:psi.extension/path`. If the typo propagates into the step 1 implementation (copy-paste from the step 6 note), `bootstrap-in!` will silently fail to find `:psi.extension/path` in extension-path results, breaking error reporting in `ext-errors` (line ~139) and `extension-loaded-count` filtering (line ~143). The step 1 sub-item text is correct (`{:psi.extension/loaded? loaded? :psi.extension/path p :psi.extension/error error}`), so the risk is limited to copy-paste from the wrong location.
+
+2. **`bootstrap-in!` docstring stale after rewrite.** The docstring step 2 says "load prompts/skills/tools/extensions via EQL mutations" — after the change this is wrong. No step addresses updating the docstring. Consistency requires the docstring to match the mechanism.
+
+3. **`refresh-active-tools-in!` missing docstring.** Every other public fn in `bootstrap.clj` has a docstring. Pre-existing but the task rewrites this file — natural opportunity to add one for consistency.

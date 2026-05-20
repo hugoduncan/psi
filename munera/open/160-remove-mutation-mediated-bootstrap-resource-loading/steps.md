@@ -67,3 +67,13 @@
   - In `model_dispatch_test.clj`, change `:origin :mutations` assertions to `:origin :core` and update test message strings
   - Must be done as part of or immediately after step 1 (direct dispatch conversion)
   - Step 3's `:mutations` scan targets the summary key, not dispatch event origins — this is a separate concern
+
+- [ ] 13. Fix typo in steps.md step 6 done-note: `:psi.parameter/path` → `:psi.extension/path` (from code-shaper review)
+  - The step 6 done-note records the wrong namespace for the path key; verify step 1 sub-item text is correct (it is) and fix the step 6 note to prevent copy-paste propagation
+
+- [ ] 14. Update `bootstrap-in!` docstring after rewrite (from code-shaper review)
+  - Step 2 in the docstring says "load prompts/skills/tools/extensions via EQL mutations" — change to reflect direct dispatch/runtime calls
+  - Do as part of or immediately after step 1
+
+- [ ] 15. Add docstring to `refresh-active-tools-in!` (from code-shaper review)
+  - Every other public fn in `bootstrap.clj` has a docstring; add one for consistency
