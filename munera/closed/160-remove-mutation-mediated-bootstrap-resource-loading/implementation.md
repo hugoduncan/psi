@@ -140,3 +140,11 @@ Both steps completed:
 2. **Step 17 — `extension-error-count` in `startup-bootstrap-introspection-test`**: added `(is (= 0 (:psi.startup/extension-error-count r)))`. All 5 queried fields now asserted.
 
 Both tests green (11 assertions in bootstrap-resource-registration, 5 in startup-bootstrap-introspection). Lint clean.
+
+## Review: code-shaper pass 2 (post-execution)
+
+Applied code-shaper skill (simplicity ∧ consistency ∧ robustness) to final bootstrap.clj, resolvers, schema, and tests.
+
+1. **Repeated state reads in `load-startup-resources-in!` return map (simplicity).** Lines 58–60 call `ss/get-session-data-in` twice and `ss/agent-ctx-in` + `agent/get-data-in` once to build the return counts. A single `let` binding for session-data and agent-data would eliminate the redundant lookups and improve local comprehensibility. Low-risk (counts are informational, state is settled after all dispatches), but easy to fix.
+
+2. **Duplicate startup-bootstrap resolver logic across components (consistency).** `startup-bootstrap-resolver` (session.clj:542) and `startup-bootstrap-summary` (introspection/resolvers.clj:165) project identical output attributes with near-identical body logic. The introspection version uses a fragile session-lookup heuristic (`active-session` fallback to `first vals`) instead of the explicit `session-id` input the session version uses. Any future projection change must be applied in both places. Pre-existing but surfaced by this task touching both to remove `:mutations`. Follow-on: extract shared projection fn or have introspection delegate to the session resolver.

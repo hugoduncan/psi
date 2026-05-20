@@ -85,3 +85,13 @@
 - [x] 17. Assert `extension-error-count` in `startup-bootstrap-introspection-test` (from test-shaper pass 2)
   - Add `(is (= 0 (:psi.startup/extension-error-count r)))` after the existing `extension-loaded-count` assertion
   - Closes the silent gap where the field is queried but never asserted
+
+- [ ] 18. Consolidate repeated state reads in `load-startup-resources-in!` return map (from code-shaper pass 2)
+  - Lines 58–60: `ss/get-session-data-in` called twice, `ss/agent-ctx-in` + `agent/get-data-in` called once
+  - Bind session-data and agent-data in a single `let` and read counts from the bindings
+  - Simplicity improvement: eliminates redundant lookups, improves local comprehensibility
+
+- [ ] 19. Extract shared startup-bootstrap projection logic from duplicate resolvers (from code-shaper pass 2)
+  - `startup-bootstrap-resolver` (session.clj:542) and `startup-bootstrap-summary` (introspection/resolvers.clj:165) have near-identical bodies
+  - Extract a shared `startup-bootstrap-projection` fn or have introspection delegate to session resolver
+  - Consistency improvement: single source of truth for the projection shape; eliminates fragile `active-session`/`first vals` heuristic in introspection version
