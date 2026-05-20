@@ -166,17 +166,24 @@
   (testing "startup bootstrap summary is queryable via introspection graph"
     (let [session-ctx      (session/create-context {:cwd (temp-cwd) :persist? false})
           session-id       (:session-id (session/new-session-in! session-ctx nil {}))
-          _               (bootstrap/bootstrap-in!
+          _               (bootstrap/load-startup-resources-in!
                            session-ctx session-id
-                           {:base-tools      []
-                            :system-prompt   "sys"
-                            :templates       [{:name "greet"
-                                               :description "desc"
-                                               :content "body"
-                                               :source :project
-                                               :file-path "/tmp/greet.md"}]
-                            :skills          []
-                            :extension-paths []})
+                           {:templates [{:name "greet"
+                                         :description "desc"
+                                         :content "body"
+                                         :source :project
+                                         :file-path "/tmp/greet.md"}]})
+          _               (session/dispatch-in! session-ctx
+                                                :session/set-startup-bootstrap-summary
+                                                {:session-id session-id
+                                                 :summary {:timestamp              (java.time.Instant/now)
+                                                           :prompt-count           1
+                                                           :skill-count            0
+                                                           :tool-count             0
+                                                           :extension-loaded-count 0
+                                                           :extension-error-count  0
+                                                           :extension-errors       []}}
+                                                {:origin :core})
           ctx         (introspection/create-context {:agent-session-ctx session-ctx})]
       (engine/bootstrap-system-in! (:engine-ctx ctx))
       (introspection/register-resolvers-in! ctx)
