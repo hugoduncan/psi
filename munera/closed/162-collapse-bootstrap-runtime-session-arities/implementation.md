@@ -1,5 +1,17 @@
 # 162 — Implementation Notes
 
+## Test review (2026-05-19)
+
+**Coverage gap — `:session-id` reuse path untested with real function.**
+`bootstrap-runtime-session!` accepts `:session-id` in opts to reuse a pre-created session (skipping `create-initial-startup-session!`). No test exercises this path through the real function. The `start-tui-runtime!` test handles `:session-id` only in its mock. The `bootstrap-runtime-session-creates-initial-session-after-startup-plan-test` calls `(bootstrap-runtime-session! ctx ai-model {:cwd cwd})` — always the default "create new session" path. `main.clj` is the sole production caller of the `:session-id` path; it has no direct test coverage.
+
+**Interaction-testing in ordering test — acceptable pragmatic choice.**
+`bootstrap-runtime-session-creates-initial-session-after-startup-plan-test` asserts call ordering via `with-redefs` + `calls` atom (interaction-testing). The ordering invariant (startup plan assembled before session creation) is genuinely hard to verify via state alone. The test also asserts state (session count at each step), which partially mitigates.
+
+**Infrastructure deps correctly nulled.** OAuth, templates, skills, system-prompt, introspection, memory-runtime all use `with-redefs` to supply nullable implementations — consistent with testing-without-mocks guidance.
+
+**All design behaviours covered except the `:session-id` reuse path.**
+
 ## Implementation review — pass (2026-05-20)
 
 All 7 acceptance criteria verified against code. No actionable issues found.
