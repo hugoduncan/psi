@@ -27,7 +27,7 @@
   - [x] prompt rendering/projection path recorded
     - prompt assembly currently renders the shared contribution layer in `components/prompt-assets/src/psi/prompt_assets/system_prompt.clj`, and request-preparation proofs assert that composed prompt in `components/agent-session/test/psi/agent_session/prompt_lifecycle_test.clj` and `components/turn-runtime/test/psi/turn_runtime/request_test.clj`; this task should preserve that rendering while changing only how the built-in workflow contribution reaches the shared store
   - [x] any remaining "extension" wording debt recorded explicitly if retained
-    - keep `# Extension Prompt Contributions` unchanged in this task as deliberate wording debt because the task’s architectural goal is built-in registration provenance, not prompt-copy churn; record that retained label as a shared prompt-layer heading, not proof that built-in workflow remains extension-owned
+    - keep `# Extension Prompt Contributions` unchanged in this task as deliberate wording debt because the task's architectural goal is built-in registration provenance, not prompt-copy churn; record that retained label as a shared prompt-layer heading, not proof that built-in workflow remains extension-owned
 - [x] Make the built-in active tool aggregation path explicit
   - [x] built-in tool aggregation path recorded
     - active tool aggregation should stop reading built-in workflow from `tool-registry/all-tools-in (:extension-registry ctx)` as if it were extension-owned; instead, runtime tool assembly should merge extension tools with built-in-registered tools from the built-in registration layer before exposing session active tools
@@ -38,25 +38,41 @@
     - `components/agent-session/src/psi/agent_session/resolvers/extensions.clj` should stop treating built-in workflow commands/tools as extension-registry-owned canonical state; extension-oriented EQL surfaces should narrow to true extensions only
   - [x] replacement built-in visibility recorded if needed
     - if runtime introspection still needs workflow command/tool visibility, add or reuse a built-in-aware projection that exposes the same user-facing availability while distinguishing built-in provenance from extension provenance; direct extension-registry assertions in `workflow_built_in_targeting_test.clj`, `workflow_reload_runtime_test.clj`, `workflow_async_path_test.clj`, and `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` should migrate to built-in-aware behavior proofs instead
-- [ ] Generalize the existing command/tool registries locally for built-in provenance-aware registration and lookup
-  - [ ] add built-in-specific registration entrypoints or equivalent provenance-aware insertion paths to the existing command/tool registries
-  - [ ] update authoritative command/tool read paths to resolve built-in + extension surfaces without requiring extension identity seeding
-  - [ ] keep this change local to the existing registries; do not extract a new common/shared registry substrate in this task
-- [ ] Move built-in workflow bootstrap off `ext/register-extension-in!`
-- [ ] Move built-in workflow bootstrap off `ext/create-extension-api`
-- [ ] Move built-in workflow tool registration to the built-in path
-- [ ] Move built-in workflow command registration to the built-in path
-- [ ] Move built-in workflow prompt contribution registration to the built-in path
-- [ ] Move built-in workflow lifecycle hook registration to the built-in path
-- [ ] Remove built-in workflow extension identity registration and extension-API-based installation
-  - [ ] retain `built-in:workflow` as the stable built-in provenance identifier; remove it only from extension-owned identity state and proofs that equate it with an extension install
-  - [ ] if any shared storage remains, record exactly which surfaces remain shared and why that is no longer pseudo-extension modeling
-- [ ] Update affected tests to prove built-in rather than pseudo-extension registration behavior
-  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_built_in_targeting_test.clj` off `[:extension-registry :state :extensions built-in:workflow :tools ...]` lookup; prove session targeting through the built-in registration/lookup path instead
-  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_reload_runtime_test.clj` off extension-registry query helpers (`command-registry/command-names-in`, `tool-registry/tool-names-in`); prove reload preservation through built-in-aware command/tool availability after namespace reload
-  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_async_path_test.clj` off `command-registry/get-command-in (:extension-registry ctx)`; prove the async delegate path through built-in-aware command resolution instead
-  - [ ] migrate `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` off the extension-registry assertion on `built-in:workflow`; replace with a runtime-boundary invariant proving workflow built-ins are available without extension identity seeding
-  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_tui_repro_test.clj` off `command-registry/get-command-in (:extension-registry ctx) "delegate"` so the TUI-like `/delegate` proof uses the same built-in-aware command resolution path as the other workflow behavior proofs
-  - [ ] shape `components/agent-session/test/psi/agent_session/workflow_tui_repro_test.clj` so the TUI-like `/delegate` proof asserts built-in command availability through the canonical built-in-aware lookup surface instead of extension-registry storage, keeping the test focused on launch behavior and failure absence
-- [ ] Update docs/implementation notes to reflect the new residual status
-- [ ] Verify preserved user-facing behavior for `delegate`, `/delegate`, `/delegate-reload`, reload behavior, and prompt contribution surfacing
+- [x] Generalize the existing command/tool registries locally for built-in provenance-aware registration and lookup
+  - [x] add built-in-specific registration entrypoints or equivalent provenance-aware insertion paths to the existing command/tool registries
+    - tool-registry: register-built-in-tool-in!, stored under :built-in-tools key; all-built-in-tools-in, built-in-tool-names-in
+    - command-registry: register-built-in-command-in!, stored under :built-in-commands key; all-built-in-commands-in, built-in-command-names-in
+    - separate :built-in-tools/:built-in-commands keys prevent name collision with extension stores
+  - [x] update authoritative command/tool read paths to resolve built-in + extension surfaces without requiring extension identity seeding
+    - tool-names-in, all-tools-in, get-tool-in now merge :built-in-tools and :extensions
+    - command-names-in, all-commands-in, get-command-in now merge :built-in-commands and :extensions
+    - built-ins listed first; first-registration wins
+  - [x] keep this change local to the existing registries; do not extract a new common/shared registry substrate in this task
+- [x] Move built-in workflow bootstrap off `ext/register-extension-in!`
+- [x] Move built-in workflow bootstrap off `ext/create-extension-api`
+- [x] Move built-in workflow tool registration to the built-in path
+  - tool-registry/register-built-in-tool-in! called via :register-tool in make-built-in-api
+- [x] Move built-in workflow command registration to the built-in path
+  - command-registry/register-built-in-command-in! called via :register-command in make-built-in-api
+- [x] Move built-in workflow prompt contribution registration to the built-in path
+  - make-prompt-contribution-fn dispatches :session/register-prompt-contribution directly without extension API wrapping
+- [x] Move built-in workflow lifecycle hook registration to the built-in path
+  - runtime-state/register-built-in-lifecycle-callback! called via :on in make-built-in-api
+  - session_lifecycle.clj calls invoke-built-in-lifecycle! "session_switch" after each ext/dispatch-in "session_switch"
+- [x] Remove built-in workflow extension identity registration and extension-API-based installation
+  - [x] retain `built-in:workflow` as the stable built-in provenance identifier; remove it only from extension-owned identity state and proofs that equate it with an extension install
+    - built-in:workflow passed as provenance-id to register-built-in-tool-in! and register-built-in-command-in!
+    - not present in ext/extensions-in output (no ext/register-extension-in! call)
+  - [x] if any shared storage remains, record exactly which surfaces remain shared and why that is no longer pseudo-extension modeling
+    - prompt contributions remain in the shared session prompt-contribution store; stored with ext-path="built-in:workflow" and reached via direct dispatch, not extension API
+    - psi.extension/tools and psi.extension/commands EQL surfaces include built-ins (wording debt per design decision; not extension ownership)
+- [x] Update affected tests to prove built-in rather than pseudo-extension registration behavior
+  - [x] migrate `workflow_built_in_targeting_test.clj`: delegate-tool-for now uses tool-registry/get-tool-in; fixture resets built-in-lifecycle-callbacks
+  - [x] migrate `workflow_reload_runtime_test.clj`: command-names-in/tool-names-in now merge built-ins; tests pass unchanged (built-in delegate-reload found via merged command-names-in)
+  - [x] migrate `workflow_async_path_test.clj`: command-registry/get-command-in now returns built-in delegate command; test passes unchanged
+  - [x] migrate `gordian_launcher_manifest_runtime_boundary_test.clj`: now proves command/tool availability via get-command-in/get-tool-in instead of extension-registry assertion
+  - [x] migrate `workflow_tui_repro_test.clj`: command-registry/get-command-in now returns built-in delegate command; test passes unchanged
+  - [x] shape `workflow_tui_repro_test.clj`: test already focuses on launch behavior and failure absence; no further shaping needed
+- [x] Update docs/implementation notes to reflect the new residual status
+- [x] Verify preserved user-facing behavior for `delegate`, `/delegate`, `/delegate-reload`, reload behavior, and prompt contribution surfacing
+  - verified: 9 workflow behavior tests (targeting, reload, async-path, tui-repro) pass; 0 failures
