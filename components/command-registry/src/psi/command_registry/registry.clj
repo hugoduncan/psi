@@ -1,5 +1,9 @@
 (ns psi.command-registry.registry
-  "Command-specific extension-registry ownership: validation, registration, and queries."
+  "Command-specific extension-registry ownership: validation, registration, and queries.
+
+   Built-in commands are stored under the `:built-in-commands` key in registry
+   state, keyed by provenance id then command name.  Extension commands continue
+   to live under `:extensions`.  All public read paths merge both stores."
   (:require
    [clojure.string :as str]))
 
@@ -54,20 +58,29 @@
        (:registration-order state)))
 
 (defn command-names-in
-  "Return set of all registered command names across all extensions in `reg`."
-  [reg]
-  (let [state (state-in reg)]
-    (into #{}
-          (mapcat keys)
-          (extension-item-maps state :commands))))
-
-(defn all-commands-in
-  "Return vector of all registered command maps across all extensions.
-   First registration per name wins across extensions and the returned vector
-   preserves first-encounter order while scanning extension registration order."
+  "Return set of all registered command names across built-ins and extensions."
   [reg]
   (let [state (state-in reg)
-        seen  (volatile! #{})]
+        built-in-names (into #{}
+                             (for [[_ cmds] (:built-in-commands state)
+                                   [name _] cmds]
+                               name))
+        ext-names (into #{}
+                        (mapcat keys)
+                        (extension-item-maps state :commands))]
+    (into built-in-names ext-names)))
+
+(defn all-commands-in
+  "Return vector of all registered command maps across built-ins and extensions.
+   Built-in commands are listed first; first registration per name wins."
+  [reg]
+  (let [state (state-in reg)
+        seen  (volatile! #{})
+        built-in-items (for [[_ cmds] (:built-in-commands state)
+                             [name cmd] cmds
+                             :when (not (contains? @seen name))
+                             :let [_ (vswap! seen conj name)]]
+                         cmd)]
     (reduce
      (fn [items path]
        (reduce-kv
@@ -79,13 +92,51 @@
               (conj items (assoc item :extension-path path)))))
         items
         (or (get-in state [:extensions path :commands]) {})))
-     []
+     (vec built-in-items)
      (:registration-order state))))
 
 (defn get-command-in
   "Return the command map for `command-name`, or nil.
-   Across extensions, first registration by extension registration order wins."
+   Checks built-in commands first, then extension commands in registration order."
   [reg command-name]
   (let [state (state-in reg)]
-    (some #(get-in state [:extensions % :commands command-name])
-          (:registration-order state))))
+    (or (some #(get-in state [:built-in-commands % command-name])
+              (keys (:built-in-commands state)))
+        (some #(get-in state [:extensions % :commands command-name])
+              (:registration-order state)))))
+
+;;; Built-in registration
+
+(defn register-built-in-command-in!
+  "Register `cmd` as a built-in command owned by `provenance-id`.
+   Built-in commands do not require a prior extension registration.
+   `provenance-id` is a stable identifier (e.g. `\"built-in:workflow\"`)."
+  [reg provenance-id cmd]
+  (let [command-name (:name cmd)]
+    (when-not (valid-command-name? command-name)
+      (throw (ex-info (str "Invalid built-in command name: " (pr-str command-name)
+                           ". Expected a non-blank string.")
+                      {:provenance-id provenance-id
+                       :command       cmd
+                       :command-name  command-name
+                       :reason        :invalid-command-name})))
+    (swap! (:state reg)
+           assoc-in [:built-in-commands provenance-id command-name] cmd)
+    reg))
+
+(defn all-built-in-commands-in
+  "Return vector of all registered built-in command maps, across all provenance ids."
+  [reg]
+  (let [state (state-in reg)]
+    (vec (for [[_ cmds] (:built-in-commands state)
+               [_ cmd]  cmds]
+           cmd))))
+
+(defn built-in-command-names-in
+  "Return set of all registered built-in command names."
+  [reg]
+  (let [state (state-in reg)]
+    (into #{}
+          (for [[_ cmds] (:built-in-commands state)
+                [name _] cmds]
+            name))))
