@@ -51,3 +51,15 @@
   - Currently asserts `:origin :mutations` (via EQL mutation wrappers); update to `:origin :core` after step 1 converts to direct dispatch
   - This verifies the mechanism change: direct dispatch events appear in the log with correct origin
   - Added as `bootstrap-dispatch-event-log-test` in `model_dispatch_test.clj`
+
+- [ ] 9. Remove redundant weak assertion in `bootstrap-resource-registration-test` (from test-shaper review)
+  - Remove `(is (pos? (count (:tools agent-data))) ...)` — subsumed by the stronger `(some #(= "test-tool" ...) ...)` assertion
+  - Clarity: the weak assertion adds no signal and could pass even without the test tool
+
+- [ ] 10. Assert `bootstrap-in!` return summary counts in `bootstrap-resource-registration-test` (from test-shaper review)
+  - Capture `bootstrap-in!` return value; assert `(:prompt-count summary)` = 1, `(:skill-count summary)` = 1, `(:tool-count summary)` ≥ 1
+  - Closes return-shape coverage gap at the bootstrap level (AC3 partial; complements introspection test)
+
+- [ ] 11. Add explicit step: update `bootstrap-dispatch-event-log-test` origin assertion from `:mutations` to `:core` (from test-shaper review)
+  - Must be done as part of or immediately after step 1 (direct dispatch conversion)
+  - Step 3's `:mutations` scan targets the summary key, not dispatch event origins — this is a separate concern

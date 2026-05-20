@@ -69,3 +69,13 @@ Both tests added to `model_dispatch_test.clj`:
 2. **`bootstrap-dispatch-event-log-test`** (step 8): clears event log, calls `bootstrap-in!` with all three resource types, asserts `:session/register-prompt-template`, `:session/register-skill`, `:session/add-tool` events appear in the dispatch event log. Currently asserts `:origin :mutations` (matching current mutation-mediated path). Comment notes the origin should be updated to `:origin :core` after step 1 converts to direct dispatch. Covers review finding 2.
 
 Both tests green, lint clean.
+
+## Review: test-shaper pass
+
+Applied test-shaper skill (clarity ∧ signal ∧ robustness ∧ economical) to all tests touching bootstrap.
+
+1. **Redundant weak assertion in `bootstrap-resource-registration-test`.** `(pos? (count (:tools agent-data)))` is subsumed by the stronger `(some #(= "test-tool" (:name %)) (:tools agent-data))` assertion that follows. The weak assertion adds no signal — it passes even if the specific tool wasn't registered (e.g. default tools from `refresh-active-tools-in!`). Remove for clarity.
+
+2. **`bootstrap-resource-registration-test` doesn't assert return summary counts.** The test verifies resources exist in session-data but discards `bootstrap-in!`'s return value. Adding `(let [summary (bootstrap/bootstrap-in! ...)] (is (= 1 (:prompt-count summary))) ...)` would close the return-shape coverage gap with minimal effort. This partially addresses the existing finding 5 (return shape untested) at the bootstrap level rather than only through introspection resolvers.
+
+3. **Missing step: update `bootstrap-dispatch-event-log-test` origin from `:mutations` to `:core`.** Step 8 documents the intent ("update to `:origin :core` after step 1") but no unchecked step exists to perform the update. Step 3 scans for `:mutations` in the startup summary key — that won't catch the dispatch event `:origin :mutations` assertion. Without an explicit step, the test will fail after step 1 converts to direct dispatch (good — it's a mechanism-change detector) but the fix could be missed or done ad-hoc.
