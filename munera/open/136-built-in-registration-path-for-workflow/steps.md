@@ -49,9 +49,13 @@
 - [ ] Move built-in workflow prompt contribution registration to the built-in path
 - [ ] Move built-in workflow lifecycle hook registration to the built-in path
 - [ ] Remove built-in workflow extension identity registration and extension-API-based installation
-  - [ ] if `built-in:workflow` remains, keep it only as a built-in provenance identifier rather than extension identity
+  - [ ] retain `built-in:workflow` as the stable built-in provenance identifier; remove it only from extension-owned identity state and proofs that equate it with an extension install
   - [ ] if any shared storage remains, record exactly which surfaces remain shared and why that is no longer pseudo-extension modeling
 - [ ] Update affected tests to prove built-in rather than pseudo-extension registration behavior
+  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_built_in_targeting_test.clj` off `[:extension-registry :state :extensions built-in:workflow :tools ...]` lookup; prove session targeting through the built-in registration/lookup path instead
+  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_reload_runtime_test.clj` off extension-registry query helpers (`command-registry/command-names-in`, `tool-registry/tool-names-in`); prove reload preservation through built-in-aware command/tool availability after namespace reload
+  - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_async_path_test.clj` off `command-registry/get-command-in (:extension-registry ctx)`; prove the async delegate path through built-in-aware command resolution instead
+  - [ ] migrate `components/app-runtime/test/psi/gordian_launcher_manifest_runtime_boundary_test.clj` off the extension-registry assertion on `built-in:workflow`; replace with a runtime-boundary invariant proving workflow built-ins are available without extension identity seeding
   - [ ] migrate `components/agent-session/test/psi/agent_session/workflow_tui_repro_test.clj` off `command-registry/get-command-in (:extension-registry ctx) "delegate"` so the TUI-like `/delegate` proof uses the same built-in-aware command resolution path as the other workflow behavior proofs
   - [ ] shape `components/agent-session/test/psi/agent_session/workflow_tui_repro_test.clj` so the TUI-like `/delegate` proof asserts built-in command availability through the canonical built-in-aware lookup surface instead of extension-registry storage, keeping the test focused on launch behavior and failure absence
 - [ ] Update docs/implementation notes to reflect the new residual status
