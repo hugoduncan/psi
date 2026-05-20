@@ -34,3 +34,6 @@
 - [x] Code-shaper: Replace manual temp dir in `app_runtime_test.clj` persisting test (line 705) with `test-support/temp-cwd`
 - [x] Test-review: Replace `(resolve 'psi.app-runtime/startup-rehydrate-from-current-session!)` with `#'psi.app-runtime/startup-rehydrate-from-current-session!` in `start-tui-runtime-extension-command-after-new-targets-new-session-test` mock (line 207) for compile-time safety
   - Replaced `(resolve 'psi.app-runtime/...)` with `#'app-runtime/...` — uses ns alias for consistency with rest of file
+- [ ] Test-shaper: Extract `with-session-state-restore` helper in `app_runtime_test.clj` to replace 8 instances of `(let [orig-state @app-runtime/session-state] (try ... (finally (reset! app-runtime/session-state orig-state))))`
+- [ ] Test-shaper: Compose `extension_install_startup_test.clj` `startup-bootstrap-bindings` from `(merge (app-test-support/bootstrap-stub-bindings) manifest-specific-bindings)` instead of duplicating 5 core infrastructure bindings
+- [ ] Test-shaper: Extract shared `test-ai-model` constant in `psi.app-runtime.test-support` and adopt across `app_runtime_test.clj` and `app_runtime_bootstrap_test.clj` — keep intentional overrides (project-preferences tests) explicit

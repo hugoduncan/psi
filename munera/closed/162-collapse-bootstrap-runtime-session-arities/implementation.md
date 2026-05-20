@@ -30,6 +30,16 @@ Already noted as pre-existing. The fallback `(or (:cwd opts) (:cwd ctx) (System/
 
 Added `bootstrap-runtime-session-reuses-pre-created-session-test` in `app_runtime_bootstrap_test.clj`. Test pre-creates a session via `session/new-session-in!`, passes its id as `:session-id` in opts to the real `bootstrap-runtime-session!`, asserts the returned session-id matches and no extra session was created. 301 tests pass, lint clean.
 
+## Test-shaper review — pass 2 (2026-05-19)
+
+**Repeated session-state save/restore ceremony (consistency/fixtures).** 8 tests in `app_runtime_test.clj` repeat `(let [orig-state @app-runtime/session-state] (try ... (finally (reset! app-runtime/session-state orig-state))))` — 4 lines of boilerplate per test. A `with-session-state-restore` helper (HOF like `with-main-bootstrap-stubs`) would compress this, reduce risk of forgetting cleanup, and improve readability.
+
+**`extension_install_startup_test.clj` still duplicates core infrastructure bindings (consistency/fixtures).** `startup-bootstrap-bindings` in this file manually lists 5 of the 7 bindings from `bootstrap-stub-bindings` plus 2 manifest-specific bindings. The prior test-shaper pass noted the overlap across three files but the fix only unified `app_runtime_bootstrap_test.clj` and `app_runtime_test.clj`. This file should compose `(merge (app-test-support/bootstrap-stub-bindings) manifest-specific-bindings)` and dissoc any it doesn't need (e.g. `introspection/register-resolvers!`, `memory-runtime/sync-memory-layer!`), rather than maintaining a parallel copy.
+
+**Incidental ai-model map variation across test files (consistency/data_shapes).** Test ai-model maps vary without purpose: some include `:context-window 200000`, others omit it; `app_runtime_bootstrap_test.clj` tests 1–2 use `"claude-sonnet-4-6"` while test 3 and all `app_runtime_test.clj` tests use `"test-model"`; `:supports-reasoning` alternates between `true` and `false` without behavioural significance. Only the project-preferences tests meaningfully need a distinct model id. A shared `test-ai-model` constant in `test-support` would eliminate incidental variation and make intentional overrides visible.
+
+**No issues found for:** single-concern, determinism, behavior-focus, meaningful failures, economical coverage, fast feedback, test layering. The existing tests are well-structured with clear arrange/act/assert patterns.
+
 ## Task-test-review — fragile `resolve` in mock (2026-05-19)
 
 **`resolve` for private fn in mock (robustness/fragility).** `start-tui-runtime-extension-command-after-new-targets-new-session-test` (line 207) uses `(resolve 'psi.app-runtime/startup-rehydrate-from-current-session!)` inside the `bootstrap-runtime-session!` mock. If the private fn is renamed or removed, `resolve` returns `nil` silently, causing an NPE at runtime rather than a clear compile-time failure. Should use `#'psi.app-runtime/startup-rehydrate-from-current-session!` (var reference) which fails at compile time if the var doesn't exist. Pre-existing pattern but the mock was modified during this task (collapsed from 2-arity to 1-arity).
