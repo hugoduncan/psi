@@ -32,3 +32,8 @@
   - Lint full: `clj-kondo --lint src components/*/src components/*/test`
 
 - [ ] 5. Commit: `⚒ 160: replace mutation-mediated bootstrap with direct dispatch`
+
+- [ ] 6. Fix extension-path return key mismatch (from implementation review)
+  - `ext-rt/add-extension-in!` returns unnamespaced `{:loaded? :path :error}` but `bootstrap-in!` reads namespaced `:psi.extension/loaded?`, `:psi.extension/path`, `:psi.extension/error`
+  - In step 1's extension-path replacement, wrap each `ext-rt/add-extension-in!` result to produce `{:psi.extension/loaded? ... :psi.extension/path ... :psi.extension/error ...}` — matching the existing init-var result shape
+  - Alternatively: normalize both extension-path and init-var result paths to unnamespaced keys and update `bootstrap-in!` reads accordingly
