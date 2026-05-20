@@ -32,4 +32,5 @@
   - Test 3 (enriches-system-prompt) dissocs `sys-prompt/build-system-prompt` to let real prompt building run
   - Removed unused `psi.introspection.core` require from `app_runtime_test.clj`
 - [x] Code-shaper: Replace manual temp dir in `app_runtime_test.clj` persisting test (line 705) with `test-support/temp-cwd`
-- [ ] Test-review: Replace `(resolve 'psi.app-runtime/startup-rehydrate-from-current-session!)` with `#'psi.app-runtime/startup-rehydrate-from-current-session!` in `start-tui-runtime-extension-command-after-new-targets-new-session-test` mock (line 207) for compile-time safety
+- [x] Test-review: Replace `(resolve 'psi.app-runtime/startup-rehydrate-from-current-session!)` with `#'psi.app-runtime/startup-rehydrate-from-current-session!` in `start-tui-runtime-extension-command-after-new-targets-new-session-test` mock (line 207) for compile-time safety
+  - Replaced `(resolve 'psi.app-runtime/...)` with `#'app-runtime/...` — uses ns alias for consistency with rest of file

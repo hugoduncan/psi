@@ -204,7 +204,7 @@
                                :session-id sid
                                :templates []
                                :skills []
-                               :startup-rehydrate ((resolve 'psi.app-runtime/startup-rehydrate-from-current-session!) ctx sid nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})}))]
+                               :startup-rehydrate (#'app-runtime/startup-rehydrate-from-current-session! ctx sid nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})}))]
               (is (= :ok (app-runtime/start-tui-runtime! tui-start! :ignored)))
               (let [dispatch-fn   (:dispatch-fn @tui-opts*)
                     query-fn      (:query-fn @tui-opts*)
