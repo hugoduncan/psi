@@ -1,5 +1,15 @@
 # 162 — Implementation Notes
 
+## Design review — inconsistency pass (2026-05-20)
+
+Three inconsistencies found between design.md claims and actual codebase:
+
+1. **Scope/AC4 overstates production caller changes**: Design scope lists `run-session`, `start-tui-runtime!`, and `main.clj` as production callers needing updates. AC4 says "All production callers (`run-session`, `start-tui-runtime!`, `main.clj`) updated". But `run-session` (line 586) and `start-tui-runtime!` (line 642) already call the 3-arity target form `(ctx ai-model opts)` — they need **zero changes**. Only `main.clj` (4-arity caller) needs updating. This parallels the RPC test finding in AC6 but was not applied consistently to production callers.
+
+2. **AC4 vs AC6 asymmetry**: AC6 correctly identifies `rpc_real_delegate_command_test` as needing no change. The same analysis should apply to `run-session` and `start-tui-runtime!` — they also already use the target form. AC4 should either narrow to `main.clj` only or explicitly note which production callers already conform.
+
+3. **`app_runtime_test.clj` mock covers both arities**: The `start-tui-runtime!` test (line ~200) mocks `bootstrap-runtime-session!` with both a 3-arity and 4-arity form. After the refactor, this mock needs updating (remove 4-arity, handle `:session-id` in opts if needed). The design's AC5 covers this generically but the mock is noteworthy: the real change is in the mock, not in `start-tui-runtime!` itself — contradicting AC4's implication that `start-tui-runtime!` needs updating.
+
 ## Design review — ambiguity follow-up (2026-05-19)
 
 All 6 design-steps from ambiguity review resolved by code analysis:
