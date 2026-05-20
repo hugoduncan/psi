@@ -15,15 +15,16 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- Task 160 remove-mutation-mediated-bootstrap-resource-loading is now complete and closed:
-  - replaced `load-startup-resources-via-mutations-in!` with direct `dispatch/dispatch!` calls for templates, skills, and tools (no more throwaway Pathom query context / mutation round-trips)
-  - replaced extension-paths loop with direct `ext-rt/add-extension-in!` calls
-  - removed throwaway query-context setup (`query/create-query-context`, `register-resolvers-in!`, `register-mutations-in!`) from bootstrap
-  - renamed function to `load-startup-resources-in!` to reflect it no longer uses mutations
-  - updated bootstrap summary map to drop the `:mutations` key
+- Task 160 remove-mutation-mediated-bootstrap-resource-loading is now genuinely complete and closed:
+  - Core rewrite executed: `load-startup-resources-via-mutations-in!` → `load-startup-resources-in!`
+  - Templates, skills, tools registered via direct `session/dispatch-in!` calls (`:origin :core`)
+  - Extension-path loading via direct `ext-rt/add-extension-in!` (no Pathom round-trip)
+  - Removed `run-mutation-in!`, throwaway query-context setup, `psi.agent-session.mutations` and `psi.query.core` requires
+  - `:mutations` key removed from bootstrap summary, session-state schema, session resolver, introspection resolver
+  - Stale `:register-global-query?` option removed from app-runtime caller
+  - Tests updated: dispatch event log origin `:mutations` → `:core`, introspection `:psi.startup/mutations` removed
   - EQL mutations themselves preserved for external consumers
-  - implementation review clean; code-shaper and test-shaper follow-ups executed
-  - focused verification green; lint clean
+  - 61 focused tests, 397 assertions, 0 failures; lint clean
 
 - Task 159 app-runtime nREPL bootstrap test split is complete and closed:
   - commit `c255eace` — `⚒ 159: split app-runtime nREPL bootstrap tests`
