@@ -1,5 +1,18 @@
 # 162 — Implementation Notes
 
+## Test-shaper review (2026-05-19)
+
+**Duplicated infrastructure nulling across bootstrap test files (consistency/fixtures).**
+`app_runtime_bootstrap_test.clj` has 3 identical 7-line `with-redefs` blocks nulling oauth, templates, skills, system-prompt, introspection, and memory-runtime. `app_runtime_test.clj` already has `with-main-bootstrap-stubs` for the same purpose. `extension_install_startup_test.clj` independently extracted `startup-bootstrap-bindings`. Three different approaches to the same infrastructure nulling across related test files. The bootstrap test file should reuse or extract a shared fixture rather than repeating 7 lines per test.
+
+**Inconsistent temp directory creation (consistency/fixtures).**
+`app_runtime_bootstrap_test.clj` manually constructs temp dirs with `(str (System/getProperty "java.io.tmpdir") "/psi-..." (UUID/randomUUID))` + `.mkdirs`. Other test files (`extension_install_startup_test.clj`, etc.) use `test-support/temp-cwd`. Incidental variation — the bootstrap tests should use the existing `temp-cwd` helper.
+
+**Bootstrap tests split across two files with no organizing principle (consistency/structure).**
+`bootstrap-runtime-session-*` tests exist in both `app_runtime_test.clj` (6 tests) and `app_runtime_bootstrap_test.clj` (3 tests). No clear separation criterion distinguishes which file a bootstrap test belongs in. Not introduced by this task — the 3 tests in `app_runtime_bootstrap_test.clj` are new, but the split is pre-existing. Low priority; noting for future consolidation.
+
+**No issues found for:** single-concern, determinism, behavior-focus, meaningful failures, economical coverage, fast feedback. The new `bootstrap-runtime-session-reuses-pre-created-session-test` is well-structured: clear arrange/act/assert, single concern (session-id reuse), state-based assertions, minimal setup.
+
 ## Test review follow-up — session-id reuse test (2026-05-20)
 
 Added `bootstrap-runtime-session-reuses-pre-created-session-test` in `app_runtime_bootstrap_test.clj`. Test pre-creates a session via `session/new-session-in!`, passes its id as `:session-id` in opts to the real `bootstrap-runtime-session!`, asserts the returned session-id matches and no extra session was created. 301 tests pass, lint clean.
