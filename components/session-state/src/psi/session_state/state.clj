@@ -105,6 +105,14 @@
 
 (defn get-sessions-map-in [ctx] (get-state-in* ctx [:agent-session :sessions]))
 
+(defn- timestamp-sort-key [timestamp]
+  (cond
+    (nil? timestamp)                     [0 nil]
+    (instance? java.time.Instant timestamp) [1 (.toEpochMilli ^java.time.Instant timestamp)]
+    (number? timestamp)                  [1 timestamp]
+    (string? timestamp)                  [2 timestamp]
+    :else                                [3 (str timestamp)]))
+
 (defn- latest-message-timestamp [entries]
   (reduce (fn [latest entry]
             (let [timestamp (when (= :message (:kind entry))
@@ -112,7 +120,8 @@
               (cond
                 (nil? timestamp) latest
                 (nil? latest)    timestamp
-                (pos? (compare timestamp latest)) timestamp
+                (pos? (compare (timestamp-sort-key timestamp)
+                               (timestamp-sort-key latest))) timestamp
                 :else latest)))
           nil
           (or entries [])))
@@ -137,7 +146,7 @@
                                                  :parent-session-path :created-at :updated-at])
                               :display-name display-name
                               :updated-at updated-at))))))
-         (sort-by (juxt :updated-at :session-id))
+         (sort-by (juxt (comp timestamp-sort-key :updated-at) :session-id))
          vec)))
 
 (defn- sc-working-memory [sc-env session-id]

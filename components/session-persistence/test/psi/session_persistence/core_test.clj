@@ -28,7 +28,6 @@
   [x]
   (cond
     (instance? Instant x) (instant->millis-precision x)
-    (instance? java.util.Date x) (Instant/ofEpochMilli (.getTime ^java.util.Date x))
     (map? x) (reduce-kv (fn [m k v] (assoc m k (entry->canonical v))) {} x)
     (sequential? x) (mapv entry->canonical x)
     :else x))

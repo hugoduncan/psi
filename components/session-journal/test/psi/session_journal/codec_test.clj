@@ -15,10 +15,10 @@
                                              :timestamp (Instant/parse "2026-01-02T03:04:06Z")}]}}}
           parsed (codec/parse-line (codec/entry->line entry))]
       (is (= :message (:kind parsed)))
-      (is (instance? java.util.Date (:timestamp parsed)))
+      (is (instance? Instant (:timestamp parsed)))
       (is (= "assistant" (get-in parsed [:data :message :role])))
       (is (= "hi" (get-in parsed [:data :message :content 0 :text])))
-      (is (instance? java.util.Date (get-in parsed [:data :message :content 0 :timestamp])))))
+      (is (instance? Instant (get-in parsed [:data :message :content 0 :timestamp])))))
 
   (testing "entry->line and parse-line preserve plain scalar/map shapes alongside instants"
     (let [entry {:type :session
@@ -34,7 +34,7 @@
       (is (= "/tmp/project" (:worktree-path parsed)))
       (is (contains? parsed :parent-session-id))
       (is (nil? (:parent-session-id parsed)))
-      (is (instance? java.util.Date (:timestamp parsed))))))
+      (is (instance? Instant (:timestamp parsed))))))
 
 (deftest parse-line-guards-test
   (testing "parse-line returns nil for blank, malformed, and non-map lines"

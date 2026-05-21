@@ -72,7 +72,7 @@
       (store/write-header! f "sess-1" "/my/project" nil)
       (let [lines  (slurp-lines f)
             header (edn/read-string
-                    {:readers {'inst #(java.util.Date/from (Instant/parse %))}}
+                    {:readers {'inst #(Instant/parse %)}}
                     (first lines))]
         (is (= 1 (count lines)))
         (is (= :session (:type header)))
@@ -137,8 +137,10 @@
       (spit f (str (slurp f) "THIS IS NOT EDN\n"))
       (let [loaded (store/load-session-file f)]
         (is (= "sess-rt" (get-in loaded [:header :id])))
+        (is (instance? Instant (get-in loaded [:header :timestamp])))
         (is (= "/my/cwd" (get-in loaded [:header :worktree-path])))
-        (is (= 3 (count (:entries loaded)))))))
+        (is (= 3 (count (:entries loaded))))
+        (is (every? #(instance? Instant (:timestamp %)) (:entries loaded))))))
 
   (testing "v1 entries gain id chain and v2 hook-message role migrates to custom"
     (let [f1 (File/createTempFile "psi-store-v1" ".ndedn")

@@ -22,13 +22,14 @@
   (pr-str (instant->date m)))
 
 (defn parse-line
-  "Parse a single NDEDN line. Returns nil on blank, parse error, or non-map."
+  "Parse a single NDEDN line. Returns nil on blank, parse error, or non-map.
+   Canonicalizes #inst values to java.time.Instant."
   [line]
   (let [trimmed (str/trim line)]
     (when-not (str/blank? trimmed)
       (try
         (let [v (edn/read-string
-                 {:readers {'inst #(java.util.Date/from (Instant/parse %))}}
+                 {:readers {'inst #(Instant/parse %)}}
                  trimmed)]
           (when (map? v) v))
         (catch Exception _
