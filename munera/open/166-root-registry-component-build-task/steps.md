@@ -1,0 +1,11 @@
+- [ ] Re-read task `165` and extract implementation requirements
+- [ ] Choose component location, namespace, and public API surface
+- [ ] Implement explicit registry declaration/initialization in root state
+- [ ] Implement register semantics with replacement and ownership-conflict handling
+- [ ] Implement lookup semantics with nil miss and unknown-registry behavior
+- [ ] Implement targeted unregister by id with failure info on miss
+- [ ] Implement clear-by-extension semantics
+- [ ] Implement per-registry global clear semantics
+- [ ] Define and implement uniform result contracts
+- [ ] Add focused lower-component tests for shared semantics
+- [ ] Refine docs/comments and task artifacts to match the delivered component
