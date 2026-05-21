@@ -21,3 +21,10 @@ Next step:
 2026-05-21 ambiguity review:
 
 - Actionable ambiguities: re-register owner-change rule/result contract unspecified; unknown-registry query vs mutation semantics unspecified; adopter assessment requested by design is still not concretely recorded per current registry.
+
+2026-05-21 ambiguity follow-up:
+
+- Updated `design.md` with explicit owner-conflict semantics for re-register: same-id replacement is allowed only when ownership stays the same; owner changes fail with `:failure-kind :ownership-conflict`.
+- Defined unknown-registry semantics precisely: lookup treats unknown registry as nil miss; mutating operations and list fail with `:failure-kind :unknown-registry`.
+- Added concrete adoption assessment for tool, command, skill, prompt, workflow, and deterministic-operation registries, distinguishing direct adopters from adapter-backed adopters.
+- The design is now implementation-guiding enough to mark the main task steps complete; no ambiguity follow-up remains from this pass.

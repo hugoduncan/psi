@@ -1,0 +1,8 @@
+- [x] Define shared root-state storage model for multiple registries
+- [x] Define canonical identity, extension ownership, and built-in handling
+- [x] Define shared validation boundary vs registry-specific validation hooks
+- [x] Define register/lookup/unregister/clear semantics
+- [x] Define uniform result contract shapes
+- [x] Assess fit of current registries against the target component
+- [x] Record intentionally dropped current behaviours
+- [x] Refine the design into an implementation-guiding target architecture artifact
