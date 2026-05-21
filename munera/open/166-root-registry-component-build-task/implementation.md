@@ -22,3 +22,7 @@ Initial next step:
 - Chose and recorded the authoritative implementation home as a new `components/root-registry/` component with primary namespace `psi.root-registry.registry` and focused tests in `components/root-registry/test/psi/root_registry/registry_test.clj`.
 - Specified the lower declaration boundary: the shared component must expose an explicit registry-declaration API, and the authoritative empty declared-registry state shape is `{:entries-by-id {} :ids-by-extension {}}` under the shared root-state registry area. Register/list/remove/clear operations must not implicitly declare registries.
 - These ambiguity follow-up items are design-resolved; no remaining ambiguity blocker is recorded from this pass.
+
+2026-05-21 inconsistency review:
+
+- Actionable inconsistencies: `design.md` and `plan.md` require an explicit list-entries operation with unknown-registry failure semantics, but `steps.md` has no step to implement or test list semantics; `design.md` also makes registry declaration idempotence and non-implicit declaration part of the authoritative contract, but `steps.md` does not yet carry explicit follow-up for proving those declaration semantics in tests.
