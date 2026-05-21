@@ -7,7 +7,8 @@
   {:state (atom {:extensions {}
                  :registration-order []
                  :flag-values {}
-                 :event-bus {}})})
+                 :event-bus {}
+                 :built-in-commands {}})})
 
 (defn- register-extension-in!
   [reg ext-path]
@@ -62,7 +63,7 @@
       (command-registry/register-command-in! reg "/ext/a" {:name "hello" :description "first"})
       (command-registry/register-command-in! reg "/ext/a" {:name "hello" :description "second"})
       (is (= "second"
-             (:description (get-in @(:state reg) [:extensions "/ext/a" :commands "hello"]))))))
+             (:description (command-registry/get-command-in reg "hello"))))))
 
   (testing "command identity is exact and no slash normalization is applied"
     (let [reg (create-test-registry)]
@@ -124,16 +125,18 @@
 ;;; Built-in command registration
 
 (deftest register-built-in-command-in-test
-  (testing "registers command under :built-in-commands keyed by provenance-id"
+  (testing "registers command under root-registry built-in provenance entry"
     (let [reg (create-test-registry)]
       (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "run workflow"})
       (is (= "delegate"
-             (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :name])))))
+             (get-in @(:state reg)
+                     [:root-registries :commands :entries-by-id "built-in:workflow" :value :commands "delegate" :name])))))
 
   (testing "stored command carries :source :built-in and :ext-path provenance-id"
     (let [reg (create-test-registry)]
       (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "run workflow"})
-      (let [stored (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate"])]
+      (let [stored (get-in @(:state reg)
+                           [:root-registries :commands :entries-by-id "built-in:workflow" :value :commands "delegate"])]
         (is (= :built-in (:source stored)))
         (is (= "built-in:workflow" (:ext-path stored))))))
 
@@ -156,7 +159,7 @@
       (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "first"})
       (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "second"})
       (is (= "second"
-             (get-in @(:state reg) [:built-in-commands "built-in:workflow" "delegate" :description]))))))
+             (:description (command-registry/get-command-in reg "delegate")))))))
 
 (deftest all-built-in-commands-in-test
   (testing "returns all built-in commands across provenance ids"

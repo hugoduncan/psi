@@ -1,9 +1,9 @@
-- [ ] Audit current command-registry storage and public behavior
-- [ ] Identify the exact compatibility surface that must remain at the command-registry boundary
-- [ ] Refactor command-registry internals to use root-registry storage
-- [ ] Preserve built-in and extension command projection behavior
-- [ ] Preserve current lookup and validation behavior
-- [ ] Update focused command-registry tests for migrated internals and preserved public contract
-- [ ] Verify migration does not leak raw root-registry semantics through the public command-registry API
-- [ ] Refine task artifacts to record migration decisions and compatibility boundaries
+- [x] Audit current command-registry storage and public behavior
+- [x] Identify the exact compatibility surface that must remain at the command-registry boundary
+- [x] Refactor command-registry internals to use root-registry storage
+- [x] Preserve built-in and extension command projection behavior
+- [x] Preserve current lookup and validation behavior
+- [x] Update focused command-registry tests for migrated internals and preserved public contract
+- [x] Verify migration does not leak raw root-registry semantics through the public command-registry API
+- [x] Refine task artifacts to record migration decisions and compatibility boundaries
   - Design follow-up items from review passes live in `design-steps.md`; execution against those items may update design/plan/implementation artifacts but should not pull execution from `steps.md` unless a later implementation phase explicitly does so.
