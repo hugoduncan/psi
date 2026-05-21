@@ -58,3 +58,9 @@ Next step:
 
 - No new actionable test-quality feedback found. Focused coverage still matches the pinned task behaviour: extension/built-in merged reads, built-ins-first ordering, same-owner replacement, `:format-request` enforcement, canonical naming, nil miss semantics, and built-in `get-tool-in` provenance.
 - Verification: `clojure -M:test --focus psi.tool-registry.registry-test` ✅; `clj-kondo --lint components/tool-registry/src components/tool-registry/test` ✅.
+
+2026-05-21 follow-up execution pass:
+
+- Read `steps.md`, `implementation.md`, `design.md`, and `plan.md` to find newly added actionable follow-up work from the preceding review pass.
+- Found no newly added unchecked implementation follow-up items in `steps.md`; the task already reflects the prior review follow-up as completed.
+- No code or task-file changes were needed for this execution pass.
