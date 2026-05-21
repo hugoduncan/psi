@@ -3,9 +3,10 @@
 - [ ] Implement explicit registry declaration/initialization in root state
 - [ ] Implement register semantics with replacement and ownership-conflict handling
 - [ ] Implement lookup semantics with nil miss and unknown-registry behavior
+- [ ] Implement explicit list-entries semantics, including unknown-registry failure
 - [ ] Implement targeted unregister by id with failure info on miss
 - [ ] Implement clear-by-extension semantics
 - [ ] Implement per-registry global clear semantics
 - [ ] Define and implement uniform result contracts
-- [ ] Add focused lower-component tests for shared semantics
+- [ ] Add focused lower-component tests for shared semantics, including explicit declaration idempotence and non-implicit declaration semantics
 - [ ] Refine docs/comments and task artifacts to match the delivered component

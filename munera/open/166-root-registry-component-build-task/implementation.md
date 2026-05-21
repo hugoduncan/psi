@@ -26,3 +26,10 @@ Initial next step:
 2026-05-21 inconsistency review:
 
 - Actionable inconsistencies: `design.md` and `plan.md` require an explicit list-entries operation with unknown-registry failure semantics, but `steps.md` has no step to implement or test list semantics; `design.md` also makes registry declaration idempotence and non-implicit declaration part of the authoritative contract, but `steps.md` does not yet carry explicit follow-up for proving those declaration semantics in tests.
+
+2026-05-21 inconsistency follow-up:
+
+- Updated `steps.md` to add an explicit implementation step for list-entries semantics, including the contract that listing an unknown registry fails explicitly.
+- Updated `steps.md` to make focused lower-component tests explicitly cover declaration idempotence and the rule that register/unregister/clear/list operations do not implicitly declare missing registries.
+- Updated `plan.md` test scope to include list semantics and declaration/non-implicit declaration proof obligations.
+- These newly added design follow-up items are completed at the task-artifact level; no blocker remains for them.
