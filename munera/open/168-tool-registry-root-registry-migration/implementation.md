@@ -24,3 +24,7 @@ Next step:
 - Pinned caller-visible provenance/read-shape fields: built-ins expose `:source :built-in` plus `:ext-path` provenance id; extension-owned tool defs expose `:source :extension`, `:ext-path` owner path, and merged extension listings/lookup projections keep `:extension-path`.
 - Decided same-owner duplicate replacement semantics are preserved for both extension-owned and built-in registrations, matching current assoc-by-name storage behavior and the `167` migration pattern.
 - Updated `design.md`, `plan.md`, and `design-steps.md` so the migration can test these points explicitly instead of re-deciding them during implementation.
+
+2026-05-21 inconsistency review:
+
+- Actionable inconsistency: `implementation.md` says the ambiguity follow-up already updated `design.md`, `plan.md`, and `design-steps.md` so built-in ordering can be tested explicitly, but `steps.md` still has unchecked `Prove or narrow multi-provenance built-in ordering for all-tools-in` work. The task files disagree on whether that ordering obligation is already resolved at the task-artifact level or remains open as implementation/test work. Added one unchecked `design-steps.md` follow-up to align the artifact story rather than re-decide it during execution.
