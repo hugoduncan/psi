@@ -139,6 +139,36 @@
 
       :else [state nil])))
 
+(defn- queue-event->message
+  [event]
+  (cond
+    (= :done (:kind event))
+    {:type :agent-result :result (:result event)}
+
+    (= :error (:kind event))
+    {:type :agent-error :error (:message event)}
+
+    (= :aborted (:kind event))
+    {:type :agent-aborted
+     :message (:message event)
+     :queued-text (:queued-text event)}
+
+    (= :agent-event (:type event))
+    event
+
+    (= :external-message (:type event))
+    event
+
+    :else
+    {:type :agent-poll}))
+
+(defn wait-cmd
+  "Command that blocks until the shared event queue yields the next event."
+  [^LinkedBlockingQueue queue]
+  (charm-program/cmd
+   (fn []
+     (queue-event->message (.take queue)))))
+
 (defn poll-cmd
   "Command that polls the shared event queue with a short timeout."
   ([^LinkedBlockingQueue queue]
@@ -147,26 +177,7 @@
    (charm-program/cmd
     (fn []
       (if-let [event (.poll queue timeout-ms TimeUnit/MILLISECONDS)]
-        (cond
-          (= :done (:kind event))
-          {:type :agent-result :result (:result event)}
-
-          (= :error (:kind event))
-          {:type :agent-error :error (:message event)}
-
-          (= :aborted (:kind event))
-          {:type :agent-aborted
-           :message (:message event)
-           :queued-text (:queued-text event)}
-
-          (= :agent-event (:type event))
-          event
-
-          (= :external-message (:type event))
-          event
-
-          :else
-          {:type :agent-poll})
+        (queue-event->message event)
         {:type :agent-poll})))))
 
 (defn key-debug-enabled?
@@ -256,4 +267,4 @@
          :tool-ui-id-by-content-index {}
          :tools-expanded?         (boolean (:tools-expanded? ui-snap))
          :repaint-generation      0}
-        (poll-cmd queue)]))))
+        (wait-cmd queue)]))))

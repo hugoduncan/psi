@@ -11,17 +11,32 @@
    [psi.tui.app.support :as support]
    [psi.tui.app.update :as app-update]))
 
-(defn- update-tick-state
+(defn- refresh-ui-facing-state
   [state]
-  (let [state (cond-> state
-                (:force-clear? state) (assoc :force-clear? false))
-        state (if-let [read-fn (:ui-read-fn state)]
+  (let [state (if-let [read-fn (:ui-read-fn state)]
                 (let [snap (read-fn)]
                   (assoc state :ui-snapshot snap :tools-expanded? (boolean (:tools-expanded? snap))))
                 state)]
     (support/dispatch-ui-event! state :session/ui-dismiss-expired {})
     (support/dispatch-ui-event! state :session/ui-dismiss-overflow {})
     (support/refresh-extension-command-names state)))
+
+(defn- explicit-refresh-boundary?
+  [m]
+  (contains? #{:window-size
+               :agent-event
+               :external-message
+               :context-updated
+               :agent-result
+               :agent-error
+               :agent-aborted}
+             (:type m)))
+
+(defn- update-tick-state
+  [state m]
+  (cond-> state
+    (:force-clear? state) (assoc :force-clear? false)
+    (explicit-refresh-boundary? m) refresh-ui-facing-state))
 
 (defn- log-key-debug!
   [m]
@@ -103,7 +118,7 @@
     (support/agent-poll? m)
     (if (= :streaming (:phase state))
       (app-update/handle-agent-poll state)
-      [state (support/poll-cmd (:queue state))])
+      [state nil])
 
     :else nil))
 
@@ -269,7 +284,7 @@
 (defn make-update
   [run-agent-fn!]
   (fn [state m]
-    (let [state (update-tick-state state)]
+    (let [state (update-tick-state state m)]
       (log-key-debug! m)
       (or (when (msg/key-match? m "ctrl+c")
             (app-update/handle-ctrl-c state))
