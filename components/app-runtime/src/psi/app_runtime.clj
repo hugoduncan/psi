@@ -563,12 +563,17 @@ Available: " (str/join ", " (map name (keys all))))
 ;; TUI session (charm.clj Elm Architecture)
 ;; ============================================================
 
+(defn- nullable-execution-mode
+  "Read PSI_NULLABLE_EXECUTION_MODE env var, trimmed and nil-punned."
+  []
+  (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty))
+
 (defn- maybe-install-nullable-execution-mode
   "When PSI_NULLABLE_EXECUTION_MODE=deterministic, install a stub executor that
    echoes user text back as the assistant response. Used by TUI integration test
    harness to run without a real AI provider."
   [ctx]
-  (let [mode (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty)]
+  (let [mode (nullable-execution-mode)]
     (if (= "deterministic" mode)
       (assoc ctx :execute-prepared-request-fn
              (fn [_ai-ctx _ctx sid prepared-request _progress-queue]

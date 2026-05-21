@@ -644,5 +644,73 @@
                      "session-root: " session-root "\n"
                      "session-file: " session-file))))))))
 
+;; ---------------------------------------------------------------------------
+;; maybe-install-nullable-execution-mode
+;; ---------------------------------------------------------------------------
+
+(deftest maybe-install-nullable-execution-mode-passthrough-when-absent-test
+  (testing "returns ctx unchanged when env var is nil"
+    (with-redefs [app-runtime/nullable-execution-mode (fn [] nil)]
+      (let [ctx {:some-key "value"}
+            result (#'app-runtime/maybe-install-nullable-execution-mode ctx)]
+        (is (= ctx result))
+        (is (not (contains? result :execute-prepared-request-fn)))))))
+
+(deftest maybe-install-nullable-execution-mode-passthrough-when-blank-test
+  (testing "returns ctx unchanged when env var is blank/whitespace"
+    (with-redefs [app-runtime/nullable-execution-mode (fn [] nil)]
+      (let [ctx {:existing "data"}
+            result (#'app-runtime/maybe-install-nullable-execution-mode ctx)]
+        (is (= ctx result))))))
+
+(deftest maybe-install-nullable-execution-mode-installs-stub-when-deterministic-test
+  (testing "installs :execute-prepared-request-fn when mode is deterministic"
+    (with-redefs [app-runtime/nullable-execution-mode (fn [] "deterministic")]
+      (let [ctx {:some-key "value"}
+            result (#'app-runtime/maybe-install-nullable-execution-mode ctx)]
+        (is (contains? result :execute-prepared-request-fn))
+        (is (fn? (:execute-prepared-request-fn result)))
+        (is (= "value" (:some-key result)))))))
+
+(deftest maybe-install-nullable-execution-mode-stub-echoes-user-text-test
+  (testing "stub executor echoes user text back as assistant response with correct shape"
+    (with-redefs [app-runtime/nullable-execution-mode (fn [] "deterministic")]
+      (let [ctx (#'app-runtime/maybe-install-nullable-execution-mode {})
+            stub (:execute-prepared-request-fn ctx)
+            prepared {:prepared-request/id "turn-42"
+                      :prepared-request/user-message
+                      {:content [{:type :text :text "hello world"}]}}
+            result (stub nil nil "session-1" prepared nil)]
+        (is (= "turn-42" (:execution-result/turn-id result)))
+        (is (= "session-1" (:execution-result/session-id result)))
+        (is (= "assistant" (get-in result [:execution-result/assistant-message :role])))
+        (is (= "hello world"
+               (get-in result [:execution-result/assistant-message :content 0 :text])))
+        (is (= :stop (get-in result [:execution-result/assistant-message :stop-reason])))
+        (is (inst? (get-in result [:execution-result/assistant-message :timestamp])))
+        (is (= :turn.outcome/stop (:execution-result/turn-outcome result)))
+        (is (= [] (:execution-result/tool-calls result)))
+        (is (= :stop (:execution-result/stop-reason result)))))))
+
+(deftest maybe-install-nullable-execution-mode-stub-generates-turn-id-when-absent-test
+  (testing "stub generates a UUID turn-id when prepared-request has no :prepared-request/id"
+    (with-redefs [app-runtime/nullable-execution-mode (fn [] "deterministic")]
+      (let [ctx (#'app-runtime/maybe-install-nullable-execution-mode {})
+            stub (:execute-prepared-request-fn ctx)
+            prepared {:prepared-request/user-message
+                      {:content [{:type :text :text "no id"}]}}
+            result (stub nil nil "s1" prepared nil)]
+        (is (string? (:execution-result/turn-id result)))
+        (is (parse-uuid (:execution-result/turn-id result)))))))
+
+(deftest maybe-install-nullable-execution-mode-stub-empty-text-when-no-user-message-test
+  (testing "stub falls back to empty string when user message text is missing"
+    (with-redefs [app-runtime/nullable-execution-mode (fn [] "deterministic")]
+      (let [ctx (#'app-runtime/maybe-install-nullable-execution-mode {})
+            stub (:execute-prepared-request-fn ctx)
+            prepared {:prepared-request/id "turn-99"}
+            result (stub nil nil "s2" prepared nil)]
+        (is (= "" (get-in result [:execution-result/assistant-message :content 0 :text])))))))
+
 
 

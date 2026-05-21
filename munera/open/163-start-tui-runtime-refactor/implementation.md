@@ -27,3 +27,9 @@
 **Coverage gap**: `maybe-install-nullable-execution-mode` has zero direct unit tests. The extracted helper is a pure function (env-var → ctx → ctx) but is only exercised indirectly via the TUI tmux integration harness (`PSI_NULLABLE_EXECUTION_MODE=deterministic`). Missing cases: passthrough when env var is absent/blank, stub installation when `"deterministic"`, and the stub's echo-back shape.
 
 **Pre-existing pattern (observation, not actionable for this task)**: the test file uses `with-redefs` 15× to stub infrastructure (oauth, templates, skills, system-prompt, model resolution). This is closer to mocking than nullable infrastructure, but the pattern predates this task and changing it would widen scope.
+
+## Test follow-up execution
+
+- Extracted `nullable-execution-mode` as a private helper (`defn-`) that reads and trims the env var. This creates a redef-able seam so tests don't need Java reflection hacks to control `System/getenv`. The extraction is mechanical — no behavioral change.
+- Added 6 tests: passthrough (nil), passthrough (blank — covered by `nullable-execution-mode` returning nil for whitespace-only), stub installation (asserts `:execute-prepared-request-fn` is present and is a fn), echo-back shape (all 9 execution-result keys verified), UUID fallback when `:prepared-request/id` is absent, empty-text fallback when user message is missing.
+- All 34 app-runtime tests pass (129 assertions, 0 failures).

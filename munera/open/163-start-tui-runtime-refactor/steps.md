@@ -16,4 +16,5 @@
 
 ## Test review follow-up
 
-- [ ] Add direct unit tests for `maybe-install-nullable-execution-mode`: (1) passthrough when env var is absent/blank, (2) stub installation when `"deterministic"`, (3) stub echo-back returns correct execution-result shape.
+- [x] Add direct unit tests for `maybe-install-nullable-execution-mode`: (1) passthrough when env var is absent/blank, (2) stub installation when `"deterministic"`, (3) stub echo-back returns correct execution-result shape.
+  - Extracted `nullable-execution-mode` helper for env-var read (testable seam). Added 6 tests covering passthrough, stub installation, echo-back shape, UUID generation fallback, and empty-text fallback. 34 tests, 129 assertions, 0 failures across app-runtime test namespaces.
