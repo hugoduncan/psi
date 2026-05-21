@@ -72,3 +72,10 @@ Initial next step:
 2026-05-21 test-shaper review:
 
 - Actionable test-shaping feedback: `components/root-registry/test/psi/root_registry/registry_test.clj` proves list membership via sets, but it does not include an explicit proof that `list-entries` remains unordered and callers must not depend on storage order; add a focused test that registers entries in one order, asserts membership/count only, and explicitly rejects any contract signal that ordering is meaningful.
+
+2026-05-21 actionable follow-up execution pass:
+
+- Executed the newly added unchecked follow-up from the preloaded test-shaper review by extending `list-entries-test` with a focused unordered-contract proof.
+- The new test registers entries in a deliberate order, asserts membership/count only via ids and count, proves `:value` mirrors `:entries`, and checks that the result does not advertise ordering metadata such as `:order`, `:sorted?`, or `:storage-order`.
+- First attempt over-constrained the collection type to `vector?`; focused test execution showed `list-entries` currently returns a sequential collection that need not be a vector, so the test was corrected to assert only `sequential?`, preserving the intended unordered contract.
+- Verification for this pass: `clojure -M:test --focus psi.root-registry.registry-test`, `clj-kondo --lint components/root-registry/src components/root-registry/test`, and `clojure -M:fmt -m cljfmt.main check components/root-registry/src/psi/root_registry/registry.clj components/root-registry/test/psi/root_registry/registry_test.clj deps.edn tests.edn` all passed.

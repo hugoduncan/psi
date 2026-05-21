@@ -95,6 +95,25 @@
       (is (= #{:read :write}
              (set (map :id (:entries result)))))))
 
+  (testing "list-entries exposes unordered membership/count only"
+    (let [root-state (-> (registry/declared-root-state [:tools])
+                         (register-entry :tools (sample-entry :write :ext/write {:name "write"}))
+                         (register-entry :tools (sample-entry :read :ext/read {:name "read"}))
+                         (register-entry :tools (sample-entry :list :ext/list {:name "list"})))
+          result (:result (registry/list-entries root-state :tools))
+          entries (:entries result)]
+      (is (= true (:ok? result)))
+      (is (= 3 (:count result)))
+      (is (= 3 (count entries)))
+      (is (= #{:write :read :list}
+             (set (map :id entries))))
+      (is (= entries (:value result)))
+      (is (not (contains? result :order)))
+      (is (not (contains? result :sorted?)))
+      (is (not (contains? result :storage-order)))
+      (is (sequential? entries)
+          "Callers may observe a concrete sequential collection, but the contract is unordered membership/count only.")))
+
   (testing "listing an unknown registry fails explicitly"
     (let [result (:result (registry/list-entries (registry/empty-root-state) :tools))]
       (is (= false (:ok? result)))

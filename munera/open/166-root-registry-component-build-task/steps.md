@@ -10,4 +10,4 @@
 - [x] Define and implement uniform result contracts
 - [x] Add focused lower-component tests for shared semantics, including explicit declaration idempotence and non-implicit declaration semantics
 - [x] Refine docs/comments and task artifacts to match the delivered component
-- [ ] Add a focused test that proves `list-entries` does not expose or depend on storage order, and that callers should treat the result as unordered membership/count only
+- [x] Add a focused test that proves `list-entries` does not expose or depend on storage order, and that callers should treat the result as unordered membership/count only
