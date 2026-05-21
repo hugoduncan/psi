@@ -544,7 +544,6 @@ Available: " (str/join ", " (map name (keys all))))
    (run-session model-key memory-runtime-opts session-config {}))
   ([model-key memory-runtime-opts session-config startup-opts]
    (let [ai-model   (resolve-model model-key)
-         ai-ctx     nil
          {:keys [ctx oauth-ctx]}
          (create-runtime-session-context ai-model {:session-config          session-config
                                                    :ui-type                 :console
@@ -553,16 +552,36 @@ Available: " (str/join ", " (map name (keys all))))
          {:keys [templates skills startup-rehydrate session-id]}
          (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts})
          cli-focus* (atom session-id)
-         cmd-opts   (cli/cli-command-opts start-new-session-with-startup! ctx cli-focus* ai-ctx ai-model oauth-ctx)]
-     (reset! session-state {:ctx ctx :ai-ctx ai-ctx :ai-model ai-model
+         cmd-opts   (cli/cli-command-opts start-new-session-with-startup! ctx cli-focus* nil ai-model oauth-ctx)]
+     (reset! session-state {:ctx ctx :ai-ctx nil :ai-model ai-model
                             :oauth-ctx oauth-ctx
                             :nrepl-runtime-atom nrepl-runtime})
      (output/print-banner ai-model templates skills ctx)
      (output/print-initial-transcript! startup-rehydrate)
-     (cli/run-cli-loop! run-prompt! runtime/journal-user-message-in! ctx cli-focus* ai-ctx ai-model oauth-ctx cmd-opts))))
+     (cli/run-cli-loop! run-prompt! runtime/journal-user-message-in! ctx cli-focus* nil ai-model oauth-ctx cmd-opts))))
 
 ;; TUI session (charm.clj Elm Architecture)
 ;; ============================================================
+
+(defn- maybe-install-nullable-execution-mode
+  "When PSI_NULLABLE_EXECUTION_MODE=deterministic, install a stub executor that
+   echoes user text back as the assistant response. Used by TUI integration test
+   harness to run without a real AI provider."
+  [ctx]
+  (let [mode (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty)]
+    (if (= "deterministic" mode)
+      (assoc ctx :execute-prepared-request-fn
+             (fn [_ai-ctx _ctx sid prepared-request _progress-queue]
+               (let [user-text (or (get-in prepared-request [:prepared-request/user-message :content 0 :text]) "")]
+                 {:execution-result/turn-id (or (:prepared-request/id prepared-request)
+                                                (str (java.util.UUID/randomUUID)))
+                  :execution-result/session-id sid
+                  :execution-result/assistant-message {:role "assistant" :content [{:type :text :text user-text}]
+                                                       :stop-reason :stop :timestamp (java.time.Instant/now)}
+                  :execution-result/turn-outcome :turn.outcome/stop
+                  :execution-result/tool-calls []
+                  :execution-result/stop-reason :stop})))
+      ctx)))
 
 (defn new-session-with-startup-in!
   "Public helper for runtimes/tests: create new session and run startup prompts.
@@ -588,7 +607,6 @@ Available: " (str/join ", " (map name (keys all))))
    (start-tui-runtime! tui-start-fn! model-key memory-runtime-opts session-config {}))
   ([tui-start-fn! model-key memory-runtime-opts session-config startup-opts]
    (let [ai-model    (resolve-model model-key)
-         ai-ctx      nil
          event-queue (java.util.concurrent.LinkedBlockingQueue.)
          {:keys [ctx oauth-ctx cwd]}
          (create-runtime-session-context ai-model {:event-queue             event-queue
@@ -596,20 +614,7 @@ Available: " (str/join ", " (map name (keys all))))
                                                    :ui-type                 :tui
                                                    :persist?                false
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
-         nullable-execution-mode (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty)
-         ctx (if (= "deterministic" nullable-execution-mode)
-               (assoc ctx :execute-prepared-request-fn
-                      (fn [_ai-ctx _ctx sid prepared-request _progress-queue]
-                        (let [user-text (or (get-in prepared-request [:prepared-request/user-message :content 0 :text]) "")]
-                          {:execution-result/turn-id (or (:prepared-request/id prepared-request)
-                                                         (str (java.util.UUID/randomUUID)))
-                           :execution-result/session-id sid
-                           :execution-result/assistant-message {:role "assistant" :content [{:type :text :text user-text}]
-                                                                :stop-reason :stop :timestamp (java.time.Instant/now)}
-                           :execution-result/turn-outcome :turn.outcome/stop
-                           :execution-result/tool-calls []
-                           :execution-result/stop-reason :stop})))
-               ctx)
+         ctx (maybe-install-nullable-execution-mode ctx)
          {:keys [startup-rehydrate session-id]}
          (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
                                                    :cwd cwd})
@@ -618,7 +623,7 @@ Available: " (str/join ", " (map name (keys all))))
          tui-focus* (atom session-id)
 
          ;; Expose state for nREPL introspection
-         _         (reset! session-state {:ctx ctx :ai-ctx ai-ctx :ai-model ai-model
+         _         (reset! session-state {:ctx ctx :ai-ctx nil :ai-model ai-model
                                           :oauth-ctx oauth-ctx
                                           :nrepl-runtime-atom nrepl-runtime
                                           :tui-focus* tui-focus*})
@@ -634,9 +639,13 @@ Available: " (str/join ", " (map name (keys all))))
          cmd-opts  {:oauth-ctx oauth-ctx
                     :ai-model ai-model
                     :supports-session-tree? true
+                    ;; Intentionally reads @tui-focus* rather than using the
+                    ;; callback parameter — the TUI always forks from the
+                    ;; currently focused session, which may differ from the
+                    ;; session that dispatched the /new command.
                     :on-new-session! (fn [_source-session-id]
                                        (let [source-session-id @tui-focus*
-                                             result             (start-new-session-with-startup! ctx source-session-id ai-ctx ai-model)]
+                                             result             (start-new-session-with-startup! ctx source-session-id nil ai-model)]
                                          (reset! tui-focus* (:session-id result))
                                          (context-event! (:session-id result))
                                          result))}

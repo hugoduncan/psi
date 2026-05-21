@@ -80,6 +80,8 @@
   {:oauth-ctx oauth-ctx
    :ai-model ai-model
    :supports-session-tree? false
+   ;; Intentionally reads @cli-focus* rather than using the callback
+   ;; parameter — the CLI always forks from the currently focused session.
    :on-new-session! (fn [_source-session-id]
                       (let [source-session-id @cli-focus*
                             result             (start-new-session-fn ctx source-session-id ai-ctx ai-model)]
