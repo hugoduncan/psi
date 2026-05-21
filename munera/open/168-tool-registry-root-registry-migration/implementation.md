@@ -53,3 +53,8 @@ Next step:
 - Added a focused `get-tool-in` assertion proving built-in lookup preserves `:ext-path "built-in:workflow"` on the public read surface.
 - Marked the follow-up step done in `steps.md`.
 - Verification: `clojure -M:test --focus psi.tool-registry.registry-test` ✅; `clj-kondo --lint components/tool-registry/src components/tool-registry/test` ✅.
+
+2026-05-21 test review:
+
+- No new actionable test-quality feedback found. Focused coverage still matches the pinned task behaviour: extension/built-in merged reads, built-ins-first ordering, same-owner replacement, `:format-request` enforcement, canonical naming, nil miss semantics, and built-in `get-tool-in` provenance.
+- Verification: `clojure -M:test --focus psi.tool-registry.registry-test` ✅; `clj-kondo --lint components/tool-registry/src components/tool-registry/test` ✅.
