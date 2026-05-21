@@ -11,6 +11,12 @@
       (is (= {:status :ok}
              (tmux/tmux-preflight-result)))))
 
+  (testing "worktree-launch-command uses an absolute repo-local launcher when bb is available"
+    (with-redefs [tmux/command-available? (fn [cmd] (= cmd "bb"))
+                  tmux/repo-local-launch-command-abs (constantly "exec /abs/bb /abs/repo/bb/psi.clj -- --tui")]
+      (is (= "exec /abs/bb /abs/repo/bb/psi.clj -- --tui"
+             (tmux/worktree-launch-command)))))
+
   (testing "returns skipped with warning for local missing tmux"
     (with-redefs [tmux/tmux-available? (constantly false)
                   tmux/ci-env?         (constantly false)]

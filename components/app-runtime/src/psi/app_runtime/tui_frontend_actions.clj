@@ -4,6 +4,7 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.runtime :as runtime]
+   [psi.app-runtime.navigation :as navigation]
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.ai.model-registry :as model-registry]))
 
@@ -50,13 +51,12 @@
       (case status
         :submitted
         (when (string? value)
-          (let [sd (session/resume-session-in! ctx sid value)]
-            (set-focus! (:session-id sd))
+          (let [nav (navigation/resume-session-result ctx nil sid value)
+                restored-id (:nav/session-id nav)]
+            (set-focus! restored-id)
             {:type :session-resume-restored
-             :restored {:messages (vec (or (:messages sd) []))
-                        :tool-calls {}
-                        :tool-order []}
-             :session-id (:session-id sd)
+             :restored (:nav/rehydration nav)
+             :session-id restored-id
              :path value}))
 
         (:cancelled :failed)

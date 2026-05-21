@@ -1,0 +1,19 @@
+- [x] Orient on task intent and confirm current task surface.
+  - Only `design.md` existed at takeover.
+- [x] Record already-completed adjacent `/resume` crash fix.
+  - Commit `609aa51d` canonicalizes resumed session timestamps to `Instant`.
+- [x] Reproduce the live TUI `/resume` discovery failure from the tmux harness.
+  - Diagnosed via harness path tracing plus direct launcher proof rather than a stable live scenario replay.
+- [x] Trace effective worktree-path/cwd/session-root/session-dir through the live TUI path.
+  - Canonical `/resume` selector data comes from persisted-session query keyed by session worktree-path.
+  - The tmux harness can start sessions in temp fixture directories.
+- [x] Identify the authoritative root cause for `(no sessions found)` despite persisted fixture presence.
+  - `worktree-launch-command` used relative `bb/psi.clj`, which fails when tmux launches outside the repo root, creating harness-only divergence from intended runtime behavior.
+- [x] Add focused tests for the discovered invariant.
+  - Added harness test proving `worktree-launch-command` must use an absolute repo-local launcher when `bb` is available.
+- [x] Implement the minimal fix.
+  - `worktree-launch-command` now uses `repo-local-launch-command-abs`.
+- [x] Re-enable the quarantined tmux rehydration scenario.
+  - Live tmux `/resume` discovery now surfaces a persisted session and selecting it visibly rehydrates the transcript.
+- [x] Verify unit coverage plus tmux scenario behavior.
+  - Focused main, tmux harness, RPC navigation, and live tmux rehydration coverage passed.

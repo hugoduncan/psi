@@ -595,7 +595,9 @@ Available: " (str/join ", " (map name (keys all))))
    `psi.app-runtime.tui-wiring`.
 
    startup-opts:
-   - :thinking-level-override explicit thinking level keyword (overrides config)"
+   - :thinking-level-override explicit thinking level keyword (overrides config)
+   - :cwd optional startup worktree/cwd override (primarily for tests/harnesses)
+   - :session-root optional persisted session root override (primarily for tests/harnesses)"
   ([tui-start-fn! model-key]
    (start-tui-runtime! tui-start-fn! model-key {} {} {}))
   ([tui-start-fn! model-key memory-runtime-opts]
@@ -608,8 +610,10 @@ Available: " (str/join ", " (map name (keys all))))
          {:keys [ctx oauth-ctx cwd]}
          (create-runtime-session-context ai-model {:event-queue             event-queue
                                                    :session-config          session-config
+                                                   :cwd                     (:cwd startup-opts)
+                                                   :session-root            (:session-root startup-opts)
                                                    :ui-type                 :tui
-                                                   :persist?                false
+                                                   :persist?                true
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
          ctx (maybe-install-nullable-execution-mode ctx)
          {:keys [startup-rehydrate session-id]}
