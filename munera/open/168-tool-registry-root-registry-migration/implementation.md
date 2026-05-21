@@ -74,3 +74,8 @@ Next step:
 - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` to execute the newly added actionable follow-up items from the preceding review pass.
 - Found no newly added unchecked follow-up items in `steps.md`; all recorded actionable work for this task remains complete.
 - No task-file or code changes were needed for this execution pass.
+
+2026-05-21 code-shaper review:
+
+- No new actionable code-shaping feedback found. `psi.tool-registry.registry` stays locally comprehensible, keeps validation/normalization adapter-owned, and preserves the merged built-in/extension read surface without reintroducing parallel storage paths.
+- Verification: `clojure -M:test --focus psi.tool-registry.registry-test` ✅; `clj-kondo --lint components/tool-registry/src components/tool-registry/test` ✅.
