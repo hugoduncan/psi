@@ -179,13 +179,14 @@
                                                                                      :ui-type                 :emacs
                                                                                      :thinking-level-override thinking-level}))
         :bootstrap-fn!       (fn [ctx session-id ai-model memory-runtime-opts]
-                               (app-runtime/bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts
-                                                                                                :cwd (:cwd ctx)}))
+                               (app-runtime/bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
+                                                                                     :session-id          session-id
+                                                                                     :cwd                 (:cwd ctx)}))
         :on-new-session!     (fn [source-session-id]
-                               (app-runtime/new-session-with-startup-in! (:ctx @app-runtime/session-state)
-                                                                         source-session-id
-                                                                         nil
-                                                                         (:ai-model @app-runtime/session-state)))})
+                               (app-runtime/start-new-session-with-startup! (:ctx @app-runtime/session-state)
+                                                                            source-session-id
+                                                                            nil
+                                                                            (:ai-model @app-runtime/session-state)))})
       (finally
         (app-runtime/stop-nrepl! nrepl-srv)))))
 

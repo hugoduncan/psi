@@ -7,13 +7,10 @@
    [psi.agent-session.extension-installs :as installs]
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
-   [psi.provider-auth.oauth.core :as oauth]
-   [psi.prompt-assets.prompt-templates :as pt]
-   [psi.prompt-assets.skills :as skills]
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]
-   [psi.app-runtime :as app-runtime]
+   [psi.app-runtime.test-support :as app-test-support]
    [psi.session-state.state :as ss]))
 
 (defn- manifest-file [root rel]
@@ -46,14 +43,11 @@
 (defn- startup-bootstrap-bindings
   [cwd home {:keys [stub-build-system-prompt?]
              :or   {stub-build-system-prompt? true}}]
-  (cond-> {#'installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
-           #'installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))
-           #'oauth/create-context (fn [] nil)
-           #'pt/discover-templates (fn [] [])
-           #'skills/discover-skills (fn [] {:skills [] :diagnostics []})
-           #'sys-prompt/discover-context-files (fn [_] [])}
-    stub-build-system-prompt?
-    (assoc #'sys-prompt/build-system-prompt (fn [_] ""))))
+  (cond-> (merge (app-test-support/bootstrap-stub-bindings)
+                 {#'installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
+                  #'installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))})
+    (not stub-build-system-prompt?)
+    (dissoc #'sys-prompt/build-system-prompt)))
 
 (defn- bootstrap-runtime-session-for-test
   ([cwd home]
@@ -61,7 +55,7 @@
   ([cwd home opts]
    (with-redefs-fn (startup-bootstrap-bindings cwd home opts)
      (fn []
-       (let [result (app-runtime/bootstrap-runtime-session! {:provider :anthropic :id "claude-sonnet-4-6" :supports-reasoning true} {:cwd cwd})]
+       (let [result (app-test-support/bootstrap-fresh-session! app-test-support/test-ai-model {:cwd cwd})]
          (model-registry/init! {:user-models-path nil :project-models-path nil})
          result)))))
 

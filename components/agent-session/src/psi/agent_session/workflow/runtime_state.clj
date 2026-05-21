@@ -1,9 +1,15 @@
 (ns psi.agent-session.workflow.runtime-state
   "Narrow owner for higher-core built-in workflow runtime state and session-bound
-   helper accessors.")
+   helper accessors.
+
+   Built-in lifecycle callbacks are stored in `built-in-lifecycle-callbacks`,
+   a plain atom mapping event-name → vector of handler fns.  These are invoked
+   by `session_lifecycle.clj` directly rather than through extension event
+   dispatch.")
 
 (defonce state (atom nil))
 (defonce inflight-runs (atom {}))
+(defonce built-in-lifecycle-callbacks (atom {}))
 (def ^:dynamic *active-workflow-session-id* nil)
 
 (def built-in-workflow-path "built-in:workflow")
@@ -61,3 +67,24 @@
 
 (defn assoc-state! [& kvs]
   (apply swap! state assoc kvs))
+
+;;; Built-in lifecycle registration and invocation
+
+(defn register-built-in-lifecycle-callback!
+  "Register `handler-fn` for `event-name` in the built-in lifecycle store.
+   `event-name` is a string (e.g. `\"session_switch\"`).
+   Replaces any existing handler for the same event to avoid duplication on
+   repeated bootstrap calls."
+  [event-name handler-fn]
+  (swap! built-in-lifecycle-callbacks assoc event-name handler-fn))
+
+(defn invoke-built-in-lifecycle!
+  "Invoke the registered built-in lifecycle handler for `event-name`, if any.
+   `event` is the payload map passed to the handler.
+   Returns the handler return value, or nil when no handler is registered."
+  [event-name event]
+  (when-let [handler (get @built-in-lifecycle-callbacks event-name)]
+    (try
+      (handler event)
+      (catch Exception e
+        {:error (.getMessage e)}))))

@@ -13,12 +13,12 @@
    (create-runtime-like-context nil))
   ([execute-prepared-request-fn]
    (let [ai-model (app/resolve-model :gpt-5.4)
-         {:keys [ctx session-id cwd]} (app/create-runtime-session-context ai-model {:event-queue (java.util.concurrent.LinkedBlockingQueue.)
-                                                                                    :ui-type :rpc
-                                                                                    :persist? false})
+         {:keys [ctx cwd]} (app/create-runtime-session-context ai-model {:event-queue (java.util.concurrent.LinkedBlockingQueue.)
+                                                                         :ui-type :rpc
+                                                                         :persist? false})
          ctx (cond-> ctx
-               execute-prepared-request-fn (assoc :execute-prepared-request-fn execute-prepared-request-fn))]
-     (app/bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts {} :cwd cwd})
+               execute-prepared-request-fn (assoc :execute-prepared-request-fn execute-prepared-request-fn))
+         {:keys [session-id]} (app/bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts {} :cwd cwd})]
      [ctx session-id])))
 
 (defn- write-line! [^java.io.Writer w line]

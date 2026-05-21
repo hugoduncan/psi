@@ -6,16 +6,20 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.agent-session.workflow.core :as workflow]
-   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]))
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [psi.session-state.state :as ss]
+   [psi.tool-registry.registry :as tool-registry]))
 
 (defn- clean-workflow-runtime-state [f]
   (reset! workflow-runtime-state/state nil)
   (reset! workflow-runtime-state/inflight-runs {})
+  (reset! workflow-runtime-state/built-in-lifecycle-callbacks {})
   (try
     (f)
     (finally
       (reset! workflow-runtime-state/state nil)
-      (reset! workflow-runtime-state/inflight-runs {}))))
+      (reset! workflow-runtime-state/inflight-runs {})
+      (reset! workflow-runtime-state/built-in-lifecycle-callbacks {}))))
 
 (use-fixtures :each clean-workflow-runtime-state)
 
@@ -37,8 +41,9 @@
                      :steps {"step-1" {:label "plan" :tools ["read"]}}}}))
 
 (defn- delegate-tool-for [ctx]
-  (some #(when (= "delegate" (:name %)) %)
-        (-> ctx :extension-registry :state deref :extensions (get workflow/built-in-workflow-path) :tools vals)))
+  ;; Resolve the delegate tool through the built-in registration path rather
+  ;; than by reading extension-registry extension-owned state directly.
+  (tool-registry/get-tool-in (:extension-registry ctx) "delegate"))
 
 (defn- stub-workflow-mutate [run-id]
   (fn [sym _params]
@@ -90,3 +95,14 @@
                    :workflow-name "planner"
                    :include? false}]
                  @created*)))))))
+
+(deftest init-built-in-registers-prompt-contribution-with-built-in-provenance-test
+  (testing "init-built-in! registers prompt contribution in shared store with ext-path=built-in:workflow"
+    (let [[ctx sid1 _sid2] (create-two-session-context)]
+      (init-built-in-workflow! ctx sid1)
+      (let [contributions (ss/list-prompt-contributions-in ctx sid1)
+            workflow-contrib (first (filter #(= "built-in:workflow" (:ext-path %)) contributions))]
+        (is (some? workflow-contrib)
+            "a prompt contribution with ext-path=built-in:workflow was registered")
+        (is (seq (:content workflow-contrib))
+            "contribution content is non-empty")))))

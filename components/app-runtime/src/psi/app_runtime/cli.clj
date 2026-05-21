@@ -30,9 +30,9 @@
             (println (str "\n  ✗ Login failed: " (ex-message e) "\n"))))))))
 
 (defn run-cli-prompt!
-  [run-prompt-fn ctx sid ai-ctx ai-model trimmed]
+  [run-prompt-fn ctx sid _ai-ctx ai-model trimmed]
   (try
-    (run-prompt-fn ctx sid ai-ctx ai-model trimmed)
+    (run-prompt-fn ctx sid _ai-ctx ai-model trimmed)
     (catch Exception e
       (println (str "\n[Error: " (ex-message e) "]\n")))))
 
@@ -76,18 +76,20 @@
       true)))
 
 (defn cli-command-opts
-  [start-new-session-fn ctx cli-focus* ai-ctx ai-model oauth-ctx]
+  [start-new-session-fn ctx cli-focus* _ai-ctx ai-model oauth-ctx]
   {:oauth-ctx oauth-ctx
    :ai-model ai-model
    :supports-session-tree? false
+   ;; Intentionally reads @cli-focus* rather than using the callback
+   ;; parameter — the CLI always forks from the currently focused session.
    :on-new-session! (fn [_source-session-id]
                       (let [source-session-id @cli-focus*
-                            result             (start-new-session-fn ctx source-session-id ai-ctx ai-model)]
+                            result             (start-new-session-fn ctx source-session-id _ai-ctx ai-model)]
                         (reset! cli-focus* (:session-id result))
                         result))})
 
 (defn run-cli-loop!
-  [run-prompt-fn journal-user-message-fn! ctx cli-focus* ai-ctx ai-model oauth-ctx cmd-opts]
+  [run-prompt-fn journal-user-message-fn! ctx cli-focus* _ai-ctx ai-model oauth-ctx cmd-opts]
   (loop []
     (print "刀: ")
     (flush)
@@ -104,7 +106,7 @@
 
           (nil? result)
           (do
-            (run-cli-prompt! run-prompt-fn ctx sid ai-ctx ai-model trimmed)
+            (run-cli-prompt! run-prompt-fn ctx sid _ai-ctx ai-model trimmed)
             (recur))
 
           (handle-cli-command-result! oauth-ctx result)

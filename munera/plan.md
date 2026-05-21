@@ -7,11 +7,10 @@ Backlog:
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/105-agent-session-component-extraction-map/`
-`munera/open/136-built-in-registration-path-for-workflow/`
+
 `munera/open/141-workflow-child-session-non-streaming-execution/`
 `munera/open/144-workflow-model-query-execution-fallback/`
 `munera/open/147-workflow-child-session-creation-contract/`
-`munera/open/134-psi-tool-mutation-surface-and-active-session-introspection/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
 `munera/open/077-custom-provider-string-provider-auth-normalization/`
@@ -24,10 +23,13 @@ Backlog:
 `munera/open/156-tui-resume-session-discovery-follow-up/`
 
 Notes:
+- `136` is complete and closed: built-in workflow now installs via explicit built-in paths — `register-built-in-tool-in!` / `register-built-in-command-in!` in the shared registries, direct `:session/register-prompt-contribution` dispatch for prompt contributions, and `register-built-in-lifecycle-callback!` / `invoke-built-in-lifecycle!` for session_switch; `ext/register-extension-in!` and `ext/create-extension-api` removed from bootstrap; `built-in:workflow` retained only as stable provenance identifier; 6 commits, lint clean, all affected workflow tests pass.
+
+
 - `151` is complete and closed: `edit-clj` structural edit extension; `psi.edit-clj.core` (pure: parse, find-candidates, apply-line-filter, replace-in) + `psi.edit-clj.extension` (tool registration, I/O, JSON); wired into top-level `deps.edn`, `tests.edn`, and `psi-owned-extension-catalog`; `rewrite-clj/rewrite-clj 1.1.47` added to runtime+test deps; 19 tests, 73 assertions, 0 failures; 1776+169 broader suite green.
 - `140-workflow-ir-compilation-errors-actionable` is complete and closed: `"invalid value"` fallback test added to `format-structural-errors-test`; all 4 AC and 8 verification expectations met; 16 formatter tests, 63 assertions, 0 failures.
 - `141` is open: workflow-scoped child-session execution-mode support so workflow-owned child sessions can request `:response-mode :non-streaming`; intentionally narrower than a full session-wide streaming toggle.
-- `145` is complete and should move to `munera/closed/`: logprob data moved out-of-band into `extensions.logprobs`; `journal->provider-messages` no longer projects synthetic user messages; `session_turn_finished` carries `:logprobs` and `:assistant-message`; `local-logprobs` now uses `logprobs/perplexity`; extension storage simplified to a single latest snapshot carrying `:session-id`; focused tests green, docs synced.
+- `145` is complete and closed: logprob data moved out-of-band into `extensions.logprobs`.
 - `140` is complete and closed: logprob collection flag for OpenAI chat-completions endpoint;
   schema + request building + SSE extraction (OpenAI + llama.cpp) + turn accumulation +
   journal append/projection + EQL resolver + /logprobs command; 1702 tests, 0 failures.
@@ -41,6 +43,8 @@ Notes:
 - `003` is the broader prompt-lifecycle convergence umbrella; `006` is the concrete remaining skill-prelude/cache-breakpoint slice that currently drives its unfinished acceptance.
 - `070` tracks the `/delegate` slash-command UX gap so delegated workflow completion comes back into the originating conversation transcript.
 - Tasks `089`, `091`, `092`, `093`, and `094` are now complete and live under `munera/closed/`.
+- `134` is complete and closed: psi-tool mutation surface + context-session-summaries resolver.
+- `142` is complete and closed: workflow session logprobs control.
 - `140` adds a runtime behavioural flag for logprob collection on the OpenAI chat-completions endpoint: session flag → options projection → request builder → `:logprobs-delta` stream event.
 - `154` is complete and closed: canonical provider telemetry events (`provider_request_started`, `provider_retry_scheduled`, `provider_request_finished`), shared `provider-error-kind` classification, metrics provider/per-model aggregation, persistence/schema coverage, and `/metrics` provider summaries are implemented; focused verification green including retry-attempt fresh prepared-request/turn-id proof.
 - Close or replace tasks as scope sharpens; do not merge task contents.

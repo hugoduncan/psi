@@ -191,7 +191,7 @@
   (testing "runtime session attrs expose in-memory process sessions and persisted session list remains queryable"
     (let [cwd                (str (System/getProperty "java.io.tmpdir") "/psi-resolvers-context-" (java.util.UUID/randomUUID))
           _                  (.mkdirs (java.io.File. cwd))
-          [ctx _]            (create-session-context {:cwd cwd})
+          [ctx _]            (create-session-context {:cwd cwd :persist? true :session-root cwd})
           sd-1               (session/new-session-in! ctx nil {})
           sid-1              (:session-id sd-1)
           path-1             (:session-file sd-1)

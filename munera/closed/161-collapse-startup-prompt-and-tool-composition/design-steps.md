@@ -1,0 +1,10 @@
+# Design review follow-ups — 161
+
+- [x] A1: Fix Intent section — correct "three times" to match actual count (2 builds, 4 persists); fix "rebuilds from build-opts" annotation on PERSIST #3 (no build-opts exist at that point)
+- [x] A2: Decide prompt-contribution application strategy — target flow uses `:session/set-system-prompt` (applies contributions via `effective-prompt`); `:session/bootstrap-prompt-state` used only to seed developer-prompt at start
+- [x] A3: Decide whether individual `:session/add-tool` dispatches in `load-startup-resources-in!` are kept or removed — removed; `set-active-tools` replaces the full set, making prior `add-tool` dispatches redundant
+- [x] A4: Decide the fate of `bootstrap-in!` — retained as test-oriented convenience; startup responsibilities inlined into `adopt-startup-plan-into-session!`; tests that redef it are unaffected
+- [x] A5: Clarify what "load resources" means in the target flow — `load-startup-resources-in!` called with templates + skills only; tools excluded (composed via `set-active-tools`); extension-paths/targets excluded (handled by `bootstrap-manifest-extensions-in!`)
+- [x] A6: Confirm that `developer-prompt` and `developer-prompt-source` are explicitly passed — yes, via an explicit `:session/bootstrap-prompt-state` dispatch at the start of the target flow, before the prompt build
+- [x] IC1: Resolve `set-active-tools` side-effect prompt persist — reordered target flow: `set-active-tools` now dispatched AFTER prompt build + `set-system-prompt` + build-opts persist. Side-effect `refresh-system-prompt` fires with build-opts present, producing an equivalent prompt rebuild (not an empty prompt). Acceptance criterion #2 updated to acknowledge the side-effect write. Verification expectations updated to include `refresh-system-prompt` count.
+- [x] IC2: Fix hotspot — replaced `components/agent-session/test/psi/agent_session/bootstrap_test.clj` with `components/agent-session/test/psi/agent_session/model_dispatch_test.clj` in design.md

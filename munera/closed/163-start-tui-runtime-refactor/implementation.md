@@ -1,0 +1,61 @@
+# Implementation log
+
+- Review: `start-tui-runtime!` post tui-wiring extraction is ~100 lines. Three actionable issues identified: dead `ai-ctx` binding, inline nullable execution mode, `:on-new-session!` parameter shadowing.
+- `ai-ctx` analysis: traced through the full call chain. `ai-ctx` IS used deep in the stack (`turn_runtime/core.clj`, `stream.clj`) to switch between context-based and standalone AI execution. But the value is always `nil` in both `start-tui-runtime!` and `run-session`. Removed the local binding from both functions; pass `nil` directly at call sites. Left the parameter on deeper functions (`start-new-session-with-startup!`, `new-session-with-startup-in!`) since callers like `main.clj` pass `nil` explicitly. Both are `defn-` (private) but serve as internal entry points for session creation.
+- Extracted `maybe-install-nullable-execution-mode` as a named helper before `start-tui-runtime!`. The env-var check + deterministic executor stub was 10 lines of inline closure that obscured the main flow.
+- `:on-new-session!` parameter shadowing is intentional: the TUI/CLI always fork from the currently focused session (`@tui-focus*` / `@cli-focus*`), not the session that dispatched the `/new` command. Added intent comments on both closures. `main.clj` correctly uses the parameter for RPC/emacs where focus tracking is different.
+- Verification: 39 tests, 195 assertions, 0 failures across app-runtime, bootstrap, nrepl, navigation, and rpc-prompt-command test namespaces. Focused lint clean.
+
+## Implementation review (task-implementation-review)
+
+**Matches design**: all three planned changes delivered — dead `ai-ctx` binding removed, `maybe-install-nullable-execution-mode` extracted, `:on-new-session!` intent documented.
+
+**Observations (no action required)**:
+- `cli.clj` functions (`cli-command-opts`, `run-cli-loop!`, `run-cli-prompt!`) still accept and thread `ai-ctx` as a live parameter (not `_ai-ctx`). Consistent with the design's decision to leave parameters on deeper functions, but the acceptance criterion ("all downstream callers updated") reads slightly broader. Acceptable — cli.clj cleanup would widen scope.
+- Implementation log says `start-new-session-with-startup!` is "public/internal API" — it is actually `defn-` (private). The decision to keep the parameter is still reasonable; the rationale text is slightly inaccurate.
+- `:ai-ctx nil` remains in `session-state` atom resets (both `run-session` and `start-tui-runtime!`). Dead data, but removing it is a separate atom-shape concern.
+- `maybe-install-nullable-execution-mode` extraction is clean: clear docstring, returns modified or unmodified `ctx`, no unnecessary abstractions.
+- No new patterns that duplicate existing reusable patterns.
+
+## Review follow-up
+
+- Fixed implementation log: corrected "public/internal API" → "private (`defn-`) but serve as internal entry points".
+- Removed dead `:ai-ctx nil` from `session-state` atom resets in both `run-session` and `start-tui-runtime!`. Verified no code reads `:ai-ctx` from `session-state` — only `dispatch_effects.clj` reads it from the runtime `ctx` map (different path). All unit tests pass.
+
+## Test review (task-test-review)
+
+**Coverage gap**: `maybe-install-nullable-execution-mode` has zero direct unit tests. The extracted helper is a pure function (env-var → ctx → ctx) but is only exercised indirectly via the TUI tmux integration harness (`PSI_NULLABLE_EXECUTION_MODE=deterministic`). Missing cases: passthrough when env var is absent/blank, stub installation when `"deterministic"`, and the stub's echo-back shape.
+
+**Pre-existing pattern (observation, not actionable for this task)**: the test file uses `with-redefs` 15× to stub infrastructure (oauth, templates, skills, system-prompt, model resolution). This is closer to mocking than nullable infrastructure, but the pattern predates this task and changing it would widen scope.
+
+## Test follow-up execution
+
+- Extracted `nullable-execution-mode` as a private helper (`defn-`) that reads and trims the env var. This creates a redef-able seam so tests don't need Java reflection hacks to control `System/getenv`. The extraction is mechanical — no behavioral change.
+- Added 6 tests: passthrough (nil), passthrough (blank — covered by `nullable-execution-mode` returning nil for whitespace-only), stub installation (asserts `:execute-prepared-request-fn` is present and is a fn), echo-back shape (all 9 execution-result keys verified), UUID fallback when `:prepared-request/id` is absent, empty-text fallback when user message is missing.
+- All 34 app-runtime tests pass (129 assertions, 0 failures).
+
+## Test shaper review (test-shaper)
+
+**Redundant test**: `maybe-install-nullable-execution-mode-passthrough-when-blank-test` redefs `nullable-execution-mode` to return `nil` — identical to the "absent" test. The name says "blank" but the blank→nil conversion happens inside `nullable-execution-mode`, not `maybe-install-nullable-execution-mode`. Either delete the test (redundant) or change it to exercise a distinct partition (e.g. redef to return `""` to verify passthrough for empty-string, though `nullable-execution-mode` already filters that).
+
+**Fixture duplication**: `with-main-bootstrap-stubs` (inline HOF in test ns) and `bootstrap-stub-bindings` (in test-support) serve the same purpose with slightly different stub sets. The inline version omits `introspection/register-resolvers!` and `memory-runtime/sync-memory-layer!`. Migrating the remaining `with-main-bootstrap-stubs` callers to `bootstrap-stub-bindings` would unify the fixture pattern and reduce maintenance surface.
+
+**No other actionable issues**: naming is consistent, single-concern per test is respected (the extension-command integration test is sociable by design), assertion style is uniform, nullable tests cover behavioral partitions well, helpers compress ceremony without hiding intent.
+
+## Test shaper follow-up execution
+
+- Deleted `maybe-install-nullable-execution-mode-passthrough-when-blank-test` — redundant with the absent test. Both redef'd `nullable-execution-mode` → nil. The blank→nil conversion lives inside `nullable-execution-mode`, not the function under test.
+- Replaced `with-main-bootstrap-stubs` (inline HOF with `with-redefs`) with `main-bootstrap-stub-bindings` (private fn returning a map). Merges `bootstrap-stub-bindings` from test-support with `resolve-model` and `discover-extension-paths` stubs. All 12 callers now use `with-redefs-fn`. Removed 3 unused requires (`oauth`, `pt`, `skills`). Lint clean, all tests pass.
+
+## Code shaper review (code-shaper)
+
+**Naming inconsistency — `ai-ctx` parameter convention**: The task underscore-prefixed `ai-ctx` in `run-prompt!` (`_ai-ctx`) and `startup-rehydrate-from-current-session!` (`_ai-ctx`), signalling dead parameters. But `start-new-session-with-startup!` (line 255) still takes `ai-ctx` without underscore and threads it to `startup-rehydrate-from-current-session!` which ignores it. Same for `new-session-with-startup-in!` (line 594) and `cli.clj` functions (`run-cli-prompt!`, `cli-command-opts`, `run-cli-loop!`). Within the file, the convention is now mixed: some dead `ai-ctx` params are underscore-prefixed, others are not. Underscore-prefix all dead `ai-ctx` params for consistency.
+
+**Trivial delegation — `new-session-with-startup-in!`**: Public `defn` (line 593) that calls `start-new-session-with-startup!` with identical args and no transformation. The docstring ("run startup prompts") is stale — startup prompts were removed. The function adds a naming indirection layer without value. Either make `start-new-session-with-startup!` public (and remove the wrapper) or collapse the two.
+
+**No other actionable issues**: `maybe-install-nullable-execution-mode` extraction is clean. `tui-wiring` delegation is well-structured. `build-tui-opts` assembles a flat map with no hidden state. The `start-tui-runtime!` let-binding is sequential and locally comprehensible. Data shapes are consistent across the wiring boundary.
+
+## Code shaper follow-up execution
+
+- Underscore-prefixed `_ai-ctx` in all 5 remaining functions: `start-new-session-with-startup!` and `new-session-with-startup-in!` in `app_runtime.clj`; `run-cli-prompt!`, `cli-command-opts`, `run-cli-loop!` in `cli.clj`. Convention now consistent across the entire `ai-ctx` parameter chain — all dead params are `_ai-ctx`.
+- Collapsed `new-session-with-startup-in!` into `start-new-session-with-startup!`: promoted private fn to public (`defn-` → `defn`), removed the trivial wrapper, updated `main.clj` caller. Updated docstring to remove stale "startup prompts" reference. 28 app-runtime tests + 8 bootstrap/rpc tests pass.

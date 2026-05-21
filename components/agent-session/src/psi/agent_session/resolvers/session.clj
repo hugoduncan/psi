@@ -550,8 +550,7 @@
                  :psi.startup/tool-count
                  :psi.startup/extension-loaded-count
                  :psi.startup/extension-error-count
-                 :psi.startup/extension-errors
-                 :psi.startup/mutations]}
+                 :psi.startup/extension-errors]}
   (let [summary (:startup-bootstrap (support/session-data agent-session-ctx session-id))]
     {:psi.startup/bootstrap-summary      summary
      :psi.startup/bootstrap-timestamp    (:timestamp summary)
@@ -560,8 +559,7 @@
      :psi.startup/tool-count             (:tool-count summary 0)
      :psi.startup/extension-loaded-count (:extension-loaded-count summary 0)
      :psi.startup/extension-error-count  (:extension-error-count summary 0)
-     :psi.startup/extension-errors       (:extension-errors summary [])
-     :psi.startup/mutations              (:mutations summary [])}))
+     :psi.startup/extension-errors       (:extension-errors summary [])}))
 
 ;; ── Invoking session identity (root-queryable) ─────────
 

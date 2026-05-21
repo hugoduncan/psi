@@ -4,6 +4,7 @@
   (:require
    [clojure.edn :as edn]
    [clojure.test :refer [deftest testing is]]
+   [psi.agent-core.core :as agent]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
@@ -349,14 +350,15 @@
         (is (= :session/request-interrupt (:event-type entry)))
         (is (= :core (:origin entry))))))
 
-  (testing "bootstrap-in! prompt metadata initialization is logged through dispatch"
+  (testing "bootstrap-prompt-state dispatch seeds prompt metadata"
     (let [[ctx session-id] (create-session-context)]
       (kernel/clear-event-log!)
-      (bootstrap/bootstrap-in!
-       ctx session-id
-       {:system-prompt          "sys"
-        :developer-prompt       "dev"
-        :developer-prompt-source :explicit})
+      (session/dispatch-in! ctx :session/bootstrap-prompt-state
+                            {:session-id              session-id
+                             :system-prompt           "sys"
+                             :developer-prompt        "dev"
+                             :developer-prompt-source :explicit}
+                            {:origin :core})
       (let [sd    (ss/get-session-data-in ctx session-id)
             entry (first (filter #(= :session/bootstrap-prompt-state (:event-type %))
                                  (kernel/event-log-entries)))]
@@ -370,11 +372,12 @@
                 :developer-prompt-source :explicit}
                (dissoc (:event-data entry) :session-id))))))
 
-  (testing "bootstrap-in! leaves developer layer unset when none is provided"
+  (testing "bootstrap-prompt-state leaves developer layer unset when none is provided"
     (let [[ctx session-id] (create-session-context)]
-      (bootstrap/bootstrap-in!
-       ctx session-id
-       {:system-prompt          "sys"})
+      (session/dispatch-in! ctx :session/bootstrap-prompt-state
+                            {:session-id    session-id
+                             :system-prompt "sys"}
+                            {:origin :core})
       (let [sd (ss/get-session-data-in ctx session-id)]
         (is (= "sys" (:base-system-prompt sd)))
         (is (nil? (:developer-prompt sd)))
@@ -490,3 +493,61 @@
       (session/dispatch-in! ctx :session/set-model {:session-id session-id :model {:provider "x" :id "y" :reasoning false}} {:origin :core})
       (session/cycle-thinking-level-in! ctx session-id)
       (is (= :off (:thinking-level (ss/get-session-data-in ctx session-id)))))))
+
+(deftest bootstrap-resource-registration-test
+  (testing "load-startup-resources-in! with templates, skills, and tools registers all resources"
+    (let [[ctx session-id] (create-session-context)
+          template {:name "greet" :description "Greeting" :content "Hello" :source :project :file-path "/tmp/greet.md"}
+          skill    {:name "test-skill" :description "A test skill" :lambda "λtest" :entrypoint "SKILL.md"}
+          tool     {:name "test-tool" :description "A test tool" :parameters {:type "object" :properties {}}}
+          result   (bootstrap/load-startup-resources-in!
+                    ctx session-id
+                    {:templates [template]
+                     :skills    [skill]
+                     :tools     [tool]})
+          sd         (ss/get-session-data-in ctx session-id)
+          agent-data (agent/get-data-in (ss/agent-ctx-in ctx session-id))]
+      (testing "return counts match registered resources"
+        (is (= 1 (:prompt-count result))
+            "prompt-count = 1")
+        (is (= 1 (:skill-count result))
+            "skill-count = 1")
+        (is (pos? (:tool-count result))
+            "tool-count ≥ 1"))
+      (is (= 1 (count (:prompt-templates sd)))
+          "one template registered in session-data")
+      (is (= 1 (count (:skills sd)))
+          "one skill registered in session-data")
+      (is (= "greet" (:name (first (:prompt-templates sd)))))
+      (is (= "test-skill" (:name (first (:skills sd)))))
+      (is (some #(= "test-tool" (:name %)) (:tools agent-data))))))
+
+(deftest bootstrap-dispatch-event-log-test
+  (testing "load-startup-resources-in! produces dispatch events for resource registration"
+    (let [[ctx session-id] (create-session-context)
+          template {:name "greet" :description "Greeting" :content "Hello" :source :project :file-path "/tmp/greet.md"}
+          skill    {:name "test-skill" :description "A test skill" :lambda "λtest" :entrypoint "SKILL.md"}
+          tool     {:name "test-tool" :description "A test tool" :parameters {:type "object" :properties {}}}]
+      (kernel/clear-event-log!)
+      (bootstrap/load-startup-resources-in!
+       ctx session-id
+       {:templates [template]
+        :skills    [skill]
+        :tools     [tool]})
+      (let [entries    (kernel/event-log-entries)
+            event-types (set (map :event-type entries))]
+        (is (contains? event-types :session/register-prompt-template)
+            "template registration event in log")
+        (is (contains? event-types :session/register-skill)
+            "skill registration event in log")
+        (is (contains? event-types :session/add-tool)
+            "tool addition event in log")
+        (testing "all resource registration events have expected origin"
+          (let [resource-events (filter #(#{:session/register-prompt-template
+                                            :session/register-skill
+                                            :session/add-tool} (:event-type %))
+                                        entries)]
+            (is (pos? (count resource-events)))
+            (doseq [e resource-events]
+              (is (= :core (:origin e))
+                  (str (:event-type e) " should have :origin :core")))))))))

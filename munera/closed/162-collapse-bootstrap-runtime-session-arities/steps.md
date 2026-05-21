@@ -1,0 +1,42 @@
+# 162 — Steps
+
+- [x] Step 1: Collapse 3+4 arities into single `(ctx ai-model opts)` with `:session-id` in opts
+  - [x] Merge 4-arity body into 3-arity (read `:session-id` from opts, default to `create-initial-startup-session!`)
+  - [x] Remove 4-arity from `bootstrap-runtime-session!`
+  - [x] Update `main.clj` `:bootstrap-fn!` to pass `(assoc opts :session-id session-id)` instead of positional arg
+  - [x] Update `start-tui-runtime!` test mock to single 3-arity form
+  - [x] Run tests, commit (128d6deb)
+- [x] Step 2: Create test helper `bootstrap-fresh-session!`
+  - [x] Create `components/app-runtime/test/psi/app_runtime/test_support.clj` with `bootstrap-fresh-session!`
+  - [x] Helper: `(ai-model opts)` → calls `create-runtime-session-context` → calls `bootstrap-runtime-session!` → returns merged result
+  - [x] Run tests, commit (ff1a9483)
+- [x] Step 3: Migrate 2-arity callers → test helper, remove 2-arity
+  - [x] Replace all `(#'app-runtime/bootstrap-runtime-session! ai-model opts)` calls with `(app-test-support/bootstrap-fresh-session! ai-model opts)`
+  - [x] Replace all `(app-runtime/bootstrap-runtime-session! ai-model opts)` calls with `(app-test-support/bootstrap-fresh-session! ai-model opts)`
+  - [x] Remove 2-arity from `bootstrap-runtime-session!`
+  - [x] Update docstring
+  - [x] Remove unused `app-runtime` requires from migrated test files
+  - [x] Run tests, commit (084bad42)
+- [x] Test review follow-up: Add test exercising `:session-id` reuse path through real `bootstrap-runtime-session!`
+  - Pre-create a session via `session/new-session-in!`, pass its id as `:session-id` in opts to the real `bootstrap-runtime-session!`, assert the returned session-id matches and no extra session was created
+  - Added `bootstrap-runtime-session-reuses-pre-created-session-test` in `app_runtime_bootstrap_test.clj`
+- [x] Test-shaper: Extract shared infrastructure nulling fixture in `app_runtime_bootstrap_test.clj`
+  - Extracted `bootstrap-stub-bindings` into `psi.app-runtime.test-support` — returns var→fn map for `with-redefs-fn`
+  - Replaced 3 identical 7-line `with-redefs` blocks; removed 6 now-unused requires from test ns
+- [x] Test-shaper: Replace manual temp dir construction in `app_runtime_bootstrap_test.clj` with `test-support/temp-cwd`
+  - All 3 tests now use `(test-support/temp-cwd)` from `psi.agent-session.test-support`
+- [x] Code-shaper: Unify infrastructure nulling in `app_runtime_test.clj` bootstrap tests
+  - 4 inline `with-redefs` blocks replaced with `(with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings) {...}) ...)`
+  - `ext/discover-extension-paths` composed alongside (not added to shared fixture — keeps `bootstrap-stub-bindings` focused)
+  - Test 2 (memory-runtime-opts) overrides `memory-runtime/sync-memory-layer!` via merge
+  - Test 3 (enriches-system-prompt) dissocs `sys-prompt/build-system-prompt` to let real prompt building run
+  - Removed unused `psi.introspection.core` require from `app_runtime_test.clj`
+- [x] Code-shaper: Replace manual temp dir in `app_runtime_test.clj` persisting test (line 705) with `test-support/temp-cwd`
+- [x] Test-review: Replace `(resolve 'psi.app-runtime/startup-rehydrate-from-current-session!)` with `#'psi.app-runtime/startup-rehydrate-from-current-session!` in `start-tui-runtime-extension-command-after-new-targets-new-session-test` mock (line 207) for compile-time safety
+  - Replaced `(resolve 'psi.app-runtime/...)` with `#'app-runtime/...` — uses ns alias for consistency with rest of file
+- [x] Test-shaper: Extract `with-session-state-restore` helper in `app_runtime_test.clj` to replace 8 instances of `(let [orig-state @app-runtime/session-state] (try ... (finally (reset! app-runtime/session-state orig-state))))`
+  - Added `with-session-state-restore` HOF to `psi.app-runtime.test-support`; all 8 tests in `app_runtime_test.clj` now use it
+- [x] Test-shaper: Compose `extension_install_startup_test.clj` `startup-bootstrap-bindings` from `(merge (app-test-support/bootstrap-stub-bindings) manifest-specific-bindings)` instead of duplicating 5 core infrastructure bindings
+  - `startup-bootstrap-bindings` now composes from `bootstrap-stub-bindings` + manifest-specific bindings; dissocs `build-system-prompt` when `stub-build-system-prompt?` is false; removed 3 unused requires (`oauth`, `pt`, `skills`)
+- [x] Test-shaper: Extract shared `test-ai-model` constant in `psi.app-runtime.test-support` and adopt across `app_runtime_test.clj` and `app_runtime_bootstrap_test.clj` — keep intentional overrides (project-preferences tests) explicit
+  - Added `test-ai-model` def to `psi.app-runtime.test-support`; adopted across `app_runtime_test.clj` (including `with-main-bootstrap-stubs`), `app_runtime_bootstrap_test.clj` (reuse test only — project-preferences tests keep intentional overrides), and `extension_install_startup_test.clj`

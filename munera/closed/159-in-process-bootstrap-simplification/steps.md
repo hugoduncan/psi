@@ -1,0 +1,15 @@
+- [x] Inspect the current `psi.app-runtime/bootstrap-runtime-session!` flow and record the exact current ordering that this task is changing, so the later refactor preserves behavior while making the phase boundary explicit.
+- [x] Make the first structural cut in `components/app-runtime/src/psi/app_runtime.clj` by separating runtime-context creation from initial-session creation.
+- [x] Extract a runtime-context creation function that owns cwd/config/model resolution, model-registry init, oauth/runtime context creation, `session/create-context`, and recursion/runtime root-state setup, but does not create a session.
+- [x] Update `bootstrap-runtime-session!` to create the initial session explicitly after runtime-context creation, preserving effective startup behavior before larger reordering.
+- [x] Introduce a named startup-plan helper that returns an explicit map-like startup-plan value consumed by later startup phases.
+- [x] Move pre-session discovery and startup input assembly into the startup-plan phase without mutating a live session.
+- [x] Stop reading prompt defaults back out of a just-created session when those values are already available from runtime-context creation or startup-plan assembly.
+- [x] Keep runtime-owned registries on the runtime-context side of the split and verify the startup-plan phase does not become a second runtime-context constructor.
+- [x] Decide whether startup-time tool definition assembly needs a small dedicated helper and, if so, extract the smallest useful helper that separates tool assembly from session active-tool application.
+- [x] Decide whether manifest extension handling needs a narrow discovery/apply split and, if so, move only the discovery side into startup-plan assembly while keeping necessary activation/adoption session-bound.
+- [x] Move initial startup session creation to one explicit point after startup-plan assembly, using the existing session lifecycle API unless a very small local input adjustment materially improves the split.
+- [x] Shrink the remaining post-session bootstrap into a clearly named startup-plan adoption phase that owns only the startup work that still genuinely requires a concrete session id.
+- [x] Keep built-in workflow bootstrap and `psi-tool` handling as narrow as possible in this slice: leave them post-session if that is the smallest coherent outcome, or split them only if a small extraction materially clarifies the boundary.
+- [x] Add or update proof that runtime-context creation does not create a session, startup-plan assembly does not mutate a live session, initial session creation happens after startup-plan assembly, and the resulting startup path still reaches the expected effective bootstrapped state.
+- [x] Record in `implementation.md` the final phase boundary, the chosen startup-plan shape, which concerns moved pre-session, which remained post-session and why, which registries remained runtime-context infrastructure, and which loader-style helpers were introduced as the smallest useful extractions.

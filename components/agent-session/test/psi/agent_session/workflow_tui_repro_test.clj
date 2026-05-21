@@ -43,14 +43,20 @@
       (try
         (let [cmd (command-registry/get-command-in (:extension-registry ctx) "delegate")
               _ (is (some? cmd))
+              _ (is (= :built-in (:source cmd)) "delegate command carries :source :built-in provenance")
               result ((:handler cmd) "lambda-build simple code is good code")]
           (is (string? result))
           (is (.contains ^String result "Delegated to lambda-build — run "))
-          (Thread/sleep 2000)
-          (let [rt (runtime-fns/make-extension-runtime-fns ctx session-id wl/built-in-workflow-path)
-                jobs (:psi.agent-session/background-jobs
-                      ((:query-fn rt) [:psi.agent-session/background-jobs]))
-                delegate-jobs (filter #(= "delegate" (:psi.background-job/tool-name %)) jobs)]
+          (let [rt          (runtime-fns/make-extension-runtime-fns ctx session-id wl/built-in-workflow-path)
+                query-jobs  (fn []
+                              (let [jobs (:psi.agent-session/background-jobs
+                                          ((:query-fn rt) [:psi.agent-session/background-jobs]))]
+                                (filter #(= "delegate" (:psi.background-job/tool-name %)) jobs)))
+                _           (workflow-test-support/poll-until #(seq (filter (fn [j]
+                                                                              (#{:failed :completed}
+                                                                               (:psi.background-job/status j)))
+                                                                            (query-jobs))))
+                delegate-jobs (query-jobs)]
             (is (seq delegate-jobs))
             (is (not-any? #(str/includes? (pr-str %) "contains? not supported on type: clojure.lang.Keyword")
                           delegate-jobs))))

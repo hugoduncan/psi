@@ -63,17 +63,12 @@
    [psi.agent-session.runtime :as runtime]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
-   [psi.app-runtime.context :as app-context]
-   [psi.app-runtime.context-summary :as context-summary]
    [psi.app-runtime.cli :as cli]
-   [psi.app-runtime.footer :as footer]
    [psi.app-runtime.nrepl-runtime :as app-nrepl]
    [psi.app-runtime.output :as output]
-   [psi.app-runtime.projections :as projections]
-   [psi.app-runtime.selectors :as selectors]
    [psi.app-runtime.transcript :as transcript]
-   [psi.app-runtime.tui-frontend-actions :as tui-frontend-actions]
-   [psi.app-runtime.ui-actions :as ui-actions]
+   [psi.app-runtime.tui-session-nav :as tui-session-nav]
+   [psi.app-runtime.tui-wiring :as tui-wiring]
    [psi.prompt-assets.prompt-templates :as pt]
    [psi.shared-config.resolution :as config-res]
    [psi.prompt-assets.skills :as skills]
@@ -241,12 +236,10 @@ Available: " (str/join ", " (map name (keys all))))
         tui-state      (transcript/agent-messages->tui-resume-state agent-messages)]
     (assoc tui-state :agent-messages agent-messages)))
 
-(defn- start-new-session-with-startup!
+(defn start-new-session-with-startup!
   "Create a fresh session branch and return rehydrate payload.
 
-   Startup prompts have been removed; the new session relies on the canonical
-   session bootstrap/runtime state and then snapshots its transcript/tool state.
-
+   Snapshots the new session's transcript/tool state after bootstrap.
    Reloads project-local custom models from the new session's worktree path so
    that models.edn changes are picked up when switching between sessions with
    different worktree paths.
@@ -257,18 +250,19 @@ Available: " (str/join ", " (map name (keys all))))
     :messages [...]
     :tool-calls {...}
     :tool-order [...]}"
-  [ctx source-session-id ai-ctx ai-model]
+  [ctx source-session-id _ai-ctx ai-model]
   (let [sd            (session/new-session-in! ctx source-session-id {})
         sid           (:session-id sd)
         worktree-path (ss/session-worktree-path-in ctx sid)]
     (model-registry/load-project-models!
      (str worktree-path "/.psi/models.edn")
      (model-registry/default-user-models-path))
-    (assoc (startup-rehydrate-from-current-session! ctx sid ai-ctx ai-model)
+    (assoc (startup-rehydrate-from-current-session! ctx sid _ai-ctx ai-model)
            :session-id sid)))
 
 (defn create-runtime-session-context
-  "Create a live session context with runtime/session state prepared, but not bootstrapped.
+  "Create a live runtime/session context with runtime state prepared, but without
+   creating the initial session.
 
    Options:
    - :event-queue optional TUI/RPC event queue
@@ -295,142 +289,240 @@ Available: " (str/join ", " (map name (keys all))))
                                   {:reasoning (:supports-reasoning effective-model)})
         effective-prompt-mode    (config-res/resolved-prompt-mode cfg)
         nucleus-prelude-override (config-res/resolved-nucleus-prelude-override cfg)
-        ctx                    (session/create-context
-                                {:session-defaults {:model {:provider  (name (:provider effective-model))
-                                                            :id        (:id effective-model)
-                                                            :reasoning (:supports-reasoning effective-model)}
-                                                    :thinking-level effective-thinking-level
-                                                    :prompt-mode              effective-prompt-mode
-                                                    :nucleus-prelude-override nucleus-prelude-override
-                                                    :ui-type                  (or ui-type :console)}
-                                 :config session-config
-                                 :event-queue event-queue
-                                 :oauth-ctx oauth-ctx
-                                 :nrepl-runtime-atom nrepl-runtime
-                                 :persist? (if (some? persist?) persist? true)
-                                 :session-root session-root
-                                 :ui-type ui-type
-                                 :mutations mutations/all-mutations})
+        ctx                      (session/create-context
+                                  {:session-defaults {:model {:provider  (name (:provider effective-model))
+                                                              :id        (:id effective-model)
+                                                              :reasoning (:supports-reasoning effective-model)}
+                                                      :thinking-level           effective-thinking-level
+                                                      :prompt-mode              effective-prompt-mode
+                                                      :nucleus-prelude-override nucleus-prelude-override
+                                                      :ui-type                  (or ui-type :console)}
+                                   :config session-config
+                                   :event-queue event-queue
+                                   :oauth-ctx oauth-ctx
+                                   :nrepl-runtime-atom nrepl-runtime
+                                   :persist? (if (some? persist?) persist? true)
+                                   :session-root session-root
+                                   :ui-type ui-type
+                                   :mutations mutations/all-mutations})
         recursion-ctx            (recursion/create-hosted-context ctx (ss/state-path :recursion))
         ctx                      (assoc ctx :recursion-ctx recursion-ctx)
         _                        (when-not (sa/recursion-state-in ctx)
-                                   (sa/set-recursion-state-in! ctx nil (recursion/initial-state)))
-        sd                       (session/new-session-in! ctx nil {})
-        session-id               (:session-id sd)]
-    {:ctx        ctx
-     :oauth-ctx  oauth-ctx
-     :cwd        cwd
-     :session-id session-id}))
+                                   (sa/set-recursion-state-in! ctx nil (recursion/initial-state)))]
+    {:ctx       ctx
+     :oauth-ctx oauth-ctx
+     :cwd       cwd}))
+
+(defn- build-startup-plan
+  "Assemble pre-session startup inputs without creating or mutating a live session."
+  [ctx {:keys [cwd]}]
+  (let [templates                   (pt/discover-templates)
+        {:keys [skills diagnostics]} (skills/discover-skills)
+        context-files               (sys-prompt/discover-context-files cwd)
+        developer-prompt            (developer-prompt-from-env)
+        {:keys [prompt-mode nucleus-prelude-override]} (:session-defaults ctx)
+        base-tools                  (vec tools/all-tools)]
+    {:cwd                      cwd
+     :templates                templates
+     :skills                   skills
+     :diagnostics              diagnostics
+     :context-files            context-files
+     :developer-prompt         developer-prompt
+     :developer-prompt-source  (if developer-prompt :env :fallback)
+     :prompt-mode              (or prompt-mode :lambda)
+     :nucleus-prelude-override nucleus-prelude-override
+     :base-tools               base-tools}))
+
+(defn- create-initial-startup-session!
+  [ctx]
+  (:session-id (session/new-session-in! ctx nil {})))
+
+(defn- log-startup-plan-diagnostics!
+  [startup-plan]
+  (doseq [d (:diagnostics startup-plan)]
+    (timbre/warn "Skill" (:type d) ":" (:message d) (:path d))))
+
+(defn- make-session-scoped-psi-tool
+  [ctx session-id cwd]
+  (tools/make-psi-tool (fn
+                         ([q] (session/query-in ctx session-id q))
+                         ([q entity] (session/query-in ctx q entity)))
+                       {:ctx ctx
+                        :session-id session-id
+                        :cwd cwd}))
+
+(defn- startup-base-prompt-opts
+  [ctx {:keys [cwd prompt-mode nucleus-prelude-override context-files skills]} tool-defs]
+  {:cwd                      cwd
+   :session-instant          (:started-at ctx)
+   :prompt-mode              prompt-mode
+   :nucleus-prelude-override nucleus-prelude-override
+   :context-files            context-files
+   :skills                   skills
+   :tool-defs                tool-defs})
+
+(defn- merge-tool-defs-by-name
+  [base-tool-defs ext-tools]
+  (->> (concat base-tool-defs ext-tools)
+       (reduce (fn [acc tool]
+                 (if (some #(= (:name tool) (:name %)) acc)
+                   acc
+                   (conj acc tool)))
+               [])))
+
+(defn- persist-system-prompt!
+  [ctx session-id prompt]
+  (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt prompt} {:origin :core}))
+
+;; finalize-startup-system-prompt! removed — prompt build inlined into
+;; adopt-startup-plan-into-session! (task 161: single-pass startup)
+
+(defn- log-startup-summary!
+  [summary]
+  (doseq [{:keys [path error]} (:extension-errors summary)]
+    (timbre/warn "Extension error:" path error))
+  (when (pos? (:extension-loaded-count summary))
+    (timbre/debug "Extensions loaded:" (:extension-loaded-count summary))))
+
+(defn- build-startup-summary
+  "Build a startup summary from resource-loading counts and extension results."
+  [ctx session-id extension-results]
+  (let [sd          (ss/get-session-data-in ctx session-id)
+        ext-errors  (keep (fn [r]
+                            (when-let [e (:psi.extension/error r)]
+                              {:path  (:psi.extension/path r)
+                               :error e}))
+                          extension-results)]
+    {:timestamp              (java.time.Instant/now)
+     :prompt-count           (count (:prompt-templates sd))
+     :skill-count            (count (:skills sd))
+     :tool-count             0   ;; tools not yet set at summary-build time
+     :extension-loaded-count (count (filter :psi.extension/loaded? extension-results))
+     :extension-error-count  (count ext-errors)
+     :extension-errors       (vec ext-errors)}))
+
+(defn- adopt-startup-plan-into-session!
+  "Adopt a startup plan into an already-created session.
+
+   Single-pass startup: each concern (prompt build, tool composition, summary
+   persistence) happens exactly once. See task 161 design for the full rationale.
+
+   Ordering:
+   1. Infrastructure (background-job UI, built-in workflows, psi-tool)
+   2. Seed developer-prompt into session state
+   3. Load templates + skills (no tools — set-active-tools overwrites the full set)
+   4. Bootstrap manifest extensions
+   5. Compose final tool set (base + extension)
+   6. Register domains + query graph-capabilities
+   7. Build system prompt (once, with all inputs)
+   8. Persist prompt, build-opts
+   9. Set active tools (after build-opts so side-effect refresh rebuilds correctly)
+   10. Build + persist summary (once)
+   11. Memory sync, extension run fn, rehydrate"
+  [ctx session-id ai-model startup-plan {:keys [memory-runtime-opts]}]
+  (let [{:keys [cwd templates skills developer-prompt developer-prompt-source base-tools]} startup-plan
+        ;; 1. Infrastructure
+        _                  (background-job-ui/install-background-job-ui-refresh! ctx)
+        _                  (workflow-bootstrap/init-built-in! ctx session-id)
+        psi-tool           (make-session-scoped-psi-tool ctx session-id cwd)
+        base-tool-defs     (conj base-tools psi-tool)
+
+        ;; 2. Seed developer-prompt + developer-prompt-source into session state.
+        ;; System-prompt is empty here — the real prompt is built once below after
+        ;; all inputs (graph-caps, extension tools) are known.
+        _                  (session/dispatch-in! ctx
+                                                 :session/bootstrap-prompt-state
+                                                 {:session-id              session-id
+                                                  :system-prompt           ""
+                                                  :developer-prompt        developer-prompt
+                                                  :developer-prompt-source developer-prompt-source}
+                                                 {:origin :core})
+
+        ;; 3. Load templates + skills only. Tools are excluded because
+        ;; :session/set-active-tools (step 9) replaces the full set, making
+        ;; individual :session/add-tool dispatches redundant.
+        _                  (session-bootstrap/load-startup-resources-in!
+                            ctx session-id
+                            {:templates templates
+                             :skills    skills})
+
+        ;; 4. Bootstrap manifest extensions
+        {:keys [summary-updates]}
+        (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
+
+        ;; 5. Compose final tool set (base + extension, once)
+        refreshed-tool-defs (merge-tool-defs-by-name
+                             base-tool-defs
+                             (extensions/all-tools-in (:extension-registry ctx)))
+
+        ;; 6. Register domains + query graph-capabilities
+        _                  (bootstrap/register-all-domains!)
+        graph-caps         (graph-capabilities-in ctx session-id)
+
+        ;; 7. Build system prompt (once, with all inputs)
+        base-prompt-opts   (startup-base-prompt-opts ctx startup-plan base-tool-defs)
+        build-opts         (assoc base-prompt-opts
+                                  :graph-capabilities graph-caps
+                                  :tool-defs refreshed-tool-defs)
+        system-prompt      (sys-prompt/build-system-prompt build-opts)
+
+        ;; 8. Persist prompt + build-opts
+        _                  (persist-system-prompt! ctx session-id system-prompt)
+        _                  (session/dispatch-in! ctx :session/set-system-prompt-build-opts
+                                                 {:session-id session-id
+                                                  :opts (dissoc build-opts :prompt-mode)}
+                                                 {:origin :core})
+
+        ;; 9. Set active tools — placed AFTER prompt build + build-opts persist
+        ;; so the side-effect :runtime/refresh-system-prompt finds build-opts in
+        ;; session state and rebuilds an equivalent prompt (not an empty one).
+        _                  (session/dispatch-in! ctx
+                                                 :session/set-active-tools
+                                                 {:session-id session-id
+                                                  :tool-maps refreshed-tool-defs}
+                                                 {:origin :core})
+
+        ;; 10. Build + persist summary (once)
+        ;; build-startup-summary provides prompt/skill counts from session state;
+        ;; manifest summary-updates provides extension-loaded/error counts.
+        ;; merge-startup-summary combines them (scalars overwritten, seqs concatenated).
+        summary-base       (build-startup-summary ctx session-id [])
+        summary            (merge-startup-summary summary-base summary-updates)
+        _                  (session/dispatch-in! ctx :session/set-startup-bootstrap-summary
+                                                 {:session-id session-id :summary summary}
+                                                 {:origin :core})
+
+        ;; 11. Memory sync, extension run fn, rehydrate
+        _                  (memory-runtime/sync-memory-layer! (merge {:cwd cwd}
+                                                                     (or memory-runtime-opts {})))
+        _                  (runtime/register-extension-run-fn-in! ctx session-id nil ai-model)
+        startup-rehydrate  (startup-rehydrate-from-current-session! ctx session-id nil ai-model)]
+    (log-startup-summary! summary)
+    {:ctx               ctx
+     :session-id        session-id
+     :templates         templates
+     :skills            skills
+     :summary           summary
+     :startup-plan      startup-plan
+     :startup-rehydrate startup-rehydrate
+     :cwd               cwd}))
 
 (defn bootstrap-runtime-session!
   "Bootstrap a live session context shared by CLI/TUI/RPC modes.
 
-   Calling forms:
-   - (bootstrap-runtime-session! ai-model opts)
-       creates a fresh runtime session context, bootstraps it, and returns result map
-   - (bootstrap-runtime-session! ctx ai-model)
-       bootstraps an existing ctx with default opts
-   - (bootstrap-runtime-session! ctx ai-model opts)
-       bootstraps an existing ctx with explicit opts
+   Builds a pre-session startup plan, creates (or reuses) the initial session,
+   and adopts the startup plan into it.
 
    Options:
+   - :session-id optional pre-created session-id (defaults to creating a new one)
    - :memory-runtime-opts optional memory/runtime sync opts
-   - :cwd optional cwd override (primarily for tests)
-   - :persist? optional persistence toggle (primarily for tests)
-   - :session-root optional explicit persisted session root (primarily for tests)"
-  ([x y]
-   (if (:state* x)
-     (bootstrap-runtime-session! x nil y {})
-     (let [ai-model x
-           opts     y
-           {:keys [ctx oauth-ctx cwd session-id]} (create-runtime-session-context ai-model {:cwd (:cwd opts)
-                                                                                            :session-config (:session-config opts)
-                                                                                            :ui-type (or (:ui-type opts) :console)
-                                                                                            :persist? (:persist? opts)
-                                                                                            :session-root (:session-root opts)})
-           result (bootstrap-runtime-session! ctx session-id ai-model opts)]
-       (assoc result :ctx ctx :oauth-ctx oauth-ctx :cwd cwd :session-id session-id))))
-  ([ctx session-id ai-model {:keys [memory-runtime-opts cwd]}]
-   (let [templates        (pt/discover-templates)
-         {:keys [skills diagnostics]} (skills/discover-skills)
-         _                (doseq [d diagnostics]
-                            (timbre/warn "Skill" (:type d) ":" (:message d) (:path d)))
-         cwd              (or cwd (System/getProperty "user.dir"))
-         _                (background-job-ui/install-background-job-ui-refresh! ctx)
-         _                (workflow-bootstrap/init-built-in! ctx session-id)
-         ctx-files        (sys-prompt/discover-context-files cwd)
-         sd               (ss/get-session-data-in ctx session-id)
-         prompt-mode      (or (:prompt-mode sd) :lambda)
-         prelude-override (:nucleus-prelude-override sd)
-         psi-tool         (tools/make-psi-tool (fn
-                                                 ([q] (session/query-in ctx session-id q))
-                                                 ([q entity] (session/query-in ctx q entity)))
-                                               {:ctx ctx
-                                                :session-id session-id
-                                                :cwd cwd})
-         base-prompt-opts {:cwd                      cwd
-                           :session-instant          (:started-at ctx)
-                           :prompt-mode              prompt-mode
-                           :nucleus-prelude-override prelude-override
-                           :context-files            ctx-files
-                           :skills                   skills
-                           :tool-defs                (conj (vec tools/all-tools) psi-tool)}
-         base-prompt      (sys-prompt/build-system-prompt base-prompt-opts)
-         developer-prompt (developer-prompt-from-env)
-         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt base-prompt} {:origin :core})
-         summary-base     (session-bootstrap/bootstrap-in!
-                           ctx session-id
-                           {:register-global-query? false
-                            :base-tools             (conj (vec tools/all-tools) psi-tool)
-                            :system-prompt          base-prompt
-                            :developer-prompt       developer-prompt
-                            :developer-prompt-source (if developer-prompt :env :fallback)
-                            :templates              templates
-                            :skills                 skills
-                            :extension-paths        []
-                            :extension-targets      []
-                            :refresh-active-tools?  false})
-         {:keys [summary-updates]}
-         (extension-runtime/bootstrap-manifest-extensions-in! ctx session-id cwd)
-         ext-tools        (extensions/all-tools-in (:extension-registry ctx))
-         refreshed-tool-defs (->> (concat (conj (vec tools/all-tools) psi-tool)
-                                          ext-tools)
-                                  (reduce (fn [acc tool]
-                                            (if (some #(= (:name tool) (:name %)) acc)
-                                              acc
-                                              (conj acc tool)))
-                                          []))
-         _                (session/dispatch-in! ctx
-                                                :session/set-active-tools
-                                                {:session-id session-id
-                                                 :tool-maps refreshed-tool-defs}
-                                                {:origin :core})
-         summary          (merge-startup-summary summary-base summary-updates)
-         _                (session/dispatch-in! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
-         _                (bootstrap/register-all-domains!)
-         graph-caps       (graph-capabilities-in ctx session-id)
-         build-opts       (assoc base-prompt-opts
-                                 :graph-capabilities graph-caps
-                                 :tool-defs refreshed-tool-defs)
-         system-prompt    (sys-prompt/build-system-prompt build-opts)
-         _                (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt system-prompt} {:origin :core})
-         _                (session/dispatch-in! ctx :session/set-system-prompt-build-opts
-                                                {:session-id session-id :opts (dissoc build-opts :prompt-mode)}
-                                                {:origin :core})
-         _                (memory-runtime/sync-memory-layer! (merge {:cwd cwd}
-                                                                    (or memory-runtime-opts {})))
-         _                (runtime/register-extension-run-fn-in! ctx session-id nil ai-model)
-         startup-rehydrate (startup-rehydrate-from-current-session! ctx session-id nil ai-model)]
-     (doseq [{:keys [path error]} (:extension-errors summary)]
-       (timbre/warn "Extension error:" path error))
-     (when (pos? (:extension-loaded-count summary))
-       (timbre/debug "Extensions loaded:" (:extension-loaded-count summary)))
-     {:ctx               ctx
-      :templates         templates
-      :skills            skills
-      :summary           summary
-      :startup-rehydrate startup-rehydrate
-      :cwd               cwd})))
+   - :cwd optional cwd override (primarily for tests)"
+  [ctx ai-model opts]
+  (let [cwd          (or (:cwd opts) (:cwd ctx) (System/getProperty "user.dir"))
+        startup-plan (build-startup-plan ctx {:cwd cwd})
+        _            (log-startup-plan-diagnostics! startup-plan)
+        session-id   (or (:session-id opts) (create-initial-startup-session! ctx))]
+    (adopt-startup-plan-into-session! ctx session-id ai-model startup-plan opts)))
 
 ;; ============================================================
 ;; Main prompt loop
@@ -450,35 +542,57 @@ Available: " (str/join ", " (map name (keys all))))
    (run-session model-key memory-runtime-opts session-config {}))
   ([model-key memory-runtime-opts session-config startup-opts]
    (let [ai-model   (resolve-model model-key)
-         ai-ctx     nil
-         {:keys [ctx oauth-ctx session-id]}
+         {:keys [ctx oauth-ctx]}
          (create-runtime-session-context ai-model {:session-config          session-config
                                                    :ui-type                 :console
                                                    :persist?                false
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
-         {:keys [templates skills startup-rehydrate]}
-         (bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts})
+         {:keys [templates skills startup-rehydrate session-id]}
+         (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts})
          cli-focus* (atom session-id)
-         cmd-opts   (cli/cli-command-opts start-new-session-with-startup! ctx cli-focus* ai-ctx ai-model oauth-ctx)]
-     (reset! session-state {:ctx ctx :ai-ctx ai-ctx :ai-model ai-model
+         cmd-opts   (cli/cli-command-opts start-new-session-with-startup! ctx cli-focus* nil ai-model oauth-ctx)]
+     (reset! session-state {:ctx ctx :ai-model ai-model
                             :oauth-ctx oauth-ctx
                             :nrepl-runtime-atom nrepl-runtime})
      (output/print-banner ai-model templates skills ctx)
      (output/print-initial-transcript! startup-rehydrate)
-     (cli/run-cli-loop! run-prompt! runtime/journal-user-message-in! ctx cli-focus* ai-ctx ai-model oauth-ctx cmd-opts))))
+     (cli/run-cli-loop! run-prompt! runtime/journal-user-message-in! ctx cli-focus* nil ai-model oauth-ctx cmd-opts))))
 
 ;; TUI session (charm.clj Elm Architecture)
 ;; ============================================================
 
-(defn new-session-with-startup-in!
-  "Public helper for runtimes/tests: create new session and run startup prompts.
-   Returns rehydrate payload map with :agent-messages + TUI projection."
-  [ctx source-session-id ai-ctx ai-model]
-  (start-new-session-with-startup! ctx source-session-id ai-ctx ai-model))
+(defn- nullable-execution-mode
+  "Read PSI_NULLABLE_EXECUTION_MODE env var, trimmed and nil-punned."
+  []
+  (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty))
+
+(defn- maybe-install-nullable-execution-mode
+  "When PSI_NULLABLE_EXECUTION_MODE=deterministic, install a stub executor that
+   echoes user text back as the assistant response. Used by TUI integration test
+   harness to run without a real AI provider."
+  [ctx]
+  (let [mode (nullable-execution-mode)]
+    (if (= "deterministic" mode)
+      (assoc ctx :execute-prepared-request-fn
+             (fn [_ai-ctx _ctx sid prepared-request _progress-queue]
+               (let [user-text (or (get-in prepared-request [:prepared-request/user-message :content 0 :text]) "")]
+                 {:execution-result/turn-id (or (:prepared-request/id prepared-request)
+                                                (str (java.util.UUID/randomUUID)))
+                  :execution-result/session-id sid
+                  :execution-result/assistant-message {:role "assistant" :content [{:type :text :text user-text}]
+                                                       :stop-reason :stop :timestamp (java.time.Instant/now)}
+                  :execution-result/turn-outcome :turn.outcome/stop
+                  :execution-result/tool-calls []
+                  :execution-result/stop-reason :stop})))
+      ctx)))
 
 (defn start-tui-runtime!
   "Create a session and run it with a provided TUI interface function.
    The caller supplies resolved runtime config; this namespace stays CLI-free.
+
+   Runtime setup (model resolution, context creation, session bootstrap) happens
+   here; TUI callback construction and options assembly are delegated to
+   `psi.app-runtime.tui-wiring`.
 
    startup-opts:
    - :thinking-level-override explicit thinking level keyword (overrides config)"
@@ -490,229 +604,79 @@ Available: " (str/join ", " (map name (keys all))))
    (start-tui-runtime! tui-start-fn! model-key memory-runtime-opts session-config {}))
   ([tui-start-fn! model-key memory-runtime-opts session-config startup-opts]
    (let [ai-model    (resolve-model model-key)
-         ai-ctx      nil
          event-queue (java.util.concurrent.LinkedBlockingQueue.)
-         {:keys [ctx oauth-ctx cwd session-id]}
+         {:keys [ctx oauth-ctx cwd]}
          (create-runtime-session-context ai-model {:event-queue             event-queue
                                                    :session-config          session-config
                                                    :ui-type                 :tui
                                                    :persist?                false
                                                    :thinking-level-override (:thinking-level-override startup-opts)})
-         nullable-execution-mode (some-> (System/getenv "PSI_NULLABLE_EXECUTION_MODE") str/trim not-empty)
-         ctx (if (= "deterministic" nullable-execution-mode)
-               (assoc ctx :execute-prepared-request-fn
-                      (fn [_ai-ctx _ctx sid prepared-request _progress-queue]
-                        (let [user-text (or (get-in prepared-request [:prepared-request/user-message :content 0 :text]) "")]
-                          {:execution-result/turn-id (or (:prepared-request/id prepared-request)
-                                                         (str (java.util.UUID/randomUUID)))
-                           :execution-result/session-id sid
-                           :execution-result/assistant-message {:role "assistant" :content [{:type :text :text user-text}]
-                                                                :stop-reason :stop :timestamp (java.time.Instant/now)}
-                           :execution-result/turn-outcome :turn.outcome/stop
-                           :execution-result/tool-calls []
-                           :execution-result/stop-reason :stop})))
-               ctx)
-         {:keys [startup-rehydrate]}
-         (bootstrap-runtime-session! ctx session-id ai-model {:memory-runtime-opts memory-runtime-opts
-                                                              :cwd cwd})
+         ctx (maybe-install-nullable-execution-mode ctx)
+         {:keys [startup-rehydrate session-id]}
+         (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
+                                                   :cwd cwd})
 
          ;; TUI-local focus atom — tracks active session-id
          tui-focus* (atom session-id)
 
          ;; Expose state for nREPL introspection
-         _         (reset! session-state {:ctx ctx :ai-ctx ai-ctx :ai-model ai-model
+         _         (reset! session-state {:ctx ctx :ai-model ai-model
                                           :oauth-ctx oauth-ctx
                                           :nrepl-runtime-atom nrepl-runtime
                                           :tui-focus* tui-focus*})
 
-         ;; Helper: put an immediate assistant message on the TUI queue.
-         reply!    (fn [^java.util.concurrent.LinkedBlockingQueue queue text]
-                     (.put queue {:kind :done
-                                  :result {:role    "assistant"
-                                           :content [{:type :text :text text}]}}))
-
-         current-context-widget
-         (fn [active-session-id]
-           (let [snapshot (app-context/context-snapshot ctx active-session-id active-session-id)
-                 widget   (context-summary/context-widget snapshot)]
-             (when (:widget/visible? widget)
-               {:placement (some-> (:widget/placement widget) name)
-                :extension-id (:widget/extension-id widget)
-                :widget-id (:widget/widget-id widget)
-                :content-lines (:widget/content-lines widget)})))
-
          context-event!
-         (fn [active-session-id]
-           (.put event-queue {:type :context-updated
-                              :active-session-id active-session-id
-                              :session-tree-widget (current-context-widget active-session-id)}))
+         (partial tui-session-nav/context-event! ctx event-queue)
 
-         ;; Resume callback used by the TUI /resume selector.
-         ;; Returns TUI resume state maps to display immediately after loading.
-         resume-fn! (fn [session-path]
-                      (try
-                        (let [current-sid @tui-focus*
-                              sd          (session/resume-session-in! ctx current-sid session-path)
-                              sid         (:session-id sd)
-                              _           (reset! tui-focus* sid)
-                              _           (context-event! sid)
-                              msgs        (:messages (agent/get-data-in (ss/agent-ctx-in ctx sid)))]
-                          (transcript/agent-messages->tui-resume-state msgs))
-                        (catch Exception e
-                          (timbre/error e "Resume failed:" session-path)
-                          {:messages [{:role :assistant
-                                       :text (str "✗ Resume failed: " (ex-message e))}]
-                           :tool-calls {}
-                           :tool-order []})))
-
-         switch-session-fn! (fn [session-id]
-                              (try
-                                (let [source-session-id @tui-focus*
-                                      sd                 (session/ensure-session-loaded-in! ctx source-session-id session-id)
-                                      sid                (:session-id sd)
-                                      _                  (reset! tui-focus* sid)
-                                      _                  (context-event! sid)
-                                      msgs               (:messages (agent/get-data-in (ss/agent-ctx-in ctx sid)))]
-                                  (transcript/agent-messages->tui-resume-state msgs))
-                                (catch Exception e
-                                  (timbre/error e "Session switch failed:" session-id)
-                                  {:messages [{:role :assistant
-                                               :text (str "✗ Session switch failed: " (ex-message e))}]
-                                   :tool-calls {}
-                                   :tool-order []})))
-
-         fork-session-fn! (fn [entry-id]
-                            (try
-                              (let [source-session-id @tui-focus*
-                                    sd                (session/fork-session-in! ctx source-session-id entry-id)
-                                    sid               (:session-id sd)
-                                    _                 (reset! tui-focus* sid)
-                                    _                 (context-event! sid)
-                                    msgs              (:messages (agent/get-data-in (ss/agent-ctx-in ctx sid)))]
-                                (assoc (transcript/agent-messages->tui-resume-state msgs)
-                                       :session-id sid))
-                              (catch Exception e
-                                (timbre/error e "Session fork failed:" entry-id)
-                                {:messages [{:role :assistant
-                                             :text (str "✗ Session fork failed: " (ex-message e))}]
-                                 :tool-calls {}
-                                 :tool-order []})))
+         ;; Session navigation callbacks
+         resume-fn!         (tui-session-nav/resume-fn! ctx tui-focus* event-queue)
+         switch-session-fn! (tui-session-nav/switch-session-fn! ctx tui-focus* event-queue)
+         fork-session-fn!   (tui-session-nav/fork-session-fn! ctx tui-focus* event-queue)
 
          cmd-opts  {:oauth-ctx oauth-ctx
                     :ai-model ai-model
                     :supports-session-tree? true
+                    ;; Intentionally reads @tui-focus* rather than using the
+                    ;; callback parameter — the TUI always forks from the
+                    ;; currently focused session, which may differ from the
+                    ;; session that dispatched the /new command.
                     :on-new-session! (fn [_source-session-id]
                                        (let [source-session-id @tui-focus*
-                                             result             (start-new-session-with-startup! ctx source-session-id ai-ctx ai-model)]
+                                             result             (start-new-session-with-startup! ctx source-session-id nil ai-model)]
                                          (reset! tui-focus* (:session-id result))
                                          (context-event! (:session-id result))
                                          result))}
 
-         ;; dispatch-fn — called synchronously by the TUI on submit.
-         ;; Returns a command result map, or nil if not a command.
-         ;; When a login is pending (waiting for auth code), returns nil
-         ;; so the input falls through to run-agent-fn! which handles it.
-         frontend-action-handler-fn!
-         (fn [action-result]
-           (tui-frontend-actions/handle-action-result
-            {:ctx ctx
-             :sid @tui-focus*
-             :action-result action-result
-             :resolve-model-by-provider+id resolve-model-by-provider+id
-             :switch-session-fn! switch-session-fn!
-             :fork-session-fn! fork-session-fn!
-             :set-focus! #(reset! tui-focus* %)}))
+         ;; Build TUI callbacks via tui-wiring
+         wiring-deps {:ctx ctx
+                      :tui-focus* tui-focus*
+                      :session-state session-state
+                      :ai-model ai-model
+                      :oauth-ctx oauth-ctx
+                      :resolve-model-by-provider+id resolve-model-by-provider+id
+                      :switch-session-fn! switch-session-fn!
+                      :fork-session-fn! fork-session-fn!
+                      :submit-prompt-fn! submit-prompt-in!
+                      :cmd-opts cmd-opts}
 
-         dispatch-fn (fn [text]
-                       (if (:pending-login @session-state)
-                         nil  ;; fall through to run-agent-fn! for login code
-                         (let [sid    @tui-focus*
-                               result (tui-frontend-actions/command-result
-                                       {:ctx ctx
-                                        :sid sid
-                                        :text text
-                                        :cmd-opts cmd-opts})]
-                           (tui-frontend-actions/journal-command-result!
-                            {:ctx ctx :sid sid :text text :result result})
-                           (when (= :login-start (:type result))
-                             (if (:uses-callback-server result)
-                               nil
-                               (swap! session-state assoc :pending-login
-                                      {:provider-id   (get-in result [:provider :id])
-                                       :provider-name (get-in result [:provider :name])
-                                       :login-state   (:login-state result)})))
-                           result)))
+         dispatch-fn                 (tui-wiring/make-dispatch-fn wiring-deps)
+         run-agent-fn                (tui-wiring/make-run-agent-fn wiring-deps)
+         on-interrupt-fn!            (tui-wiring/make-on-interrupt-fn wiring-deps)
+         frontend-action-handler-fn! (tui-wiring/make-frontend-action-handler-fn wiring-deps)
 
-         ;; Called by TUI Escape during active work.
-         on-interrupt-fn! (fn [_state]
-                            (let [sid @tui-focus*]
-                              (session/abort-in! ctx sid)
-                              {:queued-text (session/consume-queued-input-text-in! ctx sid)
-                               :message "Interrupted active work."}))
+         tui-opts (tui-wiring/build-tui-opts
+                   {:ctx ctx
+                    :tui-focus* tui-focus*
+                    :event-queue event-queue
+                    :cwd cwd
+                    :startup-rehydrate startup-rehydrate
+                    :dispatch-fn dispatch-fn
+                    :on-interrupt-fn! on-interrupt-fn!
+                    :frontend-action-handler-fn! frontend-action-handler-fn!
+                    :resume-fn! resume-fn!
+                    :switch-session-fn! switch-session-fn!
+                    :fork-session-fn! fork-session-fn!
+                    :current-context-widget (tui-session-nav/current-context-widget ctx session-id)})]
 
-         ;; run-agent-fn! — called by the TUI for non-command input.
-         ;; Handles pending-login step 2 and agent execution.
-         run-agent-fn! (fn [text ^java.util.concurrent.LinkedBlockingQueue queue]
-                         (let [trimmed (str/trim text)
-                               pending (:pending-login @session-state)]
-                           (cond
-                             ;; Step 2: pending login — this input IS the auth code
-                             pending
-                             (future
-                               (try
-                                 (let [{:keys [provider-id provider-name login-state]} pending]
-                                   (swap! session-state dissoc :pending-login)
-                                   (oauth/complete-login! oauth-ctx provider-id trimmed login-state)
-                                   (reply! queue (str "✓ Logged in to " provider-name)))
-                                 (catch Exception e
-                                   (swap! session-state dissoc :pending-login)
-                                   (reply! queue (str "✗ Login failed: " (ex-message e))))))
-
-                             ;; Everything else — send to agent
-                             :else
-                             (future
-                               (try
-                                 (let [sid @tui-focus*
-                                       {:keys [assistant-message]}
-                                       (submit-prompt-in! ctx sid ai-model text nil
-                                                          {:progress-queue queue
-                                                           :sync-on-git-head-change? true})]
-                                   (.put queue {:kind :done :result assistant-message}))
-                                 (catch Exception e
-                                   (.put queue {:kind :error :message (ex-message e)})))))))]
-
-     (tui-start-fn! run-agent-fn!
-                    {:query-fn             (fn [q] (session/query-in ctx @tui-focus* q))
-                     :footer-model-fn      (fn [] (footer/footer-model ctx @tui-focus*))
-                     :session-selector-fn  (fn [] (ui-actions/context-session-action
-                                                   (selectors/context-session-selector ctx @tui-focus*)))
-                     :initial-context-session-tree-widget (current-context-widget @tui-focus*)
-                     :ui-read-fn       (fn [] (projections/extension-ui-snapshot ctx))
-                     :ui-dispatch-fn   (fn [event-type payload]
-                                         (session/dispatch-in! ctx event-type payload {:origin :tui}))
-                     :frontend-action-handler-fn! frontend-action-handler-fn!
-                     :dispatch-fn          dispatch-fn
-                     :on-interrupt-fn!     on-interrupt-fn!
-                     :on-queue-input-fn!   (fn [text _state]
-                                             (let [sid @tui-focus*]
-                                               (if (= :streaming (ss/sc-phase-in ctx sid))
-                                                 (do
-                                                   (session/queue-while-streaming-in! ctx sid text :steer)
-                                                   {:message "Queued steering message."})
-                                                 (do
-                                                   (session/queue-while-streaming-in! ctx sid text :queue)
-                                                   {:message "Queued follow-up message."}))))
-                     :double-press-window-ms 500
-                     :double-escape-action :none
-                     :cwd                  cwd
-                     :focus-session-id     @tui-focus*
-                     :current-session-file (:session-file (ss/get-session-data-in ctx @tui-focus*))
-                     :initial-messages     (vec (or (:messages startup-rehydrate) []))
-                     :initial-tool-calls   (or (:tool-calls startup-rehydrate) {})
-                     :initial-tool-order   (vec (or (:tool-order startup-rehydrate) []))
-                     :resume-fn!           resume-fn!
-                     :switch-session-fn!   switch-session-fn!
-                     :fork-session-fn!     fork-session-fn!
-                     :event-queue          event-queue
-                     :alt-screen           false}))))
+     (tui-start-fn! run-agent-fn tui-opts))))
 ;; RPC runtime moved to psi.rpc.
