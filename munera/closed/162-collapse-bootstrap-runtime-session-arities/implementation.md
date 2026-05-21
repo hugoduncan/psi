@@ -143,6 +143,20 @@ Executed 2 test-shaper follow-up items:
 
 301 tests pass, lint clean.
 
+## Task-implementation-review — pass 2 (2026-05-19)
+
+Re-reviewed full implementation against all 5 review criteria. No new actionable issues found.
+
+- **matches(code, design)**: ✓ All 7 ACs hold. Single arity, test helper, main.clj caller, mock updates — all verified against committed code.
+- **follows(code, architecture)**: ✓ `bootstrap-runtime-session!` is pure coordination; `adopt-startup-plan-into-session!` owns sequencing; test helper cleanly separates ctx creation from bootstrap. Architecture alignment intact.
+- **new_pattern → reusable_existing_pattern**: ✓ No new patterns duplicating existing ones. `bootstrap-stub-bindings` vs `with-main-bootstrap-stubs` serve distinct purposes (direct bootstrap vs full runtime entry). Already documented.
+- **unnecessary_abstraction**: ✓ None. `bootstrap-fresh-session!` is the right level of abstraction for the "create everything" test pattern.
+- **structural_performance_issue**: ✓ None.
+
+3 unchecked items remain in steps.md — all test cleanup (session-state-restore helper, extension_install binding composition, shared test-ai-model). None affect correctness or acceptance criteria. Stashed WIP exists for these items.
+
+Pre-existing test failure `startup summary writes through dispatch handlers FAIL` is unrelated to this task.
+
 ## Code-shaper follow-up — fixture unification + temp-cwd (2026-05-20)
 
 Executed 2 code-shaper follow-up items:
