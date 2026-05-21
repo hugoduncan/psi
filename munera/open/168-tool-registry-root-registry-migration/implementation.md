@@ -28,3 +28,9 @@ Next step:
 2026-05-21 inconsistency review:
 
 - Actionable inconsistency: `implementation.md` says the ambiguity follow-up already updated `design.md`, `plan.md`, and `design-steps.md` so built-in ordering can be tested explicitly, but `steps.md` still has unchecked `Prove or narrow multi-provenance built-in ordering for all-tools-in` work. The task files disagree on whether that ordering obligation is already resolved at the task-artifact level or remains open as implementation/test work. Added one unchecked `design-steps.md` follow-up to align the artifact story rather than re-decide it during execution.
+
+2026-05-21 inconsistency follow-up execution:
+
+- Aligned the task artifacts around the already-resolved ordering obligation from the ambiguity follow-up.
+- Marked `steps.md` `Prove or narrow multi-provenance built-in ordering for all-tools-in` done because the task-level design/plan already pins that proof target explicitly rather than leaving it as unresolved design work.
+- No additional changes to `design.md` or `plan.md` were needed because they already state the preserved built-ins-first ordering rule and plan-level test obligation.
