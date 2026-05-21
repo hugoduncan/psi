@@ -77,7 +77,7 @@
 ;;;; Init
 
 (deftest init-test
-  (testing "init returns idle state and starts queue polling cmd"
+  (testing "init returns idle state and starts queue wait cmd"
     (let [init-fn (app/make-init)
           [state cmd] (init-fn)]
       (is (= :idle (:phase state)))
