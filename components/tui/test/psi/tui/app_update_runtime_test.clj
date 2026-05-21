@@ -108,8 +108,8 @@
       (is (nil? (:context-session-tree-widget s2)))
       (is (nil? (:context-session-tree-selected-index s2))))))
 
-(deftest context-widget-preserves-across-unrelated-refreshes-while-authoritative-widget-remains-test
-  (testing "unrelated refreshes preserve context widget while authoritative context state still includes it"
+(deftest context-widget-preserves-across-explicit-refreshes-while-authoritative-widget-remains-test
+  (testing "explicit refresh boundaries preserve context widget while authoritative context state still includes it"
     (let [widget    {:placement "left"
                      :extension-id "psi-session"
                      :widget-id "session-tree"
@@ -129,13 +129,13 @@
           update-fn (app/make-update (stub-agent-fn ""))
           state     (init-state {:ui-state* ui-atom
                                  :initial-context-session-tree-widget widget})
-          [s1 _]    (update-fn state {:type :agent-poll})
+          [s1 _]    (update-fn state (msg/window-size 120 40))
           _         (swap! ui-atom assoc-in [:widgets [:ext "w2"]]
                            {:placement :below-editor
                             :extension-id "ext"
                             :widget-id "w2"
                             :content ["other widget"]})
-          [s2 _]    (update-fn s1 {:type :agent-poll})]
+          [s2 _]    (update-fn s1 (msg/window-size 120 40))]
       (is (= widget (:context-session-tree-widget s1)))
       (is (= widget (:context-session-tree-widget s2)))
       (is (= 2 (count (get-in s2 [:ui-snapshot :widgets])))))))
@@ -149,7 +149,49 @@
       (is (= "boom" (:error s1)))
       (is (some? cmd)))))
 
+(deftest idle-agent-poll-refreshes-ui-snapshot-test
+  ;; Proves the current poll path refreshes ui-snapshot from the ui-read-fn.
+  (testing "idle agent-poll refreshes ui-snapshot"
+    (let [ui-atom    (atom {:widgets {[:ext "w1"] {:placement :above-editor
+                                                   :extension-id "ext"
+                                                   :widget-id "w1"
+                                                   :content ["widget body"]}}
+                            :widget-specs {}
+                            :statuses {}
+                            :notifications {}
+                            :tool-renderers {}
+                            :message-renderers {}
+                            :dialog-queue {:active nil :pending []}
+                            :tools-expanded? false})
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state {:ui-state* ui-atom})
+          [s1 _]    (update-fn state {:type :agent-poll})]
+      (is (= 1 (count (get-in s1 [:ui-snapshot :widgets]))))
+      (is (= "w1" (get-in s1 [:ui-snapshot :widgets 0 :widget-id]))))))
+
+(deftest explicit-refresh-boundary-refreshes-extension-command-names-test
+  ;; Proves explicit runtime-facing events refresh extension command names.
+  (testing "window-size refreshes extension command names"
+    (let [commands* (atom ["/one"])
+          query-fn  (fn [query]
+                      (when (= [:psi.extension/command-names] query)
+                        {:psi.extension/command-names @commands*}))
+          update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :query-fn query-fn)
+          _         (reset! commands* ["/one" "/two"])
+          [s1 _]    (update-fn state (msg/window-size 120 40))]
+      (is (= ["/one" "/two"] (:extension-command-names s1))))))
+
+(deftest idle-agent-poll-does-not-self-reschedule-test
+  ;; Proves idle poll no longer perpetually reschedules synthetic poll work.
+  (testing "idle agent-poll returns no follow-up poll command"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (init-state)
+          [_ cmd]   (update-fn state {:type :agent-poll})]
+      (is (nil? cmd)))))
+
 (deftest poll-advances-spinner-test
+  ;; Proves streaming agent-poll keeps spinner/progress polling active.
   (testing "agent-poll increments spinner-frame"
     (let [update-fn (app/make-update (stub-agent-fn ""))
           streaming (assoc (init-state) :phase :streaming

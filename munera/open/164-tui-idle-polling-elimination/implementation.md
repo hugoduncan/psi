@@ -17,3 +17,9 @@
   - Chose and recorded the authoritative extension command-name refresh boundaries for this task in both `design.md` and `plan.md`: `:window-size`, `:agent-event`, `:external-message`, `:context-updated`, `:agent-result`, `:agent-error`, and `:agent-aborted`.
   - Recorded the complementary exclusion rule: idle `:agent-poll` self-ticks are not a valid refresh trigger for extension command names after polling elimination.
   - Left `steps.md` unchanged because the user asked to execute only newly added `design-steps.md` follow-ups, not implementation checklist items.
+- 2026-05-21 implementation pass:
+  - Added focused runtime tests proving explicit refresh-boundary behavior for UI snapshot refresh and extension command-name refresh, plus post-change proof that idle `:agent-poll` no longer reschedules follow-up poll work.
+  - Tightened the existing context-widget refresh proof to use explicit `:window-size` boundaries instead of idle poll ticks, matching the task's post-change trigger rule.
+  - Refactored `components/tui/src/psi/tui/app.clj` so UI snapshot refresh, notification maintenance, and extension command-name refresh only run on explicit refresh-boundary messages.
+  - Removed idle `:agent-poll` self-rescheduling; streaming `:agent-poll` still delegates to `handle-agent-poll` and continues returning poll commands for spinner/progress refresh.
+  - Verification: `clojure -M:test --focus psi.tui.app-update-runtime-test --focus psi.tui.notification-render-test` ✅
