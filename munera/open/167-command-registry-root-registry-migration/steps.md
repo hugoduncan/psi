@@ -7,3 +7,5 @@
 - [x] Verify migration does not leak raw root-registry semantics through the public command-registry API
 - [x] Refine task artifacts to record migration decisions and compatibility boundaries
   - Design follow-up items from review passes live in `design-steps.md`; execution against those items may update design/plan/implementation artifacts but should not pull execution from `steps.md` unless a later implementation phase explicitly does so.
+- [ ] Prove or narrow multi-provenance built-in ordering for `all-commands-in`
+  - Add a focused test covering two built-in provenance ids contributing commands, then either preserve a deterministic built-ins ordering contract in the adapter or explicitly narrow the task contract/docs if cross-provenance built-in ordering is intentionally unsupported.
