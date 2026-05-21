@@ -79,3 +79,7 @@ Initial next step:
 - The new test registers entries in a deliberate order, asserts membership/count only via ids and count, proves `:value` mirrors `:entries`, and checks that the result does not advertise ordering metadata such as `:order`, `:sorted?`, or `:storage-order`.
 - First attempt over-constrained the collection type to `vector?`; focused test execution showed `list-entries` currently returns a sequential collection that need not be a vector, so the test was corrected to assert only `sequential?`, preserving the intended unordered contract.
 - Verification for this pass: `clojure -M:test --focus psi.root-registry.registry-test`, `clj-kondo --lint components/root-registry/src components/root-registry/test`, and `clojure -M:fmt -m cljfmt.main check components/root-registry/src/psi/root_registry/registry.clj components/root-registry/test/psi/root_registry/registry_test.clj deps.edn tests.edn` all passed.
+
+2026-05-21 code-shaper review:
+
+- No new actionable code-shaping feedback found: `psi.root-registry.registry` keeps storage helpers, invariant enforcement, and operation surfaces locally comprehensible; result-map shape, naming, and index maintenance are consistent with the task boundary; focused tests remain green (`clojure -M:test --focus psi.root-registry.registry-test`, `clj-kondo --lint components/root-registry/src components/root-registry/test`, `clojure -M:fmt -m cljfmt.main check components/root-registry/src/psi/root_registry/registry.clj components/root-registry/test/psi/root_registry/registry_test.clj deps.edn tests.edn`).
