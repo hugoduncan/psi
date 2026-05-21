@@ -1,0 +1,7 @@
+- [ ] Inventory the current TUI poll/tick update behaviors and identify what needs explicit proof before changing
+- [ ] Add focused tests covering the update behaviors currently provided by the polling path
+- [ ] Add a focused failing test proving idle TUI self-reschedules synthetic poll work
+- [ ] Change the TUI update loop so idle no longer self-polls
+- [ ] Preserve and prove streaming poll/reschedule behavior
+- [ ] Re-run the focused TUI proof set
+- [ ] Record the final trigger/behavior decisions in implementation.md
