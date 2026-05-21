@@ -126,6 +126,9 @@
   (let [session-name (some #(when (= :session-info (:kind %))
                               (get-in % [:data :name]))
                            (rseq (vec entries)))
+        header-ts     (:timestamp header)
+        updated-at    (or (some-> entries last :timestamp)
+                          header-ts)
         baseline     (merge (model/initial-session)
                             (select-keys current-sd [:base-system-prompt
                                                      :system-prompt
@@ -158,7 +161,9 @@
                             :interrupt-pending false
                             :interrupt-requested-at nil
                             :model model
-                            :thinking-level thinking-level)]
+                            :thinking-level thinking-level
+                            :created-at header-ts
+                            :updated-at updated-at)]
     (-> state*
         (assoc-in (state/session-data-path session-id) next-sd)
         (initialize-session-slots session-id (vec entries))

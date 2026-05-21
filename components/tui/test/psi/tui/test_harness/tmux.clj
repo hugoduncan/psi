@@ -96,13 +96,15 @@
 
 (defn worktree-launch-command
   "Resolve a launch command that always runs code from the current worktree,
-   preferring `bb` (repo-local) over the installed `psi` binary.
+   preferring the absolute repo-local `bb` launcher over the installed `psi`
+   binary. This must remain independent of the tmux session working directory,
+   since integration scenarios often launch from temp fixture directories.
    Use this for scenarios that test features that may not yet be in the
    installed release."
   []
   (cond
     (command-available? "bb")
-    repo-local-launch-command
+    (repo-local-launch-command-abs)
 
     (command-available? "psi")
     canonical-launch-command

@@ -87,7 +87,9 @@
                                                                      :startup-opts startup-opts}))
                   requiring-resolve (fn [sym]
                                       (is (= 'psi.tui.app/start! sym))
-                                      (atom start-fn))]
+                                      (atom start-fn))
+                  main/get-env (fn [k] ({"PSI_CWD" "/tmp/fixture-worktree"
+                                         "PSI_SESSION_ROOT" "/tmp/fixture-sessions"} k))]
       (main/run-tui-session! ["--tui"
                               "--model" "sonnet-4.6"
                               "--thinking-level" "medium"
@@ -98,7 +100,10 @@
       (is (= :sonnet-4.6 (:model-key @captured)))
       (is (= {:auto-store-fallback? false} (:memory-runtime-opts @captured)))
       (is (= {:llm-stream-idle-timeout-ms 42000} (:session-config @captured)))
-      (is (= {:thinking-level-override :medium} (:startup-opts @captured)))
+      (is (= {:thinking-level-override :medium
+              :cwd "/tmp/fixture-worktree"
+              :session-root "/tmp/fixture-sessions"}
+             (:startup-opts @captured)))
       (is (= {:server 7777} (:stopped @captured))))))
 
 (deftest run-console-session-delegates-to-app-runtime-component-test

@@ -448,6 +448,10 @@
                                                                  :psi.agent-session/session-name
                                                                  :psi.agent-session/system-prompt])]
         (is (= "/repo/feature-x" (:worktree-path sd)))
+        (is (instance? java.time.Instant (:created-at sd)))
+        (is (instance? java.time.Instant (:updated-at sd)))
+        (is (every? #(instance? java.time.Instant (:timestamp %))
+                    (persist/all-entries-in ctx resumed-id)))
         (is (= "/repo/feature-x" (ss/session-worktree-path-in ctx resumed-id)))
         (is (= "/repo/feature-x" (:psi.agent-session/worktree-path result)))
         (is (= "Feature X" (:session-name sd)))

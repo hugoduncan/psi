@@ -197,12 +197,15 @@
         thinking-level       (thinking-level-from-args args)
         memory-runtime-opts  (memory-runtime-opts-from-args args)
         session-runtime-opts (session-runtime-config-from-args args)
+        startup-opts         (cond-> {:thinking-level-override thinking-level}
+                               (some-> (get-env "PSI_CWD") str/trim not-empty) (assoc :cwd (some-> (get-env "PSI_CWD") str/trim not-empty))
+                               (some-> (get-env "PSI_SESSION_ROOT") str/trim not-empty) (assoc :session-root (some-> (get-env "PSI_SESSION_ROOT") str/trim not-empty)))
         nrepl-port           (nrepl-port-from-args args)
         nrepl-srv            (when nrepl-port
                                (app-runtime/start-nrepl! nrepl-port))]
     (try
       (app-runtime/start-tui-runtime! start! model-key memory-runtime-opts session-runtime-opts
-                                      {:thinking-level-override thinking-level})
+                                      startup-opts)
       (finally
         (app-runtime/stop-nrepl! nrepl-srv)))))
 

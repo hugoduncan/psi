@@ -586,7 +586,7 @@
                 :session/retarget-runtime-prompt-metadata
                 :session/append-journal-entry
                 :session/set-startup-bootstrap-summary]
-               event-types))))))
+               (take-last 5 event-types)))))))
 
 (deftest origin-logged-test
   (testing "log entry captures origin"

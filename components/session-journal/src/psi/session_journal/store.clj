@@ -263,9 +263,8 @@
   [info]
   (let [m (:modified info)]
     (cond
-      (instance? Instant m)        (- (.toEpochMilli ^Instant m))
-      (instance? java.util.Date m) (- (.getTime ^java.util.Date m))
-      :else                        0)))
+      (instance? Instant m) (- (.toEpochMilli ^Instant m))
+      :else                 0)))
 
 (defn- extract-session-info
   "Build a SessionInfo map from a loaded session {:header :entries}."
