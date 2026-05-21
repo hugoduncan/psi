@@ -55,3 +55,9 @@ Initial next step:
 - No newly added unchecked follow-up steps remained in `steps.md`; all recorded review follow-ups were already completed at the task-artifact level before this pass.
 - Verified the delivered component and focused proof obligations still hold: `clojure -M:test --focus psi.root-registry.registry-test`, `clj-kondo --lint components/root-registry/src components/root-registry/test`, and `clojure -M:fmt -m cljfmt.main check components/root-registry/src/psi/root_registry/registry.clj components/root-registry/test/psi/root_registry/registry_test.clj deps.edn tests.edn` all passed.
 - No blocker to record: there was no remaining newly added actionable work to execute in this task.
+
+2026-05-21 test review:
+
+- Reviewed `components/root-registry/test/psi/root_registry/registry_test.clj`, `components/root-registry/src/psi/root_registry/registry.clj`, and task `166` artifacts against `.psi/skills/task-test-review/SKILL.md`.
+- No new actionable test feedback found: focused tests cover the task-defined shared behaviors, exercise unknown-registry and declaration semantics explicitly, and use no mocks or stubs.
+- Re-ran focused verification: `clojure -M:test --focus psi.root-registry.registry-test`, `clj-kondo --lint components/root-registry/src components/root-registry/test`, and `clojure -M:fmt -m cljfmt.main check components/root-registry/src/psi/root_registry/registry.clj components/root-registry/test/psi/root_registry/registry_test.clj deps.edn tests.edn` all passed.
