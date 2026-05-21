@@ -280,3 +280,4 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 - 2026-05-24: Code-shaper review pass 2 for task 166 found no new actionable feedback after session-kind delivery time-source fail-fast fix; only review note appended.
 - 2026-05-21: task 167 follow-up execution pass found no newly added unchecked implementation items in `steps.md`; appended a no-op execution note to `implementation.md` and committed the pass
 - 2026-05-21: task 168 follow-up execution added the missing focused `get-tool-in` built-in `:ext-path` provenance assertion, marked the final unchecked step done, and re-verified focused tests + lint
+- 2026-05-21: task 168 later follow-up execution passes found no newly added unchecked implementation items after test review and test-shaper review; recorded no-op execution notes and committed each pass

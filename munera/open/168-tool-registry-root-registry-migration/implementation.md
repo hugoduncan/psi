@@ -68,3 +68,9 @@ Next step:
 2026-05-21 test-shaper review:
 
 - No new actionable test-shaping feedback found. Focused tests stay clear, behavior-first, and economical: each preserved contract point is asserted directly without hidden helpers or redundant case explosion, and verification remains fast (`clojure -M:test --focus psi.tool-registry.registry-test`; `clj-kondo --lint components/tool-registry/src components/tool-registry/test`).
+
+2026-05-21 follow-up execution pass:
+
+- Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` to execute the newly added actionable follow-up items from the preceding review pass.
+- Found no newly added unchecked follow-up items in `steps.md`; all recorded actionable work for this task remains complete.
+- No task-file or code changes were needed for this execution pass.
