@@ -149,13 +149,10 @@
       (is (= "boom" (:error s1)))
       (is (some? cmd)))))
 
-(deftest idle-agent-poll-refreshes-ui-snapshot-test
-  ;; Proves the current poll path refreshes ui-snapshot from the ui-read-fn.
-  (testing "idle agent-poll refreshes ui-snapshot"
-    (let [ui-atom    (atom {:widgets {[:ext "w1"] {:placement :above-editor
-                                                   :extension-id "ext"
-                                                   :widget-id "w1"
-                                                   :content ["widget body"]}}
+(deftest explicit-refresh-boundary-refreshes-ui-snapshot-test
+  ;; Proves post-change ui-snapshot refresh happens on explicit runtime-facing events, not idle poll.
+  (testing "window-size refreshes ui-snapshot from the ui-read-fn"
+    (let [ui-atom    (atom {:widgets {}
                             :widget-specs {}
                             :statuses {}
                             :notifications {}
@@ -165,7 +162,12 @@
                             :tools-expanded? false})
           update-fn (app/make-update (stub-agent-fn ""))
           state     (init-state {:ui-state* ui-atom})
-          [s1 _]    (update-fn state {:type :agent-poll})]
+          _         (swap! ui-atom assoc-in [:widgets [:ext "w1"]]
+                           {:placement :above-editor
+                            :extension-id "ext"
+                            :widget-id "w1"
+                            :content ["widget body"]})
+          [s1 _]    (update-fn state (msg/window-size 120 40))]
       (is (= 1 (count (get-in s1 [:ui-snapshot :widgets]))))
       (is (= "w1" (get-in s1 [:ui-snapshot :widgets 0 :widget-id]))))))
 

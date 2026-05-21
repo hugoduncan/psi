@@ -24,3 +24,7 @@
   - Removed idle `:agent-poll` self-rescheduling; streaming `:agent-poll` still delegates to `handle-agent-poll` and continues returning poll commands for spinner/progress refresh.
   - Verification: `clojure -M:test --focus psi.tui.app-update-runtime-test --focus psi.tui.notification-render-test` ✅
 - 2026-05-21 implementation review: actionable feedback found. `components/tui/test/psi/tui/app_update_runtime_test.clj` still contains `idle-agent-poll-refreshes-ui-snapshot-test`, but the implementation now intentionally forbids idle `:agent-poll` from refreshing UI-facing state. The focused suite passes only because the test never seeds a changed UI snapshot before asserting widget presence, so it no longer proves the pre-change idle-poll behavior required by acceptance and now encodes the opposite regime unclearly.
+- 2026-05-21 review follow-up execution:
+  - Replaced `idle-agent-poll-refreshes-ui-snapshot-test` with `explicit-refresh-boundary-refreshes-ui-snapshot-test`, which mutates the authoritative UI source and proves refresh occurs on `:window-size`, an allowed explicit refresh boundary.
+  - This resolves the stale proof shape by removing the last focused test that still implied idle `:agent-poll` refreshes UI-facing state after polling elimination.
+  - Verification: `clojure -M:test --focus psi.tui.app-update-runtime-test --focus psi.tui.notification-render-test` ✅ (24 tests, 85 assertions).
