@@ -25,3 +25,8 @@
   - Deleted: the blank→nil conversion is inside `nullable-execution-mode`, not `maybe-install-nullable-execution-mode`, so both tests exercised the same partition.
 - [x] Unify fixture pattern: migrate `with-main-bootstrap-stubs` callers to use `bootstrap-stub-bindings` from test-support, eliminating the duplicate inline fixture.
   - Replaced `with-main-bootstrap-stubs` HOF with `main-bootstrap-stub-bindings` that merges `bootstrap-stub-bindings` + `resolve-model` + `discover-extension-paths`. All 12 callers now use `with-redefs-fn`. Removed 3 unused requires (`oauth`, `pt`, `skills`). Lint clean, all tests pass.
+
+## Code shaper follow-up
+
+- [ ] Underscore-prefix all remaining dead `ai-ctx` parameters: `start-new-session-with-startup!`, `new-session-with-startup-in!` in `app_runtime.clj`, and `run-cli-prompt!`, `cli-command-opts`, `run-cli-loop!` in `cli.clj`. Align with the convention already established by `run-prompt!` and `startup-rehydrate-from-current-session!`.
+- [ ] Collapse `new-session-with-startup-in!` / `start-new-session-with-startup!` — either make the private fn public or inline the wrapper. Update the stale docstring ("run startup prompts" → no startup prompts are run). Update `main.clj` caller.

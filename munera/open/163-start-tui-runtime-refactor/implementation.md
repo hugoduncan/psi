@@ -46,3 +46,11 @@
 
 - Deleted `maybe-install-nullable-execution-mode-passthrough-when-blank-test` — redundant with the absent test. Both redef'd `nullable-execution-mode` → nil. The blank→nil conversion lives inside `nullable-execution-mode`, not the function under test.
 - Replaced `with-main-bootstrap-stubs` (inline HOF with `with-redefs`) with `main-bootstrap-stub-bindings` (private fn returning a map). Merges `bootstrap-stub-bindings` from test-support with `resolve-model` and `discover-extension-paths` stubs. All 12 callers now use `with-redefs-fn`. Removed 3 unused requires (`oauth`, `pt`, `skills`). Lint clean, all tests pass.
+
+## Code shaper review (code-shaper)
+
+**Naming inconsistency — `ai-ctx` parameter convention**: The task underscore-prefixed `ai-ctx` in `run-prompt!` (`_ai-ctx`) and `startup-rehydrate-from-current-session!` (`_ai-ctx`), signalling dead parameters. But `start-new-session-with-startup!` (line 255) still takes `ai-ctx` without underscore and threads it to `startup-rehydrate-from-current-session!` which ignores it. Same for `new-session-with-startup-in!` (line 594) and `cli.clj` functions (`run-cli-prompt!`, `cli-command-opts`, `run-cli-loop!`). Within the file, the convention is now mixed: some dead `ai-ctx` params are underscore-prefixed, others are not. Underscore-prefix all dead `ai-ctx` params for consistency.
+
+**Trivial delegation — `new-session-with-startup-in!`**: Public `defn` (line 593) that calls `start-new-session-with-startup!` with identical args and no transformation. The docstring ("run startup prompts") is stale — startup prompts were removed. The function adds a naming indirection layer without value. Either make `start-new-session-with-startup!` public (and remove the wrapper) or collapse the two.
+
+**No other actionable issues**: `maybe-install-nullable-execution-mode` extraction is clean. `tui-wiring` delegation is well-structured. `build-tui-opts` assembles a flat map with no hidden state. The `start-tui-runtime!` let-binding is sequential and locally comprehensible. Data shapes are consistent across the wiring boundary.
