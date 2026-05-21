@@ -60,12 +60,7 @@
 (defn- with-main-bootstrap-stubs
   [f]
   (with-redefs [psi.app-runtime/resolve-model
-                (fn [_]
-                  {:provider           :anthropic
-                   :id                 "test-model"
-                   :name               "Test Model"
-                   :supports-reasoning false
-                   :context-window     200000})
+                (fn [_] app-test-support/test-ai-model)
                 oauth/create-context (fn [] nil)
                 pt/discover-templates (fn [] [])
                 skills/discover-skills (fn [] {:skills [] :diagnostics []})
@@ -78,11 +73,7 @@
   (with-main-bootstrap-stubs
     (fn []
       (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
-                           {:provider           :anthropic
-                            :id                 "test-model"
-                            :name               "Test Model"
-                            :supports-reasoning false
-                            :context-window     200000}
+                           app-test-support/test-ai-model
                            {:ui-type :emacs
                             :persist? false})
             sessions (ss/list-context-sessions-in ctx)]
@@ -92,11 +83,7 @@
   (with-main-bootstrap-stubs
     (fn []
       (let [{:keys [ctx cwd]} (app-runtime/create-runtime-session-context
-                               {:provider           :anthropic
-                                :id                 "test-model"
-                                :name               "Test Model"
-                                :supports-reasoning false
-                                :context-window     200000}
+                               app-test-support/test-ai-model
                                {:ui-type :emacs
                                 :persist? false})
             plan (#'app-runtime/build-startup-plan ctx {:cwd cwd})]
@@ -111,11 +98,7 @@
   (with-main-bootstrap-stubs
     (fn []
       (let [{:keys [ctx cwd]} (app-runtime/create-runtime-session-context
-                               {:provider           :anthropic
-                                :id                 "test-model"
-                                :name               "Test Model"
-                                :supports-reasoning false
-                                :context-window     200000}
+                               app-test-support/test-ai-model
                                {:ui-type :emacs
                                 :persist? false})
             calls             (atom [])
@@ -142,10 +125,7 @@
                          :startup-plan startup-plan*})]
           (let [result (app-runtime/bootstrap-runtime-session!
                         ctx
-                        {:provider           :anthropic
-                         :id                 "test-model"
-                         :name               "Test Model"
-                         :supports-reasoning false}
+                        app-test-support/test-ai-model
                         {:cwd cwd})
                 steps  (mapv :step @calls)]
             (is (= [:build-startup-plan
@@ -162,16 +142,12 @@
             (is (= 1 (count (ss/list-context-sessions-in ctx))))))))))
 
 (deftest start-tui-runtime-extension-command-after-new-targets-new-session-test
-  (let [orig-state @app-runtime/session-state]
-    (try
+  (app-test-support/with-session-state-restore
+    (fn []
       (with-main-bootstrap-stubs
         (fn []
           (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
-                               {:provider           :anthropic
-                                :id                 "test-model"
-                                :name               "Test Model"
-                                :supports-reasoning false
-                                :context-window     200000}
+                               app-test-support/test-ai-model
                                {:ui-type :tui
                                 :persist? false})
                 session-id             (:session-id (session/new-session-in! ctx nil {}))
@@ -204,7 +180,7 @@
                                :session-id sid
                                :templates []
                                :skills []
-                               :startup-rehydrate (#'app-runtime/startup-rehydrate-from-current-session! ctx sid nil {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false})}))]
+                               :startup-rehydrate (#'app-runtime/startup-rehydrate-from-current-session! ctx sid nil app-test-support/test-ai-model)}))]
               (is (= :ok (app-runtime/start-tui-runtime! tui-start! :ignored)))
               (let [dispatch-fn   (:dispatch-fn @tui-opts*)
                     query-fn      (:query-fn @tui-opts*)
@@ -221,13 +197,11 @@
                        (last (->> (persist/all-entries-in ctx after-new-id)
                                   (filter #(= :message (:kind %)))
                                   (map #(get-in % [:data :message :content 0 :text])))))
-                    "extension command implicit query must follow the active session after /new"))))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+                    "extension command implicit query must follow the active session after /new")))))))))
 
 (deftest run-session-starts-non-persisting-console-session-test
-  (let [orig-state @app-runtime/session-state]
-    (try
+  (app-test-support/with-session-state-restore
+    (fn []
       (with-main-bootstrap-stubs
         (fn []
           (with-redefs [clojure.core/read-line (let [calls (atom 0)]
@@ -241,13 +215,11 @@
                   sd         (ss/get-session-data-in ctx session-id)]
               (is (some? ctx))
               (is (nil? (:session-file sd)))
-              (is (= :console (:ui-type sd)))))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+              (is (= :console (:ui-type sd))))))))))
 
 (deftest run-session-journals-command-inputs-test
-  (let [orig-state @app-runtime/session-state]
-    (try
+  (app-test-support/with-session-state-restore
+    (fn []
       (with-main-bootstrap-stubs
         (fn []
           (with-redefs [clojure.core/read-line (let [calls (atom 0)]
@@ -264,32 +236,28 @@
                                   (map #(get-in % [:data :message :content 0 :text]))
                                   set)]
               (is (contains? msg-texts "/history"))
-              (is (contains? msg-texts "/quit"))))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+              (is (contains? msg-texts "/quit")))))))))
 
 (deftest start-tui-runtime-passes-current-session-file-test
-  (let [orig-state @app-runtime/session-state
-        captured   (atom nil)]
-    (try
-      (with-main-bootstrap-stubs
-        (fn []
-          (let [mock-tui-start! (fn [_run-agent-fn opts]
-                                  (reset! captured opts)
-                                  :ok)]
-            (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {})))
-            (is (nil? (:current-session-file @captured)))
-            (is (fn? (:dispatch-fn @captured)))
-            (is (fn? (:on-interrupt-fn! @captured)))
-            (let [ctx (:ctx @app-runtime/session-state)
-                  session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)]
-              (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+  (let [captured (atom nil)]
+    (app-test-support/with-session-state-restore
+      (fn []
+        (with-main-bootstrap-stubs
+          (fn []
+            (let [mock-tui-start! (fn [_run-agent-fn opts]
+                                    (reset! captured opts)
+                                    :ok)]
+              (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {})))
+              (is (nil? (:current-session-file @captured)))
+              (is (fn? (:dispatch-fn @captured)))
+              (is (fn? (:on-interrupt-fn! @captured)))
+              (let [ctx (:ctx @app-runtime/session-state)
+                    session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)]
+                (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))))))))))
 
 (deftest start-tui-runtime-journals-command-input-test
-  (let [orig-state @app-runtime/session-state]
-    (try
+  (app-test-support/with-session-state-restore
+    (fn []
       (with-main-bootstrap-stubs
         (fn []
           (let [mock-tui-start! (fn [_run-agent-fn opts]
@@ -302,13 +270,11 @@
                                   (filter #(= :message (:kind %)))
                                   (map #(get-in % [:data :message :content 0 :text]))
                                   set)]
-              (is (contains? msg-texts "/history"))))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+              (is (contains? msg-texts "/history")))))))))
 
 (deftest run-session-routes-cli-prompt-through-prompt-lifecycle-test
-  (let [orig-state @app-runtime/session-state]
-    (try
+  (app-test-support/with-session-state-restore
+    (fn []
       (with-main-bootstrap-stubs
         (fn []
           (kernel/clear-event-log!)
@@ -342,104 +308,98 @@
               (is (some #(= :session/prompt-prepare-request (:event-type %)) entries))
               (is (some #(= :session/prompt-record-response (:event-type %)) entries))
               (is (some #(= :session/prompt-finish (:event-type %)) entries))
-              (is (= ["user" "assistant" "user"] roles))))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+              (is (= ["user" "assistant" "user"] roles)))))))))
 
 (deftest submit-prompt-in-runs-git-head-sync-after-successful-turn-test
-  (let [orig-state @app-runtime/session-state
-        sync-calls (atom [])]
-    (try
-      (with-main-bootstrap-stubs
-        (fn []
-          (kernel/clear-event-log!)
-          (with-redefs [clojure.core/read-line
-                        (let [calls (atom 0)]
-                          (fn []
-                            (case (swap! calls inc)
-                              1 "/quit"
-                              nil)))
-                        runtime/safe-maybe-sync-on-git-head-change!
-                        (fn [_ctx sid]
-                          (swap! sync-calls conj sid)
-                          {:ok? true})
-                        psi.turn-runtime.core/execute-prepared-request!
-                        (fn [_ai-ctx _ctx sid prepared _progress-queue]
-                          {:execution-result/turn-id (:prepared-request/id prepared)
-                           :execution-result/session-id sid
-                           :execution-result/prepared-request-id (:prepared-request/id prepared)
-                           :execution-result/assistant-message {:role "assistant"
-                                                                :content [{:type :text :text "hello from app-runtime sync"}]
-                                                                :stop-reason :stop
-                                                                :timestamp (java.time.Instant/now)}
-                           :execution-result/turn-outcome :turn.outcome/stop
-                           :execution-result/tool-calls []
-                           :execution-result/stop-reason :stop})]
-            (app-runtime/run-session :ignored)
-            (let [ctx (:ctx @app-runtime/session-state)
-                  sync-calls-before (count @sync-calls)
-                  session-id (-> @app-runtime/session-state
-                                 :ctx
-                                 ss/list-context-sessions-in
-                                 first
-                                 :session-id)]
-              (#'app-runtime/submit-prompt-in!
-               ctx
-               session-id
-               (:ai-model @app-runtime/session-state)
-               "hello"
-               nil
-               {:sync-on-git-head-change? true})
-              (is (= [session-id] (subvec (vec @sync-calls) sync-calls-before))
-                  "submit-prompt-in! runs git-head sync once after a successful prompt turn")))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+  (let [sync-calls (atom [])]
+    (app-test-support/with-session-state-restore
+      (fn []
+        (with-main-bootstrap-stubs
+          (fn []
+            (kernel/clear-event-log!)
+            (with-redefs [clojure.core/read-line
+                          (let [calls (atom 0)]
+                            (fn []
+                              (case (swap! calls inc)
+                                1 "/quit"
+                                nil)))
+                          runtime/safe-maybe-sync-on-git-head-change!
+                          (fn [_ctx sid]
+                            (swap! sync-calls conj sid)
+                            {:ok? true})
+                          psi.turn-runtime.core/execute-prepared-request!
+                          (fn [_ai-ctx _ctx sid prepared _progress-queue]
+                            {:execution-result/turn-id (:prepared-request/id prepared)
+                             :execution-result/session-id sid
+                             :execution-result/prepared-request-id (:prepared-request/id prepared)
+                             :execution-result/assistant-message {:role "assistant"
+                                                                  :content [{:type :text :text "hello from app-runtime sync"}]
+                                                                  :stop-reason :stop
+                                                                  :timestamp (java.time.Instant/now)}
+                             :execution-result/turn-outcome :turn.outcome/stop
+                             :execution-result/tool-calls []
+                             :execution-result/stop-reason :stop})]
+              (app-runtime/run-session :ignored)
+              (let [ctx (:ctx @app-runtime/session-state)
+                    sync-calls-before (count @sync-calls)
+                    session-id (-> @app-runtime/session-state
+                                   :ctx
+                                   ss/list-context-sessions-in
+                                   first
+                                   :session-id)]
+                (#'app-runtime/submit-prompt-in!
+                 ctx
+                 session-id
+                 (:ai-model @app-runtime/session-state)
+                 "hello"
+                 nil
+                 {:sync-on-git-head-change? true})
+                (is (= [session-id] (subvec (vec @sync-calls) sync-calls-before))
+                    "submit-prompt-in! runs git-head sync once after a successful prompt turn")))))))))
 
 (deftest start-tui-runtime-routes-agent-prompts-through-prompt-lifecycle-test
-  (let [orig-state @app-runtime/session-state
-        queued     (atom nil)]
-    (try
-      (with-main-bootstrap-stubs
-        (fn []
-          (kernel/clear-event-log!)
-          (with-redefs [psi.turn-runtime.core/execute-prepared-request!
-                        (fn [_ai-ctx _ctx sid prepared progress-queue]
-                          (reset! queued progress-queue)
-                          {:execution-result/turn-id (:prepared-request/id prepared)
-                           :execution-result/session-id sid
-                           :execution-result/prepared-request-id (:prepared-request/id prepared)
-                           :execution-result/assistant-message {:role "assistant"
-                                                                :content [{:type :text :text "hello from tui lifecycle"}]
-                                                                :stop-reason :stop
-                                                                :timestamp (java.time.Instant/now)}
-                           :execution-result/turn-outcome :turn.outcome/stop
-                           :execution-result/tool-calls []
-                           :execution-result/stop-reason :stop})]
-            (let [result (app-runtime/start-tui-runtime!
-                          (fn [run-agent-fn _opts]
-                            (let [queue (java.util.concurrent.LinkedBlockingQueue.)]
-                              (run-agent-fn "hello from tui" queue)
-                              (.poll queue 2000 java.util.concurrent.TimeUnit/MILLISECONDS)))
-                          :ignored {} {})
-                  ctx     (:ctx @app-runtime/session-state)
-                  sid     (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
-                  entries (kernel/event-log-entries)
-                  roles   (->> (persist/all-entries-in ctx sid)
-                               (filter #(= :message (:kind %)))
-                               (map #(get-in % [:data :message :role]))
-                               vec)]
-              (is (= :done (:kind result)))
-              (is (= "assistant" (get-in result [:result :role])))
-              (is (= "hello from tui lifecycle"
-                     (get-in result [:result :content 0 :text])))
-              (is (instance? java.util.concurrent.LinkedBlockingQueue @queued))
-              (is (some #(= :session/prompt-submit (:event-type %)) entries))
-              (is (some #(= :session/prompt-prepare-request (:event-type %)) entries))
-              (is (some #(= :session/prompt-record-response (:event-type %)) entries))
-              (is (some #(= :session/prompt-finish (:event-type %)) entries))
-              (is (= ["user" "assistant"] roles))))))
-      (finally
-        (reset! app-runtime/session-state orig-state)))))
+  (let [queued (atom nil)]
+    (app-test-support/with-session-state-restore
+      (fn []
+        (with-main-bootstrap-stubs
+          (fn []
+            (kernel/clear-event-log!)
+            (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                          (fn [_ai-ctx _ctx sid prepared progress-queue]
+                            (reset! queued progress-queue)
+                            {:execution-result/turn-id (:prepared-request/id prepared)
+                             :execution-result/session-id sid
+                             :execution-result/prepared-request-id (:prepared-request/id prepared)
+                             :execution-result/assistant-message {:role "assistant"
+                                                                  :content [{:type :text :text "hello from tui lifecycle"}]
+                                                                  :stop-reason :stop
+                                                                  :timestamp (java.time.Instant/now)}
+                             :execution-result/turn-outcome :turn.outcome/stop
+                             :execution-result/tool-calls []
+                             :execution-result/stop-reason :stop})]
+              (let [result (app-runtime/start-tui-runtime!
+                            (fn [run-agent-fn _opts]
+                              (let [queue (java.util.concurrent.LinkedBlockingQueue.)]
+                                (run-agent-fn "hello from tui" queue)
+                                (.poll queue 2000 java.util.concurrent.TimeUnit/MILLISECONDS)))
+                            :ignored {} {})
+                    ctx     (:ctx @app-runtime/session-state)
+                    sid     (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
+                    entries (kernel/event-log-entries)
+                    roles   (->> (persist/all-entries-in ctx sid)
+                                 (filter #(= :message (:kind %)))
+                                 (map #(get-in % [:data :message :role]))
+                                 vec)]
+                (is (= :done (:kind result)))
+                (is (= "assistant" (get-in result [:result :role])))
+                (is (= "hello from tui lifecycle"
+                       (get-in result [:result :content 0 :text])))
+                (is (instance? java.util.concurrent.LinkedBlockingQueue @queued))
+                (is (some #(= :session/prompt-submit (:event-type %)) entries))
+                (is (some #(= :session/prompt-prepare-request (:event-type %)) entries))
+                (is (some #(= :session/prompt-record-response (:event-type %)) entries))
+                (is (some #(= :session/prompt-finish (:event-type %)) entries))
+                (is (= ["user" "assistant"] roles))))))))))
 
 (deftest agent-messages->tui-resume-state-rehydrates-tool-rows-test
   (let [messages [{:role "user"
@@ -601,10 +561,7 @@
                          {#'ext/discover-extension-paths (fn [& _] [])})
     (fn []
       (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                           {:provider :anthropic
-                            :id "test-model"
-                            :name "Test Model"
-                            :supports-reasoning false}
+                           app-test-support/test-ai-model
                            {:persist? false})
             session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
             sd         (ss/get-session-data-in ctx session-id)
@@ -622,10 +579,7 @@
                                                                   {:ok? true})})
       (fn []
         (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                             {:provider :anthropic
-                              :id "test-model"
-                              :name "Test Model"
-                              :supports-reasoning false}
+                             app-test-support/test-ai-model
                              {:persist? false
                               :memory-runtime-opts {:store-provider "in-memory"
                                                     :retention-snapshots 22
@@ -643,10 +597,7 @@
                          {#'ext/discover-extension-paths (fn [& _] [])})
     (fn []
       (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                           {:provider :anthropic
-                            :id "test-model"
-                            :name "Test Model"
-                            :supports-reasoning false}
+                           app-test-support/test-ai-model
                            {:persist? false})
             sid    (-> (ss/list-context-sessions-in ctx) first :session-id)
             prompt (:psi.agent-session/system-prompt
@@ -665,10 +616,7 @@
                              {#'ext/discover-extension-paths (fn [& _] [])})
         (fn []
           (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                               {:provider :anthropic
-                                :id "test-model"
-                                :name "Test Model"
-                                :supports-reasoning false}
+                               app-test-support/test-ai-model
                                {:persist? false})
                 result (session/query-in ctx [:psi.runtime/nrepl-host
                                               :psi.runtime/nrepl-port
@@ -686,7 +634,7 @@
         (fn []
           (let [cwd (test-support/temp-cwd)
                 {:keys [ctx]} (app-test-support/bootstrap-fresh-session!
-                               {:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false}
+                               app-test-support/test-ai-model
                                {:cwd cwd :persist? true :session-root session-root})
                 session-id   (-> (ss/list-context-sessions-in ctx) first :session-id)
                 session-file (:session-file (ss/get-session-data-in ctx session-id))]

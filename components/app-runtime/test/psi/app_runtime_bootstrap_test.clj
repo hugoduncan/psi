@@ -54,16 +54,11 @@
           (is (= :off (:thinking-level sd))))))))
 
 (deftest bootstrap-runtime-session-reuses-pre-created-session-test
-  (let [cwd      (test-support/temp-cwd)
-        ai-model {:provider           :anthropic
-                  :id                 "test-model"
-                  :name               "Test Model"
-                  :supports-reasoning false
-                  :context-window     200000}]
+  (let [cwd (test-support/temp-cwd)]
     (with-redefs-fn (app-test-support/bootstrap-stub-bindings)
       (fn []
         (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
-                             ai-model
+                             app-test-support/test-ai-model
                              {:ui-type  :console
                               :persist? false
                               :cwd      cwd})
@@ -72,7 +67,7 @@
               _              (is (= 1 (count (ss/list-context-sessions-in ctx)))
                                  "exactly one session before bootstrap")
               result         (app-runtime/bootstrap-runtime-session!
-                              ctx ai-model {:session-id pre-created-id :cwd cwd})
+                              ctx app-test-support/test-ai-model {:session-id pre-created-id :cwd cwd})
               sessions-after (ss/list-context-sessions-in ctx)]
           (is (= pre-created-id (:session-id result))
               "bootstrap must reuse the pre-created session-id")

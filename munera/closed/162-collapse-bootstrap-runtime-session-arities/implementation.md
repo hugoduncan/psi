@@ -166,3 +166,15 @@ Executed 2 code-shaper follow-up items:
 2. **`temp-cwd` adopted**: Replaced manual `(str (System/getProperty "java.io.tmpdir") "/psi-bootstrap-persisting-" (UUID/randomUUID))` + `.mkdirs` with `(test-support/temp-cwd)` in the persisting test.
 
 301 tests pass, lint clean.
+
+## Test-shaper follow-up — session-state-restore, binding composition, shared ai-model (2026-05-20)
+
+Executed 3 remaining test-shaper follow-up items:
+
+1. **`with-session-state-restore` helper**: Added HOF to `psi.app-runtime.test-support` that saves `app-runtime/session-state`, runs body, restores in finally. All 8 `(let [orig-state ...] (try ... (finally (reset! ...))))` blocks in `app_runtime_test.clj` replaced. Tests with additional bindings (`captured`, `sync-calls`, `queued`) moved those bindings outside the wrapper.
+
+2. **`extension_install_startup_test.clj` binding composition**: `startup-bootstrap-bindings` now composes from `(merge (app-test-support/bootstrap-stub-bindings) manifest-specific-bindings)` and dissocs `build-system-prompt` when `stub-build-system-prompt?` is false. Removed 3 now-unused requires (`oauth`, `pt`, `skills`).
+
+3. **Shared `test-ai-model` constant**: Added `test-ai-model` def to `psi.app-runtime.test-support` with canonical shape `{:provider :anthropic :id "test-model" :name "Test Model" :supports-reasoning false :context-window 200000}`. Adopted across `app_runtime_test.clj` (all inline maps + `with-main-bootstrap-stubs`), `app_runtime_bootstrap_test.clj` (reuse test only), and `extension_install_startup_test.clj`. Project-preferences tests in `app_runtime_bootstrap_test.clj` intentionally keep their distinct `"claude-sonnet-4-6"` model — the override is behaviourally significant.
+
+All tests pass, lint clean.

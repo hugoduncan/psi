@@ -23,6 +23,27 @@
    #'introspection/register-resolvers! (fn [] nil)
    #'memory-runtime/sync-memory-layer! (fn [_] {:ok? true})})
 
+(def test-ai-model
+  "Shared ai-model map for bootstrap tests.  Use this as the default;
+   override individual keys only when the test behaviour depends on them
+   (e.g. project-preferences tests that intentionally supply a different model)."
+  {:provider           :anthropic
+   :id                 "test-model"
+   :name               "Test Model"
+   :supports-reasoning false
+   :context-window     200000})
+
+(defn with-session-state-restore
+  "Saves `app-runtime/session-state`, runs `(f)`, and restores the original
+   value in a finally block.  Use as a HOF wrapper around test bodies that
+   mutate session-state."
+  [f]
+  (let [orig @app-runtime/session-state]
+    (try
+      (f)
+      (finally
+        (reset! app-runtime/session-state orig)))))
+
 (def ^:private ctx-keys
   "Keys extracted from opts and forwarded to create-runtime-session-context."
   [:cwd :session-config :ui-type :persist? :session-root :thinking-level-override])
