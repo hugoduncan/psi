@@ -1,0 +1,3 @@
+- [ ] Resolve whether built-in provenance ordering in merged `all-tools-in` is part of the required preserved public contract or only a focused implementation-proof target, and record the exact expected ordering rule.
+- [ ] Pin the required stored and public read-shape provenance fields for built-in and extension tools (`:source`, `:ext-path`, `:extension-path`) so migration tests can distinguish preserved contract from incidental storage shape.
+- [ ] Decide whether same-owner duplicate tool registration replacement semantics are part of the preserved public contract for both extension-owned and built-in tools, and add explicit proof expectations if they are.
