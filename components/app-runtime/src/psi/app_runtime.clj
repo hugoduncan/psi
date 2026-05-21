@@ -553,7 +553,7 @@ Available: " (str/join ", " (map name (keys all))))
          (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts})
          cli-focus* (atom session-id)
          cmd-opts   (cli/cli-command-opts start-new-session-with-startup! ctx cli-focus* nil ai-model oauth-ctx)]
-     (reset! session-state {:ctx ctx :ai-ctx nil :ai-model ai-model
+     (reset! session-state {:ctx ctx :ai-model ai-model
                             :oauth-ctx oauth-ctx
                             :nrepl-runtime-atom nrepl-runtime})
      (output/print-banner ai-model templates skills ctx)
@@ -623,7 +623,7 @@ Available: " (str/join ", " (map name (keys all))))
          tui-focus* (atom session-id)
 
          ;; Expose state for nREPL introspection
-         _         (reset! session-state {:ctx ctx :ai-ctx nil :ai-model ai-model
+         _         (reset! session-state {:ctx ctx :ai-model ai-model
                                           :oauth-ctx oauth-ctx
                                           :nrepl-runtime-atom nrepl-runtime
                                           :tui-focus* tui-focus*})

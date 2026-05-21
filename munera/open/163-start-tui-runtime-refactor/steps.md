@@ -7,3 +7,9 @@
   - Added intent comments on both TUI and CLI `:on-new-session!` closures.
 - [x] Verify all tests pass after changes.
   - 39 tests, 195 assertions, 0 failures across app-runtime, bootstrap, nrepl, navigation, and rpc-prompt-command test namespaces.
+
+## Review follow-up
+
+- [x] Fix implementation log inaccuracy: `start-new-session-with-startup!` is `defn-` (private), not "public/internal API".
+- [x] Remove dead `:ai-ctx nil` from `session-state` atom resets in both `run-session` and `start-tui-runtime!`.
+  - Confirmed no code reads `:ai-ctx` from `session-state`. Removed from both reset sites. All unit tests pass.
