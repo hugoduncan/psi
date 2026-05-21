@@ -15,9 +15,6 @@
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.test-support :as test-support]
-   [psi.provider-auth.oauth.core :as oauth]
-   [psi.prompt-assets.prompt-templates :as pt]
-   [psi.prompt-assets.skills :as skills]
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.memory.runtime :as memory-runtime]
    [psi.app-runtime.test-support :as app-test-support]
@@ -57,20 +54,16 @@
       (is (str/includes? error "OPENAI_API_KEY"))
       (is (str/includes? error "anthropic")))))
 
-(defn- with-main-bootstrap-stubs
-  [f]
-  (with-redefs [psi.app-runtime/resolve-model
-                (fn [_] app-test-support/test-ai-model)
-                oauth/create-context (fn [] nil)
-                pt/discover-templates (fn [] [])
-                skills/discover-skills (fn [] {:skills [] :diagnostics []})
-                sys-prompt/discover-context-files (fn [_] [])
-                sys-prompt/build-system-prompt (fn [_] "")
-                ext/discover-extension-paths (fn [& _] [])]
-    (f)))
+(defn- main-bootstrap-stub-bindings
+  "Returns bootstrap-stub-bindings merged with resolve-model and
+   discover-extension-paths stubs needed by entry-point tests."
+  []
+  (merge (app-test-support/bootstrap-stub-bindings)
+         {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+          #'ext/discover-extension-paths (fn [& _] [])}))
 
 (deftest create-runtime-session-context-does-not-create-initial-session-test
-  (with-main-bootstrap-stubs
+  (with-redefs-fn (main-bootstrap-stub-bindings)
     (fn []
       (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
                            app-test-support/test-ai-model
@@ -80,7 +73,7 @@
         (is (empty? sessions))))))
 
 (deftest build-startup-plan-does-not-require-live-session-test
-  (with-main-bootstrap-stubs
+  (with-redefs-fn (main-bootstrap-stub-bindings)
     (fn []
       (let [{:keys [ctx cwd]} (app-runtime/create-runtime-session-context
                                app-test-support/test-ai-model
@@ -95,7 +88,7 @@
         (is (contains? plan :base-tools))))))
 
 (deftest bootstrap-runtime-session-creates-initial-session-after-startup-plan-test
-  (with-main-bootstrap-stubs
+  (with-redefs-fn (main-bootstrap-stub-bindings)
     (fn []
       (let [{:keys [ctx cwd]} (app-runtime/create-runtime-session-context
                                app-test-support/test-ai-model
@@ -144,7 +137,7 @@
 (deftest start-tui-runtime-extension-command-after-new-targets-new-session-test
   (app-test-support/with-session-state-restore
     (fn []
-      (with-main-bootstrap-stubs
+      (with-redefs-fn (main-bootstrap-stub-bindings)
         (fn []
           (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
                                app-test-support/test-ai-model
@@ -202,7 +195,7 @@
 (deftest run-session-starts-non-persisting-console-session-test
   (app-test-support/with-session-state-restore
     (fn []
-      (with-main-bootstrap-stubs
+      (with-redefs-fn (main-bootstrap-stub-bindings)
         (fn []
           (with-redefs [clojure.core/read-line (let [calls (atom 0)]
                                                  (fn []
@@ -220,7 +213,7 @@
 (deftest run-session-journals-command-inputs-test
   (app-test-support/with-session-state-restore
     (fn []
-      (with-main-bootstrap-stubs
+      (with-redefs-fn (main-bootstrap-stub-bindings)
         (fn []
           (with-redefs [clojure.core/read-line (let [calls (atom 0)]
                                                  (fn []
@@ -242,7 +235,7 @@
   (let [captured (atom nil)]
     (app-test-support/with-session-state-restore
       (fn []
-        (with-main-bootstrap-stubs
+        (with-redefs-fn (main-bootstrap-stub-bindings)
           (fn []
             (let [mock-tui-start! (fn [_run-agent-fn opts]
                                     (reset! captured opts)
@@ -258,7 +251,7 @@
 (deftest start-tui-runtime-journals-command-input-test
   (app-test-support/with-session-state-restore
     (fn []
-      (with-main-bootstrap-stubs
+      (with-redefs-fn (main-bootstrap-stub-bindings)
         (fn []
           (let [mock-tui-start! (fn [_run-agent-fn opts]
                                   ((:dispatch-fn opts) "/history")
@@ -275,7 +268,7 @@
 (deftest run-session-routes-cli-prompt-through-prompt-lifecycle-test
   (app-test-support/with-session-state-restore
     (fn []
-      (with-main-bootstrap-stubs
+      (with-redefs-fn (main-bootstrap-stub-bindings)
         (fn []
           (kernel/clear-event-log!)
           (with-redefs [psi.turn-runtime.core/execute-prepared-request!
@@ -314,7 +307,7 @@
   (let [sync-calls (atom [])]
     (app-test-support/with-session-state-restore
       (fn []
-        (with-main-bootstrap-stubs
+        (with-redefs-fn (main-bootstrap-stub-bindings)
           (fn []
             (kernel/clear-event-log!)
             (with-redefs [clojure.core/read-line
@@ -361,7 +354,7 @@
   (let [queued (atom nil)]
     (app-test-support/with-session-state-restore
       (fn []
-        (with-main-bootstrap-stubs
+        (with-redefs-fn (main-bootstrap-stub-bindings)
           (fn []
             (kernel/clear-event-log!)
             (with-redefs [psi.turn-runtime.core/execute-prepared-request!
@@ -630,7 +623,7 @@
 (deftest bootstrap-runtime-session-intentional-persisting-test-root-is-forwarded-test
   (test-support/with-temp-session-root
     (fn [session-root]
-      (with-main-bootstrap-stubs
+      (with-redefs-fn (main-bootstrap-stub-bindings)
         (fn []
           (let [cwd (test-support/temp-cwd)
                 {:keys [ctx]} (app-test-support/bootstrap-fresh-session!
@@ -655,13 +648,6 @@
             result (#'app-runtime/maybe-install-nullable-execution-mode ctx)]
         (is (= ctx result))
         (is (not (contains? result :execute-prepared-request-fn)))))))
-
-(deftest maybe-install-nullable-execution-mode-passthrough-when-blank-test
-  (testing "returns ctx unchanged when env var is blank/whitespace"
-    (with-redefs [app-runtime/nullable-execution-mode (fn [] nil)]
-      (let [ctx {:existing "data"}
-            result (#'app-runtime/maybe-install-nullable-execution-mode ctx)]
-        (is (= ctx result))))))
 
 (deftest maybe-install-nullable-execution-mode-installs-stub-when-deterministic-test
   (testing "installs :execute-prepared-request-fn when mode is deterministic"

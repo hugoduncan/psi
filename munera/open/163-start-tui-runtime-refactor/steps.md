@@ -21,5 +21,7 @@
 
 ## Test shaper follow-up
 
-- [ ] Remove or differentiate `maybe-install-nullable-execution-mode-passthrough-when-blank-test` — currently identical to the "absent" test (both redef `nullable-execution-mode` → nil). Either delete it or make it exercise a distinct partition.
-- [ ] Unify fixture pattern: migrate `with-main-bootstrap-stubs` callers to use `bootstrap-stub-bindings` from test-support, eliminating the duplicate inline fixture.
+- [x] Remove or differentiate `maybe-install-nullable-execution-mode-passthrough-when-blank-test` — currently identical to the "absent" test (both redef `nullable-execution-mode` → nil). Either delete it or make it exercise a distinct partition.
+  - Deleted: the blank→nil conversion is inside `nullable-execution-mode`, not `maybe-install-nullable-execution-mode`, so both tests exercised the same partition.
+- [x] Unify fixture pattern: migrate `with-main-bootstrap-stubs` callers to use `bootstrap-stub-bindings` from test-support, eliminating the duplicate inline fixture.
+  - Replaced `with-main-bootstrap-stubs` HOF with `main-bootstrap-stub-bindings` that merges `bootstrap-stub-bindings` + `resolve-model` + `discover-extension-paths`. All 12 callers now use `with-redefs-fn`. Removed 3 unused requires (`oauth`, `pt`, `skills`). Lint clean, all tests pass.

@@ -41,3 +41,8 @@
 **Fixture duplication**: `with-main-bootstrap-stubs` (inline HOF in test ns) and `bootstrap-stub-bindings` (in test-support) serve the same purpose with slightly different stub sets. The inline version omits `introspection/register-resolvers!` and `memory-runtime/sync-memory-layer!`. Migrating the remaining `with-main-bootstrap-stubs` callers to `bootstrap-stub-bindings` would unify the fixture pattern and reduce maintenance surface.
 
 **No other actionable issues**: naming is consistent, single-concern per test is respected (the extension-command integration test is sociable by design), assertion style is uniform, nullable tests cover behavioral partitions well, helpers compress ceremony without hiding intent.
+
+## Test shaper follow-up execution
+
+- Deleted `maybe-install-nullable-execution-mode-passthrough-when-blank-test` — redundant with the absent test. Both redef'd `nullable-execution-mode` → nil. The blank→nil conversion lives inside `nullable-execution-mode`, not the function under test.
+- Replaced `with-main-bootstrap-stubs` (inline HOF with `with-redefs`) with `main-bootstrap-stub-bindings` (private fn returning a map). Merges `bootstrap-stub-bindings` from test-support with `resolve-model` and `discover-extension-paths` stubs. All 12 callers now use `with-redefs-fn`. Removed 3 unused requires (`oauth`, `pt`, `skills`). Lint clean, all tests pass.
