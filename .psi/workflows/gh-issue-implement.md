@@ -55,10 +55,9 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
                "DONE" {:goto :next}}}
          {:name "implement"
           :type :delegate
-          :target "builder"
-          :prompt-string {:type :template
-                          :text "Execute the Munera task described by {{design_report}}. Work independently. Use the `clojure-coding-standards` and `testing-without-mocks` skills.\n\nRequired procedure:\n1. Read the upstream handoff to identify the PR number, PR branch, worktree path, and Munera task path.\n2. In the worktree, execute the task autonomously using the refined design as authoritative guidance.\n3. Add or refine `plan.md` only after the design is complete and unambiguous.\n4. Implement in small, reviewable steps.\n5. Keep `design.md`, `plan.md`, `steps.md`, and `implementation.md` synchronized with what was learned and done.\n6. Run relevant verification for the affected area.\n7. Shape the implementation and tests to follow `clojure-coding-standards` and `testing-without-mocks`.\n8. Record any important deviations from the initial design in `implementation.md` so they can be summarized back onto the PR.\n9. At the end of the implementation pass, commit the implementation/task-artifact updates with an appropriate commit message if there are changes to record.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Implementation Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`\n  - `deviation_summary:`"
-                          :vars {"design_report" {:from {:step "design" :yield :text}}}}
+          :target "implement-task-in-worktree"
+          :prompt-string {:type :map
+                          :fields {:input {:from {:step "design" :yield :text}}}}
           :context [{:type :source
                      :from :workflow-original}
                     {:type :source
@@ -96,4 +95,4 @@ description: Find an implement-labeled PR, prepare its branch worktree, design a
                       :add    ["review"]
                       :target "pr"}}]}
 
-Coordinate implementation work for an existing GitHub PR labeled `implement`: select the PR deterministically, prepare or reuse its branch-specific worktree, rebase the PR branch onto `origin/master`, create and refine a Munera task design with explicit implementation approach detail, implement the task, review and improve the task implementation through the `review-implementation` workflow, then push back to the PR branch, summarize any meaningful deviations from the initial design on the PR, remove the PR's `implement` label, and add the `review` label. All stages use the `work-independently` skill.
+Coordinate implementation work for an existing GitHub PR labeled `implement`: select the PR deterministically, prepare or reuse its branch-specific worktree, rebase the PR branch onto `origin/master`, create and refine a Munera task design with explicit implementation approach detail, implement the task through the looping `implement-task` workflow, review and improve the task implementation through the `review-implementation` workflow, then push back to the PR branch, summarize any meaningful deviations from the initial design on the PR, remove the PR's `implement` label, and add the `review` label. All stages use the `work-independently` skill.
