@@ -28,3 +28,7 @@ Next step:
 - Defined unknown-registry semantics precisely: lookup treats unknown registry as nil miss; mutating operations and list fail with `:failure-kind :unknown-registry`.
 - Added concrete adoption assessment for tool, command, skill, prompt, workflow, and deterministic-operation registries, distinguishing direct adopters from adapter-backed adopters.
 - The design is now implementation-guiding enough to mark the main task steps complete; no ambiguity follow-up remains from this pass.
+
+2026-05-21 inconsistency review:
+
+- Actionable inconsistencies: adopter assessment conflicts with current prompt/skill registry shapes (`prompt-registry` is currently ordered contributions, while `skill-registry` is currently registration-order-first-wins rather than id-keyed replace-by-id); storage model also conflicts on unknown-registry mutation because first-successful-registration initialization is described as optional while mutation semantics require unknown-registry failure.
