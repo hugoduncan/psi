@@ -207,6 +207,15 @@
         (is (= "delegate" (:name (first cmds))) "built-in listed first")
         (is (= "ext-cmd" (:name (second cmds)))))))
 
+  (testing "all-commands-in preserves built-in provenance registration order before extensions"
+    (let [reg (create-test-registry)]
+      (register-extension-in! reg "/ext/a")
+      (command-registry/register-command-in! reg "/ext/a" {:name "ext-cmd" :description "from ext"})
+      (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate"})
+      (command-registry/register-built-in-command-in! reg "built-in:other" {:name "other-cmd"})
+      (is (= ["delegate" "other-cmd" "ext-cmd"]
+             (mapv :name (command-registry/all-commands-in reg))))))
+
   (testing "get-command-in returns built-in command by name"
     (let [reg (create-test-registry)]
       (command-registry/register-built-in-command-in! reg "built-in:workflow" {:name "delegate" :description "built-in"})
