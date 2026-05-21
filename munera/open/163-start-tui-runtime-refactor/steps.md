@@ -13,3 +13,7 @@
 - [x] Fix implementation log inaccuracy: `start-new-session-with-startup!` is `defn-` (private), not "public/internal API".
 - [x] Remove dead `:ai-ctx nil` from `session-state` atom resets in both `run-session` and `start-tui-runtime!`.
   - Confirmed no code reads `:ai-ctx` from `session-state`. Removed from both reset sites. All unit tests pass.
+
+## Test review follow-up
+
+- [ ] Add direct unit tests for `maybe-install-nullable-execution-mode`: (1) passthrough when env var is absent/blank, (2) stub installation when `"deterministic"`, (3) stub echo-back returns correct execution-result shape.

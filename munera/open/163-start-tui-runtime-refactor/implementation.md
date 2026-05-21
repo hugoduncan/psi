@@ -21,3 +21,9 @@
 
 - Fixed implementation log: corrected "public/internal API" → "private (`defn-`) but serve as internal entry points".
 - Removed dead `:ai-ctx nil` from `session-state` atom resets in both `run-session` and `start-tui-runtime!`. Verified no code reads `:ai-ctx` from `session-state` — only `dispatch_effects.clj` reads it from the runtime `ctx` map (different path). All unit tests pass.
+
+## Test review (task-test-review)
+
+**Coverage gap**: `maybe-install-nullable-execution-mode` has zero direct unit tests. The extracted helper is a pure function (env-var → ctx → ctx) but is only exercised indirectly via the TUI tmux integration harness (`PSI_NULLABLE_EXECUTION_MODE=deterministic`). Missing cases: passthrough when env var is absent/blank, stub installation when `"deterministic"`, and the stub's echo-back shape.
+
+**Pre-existing pattern (observation, not actionable for this task)**: the test file uses `with-redefs` 15× to stub infrastructure (oauth, templates, skills, system-prompt, model resolution). This is closer to mocking than nullable infrastructure, but the pattern predates this task and changing it would widen scope.
