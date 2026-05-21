@@ -36,3 +36,4 @@
 - Code-shaper follow-up implemented:
   - added a brief doc cue on `safe-context-opts` marking it as the authoritative persisted-test guardrail seam shared by test context helpers
   - verification: focused lint on `psi.agent-session.test-support` clean
+- Task-test-review pass: no new actionable feedback. All design acceptance criteria have corresponding focused tests. Infrastructure deps use nullables (no mocks/stubs). `safe-context-opts` guardrail is broadly adopted across agent-session, app-runtime, and rpc test surfaces. Persistence tests use `with-temp-session-root` with cleanup proof. Fail-fast guardrail has focused regression proof. `start-tui-runtime!` and `run-session` both hardcode `:persist? false`. Test structure is clean: single-contract `deftest`s with clear naming and assertion messages.
