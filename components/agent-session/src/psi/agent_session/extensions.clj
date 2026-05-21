@@ -404,19 +404,21 @@
   (let [state @(:state reg)
         ext   (get-in state [:extensions ext-path])]
     (when ext
-      {:path            ext-path
-       :handler-names   (into (sorted-set) (keys (:handlers ext)))
-       :handler-count   (reduce + 0 (map count (vals (:handlers ext))))
-       :tool-names      (into (sorted-set) (keys (:tools ext)))
-       :tool-count      (count (:tools ext))
-       :operation-ids   (into (sorted-set) (keys (:operations ext)))
-       :operation-count (count (:operations ext))
-       :command-names   (into (sorted-set) (keys (:commands ext)))
-       :command-count   (count (:commands ext))
-       :flag-names      (into (sorted-set) (keys (:flags ext)))
-       :flag-count      (count (:flags ext))
-       :shortcut-count  (count (:shortcuts ext))
-       :allowed-events  (:allowed-events ext)})))
+      (let [commands (filter #(= ext-path (:extension-path %))
+                             (command-registry/all-commands-in reg))]
+        {:path            ext-path
+         :handler-names   (into (sorted-set) (keys (:handlers ext)))
+         :handler-count   (reduce + 0 (map count (vals (:handlers ext))))
+         :tool-names      (into (sorted-set) (keys (:tools ext)))
+         :tool-count      (count (:tools ext))
+         :operation-ids   (into (sorted-set) (keys (:operations ext)))
+         :operation-count (count (:operations ext))
+         :command-names   (into (sorted-set) (map :name) commands)
+         :command-count   (count commands)
+         :flag-names      (into (sorted-set) (keys (:flags ext)))
+         :flag-count      (count (:flags ext))
+         :shortcut-count  (count (:shortcuts ext))
+         :allowed-events  (:allowed-events ext)}))))
 
 (defn extension-details-in
   "Return vector of detail maps for all registered extensions."
