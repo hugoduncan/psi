@@ -236,12 +236,10 @@ Available: " (str/join ", " (map name (keys all))))
         tui-state      (transcript/agent-messages->tui-resume-state agent-messages)]
     (assoc tui-state :agent-messages agent-messages)))
 
-(defn- start-new-session-with-startup!
+(defn start-new-session-with-startup!
   "Create a fresh session branch and return rehydrate payload.
 
-   Startup prompts have been removed; the new session relies on the canonical
-   session bootstrap/runtime state and then snapshots its transcript/tool state.
-
+   Snapshots the new session's transcript/tool state after bootstrap.
    Reloads project-local custom models from the new session's worktree path so
    that models.edn changes are picked up when switching between sessions with
    different worktree paths.
@@ -252,14 +250,14 @@ Available: " (str/join ", " (map name (keys all))))
     :messages [...]
     :tool-calls {...}
     :tool-order [...]}"
-  [ctx source-session-id ai-ctx ai-model]
+  [ctx source-session-id _ai-ctx ai-model]
   (let [sd            (session/new-session-in! ctx source-session-id {})
         sid           (:session-id sd)
         worktree-path (ss/session-worktree-path-in ctx sid)]
     (model-registry/load-project-models!
      (str worktree-path "/.psi/models.edn")
      (model-registry/default-user-models-path))
-    (assoc (startup-rehydrate-from-current-session! ctx sid ai-ctx ai-model)
+    (assoc (startup-rehydrate-from-current-session! ctx sid _ai-ctx ai-model)
            :session-id sid)))
 
 (defn create-runtime-session-context
@@ -587,12 +585,6 @@ Available: " (str/join ", " (map name (keys all))))
                   :execution-result/tool-calls []
                   :execution-result/stop-reason :stop})))
       ctx)))
-
-(defn new-session-with-startup-in!
-  "Public helper for runtimes/tests: create new session and run startup prompts.
-   Returns rehydrate payload map with :agent-messages + TUI projection."
-  [ctx source-session-id ai-ctx ai-model]
-  (start-new-session-with-startup! ctx source-session-id ai-ctx ai-model))
 
 (defn start-tui-runtime!
   "Create a session and run it with a provided TUI interface function.

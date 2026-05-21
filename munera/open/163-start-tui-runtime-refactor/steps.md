@@ -28,5 +28,7 @@
 
 ## Code shaper follow-up
 
-- [ ] Underscore-prefix all remaining dead `ai-ctx` parameters: `start-new-session-with-startup!`, `new-session-with-startup-in!` in `app_runtime.clj`, and `run-cli-prompt!`, `cli-command-opts`, `run-cli-loop!` in `cli.clj`. Align with the convention already established by `run-prompt!` and `startup-rehydrate-from-current-session!`.
-- [ ] Collapse `new-session-with-startup-in!` / `start-new-session-with-startup!` — either make the private fn public or inline the wrapper. Update the stale docstring ("run startup prompts" → no startup prompts are run). Update `main.clj` caller.
+- [x] Underscore-prefix all remaining dead `ai-ctx` parameters: `start-new-session-with-startup!`, `new-session-with-startup-in!` in `app_runtime.clj`, and `run-cli-prompt!`, `cli-command-opts`, `run-cli-loop!` in `cli.clj`. Align with the convention already established by `run-prompt!` and `startup-rehydrate-from-current-session!`.
+  - Underscore-prefixed `ai-ctx` → `_ai-ctx` in all 5 functions. All call sites already pass `nil`.
+- [x] Collapse `new-session-with-startup-in!` / `start-new-session-with-startup!` — either make the private fn public or inline the wrapper. Update the stale docstring ("run startup prompts" → no startup prompts are run). Update `main.clj` caller.
+  - Made `start-new-session-with-startup!` public (`defn-` → `defn`). Removed `new-session-with-startup-in!` wrapper. Updated `main.clj` to call `start-new-session-with-startup!` directly. Updated docstring to remove stale "startup prompts" reference. All tests pass.

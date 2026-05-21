@@ -54,3 +54,8 @@
 **Trivial delegation — `new-session-with-startup-in!`**: Public `defn` (line 593) that calls `start-new-session-with-startup!` with identical args and no transformation. The docstring ("run startup prompts") is stale — startup prompts were removed. The function adds a naming indirection layer without value. Either make `start-new-session-with-startup!` public (and remove the wrapper) or collapse the two.
 
 **No other actionable issues**: `maybe-install-nullable-execution-mode` extraction is clean. `tui-wiring` delegation is well-structured. `build-tui-opts` assembles a flat map with no hidden state. The `start-tui-runtime!` let-binding is sequential and locally comprehensible. Data shapes are consistent across the wiring boundary.
+
+## Code shaper follow-up execution
+
+- Underscore-prefixed `_ai-ctx` in all 5 remaining functions: `start-new-session-with-startup!` and `new-session-with-startup-in!` in `app_runtime.clj`; `run-cli-prompt!`, `cli-command-opts`, `run-cli-loop!` in `cli.clj`. Convention now consistent across the entire `ai-ctx` parameter chain — all dead params are `_ai-ctx`.
+- Collapsed `new-session-with-startup-in!` into `start-new-session-with-startup!`: promoted private fn to public (`defn-` → `defn`), removed the trivial wrapper, updated `main.clj` caller. Updated docstring to remove stale "startup prompts" reference. 28 app-runtime tests + 8 bootstrap/rpc tests pass.
