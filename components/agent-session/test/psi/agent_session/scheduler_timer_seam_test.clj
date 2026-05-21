@@ -58,3 +58,42 @@
                             {:origin :core})
       (is (= {:handle :fake} @cancelled*))
       (is (= :cancelled (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
+
+(deftest scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test
+  (testing "cancelling the default delayed scheduler thread interrupts sleep without leaking an uncaught exception"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          started-thread*  (atom nil)
+          uncaught*        (atom nil)
+          ctx*             (assoc ctx
+                                  :daemon-thread-fn
+                                  (fn [f]
+                                    (let [thread (Thread. ^Runnable f)]
+                                      (.setDaemon thread true)
+                                      (.setUncaughtExceptionHandler
+                                       thread
+                                       (reify Thread$UncaughtExceptionHandler
+                                         (uncaughtException [_ _ ex]
+                                           (reset! uncaught* ex))))
+                                      (reset! started-thread* thread)
+                                      (.start thread)
+                                      thread)))]
+      (session/dispatch-in! ctx* :scheduler/create
+                            {:session-id session-id
+                             :schedule-id "sch-1"
+                             :label "later"
+                             :message "later"
+                             :fire-at (.plusSeconds (java.time.Instant/now) 5)}
+                            {:origin :core})
+      (dotimes [_ 50]
+        (when-not @started-thread*
+          (Thread/sleep 10)))
+      (is (some? @started-thread*))
+      (session/dispatch-in! ctx* :scheduler/cancel
+                            {:session-id session-id
+                             :schedule-id "sch-1"}
+                            {:origin :core})
+      (.join ^Thread @started-thread* 500)
+      (is (false? (.isAlive ^Thread @started-thread*)))
+      (is (nil? @uncaught*))
+      (is (nil? (get @(:scheduler-timers* ctx*) "sch-1")))
+      (is (= :cancelled (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
