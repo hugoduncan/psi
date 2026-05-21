@@ -33,3 +33,12 @@ Initial next step:
 - Updated `steps.md` to make focused lower-component tests explicitly cover declaration idempotence and the rule that register/unregister/clear/list operations do not implicitly declare missing registries.
 - Updated `plan.md` test scope to include list semantics and declaration/non-implicit declaration proof obligations.
 - These newly added design follow-up items are completed at the task-artifact level; no blocker remains for them.
+
+2026-05-21 implementation pass:
+
+- Added new standalone component `components/root-registry/` with primary namespace `psi.root-registry.registry` and focused tests in `components/root-registry/test/psi/root_registry/registry_test.clj`.
+- Implemented shared root-state host `:root-registries`, explicit idempotent declaration, canonical declared-registry state `{:entries-by-id {} :ids-by-extension {}}`, and uniform lower operation surfaces for `lookup`, `list-entries`, `register`, `unregister`, `clear-by-extension`, and `clear-registry`.
+- Chose a consistent lower return contract of `{:root-state ... :result ...}` for all operations so reads and mutations expose explicit result maps without changing current higher-level adopter registry contracts in this task.
+- Shared validation is intentionally narrow: known registry for non-lookup operations, required `:id`, required `:extension-id`, and required presence of `:value`; registry-specific entry validation remains above this layer.
+- Built-ins are represented directly through `:extension-id :built-in` as designed.
+- Verification for this pass: `clojure -M:test --focus psi.root-registry.registry-test`, `clj-kondo --lint components/root-registry/src components/root-registry/test`, and `clojure -M:fmt -m cljfmt.main check components/root-registry/src/psi/root_registry/registry.clj components/root-registry/test/psi/root_registry/registry_test.clj deps.edn tests.edn` all passed.

@@ -1,12 +1,12 @@
-- [ ] Re-read task `165` and extract implementation requirements
-- [ ] Choose component location, namespace, and public API surface
-- [ ] Implement explicit registry declaration/initialization in root state
-- [ ] Implement register semantics with replacement and ownership-conflict handling
-- [ ] Implement lookup semantics with nil miss and unknown-registry behavior
-- [ ] Implement explicit list-entries semantics, including unknown-registry failure
-- [ ] Implement targeted unregister by id with failure info on miss
-- [ ] Implement clear-by-extension semantics
-- [ ] Implement per-registry global clear semantics
-- [ ] Define and implement uniform result contracts
-- [ ] Add focused lower-component tests for shared semantics, including explicit declaration idempotence and non-implicit declaration semantics
-- [ ] Refine docs/comments and task artifacts to match the delivered component
+- [x] Re-read task `165` and extract implementation requirements
+- [x] Choose component location, namespace, and public API surface
+- [x] Implement explicit registry declaration/initialization in root state
+- [x] Implement register semantics with replacement and ownership-conflict handling
+- [x] Implement lookup semantics with nil miss and unknown-registry behavior
+- [x] Implement explicit list-entries semantics, including unknown-registry failure
+- [x] Implement targeted unregister by id with failure info on miss
+- [x] Implement clear-by-extension semantics
+- [x] Implement per-registry global clear semantics
+- [x] Define and implement uniform result contracts
+- [x] Add focused lower-component tests for shared semantics, including explicit declaration idempotence and non-implicit declaration semantics
+- [x] Refine docs/comments and task artifacts to match the delivered component
