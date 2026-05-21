@@ -6,3 +6,4 @@
 - [ ] Update focused command-registry tests for migrated internals and preserved public contract
 - [ ] Verify migration does not leak raw root-registry semantics through the public command-registry API
 - [ ] Refine task artifacts to record migration decisions and compatibility boundaries
+  - Design follow-up items from review passes live in `design-steps.md`; execution against those items may update design/plan/implementation artifacts but should not pull execution from `steps.md` unless a later implementation phase explicitly does so.

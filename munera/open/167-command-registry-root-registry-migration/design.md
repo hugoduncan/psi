@@ -36,6 +36,7 @@ However, `command-registry` still has current public behavior that must be prese
 - current public API names and caller expectations
 - current visible merged built-in + extension command surface
 - current collision/precedence behavior at the command-registry boundary unless deliberately changed in a later task
+- current listing-order behavior for the merged command surface where already proven by focused tests
 
 ## Scope
 
@@ -82,8 +83,16 @@ This migration should preserve current command-registry public behavior, includi
 - nil lookup miss from public lookup APIs
 - visible merged command surface for built-ins and extension commands
 - command-specific validation behavior
+- merged read-path precedence where built-ins shadow same-name extension commands
+- merged listing order for `all-commands-in`: built-ins first, then extension commands in first-encounter order by extension registration order
 
 The task should identify which currently tested command-registry behaviors are true public contract and keep those intact.
+
+For built-in collisions specifically, the migration only needs to preserve the currently exercised contract:
+
+- repeated registration of the same command name within the same built-in provenance id replaces the prior stored command
+- built-in commands as a class continue to outrank extension commands on merged read paths
+- collisions between two different built-in provenance ids are not a supported compatibility surface for this task and do not need a newly defined deterministic winner rule beyond avoiding any intentional semantic expansion here
 
 ### Move storage responsibility down
 
