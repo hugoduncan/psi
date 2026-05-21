@@ -43,3 +43,7 @@ Next step:
 - Preserved merged public read semantics: built-ins-first ordering, first-visible-wins name shadowing, extension registration-order projection, and caller-visible provenance fields on built-in and extension reads.
 - Expanded focused tests to prove same-owner replacement semantics, built-in provenance ordering, root-registry-backed built-in storage, and preserved public lookup/listing behavior.
 - Verification: `clojure -M:test --focus psi.tool-registry.registry-test` ✅; `clj-kondo --lint components/tool-registry/src components/tool-registry/test` ✅.
+
+2026-05-21 implementation review:
+
+- Actionable gap: focused tests prove built-in provenance/read-shape on stored entries and on `all-tools-in`, but do not explicitly assert that successful built-in `get-tool-in` lookups preserve the public `:ext-path` provenance id required by the task design.
