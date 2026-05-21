@@ -34,3 +34,12 @@ Next step:
 - Aligned the task artifacts around the already-resolved ordering obligation from the ambiguity follow-up.
 - Marked `steps.md` `Prove or narrow multi-provenance built-in ordering for all-tools-in` done because the task-level design/plan already pins that proof target explicitly rather than leaving it as unresolved design work.
 - No additional changes to `design.md` or `plan.md` were needed because they already state the preserved built-ins-first ordering rule and plan-level test obligation.
+
+2026-05-21 implementation pass:
+
+- Migrated `psi.tool-registry.registry` to the shared `root-registry` substrate using the same owner-entry pattern as task `167`.
+- Kept tool-specific validation and canonical normalization adapter-owned: kebab-case name checks, `normalize-tool-def`, and required `:format-request` enforcement still happen in `tool-registry` before root registration.
+- Replaced direct `:built-in-tools` / `:extensions ... :tools` storage ownership with root-registry owner entries under registry id `:tools`, while preserving extension registration preconditions from the surrounding root state.
+- Preserved merged public read semantics: built-ins-first ordering, first-visible-wins name shadowing, extension registration-order projection, and caller-visible provenance fields on built-in and extension reads.
+- Expanded focused tests to prove same-owner replacement semantics, built-in provenance ordering, root-registry-backed built-in storage, and preserved public lookup/listing behavior.
+- Verification: `clojure -M:test --focus psi.tool-registry.registry-test` ✅; `clj-kondo --lint components/tool-registry/src components/tool-registry/test` ✅.
