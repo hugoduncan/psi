@@ -1,0 +1,9 @@
+- [x] Audit current `tool-registry` storage and public behavior
+- [x] Identify the exact compatibility surface that must remain at the `tool-registry` boundary
+- [ ] Refactor `tool-registry` internals to use `root-registry` storage
+- [ ] Preserve built-in and extension tool projection behavior
+- [ ] Preserve current lookup, validation, and normalization behavior
+- [ ] Update focused `tool-registry` tests for migrated internals and preserved public contract
+- [ ] Verify migration does not leak raw root-registry semantics through the public `tool-registry` API
+- [ ] Refine task artifacts to record migration decisions and compatibility boundaries
+- [ ] Prove or narrow multi-provenance built-in ordering for `all-tools-in`
