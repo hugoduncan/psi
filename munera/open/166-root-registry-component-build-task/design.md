@@ -43,6 +43,16 @@ This task includes:
 
 This task may include minimal integration scaffolding needed to instantiate or exercise the component in realistic project code.
 
+For this first build slice, that scaffolding must not change the public thrown-error or public return-shape contracts of current adopter-facing registries. The new shared component may expose explicit result maps at its own lower boundary, but any adoption of `workflow-registry`, `tool-registry`, or `command-registry` remains a follow-on task and must preserve or adapt current higher-level contracts explicitly rather than changing them implicitly here.
+
+The authoritative implementation home for the new shared component is a new `components/root-registry/` component with the primary runtime namespace `psi.root-registry.registry` and focused lower-component tests under `components/root-registry/test/psi/root_registry/registry_test.clj`.
+
+The shared component must own explicit registry declaration through a lower API that declares a registry id before list or mutation operations are allowed. The authoritative declared-registry state shape for a known empty registry is:
+
+- root state hosts a shared registry area keyed by registry id
+- each declared registry state contains `:entries-by-id {}` and `:ids-by-extension {}`
+- declaration is idempotent for an already-declared registry and does not implicitly occur during register, unregister, clear-by-extension, clear-registry, or list operations
+
 This task does not include:
 
 - migrating all existing registries to the new component
