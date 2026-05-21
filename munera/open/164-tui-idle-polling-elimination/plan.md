@@ -13,6 +13,7 @@ First, inventory the behaviors that currently happen on synthetic idle polls and
   - notification dismiss-expired / dismiss-overflow dispatch in `update-tick-state`
   - extension command-name refresh in `update-tick-state`
   - spinner/progress refresh while streaming via `handle-agent-poll`
+- The authoritative post-change trigger rule for extension command-name refresh is now fixed for this task: refresh only on explicit TUI event boundaries that already re-enter the update loop with fresh runtime-facing context (`:window-size`, `:agent-event`, `:external-message`, `:context-updated`, `:agent-result`, `:agent-error`, `:agent-aborted`), never from idle `:agent-poll` self-ticks.
 - Add or tighten focused tests so these behaviors are covered explicitly before the implementation changes.
 - Treat notification maintenance as timerless/event-driven in this task; do not preserve it via a replacement idle timer.
 - Use the focused proof set named in `design.md` as the minimum acceptance boundary for this proof-first phase.

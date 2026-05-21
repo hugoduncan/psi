@@ -63,7 +63,9 @@ Required verification commands:
 - focused runtime/update proof set: `clojure -M:test --focus psi.tui.app-update-runtime-test --focus psi.tui.notification-render-test`
 - if streaming rendering assertions are shaped in the view suite, extend the focused run with `--focus psi.tui.app-view-runtime-test`
 
-## Questions to resolve during implementation
-- Which specific update behaviors truly need a periodic trigger, and which are just incidental side effects of the idle loop?
-- Should extension command-name refresh happen only on known invalidation events rather than on each generic tick?
-- Is `update-tick-state` still the right abstraction once idle self-polling is removed, or should idle and streaming refresh paths split?
+## Implementation shaping notes
+- The pre-change inventory still needs implementation confirmation for which current event boundaries already refresh each UI-facing surface in practice, but the target post-change trigger rule is fixed by this design.
+- Extension command-name refresh must remain explicit and non-periodic after idle self-polling removal. In this task, authoritative refresh boundaries are only the explicit TUI events that already re-enter the update loop with fresh runtime-facing context: `:window-size`, `:agent-event`, `:external-message`, `:context-updated`, `:agent-result`, `:agent-error`, and `:agent-aborted`.
+- `:agent-poll` is not an authoritative invalidation event for extension command-name refresh once idle self-polling is removed; command names should not be refreshed from idle self-ticks.
+- If implementation reveals a missing command-name invalidation path outside those explicit events, the fix should add another explicit event boundary rather than restoring generic idle polling.
+- `update-tick-state` may be split or narrowed during implementation if that makes the idle-versus-streaming trigger boundary more obvious in code.
