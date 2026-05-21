@@ -47,3 +47,9 @@ Next step:
 2026-05-21 implementation review:
 
 - Actionable gap: focused tests prove built-in provenance/read-shape on stored entries and on `all-tools-in`, but do not explicitly assert that successful built-in `get-tool-in` lookups preserve the public `:ext-path` provenance id required by the task design.
+
+2026-05-21 implementation review follow-up execution:
+
+- Added a focused `get-tool-in` assertion proving built-in lookup preserves `:ext-path "built-in:workflow"` on the public read surface.
+- Marked the follow-up step done in `steps.md`.
+- Verification: `clojure -M:test --focus psi.tool-registry.registry-test` ✅; `clj-kondo --lint components/tool-registry/src components/tool-registry/test` ✅.

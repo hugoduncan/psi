@@ -255,12 +255,14 @@
         (is (= :built-in (:source (first tools))))
         (is (= "built-in:workflow" (:ext-path (first tools)))))))
 
-  (testing "get-tool-in returns built-in tool by name"
+  (testing "get-tool-in returns built-in tool by name and preserves :ext-path provenance id"
     (let [reg (create-test-registry)]
       (tool-registry/register-built-in-tool-in! reg "built-in:workflow"
                                                 {:name "delegate" :label "Delegate" :format-request (fn [_] "delegate")})
-      (is (= "delegate" (:name (tool-registry/get-tool-in reg "delegate"))))
-      (is (= :built-in (:source (tool-registry/get-tool-in reg "delegate"))))))
+      (let [tool (tool-registry/get-tool-in reg "delegate")]
+        (is (= "delegate" (:name tool)))
+        (is (= :built-in (:source tool)))
+        (is (= "built-in:workflow" (:ext-path tool))))))
 
   (testing "get-tool-in prefers built-in over extension when names collide"
     (let [reg (create-test-registry)]

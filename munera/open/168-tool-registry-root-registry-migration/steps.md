@@ -7,4 +7,4 @@
 - [x] Verify migration does not leak raw root-registry semantics through the public `tool-registry` API
 - [x] Refine task artifacts to record migration decisions and compatibility boundaries
 - [x] Prove or narrow multi-provenance built-in ordering for `all-tools-in`
-- [ ] Add a focused `get-tool-in` assertion proving built-in lookup preserves `:ext-path` provenance id on the public read surface
+- [x] Add a focused `get-tool-in` assertion proving built-in lookup preserves `:ext-path` provenance id on the public read surface
