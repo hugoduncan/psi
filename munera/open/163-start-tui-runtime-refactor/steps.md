@@ -18,3 +18,8 @@
 
 - [x] Add direct unit tests for `maybe-install-nullable-execution-mode`: (1) passthrough when env var is absent/blank, (2) stub installation when `"deterministic"`, (3) stub echo-back returns correct execution-result shape.
   - Extracted `nullable-execution-mode` helper for env-var read (testable seam). Added 6 tests covering passthrough, stub installation, echo-back shape, UUID generation fallback, and empty-text fallback. 34 tests, 129 assertions, 0 failures across app-runtime test namespaces.
+
+## Test shaper follow-up
+
+- [ ] Remove or differentiate `maybe-install-nullable-execution-mode-passthrough-when-blank-test` — currently identical to the "absent" test (both redef `nullable-execution-mode` → nil). Either delete it or make it exercise a distinct partition.
+- [ ] Unify fixture pattern: migrate `with-main-bootstrap-stubs` callers to use `bootstrap-stub-bindings` from test-support, eliminating the duplicate inline fixture.
