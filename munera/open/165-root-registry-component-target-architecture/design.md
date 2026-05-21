@@ -252,7 +252,7 @@ The shared component does not store ordering. Any caller that needs ordered pres
 
 The `:ids-by-extension` index is stored explicitly rather than derived on clear operations. The component owns keeping `:entries-by-id` and `:ids-by-extension` in sync on every successful mutation.
 
-Unknown registries are not implicitly created by read operations. They become present only through explicit registry initialization by the consuming layer or the first successful registration, depending on implementation choice. Shared semantics must be the same either way: an absent registry is treated as unknown for mutation operations and as empty for lookup-by-id only.
+Unknown registries are not implicitly created by any shared-component operation. The consuming layer owns registry declaration/initialization before mutating operations are allowed. Shared semantics are uniform: an absent registry is treated as unknown for mutation and list operations, and as empty only for lookup-by-id.
 
 ### Canonical stored entry model
 
@@ -411,12 +411,14 @@ Callers should be able to distinguish insert vs replace, hit vs miss, and remove
 
 The current registries fit the shared component as follows:
 
-- `tool-registry` — direct adopter. Core semantics are id-keyed registration and lookup; invoke concerns live above the shared storage layer.
-- `command-registry` — direct adopter. Command identity and ownership fit the normalized id-keyed storage model.
-- `skill-registry` — direct adopter. Skill entries are stable id-keyed definitions with no shared-component ordering needs.
-- `prompt-registry` — adopter with adapter. Prompt contribution ordering/composition semantics should stay above the shared component, but prompt definitions themselves can use the shared registry substrate.
-- `workflow-registry` — direct adopter for workflow definitions. Any higher-level invocation or execution orchestration remains outside the shared component.
-- `deterministic-operation-registry` — adopter with adapter. Operation definitions fit id-keyed storage, but compatibility surfaces around invocation helpers or legacy registration APIs may require an adapter layer during migration.
+- `tool-registry` — direct adopter. Core semantics are extension-owned id-keyed registration and lookup; built-in precedence and merged read-surface policy can live in a wrapper/read layer above the shared storage component.
+- `command-registry` — direct adopter. Command identity and ownership fit the normalized id-keyed storage model, with current merged built-in/extension visibility preserved above the storage layer.
+- `skill-registry` — adopter with adapter, not a direct adopter. The current skill registry is an ordered collection with duplicate-ignore and first-registration-wins semantics. It can use the shared component only after splitting those order-sensitive/public result behaviors into a higher layer that projects stable ordered reads and `:changed?`/`:added?` outcomes over stricter id-keyed storage.
+- `prompt-registry` — adopter with adapter, not a direct adopter. The current prompt registry is fundamentally an ordered contribution collection with composite identity and canonical sort-by-priority behavior. A shared id-keyed storage component can host canonical prompt definition entries, but prompt ordering/composition/update surfaces must remain in a higher layer.
+- `workflow-registry` — direct adopter for workflow definitions. Any current public tuple-return shape, id normalization conveniences, or higher-level invocation/orchestration concerns can be preserved by a thin wrapper over the shared component.
+- `deterministic-operation-registry` — adopter with adapter. Operation definitions fit id-keyed storage, but the current registry-object boundary, duplicate-throw semantics, registration-order read surface, and invoke-oriented helpers are stronger compatibility constraints that require an adapter layer during migration.
+
+This target component is therefore aimed first at registries whose core contract is already one-active-entry-per-id keyed storage (`tool-registry`, `command-registry`, and likely `workflow-registry`). Ordered collection registries (`skill-registry`, `prompt-registry`) are only plausible adopters if their current ordering and public result semantics are explicitly lifted into wrapper layers rather than pushed down into the shared component.
 
 Anything that fundamentally requires ordered shared storage or invoke-as-registry semantics is intentionally out of scope for direct adoption unless those behaviours are first split into a higher layer.
 

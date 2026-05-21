@@ -32,3 +32,11 @@ Next step:
 2026-05-21 inconsistency review:
 
 - Actionable inconsistencies: adopter assessment conflicts with current prompt/skill registry shapes (`prompt-registry` is currently ordered contributions, while `skill-registry` is currently registration-order-first-wins rather than id-keyed replace-by-id); storage model also conflicts on unknown-registry mutation because first-successful-registration initialization is described as optional while mutation semantics require unknown-registry failure.
+
+2026-05-21 inconsistency follow-up:
+
+- Reclassified `skill-registry` from direct adopter to adapter-backed adopter, based on task `164`'s audit evidence that its current public contract is an ordered collection with duplicate-ignore and behaviorally meaningful `:changed?` / `:added?` outcomes.
+- Reframed `prompt-registry` more explicitly as adapter-backed rather than near-direct adoption, because its current contract centers ordered contributions, composite identity, and canonical priority sorting that must stay above any shared id-keyed storage layer.
+- Sharpened the direct-adopter set to registries whose core contract is already one-active-entry-per-id keyed storage (`tool-registry`, `command-registry`, and likely `workflow-registry`), while leaving `deterministic-operation-registry` adapter-backed because of its stronger object/invoke/order compatibility surface.
+- Removed the inconsistent "first successful registration may initialize the registry" allowance. `design.md` now requires consuming-layer registry declaration/initialization, while shared-component operations uniformly treat unknown registries as failures for mutation/list and as empty only for lookup-by-id.
+- Both inconsistency-review follow-up items are now resolved in task artifacts; no blocking design-step remains from this pass.
