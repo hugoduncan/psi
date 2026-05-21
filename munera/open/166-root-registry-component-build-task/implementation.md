@@ -68,3 +68,7 @@ Initial next step:
 - Confirmed there were no unchecked newly added follow-up steps in `steps.md` or `design-steps.md`, so no further implementation work could be executed in this pass.
 - Re-verified the current delivered slice with `clojure -M:test --focus psi.root-registry.registry-test`, `clj-kondo --lint components/root-registry/src components/root-registry/test`, and `clojure -M:fmt -m cljfmt.main check components/root-registry/src/psi/root_registry/registry.clj components/root-registry/test/psi/root_registry/registry_test.clj deps.edn tests.edn`; all passed.
 - No blocker to record: the preceding review pass had not added any remaining actionable unchecked work.
+
+2026-05-21 test-shaper review:
+
+- Actionable test-shaping feedback: `components/root-registry/test/psi/root_registry/registry_test.clj` proves list membership via sets, but it does not include an explicit proof that `list-entries` remains unordered and callers must not depend on storage order; add a focused test that registers entries in one order, asserts membership/count only, and explicitly rejects any contract signal that ordering is meaningful.
