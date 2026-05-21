@@ -5,3 +5,4 @@
 - [x] Preserve and prove streaming poll/reschedule behavior
 - [x] Re-run the focused TUI proof set
 - [x] Record the final trigger/behavior decisions in implementation.md
+- [ ] Replace `idle-agent-poll-refreshes-ui-snapshot-test` with an authoritative proof shape: either capture the required pre-change idle-poll snapshot-refresh behavior on a pre-change commit/branch, or rewrite the focused proof set so no remaining test claims idle `:agent-poll` refreshes UI-facing state after polling elimination.
