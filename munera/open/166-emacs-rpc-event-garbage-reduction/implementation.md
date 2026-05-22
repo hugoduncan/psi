@@ -17,3 +17,6 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing impleme
 
 ## 2026-05-22 — inconsistency follow-up execution
 Checked `design-steps.md` after the inconsistency review. No newly added unchecked actionable design follow-up items were present, so no design, plan, or step changes were required and no implementation steps were executed.
+
+## 2026-05-22 — ambiguity review
+Reviewed `design.md`, placeholder `plan.md`/`steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs streaming/render code/tests. New actionable ambiguity: the placeholder execution artifacts still say the task is design-only until the design review loop is complete, while all existing design follow-ups are checked; the task does not state the explicit promotion condition/owner for replacing the placeholder `plan.md` and `steps.md` with implementation-ready artifacts.
