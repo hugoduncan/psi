@@ -157,3 +157,7 @@ No newly added unchecked actionable `steps.md` items were present after the prel
 ## 2026-05-22 code-shaper review
 
 Found one actionable robustness/consistency gap: `skill-registry/register-skill` now canonicalizes duplicate/no-change result `:skills`, but the `:session/register-skill` handler only writes session `:skills` when `:changed?` is true. If a session already contains an unsorted externally supplied/pre-existing skill vector, duplicate registration returns canonical data but the dispatch boundary drops it, leaving session state non-canonical despite the branch B registry-boundary contract.
+
+## 2026-05-22 implementation review
+
+No new actionable implementation feedback. Re-read the task artifacts, `skill-registry` implementation/tests, and `:session/register-skill` handler path. The only implementation issue observed is the already-recorded unchecked follow-up: duplicate/no-change registration canonicalizes at the registry boundary but the session handler still skips writing canonical `:skills` when `:changed?` is false. No additional code/design/test gap was found, so `steps.md` was not changed.
