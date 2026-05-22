@@ -1,1 +1,2 @@
 - 2026-05-21 ψ review-follow-up(ambiguities): added missing `plan.md` and `steps.md`, restating the single intended simplification path and explicit proof/update checklist so ambiguity review can proceed.
+- 2026-05-21 ψ review(inconsistencies): design names `components/agent-session/test/psi/agent_session/extensions_test.clj` as a required affected proof surface, but plan/steps only say generic “higher proof surfaces”; add an explicit task step so the execution checklist matches the named design obligation.
