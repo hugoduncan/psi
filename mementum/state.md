@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-22: Executed task 166 implementation-review follow-up: added `psi-streaming-render-optimization-test.el` to `bb emacs:test`, marked the step done, and verified focused streaming + full Emacs suites green (34/305 tests).
 - 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no new unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-22: Executed task 166 ambiguity follow-up clarifying thinking append-only proof: assistant property ranges are suffix-only, while thinking proof uses inserted suffix mutation range plus no redraw/overlay recreation; committed e8057a3a.
 - 2026-05-21: Fixed OpenAI OAuth `gpt-5.5` routing (commit 009aed51).

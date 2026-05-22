@@ -134,3 +134,27 @@ Result: 305 tests, 305 results as expected, 0 unexpected.
 
 ## 2026-05-22 — implementation review
 Reviewed the task implementation against `task-implementation-review`, task artifacts, `psi-assistant-render.el`, streaming transcript tests, the new `psi-streaming-render-optimization-test.el`, and `bb.edn`. New actionable issue: the optimization proof tests live in a new ERT file that is not loaded by `bb emacs:test`; the recorded full-suite result therefore does not cover the core helper-instrumentation proof and the command currently reports 301 tests, not the noted 305.
+
+## 2026-05-22 — implementation-review follow-up execution
+Completed the newly added actionable follow-up from the implementation review.
+
+- Added `components/emacs-ui/test/psi-streaming-render-optimization-test.el` to `bb emacs:test`, so the helper-instrumentation optimization proof is covered by the full Emacs frontend regression task.
+- Marked the follow-up step complete in `steps.md`.
+
+Verification:
+
+```sh
+emacs -Q --batch -L components/emacs-ui \
+  -l components/emacs-ui/test/psi-test-support.el \
+  -l components/emacs-ui/test/psi-streaming-transcript-test.el \
+  -l components/emacs-ui/test/psi-streaming-render-optimization-test.el \
+  -f ert-run-tests-batch-and-exit
+```
+
+Result: 34 tests, 34 results as expected, 0 unexpected.
+
+```sh
+bb emacs:test
+```
+
+Result: 305 tests, 305 results as expected, 0 unexpected.
