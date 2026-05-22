@@ -18,3 +18,8 @@ Refined likely direction:
 ## 2026-05-22 ambiguity review
 
 Found actionable ambiguities: the task did not define `design-steps.md` despite requesting follow-ups there; "canonical `:name` order" lacks comparator/case/locale precision; the artifacts do not say whether sorted order is a read-projection contract or stored `:skills` / `register-skill` result contract; prompt/display/introspection surfaces are named broadly but raw-vector consumers make the affected surface set unclear; task `164` update scope is underspecified.
+
+
+## 2026-05-22 ambiguity review follow-up
+
+Found one additional actionable ambiguity: the design allows outcome A (keep registration order if a real dependency exists), but `plan.md` / `steps.md` are written only for the removal path and do not say what implementation, tests, or task `164` update should happen if the audit proves insertion order is required.

@@ -5,3 +5,4 @@
 - [ ] Clarify whether canonical ordering applies only to registry query/read helpers (`all-skills`, `skill-names`, prompt/discovery projections) or also to the stored/session `:skills` vector and `register-skill` result `:skills` after each registration.
 - [ ] Enumerate the prompt/display/introspection surfaces that must inherit canonical ordering, because several current callers consume raw `:skills` vectors rather than `skill-registry/all-skills`.
 - [ ] Specify the expected task `164` update scope: which current conclusion rows/text should change versus which historical audit notes should remain as prior evidence.
+- [ ] Add an explicit keep-order branch to `plan.md` / `steps.md`: if the audit finds a real insertion-order dependency, specify that no ordering-removal code change is made, the dependency is documented/test-backed, and task `164` is updated only to record the confirmed requirement.
