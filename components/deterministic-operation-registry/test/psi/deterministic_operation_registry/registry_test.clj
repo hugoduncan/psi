@@ -1,7 +1,8 @@
 (ns psi.deterministic-operation-registry.registry-test
   (:require
-   [clojure.test :refer [deftest is]]
-   [psi.deterministic-operation-registry.registry :as reg]))
+   [clojure.test :refer [deftest is testing]]
+   [psi.deterministic-operation-registry.registry :as reg]
+   [psi.root-registry.registry :as root-registry]))
 
 (deftest registry-registration-and-lookup-test
   ;; Proves registration, lookup, and unordered listing/count coherence.
@@ -136,3 +137,27 @@
            (set (reg/operation-ids-in registry))))
     (is (= #{"ops/a" "ops/b" "ops/c"}
            (set (map :id (reg/all-operations-in registry)))))))
+
+(deftest shared-root-storage-is-canonical-owner-test
+  ;; Proves the registry object hosts canonical operation entries only in shared root-registry state.
+  (let [registry   (reg/create-registry)
+        operation  {:id "github/search-issues-by-label"
+                    :ext-path "/ext/github"
+                    :handler (fn [_] {:status :ok :data {:issues []}})}]
+    (reg/register-operation-in! registry operation)
+    (let [state      @(:state registry)
+          root-state (:root-state state)
+          lookup     (root-registry/lookup root-state :deterministic-operations "github/search-issues-by-label")]
+      (testing "adapter state no longer carries a local canonical :operations map"
+        (is (= #{:root-state} (set (keys state))))
+        (is (not (contains? state :operations))))
+      (testing "shared root-registry storage holds the canonical registered entry"
+        (is (root-registry/declared-registry? root-state :deterministic-operations))
+        (is (= operation
+               (-> lookup :result :value :value)))
+        (is (= #{"github/search-issues-by-label"}
+               (->> (root-registry/list-entries root-state :deterministic-operations)
+                    :result
+                    :entries
+                    (map :id)
+                    set)))))))
