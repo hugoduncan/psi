@@ -44,3 +44,6 @@ Reviewed `design.md`, implementation-ready `plan.md`/`steps.md`, `design-steps.m
 
 ## 2026-05-22 — inconsistency follow-up execution
 Used the preloaded inconsistency-review result and checked `design-steps.md`. No newly added unchecked actionable design follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
+
+## 2026-05-22 — ambiguity review
+Reviewed `design.md`, implementation-ready `plan.md`/`steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs streaming/render code/tests (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`, plus conditional hotspot test files by name). No new actionable ambiguities found: the task now has explicit mandatory vs conditional scope, append-vs-redraw contracts, helper-wrapper instrumentation seam, execution steps, verification commands, and closure-note requirements. Existing `design-steps.md` items remain complete; no new follow-up items were added.
