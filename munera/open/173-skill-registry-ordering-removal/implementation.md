@@ -92,3 +92,7 @@ No new actionable ambiguity feedback. Re-read `design.md`, `plan.md`, `steps.md`
 ## 2026-05-22 ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md` after the preloaded no-feedback ambiguity review. All design follow-up steps remain complete, so no `design.md`, `plan.md`, or `steps.md` changes were needed.
+
+## 2026-05-22 inconsistency review
+
+No new actionable inconsistency feedback. Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, task `164` skill-registry audit/update guidance, and representative registry/resolver/session-resource/prompt/TUI/app-runtime/workflow skill-order call sites; the task artifacts remain consistent about branch B canonical registry listing, branch C presentation-owned sorting, the keep-order fallback, exact-lookup-only surfaces, proof expectations, and task `164` update scope.
