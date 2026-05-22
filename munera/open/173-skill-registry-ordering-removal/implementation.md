@@ -173,3 +173,7 @@ Found one actionable test gap: `/skills` and the `/help` embedded Skills section
 ## 2026-05-22 task-test-review follow-up execution
 
 Completed the newly added command-surface proof. Added focused `/skills` and `/help` command tests that seed raw unsorted session `:skills` and assert `/skill:*` entries render in canonical skill-name order rather than raw vector order. Verification: `clojure -M:test --focus psi.agent-session.commands-test` passed (50 tests, 192 assertions); `clj-kondo --lint components/agent-session/test/psi/agent_session/commands_test.clj` passed.
+
+## 2026-05-22 test-shaper review
+
+Found one actionable test-quality gap: `register-skill` add-path coverage only adds into an empty or already-canonical collection. Branch B requires registry result `:skills` to be canonical even when registering a new skill into an unsorted pre-existing vector, so a regression could append/sort incorrectly on the add path while duplicate/no-change and helper tests still pass.
