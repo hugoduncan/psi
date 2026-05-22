@@ -5,8 +5,8 @@
 1. Make the task’s Munera execution surface explicit so design review, implementation execution, and later review passes all have canonical task-local artifacts:
    - `design.md` holds intent, scope, semantic decisions, and acceptance
    - `plan.md` holds the chosen implementation approach and proof strategy
-   - `steps.md` holds executable implementation work only
-   - `design-steps.md` holds actionable design-review follow-up items only
+   - `steps.md` holds executable implementation work only, including the initial artifact-maintenance obligation that keeps `design-steps.md` present as a maintained deliverable for this task
+   - `design-steps.md` holds actionable design-review follow-up items only and is a maintained task-local artifact for this task rather than an assumed side file
    - `implementation.md` remains the append-only review/decision/blocker log
 
 2. Use this task first as a semantic-classification task, then as a small implementation task:

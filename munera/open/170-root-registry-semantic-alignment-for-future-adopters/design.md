@@ -63,8 +63,8 @@ This task uses the standard Munera artifact split:
 
 - `design.md` — intent, scope, semantic decisions, and acceptance
 - `plan.md` — chosen implementation approach and proof strategy
-- `steps.md` — executable implementation checklist only
-- `design-steps.md` — actionable design/ambiguity/inconsistency follow-up items only
+- `steps.md` — executable implementation checklist only, including the explicit task-local obligation to keep `design-steps.md` present as a maintained deliverable for this task
+- `design-steps.md` — actionable design/ambiguity/inconsistency follow-up items only; for this task it is a maintained task-local artifact, not an assumed side file
 - `implementation.md` — append-only review notes, decisions, discoveries, and blockers
 
 Design-review follow-up items belong in `design-steps.md` and should be executed independently from `steps.md` work when a review-follow-up pass asks for them.
