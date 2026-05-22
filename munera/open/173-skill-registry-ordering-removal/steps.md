@@ -1,8 +1,9 @@
 # Steps
 
 - [ ] Audit `skill-registry` callers/tests and record whether any true registration-order dependency exists.
-- [ ] Decide whether canonical name-sorted listing is the narrowest replacement contract or whether a real insertion-order dependency requires the keep-order branch.
-- [ ] If using the removal branch, update `skill-registry` implementation and any affected higher projection/prompt/display code.
+- [ ] Decide whether canonical name-sorted registry listing (branch B), presentation-owned canonical sorting with registry order-insensitivity (branch C), or a real insertion-order dependency (keep-order branch) is the selected contract.
+- [ ] If using branch B, update `skill-registry` implementation and any affected higher projection/prompt/display code so registry read/result surfaces are canonical by skill `:name`.
+- [ ] If using branch C, remove registry insertion-order semantics without adding registry sorted-order semantics; update higher projection/prompt/display code to own canonical presentation sorting.
 - [ ] If using the keep-order branch, make no ordering-removal code change; document the confirmed dependency and ensure it is test-backed.
 - [ ] Add or update focused tests to prove the selected ordering contract while preserving duplicate-ignore and `:added?` / `:changed?`.
 - [ ] Update `munera/open/164-registry-semantics-unification-audit/` to reflect the selected branch.

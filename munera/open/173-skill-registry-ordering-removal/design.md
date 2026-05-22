@@ -112,6 +112,8 @@ This keeps prompt/discovery surfaces deterministic without requiring the registr
 
 If ordering belongs only to presentation/prompt projection layers, make `skill-registry` itself order-insensitive and let higher layers sort explicitly when rendering.
 
+This branch is viable only if the audit shows registry callers can safely treat `all-skills`, `skill-names`, and `register-skill` result `:skills` as unordered membership/count/exact-lookup surfaces, while every user- or model-visible prompt/display/introspection surface applies its own deterministic canonical `:name` sort before rendering or projection.
+
 Current audit evidence makes B more likely than C, because higher callers already consume `all-skills` / `skill-names` directly and would otherwise each need to re-establish the same deterministic sort.
 
 ## Affected ordered surfaces
@@ -129,12 +131,14 @@ The implementation audit must check and, when needed, route these skill-list sur
 
 ## Task 164 update scope
 
-If registration order is removed, task `164` should update the current conclusions that describe `skill-registry` as order-sensitive:
+If registration order is removed via branch B, task `164` should update the current conclusions that describe `skill-registry` as order-sensitive:
 
 - revise the registry comparison row from "registration order preserved" / "ordered collection likely required" to canonical deterministic name ordering, while preserving duplicate-ignore and exact lookup conclusions
 - revise caller/test notes that currently treat stable prompt/discovery listing as evidence for insertion-order semantics
 - add a dated note that this task refined the audit conclusion after checking callers
 - keep historical audit notes as prior evidence when useful, but mark them superseded rather than deleting context that explains why this task was created
+
+If branch C is selected, task `164` should instead record that skill registration order was removed without making registry read order meaningful: registry helpers provide unordered membership/count/exact lookup, and deterministic sorting is owned by higher prompt/display/introspection projection seams. The update should identify the higher seams that now own canonical presentation sorting and should not describe `skill-registry` itself as canonical-name-sorted.
 
 If registration order is kept, task `164` should only add a dated note identifying the confirmed insertion-order dependency and should leave the order-sensitive conclusion intact.
 

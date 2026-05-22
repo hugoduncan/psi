@@ -32,3 +32,7 @@ Completed all newly added ambiguity follow-up items in `design-steps.md`. The ta
 ## 2026-05-22 inconsistency review
 
 Found one actionable inconsistency: `design.md` keeps outcome C open (registry-layer ordering non-semantic with presentation/prompt layers sorting), but `plan.md`, `steps.md`, and the task `164` update scope only define the canonical name-sorted removal branch or the keep-order branch.
+
+## 2026-05-22 inconsistency follow-up execution
+
+Completed the newly added `design-steps.md` inconsistency follow-up. Outcome C remains viable in `design.md` and now has matching execution guidance: branch C means registry-layer order-insensitive membership/count/exact lookup, with deterministic canonical sorting owned only by higher prompt/display/introspection surfaces. Updated `plan.md`, `steps.md`, and the task `164` update scope guidance to distinguish branch B canonical registry listing, branch C presentation-owned sorting, and the keep-order branch.
