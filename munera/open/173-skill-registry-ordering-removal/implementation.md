@@ -76,3 +76,7 @@ No new actionable ambiguity feedback. Re-read `design.md`, `plan.md`, `steps.md`
 ## 2026-05-22 ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md` after the preloaded no-feedback ambiguity review. All design follow-up steps remain complete, so no `design.md`, `plan.md`, or `steps.md` changes were needed.
+
+## 2026-05-22 inconsistency review
+
+Found one actionable inconsistency: `design.md` lists `psi.agent-session.prompt_request` among prompt construction / ordered skill-list surfaces that may need canonical ordering, but the referenced code path only performs exact `/skill:name` input expansion via lookup and does not render or project an ordered skill list. This conflicts with the task's distinction between ordered listing surfaces and exact-name resolution surfaces.
