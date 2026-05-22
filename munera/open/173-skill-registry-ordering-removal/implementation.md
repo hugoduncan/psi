@@ -44,3 +44,7 @@ No new actionable ambiguity feedback. Reviewed `design.md`, `plan.md`, `steps.md
 ## 2026-05-22 ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity follow-up steps remain complete, so no design, plan, or implementation checklist changes were needed.
+
+## 2026-05-22 inconsistency review
+
+Found one actionable inconsistency: `design.md` says `design-steps.md` is the actionable surface for ambiguity-review follow-up items only, but this task's prior inconsistency review already used `design-steps.md` for inconsistency follow-up and the current requested review protocol also requires inconsistency follow-ups there.
