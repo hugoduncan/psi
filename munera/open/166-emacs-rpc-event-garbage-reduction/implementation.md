@@ -56,3 +56,6 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing impleme
 
 ## 2026-05-22 — inconsistency follow-up execution
 Used the preloaded inconsistency-review result and completed the newly added design follow-up. Updated `design.md` acceptance wording so divergent assistant payloads require existing merge preservation after effective-next-text calculation, not redraw/replacement fallback. Marked the design-step complete. No implementation steps from `steps.md` were executed.
+
+## 2026-05-22 — ambiguity review
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced assistant streaming/render code/tests (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`). No new actionable ambiguities found: the artifacts now clearly define mandatory assistant/thinking scope, conditional hotspot triggers, append-vs-redraw semantics after effective-next-text calculation, named helper instrumentation seams, ordered implementation steps, and focused/full verification expectations. Existing `design-steps.md` items remain complete; no new follow-up items were added.
