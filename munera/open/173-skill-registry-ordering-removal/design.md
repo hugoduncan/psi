@@ -20,6 +20,17 @@ Current audit state:
 
 The key open question is whether any real caller requires preserved registration order, or whether order is merely carried through today because skills live in a vector.
 
+
+## Review and follow-up surfaces
+
+This task uses the standard task artifacts as follows:
+
+- `design.md` defines the intended behavior and decision branches.
+- `plan.md` defines the implementation approach for both the remove-order and keep-order outcomes.
+- `design-steps.md` is the actionable surface for ambiguity-review follow-up items only.
+- `steps.md` is the later implementation checklist and must not be used for ambiguity-review follow-up execution.
+- `implementation.md` is the append-only review, audit, decision, and blocking-note log.
+
 ## Scope
 
 This task should determine and, if justified, remove registration-order semantics from `skill-registry`.
@@ -66,7 +77,8 @@ Current refinement direction:
 
 - the caller audit should treat "stable prompt/discovery listing" and "preserved registration order" as different claims
 - if no caller truly depends on insertion order, the registry contract should shrink to deterministic exact-name lookup plus deterministic listing
-- the smallest coherent replacement is a canonical name-sorted read surface while preserving duplicate-ignore and `:added?` / `:changed?`
+- the smallest coherent replacement is a canonical name-sorted registry output/read surface while preserving duplicate-ignore and `:added?` / `:changed?`
+- if the audit finds a real insertion-order dependency, no ordering-removal code change should be made; instead, the dependency should be documented, test-backed, and reflected in task `164` as a confirmed requirement
 
 If ordering removal is justified, the resulting behavior should be explicit and test-backed.
 
@@ -85,9 +97,14 @@ If callers only need predictability, replace registration-order semantics with a
 Refined preferred candidate:
 
 - `all-skills` returns skills in canonical `:name` order
+- canonical `:name` order means ascending Clojure/JVM string comparison of the skill `:name` values (`compare` / `String.compareTo`)
+- the comparator is case-sensitive and locale-independent; names that differ only by case appear according to JVM string ordering rather than folded together
+- skill names are already unique by exact string, so case-distinct names remain distinct entries if accepted elsewhere by existing validation
 - `skill-names` follows that same canonical order
 - `find-skill` remains exact-name lookup
 - duplicate registration remains first-write-wins by identity, but the visible listing order is no longer insertion order
+- `register-skill` should return `:skills` in the same canonical order so session state written through registration is canonicalized at the registry boundary
+- arbitrary pre-existing or externally supplied session `:skills` vectors are not themselves a trusted ordering contract; prompt/display/introspection code that renders or projects skills must use `skill-registry/all-skills`, `skill-registry/skill-names`, or an equivalent canonical sort before exposing ordered output
 
 This keeps prompt/discovery surfaces deterministic without requiring the registry contract to remember registration sequence.
 
@@ -96,6 +113,30 @@ This keeps prompt/discovery surfaces deterministic without requiring the registr
 If ordering belongs only to presentation/prompt projection layers, make `skill-registry` itself order-insensitive and let higher layers sort explicitly when rendering.
 
 Current audit evidence makes B more likely than C, because higher callers already consume `all-skills` / `skill-names` directly and would otherwise each need to re-establish the same deterministic sort.
+
+## Affected ordered surfaces
+
+The implementation audit must check and, when needed, route these skill-list surfaces through canonical ordering:
+
+- `psi.skill-registry.registry/all-skills` and `skill-names`
+- `:session/register-skill` stored result and returned result map
+- discovery resolvers in `psi.agent-session.resolvers.discovery`, especially `:psi.skill/all`, `:psi.skill/names`, summaries, and source groupings
+- session introspection resolver `:psi.agent-session/skills`
+- prompt construction paths in `psi.agent-session.prompt_request`, prompt lifecycle handlers, and `psi.prompt-assets.system_prompt`
+- prompt-assets skill helpers such as `format-skills-for-prompt`, `skill-summary`, `skills-by-source`, `visible-skills`, and `hidden-skills` when their output order is user- or model-visible
+- TUI display/autocomplete surfaces that project `(:skills state)`
+- workflow child-session skill resolution only for exact-name lookup; the requested workflow skill order may remain the caller-specified subset order because that is selection order, not registry listing order
+
+## Task 164 update scope
+
+If registration order is removed, task `164` should update the current conclusions that describe `skill-registry` as order-sensitive:
+
+- revise the registry comparison row from "registration order preserved" / "ordered collection likely required" to canonical deterministic name ordering, while preserving duplicate-ignore and exact lookup conclusions
+- revise caller/test notes that currently treat stable prompt/discovery listing as evidence for insertion-order semantics
+- add a dated note that this task refined the audit conclusion after checking callers
+- keep historical audit notes as prior evidence when useful, but mark them superseded rather than deleting context that explains why this task was created
+
+If registration order is kept, task `164` should only add a dated note identifying the confirmed insertion-order dependency and should leave the order-sensitive conclusion intact.
 
 ## Constraints
 
