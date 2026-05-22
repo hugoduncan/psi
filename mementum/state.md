@@ -37,5 +37,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
+
+- 2026-05-22: Reviewed Munera task 166 design for ambiguities; committed c5151dec with one new actionable follow-up in `design-steps.md` to define the promotion condition/owner for replacing design-only placeholder `plan.md`/`steps.md` with implementation-ready artifacts.
 - 2026-05-21: OpenAI OAuth-backed `gpt-5.5` now works through Codex transport.
 - 2026-05-20: oriented on bootstrap-simplification branch; 159–163 arc confirmed complete; test errors confirmed fixed
