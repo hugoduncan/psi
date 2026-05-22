@@ -1,2 +1,2 @@
-- [ ] Add `plan.md` with the intended implementation approach for this task so ambiguity review can evaluate whether the design is being executed through a single unambiguous method.
-- [ ] Add `steps.md` with an explicit execution checklist for this task so ambiguity review can evaluate coverage/completeness against the design acceptance and affected proof surfaces.
+- [x] Add `plan.md` with the intended implementation approach for this task so ambiguity review can evaluate whether the design is being executed through a single unambiguous method.
+- [x] Add `steps.md` with an explicit execution checklist for this task so ambiguity review can evaluate coverage/completeness against the design acceptance and affected proof surfaces.
