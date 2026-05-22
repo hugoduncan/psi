@@ -1,26 +1,48 @@
 # Plan
 
-Implement this task as a focused semantic simplification pass before any shared-storage migration.
-
 ## Approach
 
-1. Remove adapter-owned registration-order state from `deterministic-operation-registry` so `:operations` is the only authoritative local storage concept.
-2. Update registry listing/count query surfaces to derive directly from registered operations without any ordering promise.
-3. Rewrite focused tests to assert membership, cardinality, cleanup coherence, duplicate-rejection stability, and unchanged invoke semantics rather than insertion order.
-4. Revisit higher proof surfaces that mention deterministic-operation listings and relax any ordered assertions to unordered membership assertions.
-5. Update task `171` so its migration target no longer carries adapter-owned ordering metadata.
+1. Treat this as a simplifying prerequisite for task `171`, not as a storage migration.
+   - remove registration-order preservation first
+   - keep canonical local storage in `:operations`
+   - keep duplicate rejection, lookup semantics, invoke semantics, and extension cleanup semantics unchanged
 
-## Key decisions
+2. Simplify the registry implementation directly at the current owner.
+   - reduce registry state from `{:operations {...} :registration-order [...]}` to `{:operations {...}}`
+   - derive `operation-ids-in` from the registered operation keys without promising order
+   - derive `all-operations-in` from the registered operations without promising order
+   - derive `operation-count-in` from canonical registered membership rather than an ordering projection
 
-- This task removes the ordering contract rather than replacing it with sorted output; listing order becomes explicitly unspecified.
-- Assertions that need stable comparison should sort or compare sets at the test boundary, not in production registry code.
-- This task stays separate from the root-registry migration; only order-related semantics and proof surfaces change here.
+3. Change the proof surface to match the actual intended contract.
+   - replace insertion-order assertions with membership/count/coherence assertions
+   - remove or rewrite the dedicated order-preservation test
+   - keep missing-invoke, duplicate-rejection, and cleanup proofs intact
 
-## Risks and checks
+4. Audit higher proof surfaces explicitly rather than only the lower component tests.
+   - inspect `components/agent-session/test/psi/agent_session/extensions_test.clj`
+   - keep the extension cleanup and invoke-staleness expectations
+   - relax any operation-id ordering assumptions to unordered membership assertions only where needed
 
-- Risk: a test or projection still depends on insertion order indirectly.
-  - Check affected deterministic-operation registry tests and higher extension cleanup tests for ordered expectations.
-- Risk: removing `:registration-order` accidentally changes duplicate or invoke semantics.
-  - Keep focused proof coverage for duplicate rejection, no-op cleanup, and missing invoke errors.
-- Risk: task `171` still documents the old target shape.
-  - Update its design after this task's semantic direction is clear.
+5. Record the simplification as a prerequisite input to task `171`.
+   - after this task, `171` should no longer assume adapter-owned ordering state in its migration target
+
+## Proof strategy
+
+- Lower component tests should prove:
+  - registering N distinct operations yields exactly N ids and N operations
+  - duplicate registration throws and does not change membership or count
+  - unregister-by-extension removes exactly matching operations
+  - unregistering a missing extension is a no-op on membership and count
+  - invoke lookup behaviour is unchanged
+
+- Higher proof surfaces should prove:
+  - extension cleanup still removes stale runtime deterministic operations
+  - invoke lookup still fails after cleanup
+  - no higher test still depends on insertion order unless it explicitly sorts at the assertion boundary
+
+## Constraints carried into execution
+
+- Do not broaden this task into task `171` shared-storage migration work.
+- Do not replace removed insertion-order guarantees with a new implicit sorted-order contract.
+- Keep invoke behaviour unchanged.
+- Prefer the smallest implementation change that removes `:registration-order` as a maintained concept entirely.
