@@ -36,3 +36,7 @@ Found one actionable inconsistency: `design.md` keeps outcome C open (registry-l
 ## 2026-05-22 inconsistency follow-up execution
 
 Completed the newly added `design-steps.md` inconsistency follow-up. Outcome C remains viable in `design.md` and now has matching execution guidance: branch C means registry-layer order-insensitive membership/count/exact lookup, with deterministic canonical sorting owned only by higher prompt/display/introspection surfaces. Updated `plan.md`, `steps.md`, and the task `164` update scope guidance to distinguish branch B canonical registry listing, branch C presentation-owned sorting, and the keep-order branch.
+
+## 2026-05-22 ambiguity review
+
+No new actionable ambiguity feedback. Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, task `164` audit excerpts, and representative skill registry / resolver / prompt / TUI surfaces; the current artifacts now define the decision branches, follow-up surfaces, ordering contract candidates, affected surfaces, and task `164` update expectations clearly enough for implementation.
