@@ -83,3 +83,6 @@ Used the preloaded inconsistency-review result and checked `design-steps.md`. No
 
 ## 2026-05-22 — ambiguity review
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs hot-path code/tests (`psi-assistant-render.el`, `psi-events.el`, `psi-tool-rows.el`, `psi-widget-projection.el`, `psi-projection.el`, `psi-streaming-transcript-test.el`). No new actionable ambiguities found: mandatory vs conditional scope, assistant/thinking append-vs-redraw semantics, instrumentation seams, proof ranges, ordered execution steps, and verification commands are explicit and aligned. Existing `design-steps.md` follow-ups remain complete; no new follow-up items were added.
+
+## 2026-05-22 — ambiguity follow-up execution
+Used the preloaded ambiguity-review result and checked `design-steps.md`. No newly added unchecked actionable ambiguity follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
