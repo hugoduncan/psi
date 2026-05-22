@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-22: Executed task 166 code-shaper follow-up: extracted shared assistant streaming optimization instrumentation helper while preserving distinct behavior assertions; focused streaming suite 36/36 and `bb emacs:test` 307/307 green.
 - 2026-05-22: Executed task 166 test-shaper follow-up: split the combined assistant append optimization proof into separate incremental-delta, cumulative-snapshot, and divergent-merge tests; focused streaming suite 36/36 and `bb emacs:test` 307/307 green.
 - 2026-05-22: Executed task 166 repeated test-review follow-up after no-action review; no new unchecked steps existed, so only implementation.md was updated.
 - 2026-05-22: Executed task 166 test-review follow-up after no-action test review; no new unchecked steps existed, so only implementation.md was updated and committed (6f0a3822).
@@ -44,6 +45,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
+- 2026-05-22: Task 166 code-shaper follow-up complete: assistant optimization tests now share `psi-test-with-assistant-streaming-instrumentation`, removing repeated redraw/prefix/property `cl-letf` setup while keeping separate incremental, cumulative snapshot, and divergent merge assertions.
 - 2026-05-22: Task 166 test-shaper follow-up complete: assistant append optimization proof is now three behavior-local tests (incremental delta, cumulative snapshot suffix, divergent merge preservation), each asserting suffix-only properties and no redraw/prefix recreation.
 - 2026-05-22: Task 166 mandatory assistant/thinking streaming optimization implemented: append-only assistant/thinking updates now use suffix insertion, avoid post-creation full redraw/prefix overlay recreation, assistant stream properties apply only to suffix ranges; focused Emacs tests and `bb emacs:test` green.
 - 2026-05-22: Executed task 166 test-review follow-up after no-action review; no newly added unchecked steps existed, so implementation.md records the no-op pass and commit 6f0a3822 captures it.
