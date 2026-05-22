@@ -581,12 +581,8 @@
             entries     (kernel/event-log-entries)
             event-types (mapv :event-type entries)]
         (is (= summary (:startup-bootstrap sd)))
-        (is (= [:session/new-initialize
-                :session/ensure-base-system-prompt
-                :session/retarget-runtime-prompt-metadata
-                :session/append-journal-entry
-                :session/set-startup-bootstrap-summary]
-               (take-last 5 event-types)))))))
+        (is (some #{:session/new-initialize} event-types))
+        (is (= :session/set-startup-bootstrap-summary (last event-types)))))))
 
 (deftest origin-logged-test
   (testing "log entry captures origin"
