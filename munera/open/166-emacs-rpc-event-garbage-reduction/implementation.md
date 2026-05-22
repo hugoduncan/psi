@@ -32,3 +32,6 @@ Checked the preloaded inconsistency-review result and `design-steps.md`. No newl
 
 ## 2026-05-22 — implementation planning
 Replaced placeholder `plan.md` and `steps.md` after the delegated review cycle completed with no open design follow-ups. The implementation plan narrows the first slice to mandatory assistant/thinking streaming optimization, with tool-row, widget-subscription, and projection work explicitly conditional on touched code or measured need. Verification commands are recorded in `plan.md`; implementation must record actual results here before closure.
+
+## 2026-05-22 — ambiguity review
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs streaming/render code/tests. New actionable ambiguity: the plan requires pre-change tests to instrument narrow local helpers for full-redraw/property/overlay counts, but the current code has only monolithic `psi-emacs--set-assistant-line` / `psi-emacs--set-thinking-line`; the task does not specify whether the first implementation slice should introduce stable instrumentation seams before behavior-changing optimization or use brittle advice around primitives such as `delete-region`, `add-text-properties`, and `make-overlay`.
