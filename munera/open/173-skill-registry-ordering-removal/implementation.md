@@ -161,3 +161,7 @@ Found one actionable robustness/consistency gap: `skill-registry/register-skill`
 ## 2026-05-22 implementation review
 
 No new actionable implementation feedback. Re-read the task artifacts, `skill-registry` implementation/tests, and `:session/register-skill` handler path. The only implementation issue observed is the already-recorded unchecked follow-up: duplicate/no-change registration canonicalizes at the registry boundary but the session handler still skips writing canonical `:skills` when `:changed?` is false. No additional code/design/test gap was found, so `steps.md` was not changed.
+
+## 2026-05-22 code-shaper follow-up execution
+
+Completed the newly added `:session/register-skill` follow-up. The session handler now writes canonicalized registry `:skills` whenever the registry result differs from the current session vector, even on duplicate/no-change registrations, while `:runtime/refresh-system-prompt` remains gated only by `:changed?`. Added focused dispatch proof that an unsorted pre-existing session skill vector is canonicalized by duplicate registration without prompt refresh. Verification: `clojure -M:test --focus psi.agent-session.config-compaction-test --focus psi.skill-registry.registry-test` passed (11 tests, 109 assertions).

@@ -228,6 +228,35 @@
         (is (= before-prompt after-prompt))
         (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (= [skill] (:skills sd)))
+        (is (= [:session/register-skill] event-types)))))
+
+  (testing "duplicate register-skill canonicalizes stored skills without refreshing the prompt"
+    (let [z-skill {:name "z-skill"
+                   :description "Z"
+                   :file-path "/tmp/z/SKILL.md"
+                   :base-dir "/tmp/z"
+                   :source :project
+                   :disable-model-invocation false}
+          a-skill {:name "a-skill"
+                   :description "A"
+                   :file-path "/tmp/a/SKILL.md"
+                   :base-dir "/tmp/a"
+                   :source :project
+                   :disable-model-invocation false}
+          [ctx session-id] (create-session-context {:session-defaults {:skills [z-skill a-skill]
+                                                                       :system-prompt "stable prompt"}})]
+      (kernel/clear-event-log!)
+      (let [before-prompt (:system-prompt (ss/get-session-data-in ctx session-id))
+            result        (session/dispatch-in! ctx :session/register-skill
+                                                {:session-id session-id
+                                                 :skill (assoc z-skill :description "Replacement attempt")}
+                                                {:origin :core})
+            after-prompt  (:system-prompt (ss/get-session-data-in ctx session-id))
+            sd            (ss/get-session-data-in ctx session-id)
+            event-types   (mapv :event-type (kernel/event-log-entries))]
+        (is (= {:added? false :changed? false :count 2} result))
+        (is (= before-prompt after-prompt))
+        (is (= [a-skill z-skill] (:skills sd)))
         (is (= [:session/register-skill] event-types))))))
 
 ;; ── Auto-retry and compaction config ───────────────────────────────────────

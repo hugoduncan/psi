@@ -438,13 +438,16 @@
   (register-core-handler!
    :session/register-skill
    (fn [ctx {:keys [session-id skill]}]
-     (let [skills  (:skills (session/get-session-data-in ctx session-id))
-           result  (skill-registry/register-skill skills skill)
-           changed? (:changed? result)]
+     (let [skills        (:skills (session/get-session-data-in ctx session-id))
+           result        (skill-registry/register-skill skills skill)
+           changed?      (:changed? result)
+           canonicalized? (not= (:skills result) (vec (or skills [])))]
        (cond-> {:return (select-keys result [:added? :changed? :count])}
+         canonicalized?
+         (assoc :root-state-update (session/session-update session-id #(assoc % :skills (:skills result))))
+
          changed?
-         (assoc :root-state-update (session/session-update session-id #(assoc % :skills (:skills result)))
-                :effects [{:effect/type :runtime/refresh-system-prompt
+         (assoc :effects [{:effect/type :runtime/refresh-system-prompt
                            :session-id session-id}])))))
 
   (register-core-handler!
