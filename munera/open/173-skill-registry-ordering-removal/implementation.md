@@ -145,3 +145,7 @@ Completed the newly added `steps.md` follow-up. TUI skill banner rendering now s
 ## 2026-05-22 test-shaper review
 
 Found one actionable test-quality gap: branch B requires `register-skill` result `:skills` to be canonical at the registry boundary even when a duplicate registration is ignored, but the current duplicate test starts from a singleton existing vector and only proves add-path canonicalization. A regression could return an unsorted pre-existing vector on the duplicate/no-change path while preserving `:added?` / `:changed?` and passing the current focused registry tests.
+
+## 2026-05-22 test-shaper follow-up execution
+
+Completed the newly added registry proof. The duplicate/no-change test now starts from an unsorted two-skill vector, verifies `register-skill` returns canonical `:skills` even when the duplicate is ignored, and still proves first-write-wins plus `:added? false` / `:changed? false`. Verification: `clojure -M:test --focus psi.skill-registry.registry-test` passed (3 tests, 24 assertions).

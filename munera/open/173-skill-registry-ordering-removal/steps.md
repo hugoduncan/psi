@@ -9,4 +9,4 @@
 - [x] Update `munera/open/164-registry-semantics-unification-audit/` to reflect the selected branch.
 - [x] Canonicalize `skills-by-source` / `:psi.skill/by-source` per-source vectors by skill `:name` and add focused proof that source-grouped discovery output does not preserve raw session vector order.
 - [x] Add focused TUI coverage proving skill banner/autocomplete order is canonical by skill `:name` when session `:skills` starts unsorted (or otherwise prove the TUI state is sourced through `:psi.agent-session/skills` canonical resolver output).
-- [ ] Add focused registry proof that duplicate/no-change `register-skill` canonicalizes an unsorted pre-existing `:skills` vector while preserving first-write-wins, `:added? false`, and `:changed? false`.
+- [x] Add focused registry proof that duplicate/no-change `register-skill` canonicalizes an unsorted pre-existing `:skills` vector while preserving first-write-wins, `:added? false`, and `:changed? false`.

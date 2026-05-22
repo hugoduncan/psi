@@ -20,19 +20,20 @@
       (is (= 1 (:count result)))))
 
   (testing "ignores duplicate registrations and returns canonical skill-name order"
-    (let [existing {:name "testing" :description "Original"}
+    (let [existing  {:name "testing" :description "Original"}
           duplicate {:name "testing" :description "Replacement attempt"}
-          later {:name "coding" :description "Coding guidance"}
-          first-result (skill-registry/register-skill [existing] duplicate)
+          earlier   {:name "coding" :description "Coding guidance"}
+          later     {:name "analysis" :description "Analysis guidance"}
+          first-result (skill-registry/register-skill [existing earlier] duplicate)
           second-result (skill-registry/register-skill (:skills first-result) later)]
-      (is (= [existing] (:skills first-result)))
+      (is (= [earlier existing] (:skills first-result)))
       (is (= existing (:skill first-result)))
       (is (false? (:added? first-result)))
       (is (false? (:changed? first-result)))
-      (is (= 1 (:count first-result)))
-      (is (= [later existing] (:skills second-result)))
-      (is (= ["coding" "testing"] (skill-registry/skill-names (:skills second-result))))
-      (is (= 2 (skill-registry/skill-count (:skills second-result))))))
+      (is (= 2 (:count first-result)))
+      (is (= [later earlier existing] (:skills second-result)))
+      (is (= ["analysis" "coding" "testing"] (skill-registry/skill-names (:skills second-result))))
+      (is (= 3 (skill-registry/skill-count (:skills second-result))))))
 
   (testing "rejects missing or blank skill names"
     (is (thrown-with-msg?
