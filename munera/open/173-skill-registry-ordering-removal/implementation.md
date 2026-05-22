@@ -52,3 +52,7 @@ Found one actionable inconsistency: `design.md` says `design-steps.md` is the ac
 ## 2026-05-22 inconsistency follow-up execution
 
 Completed the newly added `design-steps.md` inconsistency follow-up. Updated `design.md` so `design-steps.md` is the design-review follow-up surface for both ambiguity-review and inconsistency-review items, and clarified that `steps.md` remains reserved for later implementation execution rather than design-review follow-up execution.
+
+## 2026-05-22 ambiguity review
+
+No new actionable ambiguity feedback. Rechecked `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, task `164` audit references, and representative registry/resolver/prompt/TUI code paths; the branch choices, canonical ordering candidate, branch C alternative, keep-order fallback, affected surfaces, and task `164` update expectations remain clear enough for implementation.
