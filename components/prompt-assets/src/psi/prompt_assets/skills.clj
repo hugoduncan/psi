@@ -421,9 +421,9 @@
   (skill-registry/skill-names skills))
 
 (defn skills-by-source
-  "Group skills by their source."
+  "Group skills by their source with each source group in canonical skill-name order."
   [skills]
-  (group-by :source skills))
+  (group-by :source (skill-registry/all-skills skills)))
 
 (defn visible-skills
   "Return skills that are available to the model (not disabled)."

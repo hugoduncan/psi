@@ -7,4 +7,4 @@
 - [x] If using the keep-order branch, make no ordering-removal code change; document the confirmed dependency and ensure it is test-backed. Not selected; no real insertion-order dependency was found.
 - [x] Add or update focused tests to prove the selected ordering contract while preserving duplicate-ignore and `:added?` / `:changed?`.
 - [x] Update `munera/open/164-registry-semantics-unification-audit/` to reflect the selected branch.
-- [ ] Canonicalize `skills-by-source` / `:psi.skill/by-source` per-source vectors by skill `:name` and add focused proof that source-grouped discovery output does not preserve raw session vector order.
+- [x] Canonicalize `skills-by-source` / `:psi.skill/by-source` per-source vectors by skill `:name` and add focused proof that source-grouped discovery output does not preserve raw session vector order.

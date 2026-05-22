@@ -129,3 +129,7 @@ Verification: `clojure -M:test --focus psi.skill-registry.registry-test --focus 
 ## 2026-05-22 implementation review
 
 Found one actionable implementation gap: `psi.prompt-assets.skills/skills-by-source` and the `:psi.skill/by-source` discovery resolver still group raw session skill vectors without canonicalizing each source group, even though the task lists source groupings as an affected discovery surface and arbitrary session `:skills` order is not a trusted presentation contract. Existing tests only count grouped skills, so this ordered introspection surface is unproved.
+
+## 2026-05-22 implementation review follow-up execution
+
+Completed the newly added `steps.md` follow-up. `skills-by-source` now groups skills after applying `skill-registry/all-skills`, so each source-grouped vector is canonical by exact skill `:name` rather than raw session vector order. Added focused helper proof and expanded `:psi.skill/by-source` EQL proof with interleaved unsorted user/project skills. Verification: `clojure -M:test --focus psi.prompt-assets.skills-test` passed (22 tests, 120 assertions).
