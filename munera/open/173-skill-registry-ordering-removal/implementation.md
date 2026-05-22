@@ -68,3 +68,7 @@ No new actionable inconsistency feedback. Rechecked `design.md`, `plan.md`, `ste
 ## 2026-05-22 inconsistency follow-up execution
 
 No newly added unchecked inconsistency follow-up items were present in `design-steps.md` after the preloaded no-feedback inconsistency review. All design follow-up steps remain complete, so no `design.md`, `plan.md`, or `steps.md` changes were needed.
+
+## 2026-05-22 ambiguity review
+
+No new actionable ambiguity feedback. Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, task `164` skill-registry audit text, and representative registry/resolver/prompt/TUI/workflow skill-order call sites; the artifacts still specify the branch decision criteria, selected-ordering proof expectations, affected ordered surfaces, design-review follow-up surface, and task `164` update scope clearly enough for implementation.
