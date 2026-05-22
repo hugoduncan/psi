@@ -28,3 +28,7 @@ Found one additional actionable ambiguity: the design allows outcome A (keep reg
 ## 2026-05-22 ambiguity follow-up execution
 
 Completed all newly added ambiguity follow-up items in `design-steps.md`. The task artifacts now explicitly separate `design-steps.md` as the ambiguity follow-up surface from `steps.md` as the implementation checklist, define canonical skill-name ordering as case-sensitive locale-independent JVM string order, clarify that registry outputs/results and user/model-visible projections must be canonical while arbitrary incoming session vectors are not trusted ordering contracts, enumerate prompt/display/introspection surfaces to audit, define task `164` update scope for both removal and keep-order branches, and add the explicit keep-order branch to `plan.md` and `steps.md`.
+
+## 2026-05-22 inconsistency review
+
+Found one actionable inconsistency: `design.md` keeps outcome C open (registry-layer ordering non-semantic with presentation/prompt layers sorting), but `plan.md`, `steps.md`, and the task `164` update scope only define the canonical name-sorted removal branch or the keep-order branch.
