@@ -80,3 +80,7 @@ No newly added unchecked ambiguity follow-up items were present in `design-steps
 ## 2026-05-22 inconsistency review
 
 Found one actionable inconsistency: `design.md` lists `psi.agent-session.prompt_request` among prompt construction / ordered skill-list surfaces that may need canonical ordering, but the referenced code path only performs exact `/skill:name` input expansion via lookup and does not render or project an ordered skill list. This conflicts with the task's distinction between ordered listing surfaces and exact-name resolution surfaces.
+
+## 2026-05-22 inconsistency follow-up execution
+
+Completed the newly added `design-steps.md` inconsistency follow-up. Reclassified `psi.agent-session.prompt_request` in `design.md`: prompt lifecycle / `system_prompt` paths remain ordered skill-list surfaces when they render skills, while `prompt_request` is only an exact `/skill:name` lookup-expansion surface and does not own or consume canonical skill-list ordering.

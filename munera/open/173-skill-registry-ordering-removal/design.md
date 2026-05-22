@@ -124,9 +124,10 @@ The implementation audit must check and, when needed, route these skill-list sur
 - `:session/register-skill` stored result and returned result map
 - discovery resolvers in `psi.agent-session.resolvers.discovery`, especially `:psi.skill/all`, `:psi.skill/names`, summaries, and source groupings
 - session introspection resolver `:psi.agent-session/skills`
-- prompt construction paths in `psi.agent-session.prompt_request`, prompt lifecycle handlers, and `psi.prompt-assets.system_prompt`
+- prompt construction paths in prompt lifecycle handlers and `psi.prompt-assets.system_prompt` that render ordered skill lists
 - prompt-assets skill helpers such as `format-skills-for-prompt`, `skill-summary`, `skills-by-source`, `visible-skills`, and `hidden-skills` when their output order is user- or model-visible
 - TUI display/autocomplete surfaces that project `(:skills state)`
+- `psi.agent-session.prompt_request` only for exact `/skill:name` lookup expansion; it does not own or consume canonical skill-list ordering
 - workflow child-session skill resolution only for exact-name lookup; the requested workflow skill order may remain the caller-specified subset order because that is selection order, not registry listing order
 
 ## Task 164 update scope
