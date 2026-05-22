@@ -552,6 +552,85 @@ The remaining meaningful unknowns are narrower now:
 | skill-registry | pure ordered collection, name identity | duplicate ignore, no removal, simple semantics |
 | prompt-registry | pure ordered collection, register/find/count | composite identity, update, unregister, canonical sort, timestamps |
 
+## Migration guidance added after 167/168
+
+Recent command-registry (`167`) and tool-registry (`168`) migrations exposed the main operational risk in registry unification work: the storage move itself can be straightforward while stale read seams survive above the new authoritative owner.
+
+The concrete failure mode was:
+
+- registry ownership moved to a lower shared substrate
+- public read helpers were mostly updated
+- one higher introspection seam still read legacy extension-local state
+- focused contract tests existed but the stale seam still survived until full-suite verification exercised it
+
+That yields an explicit migration rule for future registry work:
+
+- a registry migration is not complete when writes and primary reads pass
+- it is complete only when every caller-visible read surface and introspection/projection seam has stopped reading legacy local storage
+
+### Registry migration checklist
+
+Use this checklist for future registry migrations, especially any follow-on `workflow-registry` work:
+
+1. **Name the new authoritative owner**
+   - identify the single post-migration storage owner/substrate
+   - record whether compatibility behavior is preserved in the substrate or only in an adapter/wrapper
+
+2. **Enumerate all write seams**
+   - direct registration/update/remove APIs
+   - built-in registration paths
+   - extension/runtime registration paths
+   - bulk cleanup/unload paths
+
+3. **Enumerate all read seams**
+   - primary lookup/list/name APIs
+   - resolver projections
+   - mutation result projections
+   - introspection/detail helpers
+   - prompt/session/bootstrap rebuilding paths
+   - any derived counts, summaries, or provenance projections
+
+4. **Classify each read seam**
+   - authoritative post-migration source
+   - compatibility fields that must still be projected
+   - ordering/precedence expectations
+   - miss/throw behavior
+
+5. **Add migration-guard tests at the seam level**
+   - one focused test for the main public API contract
+   - one focused test for introspection/detail/projection coherence
+   - where possible, assert behavior through the higher consumer seam rather than only through the migrated registry itself
+
+6. **Verify legacy storage is no longer read**
+   - identify any legacy local maps/fields that used to be authoritative
+   - update or remove higher code paths that still consult them
+   - explicitly prove replacement with a focused regression test when the seam is subtle
+
+7. **Run focused and full-suite verification before close**
+   - focused lower-component tests
+   - focused higher-consumer tests
+   - full `bb test`
+   - lint where relevant
+
+### Recommended next migration target
+
+For root-registry-style unification, the next target should be `workflow-registry`.
+
+Why:
+
+- it already has a pure root-state ownership model
+- its contract mostly fits a shared keyed-registry substrate:
+  - normalized identity
+  - register/lookup/list/remove semantics
+  - sorted public reads
+- unlike `deterministic-operation-registry`, it is not fundamentally runtime-object-owned
+
+### Recommended sequencing
+
+1. Use this task as the migration-rules source of truth.
+2. Apply the checklist above when designing the next `workflow-registry` migration slice.
+3. Continue to defer `deterministic-operation-registry` as a root-registry migration target unless its runtime-object/lifecycle coupling changes.
+
 ## Acceptance
 
 This task is complete when there is a durable, evidence-backed answer to:
@@ -561,3 +640,5 @@ This task is complete when there is a durable, evidence-backed answer to:
 - which registries can share one implementation
 - which should share only lower substrate/helper code
 - which should remain separate
+- what migration checklist should govern future registry unification work so stale read seams are caught before task close
+- which registry is the next root-registry-style migration target and why
