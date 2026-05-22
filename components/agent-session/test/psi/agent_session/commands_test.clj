@@ -170,6 +170,24 @@
     (is (str/includes? (:message result) "/quit"))
     (is (str/includes? (:message result) "/new"))
     (is (str/includes? (:message result) "/login")))
+  (testing "Skills section renders unsorted session skills in canonical skill-name order"
+    (let [z-skill {:name "z-skill"
+                   :description "Z skill"
+                   :source :project}
+          a-skill {:name "a-skill"
+                   :description "A skill"
+                   :source :user}
+          [ctx session-id] (make-test-ctx {:skills [z-skill a-skill]})
+          result (commands/dispatch-in ctx session-id "/help" cmd-opts)
+          message (:message result)
+          a-entry "  /skill:a-skill — A skill"
+          z-entry "  /skill:z-skill — Z skill"]
+      (is (= :text (:type result)))
+      (is (str/includes? message "── Skills"))
+      (is (str/includes? message a-entry))
+      (is (str/includes? message z-entry))
+      (is (< (str/index-of message a-entry)
+             (str/index-of message z-entry)))))
   (testing "/? is an alias for /help"
     (let [[ctx session-id] (make-test-ctx)]
       (is (= :text (:type (commands/dispatch-in ctx session-id "/?" cmd-opts)))))))
@@ -184,7 +202,24 @@
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/skills" cmd-opts)]
     (is (= :text (:type result)))
-    (is (str/includes? (:message result) "Skills"))))
+    (is (str/includes? (:message result) "Skills")))
+  (testing "renders unsorted session skills in canonical skill-name order"
+    (let [z-skill {:name "z-skill"
+                   :description "Z skill"
+                   :source :project}
+          a-skill {:name "a-skill"
+                   :description "A skill"
+                   :source :user}
+          [ctx session-id] (make-test-ctx {:skills [z-skill a-skill]})
+          result (commands/dispatch-in ctx session-id "/skills" cmd-opts)
+          message (:message result)
+          a-entry "  /skill:a-skill — A skill [user]"
+          z-entry "  /skill:z-skill — Z skill [project]"]
+      (is (= :text (:type result)))
+      (is (str/includes? message a-entry))
+      (is (str/includes? message z-entry))
+      (is (< (str/index-of message a-entry)
+             (str/index-of message z-entry))))))
 
 (deftest dispatch-worktree-test
   (let [[ctx session-id] (make-test-ctx)

@@ -169,3 +169,7 @@ Completed the newly added `:session/register-skill` follow-up. The session handl
 ## 2026-05-22 test review
 
 Found one actionable test gap: `/skills` and the `/help` embedded Skills section are user-visible ordered skill-list surfaces, but current command tests only cover the no-skills case. They rely on `:psi.agent-session/skills` being canonical, yet lack focused command-level proof that unsorted session `:skills` render `/skill:*` entries in canonical skill-name order and do not regress to raw vector order.
+
+## 2026-05-22 task-test-review follow-up execution
+
+Completed the newly added command-surface proof. Added focused `/skills` and `/help` command tests that seed raw unsorted session `:skills` and assert `/skill:*` entries render in canonical skill-name order rather than raw vector order. Verification: `clojure -M:test --focus psi.agent-session.commands-test` passed (50 tests, 192 assertions); `clj-kondo --lint components/agent-session/test/psi/agent_session/commands_test.clj` passed.
