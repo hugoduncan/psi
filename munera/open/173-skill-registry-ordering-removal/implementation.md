@@ -165,3 +165,7 @@ No new actionable implementation feedback. Re-read the task artifacts, `skill-re
 ## 2026-05-22 code-shaper follow-up execution
 
 Completed the newly added `:session/register-skill` follow-up. The session handler now writes canonicalized registry `:skills` whenever the registry result differs from the current session vector, even on duplicate/no-change registrations, while `:runtime/refresh-system-prompt` remains gated only by `:changed?`. Added focused dispatch proof that an unsorted pre-existing session skill vector is canonicalized by duplicate registration without prompt refresh. Verification: `clojure -M:test --focus psi.agent-session.config-compaction-test --focus psi.skill-registry.registry-test` passed (11 tests, 109 assertions).
+
+## 2026-05-22 test review
+
+Found one actionable test gap: `/skills` and the `/help` embedded Skills section are user-visible ordered skill-list surfaces, but current command tests only cover the no-skills case. They rely on `:psi.agent-session/skills` being canonical, yet lack focused command-level proof that unsorted session `:skills` render `/skill:*` entries in canonical skill-name order and do not regress to raw vector order.
