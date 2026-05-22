@@ -133,3 +133,7 @@ Found one actionable implementation gap: `psi.prompt-assets.skills/skills-by-sou
 ## 2026-05-22 implementation review follow-up execution
 
 Completed the newly added `steps.md` follow-up. `skills-by-source` now groups skills after applying `skill-registry/all-skills`, so each source-grouped vector is canonical by exact skill `:name` rather than raw session vector order. Added focused helper proof and expanded `:psi.skill/by-source` EQL proof with interleaved unsorted user/project skills. Verification: `clojure -M:test --focus psi.prompt-assets.skills-test` passed (22 tests, 120 assertions).
+
+## 2026-05-22 test review
+
+Found one actionable test gap: TUI skill display/autocomplete is an affected ordered surface, but current proof stops at the session resolver / prompt-assets helpers and does not exercise the TUI projection path that consumes `:psi.agent-session/skills` into app state and renders/suggests skill names. A regression could reintroduce raw session-vector order before the banner/autocomplete without focused coverage.
