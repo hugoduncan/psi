@@ -6,7 +6,7 @@
 - [x] Preserve current lookup, registration, removal, normalization, and sorted-read behavior
 - [x] Preserve or explicitly adapt the current tuple-shaped lower return contract
 - [x] Audit helper/test higher semantic seams that still write or read workflow definitions by direct `[:workflows :definitions ...]` shape
-- [ ] Update higher workflow read/projection seams to stop reading legacy direct storage shape
+- [x] Update higher workflow read/projection seams to stop reading legacy direct storage shape
 - [x] Add focused migration-guard tests for lower registry semantics and at least one higher consumer seam
 - [x] Verify migration does not leak raw root-registry semantics through the public `workflow-registry` API
 - [x] Record preserved adapter-owned compatibility behavior and seam-inventory findings in task artifacts
