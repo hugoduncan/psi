@@ -53,8 +53,10 @@ This task includes:
 
 - refactoring `workflow-registry` internals to use `root-registry` as the lower storage owner
 - preserving current `workflow-registry` public behavior at its adapter boundary
+- preserving the canonical persisted workflow-definition path `[:workflows :definitions]` as an adapter-owned compatibility surface for this task, rather than migrating callers to a new persisted path
 - keeping workflow-definition validation and id normalization explicit at the `workflow-registry` layer where they differ from generic shared substrate behavior
 - updating focused `workflow-registry` tests to prove preserved boundary semantics
+- keeping direct-path compatibility consumers coherent where they intentionally depend on the canonical workflow-definition path, including `session-state/state-path`, `workflow-runtime.model` documentation, and direct-path tests/docs that assert the current root-state layout
 - updating any higher consumer seams that should read through `workflow-registry` rather than legacy direct root-state shape where needed
 - adding migration-guard coverage for higher read/projection seams if any still implicitly depend on legacy workflow-definition storage shape
 
@@ -72,9 +74,10 @@ At the end of this task:
 
 - `workflow-registry` uses `root-registry` internally
 - current caller-facing `workflow-registry` behavior remains intact
+- the canonical persisted workflow-definition path remains `[:workflows :definitions]` for this migration, with that path treated as a preserved compatibility surface rather than an accidental legacy detail
 - workflow-definition validation, id normalization, and compatibility semantics remain explicit at the `workflow-registry` boundary
 - tests clearly distinguish shared storage behavior from workflow-registry adapter behavior
-- higher read surfaces no longer depend on legacy direct workflow-definition storage shape
+- higher read surfaces are explicitly classified as either preserved canonical-path compatibility consumers or redirected to authoritative `workflow-registry` helpers
 
 ## Migration direction
 
@@ -127,20 +130,20 @@ This migration must follow the explicit guidance added to task `164` after tasks
 - enumerate all read/projection/introspection seams
 - classify compatibility requirements per seam
 - add seam-level migration-guard tests
-- prove higher seams no longer read legacy local storage shape
+- prove higher seams either continue to read the preserved canonical compatibility path intentionally or are redirected away from non-authoritative storage reads
 - run focused and full-suite verification before close
 
 This is especially important because `workflow-registry` already lives in root-state, which makes stale direct-state reads harder to notice than in tool/command migrations.
 
-## Known design questions to resolve during refinement
+## Seam classification resolved during refinement
 
-This task should answer these explicitly with caller and test evidence:
+Current evidence resolves these ambiguity-review follow-ups for this task:
 
-- whether the current tuple-shaped lower API must remain exactly preserved or only adapter-equivalent
-- whether throw-on-missing remove semantics are truly required at the current lower boundary or only at public adapters
-- which higher workflow resolver / mutation / psi-tool seams currently read raw workflow-definition state and must be redirected or regression-tested
-- whether any legacy direct root-state reads should be removed entirely in favor of the workflow-registry query helpers
-- whether `root-registry` entry result shapes should remain completely hidden from workflow-facing callers
+- The canonical persisted workflow-definition path remains `[:workflows :definitions]` for this migration. `workflow-registry/definitions-path`, `session-state/state-path :workflow-definitions`, `workflow-runtime.model` root-state documentation, and direct-path root-state tests currently define that path as a compatibility surface, so this task preserves it rather than migrating callers to a new persisted location.
+- Direct-path compatibility consumers that assert the canonical root-state layout are therefore in scope for coherence, not in scope for relocation. That includes `session-state/state.clj`, `workflow-runtime.model` docs, and integration tests that assert workflow definitions still live under `[:workflows :definitions]`.
+- Higher read/projection seams that should prefer authoritative registry helpers remain in scope for inventory and targeted migration-guard coverage, especially resolver/mutation/psi-tool surfaces that expose registered workflow definitions semantically rather than raw root-state layout.
+- Extension-runtime `:loaded-definitions` is classified as an in-memory reload/prompt-contribution cache, not the canonical persisted workflow-definition store. It remains in scope as a higher projection/read seam that must stay coherent with the canonical registry contents after reload, but it does not redefine the persisted storage contract and does not by itself require migration of the canonical path.
+- `root-registry` entry result shapes should remain hidden from workflow-facing callers; preserved tuple-shaped workflow-registry contracts and canonical-path compatibility behavior stay owned by the adapter boundary.
 
 ## Acceptance
 
