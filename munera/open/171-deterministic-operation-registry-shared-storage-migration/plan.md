@@ -7,10 +7,11 @@ Execute task `171` only after task `172` is complete. That prerequisite is alrea
 Use a single migration path:
 
 1. inventory the current deterministic-operation write/read/cleanup seams named in `design.md`
-2. move canonical operation entry ownership onto shared `root-registry` storage
-3. keep invoke and public registry-object behaviour adapter-owned
-4. update focused lower and higher proofs for the migrated ownership split
-5. update the task artifacts with the final authoritative-vs-derived registry-object state classification proved by the migration
+2. record the extension-introspection ownership split explicitly before code changes: runtime deterministic-operation entries migrate to shared `root-registry`, while extension-registry `:operations` remains an upper projection surface and must not be treated as canonical invoke-time storage
+3. move canonical operation entry ownership onto shared `root-registry` storage
+4. keep invoke and public registry-object behaviour adapter-owned
+5. update focused lower and higher proofs for the migrated ownership split, including extension introspection coherence alongside invoke/cleanup coherence
+6. update the task artifacts with the final authoritative-vs-derived registry-object state classification proved by the migration
 
 ## Task-local artifact roles
 

@@ -227,6 +227,7 @@ This migration must follow the seam-audit rule established in `164` and exercise
 - `invoke-operation-in`
 - workflow invoke runtime callers in `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj`
 - extension/runtime reload and cleanup proofs in `components/agent-session/test/psi/agent_session/extensions_test.clj`
+- extension introspection/projection seams in `components/agent-session/src/psi/agent_session/extensions.clj`, especially `operation-ids-in`, `extension-detail-in`, `extension-details-in`, and `summary-in`
 - any integration tests that still assume adapter-local canonical storage shape rather than public registry behaviour
 
 ### Adapter-local state classification to record
@@ -249,8 +250,22 @@ Add at least one focused proof for each of these seams:
 
 - extension runtime registration still makes the operation invokable through the registry object
 - extension reload/unregister cleanup still removes stale operation ids so invoke lookup cannot outlive extension ownership
+- extension introspection remains coherent after migration, with operation-facing projection surfaces reading an intentionally owned projection rather than a stale parallel canonical store
 
 A migration is not complete just because lower component tests pass; higher seams must prove no stale local canonical reads survive.
+
+## Extension introspection ownership after migration
+
+Extension-facing introspection in `components/agent-session/src/psi/agent_session/extensions.clj` remains extension-registry-owned projection state rather than the canonical owner of deterministic operations.
+
+After migration:
+
+- shared `root-registry` inside `deterministic-operation-registry` is the only canonical owner for runtime deterministic-operation entries
+- extension-registry `:extensions ... :operations` remains an upper projection used for extension-facing introspection such as `operation-ids-in`, `extension-detail-in`, `extension-details-in`, and `summary-in`
+- that extension-local `:operations` map must stay derivable/coherent with runtime registration and cleanup flows, but it must not be treated as the invoke-time or duplicate-detection source of truth
+- tests for extension registration and extension unload/reload must therefore prove both sides of the split: invoke/runtime behaviour comes from the migrated deterministic-operation registry, while extension introspection stays coherent as an explicitly synchronized projection
+
+This task does not migrate extension introspection onto shared `root-registry`; it makes the ownership split explicit so the migration cannot accidentally leave extension-local `:operations` reads pretending to be canonical runtime storage.
 
 ## Design constraints
 
