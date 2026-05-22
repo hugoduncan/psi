@@ -204,3 +204,28 @@ Result: 307 tests, 307 results as expected, 0 unexpected.
 
 ## 2026-05-22 — code-shaper review
 Reviewed task implementation against `code-shaper`, task artifacts, `psi-assistant-render.el`, streaming optimization/transcript tests, and `bb.edn`. New actionable code-shaping issue: the three assistant optimization ERTs duplicate the same `cl-letf` instrumentation setup and assertions for redraw/prefix/property capture, making the proof harder to mutate consistently; extract a small local test helper so each test states only its stream events and expected final/property suffixes.
+
+## 2026-05-22 — code-shaper follow-up execution
+Completed the newly added actionable follow-up from the code-shaper review.
+
+- Extracted `psi-test-with-assistant-streaming-instrumentation` in `psi-streaming-render-optimization-test.el` to share assistant redraw, prefix-overlay, and stream-property capture across the incremental delta, cumulative snapshot, and divergent merge optimization tests.
+- Kept each assistant behavior test distinct: each still states its own stream events, expected final assistant text, buffer rendering, suffix-only property captures, and no-redraw/no-prefix-recreation assertions.
+- Marked the follow-up step complete in `steps.md`.
+
+Verification:
+
+```sh
+emacs -Q --batch -L components/emacs-ui \
+  -l components/emacs-ui/test/psi-test-support.el \
+  -l components/emacs-ui/test/psi-streaming-transcript-test.el \
+  -l components/emacs-ui/test/psi-streaming-render-optimization-test.el \
+  -f ert-run-tests-batch-and-exit
+```
+
+Result: 36 tests, 36 results as expected, 0 unexpected.
+
+```sh
+bb emacs:test
+```
+
+Result: 307 tests, 307 results as expected, 0 unexpected.
