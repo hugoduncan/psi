@@ -95,3 +95,6 @@ Used the preloaded inconsistency-review result and checked `design-steps.md`. No
 
 ## 2026-05-22 — ambiguity review
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs hot-path code/tests (`psi-assistant-render.el`, `psi-events.el`, `psi-streaming-transcript-test.el`, plus conditional hotspot files by design reference). No new actionable ambiguities found: the mandatory assistant/thinking scope, conditional hotspot triggers, append-vs-redraw rule after effective-next-text calculation, helper-wrapper instrumentation seam, thinking suffix-mutation proof, ordered implementation steps, and verification/closure notes are explicit enough to implement. Existing `design-steps.md` follow-ups remain complete; no new follow-up items were added.
+
+## 2026-05-22 — ambiguity follow-up execution
+Used the preloaded ambiguity-review result and checked `design-steps.md`. No newly added unchecked actionable ambiguity follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
