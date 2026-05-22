@@ -77,3 +77,6 @@ Used the preloaded ambiguity-review result and completed the newly added design 
 
 ## 2026-05-22 — inconsistency review
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs hot-path code/tests (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-events.el`, `psi-tool-rows.el`) for cross-file inconsistencies. No new actionable inconsistencies found: mandatory assistant/thinking scope, conditional hotspot triggers, append-vs-redraw after effective-next-text calculation, helper-wrapper instrumentation seams, thinking suffix-range proof, ordered implementation steps, and verification expectations are aligned across the task artifacts. Existing `design-steps.md` follow-ups remain complete; no new follow-up items were added.
+
+## 2026-05-22 — inconsistency follow-up execution
+Used the preloaded inconsistency-review result and checked `design-steps.md`. No newly added unchecked actionable design follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.

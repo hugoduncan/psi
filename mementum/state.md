@@ -39,6 +39,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
+- 2026-05-22: Executed task 166 inconsistency follow-up after thinking-proof clarification; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
 - 2026-05-22: Executed task 166 ambiguity follow-up: clarified thinking append-only proof uses inserted suffix mutation range and no post-creation full redraw/prefix overlay recreation, not nonexistent assistant-style property ranges.
 - 2026-05-22: Executed task 166 inconsistency follow-up: corrected divergent assistant snapshot acceptance to preserve existing merge/append semantics after effective-next-text calculation; design-step completed.
 - 2026-05-22: Executed task 166 ambiguity follow-up: pre-optimization instrumentation proof must use named helper wrappers (full redraw, stream property range, prefix overlay), with primitive advice only as temporary diagnostics; task artifacts updated and design-step completed.
