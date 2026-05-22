@@ -164,3 +164,6 @@ Reviewed the task implementation tests against `task-test-review`, `design.md` a
 
 ## 2026-05-22 — test-review follow-up execution
 Used the preloaded test-review result and checked `steps.md`. No newly added unchecked actionable follow-up items were present; all implementation and test follow-up steps remain complete. No task, code, or test changes were required.
+
+## 2026-05-22 — test review repeat
+Reviewed task tests against `task-test-review`, including `design.md` acceptance/proof requirements, `plan.md`, `steps.md`, `psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-streaming-render-optimization-test.el`, and `bb.edn`. No new actionable test-quality feedback found: required assistant/thinking behaviours and optimization proof paths are covered by focused ERT tests loaded by `bb emacs:test`; conditional tool/widget/projection suites are not required because those hotspots were not changed. Focused verification rerun: 34 tests, 34 expected, 0 unexpected.
