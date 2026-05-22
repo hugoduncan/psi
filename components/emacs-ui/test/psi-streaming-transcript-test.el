@@ -465,9 +465,22 @@ thinking prefix.
            '((:event . "assistant/message")
              (:data . ((:role . "assistant")
                        (:content . [((:type . :text) (:text . "move me"))])))))
-          (should (equal (point-max) (point))))
+          (should (= (psi-emacs--input-start-position) (point))))
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
+(ert-deftest psi-assistant-finalize-fallback-does-not-place-point-on-input-separator ()
+  "Finalizing from transcript fallback enters input, not separator."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--ensure-input-area)
+    (goto-char (point-min))
+    (psi-emacs--handle-rpc-event
+     '((:event . "assistant/message") (:data . ((:text . "done")))))
+    (should (psi-emacs--input-separator-marker-valid-p))
+    (should-not (= (psi-emacs--input-separator-position) (point)))
+    (should (= (psi-emacs--input-start-position) (point)))))
 
 (ert-deftest psi-tool-lifecycle-updates-single-inline-row-by-tool-id ()
   (with-temp-buffer

@@ -671,7 +671,11 @@ from the next user prompt."
                  (input-end-after (psi-emacs--draft-end-position))
                  (restored (+ input-start-after (or input-offset 0))))
             (goto-char (max input-start-after (min restored input-end-after))))
-        (goto-char (psi-emacs--transcript-append-position))))))
+        ;; Default completion placement belongs in the editable input area, not
+        ;; at the transcript append boundary.  With a dedicated input separator,
+        ;; `psi-emacs--transcript-append-position' is the separator line start,
+        ;; which made point visibly jump to the divider after some completions.
+        (goto-char (psi-emacs--input-start-position))))))
 
 (defun psi-emacs--assistant-content-kind (value)
   "Return normalized kind/type token for VALUE, or nil."
