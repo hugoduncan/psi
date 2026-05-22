@@ -10,6 +10,7 @@ Use a single migration path:
 2. move canonical operation entry ownership onto shared `root-registry` storage
 3. keep invoke and public registry-object behaviour adapter-owned
 4. update focused lower and higher proofs for the migrated ownership split
+5. update the task artifacts with the final authoritative-vs-derived registry-object state classification proved by the migration
 
 ## Task-local artifact roles
 
