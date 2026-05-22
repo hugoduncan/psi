@@ -53,7 +53,8 @@
 (defn slash-candidates
   [state prefix]
   (let [templates  (mapv (fn [{:keys [name]}] (str "/" name)) (:prompt-templates state))
-        skills     (mapv (fn [{:keys [name]}] (str "/skill:" name)) (:skills state))
+        skills     (mapv (fn [{:keys [name]}] (str "/skill:" name))
+                         (sort-by :name compare (:skills state)))
         ext-cmds   (vec (keep as-slash-command (:extension-command-names state)))
         all        (->> (concat shared/builtin-slash-commands templates skills ext-cmds)
                         (remove str/blank?)

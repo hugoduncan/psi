@@ -137,3 +137,7 @@ Completed the newly added `steps.md` follow-up. `skills-by-source` now groups sk
 ## 2026-05-22 test review
 
 Found one actionable test gap: TUI skill display/autocomplete is an affected ordered surface, but current proof stops at the session resolver / prompt-assets helpers and does not exercise the TUI projection path that consumes `:psi.agent-session/skills` into app state and renders/suggests skill names. A regression could reintroduce raw session-vector order before the banner/autocomplete without focused coverage.
+
+## 2026-05-22 test review follow-up execution
+
+Completed the newly added `steps.md` follow-up. TUI skill banner rendering now sorts visible skills by exact `:name` before display, and slash autocomplete sorts skill candidates by exact skill `:name` before building `/skill:name` entries, so neither surface can expose raw session `:skills` vector order. Added focused TUI projection and input-selector tests with unsorted session skills. Verification: `clojure -M:test --focus psi.prompt-assets.skills-test --focus psi.agent-session.resolvers-test --focus psi.tui.app-input-selector-test --focus psi.tui.app-projection-test` passed (62 tests, 299 assertions); `clj-kondo --lint components/tui/src components/tui/test` passed.

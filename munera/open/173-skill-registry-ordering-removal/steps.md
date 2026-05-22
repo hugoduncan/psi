@@ -8,4 +8,4 @@
 - [x] Add or update focused tests to prove the selected ordering contract while preserving duplicate-ignore and `:added?` / `:changed?`.
 - [x] Update `munera/open/164-registry-semantics-unification-audit/` to reflect the selected branch.
 - [x] Canonicalize `skills-by-source` / `:psi.skill/by-source` per-source vectors by skill `:name` and add focused proof that source-grouped discovery output does not preserve raw session vector order.
-- [ ] Add focused TUI coverage proving skill banner/autocomplete order is canonical by skill `:name` when session `:skills` starts unsorted (or otherwise prove the TUI state is sourced through `:psi.agent-session/skills` canonical resolver output).
+- [x] Add focused TUI coverage proving skill banner/autocomplete order is canonical by skill `:name` when session `:skills` starts unsorted (or otherwise prove the TUI state is sourced through `:psi.agent-session/skills` canonical resolver output).
