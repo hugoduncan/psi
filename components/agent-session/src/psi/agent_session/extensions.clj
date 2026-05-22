@@ -405,12 +405,14 @@
         ext   (get-in state [:extensions ext-path])]
     (when ext
       (let [commands (filter #(= ext-path (:extension-path %))
-                             (command-registry/all-commands-in reg))]
+                             (command-registry/all-commands-in reg))
+            tools    (filter #(= ext-path (:extension-path %))
+                             (tool-registry/all-tools-in reg))]
         {:path            ext-path
          :handler-names   (into (sorted-set) (keys (:handlers ext)))
          :handler-count   (reduce + 0 (map count (vals (:handlers ext))))
-         :tool-names      (into (sorted-set) (keys (:tools ext)))
-         :tool-count      (count (:tools ext))
+         :tool-names      (into (sorted-set) (map :name) tools)
+         :tool-count      (count tools)
          :operation-ids   (into (sorted-set) (keys (:operations ext)))
          :operation-count (count (:operations ext))
          :command-names   (into (sorted-set) (map :name) commands)
