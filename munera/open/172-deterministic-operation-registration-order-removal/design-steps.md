@@ -1,3 +1,3 @@
 - [x] Add `plan.md` with the intended implementation approach for this task so ambiguity review can evaluate whether the design is being executed through a single unambiguous method.
 - [x] Add `steps.md` with an explicit execution checklist for this task so ambiguity review can evaluate coverage/completeness against the design acceptance and affected proof surfaces.
-- [ ] Update `steps.md` so it explicitly names the required `components/agent-session/test/psi/agent_session/extensions_test.clj` unordered-membership proof pass called out in `design.md`, rather than leaving that higher-surface obligation implicit under a generic “higher proof surfaces” step.
+- [x] Update `steps.md` so it explicitly names the required `components/agent-session/test/psi/agent_session/extensions_test.clj` unordered-membership proof pass called out in `design.md`, rather than leaving that higher-surface obligation implicit under a generic “higher proof surfaces” step.
