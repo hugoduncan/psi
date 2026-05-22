@@ -204,19 +204,22 @@ the prefix face leaks onto unrelated later text."
                           end)))
       (cons content-start (max content-start content-end)))))
 
+(defun psi-emacs--apply-assistant-stream-verbatim-range (start end)
+  "Apply stream-time assistant verbatim properties to START..END."
+  (when (< start end)
+    (let ((inhibit-read-only t))
+      (add-text-properties
+       start
+       end
+       (list 'face 'default
+             'font-lock-face nil
+             psi-emacs--assistant-stream-verbatim-property t)))))
+
 (defun psi-emacs--set-assistant-stream-verbatim (range)
   "Apply verbatim display properties to in-progress assistant RANGE."
   (when-let ((content-range (psi-emacs--assistant-content-range range)))
-    (let ((start (car content-range))
-          (end (cdr content-range)))
-      (when (< start end)
-        (let ((inhibit-read-only t))
-          (add-text-properties
-           start
-           end
-           (list 'face 'default
-                 'font-lock-face nil
-                 psi-emacs--assistant-stream-verbatim-property t)))))))
+    (psi-emacs--apply-assistant-stream-verbatim-range (car content-range)
+                                                      (cdr content-range))))
 
 (defun psi-emacs--clear-assistant-stream-verbatim (range)
   "Remove verbatim display properties from assistant RANGE."
@@ -255,6 +258,69 @@ Clears stream-time verbatim properties, then applies markdown processing."
       (psi-emacs--apply-finalized-assistant-markdown (car content-range)
                                                      (cdr content-range)))))
 
+(defun psi-emacs--assistant-line-content-text (range)
+  "Return current assistant content text for live RANGE."
+  (when-let ((content-range (psi-emacs--assistant-content-range range)))
+    (buffer-substring-no-properties (car content-range) (cdr content-range))))
+
+(defun psi-emacs--redraw-assistant-line (range text stream-verbatim)
+  "Redraw live assistant RANGE with complete TEXT.
+
+When STREAM-VERBATIM is non-nil, apply stream-time properties over the
+newly-rendered assistant content.  This helper is the narrow full-redraw
+instrumentation seam for streaming tests."
+  (let ((start (car range))
+        (end (cdr range)))
+    (let ((inhibit-read-only t))
+      (goto-char start)
+      (delete-region start end)
+      (insert (psi-emacs--render-assistant-line text))
+      (psi-emacs--mark-region-read-only start (point))
+      (set-marker end (point))
+      (psi-emacs--sync-assistant-region start end))
+    (when stream-verbatim
+      (psi-emacs--set-assistant-stream-verbatim range))))
+
+(defun psi-emacs--create-assistant-line (text stream-verbatim)
+  "Create a live assistant line containing TEXT.
+
+When STREAM-VERBATIM is non-nil, apply stream-time properties to the
+created assistant content."
+  (psi-emacs--ensure-newline-before-append)
+  (let ((start (copy-marker (point) nil))
+        ;; Non-advancing end marker: tool rows inserted immediately after
+        ;; this assistant line must not cause the end marker to drift past
+        ;; them, which would make delete-region swallow the tool row on the
+        ;; next streaming delta.
+        (end (copy-marker (point) nil)))
+    (let ((inhibit-read-only t))
+      (insert (psi-emacs--render-assistant-line text))
+      (psi-emacs--mark-region-read-only start (point)))
+    (set-marker end (point))
+    (let ((range (cons start end)))
+      (psi-emacs--set-assistant-range-cache range)
+      (psi-emacs--sync-assistant-region start end)
+      (when stream-verbatim
+        (psi-emacs--set-assistant-stream-verbatim range))
+      range)))
+
+(defun psi-emacs--append-assistant-line-suffix (range suffix stream-verbatim)
+  "Append SUFFIX to live assistant RANGE.
+
+When STREAM-VERBATIM is non-nil, apply stream-time properties only to the
+inserted suffix range."
+  (when (not (string-empty-p suffix))
+    (let* ((content-range (psi-emacs--assistant-content-range range))
+           (insert-pos (cdr content-range)))
+      (goto-char insert-pos)
+      (let ((inhibit-read-only t))
+        (insert suffix)
+        (psi-emacs--mark-region-read-only insert-pos (point))
+        (set-marker (cdr range) (1+ (point)))
+        (psi-emacs--sync-assistant-region (car range) (cdr range)))
+      (when stream-verbatim
+        (psi-emacs--apply-assistant-stream-verbatim-range insert-pos (point))))))
+
 (defun psi-emacs--set-assistant-line (text &optional stream-verbatim)
   "Create or update the single assistant line with TEXT.
 
@@ -266,42 +332,106 @@ while streaming; markdown processing is deferred until finalization."
           (range (psi-emacs--assistant-range-current)))
       (if (psi-emacs--assistant-range-live-p range)
           (save-excursion
-            (let ((start (car range))
-                  (end (cdr range)))
-              (let ((inhibit-read-only t))
-                (goto-char start)
-                (delete-region start end)
-                (insert (psi-emacs--render-assistant-line text))
-                (psi-emacs--mark-region-read-only start (point))
-                (set-marker end (point))
-                (psi-emacs--sync-assistant-region start end))))
+            (let ((current (psi-emacs--assistant-line-content-text range)))
+              (if (and current (string-prefix-p current (or text "")))
+                  (psi-emacs--append-assistant-line-suffix
+                   range
+                   (substring (or text "") (length current))
+                   stream-verbatim)
+                (progn
+                  (psi-emacs--redraw-assistant-line range text stream-verbatim)
+                  (goto-char (marker-position (car range)))
+                  (psi-emacs--apply-prefix-overlay
+                   (line-beginning-position)
+                   psi-emacs--assistant-line-prefix
+                   'psi-emacs-assistant-reply-face)))))
         (save-excursion
-          (psi-emacs--ensure-newline-before-append)
-          (let ((start (copy-marker (point) nil))
-                ;; Non-advancing end marker: tool rows inserted immediately after
-                ;; this assistant line must not cause the end marker to drift past
-                ;; them, which would make delete-region swallow the tool row on the
-                ;; next streaming delta.
-                (end (copy-marker (point) nil)))
-            (let ((inhibit-read-only t))
-              (insert (psi-emacs--render-assistant-line text))
-              (psi-emacs--mark-region-read-only start (point)))
-            (set-marker end (point))
-            (psi-emacs--set-assistant-range-cache (cons start end))
-            (psi-emacs--sync-assistant-region start end))))
-      (let ((updated-range (psi-emacs--assistant-range-cache)))
-        (when (psi-emacs--assistant-range-live-p updated-range)
-          (save-excursion
-            (goto-char (marker-position (car updated-range)))
-            (psi-emacs--apply-prefix-overlay
-             (line-beginning-position)
-             psi-emacs--assistant-line-prefix
-             'psi-emacs-assistant-reply-face)))
-        (if stream-verbatim
-            (psi-emacs--set-assistant-stream-verbatim updated-range)
-          (psi-emacs--clear-assistant-stream-verbatim updated-range)))
+          (setq range (psi-emacs--create-assistant-line text stream-verbatim))
+          (goto-char (marker-position (car range)))
+          (psi-emacs--apply-prefix-overlay
+           (line-beginning-position)
+           psi-emacs--assistant-line-prefix
+           'psi-emacs-assistant-reply-face)))
+      (unless stream-verbatim
+        (psi-emacs--clear-assistant-stream-verbatim
+         (psi-emacs--assistant-range-current)))
       (when follow-anchor
         (psi-emacs--set-draft-anchor-to-end)))))
+
+(defun psi-emacs--thinking-content-range (range)
+  "Return thinking content (not prefix/newline) region for RANGE."
+  (when (psi-emacs--assistant-range-live-p range)
+    (let* ((start (marker-position (car range)))
+           (end (marker-position (cdr range)))
+           (content-start (+ start (length psi-emacs--thinking-line-prefix)))
+           (content-end (if (and (> end content-start)
+                                 (eq (char-before end) ?\n))
+                            (1- end)
+                          end)))
+      (cons content-start (max content-start content-end)))))
+
+(defun psi-emacs--thinking-line-content-text (range)
+  "Return current thinking content text for live RANGE."
+  (when-let ((content-range (psi-emacs--thinking-content-range range)))
+    (buffer-substring-no-properties (car content-range) (cdr content-range))))
+
+(defun psi-emacs--redraw-thinking-line (range text)
+  "Redraw live thinking RANGE with complete TEXT.
+
+This helper is the narrow full-redraw instrumentation seam for streaming
+tests."
+  (let ((start (car range))
+        (end (cdr range)))
+    (let ((inhibit-read-only t))
+      (goto-char start)
+      (delete-region start end)
+      (insert (psi-emacs--render-thinking-line text))
+      (psi-emacs--mark-region-read-only start (point))
+      (set-marker end (point))
+      (psi-emacs--sync-thinking-region start end))))
+
+(defun psi-emacs--create-thinking-line (text)
+  "Create a live thinking line containing TEXT."
+  (let* ((assistant-start-marker (psi-emacs--assistant-start-marker)))
+    (if assistant-start-marker
+        (progn
+          (goto-char (marker-position assistant-start-marker))
+          (unless (or (bobp) (eq (char-before) ?\n))
+            (let ((inhibit-read-only t)) (insert "\n")))
+          (let ((start (copy-marker (point) nil))
+                (end (copy-marker (point) nil)))
+            (let ((inhibit-read-only t))
+              (insert (psi-emacs--render-thinking-line text))
+              (psi-emacs--mark-region-read-only start (point)))
+            (set-marker end (point))
+            (let ((range (cons start end)))
+              (psi-emacs--set-thinking-range-cache range)
+              (psi-emacs--sync-thinking-region start end)
+              (set-marker assistant-start-marker (point))
+              range)))
+      (psi-emacs--ensure-newline-before-append)
+      (let ((start (copy-marker (point) nil))
+            (end (copy-marker (point) nil)))
+        (let ((inhibit-read-only t))
+          (insert (psi-emacs--render-thinking-line text))
+          (psi-emacs--mark-region-read-only start (point)))
+        (set-marker end (point))
+        (let ((range (cons start end)))
+          (psi-emacs--set-thinking-range-cache range)
+          (psi-emacs--sync-thinking-region start end)
+          range)))))
+
+(defun psi-emacs--append-thinking-line-suffix (range suffix)
+  "Append SUFFIX to live thinking RANGE."
+  (when (not (string-empty-p suffix))
+    (let* ((content-range (psi-emacs--thinking-content-range range))
+           (insert-pos (cdr content-range)))
+      (goto-char insert-pos)
+      (let ((inhibit-read-only t))
+        (insert suffix)
+        (psi-emacs--mark-region-read-only insert-pos (point))
+        (set-marker (cdr range) (1+ (point)))
+        (psi-emacs--sync-thinking-region (car range) (cdr range))))))
 
 (defun psi-emacs--set-thinking-line (text)
   "Create or update the single assistant thinking line with TEXT."
@@ -311,49 +441,25 @@ while streaming; markdown processing is deferred until finalization."
           (range (psi-emacs--thinking-range-current)))
       (if (psi-emacs--assistant-range-live-p range)
           (save-excursion
-            (let ((start (car range))
-                  (end (cdr range)))
-              (let ((inhibit-read-only t))
-                (goto-char start)
-                (delete-region start end)
-                (insert (psi-emacs--render-thinking-line text))
-                (psi-emacs--mark-region-read-only start (point))
-                (set-marker end (point))
-                (psi-emacs--sync-thinking-region start end))))
-        (save-excursion
-          (let* ((assistant-start-marker (psi-emacs--assistant-start-marker)))
-            (if assistant-start-marker
+            (let ((current (psi-emacs--thinking-line-content-text range)))
+              (if (and current (string-prefix-p current (or text "")))
+                  (psi-emacs--append-thinking-line-suffix
+                   range
+                   (substring (or text "") (length current)))
                 (progn
-                  (goto-char (marker-position assistant-start-marker))
-                  (unless (or (bobp) (eq (char-before) ?\n))
-                    (let ((inhibit-read-only t)) (insert "\n")))
-                  (let ((start (copy-marker (point) nil))
-                        (end (copy-marker (point) nil)))
-                    (let ((inhibit-read-only t))
-                      (insert (psi-emacs--render-thinking-line text))
-                      (psi-emacs--mark-region-read-only start (point)))
-                    (set-marker end (point))
-                    (psi-emacs--set-thinking-range-cache (cons start end))
-                    (psi-emacs--sync-thinking-region start end)
-                    (set-marker assistant-start-marker (point))))
-              (progn
-                (psi-emacs--ensure-newline-before-append)
-                (let ((start (copy-marker (point) nil))
-                      (end (copy-marker (point) nil)))
-                  (let ((inhibit-read-only t))
-                    (insert (psi-emacs--render-thinking-line text))
-                    (psi-emacs--mark-region-read-only start (point)))
-                  (set-marker end (point))
-                  (psi-emacs--set-thinking-range-cache (cons start end))
-                  (psi-emacs--sync-thinking-region start end)))))))
-      (let ((updated-range (psi-emacs--thinking-range-current)))
-        (when (psi-emacs--assistant-range-live-p updated-range)
-          (save-excursion
-            (goto-char (marker-position (car updated-range)))
-            (psi-emacs--apply-prefix-overlay
-             (line-beginning-position)
-             psi-emacs--thinking-line-prefix
-             'psi-emacs-assistant-thinking-face))))
+                  (psi-emacs--redraw-thinking-line range text)
+                  (goto-char (marker-position (car range)))
+                  (psi-emacs--apply-prefix-overlay
+                   (line-beginning-position)
+                   psi-emacs--thinking-line-prefix
+                   'psi-emacs-assistant-thinking-face)))))
+        (save-excursion
+          (setq range (psi-emacs--create-thinking-line text))
+          (goto-char (marker-position (car range)))
+          (psi-emacs--apply-prefix-overlay
+           (line-beginning-position)
+           psi-emacs--thinking-line-prefix
+           'psi-emacs-assistant-thinking-face)))
       (when follow-anchor
         (psi-emacs--set-draft-anchor-to-end)))))
 
