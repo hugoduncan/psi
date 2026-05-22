@@ -20,3 +20,9 @@ Initial intent:
 
 2026-05-21 inconsistency review:
 - Actionable: `design.md`/`plan.md` require redirecting higher semantic read/projection seams away from direct root-state shape where appropriate, but `steps.md` has no explicit step to audit and fix helper/test seams that still bypass `workflow-registry`, including `components/agent-session/test/psi/agent_session/workflow_test_support.clj` directly `assoc-in`ing `[:workflows :definitions ...]`. Add a seam-specific follow-up so preserved canonical-path compatibility does not blur with semantic helper bypasses.
+
+2026-05-21 inconsistency follow-up execution:
+- Audited helper/test higher semantic seams for direct workflow-definition shape bypasses. Most runtime and test callers already exercise the authoritative `workflow-registry` register/list/remove helpers; intentional direct-path assertions remain only in canonical compatibility tests/docs such as `session-state` and workflow runtime model comments.
+- Confirmed one actionable helper bypass in `components/agent-session/test/psi/agent_session/workflow_test_support.clj`, where `load-all-workflow-definitions!` populated state via direct `assoc-in [:workflows :definitions ...]` writes instead of the authoritative registry boundary.
+- Migrated that helper to register compiled definitions through `workflow-registry/register-definition`, preserving higher semantic coverage while still leaving explicit canonical-path compatibility assertions to dedicated tests.
+- Updated `steps.md` to add an explicit helper/test seam-audit step so the remaining implementation scope distinguishes semantic-boundary migration from intentional canonical-path compatibility coverage.

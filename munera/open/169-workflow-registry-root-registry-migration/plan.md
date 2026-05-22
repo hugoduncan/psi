@@ -12,7 +12,7 @@
    - preservation of `[:workflows :definitions]` as the canonical persisted compatibility path for this migration
    - classification of extension-runtime `:loaded-definitions` as a coherent higher projection/cache rather than canonical persisted storage
 3. Refactor `workflow-registry` internals to use `root-registry` as the lower storage owner while preserving current public behavior at the adapter boundary and preserving the canonical persisted path exposed by compatibility helpers/docs/tests.
-4. Update higher read/projection seams to use authoritative `workflow-registry` helpers where they expose workflow-definition semantics, while keeping intentional canonical-path compatibility seams coherent.
+4. Update higher read/projection seams to use authoritative `workflow-registry` helpers where they expose workflow-definition semantics, while keeping intentional canonical-path compatibility seams coherent. This includes auditing helper/test seams separately from explicit canonical-path compatibility assertions so semantic setup helpers do not bypass the registry boundary by writing `[:workflows :definitions ...]` directly.
 5. Add focused migration-guard tests:
    - lower `workflow-registry` contract tests
    - canonical-path compatibility coverage where root-state layout is intentionally preserved

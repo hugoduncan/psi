@@ -7,7 +7,8 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.workflow-loader.compiler :as workflow-file-compiler]
-   [psi.workflow-loader.core :as workflow-file-loader]))
+   [psi.workflow-loader.core :as workflow-file-loader]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (def workflow-extensions-cwd
   "/Users/duncan/projects/hugoduncan/psi/workflow-extensions")
@@ -45,5 +46,7 @@
     (when (seq errors)
       (throw (ex-info "compile errors" {:errors errors})))
     (doseq [d definitions]
-      (swap! (:state* ctx) assoc-in [:workflows :definitions (:definition-id d)] d))
+      (swap! (:state* ctx)
+             (fn [state]
+               (first (workflow-registry/register-definition state d)))))
     definitions))
