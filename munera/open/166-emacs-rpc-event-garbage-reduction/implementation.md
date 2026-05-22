@@ -41,3 +41,6 @@ Defined the pre-optimization instrumentation seam. The committed proof interface
 
 ## 2026-05-22 — inconsistency review
 Reviewed `design.md`, implementation-ready `plan.md`/`steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs streaming/render tests/code (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`). No new actionable inconsistencies found: mandatory assistant/thinking scope, conditional hotspot handling, pre-optimization helper instrumentation seam, append-vs-redraw contract, and verification steps are aligned across task artifacts. Existing `design-steps.md` items remain complete; no new follow-up items were added.
+
+## 2026-05-22 — inconsistency follow-up execution
+Used the preloaded inconsistency-review result and checked `design-steps.md`. No newly added unchecked actionable design follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
