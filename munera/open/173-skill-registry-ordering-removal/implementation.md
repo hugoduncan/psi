@@ -100,3 +100,7 @@ No new actionable inconsistency feedback. Re-read `design.md`, `plan.md`, `steps
 ## 2026-05-22 inconsistency follow-up execution
 
 No newly added unchecked inconsistency follow-up items were present in `design-steps.md` after the preloaded no-feedback inconsistency review. All design follow-up steps remain complete, so no `design.md`, `plan.md`, or `steps.md` changes were needed.
+
+## 2026-05-22 ambiguity review
+
+Found one new actionable ambiguity: `design.md` says workflow child-session requested skill order may remain caller-specified selection order, while branch B/C require canonical ordering for prompt/display/model-visible surfaces and `system_prompt/filter-skills` currently preserves parent/session order when applying `:skill-names` subset filtering. The task does not yet say whether prompt-component / workflow subset output should be caller selection order, canonical skill-name order, or inherited registry/session order, nor whether that surface is included in the branch B/C changes.
