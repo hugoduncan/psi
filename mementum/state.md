@@ -15,7 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- 2026-05-22: Reviewed task 166 for design/plan/steps ambiguities; added one new actionable follow-up clarifying thinking append-only proof for property/mutation ranges; committed e92dbd7b.
+- 2026-05-22: Executed task 166 ambiguity follow-up clarifying thinking append-only proof: assistant property ranges are suffix-only, while thinking proof uses inserted suffix mutation range plus no redraw/overlay recreation; committed e8057a3a.
 - 2026-05-21: Fixed OpenAI OAuth `gpt-5.5` routing (commit 009aed51).
   - Root cause: `gpt-5.5` used platform chat-completions while active OpenAI auth was ChatGPT OAuth; platform path returned `insufficient_quota`.
   - Runtime resolution now maps OAuth-backed `openai/gpt-5.5` to `:openai-codex-responses` / `https://chatgpt.com/backend-api`, preserving visible id `gpt-5.5`.
@@ -39,7 +39,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
-- 2026-05-22: Reviewed task 166 for design/plan/steps ambiguities; added one actionable follow-up clarifying thinking append-only proof: whether to assert no property application, instrument inserted-suffix mutation range, or add thinking-specific property wrapper.
+- 2026-05-22: Executed task 166 ambiguity follow-up: clarified thinking append-only proof uses inserted suffix mutation range and no post-creation full redraw/prefix overlay recreation, not nonexistent assistant-style property ranges.
 - 2026-05-22: Executed task 166 inconsistency follow-up: corrected divergent assistant snapshot acceptance to preserve existing merge/append semantics after effective-next-text calculation; design-step completed.
 - 2026-05-22: Executed task 166 ambiguity follow-up: pre-optimization instrumentation proof must use named helper wrappers (full redraw, stream property range, prefix overlay), with primitive advice only as temporary diagnostics; task artifacts updated and design-step completed.
 - 2026-05-22: Reviewed Munera task 166 for ambiguities after implementation planning; added one actionable design follow-up to define the pre-optimization instrumentation seam and committed it as c3f8ebdb.
