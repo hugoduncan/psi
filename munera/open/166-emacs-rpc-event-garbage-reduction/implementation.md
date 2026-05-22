@@ -201,3 +201,6 @@ bb emacs:test
 ```
 
 Result: 307 tests, 307 results as expected, 0 unexpected.
+
+## 2026-05-22 — code-shaper review
+Reviewed task implementation against `code-shaper`, task artifacts, `psi-assistant-render.el`, streaming optimization/transcript tests, and `bb.edn`. New actionable code-shaping issue: the three assistant optimization ERTs duplicate the same `cl-letf` instrumentation setup and assertions for redraw/prefix/property capture, making the proof harder to mutate consistently; extract a small local test helper so each test states only its stream events and expected final/property suffixes.

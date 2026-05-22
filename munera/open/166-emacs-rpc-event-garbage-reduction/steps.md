@@ -17,3 +17,4 @@
 - [x] Commit the implementation with task notes updated.
 - [x] Add `components/emacs-ui/test/psi-streaming-render-optimization-test.el` to `bb emacs:test` or move its proof tests into a loaded suite, then rerun/record the focused and full Emacs verification counts.
 - [x] Split the assistant append optimization proof into distinct focused tests for incremental delta append, extending cumulative snapshot suffix append, and divergent assistant merge preservation, keeping suffix-only property and no-redraw/no-prefix assertions local to each behavior.
+- [ ] Extract a shared assistant streaming optimization test helper in `psi-streaming-render-optimization-test.el` so the incremental, cumulative snapshot, and divergent merge tests do not duplicate the `cl-letf` instrumentation boilerplate while preserving their distinct expected behavior assertions.
