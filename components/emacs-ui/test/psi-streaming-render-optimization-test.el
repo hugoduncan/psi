@@ -11,10 +11,9 @@
 (require 'psi)
 (require 'psi-rpc)
 
-(ert-deftest psi-assistant-streaming-append-path-avoids-redraw-and-prefix-recreation ()
-  ;; Append-only assistant updates should mutate only the new suffix after
-  ;; initial block creation, preserving existing merge semantics for both
-  ;; delta chunks and divergent payloads.
+(ert-deftest psi-assistant-streaming-incremental-delta-append-path-avoids-redraw-and-prefix-recreation ()
+  ;; Incremental assistant delta chunks should append only the new suffix after
+  ;; initial block creation.
   (with-temp-buffer
     (psi-emacs-mode)
     (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
@@ -41,19 +40,93 @@
          '((:event . "assistant/delta") (:data . ((:text . "Hel")))))
         (psi-emacs--handle-rpc-event
          '((:event . "assistant/delta") (:data . ((:text . "lo")))))
-        (psi-emacs--handle-rpc-event
-         '((:event . "assistant/delta") (:data . ((:text . "Hello!")))))
-        (psi-emacs--handle-rpc-event
-         '((:event . "assistant/delta") (:data . ((:text . "Goodbye")))))
-        (should (equal "Hello!Goodbye"
+        (should (equal "Hello"
                        (psi-emacs-state-assistant-in-progress psi-emacs--state)))
-        (should (equal "ψ: Hello!Goodbye\n"
+        (should (equal "ψ: Hello\n"
                        (buffer-substring-no-properties
                         (point-min)
                         (psi-emacs--input-separator-position))))
         (should-not redraws)
         (should (= 1 (length prefixes)))
-        (should (equal '("Goodbye" "!" "lo" "Hel") property-texts))))))
+        (should (equal '("lo" "Hel") property-texts))))))
+
+(ert-deftest psi-assistant-streaming-cumulative-snapshot-suffix-append-path-avoids-redraw-and-prefix-recreation ()
+  ;; Extending cumulative assistant snapshots should append only the suffix
+  ;; that is not already rendered.
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--ensure-input-area)
+    (let ((redraws nil)
+          (prefixes nil)
+          (property-texts nil)
+          (orig-redraw (symbol-function 'psi-emacs--redraw-assistant-line))
+          (orig-prefix (symbol-function 'psi-emacs--apply-prefix-overlay))
+          (orig-props (symbol-function 'psi-emacs--apply-assistant-stream-verbatim-range)))
+      (cl-letf (((symbol-function 'psi-emacs--redraw-assistant-line)
+                 (lambda (&rest args)
+                   (push args redraws)
+                   (apply orig-redraw args)))
+                ((symbol-function 'psi-emacs--apply-prefix-overlay)
+                 (lambda (&rest args)
+                   (push args prefixes)
+                   (apply orig-prefix args)))
+                ((symbol-function 'psi-emacs--apply-assistant-stream-verbatim-range)
+                 (lambda (start end)
+                   (push (buffer-substring-no-properties start end) property-texts)
+                   (funcall orig-props start end))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "assistant/delta") (:data . ((:text . "Hel")))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "assistant/delta") (:data . ((:text . "Hello!")))))
+        (should (equal "Hello!"
+                       (psi-emacs-state-assistant-in-progress psi-emacs--state)))
+        (should (equal "ψ: Hello!\n"
+                       (buffer-substring-no-properties
+                        (point-min)
+                        (psi-emacs--input-separator-position))))
+        (should-not redraws)
+        (should (= 1 (length prefixes)))
+        (should (equal '("lo!" "Hel") property-texts))))))
+
+(ert-deftest psi-assistant-streaming-divergent-merge-preservation-append-path-avoids-redraw-and-prefix-recreation ()
+  ;; Divergent assistant payloads preserve the existing merge-as-delta contract,
+  ;; then append only that effective suffix.
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--ensure-input-area)
+    (let ((redraws nil)
+          (prefixes nil)
+          (property-texts nil)
+          (orig-redraw (symbol-function 'psi-emacs--redraw-assistant-line))
+          (orig-prefix (symbol-function 'psi-emacs--apply-prefix-overlay))
+          (orig-props (symbol-function 'psi-emacs--apply-assistant-stream-verbatim-range)))
+      (cl-letf (((symbol-function 'psi-emacs--redraw-assistant-line)
+                 (lambda (&rest args)
+                   (push args redraws)
+                   (apply orig-redraw args)))
+                ((symbol-function 'psi-emacs--apply-prefix-overlay)
+                 (lambda (&rest args)
+                   (push args prefixes)
+                   (apply orig-prefix args)))
+                ((symbol-function 'psi-emacs--apply-assistant-stream-verbatim-range)
+                 (lambda (start end)
+                   (push (buffer-substring-no-properties start end) property-texts)
+                   (funcall orig-props start end))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "assistant/delta") (:data . ((:text . "Hello")))))
+        (psi-emacs--handle-rpc-event
+         '((:event . "assistant/delta") (:data . ((:text . "Goodbye")))))
+        (should (equal "HelloGoodbye"
+                       (psi-emacs-state-assistant-in-progress psi-emacs--state)))
+        (should (equal "ψ: HelloGoodbye\n"
+                       (buffer-substring-no-properties
+                        (point-min)
+                        (psi-emacs--input-separator-position))))
+        (should-not redraws)
+        (should (= 1 (length prefixes)))
+        (should (equal '("Goodbye" "Hello") property-texts))))))
 
 (ert-deftest psi-assistant-streaming-tail-churn-uses-redraw-fallback ()
   ;; Tail-churn cumulative snapshots preserve existing replacement semantics and

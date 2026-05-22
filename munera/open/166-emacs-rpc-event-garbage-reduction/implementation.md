@@ -173,3 +173,31 @@ Used the preloaded repeated test-review result and checked `steps.md`. No newly 
 
 ## 2026-05-22 — test-shaper review
 Reviewed task tests against `test-shaper`, `design.md` acceptance/proof requirements, `plan.md`, `steps.md`, `psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-streaming-render-optimization-test.el`, and `bb.edn`. New actionable test-quality issue: `psi-assistant-streaming-append-path-avoids-redraw-and-prefix-recreation` compresses incremental delta append, cumulative snapshot suffix append, and divergent assistant merge preservation into one proof, so a regression would fail a broad mixed-concern test instead of identifying the broken stream contract.
+
+## 2026-05-22 — test-shaper follow-up execution
+Completed the newly added actionable follow-up from the test-shaper review.
+
+- Split the combined assistant append optimization proof into three focused ERT tests in `psi-streaming-render-optimization-test.el`:
+  - incremental delta append;
+  - extending cumulative snapshot suffix append;
+  - divergent assistant merge preservation after effective-next-text calculation.
+- Each focused test now keeps its own suffix-only stream-property assertion plus no-redraw/no-prefix-recreation assertions local to that behavior.
+- Marked the follow-up step complete in `steps.md`.
+
+Verification:
+
+```sh
+emacs -Q --batch -L components/emacs-ui \
+  -l components/emacs-ui/test/psi-test-support.el \
+  -l components/emacs-ui/test/psi-streaming-transcript-test.el \
+  -l components/emacs-ui/test/psi-streaming-render-optimization-test.el \
+  -f ert-run-tests-batch-and-exit
+```
+
+Result: 36 tests, 36 results as expected, 0 unexpected.
+
+```sh
+bb emacs:test
+```
+
+Result: 307 tests, 307 results as expected, 0 unexpected.
