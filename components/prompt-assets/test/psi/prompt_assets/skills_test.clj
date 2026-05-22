@@ -310,18 +310,18 @@
 ;; ============================================================
 
 (deftest format-skills-for-prompt-test
-  (testing "formats visible skills as XML"
-    (let [all-skills [{:name "alpha" :description "Alpha skill"
-                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
-                       :source :user :disable-model-invocation false}
-                      {:name "beta" :description "Beta skill"
+  (testing "formats visible skills as XML in canonical skill-name order"
+    (let [all-skills [{:name "beta" :description "Beta skill"
                        :file-path "/beta/SKILL.md" :base-dir "/beta"
-                       :source :project :disable-model-invocation false}]
+                       :source :project :disable-model-invocation false}
+                      {:name "alpha" :description "Alpha skill"
+                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
+                       :source :user :disable-model-invocation false}]
           result (skills/format-skills-for-prompt all-skills)]
       (is (str/includes? result "<available_skills>"))
       (is (str/includes? result "</available_skills>"))
-      (is (str/includes? result "<name>alpha</name>"))
-      (is (str/includes? result "<name>beta</name>"))
+      (is (< (str/index-of result "<name>alpha</name>")
+             (str/index-of result "<name>beta</name>")))
       (is (str/includes? result "<description>Alpha skill</description>"))
       (is (str/includes? result "<location>/alpha/SKILL.md</location>"))))
 
@@ -437,20 +437,20 @@
 ;; ============================================================
 
 (deftest skill-summary-test
-  (testing "summarizes skills"
-    (let [all-skills [{:name "a" :description "A" :source :user :disable-model-invocation false}
-                      {:name "b" :description "B" :source :project :disable-model-invocation false}
-                      {:name "c" :description "C" :source :user :disable-model-invocation true}]
+  (testing "summarizes skills in canonical skill-name order"
+    (let [all-skills [{:name "c" :description "C" :source :user :disable-model-invocation true}
+                      {:name "a" :description "A" :source :user :disable-model-invocation false}
+                      {:name "b" :description "B" :source :project :disable-model-invocation false}]
           summary (skills/skill-summary all-skills)]
       (is (= 3 (:skill-count summary)))
       (is (= 2 (:visible-count summary)))
       (is (= 1 (:hidden-count summary)))
-      (is (= 3 (count (:skills summary)))))))
+      (is (= ["a" "b" "c"] (mapv :name (:skills summary)))))))
 
 (deftest skill-names-test
-  (testing "returns name vector"
-    (let [all-skills [{:name "x" :description "X" :source :user :disable-model-invocation false}
-                      {:name "y" :description "Y" :source :user :disable-model-invocation false}]]
+  (testing "returns canonical name vector"
+    (let [all-skills [{:name "y" :description "Y" :source :user :disable-model-invocation false}
+                      {:name "x" :description "X" :source :user :disable-model-invocation false}]]
       (is (= ["x" "y"] (skills/skill-names all-skills))))))
 
 (deftest skills-by-source-test
@@ -463,17 +463,17 @@
       (is (= 1 (count (:project grouped)))))))
 
 (deftest visible-hidden-skills-test
-  (testing "visible-skills excludes hidden"
-    (let [all-skills [{:name "v" :description "V" :source :user :disable-model-invocation false}
-                      {:name "h" :description "H" :source :user :disable-model-invocation true}]]
-      (is (= 1 (count (skills/visible-skills all-skills))))
-      (is (= "v" (:name (first (skills/visible-skills all-skills)))))))
+  (testing "visible-skills excludes hidden and returns canonical order"
+    (let [all-skills [{:name "z" :description "Z" :source :user :disable-model-invocation false}
+                      {:name "h" :description "H" :source :user :disable-model-invocation true}
+                      {:name "a" :description "A" :source :user :disable-model-invocation false}]]
+      (is (= ["a" "z"] (mapv :name (skills/visible-skills all-skills))))))
 
-  (testing "hidden-skills returns only hidden"
+  (testing "hidden-skills returns only hidden in canonical order"
     (let [all-skills [{:name "v" :description "V" :source :user :disable-model-invocation false}
-                      {:name "h" :description "H" :source :user :disable-model-invocation true}]]
-      (is (= 1 (count (skills/hidden-skills all-skills))))
-      (is (= "h" (:name (first (skills/hidden-skills all-skills))))))))
+                      {:name "z-hidden" :description "Z" :source :user :disable-model-invocation true}
+                      {:name "a-hidden" :description "A" :source :user :disable-model-invocation true}]]
+      (is (= ["a-hidden" "z-hidden"] (mapv :name (skills/hidden-skills all-skills)))))))
 
 (deftest enrich-skill-test
   (testing "adds is-available-to-model"

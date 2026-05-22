@@ -115,6 +115,29 @@
     (testing "skills are filtered coherently"
       (is (= [] (:skills child-sd))))))
 
+(deftest child-session-base-state-selection-canonicalizes-selected-skills-test
+  ;; Workflow/prompt-component skill selections are allowlists, not ordering directives.
+  (let [selection {:agents-md? false
+                   :extension-prompt-contributions []
+                   :skill-names ["z-skill" "a-skill"]
+                   :components #{:skills}}
+        child-sd  (child-session-state/child-session-base-state
+                   (parent-session-data
+                    {:skills [{:name "z-skill" :description "Z"
+                               :file-path "/z/SKILL.md" :base-dir "/z"
+                               :source :user :disable-model-invocation false}
+                              {:name "a-skill" :description "A"
+                               :file-path "/a/SKILL.md" :base-dir "/a"
+                               :source :user :disable-model-invocation false}
+                              {:name "m-skill" :description "M"
+                               :file-path "/m/SKILL.md" :base-dir "/m"
+                               :source :user :disable-model-invocation false}]})
+                   {:child-session-id "child-canonical-skills"
+                    :prompt-component-selection selection})]
+    (is (= ["a-skill" "z-skill"] (mapv :name (:skills child-sd))))
+    (is (< (.indexOf (:base-system-prompt child-sd) "a-skill")
+           (.indexOf (:base-system-prompt child-sd) "z-skill")))))
+
 (deftest child-session-base-state-temperature-test
   (testing "non-nil temperature is stored in child session state"
     (let [child-sd (child-session-state/child-session-base-state

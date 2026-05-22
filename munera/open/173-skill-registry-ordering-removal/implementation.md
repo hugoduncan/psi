@@ -116,3 +116,12 @@ Found one new actionable inconsistency: the artifacts reclassify workflow child-
 ## 2026-05-22 inconsistency follow-up execution
 
 Completed the newly added workflow step `:session :skills` ordering follow-up. Clarified that workflow step skill selection is an allowlist/exact-name resolution input, not an ordering directive: resolution may use caller order internally, but any model-visible child prompt rendering of the selected subset must canonicalize by skill `:name` under branch B or branch C. Updated `design.md`, `plan.md`, and `steps.md`; marked the `design-steps.md` item complete.
+
+
+## 2026-05-22 implementation pass
+
+Selected branch B. The audit found no true registration-order dependency: callers require exact lookup, duplicate no-op/change reporting, and deterministic prompt/discovery/model-visible ordering. Updated `skill-registry` so `all-skills`, `skill-names`, and `register-skill` result `:skills` are canonical by exact skill `:name` string order while `find-skill` remains exact lookup over supplied collections and duplicate registration remains first-write-wins/no-change.
+
+Canonicalized higher visible surfaces that could otherwise expose raw session/vector order: prompt skill formatting, prompt skill summaries, visible/hidden skill helpers, `:psi.agent-session/skills`, prompt-component `:skill-names` filtering, and workflow step `:session :skills` resolution. Added focused tests for registry ordering, prompt ordering, session resource ordering, prompt-component selected subset ordering, and workflow-selected skill ordering. Updated task `164` to mark insertion-order preservation as superseded by canonical deterministic skill-name ordering while preserving duplicate-ignore and `:added?` / `:changed?`.
+
+Verification: `clojure -M:test --focus psi.skill-registry.registry-test --focus psi.prompt-assets.skills-test --focus psi.agent-session.child-session-state-test --focus psi.agent-session.resolvers-test --focus psi.workflow-step-session-config.core-test` passed (70 tests, 351 assertions). Follow-up regression verification `clojure -M:test --focus psi.agent-session.config-compaction-test --focus psi.agent-session.workflow-execution-test --focus psi.prompt-assets.system-prompt-test` passed (27 tests, 239 assertions).

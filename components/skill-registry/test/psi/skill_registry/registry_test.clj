@@ -19,10 +19,10 @@
       (is (true? (:changed? result)))
       (is (= 1 (:count result)))))
 
-  (testing "ignores duplicate registrations and preserves first-registration order"
-    (let [existing {:name "coding" :description "Original"}
-          duplicate {:name "coding" :description "Replacement attempt"}
-          later {:name "testing" :description "Testing guidance"}
+  (testing "ignores duplicate registrations and returns canonical skill-name order"
+    (let [existing {:name "testing" :description "Original"}
+          duplicate {:name "testing" :description "Replacement attempt"}
+          later {:name "coding" :description "Coding guidance"}
           first-result (skill-registry/register-skill [existing] duplicate)
           second-result (skill-registry/register-skill (:skills first-result) later)]
       (is (= [existing] (:skills first-result)))
@@ -30,7 +30,7 @@
       (is (false? (:added? first-result)))
       (is (false? (:changed? first-result)))
       (is (= 1 (:count first-result)))
-      (is (= [existing later] (:skills second-result)))
+      (is (= [later existing] (:skills second-result)))
       (is (= ["coding" "testing"] (skill-registry/skill-names (:skills second-result))))
       (is (= 2 (skill-registry/skill-count (:skills second-result))))))
 
@@ -45,11 +45,15 @@
          (skill-registry/register-skill [] {:name "   " :description "Blank name"})))))
 
 (deftest query-helpers-test
-  (let [skills [{:name "coding" :description "d"}
-                {:name "testing" :description "t"}]]
-    (is (= skills (skill-registry/all-skills skills)))
+  (let [skills [{:name "testing" :description "t"}
+                {:name "Coding" :description "capital"}
+                {:name "coding" :description "d"}]]
+    (is (= [{:name "Coding" :description "capital"}
+            {:name "coding" :description "d"}
+            {:name "testing" :description "t"}]
+           (skill-registry/all-skills skills)))
     (is (= {:name "coding" :description "d"}
            (skill-registry/find-skill skills "coding")))
     (is (nil? (skill-registry/find-skill skills "missing")))
-    (is (= ["coding" "testing"] (skill-registry/skill-names skills)))
-    (is (= 2 (skill-registry/skill-count skills)))))
+    (is (= ["Coding" "coding" "testing"] (skill-registry/skill-names skills)))
+    (is (= 3 (skill-registry/skill-count skills)))))

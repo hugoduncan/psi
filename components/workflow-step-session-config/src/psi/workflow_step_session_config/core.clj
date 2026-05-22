@@ -8,6 +8,7 @@
   (:require
    [psi.ai.model-registry :as model-registry]
    [psi.ai.model-selection :as model-selection]
+   [psi.skill-registry.registry :as skill-registry]
    [psi.tool-registry.defs :as tool-defs]
    [psi.workflow-registry.registry :as registry]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
@@ -43,14 +44,15 @@
 (defn- resolve-step-skills
   [ctx session-skills skill-config]
   (when (some? skill-config)
-    (mapv (fn [skill]
-            (cond
-              (map? skill) skill
-              (string? skill)
-              (or (execution-adapter/find-skill ctx session-skills skill)
-                  (placeholder-skill skill))
-              :else skill))
-          skill-config)))
+    (skill-registry/all-skills
+     (mapv (fn [skill]
+             (cond
+               (map? skill) skill
+               (string? skill)
+               (or (execution-adapter/find-skill ctx session-skills skill)
+                   (placeholder-skill skill))
+               :else skill))
+           skill-config))))
 
 (defn- resolve-step-tool-defs
   [session-tool-defs tool-config]

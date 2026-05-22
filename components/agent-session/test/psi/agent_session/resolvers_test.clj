@@ -56,6 +56,15 @@
        (finally
          (System/setProperty "user.dir" orig#)))))
 
+(deftest agent-session-skills-resolver-returns-canonical-skill-order-test
+  ;; The session resource resolver presents skills in canonical skill-name order.
+  (let [[ctx session-id] (create-session-context {:session-defaults
+                                                  {:skills [{:name "z-skill" :description "Z"}
+                                                            {:name "a-skill" :description "A"}]}})
+        result (session/query-in ctx session-id [:psi.agent-session/skills])]
+    (is (= ["a-skill" "z-skill"]
+           (mapv :name (:psi.agent-session/skills result))))))
+
 ;; ── :psi.agent-session/messages-count ───────────────────
 
 (deftest messages-count-resolver-test

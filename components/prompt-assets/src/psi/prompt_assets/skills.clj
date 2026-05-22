@@ -327,7 +327,7 @@
    Skills with disable-model-invocation=true are excluded from the prompt
    (they can only be invoked explicitly via /skill:name commands)."
   [skills]
-  (let [visible (remove :disable-model-invocation skills)]
+  (let [visible (remove :disable-model-invocation (skill-registry/all-skills skills))]
     (if (empty? visible)
       ""
       (let [lines (into
@@ -350,7 +350,7 @@
    Uses compact lambda notation. Skills with a :lambda-description
    frontmatter field use that; otherwise falls back to name → description."
   [skills]
-  (let [visible (remove :disable-model-invocation skills)]
+  (let [visible (remove :disable-model-invocation (skill-registry/all-skills skills))]
     (when (seq visible)
       (str "\n\nλ skills. match(task, description) → read(file) | resolve(relative_path, parent(file))\n"
            (str/join "\n"
@@ -404,15 +404,16 @@
 (defn skill-summary
   "Return an introspection summary of all skills."
   [skills]
-  {:skill-count       (count skills)
-   :visible-count     (count (remove :disable-model-invocation skills))
-   :hidden-count      (count (filter :disable-model-invocation skills))
-   :skills            (mapv (fn [s]
-                              {:name                     (:name s)
-                               :description              (:description s)
-                               :source                   (:source s)
-                               :disable-model-invocation (:disable-model-invocation s)})
-                            skills)})
+  (let [ordered-skills (skill-registry/all-skills skills)]
+    {:skill-count       (count ordered-skills)
+     :visible-count     (count (remove :disable-model-invocation ordered-skills))
+     :hidden-count      (count (filter :disable-model-invocation ordered-skills))
+     :skills            (mapv (fn [s]
+                                {:name                     (:name s)
+                                 :description              (:description s)
+                                 :source                   (:source s)
+                                 :disable-model-invocation (:disable-model-invocation s)})
+                              ordered-skills)}))
 
 (defn skill-names
   "Return a vector of skill name strings."
@@ -427,12 +428,12 @@
 (defn visible-skills
   "Return skills that are available to the model (not disabled)."
   [skills]
-  (vec (remove :disable-model-invocation skills)))
+  (vec (remove :disable-model-invocation (skill-registry/all-skills skills))))
 
 (defn hidden-skills
   "Return skills with disable-model-invocation=true."
   [skills]
-  (vec (filter :disable-model-invocation skills)))
+  (vec (filter :disable-model-invocation (skill-registry/all-skills skills))))
 
 (defn enrich-skill
   "Add derived fields to a Skill map for introspection."
