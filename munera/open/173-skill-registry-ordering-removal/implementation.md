@@ -153,3 +153,7 @@ Completed the newly added registry proof. The duplicate/no-change test now start
 ## 2026-05-22 follow-up execution
 
 No newly added unchecked actionable `steps.md` items were present after the preloaded review result. All implementation follow-up steps are already complete, so no code, test, design, or plan changes were needed.
+
+## 2026-05-22 code-shaper review
+
+Found one actionable robustness/consistency gap: `skill-registry/register-skill` now canonicalizes duplicate/no-change result `:skills`, but the `:session/register-skill` handler only writes session `:skills` when `:changed?` is true. If a session already contains an unsorted externally supplied/pre-existing skill vector, duplicate registration returns canonical data but the dispatch boundary drops it, leaving session state non-canonical despite the branch B registry-boundary contract.
