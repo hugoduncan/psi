@@ -112,3 +112,7 @@ Completed the newly added prompt-component / workflow `:skill-names` ambiguity f
 ## 2026-05-22 inconsistency review
 
 Found one new actionable inconsistency: the artifacts reclassify workflow child-session skill resolution as exact-name lookup only and clarify prompt-component / workflow `:skill-names` allowlist ordering, but workflow step `:session :skills` still declares a selected skill list whose resolved order is carried into child-session `:skills` and model-visible prompt construction. The task artifacts do not say whether that workflow `:skills` selection order is intentionally caller-declared, canonicalized under branch B/C, or exact-lookup-only metadata.
+
+## 2026-05-22 inconsistency follow-up execution
+
+Completed the newly added workflow step `:session :skills` ordering follow-up. Clarified that workflow step skill selection is an allowlist/exact-name resolution input, not an ordering directive: resolution may use caller order internally, but any model-visible child prompt rendering of the selected subset must canonicalize by skill `:name` under branch B or branch C. Updated `design.md`, `plan.md`, and `steps.md`; marked the `design-steps.md` item complete.
