@@ -14,3 +14,6 @@ Completed all newly added ambiguity follow-ups in `design-steps.md`.
 
 ## 2026-05-22 — inconsistency review
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs hot-path files/tests for cross-file inconsistency. No new actionable inconsistencies found: `plan.md`/`steps.md` consistently keep the task design-only until review follow-ups are complete, and all prior design follow-up items are already checked off.
+
+## 2026-05-22 — inconsistency follow-up execution
+Checked `design-steps.md` after the inconsistency review. No newly added unchecked actionable design follow-up items were present, so no design, plan, or step changes were required and no implementation steps were executed.
