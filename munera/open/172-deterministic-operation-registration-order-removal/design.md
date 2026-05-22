@@ -43,6 +43,12 @@ This task includes:
 
 This task may include updating `171` afterward so its design no longer treats local ordering metadata as part of the target shape.
 
+The minimum required `171` follow-up for this task is:
+
+- edit `munera/open/171-deterministic-operation-registry-shared-storage-migration/design.md`
+- update its migration shape/acceptance language so it explicitly assumes task `172` is complete and does not preserve or reintroduce adapter-owned ordering metadata or ordering guarantees
+- no `171` `plan.md`, `steps.md`, or `implementation.md` edits are required by task `172` unless that task already has those artifacts and they independently need synchronization when the design change is made
+
 ## Out of scope
 
 This task does not include:

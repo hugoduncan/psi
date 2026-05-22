@@ -24,7 +24,9 @@
    - relax any operation-id ordering assumptions to unordered membership assertions only where needed
 
 5. Record the simplification as a prerequisite input to task `171`.
-   - after this task, `171` should no longer assume adapter-owned ordering state in its migration target
+   - edit `munera/open/171-deterministic-operation-registry-shared-storage-migration/design.md` as the required follow-up artifact
+   - make the minimum semantic change explicit there: task `171` must assume task `172` is complete and must not preserve or reintroduce adapter-owned ordering metadata or ordering guarantees in its migration target
+   - no additional `171` artifact edits are required by this task unless they already exist and need synchronization with that design update
 
 ## Proof strategy
 
