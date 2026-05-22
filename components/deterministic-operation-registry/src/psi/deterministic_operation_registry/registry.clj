@@ -12,8 +12,7 @@
 (defn create-registry
   []
   (->DeterministicOperationRegistry
-   (atom {:operations {}
-          :registration-order []})))
+   (atom {:operations {}})))
 
 (defn register-operation-in!
   [reg operation]
@@ -26,32 +25,28 @@
                                {:operation-id operation-id
                                 :existing existing
                                 :new operation*})))
-             (-> s
-                 (assoc-in [:operations operation-id] operation*)
-                 (update :registration-order conj operation-id))))
+             (assoc-in s [:operations operation-id] operation*)))
     reg))
 
 (defn unregister-operations-by-extension-in!
   [reg ext-path]
   (swap! (:state reg)
          (fn [s]
-           (let [remove-ids (->> (:registration-order s)
-                                 (filter #(= ext-path (get-in s [:operations % :ext-path])))
-                                 vec)
-                 remove-id-set (set remove-ids)]
-             (-> s
-                 (update :operations #(apply dissoc % remove-ids))
-                 (update :registration-order (fn [order]
-                                               (vec (remove remove-id-set order))))))))
+           (update s :operations
+                   (fn [operations]
+                     (into {}
+                           (remove (fn [[_ operation]]
+                                     (= ext-path (:ext-path operation))))
+                           operations)))))
   reg)
 
 (defn operation-ids-in
   [reg]
-  (:registration-order @(:state reg)))
+  (-> @(:state reg) :operations keys vec))
 
 (defn operation-count-in
   [reg]
-  (count (operation-ids-in reg)))
+  (-> @(:state reg) :operations count))
 
 (defn get-operation-in
   [reg operation-id]
@@ -59,7 +54,7 @@
 
 (defn all-operations-in
   [reg]
-  (mapv #(get-operation-in reg %) (operation-ids-in reg)))
+  (-> @(:state reg) :operations vals vec))
 
 (defn invoke-operation-in
   [reg operation-id invocation invoke-operation]

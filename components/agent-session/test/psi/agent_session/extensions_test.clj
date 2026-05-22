@@ -508,7 +508,7 @@
                                            :handler (fn [_] {:status :ok :data {}})})
     (ext/unregister-extension-in! reg "/ext/a" op-reg)
     (is (= #{"/ext/b"} (set (ext/extensions-in reg))))
-    (is (= ["jira/search"] (op-reg/operation-ids-in op-reg)))
+    (is (= #{"jira/search"} (set (op-reg/operation-ids-in op-reg))))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"not found"
@@ -525,8 +525,8 @@
      ext-path
      {:id "github/search-issues-by-label"
       :handler (fn [_] {:status :ok :data {:issues []}})})
-    (is (= ["github/search-issues-by-label"]
-           (op-reg/operation-ids-in op-registry)))
+    (is (= #{"github/search-issues-by-label"}
+           (set (op-reg/operation-ids-in op-registry))))
     (ext/reload-extensions-in! reg runtime-fns [])
     (is (= [] (ext/extensions-in reg)))
     (is (= [] (op-reg/operation-ids-in op-registry)))

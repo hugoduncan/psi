@@ -4,18 +4,22 @@
    [psi.deterministic-operation-registry.registry :as reg]))
 
 (deftest registry-registration-and-lookup-test
+  ;; Proves registration, lookup, and unordered listing/count coherence.
   (let [registry (reg/create-registry)
         operation {:id "github/search-issues-by-label"
                    :description "Search issues"
                    :handler (fn [_] {:status :ok :data {:issues []}})}]
     (is (= registry (reg/register-operation-in! registry operation)))
     (is (= 1 (reg/operation-count-in registry)))
-    (is (= ["github/search-issues-by-label"] (reg/operation-ids-in registry)))
-    (is (= ["github/search-issues-by-label"] (mapv :id (reg/all-operations-in registry))))
+    (is (= #{"github/search-issues-by-label"}
+           (set (reg/operation-ids-in registry))))
+    (is (= #{"github/search-issues-by-label"}
+           (set (map :id (reg/all-operations-in registry)))))
     (is (= "github/search-issues-by-label"
            (:id (reg/get-operation-in registry "github/search-issues-by-label"))))))
 
 (deftest duplicate-operation-id-rejected-test
+  ;; Proves duplicate registration throws and preserves membership/count.
   (let [registry (reg/create-registry)
         operation {:id "github/search-issues-by-label"
                    :handler (fn [_] {:status :ok :data {}})}]
@@ -23,9 +27,13 @@
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"already registered"
-         (reg/register-operation-in! registry operation)))))
+         (reg/register-operation-in! registry operation)))
+    (is (= 1 (reg/operation-count-in registry)))
+    (is (= #{"github/search-issues-by-label"}
+           (set (reg/operation-ids-in registry))))))
 
 (deftest invoke-operation-success-and-error-test
+  ;; Proves invoke behaviour is unchanged for success and error returns.
   (let [registry (reg/create-registry)]
     (reg/register-operation-in! registry
                                 {:id "github/search-issues-by-label"
@@ -57,6 +65,7 @@
                                       ((:handler operation) invocation)))))))
 
 (deftest invoke-operation-missing-id-test
+  ;; Proves missing invoke lookup still throws.
   (let [registry (reg/create-registry)]
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
@@ -68,6 +77,7 @@
                                     (throw (ex-info "should not be called" {}))))))))
 
 (deftest unregister-operations-by-extension-test
+  ;; Proves unregister removes exactly matching operations and preserves survivors.
   (let [registry (reg/create-registry)]
     (reg/register-operation-in! registry
                                 {:id "github/search"
@@ -82,22 +92,28 @@
                                  :ext-path "/ext/b"
                                  :handler (fn [_] {:status :ok :data {}})})
     (is (= registry (reg/unregister-operations-by-extension-in! registry "/ext/a")))
-    (is (= ["jira/search"] (reg/operation-ids-in registry)))
+    (is (= 1 (reg/operation-count-in registry)))
+    (is (= #{"jira/search"} (set (reg/operation-ids-in registry))))
+    (is (= #{"jira/search"} (set (map :id (reg/all-operations-in registry)))))
     (is (nil? (reg/get-operation-in registry "github/search")))
     (is (nil? (reg/get-operation-in registry "github/create")))
     (is (= "jira/search" (:id (reg/get-operation-in registry "jira/search"))))))
 
-(deftest unregister-nil-tolerant-and-order-preserving-test
+(deftest unregister-missing-extension-is-no-op-test
+  ;; Proves missing-extension unregister is nil-tolerant and leaves membership/count unchanged.
   (let [registry (reg/create-registry)]
     (reg/register-operation-in! registry {:id "a/one" :ext-path "/ext/a" :handler (fn [_] {:status :ok :data 1})})
     (reg/register-operation-in! registry {:id "b/two" :ext-path "/ext/b" :handler (fn [_] {:status :ok :data 2})})
     (reg/register-operation-in! registry {:id "a/three" :ext-path "/ext/a" :handler (fn [_] {:status :ok :data 3})})
     (reg/unregister-operations-by-extension-in! registry "/ext/missing")
-    (is (= ["a/one" "b/two" "a/three"] (reg/operation-ids-in registry)))
-    (reg/unregister-operations-by-extension-in! registry "/ext/a")
-    (is (= ["b/two"] (reg/operation-ids-in registry)))))
+    (is (= 3 (reg/operation-count-in registry)))
+    (is (= #{"a/one" "b/two" "a/three"}
+           (set (reg/operation-ids-in registry))))
+    (is (= #{"a/one" "b/two" "a/three"}
+           (set (map :id (reg/all-operations-in registry)))))))
 
-(deftest registration-order-remains-adapter-owned-test
+(deftest listing-contract-is-unordered-membership-test
+  ;; Proves listing helpers expose exact membership without an ordering guarantee.
   (let [registry (reg/create-registry)
         operation-a {:id "ops/a" :ext-path "/ext/a" :handler (fn [_] {:status :ok :data :a})}
         operation-b {:id "ops/b" :ext-path "/ext/b" :handler (fn [_] {:status :ok :data :b})}
@@ -105,16 +121,18 @@
     (reg/register-operation-in! registry operation-a)
     (reg/register-operation-in! registry operation-b)
     (reg/register-operation-in! registry operation-c)
-    (is (= ["ops/a" "ops/b" "ops/c"]
-           (reg/operation-ids-in registry)))
-    (is (= ["ops/a" "ops/b" "ops/c"]
-           (mapv :id (reg/all-operations-in registry))))
+    (is (= 3 (reg/operation-count-in registry)))
+    (is (= #{"ops/a" "ops/b" "ops/c"}
+           (set (reg/operation-ids-in registry))))
+    (is (= #{"ops/a" "ops/b" "ops/c"}
+           (set (map :id (reg/all-operations-in registry)))))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"already registered"
          (reg/register-operation-in! registry
                                      (assoc operation-b :handler (fn [_] {:status :ok :data :b2})))))
-    (is (= ["ops/a" "ops/b" "ops/c"]
-           (reg/operation-ids-in registry)))
-    (is (= ["ops/a" "ops/b" "ops/c"]
-           (mapv :id (reg/all-operations-in registry))))))
+    (is (= 3 (reg/operation-count-in registry)))
+    (is (= #{"ops/a" "ops/b" "ops/c"}
+           (set (reg/operation-ids-in registry))))
+    (is (= #{"ops/a" "ops/b" "ops/c"}
+           (set (map :id (reg/all-operations-in registry)))))))
