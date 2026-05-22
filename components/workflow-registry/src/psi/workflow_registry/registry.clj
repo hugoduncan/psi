@@ -115,12 +115,12 @@
    definition. Public removal normalizes caller-provided ids first."
   [state definition-id]
   (let [definition-id' (normalize-id definition-id)
-        definition (workflow-definition state definition-id')]
-    (when-not definition
+        root-result (root-registry/unregister (ensure-root-registry-declared state)
+                                              registry-id
+                                              definition-id')
+        result (:result root-result)]
+    (when (= :not-found (:failure-kind result))
       (throw (ex-info "Workflow definition not found" {:definition-id definition-id'})))
-    (let [root-result (root-registry/unregister (ensure-root-registry-declared state)
-                                                registry-id
-                                                definition-id')]
-      [(-> (:root-state root-result)
-           sync-compatibility-path)
-       definition])))
+    [(-> (:root-state root-result)
+         sync-compatibility-path)
+     (root-entry->stored-definition (:value result))]))

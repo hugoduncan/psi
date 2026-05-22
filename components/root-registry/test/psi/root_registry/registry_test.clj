@@ -119,9 +119,65 @@
       (is (= false (:ok? result)))
       (is (= :unknown-registry (:failure-kind result))))))
 
-(deftest register-test
-  ;; Tests insertion, replacement, owner-conflict rejection, and validation.
+(deftest insert-test
+  ;; Tests duplicate-rejecting insertion semantics and validation.
   (testing "inserts a new entry into a declared registry"
+    (let [{:keys [root-state result]}
+          (registry/insert (registry/declared-root-state [:tools])
+                           :tools
+                           (sample-entry :read :ext/read {:name "read"}))]
+      (is (= true (:ok? result)))
+      (is (= :insert (:change result)))
+      (is (= :insert (:operation result)))
+      (is (= #{:read}
+             (get-in root-state [:root-registries :tools :ids-by-extension :ext/read])))))
+
+  (testing "duplicate insert with same owner fails with duplicate-id"
+    (let [root-state (-> (registry/declared-root-state [:tools])
+                         (register-entry :tools (sample-entry :read :ext/read {:name "read" :version 1})))
+          {:keys [root-state result]}
+          (registry/insert root-state :tools (sample-entry :read :ext/read {:name "read" :version 2}))]
+      (is (= false (:ok? result)))
+      (is (= :duplicate-id (:failure-kind result)))
+      (is (= :duplicate-id (:change result)))
+      (is (= {:name "read" :version 1}
+             (get-in root-state [:root-registries :tools :entries-by-id :read :value])))))
+
+  (testing "duplicate insert with different owner also fails with duplicate-id"
+    (let [root-state (-> (registry/declared-root-state [:tools])
+                         (register-entry :tools (sample-entry :read :ext/one {:name "read"})))
+          {:keys [root-state result]}
+          (registry/insert root-state :tools (sample-entry :read :ext/two {:name "read"}))]
+      (is (= false (:ok? result)))
+      (is (= :duplicate-id (:failure-kind result)))
+      (is (= :ext/one
+             (get-in root-state [:root-registries :tools :entries-by-id :read :extension-id])))))
+
+  (testing "insert into unknown registry fails explicitly"
+    (let [{:keys [root-state result]}
+          (registry/insert (registry/empty-root-state)
+                           :tools
+                           (sample-entry :read :ext/read {:name "read"}))]
+      (is (= false (:ok? result)))
+      (is (= :unknown-registry (:failure-kind result)))
+      (is (= {}
+             (registry/registry-area root-state)))))
+
+  (testing "invalid entries fail shared validation without mutating state"
+    (doseq [entry [{:extension-id :ext/read :value {:name "read"}}
+                   {:id :read :value {:name "read"}}
+                   {:id :read :extension-id :ext/read}]]
+      (let [{:keys [root-state result]}
+            (registry/insert (registry/declared-root-state [:tools]) :tools entry)]
+        (is (= false (:ok? result)))
+        (is (= :invalid-entry (:failure-kind result)))
+        (is (= {:entries-by-id {}
+                :ids-by-extension {}}
+               (registry/registry-state root-state :tools)))))))
+
+(deftest register-test
+  ;; Tests replace-capable registration, owner-conflict rejection, and validation.
+  (testing "register inserts a new entry into a declared registry"
     (let [{:keys [root-state result]}
           (registry/register (registry/declared-root-state [:tools])
                              :tools

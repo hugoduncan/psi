@@ -99,6 +99,22 @@
       (is (= [] (workflow-registry/definition-ids state2)))
       (is (= {} (get-in state2 [:workflows :definitions])))))
 
+  (testing "remove-definition consumes lower unregister result directly for removed value"
+    (let [[state1 definition-id stored]
+          (workflow-registry/register-definition {:workflows {:definitions {}}}
+                                                 registered-definition)
+          root-state (root-registry/declare-registry {:workflows {:definitions {}}}
+                                                     :workflow-definitions)
+          {:keys [result]}
+          (root-registry/register root-state
+                                  :workflow-definitions
+                                  {:id definition-id
+                                   :extension-id :workflow-definition
+                                   :value stored})]
+      (is (= stored (:value result)))
+      (is (= stored
+             (second (workflow-registry/remove-definition state1 definition-id))))))
+
   (testing "remove-definition throws on missing definitions"
     (let [ex (is (thrown? clojure.lang.ExceptionInfo
                           (workflow-registry/remove-definition {:workflows {:definitions {}}}

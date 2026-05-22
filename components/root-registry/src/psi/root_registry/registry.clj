@@ -72,8 +72,8 @@
         (apply array-map kvs)))
 
 (defn- invalid-entry-result
-  [registry-id entry message]
-  (result :register registry-id false :failed
+  [operation registry-id entry message]
+  (result operation registry-id false :failed
           :failure-kind :invalid-entry
           :entry entry
           :message message))
@@ -133,8 +133,51 @@
                        :count (count entries)
                        :value entries)})))
 
+(defn insert
+  "Insert one canonical shared entry into `registry-id`.
+
+   Successful outcomes are `:insert`. Attempting to insert an already-present
+   id fails with `:duplicate-id`, regardless of owner. This operation never
+   throws and never replaces existing entries."
+  [root-state registry-id entry]
+  (cond
+    (not (declared-registry? root-state registry-id))
+    {:root-state root-state
+     :result (unknown-registry-result :insert registry-id)}
+
+    (not (valid-entry? entry))
+    {:root-state root-state
+     :result (invalid-entry-result :insert registry-id entry
+                                   "Entry must contain non-nil :id and :extension-id, and a :value field")}
+
+    :else
+    (let [id (:id entry)
+          extension-id (:extension-id entry)
+          previous-entry (get-in root-state [root-state-key registry-id :entries-by-id id])]
+      (if previous-entry
+        {:root-state root-state
+         :result (result :insert registry-id false :failed
+                         :failure-kind :duplicate-id
+                         :change :duplicate-id
+                         :id id
+                         :extension-id extension-id
+                         :entry entry
+                         :previous-entry previous-entry
+                         :message (str "Entry id already registered: " (pr-str id)))}
+        (let [root-state' (-> root-state
+                              (assoc-in [root-state-key registry-id :entries-by-id id] entry)
+                              (update-in [root-state-key registry-id :ids-by-extension extension-id]
+                                         (fnil conj #{}) id))]
+          {:root-state root-state'
+           :result (result :insert registry-id true :ok
+                           :change :insert
+                           :id id
+                           :extension-id extension-id
+                           :entry entry
+                           :value entry)})))))
+
 (defn register
-  "Register one canonical shared entry into `registry-id`.
+  "Register one canonical shared entry into `registry-id` with replace-capable semantics.
 
    Successful outcomes are `:insert` and `:replace`. Replacing an existing id
    owned by a different extension fails with `:ownership-conflict`."
@@ -146,7 +189,7 @@
 
     (not (valid-entry? entry))
     {:root-state root-state
-     :result (invalid-entry-result registry-id entry
+     :result (invalid-entry-result :register registry-id entry
                                    "Entry must contain non-nil :id and :extension-id, and a :value field")}
 
     :else
