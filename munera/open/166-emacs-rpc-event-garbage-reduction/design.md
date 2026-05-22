@@ -165,8 +165,9 @@ Primitive-level advice is allowed only as a temporary diagnostic while developin
 ## Implementation shaping notes
 - Add tests that can distinguish append-only update from full redraw without relying on brittle wall-clock timing. Prefer instrumentation of narrow helper calls, marker stability assertions, buffer content equality, and counters around delete/reinsert/property application helpers.
 - A likely safe shape is to split assistant/thinking rendering into:
-  - append-only update for extension payloads,
-  - full redraw for replacement/divergent payloads,
+  - append-only update when the effective next text extends the current rendered text,
+  - full redraw only when the effective next text cannot be represented as a suffix append,
+  - assistant divergent payloads must first preserve existing merge semantics when calculating effective next text; thinking divergent or shrinking snapshots still use the redraw fallback,
   - finalization path that still handles markdown/font-lock after streaming ends.
 - For assistant deltas, avoid double cumulative merge work where possible. The backend already emits accumulated text for `:text-delta`; frontend should either trust that contract or make suffix detection cheap and explicit.
 - For thinking deltas, the backend contract is cumulative snapshots. The frontend can append only the new suffix when the snapshot extends the rendered thinking text, and redraw only when the snapshot diverges.
