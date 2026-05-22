@@ -96,3 +96,25 @@
     (is (= ["a/one" "b/two" "a/three"] (reg/operation-ids-in registry)))
     (reg/unregister-operations-by-extension-in! registry "/ext/a")
     (is (= ["b/two"] (reg/operation-ids-in registry)))))
+
+(deftest registration-order-remains-adapter-owned-test
+  (let [registry (reg/create-registry)
+        operation-a {:id "ops/a" :ext-path "/ext/a" :handler (fn [_] {:status :ok :data :a})}
+        operation-b {:id "ops/b" :ext-path "/ext/b" :handler (fn [_] {:status :ok :data :b})}
+        operation-c {:id "ops/c" :ext-path "/ext/c" :handler (fn [_] {:status :ok :data :c})}]
+    (reg/register-operation-in! registry operation-a)
+    (reg/register-operation-in! registry operation-b)
+    (reg/register-operation-in! registry operation-c)
+    (is (= ["ops/a" "ops/b" "ops/c"]
+           (reg/operation-ids-in registry)))
+    (is (= ["ops/a" "ops/b" "ops/c"]
+           (mapv :id (reg/all-operations-in registry))))
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"already registered"
+         (reg/register-operation-in! registry
+                                     (assoc operation-b :handler (fn [_] {:status :ok :data :b2})))))
+    (is (= ["ops/a" "ops/b" "ops/c"]
+           (reg/operation-ids-in registry)))
+    (is (= ["ops/a" "ops/b" "ops/c"]
+           (mapv :id (reg/all-operations-in registry))))))

@@ -103,15 +103,8 @@
     (let [[state1 definition-id stored]
           (workflow-registry/register-definition {:workflows {:definitions {}}}
                                                  registered-definition)
-          root-state (root-registry/declare-registry {:workflows {:definitions {}}}
-                                                     :workflow-definitions)
-          {:keys [result]}
-          (root-registry/register root-state
-                                  :workflow-definitions
-                                  {:id definition-id
-                                   :extension-id :workflow-definition
-                                   :value stored})]
-      (is (= stored (:value result)))
+          root-result (root-registry/lookup state1 :workflow-definitions definition-id)]
+      (is (= stored (:value (:entry root-result))))
       (is (= stored
              (second (workflow-registry/remove-definition state1 definition-id))))))
 
