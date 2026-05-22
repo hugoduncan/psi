@@ -1,0 +1,1 @@
+- 2026-05-21 ψ review(ambiguities): task is missing required `plan.md` and `steps.md`, so the pass cannot review or reconcile the intended execution approach/checklist against the design; add those artifacts before ambiguity review can be considered complete.
