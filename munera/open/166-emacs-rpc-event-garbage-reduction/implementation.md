@@ -35,3 +35,6 @@ Replaced placeholder `plan.md` and `steps.md` after the delegated review cycle c
 
 ## 2026-05-22 — ambiguity review
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs streaming/render code/tests. New actionable ambiguity: the plan requires pre-change tests to instrument narrow local helpers for full-redraw/property/overlay counts, but the current code has only monolithic `psi-emacs--set-assistant-line` / `psi-emacs--set-thinking-line`; the task does not specify whether the first implementation slice should introduce stable instrumentation seams before behavior-changing optimization or use brittle advice around primitives such as `delete-region`, `add-text-properties`, and `make-overlay`.
+
+## 2026-05-22 — ambiguity follow-up execution
+Defined the pre-optimization instrumentation seam. The committed proof interface should be named helper wrappers in `psi-assistant-render.el`, not primitive-level advice: a full-live-block redraw wrapper, a stream property application wrapper with explicit ranges, and the existing `psi-emacs--apply-prefix-overlay` prefix-overlay wrapper. Updated `design.md` and `plan.md`, then marked the ambiguity follow-up complete in `design-steps.md`. No implementation steps from `steps.md` were executed.

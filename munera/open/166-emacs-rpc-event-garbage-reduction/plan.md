@@ -7,14 +7,14 @@ Implement the mandatory assistant/thinking streaming optimization first. Treat t
 ### 1. Establish focused proof and instrumentation
 Add focused ERT coverage in `components/emacs-ui/test/psi-streaming-transcript-test.el` before changing render behavior.
 
-The tests should instrument narrow local helpers rather than wall-clock time:
+The tests should instrument named local helper wrappers rather than wall-clock time or primitive-level advice:
 
-- count full redraw helper invocations for assistant and thinking live blocks;
-- record the ranges receiving stream-time verbatim/default text properties;
-- count prefix overlay creation for each live block;
+- count full-redraw wrapper invocations for assistant and thinking live blocks;
+- record the ranges passed to the stream-time verbatim/default property wrapper;
+- count prefix overlay creation through `psi-emacs--apply-prefix-overlay`;
 - assert buffer content and marker/range correctness after each event.
 
-The expected pre-change observation is that append-only extension events still use the full redraw path and whole-content property range. Keep the behavior assertions stable while making the optimization-specific assertions drive the code change.
+If a full-redraw or property-range wrapper does not yet exist, introduce that seam as the first behavior-preserving implementation move before optimizing append-vs-redraw behavior. The expected pre-change observation is that append-only extension events still use the full redraw path and whole-content property range. Keep the behavior assertions stable while making the optimization-specific assertions drive the code change.
 
 ### 2. Split rendering into explicit append vs redraw helpers
 In `components/emacs-ui/psi-assistant-render.el`, factor assistant/thinking line updates so the public event handlers have one obvious rule:

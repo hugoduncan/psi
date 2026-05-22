@@ -148,6 +148,20 @@ Suggested verification command:
 
 If the local Emacs test runner uses a different invocation, record the exact focused command in `implementation.md` before closing the task.
 
+
+## Pre-optimization instrumentation seam
+Tests should use named helper wrappers as the authoritative instrumentation seam, not primitive-level advice around `delete-region`, `add-text-properties`, or `make-overlay`. Primitive advice is too broad because unrelated transcript cleanup or Emacs internals can call the same primitives and make hot-path proof brittle.
+
+Before changing append-vs-redraw behavior, introduce or preserve small wrappers in `psi-assistant-render.el` for the operations that define this task's optimization proof:
+
+- full live-block redraw: a wrapper that deletes and reinserts the complete assistant/thinking live line for fallback replacement;
+- stream property application: a wrapper that applies stream-time assistant verbatim/default properties to an explicit content subrange;
+- prefix overlay creation: the existing `psi-emacs--apply-prefix-overlay` helper is the wrapper for prefix overlay creation.
+
+Focused tests may instrument these wrappers with `cl-letf`/advice and assert call counts plus argument ranges. The authoritative ranges are the helper arguments: append-only events should report suffix-only property ranges and no post-creation full-redraw or prefix-overlay wrapper calls; fallback events may report whole-live-line redraw and whole-content property ranges when required.
+
+Primitive-level advice is allowed only as a temporary diagnostic while developing tests, not as the committed proof interface, unless a helper wrapper cannot be introduced without changing behavior; in that case the exception and exact primitive/range interpretation must be recorded in `implementation.md`.
+
 ## Implementation shaping notes
 - Add tests that can distinguish append-only update from full redraw without relying on brittle wall-clock timing. Prefer instrumentation of narrow helper calls, marker stability assertions, buffer content equality, and counters around delete/reinsert/property application helpers.
 - A likely safe shape is to split assistant/thinking rendering into:
