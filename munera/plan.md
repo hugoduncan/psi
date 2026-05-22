@@ -25,7 +25,6 @@ Backlog:
 `munera/open/164-tui-idle-polling-elimination/`
 `munera/open/167-emacs-tool-details-show-full-call/`
 `munera/open/168-workflow-structured-output-schemas/`
-`munera/open/169-workflow-registry-root-registry-migration/`
 `munera/open/170-workflow-provider-native-structured-output/`
 `munera/open/172-emacs-command-move-point-to-prompt-end/`
 
@@ -58,4 +57,5 @@ Notes:
 - `140` adds a runtime behavioural flag for logprob collection on the OpenAI chat-completions endpoint: session flag → options projection → request builder → `:logprobs-delta` stream event.
 - `154` is complete and closed: canonical provider telemetry events (`provider_request_started`, `provider_retry_scheduled`, `provider_request_finished`), shared `provider-error-kind` classification, metrics provider/per-model aggregation, persistence/schema coverage, and `/metrics` provider summaries are implemented; focused verification green including retry-attempt fresh prepared-request/turn-id proof.
 - `168` is complete and closed: tool-registry migrated onto root-registry storage; higher extension-detail projections now read canonical tool-registry data rather than legacy extension-local tool state.
+- `169` is complete and closed: workflow-registry migrated onto root-registry storage while preserving canonical compatibility path `[:workflows :definitions]`; higher semantic seams route through workflow-registry.
 - Close or replace tasks as scope sharpens; do not merge task contents.
