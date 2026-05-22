@@ -40,3 +40,7 @@ Completed the newly added `design-steps.md` inconsistency follow-up. Outcome C r
 ## 2026-05-22 ambiguity review
 
 No new actionable ambiguity feedback. Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, task `164` audit excerpts, and representative skill registry / resolver / prompt / TUI surfaces; the current artifacts now define the decision branches, follow-up surfaces, ordering contract candidates, affected surfaces, and task `164` update expectations clearly enough for implementation.
+
+## 2026-05-22 ambiguity follow-up execution
+
+No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity follow-up steps remain complete, so no design, plan, or implementation checklist changes were needed.
