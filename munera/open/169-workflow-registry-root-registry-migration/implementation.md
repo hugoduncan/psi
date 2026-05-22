@@ -55,3 +55,5 @@ Initial intent:
 - Reviewed the preloaded review result together with `steps.md`, `implementation.md`, `design.md`, and `plan.md`.
 - No newly added unchecked actionable steps are present in `steps.md`; all checklist items are already complete.
 - Blocking: none.
+- 2026-05-22 code-shaper review:
+- No new actionable feedback. `workflow-registry` stays locally comprehensible as a thin adapter: workflow-specific normalization/validation/sorted projection remain isolated at the boundary, root-registry entry shape stays hidden from callers, canonical `[:workflows :definitions]` compatibility is explicit rather than leaked, and the remaining direct-path reads are intentional compatibility assertions/docs rather than semantic bypasses.
