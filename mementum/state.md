@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-22: Executed task 166 test-review follow-up after no-action test review; no new unchecked steps existed, so only implementation.md was updated and committed (6f0a3822).
 - 2026-05-22: Executed task 166 implementation-review follow-up: added `psi-streaming-render-optimization-test.el` to `bb emacs:test`, marked the step done, and verified focused streaming + full Emacs suites green (34/305 tests).
 - 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no new unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-22: Executed task 166 ambiguity follow-up clarifying thinking append-only proof: assistant property ranges are suffix-only, while thinking proof uses inserted suffix mutation range plus no redraw/overlay recreation; committed e8057a3a.
@@ -29,7 +30,7 @@ Bootstrapped on 2026-04-02.
   - 160: removed mutation-mediated bootstrap resource loading
   - 161: single-pass startup, `bootstrap-in!` and `refresh-active-tools-in!` removed
   - 162: `bootstrap-runtime-session!` collapsed to single `(ctx ai-model opts)` arity
-  - 163: `start-tui-runtime!` refactored — dead `ai-ctx` removed, nullable exec mode extracted
+  - 163: `start-tui-runtime!` refactored — dead `ai-ctx` removed
 - Tasks 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 also complete and closed
 
 ## Test health
@@ -42,6 +43,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 ## Latest session notes
 
 - 2026-05-22: Task 166 mandatory assistant/thinking streaming optimization implemented: append-only assistant/thinking updates now use suffix insertion, avoid post-creation full redraw/prefix overlay recreation, assistant stream properties apply only to suffix ranges; focused Emacs tests and `bb emacs:test` green.
+- 2026-05-22: Executed task 166 test-review follow-up after no-action review; no newly added unchecked steps existed, so implementation.md records the no-op pass and commit 6f0a3822 captures it.
 - 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no new design-steps were present, no design/plan/steps changes were required, and implementation.md records the pass.
 - 2026-05-22: Reviewed task 166 design/plan/steps for inconsistencies; found no new actionable inconsistency feedback; appended implementation note only.
 - 2026-05-22: Executed task 166 ambiguity follow-up after no-action ambiguity review; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
