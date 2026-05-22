@@ -55,6 +55,8 @@ The task should also identify convergence clusters, including at minimum:
 
 ## Initial registry semantics matrix
 
+This matrix captures the pre-migration baseline observed when the audit was first assembled. Some rows below are intentionally historical snapshots and are superseded by later sections in this document, especially the post-`169`–`172` outcome guidance.
+
 | Registry | Identity | Validation | Duplicate / conflict policy | Ordering | Lookup miss | Removal | Storage / mutation model | Built-ins / ownership model | Return contract | Likely required? |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **tool-registry** | `:name` string | kebab-case ASCII; requires `:format-request` fn after normalization | per-owner storage can overwrite; merged read surface is **first name wins** with built-ins first | built-ins first, then extension `:registration-order`; dedup by first seen name | `nil` from `get-tool-in` | no symmetric public remove here | mutable registry object over shared state | dual store: `:built-in-tools` + extension-owned `:tools` | mutators return registry object | merged ownership model likely required; exact overwrite details maybe incidental |
@@ -62,9 +64,11 @@ The task should also identify convergence clusters, including at minimum:
 | **skill-registry** | `:name` string | non-blank string | duplicate name **ignored**; first wins | registration order preserved | `nil` from `find-skill` | none | pure vector collection | no built-in vs extension distinction here | returns result map `{:skills ... :added? ...}` | duplicate-ignore may be incidental; ordered collection likely required |
 | **prompt-registry** | composite identity `ext-path + id`, both string-coerced | very permissive; nil/blank identities normalize to `""`; patchable fields constrained | same identity **replaces** on register; update mutates matching entry logically | stored order preserved; separate canonical sort by `[priority ext-path id]` | `nil` from `find-contribution`; update/remove return unchanged state with flags | targeted unregister by identity; non-throwing | pure vector collection | ownership baked into identity via `ext-path` | returns result maps with status flags | identity permissiveness looks incidental; composite identity and priority ordering likely required |
 | **workflow-registry** | `:definition-id`, normalized to string; blankish ids generate UUID | target-authored workflow definition predicate | register **replaces** existing definition at normalized id | public listing sorted by `:definition-id` | `nil` from `workflow-definition` | targeted remove; **throws if missing** | pure root-state transform | no built-ins; root-state owner | tuple `[state id stored-definition]` / `[state removed-definition]` | pure-state ownership likely required; UUID-on-blank maybe incidental or compatibility |
-| **deterministic-operation-registry** | canonical `:id` string | strict normalized def validation; canonical namespaced kebab-case ids | duplicate id **throws** | explicit `:registration-order` preserved | `nil` from `get-operation-in`; invoke **throws if missing** | bulk unregister by `ext-path` | mutable registry object wrapping atom | extension ownership via `:ext-path` for cleanup | mutators return registry object | duplicate-throw + bulk-unregister feel strongly required |
+| **deterministic-operation-registry** | canonical `:id` string | strict normalized def validation; canonical namespaced kebab-case ids | duplicate id **throws** | unordered membership/count read contract; no adapter-local registration-order state | `nil` from `get-operation-in`; invoke **throws if missing** | bulk unregister by `ext-path` | runtime-owned registry object over shared `root-registry` state | extension ownership via `:ext-path` for cleanup, plus shared runtime ownership conventions | mutators return registry object | duplicate-throw + bulk-unregister feel strongly required; ordering now looks removable/adapter-level rather than essential |
 
 ## Caller-and-test-backed registry matrix
+
+This section began as an evidence pass over the then-current registry surfaces. Where later migration work changed a registry’s lower storage or ordering contract, treat the newer outcome sections later in this document as authoritative over the original audit snapshot.
 
 | Registry | Primary callers / consumers | Direct tests / evidence | Caller-backed semantic signals | Test-backed semantic signals | Initial preserve judgement |
 |---|---|---|---|---|---|
@@ -73,9 +77,11 @@ The task should also identify convergence clusters, including at minimum:
 | **skill-registry** | `components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj` for `:session/register-skill`; `components/agent-session/src/psi/agent_session/resolvers/discovery.clj`; `components/agent-session/src/psi/agent_session/context.clj` injects `find-skill`; `components/prompt-assets/src/psi/prompt_assets/skills.clj`; `components/workflow-step-session-config/src/psi/workflow_step_session_config/core.clj` via execution adapter | `components/skill-registry/test/psi/skill_registry/registry_test.clj`; integration-adjacent proofs in `components/agent-session/test/psi/agent_session/config_compaction_test.clj`; prompt-facing usage in `components/prompt-assets/test/psi/prompt_assets/skills_test.clj`; workflow adapter proof in `components/workflow-runtime/test/psi/workflow_runtime/execution_adapter_test.clj` | callers treat skills as an ordered session collection; prompt rendering and discovery depend on stable listing and lookup by exact name; session mutation path cares whether registration changed so prompts can refresh conditionally | tests explicitly prove: non-blank names required; duplicate registrations are ignored; first-registration order preserved; helper APIs return nil for miss and stable counts/names; `config_compaction_test` proves duplicate register-skill leaves skills and prompt unchanged | preserve ordered collection semantics and duplicate no-op behavior unless caller audit disproves it; result-map shape may be incidental, but `:changed?` appears behaviorally meaningful to callers |
 | **prompt-registry** | `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_handlers.clj` for register/update/unregister mutations; `components/session-state/src/psi/session_state/state.clj` sorts prompt contributions canonically; `components/agent-session/src/psi/agent_session/resolvers/extensions.clj` projects prompt contribution count | `components/prompt-registry/test/psi/prompt_registry/contributions_test.clj`; integration-adjacent proof in `components/agent-session/test/psi/agent_session/eql_introspection_test.clj` | callers use register/update/unregister result maps to write back prompt-contribution state; session-state depends on canonical sorting helper; extension introspection depends on count only, not storage shape | tests explicitly prove: identity is string-coerced; nil/blank identity normalizes to empty strings; register replaces same identity; update/remove miss are non-throwing no-op result maps; canonical sort is by `[priority ext-path id]`; patching is constrained to selected fields | preserve composite identity, update/unregister result-map semantics, and canonical priority sort; nil/blank coercion looks more like compatibility than desired contract |
 | **workflow-registry** | `components/agent-session/src/psi/agent_session/mutations/canonical_workflows.clj`; `components/agent-session/src/psi/agent_session/resolvers/workflows.clj`; `components/agent-session/src/psi/agent_session/psi_tool_workflow.clj`; `components/agent-session/src/psi/agent_session/workflow/core.clj`; `components/workflow-runtime/src/psi/workflow_runtime/core.clj`; `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/delegate.clj`; `components/workflow-step-session-config/src/psi/workflow_step_session_config/core.clj` | `components/workflow-registry/test/psi/workflow_registry/registry_test.clj`; `components/workflow-registry/test/psi/workflow_registry/definition_test.clj`; broad consumer proofs in `components/agent-session/test/psi/agent_session/mutations/canonical_workflows_test.clj`, `workflow_resolvers_test.clj`, `workflow_tools_test.clj`, `workflow_runtime_test.clj`, `workflow_session_integration_test.clj`; runtime-side proofs in `components/workflow-runtime/test/psi/workflow_runtime/core_test.clj`, `ir_runtime_adoption_test.clj`, `terminal_contract_execution_test.clj`, `progression_recording_test.clj` | callers rely on pure root-state transforms and normalized lookup across resolver, mutation, psi-tool, and runtime boundaries; workflow runtime resolves registered definitions by id, and tooling lists definitions in sorted, user-visible order | tests explicitly prove: ids normalize from keyword/string/non-string and blank ids become UUIDs; invalid definitions rejected; register replaces at same id; list/ids sorted by definition-id; public lookup normalizes ids and misses return nil; remove normalizes ids and throws when missing | preserve pure root-state API and normalized/sorted public read semantics; UUID-on-blank and throw-on-missing removal still need caller-intent review |
-| **deterministic-operation-registry** | `components/agent-session/src/psi/agent_session/extensions/runtime_fns.clj` registers runtime-owned operations; `components/agent-session/src/psi/agent_session/extensions.clj` bulk-cleans operations on unload/clear; `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj` invokes operations by id; `components/agent-session/src/psi/agent_session/context.clj` constructs registry | `components/deterministic-operation-registry/test/psi/deterministic_operation_registry/registry_test.clj`; `components/deterministic-operation-registry/test/psi/deterministic_operation_registry/defs_test.clj`; consumer proofs in `components/agent-session/test/psi/agent_session/extensions_test.clj`, `workflow_invoke_runtime_test.clj`; extension integration in `extensions/github/test/psi/github/find_issue_integration_test.clj` | callers depend on stable invoke-time ids, explicit runtime registration, and bulk unregister by `ext-path` during extension unload/reload; workflow invoke execution goes through registry lookup instead of direct function references | tests explicitly prove: canonical namespaced id validation; invalid definitions rejected; duplicate registration throws; registration order preserved in ids/listing; invoke throws on missing op; unregister-by-extension removes all matching ops and preserves surviving order; no-op unregister for missing extension | preserve duplicate rejection, bulk unregister by extension, and stable registration-order listing/invoke semantics; mutable registry-object API may be an implementation choice rather than essential contract |
+| **deterministic-operation-registry** | `components/agent-session/src/psi/agent_session/extensions/runtime_fns.clj` registers runtime-owned operations; `components/agent-session/src/psi/agent_session/extensions.clj` bulk-cleans operations on unload/clear and projects extension-facing summaries; `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj` invokes operations by id; `components/agent-session/src/psi/agent_session/context.clj` constructs registry | `components/deterministic-operation-registry/test/psi/deterministic_operation_registry/registry_test.clj`; `components/deterministic-operation-registry/test/psi/deterministic_operation_registry/defs_test.clj`; consumer proofs in `components/agent-session/test/psi/agent_session/extensions_test.clj`, `extensions_api_introspection_contract_test.clj`, `workflow_invoke_runtime_test.clj`; extension integration in `extensions/github/test/psi/github/find_issue_integration_test.clj` | callers depend on stable invoke-time ids, explicit runtime registration, bulk unregister by `ext-path` during extension unload/reload, and coherent extension-facing projection seams after migration; workflow invoke execution goes through registry lookup instead of direct function references | current tests prove: canonical namespaced id validation; invalid definitions rejected; duplicate registration throws; unordered membership/count listing contract; invoke throws on missing op; unregister-by-extension removes all matching ops; no-op unregister for missing extension; extension-introspection projections stay coherent | preserve duplicate rejection, bulk unregister by extension, invoke semantics, and higher projection coherence; ordering no longer appears essential, while the registry-object adapter boundary remains materially significant |
 
 ## Decision-oriented unification matrix
+
+This matrix records the audit’s preserve-vs-share judgements as they stood during the unification analysis. Later completed migrations refined several of these judgements, most notably for `workflow-registry` and `deterministic-operation-registry`; prefer the later outcome updates when they conflict with the earlier audit stance.
 
 | Registry | Behavior / axis | Evidence | Preserve? | Why | Candidate shared substrate |
 |---|---|---|---|---|---|
@@ -111,12 +117,14 @@ The task should also identify convergence clusters, including at minimum:
 | **workflow-registry** | Tuple return contract | visible in tests and callers, but mostly boundary-shape rather than business semantics | **Likely yes at API level, no at substrate level** | preserve public boundary while allowing lower shared mechanics | wrapper over pure keyed substrate |
 | **deterministic-operation-registry** | Stable canonical namespaced ids | runtime invoke callers and defs tests both require this | **Yes** | workflow invoke steps target ids, so ambiguity is unacceptable | keyed registry substrate with strict id validation |
 | **deterministic-operation-registry** | Duplicate registration throws | explicit tests; extension/runtime callers rely on uniqueness for invoke routing | **Yes** | two operations for one id would break determinism | keyed registry substrate with reject-on-conflict policy |
-| **deterministic-operation-registry** | Registration order preserved | explicit tests; listing helpers and cleanup preserve order | **Likely yes** | current outward read surface is order-preserving, and tests make it contract-like | keyed registry substrate with ordered ids |
+| **deterministic-operation-registry** | Unordered membership/count listing contract | current tests after `172` prove unordered membership/count/coherence rather than preserved insertion order | **Yes** | caller-visible behavior no longer requires registration-order guarantees; ordering was removable compatibility rather than essential semantics | keyed registry substrate without default ordering guarantees |
 | **deterministic-operation-registry** | Invoke missing op throws | explicit tests; workflow invoke runtime expects clear failure on missing op | **Yes** | missing invoke target is a hard workflow error, not an optional read miss | wrapper/runtime-specific invoke seam |
 | **deterministic-operation-registry** | Bulk unregister by extension path | extension unload/clear callers explicitly depend on it; tests cover matching removal and missing-ext no-op | **Yes** | lifecycle cleanup is architectural, not incidental | keyed registry substrate with owner-index/bulk-remove support |
 | **deterministic-operation-registry** | Registry object mutator API | many callers pass registry object around, but this may still be implementation-level | **Unknown / maybe no** | object identity may be convenient, but semantics live in operations and cleanup behavior | mutable adapter over keyed substrate |
 
 ## Design-history evidence pass
+
+These notes remain useful as evidence for why the first-cut contracts looked the way they did at audit time. They are historical input to the unification analysis, not necessarily the final post-migration state for every registry.
 
 | Registry | Design-history evidence | What it strengthens | Impact on current judgement |
 |---|---|---|---|
@@ -125,9 +133,11 @@ The task should also identify convergence clusters, including at minimum:
 | **skill-registry** | `112-skill-registration-component-extraction/design.md` explicitly chooses a pure vector/collection component, first-registration-wins ordering, duplicate-ignore semantics, minimal non-blank `:name` validation, and a result contract reporting `:added?`/`:changed?` so `agent-session` can preserve prompt-refresh behavior. `112` implementation notes confirm `config-compaction` coverage was extended specifically to prove duplicate registration leaves prompt/session state unchanged. | duplicate-ignore and ordered collection semantics are intentional and caller-visible; `:changed?` is not just decorative, it supports orchestration behavior. | upgrades duplicate-ignore from likely/incidental to preserve-yes in the current contract; strengthens preserve-yes for ordered collection and result-map change reporting. |
 | **prompt-registry** | `114-prompt-contribution-registration-component-extraction/design.md` originally preferred tightening identity validation, but explicitly allowed preserving looser behavior if live code depended on it. `114` implementation notes record that live behavior accepted nil/blank identities via string coercion and that the extraction deliberately preserved that loose contract; canonical sort ownership and patchable fields were also made explicit. The one intentional behavior correction was count reporting, not identity handling. | composite identity, replace/update/unregister semantics, patch contract, and sort contract are intentional. Loose nil/blank coercion is also intentional in the current first cut, but explicitly framed as behavior-preserving compatibility rather than principled design. | strengthens preserve-yes for composite identity, non-throwing update/remove miss behavior, patch semantics, and canonical sort. Reclassifies blank/nil coercion from mere smell to “preserve for now / compatibility-carried”, not “ideal contract”. |
 | **workflow-registry** | `115-workflow-registration-component-extraction/design.md` explicitly preserves normalized `:definition-id`, blank/missing id → generated UUID, target-authored definition validation, tuple-shaped lower API, sorted `list-definitions`/`definition-ids`, nil-returning lookup, and throw-on-missing lower remove helper. `115` implementation notes confirm those were preserved intentionally and pushed behind one lower owner. | workflow registry behaviors are strongly intentional first-cut contract choices, especially pure root-state ownership, normalized ids, sorted public reads, and lower tuple API. | strengthens preserve-yes for pure root-state API, sorted reads, normalized lookup, and validation. Blank-id UUID generation and remove-miss throw are no longer weak guesses; they are explicit first-cut preserve decisions, though still possible future redesign targets. |
-| **deterministic-operation-registry** | `116-deterministic-operation-registration-component-extraction/design.md` explicitly preserves registry-object API, duplicate rejection, registration-order public queries, nil lookup miss, invoke-miss throwing, and bulk unregister by `ext-path`; it also explicitly rejects redesign into a root-state registry. `116` implementation and review notes repeatedly reinforce that these semantics are the extracted lower-owner contract and that lower-component tests should be the primary proof. | duplicate-throw, registration-order preservation, runtime registry-object model, and lifecycle cleanup semantics are all deliberate first-cut contract, not incidental leftovers. | strengthens preserve-yes for duplicate rejection, ordered ids/listing, invoke-miss throw, and bulk unregister. Registry-object API remains more likely contract-bound here than in tool/command because the design explicitly chose to preserve that substrate. |
+| **deterministic-operation-registry** | `116-deterministic-operation-registration-component-extraction/design.md` explicitly preserves registry-object API, duplicate rejection, registration-order public queries, nil lookup miss, invoke-miss throwing, and bulk unregister by `ext-path`; later follow-on tasks `170`–`172` refine that first-cut contract by moving canonical storage to shared `root-registry`, keeping duplicate rejection/invoke semantics adapter-owned, and removing adapter-local ordering guarantees in favor of unordered listing/coherence proofs. | duplicate-throw, runtime registry-object model, lifecycle cleanup semantics, and adapter-owned invoke behavior remain deliberate contract; preserved ordering was proven removable. | strengthens preserve-yes for duplicate rejection, invoke-miss throw, bulk unregister, and registry-object boundary significance; weakens any preserve-yes claim for ordering as an essential long-term semantic. |
 
 ## Unknowns after design-history pass
+
+This section captures the open questions that remained at the time of the original audit pass. Some were later resolved by completed tasks `165`–`172`; those later resolutions should be read as closing or refining portions of the uncertainty recorded here.
 
 The remaining meaningful unknowns are narrower now:
 
@@ -149,6 +159,8 @@ The remaining meaningful unknowns are narrower now:
 
 ## Updated conclusions after caller-dependency audit
 
+These were the audit’s best conclusions before the later root-registry migration arc completed. Read them as an intermediate checkpoint rather than the final word when later sections provide stronger post-migration evidence.
+
 - **tool-registry mutator return shape**: likely incidental
 - **command-registry mutator return shape**: likely incidental
 - **tool same-owner overwrite behavior**: still unresolved by callers; treat as lower-policy detail unless more evidence appears
@@ -157,6 +169,8 @@ The remaining meaningful unknowns are narrower now:
 - **deterministic-operation registry object model**: much more boundary-significant than tool/command mutator return shape
 
 ## Aspect-by-aspect registry requirements
+
+This catalog mixes durable behavioral requirements with the audit-time shape of each registry. For registries later migrated onto shared storage, treat the per-aspect bullets as describing either enduring public behavior or the historical baseline that later outcome sections refine.
 
 ### 1. Storage / ownership model
 
@@ -177,8 +191,8 @@ The remaining meaningful unknowns are narrower now:
 - `workflow-registry`
   - pure operations over root workflow-definition state
 - `deterministic-operation-registry`
-  - runtime-owned registry object wrapping atom-backed state
-  - explicitly not a root-state registry
+  - runtime-owned registry object over shared `root-registry` state
+  - canonical operation entries now live in shared storage, while object-style host ownership remains adapter-significant
 
 ### 2. Identity model
 
@@ -289,7 +303,8 @@ The remaining meaningful unknowns are narrower now:
 - `workflow-registry`
   - public listings sorted by `:definition-id`
 - `deterministic-operation-registry`
-  - registration order preserved and exposed through `operation-ids-in` and `all-operations-in`
+  - unordered membership/count coherence is preserved through `operation-ids-in` and `all-operations-in`
+  - callers should not depend on insertion order
 
 ### 8. Built-in support
 
@@ -459,7 +474,7 @@ The remaining meaningful unknowns are narrower now:
   - remove returns `[state removed-definition]`
 - `deterministic-operation-registry`
   - mutators return registry object
-  - design-history says this substrate/API choice is intentional first-cut contract
+  - registry-object API remains intentional, but canonical storage now lives below it in shared `root-registry`
 
 ### 17. Change / no-change reporting
 
@@ -531,6 +546,8 @@ The remaining meaningful unknowns are narrower now:
 
 ## Initial convergence clusters
 
+These clusters reflect the audit’s original decomposition before the follow-on migration tasks completed. The later outcome section supersedes them where direct adoption versus adapter-backed shared-storage adoption became concrete.
+
 ### Group A — strongest shared-implementation candidates
 
 | Registry | Why similar | Blocking differences |
@@ -543,7 +560,7 @@ The remaining meaningful unknowns are narrower now:
 | Registry | Why similar | Blocking differences |
 |---|---|---|
 | workflow-registry | keyed registry, normalize identity, register/list/remove, pure | replacement semantics, sorted by id, root-state tuples |
-| deterministic-operation-registry | keyed registry, normalize identity, register/list/remove-ish, explicit order | mutable object, duplicate throws, bulk unregister by ext-path |
+| deterministic-operation-registry | keyed registry, normalize identity, register/list/remove-ish, adapter-backed shared storage | mutable object, duplicate throws, invoke seam, bulk unregister by ext-path |
 
 ### Group C — partial helper sharing only
 
@@ -570,7 +587,7 @@ That yields an explicit migration rule for future registry work:
 
 ### Registry migration checklist
 
-Use this checklist for future registry migrations, especially any follow-on `workflow-registry` work:
+Use this checklist for future registry migrations, as validated by the completed `workflow-registry` and deterministic-operation follow-ons:
 
 1. **Name the new authoritative owner**
    - identify the single post-migration storage owner/substrate
@@ -612,24 +629,94 @@ Use this checklist for future registry migrations, especially any follow-on `wor
    - full `bb test`
    - lint where relevant
 
-### Recommended next migration target
+### Outcomes after 169–172
 
-For root-registry-style unification, the next target should be `workflow-registry`.
+The follow-on work predicted here is now complete enough to refine this audit with concrete migration outcomes:
 
-Why:
+- `169` migrated `workflow-registry` onto `root-registry` as a thin adapter while preserving the public workflow-registry contract.
+- `170` aligned the shared lower contract for future adopters by splitting lower duplicate semantics into explicit duplicate-rejecting `insert` versus replace-capable `register`, rather than forcing every adopter through one conflict policy.
+- `171` migrated `deterministic-operation-registry` onto shared `root-registry` storage while preserving adapter-owned duplicate-throw, invoke-miss-throw, and extension-cleanup behavior.
+- `172` removed deterministic-operation adapter-local registration-order state and narrowed its public listing contract to unordered membership/count coherence rather than preserved insertion order.
 
-- it already has a pure root-state ownership model
-- its contract mostly fits a shared keyed-registry substrate:
-  - normalized identity
-  - register/lookup/list/remove semantics
+These completed tasks sharpen the audit in three important ways:
+
+1. `workflow-registry` was correctly identified as the next root-registry-style migration target.
+2. `deterministic-operation-registry` turned out to be a viable shared-storage adopter after semantic alignment, but only as an adapter-backed migration rather than a direct root-registry-style semantic fit.
+3. registration order is now more clearly classified as a compatibility surface that may be removable at the adapter boundary rather than something a shared lower substrate should preserve by default.
+
+### Updated migration conclusions
+
+#### `workflow-registry`
+
+The audit prediction was confirmed.
+
+- It now sits on `root-registry` shared storage.
+- Its adapter preserves workflow-specific semantics:
+  - id normalization
+  - blank-id UUID generation
+  - target-authored validation
+  - replace-on-register
   - sorted public reads
-- unlike `deterministic-operation-registry`, it is not fundamentally runtime-object-owned
+  - nil lookup miss
+  - throw-on-miss removal
+  - tuple-shaped public return contract
+- The migration also confirmed that preserved compatibility paths such as `[:workflows :definitions]` can remain as explicit projection/coherence surfaces while lower authoritative ownership moves to shared storage.
 
-### Recommended sequencing
+#### `deterministic-operation-registry`
 
-1. Use this task as the migration-rules source of truth.
-2. Apply the checklist above when designing the next `workflow-registry` migration slice.
-3. Continue to defer `deterministic-operation-registry` as a root-registry migration target unless its runtime-object/lifecycle coupling changes.
+The earlier “defer” judgement needs refinement.
+
+- It was correct that deterministic operations were not a direct semantic fit for the original shared keyed-registry target.
+- But after `170` introduced clearer lower conflict semantics and `172` removed adapter-local registration-order guarantees, `171` successfully moved canonical operation storage into `root-registry`.
+- The registry remains adapter-heavy and runtime-shaped:
+  - duplicate registration still throws publicly
+  - invoke miss still throws publicly
+  - owner-scoped cleanup remains required
+  - runtime-owned registrations still use adapter-owned host conventions
+  - extension-facing projection seams remain synchronized higher-level surfaces rather than canonical storage
+
+So the revised conclusion is:
+
+- `deterministic-operation-registry` can share **storage substrate** with `root-registry`
+- but it should still be treated as an **adapter-backed adopter with material boundary semantics**, not as a direct semantic model for the shared lower component
+
+### Updated convergence guidance
+
+- **Direct/shared-substrate adopter pattern confirmed**: `command-registry`, `tool-registry`, `workflow-registry`
+- **Adapter-backed shared-storage adopter pattern confirmed**: `deterministic-operation-registry`
+- **Still likely helper/substrate-only candidates**: `skill-registry`, `prompt-registry`
+
+### Additional migration rules learned from 169–172
+
+Add the following rules to future registry-unification work:
+
+1. **Separate storage adoption from semantic adoption**
+   - a registry may migrate to shared storage without becoming a direct semantic match for the lower component
+   - preserve domain-specific miss/conflict/result behavior in the adapter when needed
+
+2. **Do not overfit lower semantics to one adopter**
+   - `170` showed that lower shared operations may need distinct contracts such as duplicate-rejecting `insert` and replace-capable `register`
+   - avoid forcing incompatible registries to share one conflict policy when adapters can translate appropriately
+
+3. **Treat ordering as opt-in, not default substrate behavior**
+   - `172` showed preserved ordering can be an adapter-local compatibility choice rather than a property worth baking into shared storage
+   - when callers only need membership/count/coherence, prefer unordered contracts
+
+4. **Projection seams may remain intentionally derived**
+   - a migration can leave higher compatibility projections in place so long as canonical ownership is singular and seam-level coherence is tested
+   - this was important for workflow canonical-path compatibility and deterministic-operation extension introspection surfaces
+
+5. **Prove higher seams explicitly after storage moves**
+   - `169` and `171` both confirmed that lower-component success is insufficient without tests proving resolver/introspection/helper/runtime coherence above the migrated store
+
+### Revised sequencing guidance
+
+1. Use this task as the source-of-truth audit for required-vs-incidental registry semantics.
+2. When adopting new registries, decide first whether they are:
+   - direct semantic adopters of `root-registry`, or
+   - adapter-backed shared-storage adopters.
+3. Prefer removing adapter-owned ordering guarantees when caller-visible behavior does not truly require them.
+4. Keep future migrations focused on single registries plus their higher read/projection seams rather than broad simultaneous normalization.
 
 ## Acceptance
 

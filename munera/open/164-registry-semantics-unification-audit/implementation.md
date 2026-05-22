@@ -24,3 +24,12 @@ Additional refinement after tasks `167` and `168`:
 - recorded the core failure pattern to guard against: storage migration succeeding while higher read/introspection seams continue reading legacy local state
 - added a future migration checklist covering authoritative owner declaration, full read/write seam enumeration, seam-level guard tests, and required full-suite verification before close
 - recorded `workflow-registry` as the next recommended root-registry-style migration target, while reaffirming that `deterministic-operation-registry` should remain deferred because its runtime-owned object/lifecycle model is materially different
+
+Additional refinement after completed tasks `165`–`172`:
+
+- recorded that task `165` captured the shared target architecture and task `166` built the standalone `root-registry` component
+- confirmed the predicted direct-adopter path for `command-registry`, `tool-registry`, and `workflow-registry`
+- refined the deterministic-operation conclusion: it is now proven as an adapter-backed shared-storage adopter rather than a direct semantic fit for the lower component
+- recorded the semantic-alignment lesson from `170`: lower shared registry APIs may need distinct conflict contracts (`insert` vs `register`) rather than one forced duplicate policy
+- recorded the contract-simplification lesson from `172`: preserved registration order can be an adapter-local compatibility surface that may be removed when callers only require unordered membership/count coherence
+- updated the audit conclusion so future migrations distinguish direct semantic adoption from adapter-backed storage adoption, and treat ordering as opt-in rather than default lower-substrate behavior
