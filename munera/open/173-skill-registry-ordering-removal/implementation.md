@@ -141,3 +141,7 @@ Found one actionable test gap: TUI skill display/autocomplete is an affected ord
 ## 2026-05-22 test review follow-up execution
 
 Completed the newly added `steps.md` follow-up. TUI skill banner rendering now sorts visible skills by exact `:name` before display, and slash autocomplete sorts skill candidates by exact skill `:name` before building `/skill:name` entries, so neither surface can expose raw session `:skills` vector order. Added focused TUI projection and input-selector tests with unsorted session skills. Verification: `clojure -M:test --focus psi.prompt-assets.skills-test --focus psi.agent-session.resolvers-test --focus psi.tui.app-input-selector-test --focus psi.tui.app-projection-test` passed (62 tests, 299 assertions); `clj-kondo --lint components/tui/src components/tui/test` passed.
+
+## 2026-05-22 test-shaper review
+
+Found one actionable test-quality gap: branch B requires `register-skill` result `:skills` to be canonical at the registry boundary even when a duplicate registration is ignored, but the current duplicate test starts from a singleton existing vector and only proves add-path canonicalization. A regression could return an unsorted pre-existing vector on the duplicate/no-change path while preserving `:added?` / `:changed?` and passing the current focused registry tests.
