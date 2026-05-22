@@ -50,3 +50,6 @@ Reviewed `design.md`, implementation-ready `plan.md`/`steps.md`, `design-steps.m
 
 ## 2026-05-22 — ambiguity follow-up execution
 Used the preloaded ambiguity-review result and checked `design-steps.md`. No newly added unchecked actionable ambiguity follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
+
+## 2026-05-22 — inconsistency review
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced assistant streaming code/tests (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-events.el`) for cross-file inconsistencies. New actionable inconsistency: `design.md` acceptance still names "divergent snapshot fallback" for assistant streaming, while the later assistant payload contract, `plan.md`, and `steps.md` require preserving existing divergent assistant semantics by merging/appending (`"Hello"` + `"Goodbye"` → `"HelloGoodbye"`) after computing the effective next text. The acceptance wording should be corrected so tests do not implement a redraw/replacement fallback for divergent assistant payloads.
