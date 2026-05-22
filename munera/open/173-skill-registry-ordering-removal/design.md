@@ -27,8 +27,8 @@ This task uses the standard task artifacts as follows:
 
 - `design.md` defines the intended behavior and decision branches.
 - `plan.md` defines the implementation approach for both the remove-order and keep-order outcomes.
-- `design-steps.md` is the actionable surface for ambiguity-review follow-up items only.
-- `steps.md` is the later implementation checklist and must not be used for ambiguity-review follow-up execution.
+- `design-steps.md` is the actionable surface for review follow-up items that refine task design, including ambiguity-review and inconsistency-review follow-ups.
+- `steps.md` is the later implementation checklist and must not be used for design-review follow-up execution.
 - `implementation.md` is the append-only review, audit, decision, and blocking-note log.
 
 ## Scope

@@ -48,3 +48,7 @@ No newly added unchecked ambiguity follow-up items were present in `design-steps
 ## 2026-05-22 inconsistency review
 
 Found one actionable inconsistency: `design.md` says `design-steps.md` is the actionable surface for ambiguity-review follow-up items only, but this task's prior inconsistency review already used `design-steps.md` for inconsistency follow-up and the current requested review protocol also requires inconsistency follow-ups there.
+
+## 2026-05-22 inconsistency follow-up execution
+
+Completed the newly added `design-steps.md` inconsistency follow-up. Updated `design.md` so `design-steps.md` is the design-review follow-up surface for both ambiguity-review and inconsistency-review items, and clarified that `steps.md` remains reserved for later implementation execution rather than design-review follow-up execution.
