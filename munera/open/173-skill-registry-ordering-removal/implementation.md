@@ -108,3 +108,7 @@ Found one new actionable ambiguity: `design.md` says workflow child-session requ
 ## 2026-05-22 ambiguity follow-up execution
 
 Completed the newly added prompt-component / workflow `:skill-names` ambiguity follow-up. Clarified that `:skill-names` is an allowlist rather than an ordering directive: caller-declared order is only input metadata, inherited parent/session vector order must not become model-visible ordering, and rendered/projected selected skill subsets should use canonical skill-name order under branch B or branch C. Updated `plan.md` so both branch B and branch C explicitly include prompt-component / workflow filtered skill subsets in their ordering proof scope.
+
+## 2026-05-22 inconsistency review
+
+Found one new actionable inconsistency: the artifacts reclassify workflow child-session skill resolution as exact-name lookup only and clarify prompt-component / workflow `:skill-names` allowlist ordering, but workflow step `:session :skills` still declares a selected skill list whose resolved order is carried into child-session `:skills` and model-visible prompt construction. The task artifacts do not say whether that workflow `:skills` selection order is intentionally caller-declared, canonicalized under branch B/C, or exact-lookup-only metadata.
