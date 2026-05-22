@@ -19,6 +19,17 @@
       (is (true? (:changed? result)))
       (is (= 1 (:count result)))))
 
+  (testing "adds new skills into unsorted collections in canonical skill-name order"
+    (let [z-skill {:name "z-skill" :description "Z"}
+          m-skill {:name "m-skill" :description "M"}
+          a-skill {:name "a-skill" :description "A"}
+          result  (skill-registry/register-skill [z-skill m-skill] a-skill)]
+      (is (= [a-skill m-skill z-skill] (:skills result)))
+      (is (= a-skill (:skill result)))
+      (is (true? (:added? result)))
+      (is (true? (:changed? result)))
+      (is (= 3 (:count result)))))
+
   (testing "ignores duplicate registrations and returns canonical skill-name order"
     (let [existing  {:name "testing" :description "Original"}
           duplicate {:name "testing" :description "Replacement attempt"}

@@ -177,3 +177,7 @@ Completed the newly added command-surface proof. Added focused `/skills` and `/h
 ## 2026-05-22 test-shaper review
 
 Found one actionable test-quality gap: `register-skill` add-path coverage only adds into an empty or already-canonical collection. Branch B requires registry result `:skills` to be canonical even when registering a new skill into an unsorted pre-existing vector, so a regression could append/sort incorrectly on the add path while duplicate/no-change and helper tests still pass.
+
+## 2026-05-22 test-shaper follow-up execution
+
+Completed the newly added add-path registry proof. `register-skill` now has focused coverage for adding a new skill into an unsorted pre-existing vector, asserting canonical `:skills` result order while preserving `:added? true`, `:changed? true`, and count. Verification: `clojure -M:test --focus psi.skill-registry.registry-test` passed.
