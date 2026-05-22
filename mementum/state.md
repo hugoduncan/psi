@@ -39,6 +39,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
+- 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
 - 2026-05-22: Executed task 166 ambiguity follow-up after no-action ambiguity review; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
 - 2026-05-22: Executed task 166 inconsistency follow-up after thinking-proof clarification; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
 - 2026-05-22: Executed task 166 ambiguity follow-up: clarified thinking append-only proof uses inserted suffix mutation range and no post-creation full redraw/prefix overlay recreation, not nonexistent assistant-style property ranges.
