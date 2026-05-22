@@ -30,7 +30,7 @@
 (defn handle-model-selection!
   [ctx session-id resolve-model emit! value]
   (when-let [{:keys [provider id]} value]
-    (when-let [resolved (resolve-model provider id)]
+    (when-let [resolved (resolve-model ctx provider id)]
       (let [provider-str (name (:provider resolved))
             model {:provider provider-str
                    :id (:id resolved)

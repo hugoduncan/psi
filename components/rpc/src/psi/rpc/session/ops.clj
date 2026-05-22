@@ -138,7 +138,7 @@
                            (and (some? scope) (not (contains? valid-model-scopes scope))))
                    (throw (ex-info "invalid request parameter :scope: session, project, or user"
                                    {:error-code "request/invalid-params"})))
-        resolved (resolve-model provider model-id)]
+        resolved (resolve-model ctx provider model-id)]
     (when-not resolved
       (throw (ex-info "unknown model"
                       {:error-code "request/unknown-model"})))

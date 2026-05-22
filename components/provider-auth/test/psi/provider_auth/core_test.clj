@@ -51,3 +51,18 @@
   (testing "returns nil when no auth config exists"
     (with-redefs [model-registry/get-auth (fn [_] nil)]
       (is (nil? (provider-auth/provider-request-options :anthropic))))))
+
+(deftest oauth-backed-test
+  (testing "true when provider has stored oauth credential"
+    (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
+                                                                             :access "tok"
+                                                                             :refresh "ref"
+                                                                             :expires (+ (System/currentTimeMillis) 60000)}}})}]
+      (is (true? (provider-auth/oauth-backed? ctx :openai)))))
+
+  (testing "false when provider has api-key credential or no credential"
+    (let [api-key-ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :api-key
+                                                                                     :key "sk-1"}}})}
+          empty-ctx   {:oauth-ctx (oauth/create-null-context)}]
+      (is (false? (provider-auth/oauth-backed? api-key-ctx :openai)))
+      (is (false? (provider-auth/oauth-backed? empty-ctx :openai))))))

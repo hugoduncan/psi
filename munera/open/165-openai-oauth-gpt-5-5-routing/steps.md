@@ -1,0 +1,5 @@
+- [x] Add shared auth-aware runtime-model resolution helper in `psi.ai.model-registry`.
+- [x] Update prompt-request to use shared helper.
+- [x] Update app-runtime, rpc, and command resolution call sites to use shared helper.
+- [x] Add focused regression tests for OAuth-backed and non-OAuth-backed `gpt-5.5` resolution.
+- [x] Verify with focused tests and live eval.

@@ -208,14 +208,16 @@
     :else               nil))
 
 (defn resolve-model
-  [provider model-id]
-  (let [provider* (normalize-provider provider)]
-    (or (model-registry/find-model provider* model-id)
-        (some (fn [[_ model]]
-                (when (and (= provider* (:provider model))
-                           (= model-id (:id model)))
-                  model))
-              ai-models/all-models))))
+  ([provider model-id]
+   (resolve-model nil provider model-id))
+  ([ctx provider model-id]
+   (let [provider* (normalize-provider provider)]
+     (or (model-registry/resolve-runtime-model ctx provider* model-id)
+         (some (fn [[_ model]]
+                 (when (and (= provider* (:provider model))
+                            (= model-id (:id model)))
+                   model))
+               ai-models/all-models)))))
 
 (defn- current-ai-model
   ([ctx session-deps]
@@ -225,7 +227,7 @@
               (ss/get-session-data-in ctx session-id))]
      (or (when-let [provider (get-in sd [:model :provider])]
            (when-let [model-id (get-in sd [:model :id])]
-             (resolve-model provider model-id)))
+             (resolve-model ctx provider model-id)))
          rpc-ai-model)))
   ([ctx session-deps _state session-id]
    (current-ai-model ctx session-deps session-id)))

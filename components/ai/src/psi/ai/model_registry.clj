@@ -173,6 +173,43 @@
   [provider-kw model-id]
   (get (ensure-catalog) [provider-kw model-id]))
 
+(defn openai-oauth-runtime-model
+  "Return an OpenAI runtime model override for OAuth-backed ChatGPT sessions,
+   or nil when the canonical catalog entry should remain unchanged.
+
+   Current policy:
+   - `gpt-5.5` uses the ChatGPT/Codex backend under OpenAI OAuth so the same
+     user-visible model id works with ChatGPT credentials, matching Codex-style
+     account capabilities.
+   - all other models keep their catalog-defined transport."
+  [provider-kw model-id]
+  (when (and (= :openai provider-kw)
+             (= "gpt-5.5" model-id))
+    (assoc (or (find-model :openai "gpt-5.5")
+               (get built-in/all-models :gpt-5.5))
+           :api :openai-codex-responses
+           :base-url "https://chatgpt.com/backend-api")))
+
+(defn resolve-runtime-model
+  "Resolve the runtime model map for provider/model-id, optionally considering
+   runtime auth context.
+
+   Canonical catalog entries remain the source of truth for the user-visible
+   model catalog. This helper only shapes the execution transport for runtime
+   use when auth context requires it."
+  ([provider model-id]
+   (resolve-runtime-model nil provider model-id))
+  ([ctx provider model-id]
+   (let [provider-kw (cond
+                       (keyword? provider) provider
+                       (string? provider) (keyword provider)
+                       :else nil)]
+     (or (when (and ctx (= :openai provider-kw))
+           (let [oauth-backed? ((requiring-resolve 'psi.provider-auth.core/oauth-backed?) ctx provider-kw)]
+             (when oauth-backed?
+               (openai-oauth-runtime-model provider-kw model-id))))
+         (find-model provider-kw model-id)))))
+
 (defn get-auth
   "Get auth config for a provider keyword.
    Returns {:provider kw :api-key str? :auth-header? bool :headers map?} or nil."

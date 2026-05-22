@@ -238,3 +238,14 @@
     (model-registry/init! {})
     (is (nil? (runtime/resolve-api-key-in {} "sid" {:provider :anthropic :id "claude-sonnet-4-6"})))
     (is (nil? (runtime/resolve-api-key-in {} "sid" {:provider "anthropic" :id "claude-sonnet-4-6"})))))
+
+(deftest openai-oauth-backed-gpt-5-5-resolves-to-codex-runtime-model-test
+  (model-registry/init! {})
+  (let [oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
+                                                                     :access "tok"
+                                                                     :refresh "ref"
+                                                                     :expires (+ (System/currentTimeMillis) 60000)}}})
+        model     (model-registry/resolve-runtime-model {:oauth-ctx oauth-ctx} :openai "gpt-5.5")]
+    (is (= :openai-codex-responses (:api model)))
+    (is (= "https://chatgpt.com/backend-api" (:base-url model)))
+    (is (= "gpt-5.5" (:id model)))))

@@ -6,7 +6,8 @@
   (:require
    [clojure.string :as str]
    [psi.ai.model-registry :as model-registry]
-   [psi.provider-auth.oauth.core :as oauth]))
+   [psi.provider-auth.oauth.core :as oauth]
+   [psi.provider-auth.oauth.store :as oauth.store]))
 
 (defn normalize-provider-id
   "Normalize provider identity to the keyword form used by shared provider
@@ -35,6 +36,21 @@
         (when-let [auth (provider-auth-config provider-id)]
           (when (:auth-header? auth)
             (:api-key auth))))))
+
+(defn oauth-credential-type
+  "Return the stored OAuth credential type for `provider` from `ctx`, or nil.
+   This is intentionally narrower than auth resolution: it inspects the live
+   stored credential so higher layers can distinguish ChatGPT OAuth-backed
+   OpenAI sessions from platform-key-backed ones."
+  [ctx provider]
+  (when-let [provider-id (normalize-provider-id provider)]
+    (when-let [store (some-> ctx :oauth-ctx :store)]
+      (:type (oauth.store/get-credential store provider-id)))))
+
+(defn oauth-backed?
+  "True when `provider` currently resolves from a stored OAuth credential."
+  [ctx provider]
+  (= :oauth (oauth-credential-type ctx provider)))
 
 (defn provider-request-options
   "Return provider-scoped request options derived from model-registry auth.

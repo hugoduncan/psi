@@ -142,10 +142,11 @@ Available: " (str/join ", " (map name (keys all))))
                         {:model-key model-key})))))
 
 (defn- resolve-model-by-provider+id
-  "Find a runtime model map by provider string + model-id string."
-  [provider model-id]
+  "Find a runtime model map by provider string + model-id string.
+   Auth-aware so runtime execution can select the correct transport variant."
+  [ctx provider model-id]
   (let [provider* (some-> provider keyword)]
-    (or (model-registry/find-model provider* model-id)
+    (or (model-registry/resolve-runtime-model ctx provider* model-id)
         (some (fn [[_ model]]
                 (when (and (= provider* (:provider model))
                            (= model-id (:id model)))
@@ -159,7 +160,7 @@ Available: " (str/join ", " (map name (keys all))))
   [ctx session-id fallback-ai-model]
   (let [{:keys [provider id]} (:model (ss/get-session-data-in ctx session-id))]
     (or (when (and provider id)
-          (resolve-model-by-provider+id provider id))
+          (resolve-model-by-provider+id ctx provider id))
         fallback-ai-model)))
 
 (defn- submit-prompt-in!
@@ -281,7 +282,8 @@ Available: " (str/join ", " (map name (keys all))))
         oauth-ctx                (oauth/create-context)
         cfg                      (config-res/resolve-config cwd)
         effective-model          (if-let [{:keys [provider id]} (config-res/resolved-model cfg)]
-                                   (or (resolve-model-by-provider+id provider id) ai-model)
+                                   ;; oauth-ctx not yet created here; config-time resolution stays catalog-based
+                                   (or (model-registry/resolve-runtime-model nil provider id) ai-model)
                                    ai-model)
         effective-thinking-level (session-data/clamp-thinking-level
                                   (or thinking-level-override

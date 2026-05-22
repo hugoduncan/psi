@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as registry]
-   [psi.ai.models :as built-in]))
+   [psi.ai.models :as built-in]
+   [psi.provider-auth.oauth.core :as oauth]))
 
 ;; ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,33 @@
     (let [providers (registry/providers)]
       (is (contains? providers :anthropic))
       (is (contains? providers :openai)))))
+
+(deftest resolve-runtime-model-openai-oauth-routing-test
+  (registry/init! {})
+
+  (testing "openai gpt-5.5 remains chat-completions without oauth context"
+    (let [model (registry/resolve-runtime-model nil :openai "gpt-5.5")]
+      (is (= :openai-completions (:api model)))
+      (is (= "https://api.openai.com/v1" (:base-url model)))))
+
+  (testing "openai gpt-5.5 resolves to codex transport when oauth credential is present"
+    (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
+                                                                             :access "tok"
+                                                                             :refresh "ref"
+                                                                             :expires (+ (System/currentTimeMillis) 60000)}}})}
+          model (registry/resolve-runtime-model ctx :openai "gpt-5.5")]
+      (is (= :openai-codex-responses (:api model)))
+      (is (= "https://chatgpt.com/backend-api" (:base-url model)))
+      (is (= "gpt-5.5" (:id model)))))
+
+  (testing "other openai models preserve catalog transport under oauth"
+    (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
+                                                                             :access "tok"
+                                                                             :refresh "ref"
+                                                                             :expires (+ (System/currentTimeMillis) 60000)}}})}
+          model (registry/resolve-runtime-model ctx :openai "gpt-5.4")]
+      (is (= :openai-codex-responses (:api model)))
+      (is (= "https://chatgpt.com/backend-api" (:base-url model))))))
 
 ;; ── Init with user models ────────────────────────────────────────────────────
 
