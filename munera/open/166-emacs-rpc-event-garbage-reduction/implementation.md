@@ -170,3 +170,6 @@ Reviewed task tests against `task-test-review`, including `design.md` acceptance
 
 ## 2026-05-22 — test-review repeat follow-up execution
 Used the preloaded repeated test-review result and checked `steps.md`. No newly added unchecked actionable follow-up items were present; all implementation and test follow-up steps remain complete. No task, code, or test changes were required.
+
+## 2026-05-22 — test-shaper review
+Reviewed task tests against `test-shaper`, `design.md` acceptance/proof requirements, `plan.md`, `steps.md`, `psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-streaming-render-optimization-test.el`, and `bb.edn`. New actionable test-quality issue: `psi-assistant-streaming-append-path-avoids-redraw-and-prefix-recreation` compresses incremental delta append, cumulative snapshot suffix append, and divergent assistant merge preservation into one proof, so a regression would fail a broad mixed-concern test instead of identifying the broken stream contract.
