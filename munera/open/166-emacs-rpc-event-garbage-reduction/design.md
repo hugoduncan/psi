@@ -52,6 +52,46 @@ This creates allocation proportional to the accumulated response/output size per
 9. Focused Emacs tests pass.
 10. The implementation notes identify which suspected garbage sources were fixed, which were measured but left unchanged, and why.
 
+## Success threshold
+The task is successful when focused tests prove that append-only assistant and thinking updates take the incremental path instead of the full redraw path.
+
+Required proof for the optimized assistant/thinking path:
+- Add narrow instrumentation around the local rendering helpers, not wall-clock timing.
+- For append-only extension events, assert that the full-block `delete-region`/reinsert helper path is not called after the initial block creation.
+- For append-only extension events, assert that stream-time text properties are applied only to the newly inserted suffix range, not to the unchanged accumulated content.
+- For append-only extension events, assert that the prefix overlay for the live block is not recreated after the initial block creation.
+- For divergent/non-extension events, assert that the fallback full redraw path remains available and is used when required.
+
+A sufficient allocation/CPU proxy is helper-call and range-size evidence: append-only tests must show O(delta-size) mutation ranges for suffix events, while fallback tests may show O(total-size) redraw ranges only for non-append payloads.
+
+## Assistant stream payload contract
+`assistant/delta` events are accepted as mixed stream payloads because existing frontend behavior already supports both historical payload shapes:
+
+- Incremental delta: current in-progress text is `"Hel"`, incoming payload is `"lo"`; next rendered text is `"Hello"`. This is append-safe when the incoming payload does not look like a cumulative snapshot or replacement.
+- Extending cumulative snapshot: current text is `"Hel"`, incoming payload is `"Hello"`; next rendered text is `"Hello"`. This is append-safe because the incoming payload has the current text as a prefix; only suffix `"lo"` should be inserted.
+- Tail-churn cumulative snapshot: current text is `"Hello\n"`, incoming payload is `"Hello world"`; next rendered text is `"Hello world"`. This is not a pure append to the current buffer contents, but existing merge behavior treats near-tail churn as replacement of the live text. It must use the redraw fallback unless a smaller safe local edit is explicitly implemented and tested.
+- Divergent snapshot: current text is `"Hello"`, incoming payload is `"Goodbye"`; existing behavior treats this as an incremental delta and renders `"HelloGoodbye"`. This task must preserve that behavior unless an explicit contract change is made outside this task.
+
+`assistant/thinking-delta` events are cumulative snapshots. Incoming thinking text replaces the in-progress thinking value. If the new snapshot extends the current rendered thinking text, only the suffix should be inserted. If it diverges or shrinks, the full redraw fallback should replace the single live thinking line without duplicating thinking content.
+
+Append-vs-redraw rule:
+- append when the incoming effective next text has the current rendered text as a prefix;
+- redraw when the effective next text cannot be represented as a suffix append;
+- preserve the existing assistant merge semantics that determine the effective next text before choosing the render path.
+
+## Mandatory and conditional hotspot classes
+Mandatory for this task:
+- assistant streaming render path (`assistant/delta` → assistant line update),
+- thinking streaming render path (`assistant/thinking-delta` → thinking line update),
+- finalization behavior interacting with optimized assistant/thinking ranges.
+
+Conditional for this task:
+- Tool-row rendering is optimized only if implementation touches `psi-emacs--upsert-tool-row` or tests demonstrate tool rows are the dominant remaining corruption/garbage risk after assistant/thinking changes. If touched, all tool-row acceptance criteria apply.
+- Widget subscription dispatch is optimized only if implementation touches `psi-widget-projection-handle-event` or measurement/instrumentation shows the unconditional scan is material for high-frequency stream events. If touched, all widget subscription acceptance criteria apply.
+- Projection/footer rendering is optimized only if implementation touches projection rendering or measurement shows frequent projection redraws contribute materially to the same event-hot-path problem. If touched, all projection acceptance criteria apply.
+
+Do not broaden this task to EDN parsing, process filter framing, output virtualization, or backend accumulator redesign unless a small frontend-preserving change is proven necessary and covered by focused tests.
+
 ## Design constraints
 - Optimize only behavior that has focused test coverage.
 - Preserve one obvious rendering rule: append when safe, redraw when necessary.
