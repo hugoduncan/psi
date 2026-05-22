@@ -38,3 +38,6 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing impleme
 
 ## 2026-05-22 — ambiguity follow-up execution
 Defined the pre-optimization instrumentation seam. The committed proof interface should be named helper wrappers in `psi-assistant-render.el`, not primitive-level advice: a full-live-block redraw wrapper, a stream property application wrapper with explicit ranges, and the existing `psi-emacs--apply-prefix-overlay` prefix-overlay wrapper. Updated `design.md` and `plan.md`, then marked the ambiguity follow-up complete in `design-steps.md`. No implementation steps from `steps.md` were executed.
+
+## 2026-05-22 — inconsistency review
+Reviewed `design.md`, implementation-ready `plan.md`/`steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs streaming/render tests/code (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`). No new actionable inconsistencies found: mandatory assistant/thinking scope, conditional hotspot handling, pre-optimization helper instrumentation seam, append-vs-redraw contract, and verification steps are aligned across task artifacts. Existing `design-steps.md` items remain complete; no new follow-up items were added.
