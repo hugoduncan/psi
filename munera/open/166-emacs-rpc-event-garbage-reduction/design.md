@@ -28,7 +28,7 @@ This creates allocation proportional to the accumulated response/output size per
 1. Focused tests cover the current assistant streaming behavior before optimization:
    - incremental delta append,
    - cumulative snapshot replacement/extension,
-   - divergent snapshot fallback,
+   - divergent snapshot merge preservation after effective-next-text calculation,
    - finalization after optimized streaming.
 2. Focused tests cover thinking streaming behavior before optimization:
    - cumulative thinking snapshot replacement/extension,

@@ -53,3 +53,6 @@ Used the preloaded ambiguity-review result and checked `design-steps.md`. No new
 
 ## 2026-05-22 — inconsistency review
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced assistant streaming code/tests (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-events.el`) for cross-file inconsistencies. New actionable inconsistency: `design.md` acceptance still names "divergent snapshot fallback" for assistant streaming, while the later assistant payload contract, `plan.md`, and `steps.md` require preserving existing divergent assistant semantics by merging/appending (`"Hello"` + `"Goodbye"` → `"HelloGoodbye"`) after computing the effective next text. The acceptance wording should be corrected so tests do not implement a redraw/replacement fallback for divergent assistant payloads.
+
+## 2026-05-22 — inconsistency follow-up execution
+Used the preloaded inconsistency-review result and completed the newly added design follow-up. Updated `design.md` acceptance wording so divergent assistant payloads require existing merge preservation after effective-next-text calculation, not redraw/replacement fallback. Marked the design-step complete. No implementation steps from `steps.md` were executed.
