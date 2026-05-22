@@ -84,3 +84,7 @@ Found one actionable inconsistency: `design.md` lists `psi.agent-session.prompt_
 ## 2026-05-22 inconsistency follow-up execution
 
 Completed the newly added `design-steps.md` inconsistency follow-up. Reclassified `psi.agent-session.prompt_request` in `design.md`: prompt lifecycle / `system_prompt` paths remain ordered skill-list surfaces when they render skills, while `prompt_request` is only an exact `/skill:name` lookup-expansion surface and does not own or consume canonical skill-list ordering.
+
+## 2026-05-22 ambiguity review
+
+No new actionable ambiguity feedback. Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, task `164` skill-registry audit text, and representative registry/resolver/session-resource/prompt/TUI/app-runtime/workflow call sites after the latest `prompt_request` reclassification; the artifacts still define the branch decision criteria, canonical ordering candidate, branch C presentation-owned alternative, keep-order fallback, affected surfaces, proof expectations, and task `164` update scope clearly enough for implementation.
