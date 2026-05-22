@@ -233,20 +233,29 @@
 
 (deftest start-tui-runtime-passes-current-session-file-test
   (let [captured (atom nil)]
-    (app-test-support/with-session-state-restore
-      (fn []
-        (with-redefs-fn (main-bootstrap-stub-bindings)
+    (test-support/with-temp-session-root
+      (fn [session-root]
+        (app-test-support/with-session-state-restore
           (fn []
-            (let [mock-tui-start! (fn [_run-agent-fn opts]
-                                    (reset! captured opts)
-                                    :ok)]
-              (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {})))
-              (is (nil? (:current-session-file @captured)))
-              (is (fn? (:dispatch-fn @captured)))
-              (is (fn? (:on-interrupt-fn! @captured)))
-              (let [ctx (:ctx @app-runtime/session-state)
-                    session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)]
-                (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))))))))))
+            (with-redefs-fn (main-bootstrap-stub-bindings)
+              (fn []
+                (let [mock-tui-start! (fn [_run-agent-fn opts]
+                                        (reset! captured opts)
+                                        :ok)]
+                  (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {} {:session-root session-root})))
+                  (is (string? (:current-session-file @captured))
+                      "persisted TUI startup should pass the current session file to the frontend")
+                  (is (fn? (:dispatch-fn @captured)))
+                  (is (fn? (:on-interrupt-fn! @captured)))
+                  (let [ctx (:ctx @app-runtime/session-state)
+                        session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
+                        session-file (:session-file (ss/get-session-data-in ctx session-id))]
+                    (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))
+                    (is (= session-file (:current-session-file @captured)))
+                    (is (.startsWith session-file session-root)
+                        (str "expected persisted TUI session-file under isolated session-root\n"
+                             "session-root: " session-root "\n"
+                             "session-file: " session-file))))))))))))
 
 (deftest start-tui-runtime-journals-command-input-test
   (app-test-support/with-session-state-restore
