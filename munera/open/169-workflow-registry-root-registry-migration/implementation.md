@@ -39,3 +39,6 @@ Initial intent:
 2026-05-21 follow-up execution pass:
 - Reviewed preloaded review result plus current task artifacts. No newly added unchecked actionable steps remain in `steps.md`; all checklist items are already complete.
 - Blocking: none. No further execution change was possible without new review feedback because the previously noted stale unchecked-step concern is no longer reflected in the task checklist.
+
+2026-05-21 test review:
+- No new actionable test issue found. `task-test-review` checks pass: focused registry tests cover preserved boundary semantics (normalization, replacement, sorted reads, nil/throw misses, hidden root-registry entry shape, canonical `[:workflows :definitions]` coherence), higher-seam coverage exercises both canonical-path compatibility and reload `:loaded-definitions` coherence, and the current full `bb test` run is green.
