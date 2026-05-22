@@ -98,3 +98,6 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing impleme
 
 ## 2026-05-22 — ambiguity follow-up execution
 Used the preloaded ambiguity-review result and checked `design-steps.md`. No newly added unchecked actionable ambiguity follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
+
+## 2026-05-22 — inconsistency review
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs hot-path code/tests (`psi-assistant-render.el`, `psi-events.el`, `psi-tool-rows.el`, `psi-widget-projection.el`, `psi-projection.el`, `psi-streaming-transcript-test.el`) for cross-file inconsistencies. No new actionable inconsistencies found: assistant/thinking mandatory scope, conditional hotspot triggers, append-vs-redraw after effective-next-text calculation, helper-wrapper proof seams, thinking suffix-mutation proof, implementation ordering, and verification commands remain consistent. Existing `design-steps.md` items are complete; no new follow-up items were added.
