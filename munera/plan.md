@@ -25,6 +25,7 @@ Backlog:
 `munera/open/164-tui-idle-polling-elimination/`
 `munera/open/167-emacs-tool-details-show-full-call/`
 `munera/open/168-workflow-structured-output-schemas/`
+`munera/open/169-workflow-registry-root-registry-migration/`
 `munera/open/170-workflow-provider-native-structured-output/`
 `munera/open/172-emacs-command-move-point-to-prompt-end/`
 
