@@ -128,7 +128,21 @@ The implementation audit must check and, when needed, route these skill-list sur
 - prompt-assets skill helpers such as `format-skills-for-prompt`, `skill-summary`, `skills-by-source`, `visible-skills`, and `hidden-skills` when their output order is user- or model-visible
 - TUI display/autocomplete surfaces that project `(:skills state)`
 - `psi.agent-session.prompt_request` only for exact `/skill:name` lookup expansion; it does not own or consume canonical skill-list ordering
-- workflow child-session skill resolution only for exact-name lookup; the requested workflow skill order may remain the caller-specified subset order because that is selection order, not registry listing order
+- workflow child-session skill resolution only for exact-name lookup; prompt-component / workflow `:skill-names` is an allowlist, not an ordering directive
+
+## Prompt-component skill subset ordering
+
+Prompt-component and workflow child-session `:skill-names` values select which skills are included; they do not define the order in which selected skills are rendered to the model.
+
+Expected behavior:
+
+- `:skill-names` preserves caller-declared order only as input/configuration metadata.
+- filtering by `:skill-names` should not expose inherited parent/session vector order as a model-visible ordering contract.
+- when the filtered skill subset is rendered or projected as an ordered list, it should use the same canonical skill `:name` ordering as other prompt/display surfaces.
+- branch B satisfies this naturally if the source skill collection is canonicalized at the registry/read boundary; any prompt path that filters a raw or externally supplied `:skills` vector must still canonicalize before model-visible rendering.
+- branch C keeps the registry order-insensitive, so prompt-component filtering/rendering is explicitly in scope as a higher prompt projection seam that must canonicalize the filtered subset before exposing it.
+- the keep-order branch may preserve insertion-order rendering only if the implementation audit finds and documents a real requirement for that behavior.
+
 
 ## Task 164 update scope
 

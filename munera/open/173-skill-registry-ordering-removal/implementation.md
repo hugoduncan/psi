@@ -104,3 +104,7 @@ No newly added unchecked inconsistency follow-up items were present in `design-s
 ## 2026-05-22 ambiguity review
 
 Found one new actionable ambiguity: `design.md` says workflow child-session requested skill order may remain caller-specified selection order, while branch B/C require canonical ordering for prompt/display/model-visible surfaces and `system_prompt/filter-skills` currently preserves parent/session order when applying `:skill-names` subset filtering. The task does not yet say whether prompt-component / workflow subset output should be caller selection order, canonical skill-name order, or inherited registry/session order, nor whether that surface is included in the branch B/C changes.
+
+## 2026-05-22 ambiguity follow-up execution
+
+Completed the newly added prompt-component / workflow `:skill-names` ambiguity follow-up. Clarified that `:skill-names` is an allowlist rather than an ordering directive: caller-declared order is only input metadata, inherited parent/session vector order must not become model-visible ordering, and rendered/projected selected skill subsets should use canonical skill-name order under branch B or branch C. Updated `plan.md` so both branch B and branch C explicitly include prompt-component / workflow filtered skill subsets in their ordering proof scope.
