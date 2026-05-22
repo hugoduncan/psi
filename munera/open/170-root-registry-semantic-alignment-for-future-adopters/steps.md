@@ -7,3 +7,4 @@
 - [x] Add focused `workflow-registry` tests proving any changed lower-interaction path while preserving current public behaviour.
 - [x] Record the final future-target migration guidance for `deterministic-operation-registry` in the task artifacts and verify all task files agree on the shared-vs-adapter semantic split.
 - [x] Add an alignment-focused deterministic-operation-registry test proving preserved registration-order behavior remains intact and adapter-owned independently of the new shared `root-registry` result semantics.
+- [ ] Fix the stale `workflow-registry` lower-result test so it asserts against the canonical `root-registry/lookup` result shape (`[:result :value]`) instead of the nonexistent nested `:entry` field, keeping the review proof aligned with the live lower contract.
