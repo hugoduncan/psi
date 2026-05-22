@@ -13,8 +13,9 @@
                     :ui.result/status :submitted
                     :ui.result/value {:provider "openai" :id "gpt-5.3-codex"}}
           resolve-model-by-provider+id
-          (fn [provider id]
-            (when (= [provider id] ["openai" "gpt-5.3-codex"])
+          (fn [ctx' provider id]
+            (when (and (= ctx' ctx)
+                       (= [provider id] ["openai" "gpt-5.3-codex"]))
               {:provider :openai :id "gpt-5.3-codex" :supports-reasoning true}))]
       (with-redefs [session/set-model-in! (fn [ctx' sid' model & [scope]]
                                             (reset! captured {:ctx ctx'

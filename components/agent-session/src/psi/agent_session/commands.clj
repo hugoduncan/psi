@@ -334,9 +334,9 @@
   #{:session :project :user})
 
 (defn- resolve-runtime-model
-  [provider model-id]
+  [ctx provider model-id]
   (let [provider* (some-> provider keyword)]
-    (or (model-registry/find-model provider* model-id)
+    (or (model-registry/resolve-runtime-model ctx provider* model-id)
         (some (fn [[_ model]]
                 (when (and (= provider* (:provider model))
                            (= model-id (:id model)))
@@ -546,7 +546,7 @@
                :message (unknown-model-scope-message scope-token)}
 
               :else
-              (let [resolved (resolve-runtime-model provider model-id)]
+              (let [resolved (resolve-runtime-model ctx provider model-id)]
                 (if-not resolved
                   {:type :text
                    :message (str "Unknown model: " provider " " model-id)}

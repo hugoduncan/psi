@@ -171,10 +171,10 @@
       (merge provider-options))))
 
 (defn- resolve-runtime-model
-  [session-model]
+  [ctx session-model]
   (let [provider (provider-auth/normalize-provider-id (:provider session-model))
         model-id (:id session-model)]
-    (model-registry/find-model provider model-id)))
+    (model-registry/resolve-runtime-model ctx provider model-id)))
 
 (defn- sorted-contributions
   [session-data]
@@ -264,7 +264,7 @@
      :turn/queued-steering-messages     queued-steering-messages
      :turn/messages                     messages
      :turn/runtime-model                (or runtime-model
-                                            (resolve-runtime-model (:model session-data)))
+                                            (resolve-runtime-model ctx (:model session-data)))
      :turn/ai-options                   (session->request-options ctx session-data (or runtime-opts {}))
      :turn/cache-breakpoints            cache-bps
      :turn/session-model                (:model session-data)

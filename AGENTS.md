@@ -350,6 +350,12 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
    ∧ lower_components → pure_domain_apis
    ∧ higher_adapters → route_through(agent-session)
 
+λ shims_adapters(x).
+  ¬silently_introduce(x)
+  ∧ ((shim(x) ∨ adapter(x)) → (violates(one_way_guideline) ∧ increases(complexity)))
+  ∧ (change_requires(interface_mismatch) → (choose(explicit_contract_update) > compatibility_layer))
+  ∧ ((exception(x) → (requires(user_intent) ∨ documented_design_decision(x))))
+
 ### Frontier
 
 - **Handler purity**: pure-result shape (`{:root-state-update f :effects [...]}`) defined and validated; legacy handlers still perform side effects inline — migration ongoing

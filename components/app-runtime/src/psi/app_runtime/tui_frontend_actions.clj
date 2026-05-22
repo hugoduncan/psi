@@ -17,7 +17,7 @@
       (case status
         :submitted
         (if-let [resolved (and (map? value)
-                               (resolve-model-by-provider+id (:provider value) (:id value)))]
+                               (resolve-model-by-provider+id ctx (:provider value) (:id value)))]
           (let [provider-str (name (:provider resolved))
                 model {:provider provider-str
                        :id (:id resolved)

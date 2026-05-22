@@ -493,8 +493,9 @@
                                             {:model model})]
         (psi.rpc.session.command-pickers/handle-model-selection!
          ctx sid
-         (fn [provider id]
-           (when (= [provider id] ["openai" "gpt-5.3-codex"])
+         (fn [ctx' provider id]
+           (when (and (= ctx' ctx)
+                      (= [provider id] ["openai" "gpt-5.3-codex"]))
              {:provider :openai :id "gpt-5.3-codex" :supports-reasoning true}))
          emit!
          {:provider "openai" :id "gpt-5.3-codex"}))

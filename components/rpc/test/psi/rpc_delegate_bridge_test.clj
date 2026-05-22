@@ -4,7 +4,12 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
+   [psi.rpc :as rpc]
    [psi.rpc-test-support :as support]))
+
+(defn- write-line! [^java.io.Writer w line]
+  (.write w (str line "\n"))
+  (.flush w))
 
 (deftest rpc-external-user-role-and-command-result-both-surface-for-delegate-like-flow-test
   (testing "RPC surfaces both the immediate command-result and the later user+assistant bridge messages"
@@ -25,37 +30,49 @@
                                        ((:append-message api) "assistant" "result text"))
                                      "Delegated to lambda-build — run run-1")})
           state         (atom {:transport {:ready? true :pending {}}
-                               :connection {:subscribed-topics #{"assistant/message"
-                                                                 "command-result"
-                                                                 "session/updated"
-                                                                 "footer/updated"}}})
+                               :connection {:focus-session-id session-id
+                                            :subscribed-topics #{}}})
           handler       (support/make-handler ctx state)
-          input         (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                             "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"command-result\" \"session/updated\" \"footer/updated\"]}}\n"
-                             "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/fake-delegate\"}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state 250)
-          result         (support/await-until
-                          (fn []
-                            (let [frames         (support/parse-frames out-lines)
-                                  events         (filter #(= :event (:kind %)) frames)
-                                  command-text   (some #(when (= "command-result" (:event %)) %) events)
-                                  assistant-msgs (filter #(= "assistant/message" (:event %)) events)
-                                  user-texts     (keep #(when (= "user" (get-in % [:data :role]))
-                                                          (get-in % [:data :text]))
-                                                       assistant-msgs)
-                                  asst-texts     (keep #(when (= "assistant" (get-in % [:data :role]))
-                                                          (get-in % [:data :text]))
-                                                       assistant-msgs)]
-                              (when (and (= "Delegated to lambda-build — run run-1"
-                                            (get-in command-text [:data :message]))
-                                         (some #{"Workflow run run-1 result:"} user-texts)
-                                         (some #{"result text"} asst-texts))
-                                {:command-text command-text
-                                 :user-texts user-texts
-                                 :asst-texts asst-texts})))
-                          1000)]
-      (is (not= support/timeout-token result) "timed out waiting for delegate bridge command-result and messages")
-      (is (= "Delegated to lambda-build — run run-1"
-             (get-in result [:command-text :data :message])))
-      (is (some #{"Workflow run run-1 result:"} (:user-texts result)))
-      (is (some #{"result text"} (:asst-texts result))))))
+          in-reader     (java.io.PipedReader.)
+          in-writer     (java.io.PipedWriter. in-reader)
+          out-writer    (java.io.StringWriter.)
+          err-writer    (java.io.StringWriter.)
+          loop-future   (future
+                          (rpc/run-stdio-loop! {:in in-reader
+                                                :out out-writer
+                                                :err err-writer
+                                                :state state
+                                                :request-handler handler}))]
+      (try
+        (write-line! in-writer "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}")
+        (write-line! in-writer "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/message\" \"command-result\" \"session/updated\" \"footer/updated\"]}}")
+        (write-line! in-writer "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/fake-delegate\"}}")
+        (let [result (support/await-frames!
+                      out-writer
+                      (fn [frames]
+                        (let [events         (filter #(= :event (:kind %)) frames)
+                              command-text   (some #(when (= "command-result" (:event %)) %) events)
+                              assistant-msgs (filter #(= "assistant/message" (:event %)) events)
+                              user-texts     (keep #(when (= "user" (get-in % [:data :role]))
+                                                      (get-in % [:data :text]))
+                                                   assistant-msgs)
+                              asst-texts     (keep #(when (= "assistant" (get-in % [:data :role]))
+                                                      (get-in % [:data :text]))
+                                                   assistant-msgs)]
+                          (when (and (= "Delegated to lambda-build — run run-1"
+                                        (get-in command-text [:data :message]))
+                                     (some #{"Workflow run run-1 result:"} user-texts)
+                                     (some #{"result text"} asst-texts))
+                            {:command-text command-text
+                             :user-texts user-texts
+                             :asst-texts asst-texts})))
+                      5000)]
+          (is (not= support/timeout-token result) "timed out waiting for delegate bridge command-result and messages")
+          (is (= "Delegated to lambda-build — run run-1"
+                 (get-in result [:command-text :data :message])))
+          (is (some #{"Workflow run run-1 result:"} (:user-texts result)))
+          (is (some #{"result text"} (:asst-texts result))))
+        (finally
+          (future-cancel loop-future)
+          (try (.close in-writer) (catch Exception _ nil))
+          (try (.close in-reader) (catch Exception _ nil)))))))
