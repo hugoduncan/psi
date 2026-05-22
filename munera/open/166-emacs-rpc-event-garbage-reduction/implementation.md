@@ -62,3 +62,6 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing impleme
 
 ## 2026-05-22 — ambiguity follow-up execution
 Used the preloaded ambiguity-review result and checked `design-steps.md`. No newly added unchecked actionable ambiguity follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
+
+## 2026-05-22 — inconsistency review
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced assistant streaming/render code/tests (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-events.el`) for cross-file inconsistencies. New actionable inconsistency: `design.md` implementation shaping notes still say the split renderer should use "full redraw for replacement/divergent payloads", which conflicts with the assistant payload contract, `plan.md`, and `steps.md` requiring divergent assistant payloads to preserve existing merge/append semantics after effective-next-text calculation. The shaping note should distinguish assistant divergent payloads from thinking divergent snapshots or otherwise state redraw applies only after effective-next-text is non-append.
