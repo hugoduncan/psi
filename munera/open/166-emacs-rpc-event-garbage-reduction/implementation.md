@@ -59,3 +59,6 @@ Used the preloaded inconsistency-review result and completed the newly added des
 
 ## 2026-05-22 — ambiguity review
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced assistant streaming/render code/tests (`psi-assistant-render.el`, `psi-streaming-transcript-test.el`). No new actionable ambiguities found: the artifacts now clearly define mandatory assistant/thinking scope, conditional hotspot triggers, append-vs-redraw semantics after effective-next-text calculation, named helper instrumentation seams, ordered implementation steps, and focused/full verification expectations. Existing `design-steps.md` items remain complete; no new follow-up items were added.
+
+## 2026-05-22 — ambiguity follow-up execution
+Used the preloaded ambiguity-review result and checked `design-steps.md`. No newly added unchecked actionable ambiguity follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
