@@ -11,3 +11,6 @@ Completed all newly added ambiguity follow-ups in `design-steps.md`.
 - Clarified `assistant/delta` as mixed payload input preserving existing merge semantics, with examples for incremental deltas, extending cumulative snapshots, tail churn, and divergent snapshots.
 - Clarified `assistant/thinking-delta` as cumulative snapshots and defined the append-vs-redraw rule over the effective next text.
 - Split mandatory scope to assistant/thinking/finalization, with tool rows, widget subscriptions, and projection conditional on touched code or material measurement.
+
+## 2026-05-22 — inconsistency review
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs hot-path files/tests for cross-file inconsistency. No new actionable inconsistencies found: `plan.md`/`steps.md` consistently keep the task design-only until review follow-ups are complete, and all prior design follow-up items are already checked off.
