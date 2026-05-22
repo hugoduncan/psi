@@ -169,6 +169,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Suggested next step
 - Task 170 test-shaper follow-up is complete: session-step and LLM-judge success-path tests now prove bounded turn-result top-level `:structured-output` strategy/source/payload metadata is propagated into workflow envelopes; focused workflow tests and clj-kondo green.
+- Registry unification arc: use `munera/open/164-registry-semantics-unification-audit` as the migration-rules source of truth, then shape the next root-registry-style migration around `workflow-registry`.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
@@ -281,3 +282,5 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 - 2026-05-21: task 167 follow-up execution pass found no newly added unchecked implementation items in `steps.md`; appended a no-op execution note to `implementation.md` and committed the pass
 - 2026-05-21: task 168 follow-up execution added the missing focused `get-tool-in` built-in `:ext-path` provenance assertion, marked the final unchecked step done, and re-verified focused tests + lint
 - 2026-05-21: task 168 later follow-up execution passes found no newly added unchecked implementation items after test review and test-shaper review; recorded no-op execution notes and committed each pass
+- 2026-05-21: task 168 initially failed full `bb test` after implementation because `extension-detail-in` still read legacy extension-local `:tools` state after tool ownership moved to `tool-registry`/`root-registry`; fixed by sourcing extension tool detail from `tool-registry/all-tools-in`, then closed 168
+- 2026-05-21: task 164 was updated with explicit registry migration guidance: future registry moves must inventory write seams plus all higher read/introspection/projection seams, add a higher-surface coherence test, and run full-suite verification before close; `workflow-registry` is now the recommended next root-registry-style migration target while `deterministic-operation-registry` remains deferred
