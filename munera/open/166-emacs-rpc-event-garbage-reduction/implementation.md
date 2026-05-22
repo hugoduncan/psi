@@ -161,3 +161,6 @@ Result: 305 tests, 305 results as expected, 0 unexpected.
 
 ## 2026-05-22 — test review
 Reviewed the task implementation tests against `task-test-review`, `design.md` acceptance/proof requirements, `plan.md`, `steps.md`, `psi-assistant-render.el`, `psi-streaming-transcript-test.el`, `psi-streaming-render-optimization-test.el`, and `bb.edn`. No new actionable test-quality feedback found: focused ERT coverage now exercises assistant/thinking append-vs-redraw behavior through named helper seams, preserves assistant merge/thinking snapshot semantics, covers finalization/archive/marker safety in the transcript suite, avoids mocks/stubs, and `bb emacs:test` loads the optimization proof suite.
+
+## 2026-05-22 — test-review follow-up execution
+Used the preloaded test-review result and checked `steps.md`. No newly added unchecked actionable follow-up items were present; all implementation and test follow-up steps remain complete. No task, code, or test changes were required.
