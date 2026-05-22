@@ -6,4 +6,6 @@
 - Added provider-auth helpers to detect stored OAuth credential type without conflating it with general API-key resolution.
 - Updated prompt-request, app-runtime, RPC, TUI frontend action, and `/model` command paths to use auth-aware runtime resolution.
 - Tests: `clojure -M:test --focus psi.provider-auth.core-test --focus psi.ai.model-registry-test --focus psi.agent-session.runtime-test --focus psi.agent-session.prompt-request-test` => 32 tests, 162 assertions, 0 failures.
+- CI follow-up: updated picker-backed model selection tests/callbacks to the new auth-aware three-arity resolver contract; no two-arity adapter remains.
+- Full local Clojure verification: `bb clojure:test` => ✅ All tests passed.
 - Live reload/eval verified `gpt-5.5` resolves to Codex transport under current OAuth session, then user successfully switched `/model openai gpt-5.5`.
