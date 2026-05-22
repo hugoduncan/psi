@@ -88,3 +88,7 @@ Completed the newly added `design-steps.md` inconsistency follow-up. Reclassifie
 ## 2026-05-22 ambiguity review
 
 No new actionable ambiguity feedback. Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, task `164` skill-registry audit text, and representative registry/resolver/session-resource/prompt/TUI/app-runtime/workflow call sites after the latest `prompt_request` reclassification; the artifacts still define the branch decision criteria, canonical ordering candidate, branch C presentation-owned alternative, keep-order fallback, affected surfaces, proof expectations, and task `164` update scope clearly enough for implementation.
+
+## 2026-05-22 ambiguity follow-up execution
+
+No newly added unchecked ambiguity follow-up items were present in `design-steps.md` after the preloaded no-feedback ambiguity review. All design follow-up steps remain complete, so no `design.md`, `plan.md`, or `steps.md` changes were needed.
