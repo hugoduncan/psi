@@ -15,3 +15,4 @@
 - [x] Run the mandatory focused Emacs test command and record results in `implementation.md`.
 - [x] Run `bb emacs:test` before closing and record results in `implementation.md`.
 - [x] Commit the implementation with task notes updated.
+- [ ] Add `components/emacs-ui/test/psi-streaming-render-optimization-test.el` to `bb emacs:test` or move its proof tests into a loaded suite, then rerun/record the focused and full Emacs verification counts.

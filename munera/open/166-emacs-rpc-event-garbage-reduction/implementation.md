@@ -131,3 +131,6 @@ bb emacs:test
 ```
 
 Result: 305 tests, 305 results as expected, 0 unexpected.
+
+## 2026-05-22 — implementation review
+Reviewed the task implementation against `task-implementation-review`, task artifacts, `psi-assistant-render.el`, streaming transcript tests, the new `psi-streaming-render-optimization-test.el`, and `bb.edn`. New actionable issue: the optimization proof tests live in a new ERT file that is not loaded by `bb emacs:test`; the recorded full-suite result therefore does not cover the core helper-instrumentation proof and the command currently reports 301 tests, not the noted 305.
