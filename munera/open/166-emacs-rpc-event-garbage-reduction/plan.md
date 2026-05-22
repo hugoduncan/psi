@@ -10,7 +10,8 @@ Add focused ERT coverage in `components/emacs-ui/test/psi-streaming-transcript-t
 The tests should instrument named local helper wrappers rather than wall-clock time or primitive-level advice:
 
 - count full-redraw wrapper invocations for assistant and thinking live blocks;
-- record the ranges passed to the stream-time verbatim/default property wrapper;
+- record the ranges passed to the assistant stream-time verbatim/default property wrapper;
+- for thinking append-only events, record the inserted-suffix mutation range rather than requiring a nonexistent assistant-style content-property wrapper;
 - count prefix overlay creation through `psi-emacs--apply-prefix-overlay`;
 - assert buffer content and marker/range correctness after each event.
 

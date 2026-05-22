@@ -58,11 +58,12 @@ The task is successful when focused tests prove that append-only assistant and t
 Required proof for the optimized assistant/thinking path:
 - Add narrow instrumentation around the local rendering helpers, not wall-clock timing.
 - For append-only extension events, assert that the full-block `delete-region`/reinsert helper path is not called after the initial block creation.
-- For append-only extension events, assert that stream-time text properties are applied only to the newly inserted suffix range, not to the unchanged accumulated content.
+- For append-only assistant extension events, assert that stream-time assistant content properties are applied only to the newly inserted suffix range, not to the unchanged accumulated content.
+- For append-only thinking extension events, do not require an assistant-style stream-property assertion unless thinking rendering gains a content-property wrapper; instead assert the inserted thinking suffix mutation range is suffix-only and that no full redraw/prefix-overlay recreation occurs after initial creation.
 - For append-only extension events, assert that the prefix overlay for the live block is not recreated after the initial block creation.
 - For divergent/non-extension events, assert that the fallback full redraw path remains available and is used when required.
 
-A sufficient allocation/CPU proxy is helper-call and range-size evidence: append-only tests must show O(delta-size) mutation ranges for suffix events, while fallback tests may show O(total-size) redraw ranges only for non-append payloads.
+A sufficient allocation/CPU proxy is helper-call and range-size evidence: append-only tests must show O(delta-size) mutation ranges for suffix events, assistant property application must be suffix-only, thinking append proof may be the suffix insertion range itself, and fallback tests may show O(total-size) redraw ranges only for non-append payloads.
 
 ## Assistant stream payload contract
 `assistant/delta` events are accepted as mixed stream payloads because existing frontend behavior already supports both historical payload shapes:

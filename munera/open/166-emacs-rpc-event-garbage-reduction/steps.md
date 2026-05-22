@@ -2,7 +2,7 @@
 
 - [ ] Add focused assistant streaming tests in `psi-streaming-transcript-test.el` for append-only incremental delta, extending cumulative snapshot, tail-churn redraw fallback, divergent merge preservation, and finalization.
 - [ ] Add focused thinking streaming tests in `psi-streaming-transcript-test.el` for extending cumulative snapshot append, divergent/shrinking redraw fallback, no duplicate thinking content, and archive interaction.
-- [ ] Add narrow test instrumentation proving append-only assistant/thinking events avoid post-creation full redraw, apply stream properties only to suffix ranges, and do not recreate prefix overlays.
+- [ ] Add narrow test instrumentation proving append-only assistant/thinking events avoid post-creation full redraw and do not recreate prefix overlays; assistant stream properties apply only to suffix ranges, while thinking append proof records the inserted suffix mutation range unless a thinking content-property wrapper is introduced.
 - [ ] Run the focused streaming transcript tests and record the expected pre-optimization failure/observation in `implementation.md`.
 - [ ] Refactor `psi-assistant-render.el` to separate create, append-suffix, and full-redraw paths for assistant live lines.
 - [ ] Refactor `psi-assistant-render.el` to separate create, append-suffix, and full-redraw paths for thinking live lines.
