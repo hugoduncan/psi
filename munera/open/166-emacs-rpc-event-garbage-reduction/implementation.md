@@ -20,3 +20,6 @@ Checked `design-steps.md` after the inconsistency review. No newly added uncheck
 
 ## 2026-05-22 — ambiguity review
 Reviewed `design.md`, placeholder `plan.md`/`steps.md`, `design-steps.md`, existing implementation notes, and referenced Emacs streaming/render code/tests. New actionable ambiguity: the placeholder execution artifacts still say the task is design-only until the design review loop is complete, while all existing design follow-ups are checked; the task does not state the explicit promotion condition/owner for replacing the placeholder `plan.md` and `steps.md` with implementation-ready artifacts.
+
+## 2026-05-22 — ambiguity follow-up execution
+Defined the promotion gate and owner in placeholder `plan.md` and `steps.md`: the design-review workflow owns promotion, and promotion occurs only after a full ambiguity-and-inconsistency review cycle adds no new actionable design feedback and all `design-steps.md` items are checked or explicitly blocked in `implementation.md`. Marked the final ambiguity follow-up complete. No implementation steps were executed.
