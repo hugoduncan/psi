@@ -29,3 +29,6 @@ Reviewed `design.md`, placeholder `plan.md`/`steps.md`, `design-steps.md`, exist
 
 ## 2026-05-22 — inconsistency follow-up execution
 Checked the preloaded inconsistency-review result and `design-steps.md`. No newly added unchecked actionable design follow-up items were present, so no design, plan, or step changes were required and no implementation steps were executed.
+
+## 2026-05-22 — implementation planning
+Replaced placeholder `plan.md` and `steps.md` after the delegated review cycle completed with no open design follow-ups. The implementation plan narrows the first slice to mandatory assistant/thinking streaming optimization, with tool-row, widget-subscription, and projection work explicitly conditional on touched code or measured need. Verification commands are recorded in `plan.md`; implementation must record actual results here before closure.
