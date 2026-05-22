@@ -104,3 +104,30 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, existing impleme
 
 ## 2026-05-22 — inconsistency follow-up execution
 Used the preloaded inconsistency-review result and checked `design-steps.md`. No newly added unchecked actionable design follow-up items were present; all design follow-up steps remain complete. No `design.md`, `plan.md`, or `steps.md` changes were required, and no implementation steps from `steps.md` were executed.
+
+
+## 2026-05-22 — implementation pass
+Implemented the mandatory assistant/thinking streaming optimization slice.
+
+- Added named helper seams in `psi-assistant-render.el` for assistant full redraw, assistant suffix append, assistant stream-property range application, thinking full redraw, thinking suffix append, and live-line creation.
+- Changed assistant and thinking live-line updates to compute current rendered content, append only the suffix when the effective next text extends it, and use explicit full redraw only for non-append fallback. Assistant effective text still comes from existing `psi-emacs--merge-assistant-stream-text`, so divergent assistant payloads preserve append/merge semantics before path selection. Thinking remains cumulative snapshot replacement, with divergent/shrinking snapshots routed to redraw.
+- Assistant stream-time properties are applied to the created content on initial creation and only to inserted suffix ranges on append-only updates. Prefix overlays are created on initial creation and fallback redraw, not suffix appends. Thinking append proof uses suffix helper calls and no post-creation prefix/full-redraw calls.
+- Added focused ERT instrumentation tests for assistant append path, assistant tail-churn redraw fallback, thinking append path, and thinking divergent redraw fallback. Existing tests continue to cover finalization, thinking archive, draft/input cursor behavior, and marker safety around tool rows. A separate committed pre-optimization failing run was not kept; the expected pre-optimization observation is represented by the old monolithic setters: append-only updates had no suffix helper seam, recreated prefix overlays through the setter, and reapplied assistant stream properties over the whole live content range.
+- Conditional hotspots were not broadened: `psi-tool-rows.el`, widget subscription dispatch, projection/footer rendering, RPC framing, and backend accumulators were left unchanged because the mandatory assistant/thinking success threshold is met without touching them.
+
+Verification:
+
+```sh
+emacs -Q --batch -L components/emacs-ui \
+  -l components/emacs-ui/test/psi-test-support.el \
+  -l components/emacs-ui/test/psi-streaming-transcript-test.el \
+  -f ert-run-tests-batch-and-exit
+```
+
+Result: 34 tests, 34 results as expected, 0 unexpected.
+
+```sh
+bb emacs:test
+```
+
+Result: 305 tests, 305 results as expected, 0 unexpected.
