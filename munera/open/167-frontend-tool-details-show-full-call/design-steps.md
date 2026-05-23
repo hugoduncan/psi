@@ -1,0 +1,5 @@
+# Design follow-up steps
+
+- [ ] Clarify the authoritative full-call data source and precedence when both parsed/structured arguments and raw argument strings are available, including how invalid or partially parsed JSON should render without silently dropping raw content.
+- [ ] Define the expanded-detail layout contract for both Emacs and TUI: section labels/order, whether the header summary remains separate from `Call` details, how empty/nil arguments render, and how multiline/nested arguments preserve full content without truncation.
+- [ ] Decide how tool-specific/extension call renderers interact with the new expanded full-call details, especially whether a renderer may replace the full call, must be accompanied by raw/structured fallback details, or applies only to the collapsed header.
