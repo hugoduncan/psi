@@ -1,3 +1,4 @@
 # Design follow-up steps
 
 - [x] Clarify the exact canonical IR source-ref surfaces that count as data-flow positions for this task, and state whether self/future-step rejection must continue uniformly across every `step-source-refs` surface (for example session contributions, delegate prompt/context, invoke args, judge refs, and delegate-target source-specs) rather than only representative contribution/template cases.
+- [ ] Align the task artifacts with the existing IR error surface: if acceptance still requires compiler errors to distinguish invalid self data dependencies from forward data dependencies and from non-data-flow transition issues, update design/plan/steps to call for separate validation/error cases or explicitly narrow the requirement so the current shared `:non-prior-step-ref` class/message is intentional.
