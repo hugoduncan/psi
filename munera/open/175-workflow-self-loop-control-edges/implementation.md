@@ -12,3 +12,7 @@ Target design:
 - self-loop `:goto` is valid control flow
 - self-sourced yields remain invalid data flow
 - forward-sourced yields remain invalid data flow
+
+2026-05-22 ambiguity review:
+
+- Actionable ambiguity: design/plan/steps say preserve rejection of self/future data dependencies in contributions/vars/fields and similar data-flow positions, but they do not enumerate the full canonical IR source-ref surfaces that must keep that rule (`session` contributions, `delegate` prompt/context, `invoke` args, judge refs, delegate-target source-specs, etc.). Clarify whether the self/future-data-dependency prohibition applies uniformly to every `step-source-refs` surface, not just representative template/contribution cases.
