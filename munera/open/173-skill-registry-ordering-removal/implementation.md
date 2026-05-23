@@ -209,3 +209,7 @@ No new actionable test-shaping feedback. Re-read the task artifacts and branch B
 ## 2026-05-22 test-shaper follow-up execution
 
 No newly added unchecked actionable `steps.md` items were present after the preloaded no-feedback test-shaper review result. All implementation follow-up steps are already complete, so no code, test, design, or plan changes were needed.
+
+## 2026-05-22 test-shaper review
+
+No new actionable test-shaping feedback. Re-read the test-shaper skill, task artifacts, and branch B ordered-skill proof set across registry, dispatch, prompt-assets/system prompt filtering, child-session/workflow skill selection, session/discovery resolvers, TUI banner/autocomplete, and `/skills` / `/help` command surfaces. Focused verification passed (154 tests, 783 assertions); the tests remain behavior-focused, deterministic, economical, and cover the canonical ordering invariant without exposing raw session-vector order.
