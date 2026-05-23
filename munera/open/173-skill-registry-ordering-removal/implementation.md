@@ -185,3 +185,7 @@ Completed the newly added add-path registry proof. `register-skill` now has focu
 ## 2026-05-22 follow-up execution
 
 No newly added unchecked actionable `steps.md` items were present after the preloaded review result. All implementation follow-up steps are already complete, so no code, test, design, or plan changes were needed.
+
+## 2026-05-22 implementation review
+
+No new actionable implementation feedback. Re-read the task artifacts and affected implementation surfaces: `skill-registry` canonical read/result behavior, `:session/register-skill` duplicate/no-change canonicalization, discovery/session resolvers, prompt formatting/filtering, workflow child-session skill selection, TUI banner/autocomplete, and command rendering. The selected branch B implementation still matches the design: exact lookup and duplicate first-write-wins are preserved, visible ordered surfaces canonicalize by skill `:name`, and recent follow-ups cover the previously found grouped-discovery, duplicate/no-change, command, and add-path gaps.
