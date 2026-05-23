@@ -122,12 +122,25 @@ rule BackgroundReflectsExecutionState {
             view.background = success
 }
 
-rule ExpandedShowsCompleteText {
+rule ExpandedShowsFullCallAndCompleteOutput {
     when: ToolOutputRenderRequested(view, registration)
     requires: view.output != null
     requires: view.expanded = true
 
-    ensures: view.visible_text = view.output.text
+    ensures: Contains(view.visible_text, "Call")
+    ensures: Contains(view.visible_text, view.tool_name)
+    ensures:
+        if ParsedArgumentsAreTrustedComplete(view):
+            Contains(view.visible_text, FormatStructuredArguments(view.parsed_args))
+        else if view.parsed_args != null and view.args != null:
+            Contains(view.visible_text, FormatStructuredArguments(view.parsed_args))
+            and Contains(view.visible_text, view.args)
+        else if view.args != null:
+            Contains(view.visible_text, view.args)
+        else:
+            Contains(view.visible_text, EmptyArgumentsMarker())
+    ensures: Contains(view.visible_text, "Response") or Contains(view.visible_text, view.output.text)
+    ensures: Contains(view.visible_text, view.output.text)
 }
 
 rule CollapsedPreviewsAreBounded {
