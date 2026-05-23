@@ -6,15 +6,20 @@ Initial design decision was helper-level alignment only, but the user clarified 
 
 The user then further clarified that the migration must remove legacy session `:skills` projection storage. Compatibility should be read-time/API projection from root-registry and one-way hydration from legacy/input seeds only, not synchronized duplicate storage.
 
+The user then further clarified the desired ownership boundary:
+
+- registry owns skill definitions
+- session owns which skills it includes, but only by reference
+
 Current target:
 
-- move canonical session skill storage to root-registry
-- keep skills session-scoped, not global across sessions
+- move canonical skill definitions to root-registry
+- keep session ownership of membership via `:skill-ids`
 - preserve public task `173` behavior: exact lookup, duplicate-ignore/first-write-wins, `:added?` / `:changed?`, and canonical exact skill-name ordering
 - treat any input/persisted session `:skills` vector as a one-way hydration seed only
-- remove `:skills` from runtime/persisted session data after hydration/create/set/register paths complete
-- migrate all higher read/projection seams away from raw `:skills` reads where root-registry data is authoritative
+- remove embedded `:skills` from runtime/persisted session data after hydration/create/set/register paths complete
+- migrate all higher read/projection seams away from raw `:skills` reads onto session `:skill-ids` plus registry lookup
 
 Important design pressure:
 
-Many code paths currently seed, copy, or read `:skills` directly: session defaults, child sessions, scheduler sessions, prompt refresh, prompt request lookup, discovery/session resolvers, commands, TUI, workflow step session config, and tests. The implementation must inventory these seams before changing storage so task `168`'s stale-projection failure pattern does not repeat. Because legacy projection storage is being removed rather than synchronized, every remaining raw `:skills` access must be either eliminated or explicitly limited to a pre-hydration seed read.
+Many code paths currently seed, copy, or read embedded `:skills` directly: session defaults, child sessions, scheduler sessions, prompt refresh, prompt request lookup, discovery/session resolvers, commands, TUI, workflow step session config, and tests. The implementation must inventory these seams before changing storage so task `168`'s stale-projection failure pattern does not repeat. Because embedded `:skills` storage is being removed rather than synchronized, every remaining raw `:skills` access must be either eliminated or explicitly limited to a pre-hydration seed read, while child-session and related inheritance paths must become `:skill-ids`-driven.
