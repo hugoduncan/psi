@@ -41,7 +41,7 @@ This task includes:
 - auditing the workflow IR/compiler path that currently rejects self references
 - distinguishing control-edge validation from data-dependency validation
 - allowing self-loop `:goto` edges in workflow transitions
-- preserving rejection of invalid self/future data dependencies
+- preserving rejection of invalid self/future data dependencies across every canonical `step-source-refs` data-flow surface, not only representative contribution/template cases
 - updating or adding focused workflow compiler tests
 - updating one representative workflow, likely `implement-task`, back to the simpler intended self-loop form once compiler support exists
 
@@ -61,8 +61,8 @@ The implementation must preserve these rules:
 
 1. A step may transition to itself through `:on` / `:goto`.
 2. Self-loop control edges remain subject to existing runtime loop controls, including `:max-iterations` where present.
-3. A step may not depend on its own future yield in contributions, vars, fields, or other data-flow positions.
-4. References to later steps in data-flow positions remain invalid.
+3. A step may not depend on its own future yield in any canonical IR data-flow source-ref surface gathered by `step-source-refs`. For this task that uniformly includes step `:invoke` arg refs, step `:session` contributions/template vars, delegate target source-spec refs, delegate prompt-string template/map refs, delegate context contributions, and judge-owned source refs (`:llm` session contributions/template vars or `:invoke` args).
+4. References to later steps in those same data-flow positions remain invalid.
 5. Compiler errors should explain whether the problem is:
    - invalid self/future data dependency, or
    - another transition/IR issue.
