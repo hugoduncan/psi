@@ -204,6 +204,26 @@
                :step "report"}]
              (:semantic-errors result)))))
 
+  (testing "semantic validation allows self-loop control edges while keeping data refs prior-only"
+    (let [self-loop-step {:name "build"
+                          :type :session
+                          :session {:contributions [{:type :template
+                                                     :text "Build {{input}}"
+                                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}
+                          :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                          :yields {:type :text :text :final-llm-reply}
+                          :judge {:type :llm
+                                  :session {:contributions [{:type :template
+                                                             :text "REPEAT or DONE"
+                                                             :vars {}}]}}
+                          :on {"REPEAT" {:goto "build" :max-iterations 3}
+                               "DONE" {:goto :done}}}
+          ir {:version :workflow-ir/v1
+              :steps [self-loop-step]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             result))))
+
   (testing "semantic validation rejects non-prior-step refs"
     (let [future-session-step (assoc valid-session-step
                                      :session {:contributions [{:type :template

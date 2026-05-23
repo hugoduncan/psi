@@ -34,10 +34,8 @@ PASS_STATUS: IMPLEMENTATION_COMPLETE"
           :judge {:type :llm
                   :contributions [{:type :source
                                    :from :workflow-original}
-                                  {:type :source
-                                   :from {:step "implement-pass" :yield :text}}
                                   {:type :template
-                                   :text "Review the specific Munera task described by {{input}} and decide whether implementation work still remains. Independently inspect that task's artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, and use the prior implementation-pass output as supporting context.
+                                   :text "Review the specific Munera task described by {{input}} and decide whether implementation work still remains. Independently inspect that task's artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`.
 
 Respond with exactly one word: REPEAT or DONE.
 
@@ -45,7 +43,7 @@ Decision rules:
 - Respond REPEAT if `steps.md` still contains any unchecked implementation item (`- [ ]`) that is not explicitly marked as intentionally deferred or out of scope.
 - Respond REPEAT if the task artifacts record unmet acceptance criteria, missing verification, blocked implementation follow-up, or newly discovered concrete work for another implementation pass.
 - Respond DONE only if the implementation work is complete enough for handoff: no remaining unchecked implementation items, relevant verification has been run, and the task artifacts do not indicate remaining implementation work.
-- When the prior implementation-pass output conflicts with the task artifacts, trust the task artifacts.
+- Trust the task artifacts over any incomplete or stale supporting context.
 
 Do not review the repository generically. Judge only the specific named task from the actor-step context."
                                    :vars {"input" {:from :workflow-input
