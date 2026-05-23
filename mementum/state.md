@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 167 implementation with code-shaper; added a follow-up to canonicalize parsed/raw argument equivalence before suppressing Emacs raw fallback.
 - 2026-05-23: Executed task 167 repeated test-shaper follow-up after no-action review; no unchecked implementation steps remained, so implementation.md records the pass.
 - 2026-05-23: Executed task 167 test-shaper follow-up after no-action review; no unchecked implementation steps remained, so implementation.md records the pass.
 - 2026-05-23: Reviewed task 167 tests with test-shaper; found no new actionable test-shaping feedback after existing Emacs full-call, raw fallback, nil/empty, invalid raw, and toggle coverage.
