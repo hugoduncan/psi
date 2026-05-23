@@ -6,5 +6,5 @@
 - [x] Add focused compiler tests proving the allowed vs forbidden distinction across representative canonical control-edge vs data-flow cases, while keeping the current shared non-prior data-ref error class/message intentional and distinct from other transition/IR validation failures.
 - [x] Simplify `.psi/workflows/implement-task.md` back to the intended self-looping judged `implement-pass` form.
 - [x] Reload/verify the workflow compiles successfully.
-- [ ] Add focused workflow IR/compiler tests proving self/future non-prior-step rejection for delegate target source-spec refs and delegate prompt `:map` refs, not just session-template refs.
-- [ ] Add focused workflow IR/compiler tests proving self/future non-prior-step rejection for delegate context refs and judge-owned source refs (`:llm` session contributions and `:invoke` args).
+- [x] Add focused workflow IR/compiler tests proving self/future non-prior-step rejection for delegate target source-spec refs and delegate prompt `:map` refs, not just session-template refs.
+- [x] Add focused workflow IR/compiler tests proving self/future non-prior-step rejection for delegate context refs and judge-owned source refs (`:llm` session contributions and `:invoke` args).
