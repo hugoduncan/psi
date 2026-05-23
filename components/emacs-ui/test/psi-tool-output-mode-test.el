@@ -306,6 +306,58 @@
         (should (string-match-p "Response" expanded))
         (should (string-match-p "tool output" expanded))))))
 
+(ert-deftest psi-emacs-test-expanded-tool-details-show-explicit-nil-arguments-and-toggle-closed ()
+  "Expanded Call details show an explicit nil marker when no arguments exist."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--handle-rpc-event
+     '((:event . "tool/result")
+       (:data . ((:tool-id . "t-no-args")
+                 (:tool-name . "no-arg-tool")
+                 (:call-summary . "no-arg-tool")
+                 (:result-text . "done")))))
+    (let ((collapsed (buffer-substring-no-properties (point-min) (point-max))))
+      (should (string-match-p (regexp-quote "no-arg-tool success") collapsed))
+      (should-not (string-match-p "Call" collapsed))
+      (should-not (string-match-p "Arguments: nil" collapsed))
+      (should-not (string-match-p "done" collapsed)))
+    (psi-emacs-toggle-tool-output-view)
+    (let ((expanded (buffer-substring-no-properties (point-min) (point-max))))
+      (should (string-match-p "Call" expanded))
+      (should (string-match-p "Tool: no-arg-tool" expanded))
+      (should (string-match-p "Arguments: nil" expanded))
+      (should (string-match-p "Response" expanded))
+      (should (string-match-p "done" expanded)))
+    (psi-emacs-toggle-tool-output-view)
+    (let ((closed (buffer-substring-no-properties (point-min) (point-max))))
+      (should (string-match-p (regexp-quote "no-arg-tool success") closed))
+      (should-not (string-match-p "Call" closed))
+      (should-not (string-match-p "Arguments: nil" closed))
+      (should-not (string-match-p "done" closed)))))
+
+(ert-deftest psi-emacs-test-expanded-tool-details-show-invalid-raw-arguments-verbatim ()
+  "Expanded Call details display unparseable raw arguments verbatim."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((invalid-raw "{\"command\": \"echo alpha\", trailing-garbage"))
+      (psi-emacs--handle-rpc-event
+       `((:event . "tool/result")
+         (:data . ((:tool-id . "t-invalid-raw")
+                   (:tool-name . "bash")
+                   (:arguments . ,invalid-raw)
+                   (:call-summary . "$ echo alpha")
+                   (:result-text . "alpha")))))
+      (psi-emacs-toggle-tool-output-view)
+      (let ((expanded (buffer-substring-no-properties (point-min) (point-max))))
+        (should (string-match-p "Call" expanded))
+        (should (string-match-p "Tool: bash" expanded))
+        (should (string-match-p (regexp-quote (concat "Arguments: " invalid-raw)) expanded))
+        (should-not (string-match-p (regexp-quote "Arguments: ((command . \"echo alpha\"))") expanded))
+        (should (string-match-p "Response" expanded))
+        (should (string-match-p "alpha" expanded))))))
+
 
 (provide 'psi-tool-output-mode-test)
 
