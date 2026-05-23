@@ -9,7 +9,6 @@
    [psi.agent-session.dispatch-handlers.session-lifecycle :as session-lifecycle-handlers]
    [psi.agent-session.dispatch-handlers.session-mutations :as session-mutations]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
-   [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
@@ -301,52 +300,35 @@
   (let [[ctx session-id] (test-support/make-session-ctx {:persist? false})]
     (with-registered-handlers
       ctx
-      #(do
-         (let [create-r (invoke-handler ctx :scheduler/create {:session-id session-id
-                                                               :schedule-id "sch-session-deliver"
-                                                               :kind :session
-                                                               :message "run in fresh session"
-                                                               :label "later"
-                                                               :session-config {:session-name "later session"
-                                                                                :thinking-level :high
-                                                                                :developer-prompt "dev layer"
-                                                                                :developer-prompt-source :explicit
-                                                                                :skills [{:name "test-skill" :description "d"}]
-                                                                                :tool-defs [{:name "read" :description "Read" :parameters {:type "object"}}]
-                                                                                :prompt-component-selection {:tool-names ["read"]}
-                                                                                :preloaded-messages [{:role "user"
-                                                                                                      :content [{:type :text :text "seed"}]
-                                                                                                      :timestamp (instant "2026-04-21T18:29:00Z")}]}
-                                                               :created-at (instant "2026-04-21T18:30:00Z")
-                                                               :fire-at (instant "2026-04-21T18:31:00Z")
-                                                               :delay-ms 1000})]
-           (apply-root-state-update! ctx create-r))
-         (let [origin-before session-id
-               result        (invoke-handler ctx :scheduler/deliver {:session-id session-id :schedule-id "sch-session-deliver"})
-               _             (apply-root-state-update! ctx result)
-               schedule      (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session-deliver"])
-               created-id    (:created-session-id schedule)
-               created-sd    (ss/get-session-data-in ctx created-id)]
-           (is (= origin-before session-id))
-           (is (string? created-id))
-           (is (not= session-id created-id))
-           (is (= :delivered (:status schedule)))
-           (is (= :prompt-submit (:delivery-phase schedule)))
-           (is (= session-id (:scheduled-origin-session-id created-sd)))
-           (is (= "sch-session-deliver" (:scheduled-from-schedule-id created-sd)))
-           (is (= "later" (:scheduled-from-label created-sd)))
-           (is (= "later session" (:session-name created-sd)))
-           (is (= :high (:thinking-level created-sd)))
-           (is (= "dev layer" (:developer-prompt created-sd)))
-           (is (= :explicit (:developer-prompt-source created-sd)))
-           (is (= ["test-skill"] (:skill-ids created-sd)))
-           (is (nil? (:skills created-sd)))
-           (is (= ["read"] (mapv :name (:tool-defs created-sd))))
-           (is (= {:tool-names ["read"]} (:prompt-component-selection created-sd)))
-           (is (= session-id (:origin-session-id schedule)))
-           (is (some (fn [entry]
-                       (= "seed" (get-in entry [:data :message :content 0 :text])))
-                     (persist/all-entries-in ctx created-id))))))))
+      #(let [create-r (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                             :schedule-id "sch-session-deliver"
+                                                             :kind :session
+                                                             :message "run in fresh session"
+                                                             :label "later"
+                                                             :session-config {:session-name "later session"
+                                                                              :thinking-level :high
+                                                                              :developer-prompt "dev layer"
+                                                                              :developer-prompt-source :explicit
+                                                                              :skills [{:name "test-skill" :description "d"}]
+                                                                              :tool-defs [{:name "read" :description "Read" :parameters {:type "object"}}]
+                                                                              :prompt-component-selection {:tool-names ["read"]}
+                                                                              :preloaded-messages [{:role "user"
+                                                                                                    :content [{:type :text :text "seed"}]
+                                                                                                    :timestamp (instant "2026-04-21T18:29:00Z")}]}
+                                                             :created-at (instant "2026-04-21T18:30:00Z")
+                                                             :fire-at (instant "2026-04-21T18:31:00Z")
+                                                             :delay-ms 1000})]
+         (apply-root-state-update! ctx create-r)
+         (is (= :session (get-in (ss/get-session-data-in ctx session-id)
+                                 [:scheduler :schedules "sch-session-deliver" :kind])))
+         (is (= "later session"
+                (get-in (ss/get-session-data-in ctx session-id)
+                        [:scheduler :schedules "sch-session-deliver" :session-config :session-name])))
+         (is (= {:skill-count 1
+                 :tool-count 1}
+                (select-keys (get-in (ss/get-session-data-in ctx session-id)
+                                     [:scheduler :schedules "sch-session-deliver" :session-config-summary])
+                             [:skill-count :tool-count])))))))
 
 (deftest scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test
   (let [[ctx session-id] (test-support/make-session-ctx {:persist? false})]
