@@ -159,6 +159,50 @@ The adapter must not expose root-registry entries or lower result maps through p
 
    Preferred answer: use existing list/filter or owner-scoped cleanup if adequate. Add lower helpers only if the seam would otherwise duplicate brittle filtering logic.
 
+
+## Adapter boundary and APIs
+
+The root-registry-backed skill adapter lives in `components/skill-registry`. That component should gain a dependency on `psi/root-registry` and expose root-state/root-registry-aware APIs alongside the existing pure vector helpers.
+
+Boundary decision:
+
+- `psi.skill-registry.registry` keeps the existing pure vector API for validation, canonicalization, compatibility projections, and tests that intentionally exercise the public collection contract.
+- The same component, preferably in a new namespace such as `psi.skill-registry.root-storage`, owns the root-registry adapter because it is still skill-domain behavior: skill validation, exact `:name` identity, duplicate-ignore projection, canonical skill-name ordering, and public result metadata.
+- `agent-session` must call that adapter for session-aware root-state writes and reads; it should not reimplement root-registry entry filtering, duplicate translation, or canonical skill projection locally.
+- `session-state` remains a lower pure session-map initializer and does not take a root-registry dependency. It may continue to copy legacy `:skills` vectors as compatibility seeds, but it does not own hydration.
+- Prompt, resolver, TUI, command, and workflow seams should depend on agent-session/session-facing helper functions or the skill-registry adapter result, not on raw root-registry entries.
+
+Adapter API shape to implement:
+
+- `ensure-skill-registry` / `ensure-skill-registry-in` declares the shared `:session-skills` root-registry area idempotently.
+- `hydrate-session-skills` migrates a session's compatibility `:skills` seed into root-registry only when that session has no root-registry skill entries yet, then writes the canonical compatibility projection back to session data.
+- `all-skills-in`, `find-skill-in`, `skill-names-in`, and `skill-count-in` read one session's canonical projected skills from root-registry storage.
+- `register-skill-in` inserts one session-scoped skill entry using `root-registry/insert` and translates lower duplicate failures into the public duplicate/no-change result.
+- `set-skills-in` replaces the complete root-registry-backed skill set for one session and returns the canonical compatibility projection.
+- optional `sync-session-skills-projection` writes the canonical vector back to session `:skills` when a compatibility projection is still needed for persistence or legacy consumers.
+
+These APIs should return root-state update results or pure root-state transforms, not perform effects. Prompt refresh remains owned by `agent-session` dispatch handlers, gated only by the adapter's public `:changed?` result.
+
+## Hydration timing and ownership
+
+Hydration is owned by `agent-session` at session lifecycle boundaries because those handlers already compose root-state updates and know the active session id. Hydration is a synchronous part of the same root-state update that creates, resumes, forks, or creates a child session; it is not a follow-up effect and must not require a second dispatch for correctness.
+
+Rules:
+
+- New top-level session creation (`:session/new-initialize`, `:session/create-top-level`) first runs the existing pure session-state initializer, then hydrates the new session id from the newly written compatibility `:skills` seed.
+- Resume (`:session/resume-loaded`, `:session/resume-missing-initialize`) hydrates the resumed session id from persisted/current legacy `:skills` in the same update that writes resumed session data. Persisted vectors are seeds only.
+- Fork (`:session/fork-initialize`) hydrates the new session id from the forked session data copied by `session-state`; the parent and child then have distinct session-scoped root-registry entries.
+- Child session creation (`:session/create-child`) derives the child prompt and selected skill vector as it does today, writes that vector as a compatibility seed in the child session data, then hydrates the child session id in the same update.
+- Scheduler-created sessions and workflow child sessions use the same lifecycle handlers above; any `:session/set-skills` event they emit after creation is authoritative replacement through the adapter, not a separate hydration rule.
+- Bootstrap or context construction paths that seed an initial `:skills` vector should either dispatch through `:session/set-skills` / `:session/register-skill` or call the lifecycle hydration helper as part of root-state initialization before higher read surfaces run.
+
+Conflict rule:
+
+- If root-registry already contains entries for a session, root-registry wins and session `:skills` is rewritten from the canonical projection. A non-empty session vector does not replace existing root-registry entries unless the caller explicitly invokes `:session/set-skills`.
+- If root-registry has no entries for the session, the session `:skills` vector is treated as a one-way legacy seed; duplicate names in that seed follow first-write-wins and the resulting compatibility projection is canonicalized.
+
+This makes hydration deterministic, synchronous, and replayable: every lifecycle handler's root-state transform leaves both canonical storage and compatibility projection coherent before effects or higher projections observe the session.
+
 ## Affected seams to audit
 
 Implementation must audit and preserve these seams:

@@ -5,20 +5,24 @@
    - prefer one declared registry id `:session-skills` with session-scoped lower ids if it keeps declaration/listing simple
    - define the stable lower owner/extension id convention required by root-registry
 
-2. Build the root-registry-backed skill adapter:
-   - declare/ensure the skill registry area in root state
+2. Build the root-registry-backed skill adapter in `components/skill-registry`:
+   - keep existing pure vector helpers for public collection semantics and compatibility projections
+   - add a root-state/root-registry-aware adapter namespace rather than reimplementing root-registry filtering in agent-session
+   - declare/ensure the shared `:session-skills` registry area in root state
    - map `(session-id, skill-name)` to a root-registry entry
    - use `root-registry/insert` for `:session/register-skill`
    - translate duplicate-id lower results to the public skill no-op result
+   - expose `all/find/names/count/register/set/hydrate/sync-projection` session-aware APIs
    - provide projected canonical skill vectors for reads and compatibility outputs
    - provide replace-whole-session-skill-set behavior for `:session/set-skills`
 
-3. Migrate authoritative write seams:
-   - `:session/register-skill`
-   - `:session/set-skills`
-   - session creation/defaults paths that seed `:skills`
-   - child-session and scheduler paths that copy or set `:skills`
-   - resume/hydration paths for persisted sessions with legacy `:skills`
+3. Migrate authoritative write and hydration seams:
+   - `:session/register-skill` writes through the skill-registry adapter and gates prompt refresh on `:changed?`
+   - `:session/set-skills` replaces the session's complete root-registry-backed set through the adapter
+   - session creation/defaults paths run lifecycle hydration in the same root-state update that creates session data
+   - fork and child-session paths hydrate the new session id from copied/derived compatibility seeds in the same update
+   - scheduler-created and workflow child sessions rely on those lifecycle handlers; later explicit set events use adapter replacement semantics
+   - resume paths hydrate persisted legacy `:skills` synchronously; if root-registry entries already exist, they win and rewrite the projection
 
 4. Migrate authoritative read/projection seams:
    - session and discovery resolvers
@@ -31,7 +35,8 @@
 
 5. Preserve compatibility deliberately:
    - if session data still carries `:skills`, mark it as derived compatibility projection
-   - define when it is written, read, or ignored
+   - write it from adapter projections after hydration/register/set when persistence or legacy readers need it
+   - read it only as a seed when root-registry has no entries for that session
    - add tests that root-registry data wins after hydration so stale raw vectors cannot masquerade as authoritative
 
 6. Update tests:
