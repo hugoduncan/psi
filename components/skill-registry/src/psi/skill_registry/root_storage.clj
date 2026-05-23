@@ -50,9 +50,9 @@
 
 (defn find-skill
   [root-state _session-data skill-id]
-  (some->> skill-id
-           (lookup-definition root-state)
-           skill-registry/ensure-valid-skill!))
+  (some-> skill-id
+          (lookup-definition root-state)
+          skill-registry/ensure-valid-skill!))
 
 (defn find-skill-in
   [ctx session-id skill-name]

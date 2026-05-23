@@ -439,10 +439,10 @@
   (register-core-handler!
    :session/register-skill
    (fn [ctx {:keys [session-id skill]}]
-     (let [{:keys [root-state added? changed? count]}
+     (let [{:keys [root-state added? changed? count skills]}
            (skill-storage/register-skill-in-root-state @(:state* ctx) session-id skill)]
        {:root-state-update (constantly root-state)
-        :return {:added? added? :changed? changed? :count count}
+        :return {:added? added? :changed? changed? :count count :skills skills}
         :effects (when changed?
                    [{:effect/type :runtime/refresh-system-prompt
                      :session-id session-id}])})))
