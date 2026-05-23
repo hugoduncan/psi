@@ -20,6 +20,7 @@
     - [x] Minimal test support now synthesizes placeholder root-registry definitions for tests that seed only canonical `:skill-ids`, preventing silent empty projected skill reads in command/resolver/prompt paths.
   - [x] Finish converting create-child/workflow/scheduler assertions from embedded `:skills` vectors to canonical `:skill-ids` plus prompt/read-surface projections.
 - [ ] Migrate resolvers, prompt refresh/build paths, command surfaces, TUI projection/autocomplete, prompt request lookup, and workflow child-session selection away from raw `:skills` reads and onto `:skill-ids` + registry lookup.
+  - [x] Restore exact `/skill:name` request-time lookup to resolve directly from root-registry-backed definitions by skill id/name rather than searching only projected session vectors, preserving prompt expansion and higher command/RPC surfaces.
   - [x] Migrate prompt refresh rebuilds, request-time `/skill:` expansion, workflow step session-skill selection, and scheduler session-config skill counts to root-registry-backed resolution.
   - [ ] Migrate child-session lifecycle storage/derivation off embedded `:skills` without regressing create-child/workflow/TUI/command/introspection surfaces.
 - [ ] Remove any remaining runtime/persistence embedded `:skills` writes and reads.
