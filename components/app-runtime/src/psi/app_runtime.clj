@@ -397,7 +397,7 @@ Available: " (str/join ", " (map name (keys all))))
                           extension-results)]
     {:timestamp              (java.time.Instant/now)
      :prompt-count           (count (:prompt-templates sd))
-     :skill-count            (count (:skills sd))
+     :skill-count            (count (:skill-ids sd))
      :tool-count             0   ;; tools not yet set at summary-build time
      :extension-loaded-count (count (filter :psi.extension/loaded? extension-results))
      :extension-error-count  (count ext-errors)
