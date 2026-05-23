@@ -23,7 +23,7 @@
   - [x] Preserve explicit empty child-session skill selection in create-child mutation/context entrypoints by always forwarding the `:skills` key when supplied, including `[]`, so canonical `:skill-ids` replacement semantics remain reachable after embedded session `:skills` storage removal.
   - [x] Restore exact `/skill:name` request-time lookup to resolve directly from root-registry-backed definitions by skill id/name rather than searching only projected session vectors, preserving prompt expansion and higher command/RPC surfaces.
   - [x] Migrate prompt refresh rebuilds, request-time `/skill:` expansion, workflow step session-skill selection, and scheduler session-config skill counts to root-registry-backed resolution.
-  - [ ] Migrate child-session lifecycle storage/derivation off embedded `:skills` without regressing create-child/workflow/TUI/command/introspection surfaces.
+  - [x] Migrate child-session lifecycle storage/derivation off embedded `:skills` without regressing create-child/workflow/TUI/command/introspection surfaces.
 - [ ] Remove any remaining runtime/persistence embedded `:skills` writes and reads.
 - [ ] Add focused adapter/storage tests for definition add/duplicate, membership add/duplicate/set, exact lookup, `skill-ids` access, projected name listing/count, root-registry ownership/coherence, and absence of embedded session `:skills` after operations.
 - [ ] Add focused bootstrap tests proving skill definitions load into root-registry before sessions exist and session creation thereafter only records `:skill-ids` membership.
