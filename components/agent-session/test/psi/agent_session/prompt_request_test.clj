@@ -258,9 +258,8 @@
           prepared (prompt-request/build-prepared-request
                     ctx
                     session-id
-                    {:user-input "/skill:lambda-compiler"
-                     :messages []
-                     :session-data (get-in @state* [:agent-session :sessions session-id :data])
+                    {:user-message {:role "user"
+                                    :content [{:type :text :text "/skill:lambda-compiler"}]}
                      :runtime-opts {}})]
       (is (= "/skill:lambda-compiler" (:prepared-request/input-text prepared)))
       (is (= "user" (-> prepared :prepared-request/provider-messages first :role)))

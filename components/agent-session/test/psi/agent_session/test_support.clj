@@ -184,9 +184,16 @@
                        :background-jobs {:store (bg-jobs/empty-state)}
                        :ui {:extension-ui @(ui-state/create-ui-state)}}
         state-with-skills    (if (contains? initial-sd :skill-ids)
-                               (-> (merge base-state (or state {}))
-                                   (skill-storage/set-skills-in-root-state sid (or (:skills session-data) []))
-                                   :root-state)
+                               (let [seed-skills (or (:skills session-data)
+                                                     (mapv (fn [skill-id]
+                                                             {:name skill-id
+                                                              :description (str skill-id " description")
+                                                              :source :project
+                                                              :disable-model-invocation false})
+                                                           (:skill-ids initial-sd)))]
+                                 (-> (merge base-state (or state {}))
+                                     (skill-storage/set-skills-in-root-state sid seed-skills)
+                                     :root-state))
                                (merge base-state (or state {})))
         state*               (atom state-with-skills)
         ext-reg       (ext/create-registry)
