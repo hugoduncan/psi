@@ -112,6 +112,33 @@
       lines-truncated?
       (conj "Long lines truncated"))))
 
+(defn- tool-detail-value-string
+  [value]
+  (cond
+    (string? value) value
+    (nil? value) "nil"
+    :else (binding [*print-length* nil
+                    *print-level* nil]
+            (pr-str value))))
+
+(defn- tool-call-arguments-detail
+  [parsed-args args-str]
+  (cond
+    (some? parsed-args) (tool-detail-value-string parsed-args)
+    (and (string? args-str) (not (str/blank? args-str)))
+    (if-let [parsed (parse-tool-args nil args-str)]
+      (tool-detail-value-string parsed)
+      args-str)
+    (string? args-str) args-str
+    :else "nil"))
+
+(defn- generic-call-detail-lines
+  [tc]
+  ["Call"
+   (str "Tool: " (or (:name tc) "tool"))
+   (str "Arguments: " (tool-call-arguments-detail (:parsed-args tc) (:args tc)))
+   "Response"])
+
 (defn- extension-call-render
   [ui-snapshot tc]
   (when-let [render-fn (some-> (get-in ui-snapshot [:tool-renderers (:name tc)])
@@ -171,10 +198,12 @@
                                    (render-prefixed-lines (str/split-lines result-render)
                                                           result-avail
                                                           (if (:is-error tc) tool-err-style tool-dim-style))
-                                   (let [lines         (or (tool-all-lines (:name tc) raw-result) [])
+                                   (let [call-lines    (generic-call-detail-lines tc)
+                                         lines         (or (tool-all-lines (:name tc) raw-result) [])
                                          warning-lines (detail-warning-lines (:details tc))
                                          result-style  (if (:is-error tc) tool-err-style tool-dim-style)]
-                                     (concat (render-prefixed-lines lines result-avail result-style)
+                                     (concat (render-prefixed-lines call-lines result-avail tool-dim-style)
+                                             (render-prefixed-lines lines result-avail result-style)
                                              (render-prefixed-lines warning-lines result-avail dim-style))))))]
            (str "  " status-icon " " header
                 (when (seq body-lines)

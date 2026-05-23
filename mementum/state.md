@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Implemented task 167 Emacs/TUI expanded tool-call details with `Call` before response, focused frontend tests green, lint green.
 - 2026-05-23: Executed task 167 inconsistency follow-up repeat 2 after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
 - 2026-05-23: Re-reviewed task 167 design/plan/steps for inconsistencies (repeat 2); found no new actionable inconsistency feedback and appended the implementation note.
 - 2026-05-23: Executed task 167 ambiguity follow-up repeat 2 after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.

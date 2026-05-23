@@ -536,6 +536,46 @@
       ;; expanded: content lines visible
       (is (str/includes? out-after "output-line")))))
 
+(deftest ctrl-o-expanded-tool-details-show-full-call-and-toggle-closed-test
+  ;; Verifies global ctrl+o reveals auditable call details before the response,
+  ;; and toggling again returns the tool row to collapsed header-only rendering.
+  (testing "expanded tool details include full call arguments and close globally"
+    (let [update-fn    (app/make-update (stub-agent-fn ""))
+          long-command "printf 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'"
+          state        (assoc (init-state)
+                              :width 200
+                              :phase :idle
+                              :tools-expanded? false
+                              :messages [{:role :tool :tool-id "t1"}]
+                              :tool-order ["t1"]
+                              :tool-calls {"t1" {:name "bash"
+                                                 :args (str "{\"command\":" (pr-str long-command)
+                                                            ",\"nested\":{\"keep\":[1,2,3]}}")
+                                                 :call-summary "$ printf 'alpha beta…"
+                                                 :status :success
+                                                 :result "command output"
+                                                 :is-error false}})
+          collapsed    (ansi/strip-ansi (app/view state))
+          [expanded-state _] (update-fn state (msg/key-press "o" :ctrl true))
+          expanded     (ansi/strip-ansi (app/view expanded-state))
+          [closed-state _] (update-fn expanded-state (msg/key-press "o" :ctrl true))
+          closed       (ansi/strip-ansi (app/view closed-state))]
+      (is (str/includes? collapsed "$ printf 'alpha beta…"))
+      (is (not (str/includes? collapsed "Call")))
+      (is (not (str/includes? collapsed long-command)))
+      (is (not (str/includes? collapsed "command output")))
+      (is (str/includes? expanded "Call"))
+      (is (str/includes? expanded "Tool: bash"))
+      (is (str/includes? expanded long-command))
+      (is (str/includes? expanded "nested"))
+      (is (str/includes? expanded "Response"))
+      (is (str/includes? expanded "command output"))
+      (is (false? (:tools-expanded? closed-state)))
+      (is (str/includes? closed "$ printf 'alpha beta…"))
+      (is (not (str/includes? closed "Call")))
+      (is (not (str/includes? closed long-command)))
+      (is (not (str/includes? closed "command output"))))))
+
 (deftest ctrl-o-toggles-tools-expanded-in-idle-test
   (testing "ctrl+o expands tool output in idle phase; collapsed shows no content"
     (let [update-fn  (app/make-update (stub-agent-fn ""))

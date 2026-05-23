@@ -110,7 +110,7 @@
                  (:result-text . "line one\nline two")))))
     (psi-emacs-toggle-tool-output-view)
     (let ((text (buffer-substring-no-properties (point-min) (point-max))))
-      (should (string-match-p (regexp-quote "$ ls success\nline one\nline two\n") text)))))
+      (should (string-match-p (regexp-quote "$ ls success\nCall\nTool: bash\nArguments: ((command . \"ls\"))\nResponse\nline one\nline two\n") text)))))
 
 (ert-deftest psi-emacs-test-toggle-expanded-preserves-header-faces ()
   "Expanding keeps summary and status faces confined to the header line."
@@ -249,6 +249,39 @@
         (psi-emacs-send-from-buffer nil)))
     ;; Mode must still be expanded
     (should (eq 'expanded (psi-emacs-state-tool-output-view-mode psi-emacs--state)))))
+
+(ert-deftest psi-emacs-test-expanded-tool-details-show-full-call-and-toggle-closed ()
+  "Expanded tool details show full call arguments before response and collapse globally."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((long-command "printf 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'"))
+      (psi-emacs--handle-rpc-event
+       `((:event . "tool/result")
+         (:data . ((:tool-id . "t-full-call")
+                   (:tool-name . "bash")
+                   (:arguments . ,(format "{\"command\":%S,\"nested\":{\"keep\":[1,2,3]}}" long-command))
+                   (:call-summary . "$ printf 'alpha beta…")
+                   (:result-text . "command output")))))
+      (let ((collapsed (buffer-substring-no-properties (point-min) (point-max))))
+        (should (string-match-p (regexp-quote "$ printf 'alpha beta… success") collapsed))
+        (should-not (string-match-p "Call" collapsed))
+        (should-not (string-match-p (regexp-quote long-command) collapsed))
+        (should-not (string-match-p "command output" collapsed)))
+      (psi-emacs-toggle-tool-output-view)
+      (let ((expanded (buffer-substring-no-properties (point-min) (point-max))))
+        (should (string-match-p "Call" expanded))
+        (should (string-match-p "Tool: bash" expanded))
+        (should (string-match-p (regexp-quote long-command) expanded))
+        (should (string-match-p "nested" expanded))
+        (should (string-match-p "Response" expanded))
+        (should (string-match-p "command output" expanded)))
+      (psi-emacs-toggle-tool-output-view)
+      (let ((closed (buffer-substring-no-properties (point-min) (point-max))))
+        (should (string-match-p (regexp-quote "$ printf 'alpha beta… success") closed))
+        (should-not (string-match-p "Call" closed))
+        (should-not (string-match-p (regexp-quote long-command) closed))
+        (should-not (string-match-p "command output" closed))))))
 
 
 (provide 'psi-tool-output-mode-test)
