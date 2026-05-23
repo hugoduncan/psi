@@ -15,3 +15,6 @@ Current target:
 Important design pressure:
 
 Many code paths currently seed, copy, or read `:skills` directly: session defaults, child sessions, scheduler sessions, prompt refresh, prompt request lookup, discovery/session resolvers, commands, TUI, workflow step session config, and tests. The implementation must inventory these seams before changing storage so task `168`'s stale-projection failure pattern does not repeat.
+
+2026-05-22 ambiguity review:
+- Found two new actionable ambiguities before implementation: the root-registry-backed skill adapter boundary/API ownership is not explicit, and hydration timing/ownership across session lifecycle paths is underspecified given current pure session-state initialization seams.
