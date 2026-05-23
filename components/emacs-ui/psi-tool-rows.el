@@ -370,6 +370,100 @@ properties and recreate live markers. Returns updated row plist or ROW."
                       'face 'default
                       'font-lock-face 'default)))
 
+
+(defun psi-emacs--tool-detail-value-string (value)
+  "Return deterministic display text for expanded tool detail VALUE."
+  (cond
+   ((stringp value) value)
+   ((null value) "nil")
+   (t (let ((print-escape-newlines nil)
+            (print-length nil)
+            (print-level nil))
+        (prin1-to-string value)))))
+
+(defun psi-emacs--tool-normalized-parsed-args (parsed-args)
+  "Return normalized parsed argument map for PARSED-ARGS, or nil."
+  (cond
+   ((psi-emacs--alist-map-p parsed-args) parsed-args)
+   ((hash-table-p parsed-args) (psi-emacs--hash-table->alist parsed-args))
+   (t nil)))
+
+(defun psi-emacs--tool-canonical-arg-key (key)
+  "Return canonical string representation for argument map KEY."
+  (cond
+   ((keywordp key) (substring (symbol-name key) 1))
+   ((symbolp key) (symbol-name key))
+   ((stringp key) key)
+   (t (format "%s" key))))
+
+(defun psi-emacs--tool-canonical-arg-value (value)
+  "Return canonical comparison value for tool argument VALUE.
+
+Canonicalization is for parsed/raw completeness comparison only.  It normalizes
+map key shape differences, such as JSON string keys versus Emacs symbol or
+keyword keys, while preserving scalar values and list order."
+  (cond
+   ((hash-table-p value)
+    (psi-emacs--tool-canonical-arg-value (psi-emacs--hash-table->alist value)))
+   ((psi-emacs--alist-map-p value)
+    (sort (mapcar (lambda (entry)
+                    (cons (psi-emacs--tool-canonical-arg-key (car entry))
+                          (psi-emacs--tool-canonical-arg-value (cdr entry))))
+                  value)
+          (lambda (a b) (string< (car a) (car b)))))
+   ((listp value)
+    (mapcar #'psi-emacs--tool-canonical-arg-value value))
+   (t value)))
+
+(defun psi-emacs--tool-canonical-arg-map (args)
+  "Return canonical argument map for ARGS, or nil when ARGS is not a map."
+  (when-let ((normalized (psi-emacs--tool-normalized-parsed-args args)))
+    (psi-emacs--tool-canonical-arg-value normalized)))
+
+(defun psi-emacs--tool-call-arguments-detail (parsed-args arguments)
+  "Return expanded auditable arguments detail from PARSED-ARGS and ARGUMENTS.
+
+When both parsed and raw argument fields are present, include the raw fallback
+unless Emacs can prove equivalence by successfully parsing the complete raw
+field to the same normalized value."
+  (let* ((parsed-normalized (psi-emacs--tool-normalized-parsed-args parsed-args))
+         (parsed-canonical (psi-emacs--tool-canonical-arg-map parsed-normalized))
+         (raw-present? (and (stringp arguments)
+                            (not (string-empty-p (string-trim arguments)))))
+         (raw-parsed (and raw-present?
+                          (psi-emacs--json-parse-string-safe arguments)))
+         (raw-parsed-normalized (psi-emacs--tool-normalized-parsed-args raw-parsed))
+         (raw-parsed-canonical (psi-emacs--tool-canonical-arg-map raw-parsed-normalized)))
+    (cond
+     (parsed-normalized
+      (let ((parsed-text (psi-emacs--tool-detail-value-string parsed-normalized)))
+        (if (and raw-present?
+                 (not (equal parsed-canonical raw-parsed-canonical)))
+            (concat parsed-text "\nRaw arguments: " arguments)
+          parsed-text)))
+     (raw-present?
+      (if raw-parsed-normalized
+          (psi-emacs--tool-detail-value-string raw-parsed-normalized)
+        arguments))
+     ((stringp arguments) arguments)
+     (t "nil"))))
+
+(defun psi-emacs--tool-expanded-detail-text (tool-name parsed-args arguments response-text)
+  "Return expanded tool detail text with Call before RESPONSE-TEXT."
+  (let* ((name-raw (or tool-name "tool"))
+         (name (if (symbolp name-raw) (symbol-name name-raw) (format "%s" name-raw)))
+         (args-text (psi-emacs--tool-call-arguments-detail parsed-args arguments))
+         (response (or response-text "")))
+    (concat "Call
+"
+            "Tool: " name "
+"
+            "Arguments: " args-text "
+"
+            "Response
+"
+            response)))
+
 (defun psi-emacs--tool-body-string (text)
   "Return TEXT with ANSI faces applied and explicit de-emphasized baseline.
 
@@ -404,12 +498,16 @@ sequences in TEXT are converted to Emacs faces."
                     ""
                   (propertize "\n" 'face 'default 'font-lock-face 'default)))))))
 
-(defun psi-emacs--render-tool-row (tool-summary status accumulated-text mode)
+(defun psi-emacs--render-tool-row (tool-summary status accumulated-text mode
+                                          &optional tool-name parsed-args arguments)
   "Render tool row using TOOL-SUMMARY STATUS ACCUMULATED-TEXT and MODE.
 
-MODE nil is treated as collapsed (default)."
+MODE nil is treated as collapsed (default).  Expanded rows include generic
+Call details before the accumulated response text."
   (if (eq mode 'expanded)
-      (psi-emacs--tool-row-string tool-summary status (or accumulated-text ""))
+      (psi-emacs--tool-row-string
+       tool-summary status
+       (psi-emacs--tool-expanded-detail-text tool-name parsed-args arguments accumulated-text))
     (psi-emacs--tool-row-header-string tool-summary status)))
 
 (defun psi-emacs--upsert-tool-row (tool-id stage text &optional tool-name arguments parsed-args is-error details call-summary)
@@ -445,7 +543,8 @@ Rows are rendered according to global tool-output-view-mode."
                             (plist-get row :call-summary)))
            (accumulated (psi-emacs--tool-next-accumulated-text row stage text arguments))
            (tool-summary (psi-emacs--tool-summary tool-name* parsed-args* arguments* tool-id details* call-summary*))
-           (rendered (psi-emacs--render-tool-row tool-summary status accumulated view-mode)))
+           (rendered (psi-emacs--render-tool-row tool-summary status accumulated view-mode
+                                                   tool-name* parsed-args* arguments*)))
       (if (and (markerp start)
                (markerp end)
                (marker-buffer start)
@@ -623,7 +722,10 @@ This command is valid even when no tool rows exist."
                                 (marker-buffer start)
                                 (marker-buffer end))
                        (let ((rendered (psi-emacs--render-tool-row
-                                        tool-summary status accumulated new-mode)))
+                                        tool-summary status accumulated new-mode
+                                        (plist-get row* :tool-name)
+                                        (plist-get row* :parsed-args)
+                                        (plist-get row* :arguments))))
                          (save-excursion
                            (let* ((start-pos (marker-position start))
                                   (end-pos (psi-emacs--tool-row-safe-end-position end)))

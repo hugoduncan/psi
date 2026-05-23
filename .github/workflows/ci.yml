@@ -267,3 +267,6 @@ jobs:
 
       - name: Run Emacs tests
         run: bb emacs:check
+
+      - name: Run Emacs tool details e2e
+        run: bb emacs:tool-details:e2e
