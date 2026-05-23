@@ -137,7 +137,8 @@
       (is (= ["read"] (mapv :name (:tool-defs child-sd)))))
 
     (testing "skills are filtered coherently"
-      (is (= [] (:skills child-sd))))))
+      (is (= [] (:skill-ids child-sd)))
+      (is (nil? (:skills child-sd))))))
 
 (deftest child-session-base-state-selection-canonicalizes-selected-skills-test
   ;; Workflow/prompt-component skill selections are allowlists, not ordering directives.
@@ -162,7 +163,7 @@
                    parent-sd
                    {:child-session-id "child-canonical-skills"
                     :prompt-component-selection selection})]
-    (is (= ["a-skill" "z-skill"] (mapv :name (:skills child-sd))))
+    (is (= ["a-skill" "z-skill"] (:skill-ids child-sd)))
     (is (< (.indexOf (:base-system-prompt child-sd) "a-skill")
            (.indexOf (:base-system-prompt child-sd) "z-skill")))))
 

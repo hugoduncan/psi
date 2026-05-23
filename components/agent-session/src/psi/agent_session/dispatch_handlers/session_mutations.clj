@@ -211,11 +211,11 @@
   (register-core-handler!
    :session/set-skills
    (fn [_ctx {:keys [session-id skills]}]
-     {:root-state-update (fn [root-state]
-                           (:root-state (skill-storage/set-skills-in-root-state root-state session-id skills)))
-      :effects [{:effect/type :runtime/refresh-system-prompt
-                 :session-id session-id}]
-      :return {:skills (vec (or skills []))}}))
+     (let [{:keys [root-state skills]} (skill-storage/set-skills-in-root-state _ctx session-id skills)]
+       {:root-state-update (constantly root-state)
+        :effects [{:effect/type :runtime/refresh-system-prompt
+                   :session-id session-id}]
+        :return {:skills skills}})))
 
   (register-core-handler!
    :session/set-prompt-component-selection

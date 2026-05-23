@@ -474,12 +474,8 @@
                            (assoc-in [:agent-session :sessions session-id :data :tool-defs]
                                      [{:name "read" :description "Read"}
                                       {:name "bash" :description "Bash"}])
-                           (assoc-in [:agent-session :sessions session-id :data :skills]
-                                     [{:name "testing-best-practices" :description "Testing"
-                                       :file-path "/s/SKILL.md"
-                                       :base-dir "/s"
-                                       :source :project
-                                       :disable-model-invocation false}])
+                           (assoc-in [:agent-session :sessions session-id :data :skill-ids]
+                                     ["testing-best-practices"])
                            (assoc-in [:agent-session :sessions session-id :data :prompt-contributions]
                                      [{:id "a"
                                        :ext-path "/ext/a"
@@ -502,7 +498,7 @@
                                         :content [{:type :text :text "plan it"}]}})]
           (is (= :completed (:status result)))
           (is (= ["read"] (mapv :name (:tool-defs child-sd))))
-          (is (= ["testing-best-practices"] (mapv :name (:skills child-sd))))
+          (is (= ["testing-best-practices"] (:skill-ids child-sd)))
           (is (= {:agents-md? false
                   :extension-prompt-contributions []
                   :tool-names ["read"]

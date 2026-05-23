@@ -59,8 +59,16 @@
 (deftest agent-session-skills-resolver-returns-canonical-skill-order-test
   ;; The session resource resolver presents skills in canonical skill-name order.
   (let [[ctx session-id] (create-session-context {:session-defaults
-                                                  {:skills [{:name "z-skill" :description "Z"}
-                                                            {:name "a-skill" :description "A"}]}})
+                                                  {:skills [{:name "z-skill" :description "Z"
+                                                             :file-path "/tmp/z/SKILL.md"
+                                                             :base-dir "/tmp/z"
+                                                             :source :project
+                                                             :disable-model-invocation false}
+                                                            {:name "a-skill" :description "A"
+                                                             :file-path "/tmp/a/SKILL.md"
+                                                             :base-dir "/tmp/a"
+                                                             :source :project
+                                                             :disable-model-invocation false}]}})
         result (session/query-in ctx session-id [:psi.agent-session/skills])]
     (is (= ["a-skill" "z-skill"]
            (mapv :name (:psi.agent-session/skills result))))))

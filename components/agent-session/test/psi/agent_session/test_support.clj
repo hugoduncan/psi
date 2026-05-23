@@ -162,6 +162,10 @@
         initial-sd    (merge (assoc (session-data/initial-session {})
                                     :provider-error-replies [])
                              (or session-data {}))
+        initial-sd    (cond-> initial-sd
+                        (contains? initial-sd :skills)
+                        (-> (assoc :skill-ids (mapv :name (or (:skills initial-sd) [])))
+                            (dissoc :skills)))
         sid           (:session-id initial-sd)
         base-state    {:agent-session {:sessions {sid {:data          initial-sd
                                                        :agent-ctx     agent-ctx*

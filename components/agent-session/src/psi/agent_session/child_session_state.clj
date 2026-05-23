@@ -51,7 +51,6 @@
                                  (:base-system-prompt parent-sd))]
     {:prompt-component-selection normalized-selection
      :tool-defs                  resolved-tool-defs
-     :skills                     resolved-skills
      :skill-ids                  (mapv :name resolved-skills)
      :system-prompt-build-opts   build-opts
      :base-system-prompt         resolved-base-prompt

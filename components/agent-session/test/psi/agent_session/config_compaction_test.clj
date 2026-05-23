@@ -117,7 +117,8 @@
         (is (= [] (:steering-messages sd)))
         (is (= [] (:follow-up-messages sd)))
         (is (= 1 (count (:prompt-templates sd))))
-        (is (= 1 (count (:skills sd))))
+        (is (= ["coding"] (:skill-ids sd)))
+        (is (nil? (:skills sd)))
         (is (= [:session/enqueue-steering-message
                 :session/enqueue-follow-up-message
                 :session/register-prompt-template
@@ -227,7 +228,8 @@
         (is (= {:added? false :changed? false :count 1} result))
         (is (= before-prompt after-prompt))
         (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
-        (is (= [skill] (:skills sd)))
+        (is (= ["coding"] (:skill-ids sd)))
+        (is (nil? (:skills sd)))
         (is (= [:session/register-skill] event-types)))))
 
   (testing "duplicate register-skill canonicalizes stored skills without refreshing the prompt"
@@ -256,7 +258,8 @@
             event-types   (mapv :event-type (kernel/event-log-entries))]
         (is (= {:added? false :changed? false :count 2} result))
         (is (= before-prompt after-prompt))
-        (is (= [a-skill z-skill] (:skills sd)))
+        (is (= ["z-skill" "a-skill"] (:skill-ids sd)))
+        (is (nil? (:skills sd)))
         (is (= [:session/register-skill] event-types))))))
 
 ;; ── Auto-retry and compaction config ───────────────────────────────────────
