@@ -13,3 +13,4 @@
 - [x] Make `:session/register-skill` apply canonicalized `register-skill` result `:skills` when they differ from current session skills even if `:changed?` is false, without emitting prompt-refresh effects for duplicate/no-change skill identity.
 - [x] Add focused command tests proving `/skills` output and the `/help` Skills section render unsorted session `:skills` in canonical skill-name order rather than raw vector order.
 - [x] Add focused registry proof that adding a new skill to an unsorted pre-existing `:skills` vector returns canonical skill-name order while preserving `:added? true` / `:changed? true`.
+- [ ] Replace TUI-local skill ordering in banner/autocomplete with the shared canonical skill ordering helper so presentation code cannot drift from `skill-registry` ordering semantics.

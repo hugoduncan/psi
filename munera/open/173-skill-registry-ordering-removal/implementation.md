@@ -217,3 +217,7 @@ No new actionable test-shaping feedback. Re-read the test-shaper skill, task art
 ## 2026-05-22 test-shaper follow-up execution
 
 No newly added unchecked actionable `steps.md` items were present after the preloaded no-feedback test-shaper review result. All implementation follow-up steps are already complete, so no code, test, design, or plan changes were needed.
+
+## 2026-05-22 code-shaper review
+
+Found one actionable consistency/robustness gap: the TUI banner and slash autocomplete now reimplement canonical skill ordering locally with `(sort-by :name compare)` instead of routing through the shared skill ordering helper. This keeps current behavior correct, but duplicates the canonical comparator outside `skill-registry`, so a future change to the canonical ordering contract could drift in TUI-only presentation code.
