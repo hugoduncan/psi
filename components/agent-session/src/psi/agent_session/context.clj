@@ -35,7 +35,7 @@
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-step-materialization.core :as workflow-step-materialization]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
-   [psi.skill-registry.registry :as skill-registry]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.history.resolvers :as history-resolvers]
    [psi.query.core :as query]
@@ -131,7 +131,8 @@
                                                     (:cwd ctx))
                                  :system-prompt system-prompt
                                  :tool-defs tool-defs
-                                 :thinking-level thinking-level}
+                                 :thinking-level thinking-level
+                                 :skills skills}
                           (some? prompt-mode) (assoc :prompt-mode prompt-mode)
                           (some? response-mode) (assoc :response-mode response-mode)
                           (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
@@ -205,7 +206,7 @@
    :resume-and-execute-workflow-run-fn #'workflow-execution/resume-and-execute-run!
    :get-session-data-fn #'ss/get-session-data-in
    :list-context-sessions-fn #'ss/list-context-sessions-in
-   :find-skill-fn #'skill-registry/find-skill
+   :find-skill-fn #'skill-storage/find-skill
    :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation

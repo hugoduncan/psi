@@ -87,7 +87,8 @@
                                  :session-name     session-name
                                  :system-prompt    system-prompt
                                  :tool-defs        tool-defs
-                                 :thinking-level   thinking-level}
+                                 :thinking-level   thinking-level
+                                 :skills           skills}
                           (some? response-mode)
                           (assoc :response-mode response-mode)
 
