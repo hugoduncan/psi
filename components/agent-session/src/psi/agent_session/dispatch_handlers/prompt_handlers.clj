@@ -8,6 +8,7 @@
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.prompt-registry.contributions :as contributions]
    [psi.session-state.state :as session]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.state-kernel.dispatch :as kernel]))
 
 ;;; Prompt contribution pure helpers
@@ -44,7 +45,7 @@
                      (let [live-tool-defs (vec (or (:tool-defs sd) []))
                            selected-tools (or (some->> live-tool-defs seq (mapv :name))
                                               (:selected-tools build-opts))
-                           live-skills    (vec (or (:skills sd) []))]
+                           live-skills    (skill-storage/all-skills @(:state* ctx) sd)]
                        (sys-prompt/build-system-prompt
                         (cond-> (assoc build-opts
                                        :prompt-mode (:prompt-mode sd :lambda)

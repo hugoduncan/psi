@@ -13,6 +13,8 @@
 - [x] Migrate `:session/set-skills` to replace the session's `:skill-ids` membership from supplied skill maps and avoid storing session `:skills`.
 - [ ] Migrate session creation/defaults, child-session creation, scheduler-created sessions, and resume paths to use canonical `:skill-ids` directly or resolve supplied already-registered skill maps into `:skill-ids`.
 - [ ] Migrate resolvers, prompt refresh/build paths, command surfaces, TUI projection/autocomplete, prompt request lookup, and workflow child-session selection away from raw `:skills` reads and onto `:skill-ids` + registry lookup.
+  - [x] Migrate prompt refresh rebuilds, request-time `/skill:` expansion, workflow step session-skill selection, and scheduler session-config skill counts to root-registry-backed resolution.
+  - [ ] Migrate child-session lifecycle storage/derivation off embedded `:skills` without regressing create-child/workflow/TUI/command/introspection surfaces.
 - [ ] Remove any remaining runtime/persistence embedded `:skills` writes and reads.
 - [ ] Add focused adapter/storage tests for definition add/duplicate, membership add/duplicate/set, exact lookup, `skill-ids` access, projected name listing/count, root-registry ownership/coherence, and absence of embedded session `:skills` after operations.
 - [ ] Add focused bootstrap tests proving skill definitions load into root-registry before sessions exist and session creation thereafter only records `:skill-ids` membership.

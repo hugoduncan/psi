@@ -9,6 +9,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.ai.model-selection :as model-selection]
    [psi.skill-registry.registry :as skill-registry]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]
    [psi.workflow-registry.registry :as registry]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
@@ -161,7 +162,7 @@
         parent-session (execution-adapter/get-session-data ctx authoritative-parent-session-id)
         parent-session-model (:model parent-session)
         parent-session-prompt-mode (:prompt-mode parent-session)
-        session-skills (vec (or (:skills parent-session) []))
+        session-skills (skill-storage/all-skills @(:state* ctx) parent-session)
         session-tool-defs (vec (or (:tool-defs parent-session) []))
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)

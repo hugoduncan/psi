@@ -11,7 +11,8 @@
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
    [psi.prompt-assets.skills :as skills]
-   [psi.prompt-assets.system-prompt :as system-prompt]))
+   [psi.prompt-assets.system-prompt :as system-prompt]
+   [psi.skill-registry.root-storage :as skill-storage]))
 
 (defn- assistant-tool-call-ids
   [message]
@@ -186,8 +187,8 @@
       ss/sorted-prompt-contributions))
 
 (defn- input-expansion
-  [session-data text commands]
-  (let [loaded-skills (:skills session-data)
+  [root-state session-data text commands]
+  (let [loaded-skills (skill-storage/all-skills root-state session-data)
         templates     (:prompt-templates session-data)]
     (if-let [skill-result (skills/invoke-skill loaded-skills text)]
       {:text      (:content skill-result)
@@ -204,13 +205,13 @@
 
    Returns {:user-message message :expansion expansion?} or nil when the input
    message is nil or has no text block to expand."
-  [session-data user-message commands]
+  [root-state session-data user-message commands]
   (when-let [text (some->> (:content user-message)
                            (keep (fn [block]
                                    (when (= :text (:type block))
                                      (:text block))))
                            first)]
-    (let [{expanded-text :text expansion :expansion} (input-expansion session-data text commands)]
+    (let [{expanded-text :text expansion :expansion} (input-expansion root-state session-data text commands)]
       {:user-message (update user-message :content
                              (fn [blocks]
                                (let [replaced? (atom false)]
@@ -243,8 +244,8 @@
          not-empty)))
 
 (defn- expanded-turn-input
-  [session-data user-message commands]
-  (or (expand-user-message session-data user-message commands)
+  [root-state session-data user-message commands]
+  (or (expand-user-message root-state session-data user-message commands)
       {:user-message user-message
        :expansion nil}))
 
@@ -291,8 +292,9 @@
    - :runtime-opts
    - :runtime-model"
   [ctx session-id {:keys [turn-id user-message runtime-opts runtime-model commands]}]
-  (let [session-data (ss/get-session-data-in ctx session-id)
-        {:keys [user-message expansion]} (expanded-turn-input session-data user-message commands)
+  (let [root-state @(:state* ctx)
+        session-data (ss/get-session-data-in ctx session-id)
+        {:keys [user-message expansion]} (expanded-turn-input root-state session-data user-message commands)
         {:keys [messages queued-steering-messages]} (prepared-turn-messages ctx session-id session-data user-message)
         normalized-turn (normalized-turn-input ctx session-id session-data
                                                {:turn-id turn-id
