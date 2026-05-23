@@ -7,6 +7,7 @@
 - [ ] Decide the persistent storage split: root-registry definition registry id, lower owner/extension id convention, and canonical session membership field shape (`:skill-ids` or justified equivalent).
 - [ ] Implement root-registry-backed definition storage helpers plus session-membership helpers for declaring storage, definition conversion, exact lookup, register/insert, projected list-by-session, `skill-ids` access, and replace whole session membership.
 - [ ] Update bootstrap/root-runtime initialization to hydrate or register skill definitions directly into root-registry before sessions exist.
+  - [ ] Replace the current `components/agent-session/src/psi/agent_session/bootstrap.clj` startup `:session/register-skill` loop with direct root-registry skill-definition hydration before any session membership is created.
 - [ ] Update session schema/model to add canonical `:skill-ids` and remove embedded `:skills` from canonical runtime/persisted session data.
 - [ ] Migrate `:session/register-skill` to ensure root-registry definitions, update session `:skill-ids`, preserve public add/duplicate/change result semantics, and avoid storing session `:skills`.
 - [ ] Migrate `:session/set-skills` to replace the session's `:skill-ids` membership from supplied skill maps and avoid storing session `:skills`.
