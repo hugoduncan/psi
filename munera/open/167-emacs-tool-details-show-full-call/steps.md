@@ -6,3 +6,5 @@
 - [x] Run focused Emacs verification for the touched tool-row/transcript tests.
 - [x] Run adjacent affected Emacs test suites or lint if implementation touches shared RPC/event payload code.
 - [x] Update Emacs expanded call rendering so when both trusted raw `arguments` and `parsed-args` are present but parsed completeness is not provably equivalent, the `Call` section includes the raw arguments fallback; add focused coverage with a projected/filtered parsed-args fixture such as `psi-tool`.
+- [ ] Add focused Emacs coverage proving expanded `Call` details render an explicit nil/empty argument marker when no arguments are available, while collapsed rows still omit call details and toggled-closed rows remove them.
+- [ ] Add focused Emacs coverage proving invalid or unparseable raw `arguments` are displayed verbatim in expanded `Call` details instead of being dropped or reconstructed from the summary.
