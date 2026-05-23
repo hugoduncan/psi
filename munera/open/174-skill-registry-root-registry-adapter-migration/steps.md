@@ -25,6 +25,8 @@
   - [x] Migrate prompt refresh rebuilds, request-time `/skill:` expansion, workflow step session-skill selection, and scheduler session-config skill counts to root-registry-backed resolution.
   - [x] Migrate child-session lifecycle storage/derivation off embedded `:skills` without regressing create-child/workflow/TUI/command/introspection surfaces.
 - [ ] Remove any remaining runtime/persistence embedded `:skills` writes and reads.
+  - [x] Remove TUI slash-autocomplete's redundant embedded-registry re-canonicalization; projected TUI state now treats `:skills` as already projected skill maps.
+  - [x] Remove scheduler session-config summary fallback to embedded persisted session skill storage; runtime scheduler summaries still accept concrete `:skills` request payloads and derive counts from them until create/deliver normalization persists canonical `:skill-ids`.
 - [ ] Add focused adapter/storage tests for definition add/duplicate, membership add/duplicate/set, exact lookup, `skill-ids` access, projected name listing/count, root-registry ownership/coherence, and absence of embedded session `:skills` after operations.
 - [ ] Add focused bootstrap tests proving skill definitions load into root-registry before sessions exist and session creation thereafter only records `:skill-ids` membership.
 - [ ] Add dispatch tests proving prompt refresh remains gated by semantic membership `:changed?`, duplicate/no-change does not refresh prompts, and canonical session data uses `:skill-ids` rather than embedded `:skills`.
