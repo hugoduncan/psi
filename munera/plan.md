@@ -20,6 +20,7 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 `munera/open/149-reload-fixup-inventory-and-safety/`
 `munera/open/174-skill-registry-root-registry-adapter-migration/`
+`munera/open/175-workflow-self-loop-control-edges/`
 `munera/open/150-explicit-runtime-vs-persisted-session-graph-surface/`
 `munera/open/152-retry-header-aware-backoff-and-ui-rate-limit-surfacing/`
 `munera/open/156-tui-resume-session-discovery-follow-up/`
