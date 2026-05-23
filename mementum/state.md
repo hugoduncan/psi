@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 167 tests with test-shaper; found no new actionable test-shaping feedback after existing Emacs full-call, raw fallback, nil/empty, invalid raw, and toggle coverage.
 - 2026-05-23: Reviewed task 167 tests with task-test-review; added follow-ups for missing Emacs coverage of explicit nil/empty argument markers and invalid raw argument fallback in expanded `Call` details.
 - 2026-05-23: Executed task 167 implementation-review follow-up: Emacs expanded `Call` details now include raw `arguments` when `parsed-args` cannot be proven equivalent; projected `psi-tool` coverage added; focused Emacs suite green.
 - 2026-05-23: Scoped task 167 back to Emacs-only full tool-call details; TUI equivalence and TUI extension-renderer gaps are out of scope.
