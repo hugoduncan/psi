@@ -23,9 +23,9 @@
 
 4. Migrate authoritative write and session-lifecycle seams:
    - `:session/register-skill` ensures the definition in root-registry, appends the skill id to session `:skill-ids` when absent, and gates prompt refresh on `:changed?`
-   - `:session/set-skills` replaces the session's complete `:skill-ids` set through the adapter and does not store session `:skills`
-   - session creation/defaults paths write canonical `:skill-ids`; when they are supplied skill maps, they resolve/register definitions first but do not act as the bootstrap path
-   - fork and child-session paths copy/filter authoritative parent `:skill-ids` rather than embedded skill maps
+   - `:session/set-skills` replaces the session's complete `:skill-ids` set through the adapter and does not store session `:skills`; if supplied concrete skill maps whose definitions are missing, it must register them synchronously in the same root-state update before persisting membership ids
+   - session creation/defaults paths write canonical `:skill-ids`; bootstrap/default startup skill loading should pre-register definitions, but non-bootstrap creation paths supplied concrete skill maps must also normalize them synchronously in the same root-state update rather than reject or require a follow-up dispatch/effect
+   - fork and child-session paths copy/filter authoritative parent `:skill-ids` rather than embedded skill maps when selecting from already-registered parent membership; child-session or scheduler inputs that carry concrete skill maps must first ensure missing definitions in the same update
    - scheduler-created and workflow child sessions rely on those lifecycle handlers; later explicit set events use membership replacement semantics
    - resume paths are assumed to use canonical `:skill-ids`, not legacy embedded `:skills`
 
