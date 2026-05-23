@@ -283,6 +283,29 @@
         (should-not (string-match-p (regexp-quote long-command) closed))
         (should-not (string-match-p "command output" closed))))))
 
+(ert-deftest psi-emacs-test-expanded-tool-details-include-raw-fallback-for-projected-parsed-args ()
+  "Expanded details include raw fallback when parsed args omit raw invocation fields."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((raw-arguments "{\"path\":\"mementum/state.md\",\"offset\":5,\"limit\":13,\"reason\":\"audit full invocation\"}"))
+      (psi-emacs--handle-rpc-event
+       `((:event . "tool/result")
+         (:data . ((:tool-id . "t-projected")
+                   (:tool-name . "psi-tool")
+                   (:arguments . ,raw-arguments)
+                   (:parsed-args . ((path . "mementum/state.md")))
+                   (:call-summary . "psi-tool mementum/state.md…")
+                   (:result-text . "tool output")))))
+      (psi-emacs-toggle-tool-output-view)
+      (let ((expanded (buffer-substring-no-properties (point-min) (point-max))))
+        (should (string-match-p "Call" expanded))
+        (should (string-match-p "Tool: psi-tool" expanded))
+        (should (string-match-p (regexp-quote "Arguments: ((path . \"mementum/state.md\"))") expanded))
+        (should (string-match-p (regexp-quote "Raw arguments: {\"path\":\"mementum/state.md\",\"offset\":5,\"limit\":13,\"reason\":\"audit full invocation\"}") expanded))
+        (should (string-match-p "Response" expanded))
+        (should (string-match-p "tool output" expanded))))))
+
 
 (provide 'psi-tool-output-mode-test)
 

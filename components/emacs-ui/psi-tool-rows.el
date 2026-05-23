@@ -381,27 +381,38 @@ properties and recreate live markers. Returns updated row plist or ROW."
             (print-level nil))
         (prin1-to-string value)))))
 
-(defun psi-emacs--tool-call-arguments-detail (parsed-args arguments)
-  "Return expanded auditable arguments detail from PARSED-ARGS and ARGUMENTS."
+(defun psi-emacs--tool-normalized-parsed-args (parsed-args)
+  "Return normalized parsed argument map for PARSED-ARGS, or nil."
   (cond
-   ((and (not (null parsed-args))
-         (or (psi-emacs--alist-map-p parsed-args)
-             (hash-table-p parsed-args)))
-    (psi-emacs--tool-detail-value-string
-     (if (hash-table-p parsed-args)
-         (psi-emacs--hash-table->alist parsed-args)
-       parsed-args)))
-   ((and (stringp arguments)
-         (not (string-empty-p (string-trim arguments))))
-    (let ((parsed (psi-emacs--json-parse-string-safe arguments)))
-      (cond
-       ((psi-emacs--alist-map-p parsed)
-        (psi-emacs--tool-detail-value-string parsed))
-       ((hash-table-p parsed)
-        (psi-emacs--tool-detail-value-string (psi-emacs--hash-table->alist parsed)))
-       (t arguments))))
-   ((stringp arguments) arguments)
-   (t "nil")))
+   ((psi-emacs--alist-map-p parsed-args) parsed-args)
+   ((hash-table-p parsed-args) (psi-emacs--hash-table->alist parsed-args))
+   (t nil)))
+
+(defun psi-emacs--tool-call-arguments-detail (parsed-args arguments)
+  "Return expanded auditable arguments detail from PARSED-ARGS and ARGUMENTS.
+
+When both parsed and raw argument fields are present, include the raw fallback
+unless Emacs can prove equivalence by successfully parsing the complete raw
+field to the same normalized value."
+  (let* ((parsed-normalized (psi-emacs--tool-normalized-parsed-args parsed-args))
+         (raw-present? (and (stringp arguments)
+                            (not (string-empty-p (string-trim arguments)))))
+         (raw-parsed (and raw-present?
+                          (psi-emacs--json-parse-string-safe arguments)))
+         (raw-parsed-normalized (psi-emacs--tool-normalized-parsed-args raw-parsed)))
+    (cond
+     (parsed-normalized
+      (let ((parsed-text (psi-emacs--tool-detail-value-string parsed-normalized)))
+        (if (and raw-present?
+                 (not (equal parsed-normalized raw-parsed-normalized)))
+            (concat parsed-text "\nRaw arguments: " arguments)
+          parsed-text)))
+     (raw-present?
+      (if raw-parsed-normalized
+          (psi-emacs--tool-detail-value-string raw-parsed-normalized)
+        arguments))
+     ((stringp arguments) arguments)
+     (t "nil"))))
 
 (defun psi-emacs--tool-expanded-detail-text (tool-name parsed-args arguments response-text)
   "Return expanded tool detail text with Call before RESPONSE-TEXT."

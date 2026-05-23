@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 167 implementation-review follow-up: Emacs expanded `Call` details now include raw `arguments` when `parsed-args` cannot be proven equivalent; projected `psi-tool` coverage added; focused Emacs suite green.
 - 2026-05-23: Scoped task 167 back to Emacs-only full tool-call details; TUI equivalence and TUI extension-renderer gaps are out of scope.
 - 2026-05-23: Executed task 167 inconsistency follow-up repeat 2 after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
 - 2026-05-23: Re-reviewed task 167 design/plan/steps for inconsistencies (repeat 2); found no new actionable inconsistency feedback and appended the implementation note.
