@@ -65,8 +65,7 @@
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id :psi.skill/name]
    ::pco/output [:psi.skill/detail]}
   (let [session-data (support/session-data agent-session-ctx session-id)
-        all-skills   (skill-storage/all-skills @(:state* agent-session-ctx) session-data)
-        skill        (skill-registry/find-skill all-skills name)]
+        skill        (skill-storage/find-skill @(:state* agent-session-ctx) session-data name)]
     {:psi.skill/detail
      (when skill (skills/enrich-skill skill))}))
 

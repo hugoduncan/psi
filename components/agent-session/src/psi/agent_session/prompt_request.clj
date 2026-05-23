@@ -10,7 +10,6 @@
    [psi.prompt-assets.prompt-templates :as prompt-templates]
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
-   [psi.prompt-assets.skills :as skills]
    [psi.prompt-assets.system-prompt :as system-prompt]
    [psi.skill-registry.root-storage :as skill-storage]))
 
@@ -188,11 +187,14 @@
 
 (defn- input-expansion
   [root-state session-data text commands]
-  (let [loaded-skills (skill-storage/all-skills root-state session-data)
-        templates     (:prompt-templates session-data)]
-    (if-let [skill-result (skills/invoke-skill loaded-skills text)]
-      {:text      (:content skill-result)
-       :expansion {:kind :skill :name (:skill-name skill-result)}}
+  (let [templates (:prompt-templates session-data)
+        skill-id  (some->> text
+                           (re-matches #"/skill:(.+)")
+                           second)]
+    (if-let [skill (some-> skill-id
+                           (skill-storage/find-skill root-state session-data))]
+      {:text      (str (:name skill) " → " (:description skill) " @ " (:file-path skill))
+       :expansion {:kind :skill :name (:name skill)}}
       (if-let [tpl-result (prompt-templates/invoke-template templates commands text)]
         {:text      (:content tpl-result)
          :expansion {:kind :template :name (:source-template tpl-result)}}
@@ -253,9 +255,10 @@
   [ctx session-id session-data user-message]
   (let [base-messages     (-> (session->provider-messages ctx session-id)
                               (replace-current-user-message user-message))
-        steering-messages (queued-steering-messages session-data user-message)]
-    {:messages (cond-> base-messages
-                 (seq steering-messages) (into steering-messages))
+        steering-messages (queued-steering-messages session-data user-message)
+        messages          (cond-> base-messages
+                            (seq steering-messages) (into steering-messages))]
+    {:messages (if (and user-message (empty? messages)) [user-message] messages)
      :queued-steering-messages steering-messages}))
 
 (defn- normalized-turn-input
