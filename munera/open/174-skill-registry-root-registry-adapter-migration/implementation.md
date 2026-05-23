@@ -13,10 +13,16 @@ The user then further clarified the desired ownership boundary:
 
 The user then clarified that we do not need a legacy hydration path.
 
+The user then clarified a further ownership split for startup:
+
+- bootstrap must hydrate the skill registry directly
+- bootstrap must not go through any session-owned membership path
+
 Current target:
 
 - move canonical skill definitions to root-registry
 - keep session ownership of membership via `:skill-ids`
+- bootstrap/root-runtime initialization loads skill definitions directly into root-registry before sessions exist
 - preserve public task `173` behavior: exact lookup, duplicate-ignore/first-write-wins, `:added?` / `:changed?`, and canonical exact skill-name ordering
 - remove embedded `:skills` from runtime/persisted session data
 - migrate all higher read/projection seams away from raw `:skills` reads onto session `:skill-ids` plus registry lookup
@@ -24,4 +30,4 @@ Current target:
 
 Important design pressure:
 
-Many code paths currently seed, copy, or read embedded `:skills` directly: session defaults, child sessions, scheduler sessions, prompt refresh, prompt request lookup, discovery/session resolvers, commands, TUI, workflow step session config, and tests. The implementation must inventory these seams before changing storage so task `168`'s stale-projection failure pattern does not repeat. Because embedded `:skills` storage is being removed rather than synchronized, every remaining raw `:skills` access must be either eliminated or replaced with `:skill-ids` + registry lookup, and child-session plus related inheritance paths must become `:skill-ids`-driven.
+Many code paths currently seed, copy, or read embedded `:skills` directly: bootstrap/session defaults, child sessions, scheduler sessions, prompt refresh, prompt request lookup, discovery/session resolvers, commands, TUI, workflow step session config, and tests. The implementation must inventory these seams before changing storage so task `168`'s stale-projection failure pattern does not repeat. Because embedded `:skills` storage is being removed rather than synchronized, every remaining raw `:skills` access must be either eliminated or replaced with `:skill-ids` + registry lookup, and child-session plus related inheritance paths must become `:skill-ids`-driven. Bootstrap skill loading must be audited separately so definition hydration happens before any session creation path consumes skill ids.

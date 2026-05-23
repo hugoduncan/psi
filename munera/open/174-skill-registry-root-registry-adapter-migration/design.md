@@ -194,7 +194,7 @@ Rules:
 - Fork (`:session/fork-initialize`) copies the parent's `:skill-ids` membership into the new child session data; parent and child share root-registry definitions by id rather than duplicating stored skill maps.
 - Child session creation (`:session/create-child`) derives the child selected skill ids from the parent session membership and selected/filtering logic, writes those ids to the child session data in the same update, and stores no child `:skills` projection.
 - Scheduler-created sessions and workflow child sessions use the same lifecycle handlers above; any `:session/set-skills` event they emit after creation is authoritative replacement of session `:skill-ids` through the adapter.
-- Bootstrap or context construction paths that supply skill maps should normalize them immediately into root-registry definitions plus canonical session `:skill-ids` before higher read surfaces run.
+- Bootstrap or context construction paths that supply skill maps should hydrate the root skill-definition registry directly before sessions are created, so later session creation only writes canonical `:skill-ids` membership and never acts as the bootstrap path for definitions.
 
 This keeps lifecycle behavior deterministic, synchronous, and replayable: every lifecycle handler's root-state transform leaves canonical root-registry definitions and session membership populated, with no embedded `:skills` projection.
 ## Affected seams to audit
@@ -206,7 +206,8 @@ Implementation must audit and preserve these seams:
 - `components/skill-registry/test/psi/skill_registry/registry_test.clj`
 - session schema/model paths for introducing `:skill-ids` and removing embedded `:skills`
 - `components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj` for `:session/register-skill` and `:session/set-skills`
-- session lifecycle/session creation/child-session/scheduler paths that seed or copy skills
+- bootstrap/root-runtime initialization paths that currently load skill maps before sessions exist
+- session lifecycle/session creation/child-session/scheduler paths that seed or copy skill membership
 - session persistence/resume paths that must use canonical `:skill-ids`
 - `components/agent-session/test/psi/agent_session/config_compaction_test.clj`
 - `components/agent-session/src/psi/agent_session/resolvers/discovery.clj`
@@ -229,7 +230,8 @@ This task is complete when:
 - session `:skills` is removed from runtime/persisted session data; no legacy embedded skill-map projection storage remains
 - focused tests prove add, set/replace, duplicate, unsorted input canonicalization, exact lookup, count, membership replacement, and public result metadata through the root-registry-plus-`skill-ids` path
 - session dispatch tests prove prompt refresh still fires only for semantic additions to session membership, not duplicate/no-change canonicalization
-- session creation/resume/child/scheduler paths use canonical `:skill-ids` directly or normalize supplied skill maps immediately into definitions plus `:skill-ids`
+- bootstrap/root-runtime initialization hydrates root-registry skill definitions directly before sessions exist
+- session creation/resume/child/scheduler paths use canonical `:skill-ids` directly or normalize supplied already-registered skill maps into `:skill-ids`
 - child-session inheritance uses parent session skill ids, not embedded parent skill maps
 - higher ordered skill-list surfaces remain canonical by exact skill name and no longer read raw session `:skills`
 - task `164` records the new classification of `skill-registry` as a root-registry-backed definition owner with session-owned skill-id membership

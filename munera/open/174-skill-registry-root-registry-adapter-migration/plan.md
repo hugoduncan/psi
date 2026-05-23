@@ -16,15 +16,20 @@
    - provide replace-whole-session-membership behavior for `:session/set-skills`
    - do not provide or retain a session `:skills` sync/projection writer or a legacy hydration compatibility path
 
-3. Migrate authoritative write and session-lifecycle seams:
+3. Separate bootstrap definition loading from session membership:
+   - bootstrap/root-runtime initialization should load or register skill definitions directly into root-registry before sessions exist
+   - this bootstrap path must not go through a session-owned membership API
+   - session creation/defaults then consume already-registered skills by writing `:skill-ids`
+
+4. Migrate authoritative write and session-lifecycle seams:
    - `:session/register-skill` ensures the definition in root-registry, appends the skill id to session `:skill-ids` when absent, and gates prompt refresh on `:changed?`
    - `:session/set-skills` replaces the session's complete `:skill-ids` set through the adapter and does not store session `:skills`
-   - session creation/defaults paths normalize supplied skill maps immediately into root-registry definitions plus `:skill-ids`
+   - session creation/defaults paths write canonical `:skill-ids`; when they are supplied skill maps, they resolve/register definitions first but do not act as the bootstrap path
    - fork and child-session paths copy/filter authoritative parent `:skill-ids` rather than embedded skill maps
    - scheduler-created and workflow child sessions rely on those lifecycle handlers; later explicit set events use membership replacement semantics
    - resume paths are assumed to use canonical `:skill-ids`, not legacy embedded `:skills`
 
-4. Migrate authoritative read/projection seams:
+5. Migrate authoritative read/projection seams:
    - session and discovery resolvers
    - prompt refresh/build paths
    - prompt request exact lookup path
@@ -33,24 +38,26 @@
    - workflow child-session skill selection
    - any direct raw `(:skills sd)` read must be removed or replaced with a `:skill-ids` + registry lookup path
 
-5. Update session schema/model deliberately:
+6. Update session schema/model deliberately:
    - add canonical `:skill-ids` to session schema/model
    - remove runtime/persisted `:skills` as an embedded authoritative field
    - no legacy embedded-`:skills` hydration path is required for this task
    - add tests proving embedded `:skills` is absent from canonical runtime/persisted session data and that `:skill-ids` owns membership
 
-6. Update tests:
+7. Update tests:
    - focused lower definition-storage + membership adapter tests
+   - focused bootstrap tests proving skill definitions load into root-registry before sessions exist
    - dispatch tests for add/duplicate/set and prompt refresh gating
    - tests proving runtime/persisted session data uses `:skill-ids` and no longer retains embedded `:skills`
    - representative higher-surface canonical ordering tests from task `173`
    - child-session inheritance tests proving parent skill ids drive inheritance
 
-7. Update task `164`:
+8. Update task `164`:
    - classify `skill-registry` as a root-registry-backed definition owner with session-owned skill-id membership
    - record which semantics remain adapter-owned: duplicate-ignore projection, `:added?` / `:changed?`, prompt-refresh gating, canonical skill-name ordering
    - record that embedded session `:skills` storage was removed in favor of `:skill-ids`, with no legacy hydration compatibility retained
+   - record that bootstrap hydrates definition storage directly rather than via session membership
 
-8. Verify:
+9. Verify:
    - focused lower and higher tests
    - full `bb test` before close
