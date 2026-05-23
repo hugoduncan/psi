@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 167 design/plan/steps for inconsistencies; found TUI verification gap versus close-toggle acceptance (TUI supports ctrl+o close but plan/steps only mention collapsed+expanded coverage); added design-step and implementation note.
 - 2026-05-22: Created Munera task 167 for frontend tool details: Emacs `C-c C-t` and TUI tool-detail expansion should include full tool call details alongside responses.
 - 2026-05-22: Fixed Emacs prompt-completion cursor fallback so finalization places point in the editable input area instead of the input divider line; added regression coverage; `bb emacs:test --focus psi-streaming-transcript-test` ran 308/308 green.
 - 2026-05-22: Executed task 166 code-shaper follow-up: extracted shared assistant streaming optimization instrumentation helper while preserving distinct behavior assertions; focused streaming suite 36/36 and `bb emacs:test` 307/307 green.
@@ -22,7 +23,7 @@ Bootstrapped on 2026-04-02.
 - 2026-05-22: Executed task 166 repeated test-review follow-up after no-action review; no new unchecked steps existed, so only implementation.md was updated.
 - 2026-05-22: Executed task 166 test-review follow-up after no-action test review; no new unchecked steps existed, so only implementation.md was updated and committed (6f0a3822).
 - 2026-05-22: Executed task 166 implementation-review follow-up: added `psi-streaming-render-optimization-test.el` to `bb emacs:test`, marked the step done, and verified focused streaming + full Emacs suites green (34/305 tests).
-- 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no new unchecked design-steps existed, so only implementation.md was updated.
+- 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no new design-steps existed, so only implementation.md was updated.
 - 2026-05-22: Executed task 166 ambiguity follow-up clarifying thinking append-only proof: assistant property ranges are suffix-only, while thinking proof uses inserted suffix mutation range plus no redraw/overlay recreation; committed e8057a3a.
 - 2026-05-21: Fixed OpenAI OAuth `gpt-5.5` routing (commit 009aed51).
   - Root cause: `gpt-5.5` used platform chat-completions while active OpenAI auth was ChatGPT OAuth; platform path returned `insufficient_quota`.
@@ -47,6 +48,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
+- 2026-05-23: Reviewed task 167 design/plan/steps for inconsistencies; added follow-up to align TUI close-toggle verification with acceptance criterion 7.
 - 2026-05-23: Reviewed task 167 design/plan/steps for ambiguities after plan/steps creation; found one remaining actionable ambiguity around parsed-vs-raw argument completeness detection for expanded `Call` rendering; added design-step and committed c2390ebf.
 - 2026-05-22: Executed task 167 ambiguity follow-ups: design now specifies full-call data precedence with raw fallback, shared Emacs/TUI expanded layout, and extension renderer constraints; all ambiguity design-steps marked done.
 - 2026-05-22: Reviewed task 167 design artifacts for ambiguities; added design follow-ups for full-call data precedence, expanded-detail layout contract, and extension renderer interaction.
@@ -56,11 +58,11 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 - 2026-05-22: Executed task 166 test-review follow-up after no-action review; no newly added unchecked steps existed, so implementation.md records the no-op pass and commit 6f0a3822 captures it.
 - 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no new design-steps were present, no design/plan/steps changes were required, and implementation.md records the pass.
 - 2026-05-22: Reviewed task 166 design/plan/steps for inconsistencies; found no new actionable inconsistency feedback; appended implementation note only.
-- 2026-05-22: Executed task 166 ambiguity follow-up after no-action ambiguity review; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
+- 2026-05-22: Executed task 166 ambiguity follow-up after no-action ambiguity review; no newly added design-steps were present, so no task artifact changes beyond implementation note were needed.
 - 2026-05-22: Re-reviewed task 166 design/plan/steps for ambiguities; found no new actionable ambiguity feedback; appended implementation note and left design-steps unchanged.
-- 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
-- 2026-05-22: Executed task 166 ambiguity follow-up after no-action ambiguity review; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
-- 2026-05-22: Executed task 166 inconsistency follow-up after thinking-proof clarification; no newly added unchecked design-steps were present, so no task artifact changes beyond implementation note were needed.
+- 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no newly added design-steps were present, so no task artifact changes beyond implementation note were needed.
+- 2026-05-22: Executed task 166 ambiguity follow-up after no-action ambiguity review; no newly added design-steps were present, so no task artifact changes beyond implementation note were needed.
+- 2026-05-22: Executed task 166 inconsistency follow-up after thinking-proof clarification; no newly added design-steps were present, so no task artifact changes beyond implementation note were needed.
 - 2026-05-22: Executed task 166 ambiguity follow-up: clarified thinking append-only proof uses inserted suffix mutation range and no post-creation full redraw/prefix overlay recreation, not nonexistent assistant-style property ranges.
 - 2026-05-22: Executed task 166 inconsistency follow-up: corrected divergent assistant snapshot acceptance to preserve existing merge/append semantics after effective-next-text calculation; design-step completed.
 - 2026-05-22: Executed task 166 ambiguity follow-up: pre-optimization instrumentation proof must use named helper wrappers (full redraw, stream property range, prefix overlay), with primitive advice only as temporary diagnostics; task artifacts updated and design-step completed.
