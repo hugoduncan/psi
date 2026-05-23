@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [psi.skill-registry.registry :as skill-registry]
    [psi.tui.app.shared :as shared]
    [psi.tui.app.support :as support]))
 
@@ -54,7 +55,7 @@
   [state prefix]
   (let [templates  (mapv (fn [{:keys [name]}] (str "/" name)) (:prompt-templates state))
         skills     (mapv (fn [{:keys [name]}] (str "/skill:" name))
-                         (sort-by :name compare (:skills state)))
+                         (skill-registry/all-skills (:skills state)))
         ext-cmds   (vec (keep as-slash-command (:extension-command-names state)))
         all        (->> (concat shared/builtin-slash-commands templates skills ext-cmds)
                         (remove str/blank?)

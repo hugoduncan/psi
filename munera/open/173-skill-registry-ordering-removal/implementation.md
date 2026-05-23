@@ -221,3 +221,7 @@ No newly added unchecked actionable `steps.md` items were present after the prel
 ## 2026-05-22 code-shaper review
 
 Found one actionable consistency/robustness gap: the TUI banner and slash autocomplete now reimplement canonical skill ordering locally with `(sort-by :name compare)` instead of routing through the shared skill ordering helper. This keeps current behavior correct, but duplicates the canonical comparator outside `skill-registry`, so a future change to the canonical ordering contract could drift in TUI-only presentation code.
+
+## 2026-05-22 code-shaper follow-up execution
+
+Completed the newly added TUI ordering follow-up. TUI banner and slash autocomplete now import `psi.skill-registry.registry` and route skill ordering through `skill-registry/all-skills` instead of duplicating `(sort-by :name compare)` locally; `components/tui` now declares the `psi/skill-registry` dependency. Verification: `clojure -M:test --focus psi.tui.app-input-selector-test --focus psi.tui.app-projection-test` passed (19 tests, 52 assertions); `clj-kondo --lint components/tui/src components/tui/test` passed.

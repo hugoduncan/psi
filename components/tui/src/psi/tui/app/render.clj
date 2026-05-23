@@ -2,6 +2,7 @@
   (:require
    [charm.style.core :as charm-style]
    [clojure.string :as str]
+   [psi.skill-registry.registry :as skill-registry]
    [psi.tui.ansi :as ansi]
    [psi.tui.app.shared :as shared]
    [psi.tui.app.support :as support]
@@ -30,9 +31,8 @@
 
 (defn- banner-rows
   [model-text prompt-templates skills extension-summary]
-  (let [visible-skills (->> skills
-                            (remove :disable-model-invocation)
-                            (sort-by :name compare))
+  (let [visible-skills (->> (skill-registry/all-skills skills)
+                            (remove :disable-model-invocation))
         ext-count      (:extension-count extension-summary 0)]
     [{:prefix "  Model: "
       :text model-text}
