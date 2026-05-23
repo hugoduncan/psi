@@ -18,3 +18,5 @@
 - 2026-05-23 inconsistency follow-up execution: aligned TUI verification with the close-toggle acceptance criterion by requiring focused TUI collapsed, expanded/detail, and toggled-closed coverage in `design.md`, `plan.md`, and `steps.md`. Marked the design-step done; implementation `steps.md` items remain unexecuted as requested.
 
 - 2026-05-23 ambiguity review: found one new actionable ambiguity. The design and acceptance describe `C-c C-t`/tool-detail toggling in row-local terms ("same row closed"), while the current Emacs implementation and TUI state use a global tools-expanded mode. Added a design-step to decide whether the change must preserve global expand/collapse semantics or introduce/require row-local detail state, and to align acceptance/tests accordingly.
+
+- 2026-05-23 ambiguity follow-up execution: clarified tool-detail toggle granularity. The task preserves existing global Emacs `C-c C-t` and TUI `ctrl+o` tools-expanded semantics rather than introducing row-local expansion. Updated acceptance, plan decisions, and implementation test checklist to require global collapsed/expanded/toggled-closed coverage. Marked the design-step done.

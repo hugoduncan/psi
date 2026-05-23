@@ -11,9 +11,9 @@ Implement the full-call detail display as a small frontend rendering change, pre
    - falls back to raw argument payloads when structured arguments are absent, invalid, partial, or summary-derived;
    - explicitly renders empty or nil arguments;
    - preserves multiline, nested, and long values without summary truncation.
-3. Insert the Emacs `Call` section into the existing first-level detail expansion before the existing response/output details, without changing collapsed summary behavior or keybindings.
+3. Insert the Emacs `Call` section into the existing global first-level detail expansion before the existing response/output details, without changing collapsed summary behavior, `C-c C-t`, or the all-tool-rows toggle semantics.
 4. Inspect the TUI transcript/tool-detail rendering path and tests to identify the equivalent expanded detail surface and available call data.
-5. Add or reuse a deterministic TUI formatter using the same conceptual `Call` then response/output layout and the same structured/raw precedence rules.
+5. Add or reuse a deterministic TUI formatter using the same conceptual `Call` then response/output layout, the same structured/raw precedence rules, and the existing global `tools-expanded?` / `ctrl+o` semantics.
 6. Preserve existing response/output rendering in both frontends apart from placing it after or alongside the new call section.
 7. Add focused Emacs tests for collapsed, expanded, and toggled-closed states using arguments that are truncated or incomplete in the collapsed summary.
 8. Add focused TUI tests for collapsed, expanded/detail, and toggled-closed states using equivalent long or nested arguments.
@@ -22,6 +22,7 @@ Implement the full-call detail display as a small frontend rendering change, pre
 ## Decisions
 
 - The row header/collapsed summary remains the compact existing summary and remains separate from expanded `Call` details.
+- Tool-detail toggles remain global in both frontends: `C-c C-t` and `ctrl+o` expand/collapse all tool rows rather than introducing row-local detail state.
 - Expanded details always include a generic auditable `Call` section unless an existing specialized renderer demonstrably includes the complete tool name, complete arguments, and raw fallback behavior.
 - Expanded call rendering uses frontend data fields, not reconstruction from the collapsed summary.
 - Missing argument data is rendered explicitly rather than making the call section disappear.

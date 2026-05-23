@@ -34,7 +34,7 @@ Emacs and TUI should provide equivalent auditability: if a tool row can be expan
 4. Long or nested tool-call arguments are not silently truncated in expanded details views.
 5. The call-details rendering is deterministic enough for tests and stable user inspection in both frontends.
 6. Existing response/output display behavior remains unchanged apart from being accompanied by call details.
-7. Toggling the same row closed removes the expanded call and response details, returning to the collapsed row, for frontends that support closing detail rows.
+7. Toggling tool details closed removes the expanded call and response details, returning affected tool rows to collapsed rendering, for frontends that support closing detail rows. For this task, Emacs `C-c C-t` and TUI `ctrl+o` preserve the existing global tools-expanded mode: one toggle expands all tool rows and the next toggle collapses all tool rows. The acceptance wording does not require introducing row-local expansion state.
 8. Focused Emacs tests cover collapsed, expanded, and toggled-closed states for a tool row with arguments that would be truncated or incomplete in the summary line.
 9. Focused TUI tests cover the equivalent collapsed, expanded/detail, and toggled-closed states for a tool row with arguments that would be truncated or incomplete in the summary line.
 
@@ -93,6 +93,12 @@ Emacs and TUI expanded tool details should use the same conceptual layout:
 6. Use deterministic pretty-printing/serialization so equivalent frontend inputs produce stable output for tests.
 
 The `Call` section is part of the first-level details revealed by the existing tool-detail toggle. It must not require a second nested toggle to inspect the executed call.
+
+
+### Tool-detail toggle granularity
+This task preserves the existing global tool-detail toggle semantics in both frontends. Emacs `C-c C-t` toggles the frontend tool-output view mode between collapsed and expanded for all tool rows. TUI `ctrl+o` toggles the shared `tools-expanded?` state used when rendering tool rows. The full-call work should add `Call` details to the expanded rendering produced by that existing global mode; it should not introduce row-local expansion state, per-row selection, or a new keybinding.
+
+Tests should align with that behavior: collapsed assertions use global collapsed mode, expanded assertions use global expanded mode, and toggled-closed assertions toggle the same global mode back to collapsed and verify the expanded `Call` and response details are absent. It is sufficient for a focused single-row fixture to prove the target row closes, but multi-row fixtures must expect all rows to follow the same global mode rather than independent row-local state.
 
 ### Tool-specific and extension renderers
 Tool-specific or extension-provided renderers may improve the collapsed/header summary or add specialized expanded presentation, but they must not be the only source of audit data for the executed call. Expanded details must always include a generic full-call representation based on structured/raw frontend data. A specialized renderer may appear alongside that generic representation, but it may not replace the generic `Call` section unless it demonstrably includes the complete tool name and complete arguments with the same raw fallback behavior.
