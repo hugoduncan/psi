@@ -59,7 +59,7 @@ The resulting design should make this split explicit:
 - `skill-registry` owns validation of skill maps and exact `:name` identity
 - `skill-registry` owns public duplicate-ignore/no-change result projection over lower duplicate-detection results
 - session-facing read surfaces resolve `:skill-ids` through root-registry-backed skill definitions and project canonical skill vectors on demand
-- session `:skills` vector storage is removed as a persisted/runtime projection after one-way migration from legacy data
+- session `:skills` vector storage is removed from runtime/persisted session data; no legacy hydration path is required for this task
 
 ## Scope
 
@@ -71,7 +71,7 @@ This task includes:
 - migrating `:session/register-skill` to register or ensure skill definitions in root-registry and append/retain membership in session `:skill-ids`
 - migrating `:session/set-skills` to replace the session's `:skill-ids` membership from supplied skill maps via registry-backed id resolution/registration
 - migrating session/resolver/prompt/TUI/command/workflow read seams to resolve projected canonical skills from session `:skill-ids` plus root-registry-backed definitions rather than raw session `:skills`
-- removing session-local `:skills` runtime/persisted projection storage after migrating/hydrating any legacy seed vectors into `:skill-ids`
+- removing session-local `:skills` runtime/persisted projection storage and replacing it directly with `:skill-ids`
 - using `root-registry/insert` as the lower duplicate-detection primitive for skill definitions
 - translating lower duplicate results into the current public duplicate-ignore/no-change skill result
 - preserving canonical exact skill-name ordering for all projected registry results and read helpers
@@ -143,23 +143,19 @@ The adapter must not expose root-registry entries or lower result maps through p
 
    Preferred answer: `:skill-ids` as a vector of skill ids/names. The field should represent explicit session ownership of included skills, while projected `:skills` vectors disappear from stored session data.
 
-3. How should existing session `:skills` vectors be migrated?
+3. Should this task support a legacy embedded-`:skills` hydration path?
 
-   Preferred answer: provide an explicit hydration/migration step for session creation, session resume, child-session creation, scheduler-created sessions, and compatibility paths that still seed embedded `:skills`. Hydration should register/ensure definitions in root-registry, write canonical `:skill-ids`, then remove `:skills` from session data.
+   Preferred answer: no. The task should change canonical session shape directly to `:skill-ids` and update creation/copy/set paths accordingly, without carrying a compatibility hydration path for embedded `:skills`.
 
-4. What should happen if a session has both `:skills` and `:skill-ids` during migration?
-
-   Preferred answer: `:skill-ids` is authoritative once present. Legacy `:skills` is only a one-way seed before hydration and must be removed afterward.
-
-5. Should `:session/set-skills` replace the whole session membership set or insert only missing skills?
+4. Should `:session/set-skills` replace the whole session membership set or insert only missing skills?
 
    Preferred answer: preserve current set-style semantics by replacing the session's `:skill-ids` from the supplied skill maps, while `:session/register-skill` remains insert/no-op membership addition.
 
-6. Should lower duplicate-id results ever surface to callers?
+5. Should lower duplicate-id results ever surface to callers?
 
    Preferred answer: no. Lower duplicates are an implementation detail translated into the current skill duplicate-ignore result.
 
-7. Does this require extending `root-registry` for owner/listing semantics?
+6. Does this require extending `root-registry` for owner/listing semantics?
 
    Preferred answer: probably less than the previous design, because registry listing is global by skill definition id while session ownership lives in `:skill-ids`. Add lower helpers only if definition registration/lookup would otherwise duplicate brittle logic.
 
@@ -173,40 +169,34 @@ Boundary decision:
 - `psi.skill-registry.registry` keeps the existing pure vector API for validation, canonicalization, API-level return projections, and tests that intentionally exercise the public collection contract. It must not be used as persisted/runtime session storage after migration.
 - The same component, preferably in a new namespace such as `psi.skill-registry.root-storage`, owns the root-registry/session-membership adapter because it is still skill-domain behavior: skill validation, exact `:name` identity, duplicate-ignore projection, canonical skill-name ordering, and public result metadata.
 - `agent-session` must call that adapter for session-aware root-state writes and reads; it should not reimplement root-registry lookup, definition registration, membership updates, or canonical skill projection locally.
-- `session-state` remains a lower pure session-map initializer and does not take a root-registry dependency. It may accept legacy/input `:skills` vectors only as transient seeds for agent-session lifecycle hydration; post-hydration session maps should retain `:skill-ids` and not retain `:skills`.
+- `session-state` remains a lower pure session-map initializer and does not take a root-registry dependency. Its canonical session shape for this task should use `:skill-ids` rather than embedded `:skills`.
 - Prompt, resolver, TUI, command, and workflow seams should depend on agent-session/session-facing helper functions or the skill-registry adapter result, not on raw root-registry entries.
 
 Adapter API shape to implement:
 
 - `ensure-skill-registry` / `ensure-skill-registry-in` declares the shared `:skills` root-registry area idempotently.
-- `hydrate-session-skills` migrates a session's legacy/input `:skills` seed into root-registry definitions and session `:skill-ids` only when that session does not already have authoritative `:skill-ids`, then removes `:skills` from session data.
+- session-aware APIs should operate directly on root-registry definitions plus session `:skill-ids`; no legacy `hydrate-session-skills` compatibility path is required.
 - `all-skills-in`, `find-skill-in`, `skill-names-in`, and `skill-count-in` resolve one session's canonical projected skills from session `:skill-ids` plus root-registry-backed definitions.
 - `register-skill-in` inserts/ensures one skill definition using `root-registry/insert`, adds the skill id to session membership when absent, and translates lower duplicate failures into the public duplicate/no-change result.
 - `set-skills-in` replaces the complete session `:skill-ids` membership from supplied skill maps and returns the canonical API projection without storing projected `:skills` in session data.
 - `skill-ids-in` should expose the session-owned membership seam explicitly for child-session inheritance and other session-local capability logic.
-- no `sync-session-skills-projection` should exist in the final design. Compatibility is handled by read-time API projections and one-way hydration only, not by storing a duplicate `:skills` vector.
+- no `sync-session-skills-projection` or legacy hydration compatibility path should exist in the final design.
 
 These APIs should return root-state update results or pure root-state transforms, not perform effects. Prompt refresh remains owned by `agent-session` dispatch handlers, gated only by the adapter's public `:changed?` result.
-## Hydration timing and ownership
+## Session lifecycle and membership ownership
 
-Hydration is owned by `agent-session` at session lifecycle boundaries because those handlers already compose root-state updates and know the active session id. Hydration is a synchronous part of the same root-state update that creates, resumes, forks, or creates a child session; it is not a follow-up effect and must not require a second dispatch for correctness.
+Session lifecycle handlers should create and propagate canonical `:skill-ids` directly.
 
 Rules:
 
-- New top-level session creation (`:session/new-initialize`, `:session/create-top-level`) first runs the existing pure session-state initializer, then hydrates the new session id from any input `:skills` seed into root-registry definitions plus session `:skill-ids`, and removes `:skills` from stored session data.
-- Resume (`:session/resume-loaded`, `:session/resume-missing-initialize`) hydrates the resumed session id from persisted/current legacy `:skills` into root-registry definitions plus session `:skill-ids` in the same update that writes resumed session data. Persisted embedded vectors are seeds only.
-- Fork (`:session/fork-initialize`) copies the parent's `:skill-ids` membership into the new child session data; parent and child share root-registry definitions by id rather than duplicating per-session stored skill maps.
+- New top-level session creation (`:session/new-initialize`, `:session/create-top-level`) creates canonical session data with `:skill-ids`, not embedded `:skills`.
+- Resume paths should load canonical session data with `:skill-ids`; supporting persisted embedded `:skills` compatibility is out of scope for this task.
+- Fork (`:session/fork-initialize`) copies the parent's `:skill-ids` membership into the new child session data; parent and child share root-registry definitions by id rather than duplicating stored skill maps.
 - Child session creation (`:session/create-child`) derives the child selected skill ids from the parent session membership and selected/filtering logic, writes those ids to the child session data in the same update, and stores no child `:skills` projection.
-- Scheduler-created sessions and workflow child sessions use the same lifecycle handlers above; any `:session/set-skills` event they emit after creation is authoritative replacement of session `:skill-ids` through the adapter, not a separate hydration rule.
-- Bootstrap or context construction paths that seed an initial `:skills` vector should either dispatch through `:session/set-skills` / `:session/register-skill` or call the lifecycle hydration helper as part of root-state initialization before higher read surfaces run.
+- Scheduler-created sessions and workflow child sessions use the same lifecycle handlers above; any `:session/set-skills` event they emit after creation is authoritative replacement of session `:skill-ids` through the adapter.
+- Bootstrap or context construction paths that supply skill maps should normalize them immediately into root-registry definitions plus canonical session `:skill-ids` before higher read surfaces run.
 
-Conflict rule:
-
-- If a session already has authoritative `:skill-ids`, that membership wins and any session `:skills` vector is removed. A non-empty embedded vector does not replace existing `:skill-ids` unless the caller explicitly invokes `:session/set-skills`.
-- If a session has no `:skill-ids`, a legacy `:skills` vector is treated as a one-way seed; duplicate names in that seed follow first-write-wins, the resulting session data stores canonical `:skill-ids`, and stored `:skills` is removed after hydration.
-
-This makes hydration deterministic, synchronous, and replayable: every lifecycle handler's root-state transform leaves canonical root-registry definitions and session membership populated, with legacy `:skills` projection removed before effects or higher projections observe the session.
-
+This keeps lifecycle behavior deterministic, synchronous, and replayable: every lifecycle handler's root-state transform leaves canonical root-registry definitions and session membership populated, with no embedded `:skills` projection.
 ## Affected seams to audit
 
 Implementation must audit and preserve these seams:
@@ -217,7 +207,7 @@ Implementation must audit and preserve these seams:
 - session schema/model paths for introducing `:skill-ids` and removing embedded `:skills`
 - `components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj` for `:session/register-skill` and `:session/set-skills`
 - session lifecycle/session creation/child-session/scheduler paths that seed or copy skills
-- session persistence/resume paths that load older embedded `:skills` vectors
+- session persistence/resume paths that must use canonical `:skill-ids`
 - `components/agent-session/test/psi/agent_session/config_compaction_test.clj`
 - `components/agent-session/src/psi/agent_session/resolvers/discovery.clj`
 - `components/agent-session/src/psi/agent_session/resolvers/session.clj` for `:psi.agent-session/skills` and any new `:psi.agent-session/skill-ids` surface if exposed
@@ -236,10 +226,10 @@ This task is complete when:
 - session data is the authoritative owner of included skill membership via `:skill-ids` or the explicitly chosen equivalent reference field
 - public `skill-registry` and agent-session skill behavior is unchanged from the task `173` contract
 - duplicate registration is implemented through lower duplicate detection and translated into public duplicate-ignore/no-change behavior at the session-membership boundary
-- session `:skills` is removed from runtime/persisted session data after one-way hydration; no legacy embedded skill-map projection storage remains
+- session `:skills` is removed from runtime/persisted session data; no legacy embedded skill-map projection storage remains
 - focused tests prove add, set/replace, duplicate, unsorted input canonicalization, exact lookup, count, membership replacement, and public result metadata through the root-registry-plus-`skill-ids` path
 - session dispatch tests prove prompt refresh still fires only for semantic additions to session membership, not duplicate/no-change canonicalization
-- session creation/resume/child/scheduler paths hydrate legacy embedded skills into definitions plus `:skill-ids`, or are explicitly updated to write `:skill-ids` directly
+- session creation/resume/child/scheduler paths use canonical `:skill-ids` directly or normalize supplied skill maps immediately into definitions plus `:skill-ids`
 - child-session inheritance uses parent session skill ids, not embedded parent skill maps
 - higher ordered skill-list surfaces remain canonical by exact skill name and no longer read raw session `:skills`
 - task `164` records the new classification of `skill-registry` as a root-registry-backed definition owner with session-owned skill-id membership
