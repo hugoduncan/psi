@@ -31,7 +31,13 @@
                           {:origin :core}))
   (ss/apply-root-state-update-in! ctx
                                   (fn [root-state]
-                                    (:root-state (skill-storage/set-skills-in-root-state root-state session-id skills))))
+                                    (let [root-state' (:root-state (reduce (fn [{:keys [root-state]} skill]
+                                                                             (skill-storage/register-skill-in-root-state root-state session-id skill))
+                                                                           {:root-state root-state}
+                                                                           skills))]
+                                      (assoc-in root-state'
+                                                (conj (ss/session-data-path session-id) :skill-ids)
+                                                (mapv :name skills)))))
   (doseq [tool tools]
     (session/dispatch-in! ctx :session/add-tool
                           {:session-id session-id :tool tool}

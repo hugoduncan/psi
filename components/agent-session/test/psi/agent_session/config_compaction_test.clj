@@ -5,6 +5,7 @@
    [psi.agent-session.test-support :as test-support]
    [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
+   [psi.agent-session.bootstrap]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
@@ -172,7 +173,9 @@
         (is (str/includes? (or before-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (not (str/includes? (or before-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md"))))
       (let [result (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})]
-        (is (= {:added? true :changed? true :count 1} result)))
+        (is (= {:added? true :changed? true :count 1
+                :skills [skill]}
+               result)))
       (let [after-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
         (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (str/includes? (or after-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md")))))
@@ -225,7 +228,9 @@
             after-prompt  (:system-prompt (ss/get-session-data-in ctx session-id))
             sd            (ss/get-session-data-in ctx session-id)
             event-types   (mapv :event-type (kernel/event-log-entries))]
-        (is (= {:added? false :changed? false :count 1} result))
+        (is (= {:added? false :changed? false :count 1
+                :skills [skill]}
+               result))
         (is (= before-prompt after-prompt))
         (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (= ["coding"] (:skill-ids sd)))
@@ -245,8 +250,9 @@
                    :base-dir "/tmp/a"
                    :source :project
                    :disable-model-invocation false}
-          [ctx session-id] (create-session-context {:session-defaults {:skills [z-skill a-skill]
-                                                                       :system-prompt "stable prompt"}})]
+          [ctx session-id] (create-session-context)
+          _ (psi.agent-session.bootstrap/load-startup-resources-in! ctx session-id {:skills [z-skill a-skill]})
+          _ (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt "stable prompt"} {:origin :test})]
       (kernel/clear-event-log!)
       (let [before-prompt (:system-prompt (ss/get-session-data-in ctx session-id))
             result        (session/dispatch-in! ctx :session/register-skill
@@ -256,7 +262,9 @@
             after-prompt  (:system-prompt (ss/get-session-data-in ctx session-id))
             sd            (ss/get-session-data-in ctx session-id)
             event-types   (mapv :event-type (kernel/event-log-entries))]
-        (is (= {:added? false :changed? false :count 2} result))
+        (is (= {:added? false :changed? false :count 2
+                :skills [a-skill z-skill]}
+               result))
         (is (= before-prompt after-prompt))
         (is (= ["z-skill" "a-skill"] (:skill-ids sd)))
         (is (nil? (:skills sd)))
