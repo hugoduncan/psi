@@ -51,3 +51,7 @@
 
 
 - 2026-05-23 implementation pass: implemented generic expanded `Call` details in Emacs tool rows and TUI tool rendering, preserving collapsed summaries and global toggles. Emacs expanded rows now render `Call`/`Tool`/`Arguments` before `Response`; TUI expanded rows prepend the same generic call block before result/warnings. Added Emacs and TUI collapsed/expanded/toggled-closed coverage with long nested call arguments, updated adjacent Emacs expectations for the new expanded layout, and verified `bb emacs:test --focus psi-tool-output-mode-test` plus `clojure -M:test --focus psi.tui.app-view-runtime-test` green.
+
+- 2026-05-23 implementation review: found one actionable implementation gap. The TUI expanded rendering path prepends the generic `Call` block only when using the built-in result renderer; if an extension `:render-result-fn` is present, `render-tool-calls` renders the extension result directly and omits the generic auditable `Call` section, contrary to the design/Allium requirement that extension renderers may not replace full call details unless they prove equivalent completeness.
+
+- 2026-05-23 scope update: user explicitly dropped TUI equivalence from task 167. Updated design, plan, steps, and design-steps so 167 is Emacs-scoped only. The prior implementation-review gap about TUI extension `:render-result-fn` coverage is no longer an acceptance blocker for this task; any remaining TUI parity/extension-renderer work should be handled by a separate task if desired.

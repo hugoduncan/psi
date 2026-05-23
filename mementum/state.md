@@ -15,7 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- 2026-05-23: Implemented task 167 Emacs/TUI expanded tool-call details with `Call` before response, focused frontend tests green, lint green.
+- 2026-05-23: Scoped task 167 back to Emacs-only full tool-call details; TUI equivalence and TUI extension-renderer gaps are out of scope.
 - 2026-05-23: Executed task 167 inconsistency follow-up repeat 2 after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
 - 2026-05-23: Re-reviewed task 167 design/plan/steps for inconsistencies (repeat 2); found no new actionable inconsistency feedback and appended the implementation note.
 - 2026-05-23: Executed task 167 ambiguity follow-up repeat 2 after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
@@ -27,7 +27,7 @@ Bootstrapped on 2026-04-02.
 - 2026-05-23: Executed task 167 inconsistency follow-up after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
 - 2026-05-23: Executed task 167 ambiguity follow-up: design now preserves existing global Emacs `C-c C-t` and TUI `ctrl+o` tools-expanded semantics; no row-local expansion is required.
 - 2026-05-23: Reviewed task 167 design/plan/steps for inconsistencies; found TUI verification gap versus close-toggle acceptance (TUI supports ctrl+o close but plan/steps only mention collapsed+expanded coverage); added design-step and implementation note.
-- 2026-05-22: Created Munera task 167 for frontend tool details: Emacs `C-c C-t` and TUI tool-detail expansion should include full tool call details alongside responses.
+- 2026-05-22: Created Munera task 167 for Emacs `C-c C-t` tool details to include full tool call details alongside responses; TUI equivalence later dropped from scope.
 - 2026-05-22: Fixed Emacs prompt-completion cursor fallback so finalization places point in the editable input area instead of the input divider line; added regression coverage; `bb emacs:test --focus psi-streaming-transcript-test` ran 308/308 green.
 - 2026-05-22: Executed task 166 code-shaper follow-up: extracted shared assistant streaming optimization instrumentation helper while preserving distinct behavior assertions; focused streaming suite 36/36 and `bb emacs:test` 307/307 green.
 - 2026-05-22: Executed task 166 test-shaper follow-up: split the combined assistant append optimization proof into separate incremental-delta, cumulative-snapshot, and divergent-merge tests; focused streaming suite 36/36 and `bb emacs:test` 307/307 green.
