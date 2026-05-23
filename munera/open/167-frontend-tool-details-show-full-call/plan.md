@@ -16,7 +16,7 @@ Implement the full-call detail display as a small frontend rendering change, pre
 5. Add or reuse a deterministic TUI formatter using the same conceptual `Call` then response/output layout and the same structured/raw precedence rules.
 6. Preserve existing response/output rendering in both frontends apart from placing it after or alongside the new call section.
 7. Add focused Emacs tests for collapsed, expanded, and toggled-closed states using arguments that are truncated or incomplete in the collapsed summary.
-8. Add focused TUI tests for collapsed and expanded/detail states using equivalent long or nested arguments.
+8. Add focused TUI tests for collapsed, expanded/detail, and toggled-closed states using equivalent long or nested arguments.
 9. Run focused Emacs and TUI verification, then any adjacent transcript/tool-row test suites affected by the change.
 
 ## Decisions

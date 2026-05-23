@@ -36,7 +36,7 @@ Emacs and TUI should provide equivalent auditability: if a tool row can be expan
 6. Existing response/output display behavior remains unchanged apart from being accompanied by call details.
 7. Toggling the same row closed removes the expanded call and response details, returning to the collapsed row, for frontends that support closing detail rows.
 8. Focused Emacs tests cover collapsed, expanded, and toggled-closed states for a tool row with arguments that would be truncated or incomplete in the summary line.
-9. Focused TUI tests cover the equivalent collapsed and expanded/detail states for a tool row with arguments that would be truncated or incomplete in the summary line.
+9. Focused TUI tests cover the equivalent collapsed, expanded/detail, and toggled-closed states for a tool row with arguments that would be truncated or incomplete in the summary line.
 
 ## Design constraints
 - Use data already available to each frontend if possible; only change the RPC/event payload contract if the full call is not currently available.
