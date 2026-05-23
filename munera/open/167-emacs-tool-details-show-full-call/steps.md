@@ -9,3 +9,4 @@
 - [x] Add focused Emacs coverage proving expanded `Call` details render an explicit nil/empty argument marker when no arguments are available, while collapsed rows still omit call details and toggled-closed rows remove them.
 - [x] Add focused Emacs coverage proving invalid or unparseable raw `arguments` are displayed verbatim in expanded `Call` details instead of being dropped or reconstructed from the summary.
 - [x] Normalize parsed/raw argument completeness comparison through a canonical argument-map shape so equivalent complete raw JSON and parsed Emacs args suppress unnecessary `Raw arguments:` fallback while projected or lossy parsed args still include raw fallback.
+- [x] Add a dedicated Emacs tool-details e2e harness and bb task that exercises rpc-edn transport, tool/result rendering, `C-c C-t`/toggle expansion, and toggled-closed collapse.

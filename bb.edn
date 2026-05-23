@@ -256,6 +256,10 @@
   {:doc  "Run the focused Emacs frontend /delegate end-to-end harness against the current worktree backend."
    :task (shell "emacs -Q --batch -L components/emacs-ui -l components/emacs-ui/test/psi-delegate-e2e-test.el -f psi-delegate-e2e-run")}
 
+  emacs:tool-details:e2e
+  {:doc  "Run the focused Emacs frontend tool-details end-to-end harness against a deterministic rpc-edn backend."
+   :task (shell "emacs -Q --batch -L components/emacs-ui -l components/emacs-ui/test/psi-tool-details-e2e-test.el -f psi-tool-details-e2e-run")}
+
   emacs:check
   {:doc     "Run byte-compile guard and Emacs frontend tests."
    :depends [emacs:byte-compile emacs:test]}
