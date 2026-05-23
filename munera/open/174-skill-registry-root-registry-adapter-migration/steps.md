@@ -31,7 +31,7 @@
   - [ ] Fix the root-registry exact-lookup regression still visible in focused prompt/discovery tests: `/skill:name` request expansion and `:psi.skill/detail` must resolve from canonical root definitions by id/name without depending on projected session vectors or embedded session `:skills`.
 - [ ] Add focused bootstrap tests proving skill definitions load into root-registry before sessions exist and session creation thereafter only records `:skill-ids` membership.
 - [ ] Add dispatch tests proving prompt refresh remains gated by semantic membership `:changed?`, duplicate/no-change does not refresh prompts, and canonical session data uses `:skill-ids` rather than embedded `:skills`.
-  - [ ] Repair `:session/register-skill` pure-result sequencing after the root-registry migration: current handler computes `:return`/refresh gating before `:root-state-update`, so focused config-compaction and prompt-request tests still show stale `nil` return data and missing prompt refresh on real additions.
+  - [x] Repair `:session/register-skill` pure-result sequencing after the root-registry migration: current handler computes `:return`/refresh gating before `:root-state-update`, so focused config-compaction and prompt-request tests still show stale `nil` return data and missing prompt refresh on real additions.
 - [ ] Re-run or update representative task `173` higher-surface tests for prompt/display/TUI/command/workflow canonical ordering and child-session inheritance via `:skill-ids`.
 - [ ] Update `munera/closed/164-registry-semantics-unification-audit/` to record the new `skill-registry` classification, session-owned `:skill-ids`, removal of embedded session `:skills` storage, and direct bootstrap definition hydration.
 - [ ] Run full `bb test` before close.

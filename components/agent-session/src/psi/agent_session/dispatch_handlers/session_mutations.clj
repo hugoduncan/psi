@@ -438,14 +438,12 @@
 
   (register-core-handler!
    :session/register-skill
-   (fn [_ctx {:keys [session-id skill]}]
-     (let [state* (atom nil)]
-       {:root-state-update (fn [root-state]
-                             (let [result (skill-storage/register-skill-in-root-state root-state session-id skill)]
-                               (reset! state* result)
-                               (:root-state result)))
-        :return (select-keys @state* [:added? :changed? :count])
-        :effects (when (:changed? @state*)
+   (fn [ctx {:keys [session-id skill]}]
+     (let [{:keys [root-state added? changed? count]}
+           (skill-storage/register-skill-in-root-state @(:state* ctx) session-id skill)]
+       {:root-state-update (constantly root-state)
+        :return {:added? added? :changed? changed? :count count}
+        :effects (when changed?
                    [{:effect/type :runtime/refresh-system-prompt
                      :session-id session-id}])})))
 
