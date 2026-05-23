@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 167 inconsistency follow-up after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
 - 2026-05-23: Executed task 167 ambiguity follow-up: design now preserves existing global Emacs `C-c C-t` and TUI `ctrl+o` tools-expanded semantics; no row-local expansion is required.
 - 2026-05-23: Reviewed task 167 design/plan/steps for inconsistencies; found TUI verification gap versus close-toggle acceptance (TUI supports ctrl+o close but plan/steps only mention collapsed+expanded coverage); added design-step and implementation note.
 - 2026-05-22: Created Munera task 167 for frontend tool details: Emacs `C-c C-t` and TUI tool-detail expansion should include full tool call details alongside responses.
