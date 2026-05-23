@@ -283,6 +283,33 @@
         (should-not (string-match-p (regexp-quote long-command) closed))
         (should-not (string-match-p "command output" closed))))))
 
+
+(ert-deftest psi-emacs-test-expanded-tool-details-suppress-raw-fallback-for-canonically-equivalent-args ()
+  "Equivalent complete parsed/raw args suppress unnecessary raw fallback."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((raw-arguments "{\"command\":\"echo alpha\",\"nested\":{\"path\":\"a/b\",\"count\":2}}"))
+      (psi-emacs--handle-rpc-event
+       `((:event . "tool/result")
+         (:data . ((:tool-id . "t-equivalent")
+                   (:tool-name . "bash")
+                   (:arguments . ,raw-arguments)
+                   (:parsed-args . ((command . "echo alpha")
+                                    (nested . ((path . "a/b")
+                                               (count . 2)))))
+                   (:call-summary . "$ echo alpha")
+                   (:result-text . "alpha")))))
+      (psi-emacs-toggle-tool-output-view)
+      (let ((expanded (buffer-substring-no-properties (point-min) (point-max))))
+        (should (string-match-p "Call" expanded))
+        (should (string-match-p "Tool: bash" expanded))
+        (should (string-match-p (regexp-quote "Arguments: ((command . \"echo alpha\")") expanded))
+        (should (string-match-p "nested" expanded))
+        (should-not (string-match-p "Raw arguments:" expanded))
+        (should (string-match-p "Response" expanded))
+        (should (string-match-p "alpha" expanded))))))
+
 (ert-deftest psi-emacs-test-expanded-tool-details-include-raw-fallback-for-projected-parsed-args ()
   "Expanded details include raw fallback when parsed args omit raw invocation fields."
   (with-temp-buffer
