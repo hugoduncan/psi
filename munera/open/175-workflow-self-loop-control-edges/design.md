@@ -63,9 +63,7 @@ The implementation must preserve these rules:
 2. Self-loop control edges remain subject to existing runtime loop controls, including `:max-iterations` where present.
 3. A step may not depend on its own future yield in any canonical IR data-flow source-ref surface gathered by `step-source-refs`. For this task that uniformly includes step `:invoke` arg refs, step `:session` contributions/template vars, delegate target source-spec refs, delegate prompt-string template/map refs, delegate context contributions, and judge-owned source refs (`:llm` session contributions/template vars or `:invoke` args).
 4. References to later steps in those same data-flow positions remain invalid.
-5. Compiler errors should explain whether the problem is:
-   - invalid self/future data dependency, or
-   - another transition/IR issue.
+5. Compiler errors should continue to distinguish invalid data dependencies from other transition/IR issues, but this task does not require separate self-vs-forward data-dependency classes/messages. The existing shared `:non-prior-step-ref` semantic error/message for non-prior data refs remains acceptable so long as valid self-loop `:goto` control edges compile cleanly and non-data-flow transition/IR issues still surface through their own error cases.
 
 ## Representative target use case
 

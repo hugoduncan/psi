@@ -10,5 +10,6 @@
    - allowed self `:goto`
    - rejected self yield sourcing from representative canonical data-flow surfaces
    - rejected forward yield sourcing from representative canonical data-flow surfaces
+   - preserved semantic error separation between non-prior data refs and other transition/IR validation failures, without requiring separate self-vs-forward non-prior error classes/messages
 6. Simplify `implement-task` back to a self-looping judged `implement-pass` once compiler support exists.
 7. Verify the workflow reloads successfully.
