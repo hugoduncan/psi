@@ -69,6 +69,19 @@ Expanded tool details should prefer the most structured complete call data alrea
 
 Invalid JSON, invalid EDN, or otherwise partially parsed call data should be displayed as raw text in expanded details with enough labeling to make clear that the raw payload is what the frontend received. The expanded view must not reconstruct full call details from the collapsed summary line.
 
+### Parsed/raw completeness rule
+A frontend may render parsed/structured arguments without also rendering raw arguments only when the parsed value comes from a trusted complete argument field, not from display text. Trusted complete fields are fields whose contract is the actual tool-call argument value or payload, including live execution events that carry the tool call's `args`/`arguments` as data and rehydrated transcript rows that persisted that same call argument value. Summary/header text, shortened preview fields, ellipsized strings, display labels, and strings already marked or known as truncated are never trusted complete argument fields.
+
+When both parsed and raw argument fields are present:
+
+1. If the parsed value was produced from the raw field in the same frontend rendering path and parsing consumed the complete raw field successfully, render the parsed value only.
+2. If the parsed value and raw field are both trusted complete representations of the same argument payload, render the parsed value only.
+3. If the frontend cannot prove that the parsed value came from a trusted complete field or from a complete parse of the full raw field, render the parsed value first and include the raw field as a fallback.
+4. If parsing the raw field fails, consumes only part of the raw field, or normalizes away data that is needed to audit the invocation, render the raw field as the auditable fallback.
+5. If the only available parsed value comes from live `tool/executing` data or a rehydrated row whose argument field is stored as the canonical call argument value, trust it as complete even when no separate raw field exists.
+
+The same rule applies in Emacs and TUI so equivalent frontend inputs choose parsed-only, raw-only, or parsed-plus-raw rendering consistently.
+
 ### Expanded-detail layout
 Emacs and TUI expanded tool details should use the same conceptual layout:
 
