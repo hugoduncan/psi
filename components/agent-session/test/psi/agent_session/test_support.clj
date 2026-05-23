@@ -19,7 +19,7 @@
    [psi.agent-session.workflow-judge]
    [psi.agent-session.context :as session-context]
    [psi.session-state.model :as session-data]
-   [psi.skill-registry.registry]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-step-materialization.core]
    [psi.workflow-step-session-config.core]
@@ -183,7 +183,12 @@
                                                        :turn {:ctx nil}}}}
                        :background-jobs {:store (bg-jobs/empty-state)}
                        :ui {:extension-ui @(ui-state/create-ui-state)}}
-        state*               (atom (merge base-state (or state {})))
+        state-with-skills    (if (contains? initial-sd :skill-ids)
+                               (-> (merge base-state (or state {}))
+                                   (skill-storage/set-skills-in-root-state sid (or (:skills session-data) []))
+                                   :root-state)
+                               (merge base-state (or state {})))
+        state*               (atom state-with-skills)
         ext-reg       (ext/create-registry)
         wf-reg        (extension-workflow-runtime/create-registry)
         sc-env        (session-sc/create-sc-env)
@@ -260,7 +265,7 @@
                                                          msg)))
                        :get-session-data-fn          ss/get-session-data-in
                        :list-context-sessions-fn     ss/list-context-sessions-in
-                       :find-skill-fn                psi.skill-registry.registry/find-skill
+                       :find-skill-fn                psi.skill-registry.root-storage/find-skill-in
                        :resolve-workflow-step-session-config-fn psi.workflow-step-session-config.core/resolve-step-session-config
                        :materialize-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/materialize-step-session-conversation
                        :split-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/split-step-session-conversation

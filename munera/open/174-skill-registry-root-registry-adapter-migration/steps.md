@@ -15,6 +15,7 @@
   - [x] Migrate child-session base-state storage to persist `:skill-ids` instead of embedded `:skills` while still rebuilding prompt-visible skill vectors from root-registry definitions.
   - [ ] Finish the remaining child/scheduler lifecycle fallout: align create-child, scheduler-created top-level sessions, and workflow execution tests plus any remaining runtime seams that still assume embedded session `:skills` storage.
   - [ ] Ensure child/workflow/scheduler test setup populates root-registry skill definitions whenever tests seed session `:skill-ids` or legacy test-only `:skills`, so projected skill reads and prompt rebuilds do not silently return empty sets.
+    - [x] `agent-session` minimal test support now registers session-default seeded `:skills` into root-registry alongside canonical `:skill-ids`.
   - [ ] Finish converting create-child/workflow/scheduler assertions from embedded `:skills` vectors to canonical `:skill-ids` plus prompt/read-surface projections.
 - [ ] Migrate resolvers, prompt refresh/build paths, command surfaces, TUI projection/autocomplete, prompt request lookup, and workflow child-session selection away from raw `:skills` reads and onto `:skill-ids` + registry lookup.
   - [x] Migrate prompt refresh rebuilds, request-time `/skill:` expansion, workflow step session-skill selection, and scheduler session-config skill counts to root-registry-backed resolution.
