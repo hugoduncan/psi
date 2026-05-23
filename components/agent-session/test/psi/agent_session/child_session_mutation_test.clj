@@ -289,7 +289,8 @@
                       :include-runtime-metadata? false)
                (:prompt-component-selection child-sd)))
         (is (= ["read"] (mapv :name (:tool-defs child-sd))))
-        (is (= [] (:skills child-sd)))
+        (is (= [] (:skill-ids child-sd)))
+        (is (nil? (:skills child-sd)))
         (is (not (str/includes? (:base-system-prompt child-sd) "Context text")))
         (is (= ["read"] (mapv :name (:tools provider))))))))
 

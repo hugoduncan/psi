@@ -516,10 +516,12 @@
             "tool-count ≥ 1"))
       (is (= 1 (count (:prompt-templates sd)))
           "one template registered in session-data")
-      (is (= 1 (count (:skills sd)))
-          "one skill registered in session-data")
+      (is (= 1 (count (:skill-ids sd)))
+          "one skill id registered in session-data")
+      (is (nil? (:skills sd))
+          "embedded session :skills removed from canonical session-data")
       (is (= "greet" (:name (first (:prompt-templates sd)))))
-      (is (= "test-skill" (:name (first (:skills sd)))))
+      (is (= ["test-skill"] (:skill-ids sd)))
       (is (some #(= "test-tool" (:name %)) (:tools agent-data))))))
 
 (deftest bootstrap-dispatch-event-log-test
@@ -538,13 +540,12 @@
             event-types (set (map :event-type entries))]
         (is (contains? event-types :session/register-prompt-template)
             "template registration event in log")
-        (is (contains? event-types :session/register-skill)
-            "skill registration event in log")
+        (is (not (contains? event-types :session/register-skill))
+            "startup skill hydration no longer routes through session/register-skill")
         (is (contains? event-types :session/add-tool)
             "tool addition event in log")
         (testing "all resource registration events have expected origin"
           (let [resource-events (filter #(#{:session/register-prompt-template
-                                            :session/register-skill
                                             :session/add-tool} (:event-type %))
                                         entries)]
             (is (pos? (count resource-events)))

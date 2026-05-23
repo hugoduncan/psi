@@ -9,7 +9,7 @@
   (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/parent"})
                           :model {:provider "p" :id "m"}
                           :thinking-level :high
-                          :skills [{:name "s"}]
+                          :skill-ids ["s"]
                           :tool-defs [{:name "bash"}])
         state0     {}
         state1     (init/initialize-new-session-state
@@ -28,7 +28,8 @@
     (testing "selected inherited lower-level session fields are carried"
       (is (= {:provider "p" :id "m"} (:model sd1)))
       (is (= :high (:thinking-level sd1)))
-      (is (= [{:name "s"}] (:skills sd1)))
+      (is (= ["s"] (:skill-ids sd1)))
+      (is (nil? (:skills sd1)))
       (is (= [{:name "bash"}] (:tool-defs sd1))))
     (testing "journal, telemetry, and flush slots are initialized"
       (let [persistence (get-in state1 [:agent-session :sessions "child-1" :persistence])]
@@ -50,7 +51,7 @@
 
 (deftest initialize-resumed-session-state-test
   (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/source"})
-                          :skills [{:name "keep"}])
+                          :skill-ids ["keep"])
         entries    [{:kind :session-info :data {:name "resumed name"}}
                     {:kind :message :data {:message {:role "user" :content "hi"}}}]
         state1     (init/initialize-resumed-session-state
