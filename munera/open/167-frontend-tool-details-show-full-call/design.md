@@ -54,3 +54,32 @@ Likely areas to inspect:
 - The RPC/event shape that creates or updates tool rows, to verify whether full call details already reach each frontend.
 
 Suggested focused verification should include the relevant Emacs tool-row test file(s), the relevant TUI tool/transcript test file(s), plus any adjacent transcript tests touched by the change.
+
+
+## Expanded full-call detail contract
+
+### Authoritative call data source
+Expanded tool details should prefer the most structured complete call data already available to the frontend, but must never drop raw call content when parsing is invalid, partial, or lossy. The precedence is:
+
+1. Render the tool name from the canonical tool identity field used by the frontend tool row.
+2. Render parsed/structured arguments when they are present and represent the complete call arguments.
+3. If parsed arguments are absent, incomplete, invalid, or known to have been derived from a truncated summary, render the raw argument string/payload instead.
+4. If both structured arguments and raw arguments are available and parsing is known or suspected to be partial, render the structured form first and include the raw form as a fallback so the expanded view remains auditable.
+5. If no arguments are available, render an explicit empty argument marker rather than omitting the call section.
+
+Invalid JSON, invalid EDN, or otherwise partially parsed call data should be displayed as raw text in expanded details with enough labeling to make clear that the raw payload is what the frontend received. The expanded view must not reconstruct full call details from the collapsed summary line.
+
+### Expanded-detail layout
+Emacs and TUI expanded tool details should use the same conceptual layout:
+
+1. Keep the existing collapsed/header summary as the row header.
+2. Add a `Call` section before the existing response/output details.
+3. Render the `Call` section with the tool name and arguments. Empty or nil arguments should appear explicitly, for example as `Arguments: nil` or `Arguments: {}` depending on the underlying value.
+4. Keep the existing response/output rendering under a `Response` or equivalent existing output section after `Call`.
+5. Preserve multiline strings, nested maps/vectors, shell commands, and long argument values in expanded details without applying summary-line truncation.
+6. Use deterministic pretty-printing/serialization so equivalent frontend inputs produce stable output for tests.
+
+The `Call` section is part of the first-level details revealed by the existing tool-detail toggle. It must not require a second nested toggle to inspect the executed call.
+
+### Tool-specific and extension renderers
+Tool-specific or extension-provided renderers may improve the collapsed/header summary or add specialized expanded presentation, but they must not be the only source of audit data for the executed call. Expanded details must always include a generic full-call representation based on structured/raw frontend data. A specialized renderer may appear alongside that generic representation, but it may not replace the generic `Call` section unless it demonstrably includes the complete tool name and complete arguments with the same raw fallback behavior.
