@@ -8,7 +8,8 @@
    [psi.agent-session.extension-runtime :as ext-rt]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as extension-runtime-fns]
-   [psi.session-state.state :as ss]))
+   [psi.session-state.state :as ss]
+   [psi.skill-registry.root-storage :as skill-storage]))
 
 (defn load-startup-resources-in!
   "Load startup prompt templates, skills, tools, and extensions via direct
@@ -28,10 +29,9 @@
     (session/dispatch-in! ctx :session/register-prompt-template
                           {:session-id session-id :template t}
                           {:origin :core}))
-  (doseq [s skills]
-    (session/dispatch-in! ctx :session/register-skill
-                          {:session-id session-id :skill s}
-                          {:origin :core}))
+  (ss/apply-root-state-update-in! ctx
+                                  (fn [root-state]
+                                    (:root-state (skill-storage/set-skills-in-root-state root-state session-id skills))))
   (doseq [tool tools]
     (session/dispatch-in! ctx :session/add-tool
                           {:session-id session-id :tool tool}
@@ -55,7 +55,7 @@
                            (filter #(= :init-var (:kind %)) extension-targets))
         ext-results  (vec (concat path-results init-results))]
     {:prompt-count      (count (:prompt-templates (ss/get-session-data-in ctx session-id)))
-     :skill-count       (count (:skills (ss/get-session-data-in ctx session-id)))
+     :skill-count       (count (:skill-ids (ss/get-session-data-in ctx session-id)))
      :tool-count        (count (:tools (agent/get-data-in (ss/agent-ctx-in ctx session-id))))
      :extension-results ext-results}))
 

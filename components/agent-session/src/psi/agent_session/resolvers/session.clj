@@ -12,7 +12,7 @@
    [psi.agent-session.statechart :as sc]
    [psi.ai.model-registry :as model-registry]
    [psi.history.git :as git]
-   [psi.skill-registry.registry :as skill-registry]))
+   [psi.skill-registry.root-storage :as skill-storage]))
 
 ;; ── Core session fields ─────────────────────────────────
 
@@ -228,7 +228,7 @@
    ::pco/output [:psi.agent-session/skills
                  :psi.agent-session/prompt-templates]}
   (let [sd (support/session-data agent-session-ctx session-id)]
-    {:psi.agent-session/skills           (skill-registry/all-skills (:skills sd))
+    {:psi.agent-session/skills           (skill-storage/all-skills @(:state* agent-session-ctx) sd)
      :psi.agent-session/prompt-templates (:prompt-templates sd)}))
 
 (pco/defresolver agent-session-message-history

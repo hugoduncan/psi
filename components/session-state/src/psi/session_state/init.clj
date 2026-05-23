@@ -87,7 +87,7 @@
                                                  :auto-retry-enabled
                                                  :auto-compaction-enabled
                                                  :scoped-models
-                                                 :skills
+                                                 :skill-ids
                                                  :prompt-templates
                                                  :prompt-contributions
                                                  :tool-defs
@@ -142,7 +142,7 @@
                                                      :auto-retry-enabled
                                                      :auto-compaction-enabled
                                                      :scoped-models
-                                                     :skills
+                                                     :skill-ids
                                                      :prompt-templates
                                                      :prompt-contributions
                                                      :tool-defs
@@ -187,7 +187,7 @@
                                                            :auto-retry-enabled
                                                            :auto-compaction-enabled
                                                            :scoped-models
-                                                           :skills
+                                                           :skill-ids
                                                            :prompt-templates
                                                            :prompt-contributions
                                                            :tool-defs

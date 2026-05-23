@@ -14,7 +14,7 @@
    [psi.agent-session.post-tool :as post-tool]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as session]
-   [psi.skill-registry.registry :as skill-registry]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
 
@@ -211,7 +211,8 @@
   (register-core-handler!
    :session/set-skills
    (fn [_ctx {:keys [session-id skills]}]
-     {:root-state-update (session/session-update session-id #(assoc % :skills (vec (or skills []))))
+     {:root-state-update (fn [root-state]
+                           (:root-state (skill-storage/set-skills-in-root-state root-state session-id skills)))
       :effects [{:effect/type :runtime/refresh-system-prompt
                  :session-id session-id}]
       :return {:skills (vec (or skills []))}}))
@@ -437,18 +438,16 @@
 
   (register-core-handler!
    :session/register-skill
-   (fn [ctx {:keys [session-id skill]}]
-     (let [skills        (:skills (session/get-session-data-in ctx session-id))
-           result        (skill-registry/register-skill skills skill)
-           changed?      (:changed? result)
-           canonicalized? (not= (:skills result) (vec (or skills [])))]
-       (cond-> {:return (select-keys result [:added? :changed? :count])}
-         canonicalized?
-         (assoc :root-state-update (session/session-update session-id #(assoc % :skills (:skills result))))
-
-         changed?
-         (assoc :effects [{:effect/type :runtime/refresh-system-prompt
-                           :session-id session-id}])))))
+   (fn [_ctx {:keys [session-id skill]}]
+     (let [state* (atom nil)]
+       {:root-state-update (fn [root-state]
+                             (let [result (skill-storage/register-skill-in-root-state root-state session-id skill)]
+                               (reset! state* result)
+                               (:root-state result)))
+        :return (select-keys @state* [:added? :changed? :count])
+        :effects (when (:changed? @state*)
+                   [{:effect/type :runtime/refresh-system-prompt
+                     :session-id session-id}])})))
 
   (register-core-handler!
    :session/request-interrupt

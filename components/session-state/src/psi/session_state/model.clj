@@ -183,7 +183,7 @@
    [:auto-retry-enabled :boolean]
    [:auto-compaction-enabled :boolean]
    [:scoped-models [:vector scoped-model-schema]]
-   [:skills [:vector skill-schema]]
+   [:skill-ids [:vector :string]]
    [:prompt-templates [:vector prompt-template-schema]]
    [:prompt-contributions {:optional true} [:vector prompt-contribution-schema]]
    [:tool-defs {:optional true} [:vector :map]]
@@ -273,7 +273,7 @@
      :auto-retry-enabled      (:auto-retry-enabled default-config)
      :auto-compaction-enabled false
      :scoped-models           []
-     :skills                  []
+     :skill-ids               []
      :prompt-templates        []
      :prompt-contributions    []
      :tool-defs               []

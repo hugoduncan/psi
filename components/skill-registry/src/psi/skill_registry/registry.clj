@@ -9,7 +9,7 @@
   (and (string? skill-name)
        (not (str/blank? skill-name))))
 
-(defn- ensure-valid-skill!
+(defn ensure-valid-skill!
   [skill]
   (let [skill-name (:name skill)]
     (when-not (valid-skill-name? skill-name)

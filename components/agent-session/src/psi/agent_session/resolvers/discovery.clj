@@ -6,7 +6,8 @@
    [psi.prompt-assets.skills :as skills]
    [psi.session-journal.store :as journal-store]
    [psi.agent-session.resolvers.support :as support]
-   [psi.skill-registry.registry :as skill-registry]))
+   [psi.skill-registry.registry :as skill-registry]
+   [psi.skill-registry.root-storage :as skill-storage]))
 
 ;; ── Prompt template introspection ────────────────────────
 
@@ -47,8 +48,9 @@
                  :psi.skill/visible-count
                  :psi.skill/hidden-count
                  :psi.skill/by-source]}
-  (let [all-skills (:skills (support/session-data agent-session-ctx session-id))
-        summary    (skills/skill-summary all-skills)]
+  (let [session-data (support/session-data agent-session-ctx session-id)
+        all-skills   (skill-storage/all-skills @(:state* agent-session-ctx) session-data)
+        summary      (skills/skill-summary all-skills)]
     {:psi.skill/summary       summary
      :psi.skill/names         (skill-registry/skill-names all-skills)
      :psi.skill/count         (:skill-count summary)
@@ -62,8 +64,9 @@
   [{:keys [psi/agent-session-ctx psi.agent-session/session-id psi.skill/name]}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id :psi.skill/name]
    ::pco/output [:psi.skill/detail]}
-  (let [all-skills (:skills (support/session-data agent-session-ctx session-id))
-        skill      (skill-registry/find-skill all-skills name)]
+  (let [session-data (support/session-data agent-session-ctx session-id)
+        all-skills   (skill-storage/all-skills @(:state* agent-session-ctx) session-data)
+        skill        (skill-registry/find-skill all-skills name)]
     {:psi.skill/detail
      (when skill (skills/enrich-skill skill))}))
 
