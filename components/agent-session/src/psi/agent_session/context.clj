@@ -149,9 +149,9 @@
                           (some? workflow-attempt-id) (assoc :workflow-attempt-id workflow-attempt-id)
                           (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?))
                         {:origin :mutations})
-    (let [sd (ss/get-session-data-in ctx child-session-id)
+    (let [child-sd (ss/get-session-data-in ctx child-session-id)
           messages (vec (or preloaded-messages []))
-          fresh (session-runtime/create-runtime! ctx child-session-id {:session-data sd :messages messages :agent-initial (:agent-initial ctx)})
+          fresh (session-runtime/create-runtime! ctx child-session-id {:session-data child-sd :messages messages :agent-initial (:agent-initial ctx)})
           result {:psi.agent-session/session-id child-session-id}]
       (swap! (:state* ctx)
              (fn [state]

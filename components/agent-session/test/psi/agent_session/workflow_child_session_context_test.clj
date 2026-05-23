@@ -49,6 +49,8 @@
           agent-msgs (:messages (agent-core/get-data-in (ss/agent-ctx-in ctx child-session-id)))]
       (is (= {:psi.agent-session/session-id child-session-id} result))
       (is (= parent-session-id (:parent-session-id child-sd)))
+      (is (= [] (:skill-ids child-sd)))
+      (is (nil? (:skills child-sd)))
       (is (= "run-1" (:workflow-run-id child-sd)))
       (is (= "plan" (:workflow-step-id child-sd)))
       (is (= "attempt-1" (:workflow-attempt-id child-sd)))
@@ -80,6 +82,8 @@
           agent-msgs (:messages (agent-core/get-data-in (ss/agent-ctx-in ctx child-session-id)))]
       (is (= {:psi.agent-session/session-id child-session-id} result))
       (is (= parent-session-id (:parent-session-id child-sd)))
+      (is (= [] (:skill-ids child-sd)))
+      (is (nil? (:skills child-sd)))
       (is (= "workflow judge" (:session-name child-sd)))
       (is (= "judge system" (:system-prompt child-sd)))
       (is (true? (:workflow-owned? child-sd)))

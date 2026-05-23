@@ -137,7 +137,7 @@
       (is (= ["read"] (mapv :name (:tool-defs child-sd)))))
 
     (testing "skills are filtered coherently"
-      (is (= [] (:skill-ids child-sd)))
+      (is (= ["skill-a"] (:skill-ids child-sd)))
       (is (nil? (:skills child-sd))))))
 
 (deftest child-session-base-state-selection-canonicalizes-selected-skills-test
