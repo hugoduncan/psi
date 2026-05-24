@@ -129,6 +129,46 @@
                (is (= :runtime/dispatch-event-with-effect-result (-> result :effects first :effect/type)))
                (is (= :session/submit-synthetic-user-prompt (-> result :effects first :event-type))))))))))
 
+(deftest scheduler-deliver-and-drain-use-time-source-when-delivered-at-omitted-test
+  (let [delivered-at (instant "2026-04-21T18:12:34Z")
+        [ctx0 session-id] (test-support/make-session-ctx {})
+        ctx (assoc ctx0 :scheduler-time-source (test-support/fixed-scheduler-time-source delivered-at))]
+    (with-registered-handlers
+      ctx
+      #(do
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-deliver-from-source"
+                                                 :kind :message
+                                                 :message "wake up"
+                                                 :created-at (instant "2026-04-21T18:10:00Z")
+                                                 :fire-at (instant "2026-04-21T18:11:00Z")
+                                                 :delay-ms 1000}))
+         (testing "deliver stamps scheduled user message from scheduler time source"
+           (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id
+                                                                :schedule-id "sch-deliver-from-source"})]
+             (apply-root-state-update! ctx result)
+             (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))))
+
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-drain-from-source"
+                                                 :kind :message
+                                                 :message "resume"
+                                                 :created-at (instant "2026-04-21T18:13:00Z")
+                                                 :fire-at (instant "2026-04-21T18:14:00Z")
+                                                 :delay-ms 1000}))
+         (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id
+                                                                             :schedule-id "sch-drain-from-source"}))
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+         (testing "drain stamps scheduled user message from scheduler time source"
+           (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id})]
+             (apply-root-state-update! ctx result)
+             (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))))))))
+
 (deftest scheduler-deliver-and-drain-require-time-source-when-delivered-at-omitted-test
   (let [[ctx session-id] (test-support/make-session-ctx {})]
     (with-registered-handlers
