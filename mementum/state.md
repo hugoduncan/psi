@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 168 ambiguity follow-ups repeat: aligned workflow grammar docs for session/judge structured `:outputs` and specified prompted JSON fallback with schema-guided Malli coercion; design-steps all checked.
 - 2026-05-23: Created Munera task 168 design for workflow structured output schemas: optional step/judge schemas, raw+validated result storage, explicit downstream structured references, provider strategy visibility, and fail-fast validation semantics. Commit 3106da5f.
 - 2026-05-23: Wired `bb emacs:tool-details:e2e` into CI/release Emacs jobs as an explicit step; local e2e green.
 - 2026-05-23: Added dedicated task 167 Emacs tool-details e2e harness (`bb emacs:tool-details:e2e`) using a deterministic rpc-edn fake backend; e2e and focused Emacs tests green.
@@ -69,6 +70,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
+- 2026-05-23: Executed task 168 ambiguity follow-ups repeat: grammar docs now allow session and LLM-judge structured outputs; design clarifies JSON wire format, schema-guided enum/key coercion, and invalid parse/coercion recording.
 - 2026-05-23: Reviewed task 168 design for ambiguities; added design follow-ups for absent plan/steps, unresolved concrete structured-output IR/authored syntax, and unspecified first standard schema/example.
 - 2026-05-23: Executed task 167 code-shaper follow-up and committed 2660283c: canonical argument-map comparison now prevents unnecessary Emacs raw fallback when complete parsed/raw args are equivalent despite key-shape differences.
 - 2026-05-23: Re-reviewed task 167 design/plan/steps for ambiguities; found no new actionable ambiguity feedback; appended implementation note and committed 9e7d4153.

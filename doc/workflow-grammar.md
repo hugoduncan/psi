@@ -36,6 +36,7 @@ session-step ::= {:name step-name
                   :type :session
                   session-config-entry*
                   :contributions [contribution+]
+                  outputs?
                   yields?
                   control-flow*}
 
@@ -56,7 +57,8 @@ judge-spec ::= llm-judge | invoke-judge
 
 llm-judge ::= {:type :llm
                judge-session-config-entry*
-               :contributions [contribution+]}
+               :contributions [contribution+]
+               outputs?}
 
 invoke-judge ::= {:type :invoke
                   :operation operation-id
@@ -102,7 +104,34 @@ source-ref ::= :workflow-input
              | {:step step-name :output output-key}
              | {:step step-name :yield yield-field}
 
-outputs ::= {:handoff {:source :delegate/handoff}}
+outputs ::= {output-key output-spec}+
+
+output-spec ::= delegate-handoff-output
+              | session-text-output
+              | session-structured-output
+              | judge-structured-output
+
+delegate-handoff-output ::= {:source :delegate/handoff}
+
+session-text-output ::= {:source :session/final-llm-reply}
+
+session-structured-output ::= {:source :session/structured-output
+                               :mode :structured
+                               schema-contract
+                               invalid-policy?}
+
+judge-structured-output ::= {:source :judge/structured-output
+                             :mode :structured
+                             schema-contract
+                             invalid-policy?}
+
+schema-contract ::= :schema-id keyword
+                  :schema-version pos-int
+                  :schema malli-schema
+
+invalid-policy ::= :on-invalid {:action :fail-fast}
+                 | :on-invalid {:action :retry
+                                :max-attempts pos-int}
 
 output-key ::= keyword
 
@@ -144,6 +173,7 @@ outcome ::= string | keyword
 path ::= vector
 projection ::= map
 literal ::= string | keyword | number | boolean | nil | vector | map
+malli-schema ::= vector | map | keyword
 pos-int ::= integer
 map ::= clojure-map
 vector ::= clojure-vector
@@ -153,3 +183,30 @@ number ::= clojure-number
 boolean ::= true | false
 nil ::= nil
 ```
+
+## Structured outputs
+
+Session steps may declare machine-facing structured outputs under the existing
+step-local `:outputs` map. LLM judges may declare judge-local structured
+outputs under their own `:outputs` map. Delegate `:outputs` remain supported
+for handoff data; `outputs` is no longer delegate-only.
+
+Structured outputs use `:source :session/structured-output` for ordinary
+session step output and `:source :judge/structured-output` for LLM judge
+output. Both forms require `:mode :structured` plus a Malli-compatible schema
+contract (`:schema-id`, `:schema-version`, and `:schema`).
+
+Downstream references use the normal source-spec shape:
+
+```clojure
+{:from {:step "review-design" :output :review}
+ :path [:decision]}
+```
+
+The path is resolved against the validated structured `:value`, never by
+parsing prose. If the source output is missing, non-structured, invalid, or the
+path is absent, resolution fails clearly.
+
+Prompted fallback asks models for JSON and then schema-guided coercion maps JSON
+object keys and enum strings into the declared Malli-domain values before
+validation. Raw text is retained even when coercion and validation succeed.

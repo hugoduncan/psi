@@ -15,3 +15,7 @@ Found one actionable inconsistency: the task design/plan choose step-local `:out
 ## 2026-05-23 — ambiguity review repeat
 
 Found one new actionable ambiguity: the design requires prompted JSON fallback plus Malli schemas using keyword enums, but does not specify the wire format/coercion boundary (JSON strings vs EDN keywords, parse format preference, coercion before validation, and failure recording when coercion cannot map values).
+
+## 2026-05-23 — ambiguity follow-up repeat
+
+Completed newly added ambiguity follow-ups only: aligned `doc/workflow-grammar.md` so session steps and LLM judges can declare structured `outputs?` beyond delegate handoffs, and specified prompted fallback as JSON wire format with schema-guided coercion into Malli-domain values before validation. Marked both design-steps done. Did not execute `steps.md` implementation items.

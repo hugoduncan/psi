@@ -215,6 +215,31 @@ At minimum the runtime should distinguish:
 
 Provider-native support is preferred when available. Fallback strategies must be visible in recorded workflow state so debugging can distinguish provider guarantees from prompt-only adherence.
 
+
+## Prompted fallback wire format and coercion
+
+Prompted fallback uses **JSON as the model-facing wire format** for the first implementation. EDN may appear in authored workflow definitions because workflow files are EDN/Clojure data, and Malli schemas may use keywords, but the model prompt should request a single JSON object for the structured value.
+
+The runtime boundary is:
+
+1. capture raw model/judge text unchanged as `:raw-output`;
+2. extract/parse one JSON object from the response for structured outputs using `:strategy :prompted-json`;
+3. coerce the parsed JSON value into the Malli-domain value before validation;
+4. validate the coerced value against the declared Malli schema;
+5. expose only a valid coerced `:value` to downstream references.
+
+Coercion rules for this slice:
+
+- JSON object string keys map to Clojure keyword keys when the target schema expects map keys.
+- JSON strings map to Malli keyword enum values when the declared enum contains the corresponding keyword. For example, `"needs-work"` may coerce to `:needs-work` for `[:enum :clear :needs-work :unclear]`.
+- JSON numbers, booleans, arrays, objects, and null map to ordinary Clojure numbers, booleans, vectors, maps, and nil before schema validation.
+- Coercion is schema-guided; strings are not globally keywordized when the schema expects `:string`.
+- Unknown enum strings, uncoercible values, missing required fields, wrong container shapes, and malformed JSON all produce an invalid structured-output result.
+
+When parsing or coercion fails, the recorded structured-output envelope must include `:status :invalid`, `:strategy :prompted-json`, and `:errors` describing the parse/coercion/validation failure. If a JSON value was parsed but could not be coerced or validated, record it as `:parsed-value` for debugging and omit `:value`. Downstream control flow must not consume `:parsed-value`.
+
+Provider-native structured output may return already-typed data or provider JSON depending on the API. The runtime must still normalize through the same canonical envelope and Malli validation boundary before exposing `:value`.
+
 ## Validation failure policy
 
 The first implementation must not silently continue with invalid structured data.
