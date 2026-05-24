@@ -19,3 +19,7 @@ Found one new actionable ambiguity: the design requires prompted JSON fallback p
 ## 2026-05-23 — ambiguity follow-up repeat
 
 Completed newly added ambiguity follow-ups only: aligned `doc/workflow-grammar.md` so session steps and LLM judges can declare structured `outputs?` beyond delegate handoffs, and specified prompted fallback as JSON wire format with schema-guided coercion into Malli-domain values before validation. Marked both design-steps done. Did not execute `steps.md` implementation items.
+
+## 2026-05-23 — inconsistency review repeat
+
+Found one new actionable inconsistency: `design.md`, `plan.md`, and `doc/workflow-grammar.md` now define session-step and LLM-judge structured outputs under `:outputs`, but the referenced user guide `doc/workflows.md` still describes `:output :handoff` as the only standardized structured export key and says the guide intentionally avoids a broader author-facing output menu. That guide wording conflicts with the chosen task contract and would mislead authors away from the new session/judge structured-output surface.
