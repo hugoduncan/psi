@@ -115,3 +115,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed inconsistency follow-ups repeat 6
 
 No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat 7
+
+Found one new actionable ambiguity: the artifacts require capability selection to be auth-path/transport-aware and give `openai/gpt-5.5` under ChatGPT OAuth/Codex as fallback-only, but the current runtime model override changes only `:api`/`:base-url` for OAuth-backed `gpt-5.5`. If built-in platform `gpt-5.5` later declares OpenAI Chat Completions native capability, it is ambiguous whether the OAuth override also clears/replaces that capability or whether strategy selection derives effective capability from the post-auth runtime API. The design should specify the authoritative capability source after runtime auth/transport resolution so Codex OAuth cannot inherit platform-native structured-output support accidentally.
