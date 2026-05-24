@@ -2,6 +2,25 @@
   "Anthropic provider-native structured-output helpers."
   (:require [psi.ai.structured-output :as structured-output]))
 
+(def json-schema-output-beta "structured-outputs-2025-11-13")
+
+(defn json-schema-output-mechanism?
+  [strategy]
+  (and (= :provider-native (:strategy strategy))
+       (= :anthropic/json-schema-output (:native-mechanism strategy))))
+
+(defn forced-tool-mechanism?
+  [strategy]
+  (and (= :provider-native (:strategy strategy))
+       (= :anthropic/forced-tool-use (:native-mechanism strategy))))
+
+(defn output-format
+  [request]
+  {:type "json_schema"
+   :name (structured-output/structured-output-name request)
+   :schema (:json-schema request)
+   :strict (:strict? request)})
+
 (defn structured-tool-name
   [request tools]
   (let [base     (str "psi_structured_output__"
@@ -21,7 +40,7 @@
 
 (defn structured-tool-name-from-request
   [strategy request-body]
-  (when (= :provider-native (:strategy strategy))
+  (when (forced-tool-mechanism? strategy)
     (get-in request-body [:tool_choice :name])))
 
 (defn structured-tool-block?
@@ -29,18 +48,29 @@
   (and (= "tool_use" (:type block-info))
        (= structured-tool-name (:name block-info))))
 
+(defn structured-output-result
+  [strategy source raw-payload]
+  (let [payload (structured-output/parse-json-object raw-payload)]
+    (cond-> (assoc strategy
+                   :source source
+                   :raw-payload raw-payload)
+      payload (assoc :payload payload)
+      (not payload) (assoc :parse-error? true))))
+
 (defn emit-structured-result!
   [consume-fn strategy source raw-payload]
-  (let [payload (structured-output/parse-json-object raw-payload)]
-    (consume-fn {:type :structured-output-result
-                 :structured-output (cond-> (assoc strategy
-                                                   :source source
-                                                   :raw-payload raw-payload)
-                                      payload (assoc :payload payload))})))
+  (consume-fn {:type :structured-output-result
+               :structured-output (structured-output-result strategy source raw-payload)}))
 
 (defn maybe-emit-structured-result!
   [consume-fn strategy raw-payload]
   (emit-structured-result! consume-fn strategy :anthropic/tool-use raw-payload))
+
+(defn maybe-emit-json-schema-output-result!
+  [consume-fn emitted? strategy raw-text]
+  (when (and (json-schema-output-mechanism? strategy)
+             (compare-and-set! emitted? false true))
+    (emit-structured-result! consume-fn strategy :anthropic/json-schema-output raw-text)))
 
 (defn maybe-emit-prompted-json-result!
   [consume-fn emitted? strategy raw-text]

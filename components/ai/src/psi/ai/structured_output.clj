@@ -20,6 +20,11 @@
    :strategies [:provider-native :prompted-json]
    :native-mechanism :anthropic/forced-tool-use})
 
+(def anthropic-json-schema-output-native-capability
+  {:supported? true
+   :strategies [:provider-native :prompted-json]
+   :native-mechanism :anthropic/json-schema-output})
+
 (def openai-codex-fallback-capability
   {:supported? true
    :strategies [:prompted-json]

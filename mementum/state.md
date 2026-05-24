@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Implemented task 171 Anthropic JSON Schema native structured output: capability enum/helper, Claude 4.5+ catalog assignment, request `output_format` + beta/header, strict semantics, forced-tool separation, Anthropic non-streaming execute, streaming/non-streaming extraction, docs/task-170 wording, guarded live skip path, and focused verification green.
+
 - 2026-05-24: Executed task 171 inconsistency follow-up repeat 4 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the pass.
 
 - 2026-05-24: Reviewed task 171 design/plan/steps for inconsistencies repeat 4; found no new actionable inconsistency feedback after rechecking task artifacts, prior notes, current Anthropic/model/schema structured-output code, AI/custom-provider docs, and task 170 wording. Commit be164b91.

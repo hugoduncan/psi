@@ -35,10 +35,49 @@
    :strict? true
    :fallback-allowed? true})
 
+(deftest anthropic-json-schema-output-request-shaping-test
+  ;; Tests Anthropic JSON Schema output request shape is selected for supported
+  ;; Claude catalog entries without synthetic forced-tool fields.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys")
+                  (conv/add-tool {:name "ordinary_tool"
+                                  :description "existing"
+                                  :parameters {:type "object"}})
+                  (conv/add-user-message "Review this"))
+        req   (#'anthropic/build-request convo model {:api-key "test-key"
+                                                      :structured-output (dissoc judge-structured-output-request
+                                                                                 :strict?)})
+        body  (json/parse-string (:body req) true)
+        beta  (get-in req [:headers "anthropic-beta"])]
+    (is (= {:type "json_schema"
+            :name "judge_review_result"
+            :schema judge-json-schema
+            :strict true}
+           (:output_format body)))
+    (is (re-find #"structured-outputs-2025-11-13" beta))
+    (is (= "ordinary_tool" (get-in body [:tools 0 :name])))
+    (is (nil? (:tool_choice body)))
+    (is (= :provider-native
+           (:strategy (structured-output/select-strategy model judge-structured-output-request))))
+    (is (= :anthropic/json-schema-output
+           (:native-mechanism (structured-output/select-strategy model judge-structured-output-request))))))
+
+(deftest anthropic-json-schema-output-request-honors-explicit-non-strict-test
+  ;; Tests explicit :strict? false is sent as :strict false for Anthropic JSON
+  ;; Schema output instead of being coerced back to true.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys")
+                  (conv/add-user-message "Review this"))
+        req   (#'anthropic/build-request convo model {:api-key "test-key"
+                                                      :structured-output (assoc judge-structured-output-request
+                                                                                :strict? false)})
+        body  (json/parse-string (:body req) true)]
+    (is (false? (get-in body [:output_format :strict])))))
+
 (deftest anthropic-structured-output-forced-tool-request-shaping-test
   ;; Tests Anthropic provider-native structured output as a synthetic forced tool
   ;; composed alongside ordinary user tools.
-  (let [model (models/get-model :sonnet-4.6)
+  (let [model (models/get-model :sonnet-4)
         convo (-> (conv/create "sys")
                   (conv/add-tool {:name "psi_structured_output__judge_review_result"
                                   :description "existing"
@@ -60,7 +99,7 @@
 (deftest anthropic-structured-output-missing-json-schema-test
   ;; Tests schema-only structured-output requests report unsupported and do not
   ;; add a synthetic forced tool.
-  (let [model   (models/get-model :sonnet-4.6)
+  (let [model   (models/get-model :sonnet-4)
         request (dissoc judge-structured-output-request :json-schema)
         convo   (-> (conv/create "sys")
                     (conv/add-user-message "Review this"))
@@ -102,8 +141,8 @@
     (is (nil? (:tool_choice body)))))
 
 (deftest anthropic-streaming-structured-output-events-test
-  ;; Tests streaming strategy and result metadata are emitted as first-class AI events.
-  (let [model  (models/get-model :sonnet-4.6)
+  ;; Tests forced-tool streaming strategy and result metadata are emitted as first-class AI events.
+  (let [model  (models/get-model :sonnet-4)
         convo  (-> (conv/create "sys")
                    (conv/add-user-message "Review this"))
         events (atom [])
@@ -190,4 +229,66 @@
                     (= :prompted-json/text (get-in % [:structured-output :source]))
                     (= {:ok true} (get-in % [:structured-output :payload]))
                     (= "{\"ok\":true}" (get-in % [:structured-output :raw-payload])))
+              @events))))
+
+(deftest anthropic-json-schema-output-non-streaming-execute-test
+  ;; Tests Anthropic non-streaming execute returns the top-level structured-output
+  ;; surface for JSON Schema native responses.
+  (let [model  (models/get-model :sonnet-4.6)
+        convo  (-> (conv/create "sys")
+                   (conv/add-user-message "Review this"))
+        body   {:content [{:type "text" :text "{\"ok\":true}"}]
+                :stop_reason "end_turn"
+                :usage {:input_tokens 1 :output_tokens 1}}
+        result (with-redefs [http/post (fn [_url _req]
+                                         {:status 200
+                                          :body (json/generate-string body)})]
+                 ((:execute anthropic/provider)
+                  convo model {:api-key "test-key"
+                               :structured-output judge-structured-output-request}))]
+    (is (= {:ok true} (get-in result [:structured-output :payload])))
+    (is (= :anthropic/json-schema-output
+           (get-in result [:structured-output :source])))
+    (is (= :anthropic/json-schema-output
+           (get-in result [:structured-output :native-mechanism])))
+    (is (= "{\"ok\":true}" (get-in result [:structured-output :raw-payload])))))
+
+(deftest anthropic-streaming-json-schema-output-events-test
+  ;; Tests JSON Schema native streaming preserves text events and emits a parsed
+  ;; structured-output result sourced from ordinary assistant text.
+  (let [model  (models/get-model :sonnet-4.6)
+        convo  (-> (conv/create "sys")
+                   (conv/add-user-message "Review this"))
+        events (atom [])
+        sse    (str (sse-line "message_start"
+                              {:type "message_start"
+                               :message {:usage {:input_tokens 1}}})
+                    (sse-line "content_block_start"
+                              {:type "content_block_start"
+                               :index 0
+                               :content_block {:type "text"}})
+                    (sse-line "content_block_delta"
+                              {:type "content_block_delta"
+                               :index 0
+                               :delta {:text "{\"ok\":true}"}})
+                    (sse-line "content_block_stop"
+                              {:type "content_block_stop"
+                               :index 0})
+                    (sse-line "message_delta"
+                              {:type "message_delta"
+                               :delta {:stop_reason "end_turn"}
+                               :usage {:output_tokens 1}}))]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse)})]
+      ((:stream anthropic/provider)
+       convo model {:api-key "test-key"
+                    :structured-output judge-structured-output-request}
+       (fn [ev] (swap! events conj ev))))
+    (is (some #(and (= :text-delta (:type %))
+                    (= "{\"ok\":true}" (:delta %)))
+              @events))
+    (is (some #(and (= :structured-output-result (:type %))
+                    (= {:ok true} (get-in % [:structured-output :payload]))
+                    (= :anthropic/json-schema-output
+                       (get-in % [:structured-output :source])))
               @events))))

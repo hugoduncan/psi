@@ -26,7 +26,7 @@ This task depends on task 169 or equivalent capability work being complete enoug
 
 - model/provider descriptions with structured-output capability data;
 - a request-level structured-output option for LLM generation;
-- provider-native request construction for capable OpenAI and Anthropic paths;
+- provider-native request construction for capable paths: OpenAI native JSON Schema from task 169, Anthropic forced-tool native support from task 169, and Anthropic JSON Schema native output from task 171 or equivalent;
 - observable strategy metadata for the actual generation path used.
 
 If task 169 is incomplete, this task should stop at design/plan refinement rather than reimplementing provider adapters locally.
@@ -47,7 +47,7 @@ In scope:
 
 ## Explicitly out of scope
 
-- Implementing provider-native OpenAI or Anthropic adapter support. That belongs to task 169.
+- Implementing provider-native OpenAI or Anthropic adapter support. That belongs to task 169/task 171 provider-adapter capability work.
 - Making every workflow step structured.
 - Removing text-mode workflow steps or prose summaries.
 - Removing local validation after provider-native generation.

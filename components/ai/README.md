@@ -132,8 +132,10 @@ Request options may include `:structured-output` with `:schema-id`, `:schema-ver
 Supported native mechanisms in this slice:
 
 - OpenAI `:openai-completions` models that declare `:openai/chat-completions-json-schema-response-format` send Chat Completions `response_format {:type "json_schema" ...}`.
-- Anthropic `:anthropic-messages` models that declare `:anthropic/forced-tool-use` append a synthetic forced tool with `input_schema`.
+- Anthropic `:anthropic-messages` models that declare `:anthropic/json-schema-output` use Anthropic Messages `output_format {:type "json_schema" ...}` plus the structured-output beta header. This is the preferred Anthropic native mechanism for supported Claude 4.5+ catalog entries.
+- Anthropic `:anthropic-messages` models that declare `:anthropic/forced-tool-use` append a synthetic forced tool with `input_schema`. This is a separate native tool-use mechanism for older or compatibility model entries, not the only Anthropic structured-output path.
 - OpenAI `:openai-codex-responses` models are fallback-only when declared; they never receive public OpenAI Chat Completions/Responses schema fields.
+- Prompted JSON remains fallback only; local runtime validation still gates downstream structured values.
 
 Strategy metadata is explicit. Streaming calls emit `:structured-output-strategy` before provider content and `:structured-output-result` when extracted payload data is known. Non-streaming provider results include top-level `:structured-output` metadata and any extracted payload. Provider-native output still requires caller/workflow validation before use as trusted structured data.
 
@@ -144,8 +146,13 @@ Currently supports:
 ### Anthropic
 - Claude 3.5 Sonnet (reasoning, multimodal)
 - Claude 3.5 Haiku (multimodal)
-- Messages API with streaming
+- Claude 4/4.5+ catalog entries
+- Messages API with streaming and non-streaming execution
+- JSON Schema structured output for supported Claude 4.5+ catalog entries via `:anthropic/json-schema-output`
+- Forced tool-use structured output for older/compatibility entries via `:anthropic/forced-tool-use`
+- Prompted JSON fallback only when explicitly declared; local runtime validation remains authoritative
 - Prompt caching support
+- OAuth/API tokens must not be written into docs, task files, fixtures, logs, or commits
 
 ### OpenAI  
 - GPT-4o (multimodal)

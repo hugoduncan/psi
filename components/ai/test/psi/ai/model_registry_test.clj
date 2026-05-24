@@ -123,11 +123,18 @@
       (is (= [:prompted-json] (:strategies capability)))
       (is (nil? (:native-mechanism capability)))))
 
-  (testing "Anthropic Messages models declare forced-tool native support"
-    (let [capability (-> (registry/find-model :anthropic "claude-sonnet-4-6")
+  (testing "older Anthropic Messages models declare forced-tool native support"
+    (let [capability (-> (registry/find-model :anthropic "claude-sonnet-4-20250514")
                          structured-output/effective-capability)]
       (is (= true (:supported? capability)))
       (is (= :anthropic/forced-tool-use (:native-mechanism capability)))
+      (is (contains? (set (:strategies capability)) :provider-native))))
+
+  (testing "documented Claude 4.5+ catalog models declare Anthropic JSON Schema output"
+    (let [capability (-> (registry/find-model :anthropic "claude-sonnet-4-6")
+                         structured-output/effective-capability)]
+      (is (= true (:supported? capability)))
+      (is (= :anthropic/json-schema-output (:native-mechanism capability)))
       (is (contains? (set (:strategies capability)) :provider-native)))))
 
 ;; ── Init with user models ────────────────────────────────────────────────────

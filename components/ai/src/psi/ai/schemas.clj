@@ -139,7 +139,8 @@
 (def StructuredOutputNativeMechanism
   [:enum :openai/chat-completions-json-schema-response-format
    :openai/strict-tool-schema
-   :anthropic/forced-tool-use])
+   :anthropic/forced-tool-use
+   :anthropic/json-schema-output])
 
 (def StructuredOutputCapability
   [:map {:closed true}

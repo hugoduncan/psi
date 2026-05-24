@@ -568,11 +568,21 @@
     :gpt-5.4-mini
     :gpt-5.5})
 
+(def ^:private anthropic-json-schema-native-model-keys
+  #{:sonnet-4.5
+    :opus-4.5
+    :sonnet-4.6
+    :opus-4.6
+    :haiku-4.5
+    :opus-4.7})
+
 (defn- built-in-structured-output-capability
   [model-key model]
   (case (:api model)
     :anthropic-messages
-    structured-output/anthropic-forced-tool-native-capability
+    (if (contains? anthropic-json-schema-native-model-keys model-key)
+      structured-output/anthropic-json-schema-output-native-capability
+      structured-output/anthropic-forced-tool-native-capability)
 
     :openai-codex-responses
     structured-output/openai-codex-fallback-capability
