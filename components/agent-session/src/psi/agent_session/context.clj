@@ -81,10 +81,14 @@
     (:all-mutations ctx)))
 
 (defn- resolve-session-defaults [session-defaults resolved-cwd ui-type]
-  (cond-> (or session-defaults {})
-    (not (contains? (or session-defaults {}) :worktree-path))
-    (assoc :worktree-path resolved-cwd)
-    (some? ui-type) (assoc :ui-type ui-type)))
+  (let [session-defaults (or session-defaults {})]
+    (cond-> session-defaults
+      (contains? session-defaults :skills)
+      (-> (assoc :skill-ids (mapv :name (or (:skills session-defaults) [])))
+          (dissoc :skills))
+      (not (contains? session-defaults :worktree-path))
+      (assoc :worktree-path resolved-cwd)
+      (some? ui-type) (assoc :ui-type ui-type))))
 
 (defn- initial-root-state [nrepl-runtime-atom recursion-ctx]
   {:agent-session {:sessions {}}

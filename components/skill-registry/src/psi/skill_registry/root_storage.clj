@@ -49,10 +49,13 @@
   (all-skills @(:state* ctx) (session-state/get-session-data-in ctx session-id)))
 
 (defn find-skill
-  [root-state session-data skill-id]
-  (when (some #(= skill-id %) (skill-ids session-data))
-    (some-> (lookup-definition root-state skill-id)
-            skill-registry/ensure-valid-skill!)))
+  ([root-state session-data]
+   (fn [skill-id]
+     (find-skill root-state session-data skill-id)))
+  ([root-state session-data skill-id]
+   (when (some #(= skill-id %) (skill-ids session-data))
+     (some-> (lookup-definition root-state skill-id)
+             skill-registry/ensure-valid-skill!))))
 
 (defn find-skill-in
   [ctx session-id skill-name]
@@ -76,21 +79,21 @@
 
 (defn register-skill-in-root-state
   [root-state session-id skill]
-  (let [skill          (skill-registry/ensure-valid-skill! skill)
-        root-state*    (ensure-skill-registry root-state)
-        current-sd     (get-in root-state* (session-state/session-data-path session-id))
-        current-ids    (skill-ids current-sd)
-        skill-id       (:name skill)
-        inserted?      (nil? (lookup-definition root-state* skill-id))
-        insert-result  (root-registry/insert root-state* registry-id (skill-entry skill))
-        root-state*    (:root-state insert-result)
-        existing-skill (or (lookup-definition root-state* skill-id) skill)
+  (let [skill           (skill-registry/ensure-valid-skill! skill)
+        root-state*     (ensure-skill-registry root-state)
+        current-sd      (get-in root-state* (session-state/session-data-path session-id))
+        current-ids     (skill-ids current-sd)
+        skill-id        (:name skill)
+        inserted?       (nil? (lookup-definition root-state* skill-id))
+        insert-result   (root-registry/insert root-state* registry-id (skill-entry skill))
+        root-state*     (:root-state insert-result)
+        existing-skill  (or (lookup-definition root-state* skill-id) skill)
         already-member? (some #(= skill-id %) current-ids)
-        next-ids       (if already-member? current-ids (conj current-ids skill-id))
-        next-state     (if (= next-ids current-ids)
-                         root-state*
-                         (assoc-in root-state* (conj (session-state/session-data-path session-id) session-skill-ids-key) next-ids))
-        projected      (all-skills next-state (get-in next-state (session-state/session-data-path session-id)))]
+        next-ids        (if already-member? current-ids (conj current-ids skill-id))
+        next-state      (if (= next-ids current-ids)
+                          root-state*
+                          (assoc-in root-state* (conj (session-state/session-data-path session-id) session-skill-ids-key) next-ids))
+        projected       (all-skills next-state {:skill-ids next-ids})]
     {:root-state next-state
      :skills projected
      :skill existing-skill
