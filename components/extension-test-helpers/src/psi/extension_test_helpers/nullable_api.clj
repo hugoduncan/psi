@@ -6,7 +6,8 @@
    - Record registrations and runtime calls for assertions
    - Avoid mocks/spies in favor of nullable infrastructure"
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [psi.prompt-registry.contributions :as contributions]))
 
 (defn create-state
   "Create mutable in-memory state used by the nullable API."
@@ -94,9 +95,6 @@
 (defn- prompt-contribution-count [state]
   (count (:prompt-contributions @state)))
 
-(defn- prompt-contribution-key [params]
-  (str (:id params)))
-
 (defn- register-command! [state params]
   (let [name (:name params)
         opts (:opts params)]
@@ -167,37 +165,38 @@
     {:psi.extension.workflow/removed? removed?}))
 
 (defn- register-prompt-contribution! [state params]
-  (let [id    (str (:id params))
-        key   (prompt-contribution-key params)
-        value (merge {:id id
-                      :ext-path (:ext-path params)}
-                     (:contribution params))]
-    (swap! state assoc-in [:prompt-contributions key] value)
+  (let [result (contributions/register-contribution
+                (vals (:prompt-contributions @state))
+                (:ext-path params)
+                (:id params)
+                (:contribution params))
+        contribution (:contribution result)]
+    (swap! state assoc-in [:prompt-contributions (:id contribution)] contribution)
     {:psi.extension.prompt-contribution/registered? true
-     :psi.extension.prompt-contribution/id id
+     :psi.extension.prompt-contribution/id (:id contribution)
      :psi.extension.prompt-contribution/count (prompt-contribution-count state)}))
 
 (defn- update-prompt-contribution! [state params]
-  (let [id      (str (:id params))
-        key     (prompt-contribution-key params)
-        current (get-in @state [:prompt-contributions key])]
-    (if current
-      (do
-        (swap! state update-in [:prompt-contributions key] merge (:patch params))
-        {:psi.extension.prompt-contribution/updated? true
-         :psi.extension.prompt-contribution/id id
-         :psi.extension.prompt-contribution/count (prompt-contribution-count state)})
-      {:psi.extension.prompt-contribution/updated? false
-       :psi.extension.prompt-contribution/id id
-       :psi.extension.prompt-contribution/count (prompt-contribution-count state)})))
+  (let [result (contributions/update-contribution
+                (vals (:prompt-contributions @state))
+                (:ext-path params)
+                (:id params)
+                (:patch params))]
+    (when-let [contribution (:contribution result)]
+      (swap! state assoc-in [:prompt-contributions (:id contribution)] contribution))
+    {:psi.extension.prompt-contribution/updated? (:updated? result)
+     :psi.extension.prompt-contribution/id (str (:id params))
+     :psi.extension.prompt-contribution/count (prompt-contribution-count state)}))
 
 (defn- unregister-prompt-contribution! [state params]
-  (let [id      (str (:id params))
-        key     (prompt-contribution-key params)
-        existed? (contains? (:prompt-contributions @state) key)]
-    (swap! state update :prompt-contributions dissoc key)
-    {:psi.extension.prompt-contribution/removed? existed?
-     :psi.extension.prompt-contribution/id id
+  (let [result (contributions/unregister-contribution
+                (vals (:prompt-contributions @state))
+                (:ext-path params)
+                (:id params))]
+    (when (:removed? result)
+      (swap! state update :prompt-contributions dissoc (str (:id params))))
+    {:psi.extension.prompt-contribution/removed? (:removed? result)
+     :psi.extension.prompt-contribution/id (str (:id params))
      :psi.extension.prompt-contribution/count (prompt-contribution-count state)}))
 
 (defn- append-entry! [state params]

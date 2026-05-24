@@ -4,6 +4,7 @@
    through agent-session prompt assembly semantics."
   (:require
    [psi.prompt-assets.system-prompt]
+   [psi.prompt-registry.root-storage :as prompt-storage]
    [psi.session-persistence.core :as persistence]
    [psi.session-state.init :as init]
    [psi.session-state.model :as session-data]
@@ -73,6 +74,7 @@
                                              (when (not= :fallback source)
                                                source))
         ts (java.time.Instant/now)
+        prompt-contributions (prompt-storage/list-contributions root-state parent-sd)
         session-data
         (merge (session-data/initial-session
                 {:worktree-path (:worktree-path parent-sd)})
@@ -99,7 +101,8 @@
                                                         (:cache-breakpoints parent-sd)
                                                         (:cache-breakpoints (session-data/initial-session)))
                         :prompt-component-selection prompt-component-selection
-                        :prompt-contributions       (vec (or (:prompt-contributions parent-sd) []))
+                        :prompt-contribution-ids    (prompt-storage/prompt-ids parent-sd)
+                        :prompt-contributions       prompt-contributions
                         :model                      (or model (:model parent-sd))
                         :created-at                 ts
                         :updated-at                 ts}

@@ -7,6 +7,7 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [psi.prompt-registry.contributions :as prompt-contributions]
+   [psi.prompt-registry.root-storage :as prompt-storage]
    [psi.session-persistence.core :as session-persistence]
    [psi.session-state.display-name :as display-name]
    [psi.workflow-registry.registry :as workflow-registry]))
@@ -163,7 +164,7 @@
   (prompt-contributions/sort-contributions coll))
 
 (defn list-prompt-contributions-in [ctx session-id]
-  (sorted-prompt-contributions (:prompt-contributions (get-session-data-in ctx session-id))))
+  (prompt-storage/list-contributions @(:state* ctx) (get-session-data-in ctx session-id)))
 
 (defn children-of-in
   [ctx parent-id]

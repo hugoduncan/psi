@@ -7,7 +7,7 @@
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.agent-session.resolvers.support :as support]
    [psi.command-registry.registry :as command-registry]
-   [psi.prompt-registry.contributions :as prompt-contributions]
+   [psi.session-state.state :as session-state]
    [psi.tool-registry.registry :as tool-registry]
    [psi.ui.state :as ui-state]))
 
@@ -165,8 +165,7 @@
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
    ::pco/output [:psi.extension/prompt-contributions
                  :psi.extension/prompt-contribution-count]}
-  (let [contribs (->> (:prompt-contributions (support/session-data agent-session-ctx session-id))
-                      prompt-contributions/sort-contributions
+  (let [contribs (->> (session-state/list-prompt-contributions-in agent-session-ctx session-id)
                       (mapv support/contribution->attrs))]
     {:psi.extension/prompt-contributions contribs
      :psi.extension/prompt-contribution-count (count contribs)}))

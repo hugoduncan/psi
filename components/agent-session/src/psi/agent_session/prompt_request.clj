@@ -181,8 +181,8 @@
     (model-registry/resolve-runtime-model ctx provider model-id)))
 
 (defn- sorted-contributions
-  [session-data]
-  (-> (:prompt-contributions session-data)
+  [ctx session-id session-data]
+  (-> (ss/list-prompt-contributions-in ctx session-id)
       (system-prompt/filter-prompt-contributions (:prompt-component-selection session-data))
       ss/sorted-prompt-contributions))
 
@@ -280,7 +280,7 @@
      :turn/developer-prompt             (:developer-prompt session-data)
      :turn/developer-prompt-source      (:developer-prompt-source session-data)
      :turn/base-system-prompt           (:base-system-prompt session-data)
-     :turn/sorted-prompt-contributions  (sorted-contributions session-data)
+     :turn/sorted-prompt-contributions  (sorted-contributions ctx session-id session-data)
      :turn/filtered-tool-defs           (system-prompt/filter-tool-defs (:tool-defs session-data)
                                                                         (:prompt-component-selection session-data))}))
 

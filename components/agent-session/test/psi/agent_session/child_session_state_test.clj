@@ -20,6 +20,7 @@
                         {:name "bash" :description "Bash"}
                         {:name "psi-tool" :description "Psi tool"}]
             :skill-ids ["skill-a"]
+            :prompt-contribution-ids ["ext-a"]
             :prompt-contributions [{:id "ext-a" :ext-path "/ext/a" :section "Ext" :content "A" :enabled true}]
             :cache-breakpoints #{:system :tools}
             :model {:provider "prov" :id "m"}
@@ -38,7 +39,15 @@
   [parent-sd skills]
   (reduce (fn [root-state skill]
             (:root-state (skill-storage/register-skill-in-root-state root-state (:session-id parent-sd) skill)))
-          {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
+          {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}
+           :root-registries {:prompt-contributions {:entries-by-id {"ext-a" {:id "ext-a"
+                                                                             :extension-id "/ext/a"
+                                                                             :value {:id "ext-a"
+                                                                                     :ext-path "/ext/a"
+                                                                                     :section "Ext"
+                                                                                     :content "A"
+                                                                                     :enabled true}}}
+                                                    :ids-by-extension {"/ext/a" #{"ext-a"}}}}}
           skills))
 
 (deftest child-session-base-state-normalizes-and-inherits-test

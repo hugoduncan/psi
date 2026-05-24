@@ -185,6 +185,7 @@
    [:scoped-models [:vector scoped-model-schema]]
    [:skill-ids [:vector :string]]
    [:prompt-templates [:vector prompt-template-schema]]
+   [:prompt-contribution-ids {:optional true} [:vector :string]]
    [:prompt-contributions {:optional true} [:vector prompt-contribution-schema]]
    [:tool-defs {:optional true} [:vector :map]]
    [:extensions [:map-of :string extension-schema]]
@@ -275,6 +276,7 @@
      :scoped-models           []
      :skill-ids               []
      :prompt-templates        []
+     :prompt-contribution-ids []
      :prompt-contributions    []
      :tool-defs               []
      :extensions              {}

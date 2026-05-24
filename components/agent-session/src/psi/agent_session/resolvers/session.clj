@@ -183,7 +183,7 @@
         sys        (:system-prompt sd)
         dev        (:developer-prompt sd)
         dev-source (:developer-prompt-source sd)
-        contribs   (vec (:prompt-contributions sd))]
+        contribs   (ss/list-prompt-contributions-in agent-session-ctx session-id)]
     (merge
      {:psi.agent-session/base-system-prompt      base
       :psi.agent-session/system-prompt           sys

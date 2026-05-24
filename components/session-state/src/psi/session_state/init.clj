@@ -89,6 +89,7 @@
                                                  :scoped-models
                                                  :skill-ids
                                                  :prompt-templates
+                                                 :prompt-contribution-ids
                                                  :prompt-contributions
                                                  :tool-defs
                                                  :extensions
@@ -144,6 +145,7 @@
                                                      :scoped-models
                                                      :skill-ids
                                                      :prompt-templates
+                                                     :prompt-contribution-ids
                                                      :prompt-contributions
                                                      :tool-defs
                                                      :extensions
@@ -189,6 +191,7 @@
                                                            :scoped-models
                                                            :skill-ids
                                                            :prompt-templates
+                                                           :prompt-contribution-ids
                                                            :prompt-contributions
                                                            :tool-defs
                                                            :extensions
