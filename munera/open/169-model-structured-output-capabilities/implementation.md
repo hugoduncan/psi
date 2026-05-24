@@ -28,3 +28,7 @@ Completed the newly added ambiguity follow-ups without executing implementation 
 ## 2026-05-23 — inconsistency review repeat
 
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, referenced AI provider/model files, and provider docs for cross-artifact inconsistency after the payload-surface and validation-boundary clarifications. Found no new actionable inconsistency feedback. The artifacts consistently keep OpenAI provider-native support limited to explicit `:openai-completions` Chat Completions `response_format`, keep Codex fallback-only, model Anthropic forced synthetic tool extraction separately from ordinary tool calls, expose explicit strategy/payload metadata, and leave final Malli validation authority to workflow/runtime callers.
+
+## 2026-05-23 — executed inconsistency follow-ups repeat
+
+No newly added unchecked `design-steps.md` items existed after the repeated inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
