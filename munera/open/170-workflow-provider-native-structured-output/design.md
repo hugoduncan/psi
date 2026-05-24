@@ -130,8 +130,8 @@ For a structured workflow step or judge:
 2. Require the spec to include both the Malli `:schema` for workflow-local validation/coercion and `:json-schema` for AI request shaping.
 3. Build the provider-neutral task-169 request under `:structured-output` using the canonical keys above.
 4. Ask turn execution to generate with that structured-output contract.
-5. Receive text or native structured payload plus actual AI structured-output metadata.
-6. Build the workflow structured-output envelope using the actual strategy and metadata.
+5. Receive the bounded turn result with raw assistant text plus the authoritative `:structured-output` seam described below.
+6. Build the workflow structured-output envelope from that turn-result `:structured-output` value, not from provider names, journal replay, provider captures, or assistant-message side channels.
 7. Validate locally against the Malli schema.
 8. Expose downstream structured value only if valid.
 9. Block/fail explicitly on invalid output or unsupported required capability.
@@ -162,6 +162,28 @@ The workflow structured-output envelope keeps `:value` as the only downstream da
 - Provider-specific diagnostic maps may be kept under `[:structured-output :provider-metadata]`, but downstream source resolution must ignore them.
 
 Local validation still determines `[:structured-output :status]` and `[:structured-output :value]`. Downstream `{:step ... :output ...}` resolution continues to read only valid `:value`; it must not read `:payload`, `:raw-payload`, `:parsed-value`, `:provider-metadata`, or provider text.
+
+## Turn-execution structured-output seam
+
+Workflow runtime reads AI structured-output metadata from one authoritative bounded turn-result field:
+
+```edn
+{:status :ok
+ :assistant-text text-or-empty-string
+ :assistant-message assistant-message
+ :execution-result execution-result
+ :structured-output structured-output-metadata-or-nil}
+```
+
+`execute-actor-turn!` and `execute-judge-turn!` must expose this same top-level `:structured-output` key. They derive it only from `[:execution-result/structured-output]` on the canonical execution result returned by turn runtime. Workflow envelope code must not inspect provider captures, journals, model ids, assistant-message metadata, or provider-specific response fields to recover strategy/payload metadata.
+
+Turn runtime owns population of `:execution-result/structured-output`:
+
+- Non-streaming provider execution copies the provider result's top-level `:structured-output` metadata into `:execution-result/structured-output`. This is the existing task-169/171 non-streaming provider result surface.
+- Streaming provider execution accumulates first-class `:structured-output-strategy` and `:structured-output-result` events in turn data. On turn completion, `:execution-result/structured-output` is the last `:structured-output-result` payload when present; otherwise it may be the strategy metadata from `:structured-output-strategy` if no parsed payload was emitted.
+- AI strategy-selection failures for fallback-forbidden requests should surface as an error execution result with machine-readable structured-output failure data available at `:execution-result/structured-output`, including at least `{:strategy :unsupported :reason :unsupported-structured-output ...}` or equivalent AI error details. Workflow code maps that to the session-step or judge failure envelopes defined below.
+
+The workflow envelope builder consumes only the bounded turn result's top-level `:structured-output` key plus `:assistant-text` as raw output. If `:structured-output` is nil for a structured request, implementation should treat that as an explicit integration failure or invalid structured output rather than guessing the strategy from assistant text. Tests for task 170 should stub `execute-actor-turn!` / `execute-judge-turn!` with this top-level seam and include coverage proving provider metadata is read from `:structured-output`.
 
 
 ## Structured-output failure surfaces
