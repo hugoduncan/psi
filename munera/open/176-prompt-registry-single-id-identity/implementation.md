@@ -16,3 +16,12 @@
 ## 2026-05-24 ambiguity review
 - New actionable ambiguity: `design.md` requires explicit post-change targeting/compatibility behavior for callers that currently pass `ext-path + id`, but the task artifacts do not distinguish which already-single-id extension-facing API/doc surfaces are intentionally preserved versus which lower-level dispatch or Pathom mutation surfaces remain owner-qualified today and therefore need explicit migration or temporary compatibility rules. Without that surface-by-surface targeting statement, the compatibility scope is still ambiguous across concrete callers.
   - Added a `design-steps.md` follow-up to make the surface-level targeting/compatibility contract explicit and avoid hidden divergence between extension API helpers, session dispatch handlers, query mutations, and docs.
+
+## 2026-05-24 ambiguity follow-up execution
+- Reviewed the concrete caller surfaces behind prompt contributions before updating the design:
+  - extension-facing API helpers in `components/agent-session/src/psi/agent_session/extensions/api.clj` and user docs in `doc/extensions.md` already expose single-id register/update/unregister helpers
+  - built-in workflow prompt contribution registration in `components/agent-session/src/psi/agent_session/workflow/bootstrap.clj` supplies owner provenance internally while still presenting contribution-level single-id targeting
+  - lower-level session dispatch handlers in `dispatch_handlers/prompt_handlers.clj` and Pathom mutations in `mutations/prompts.clj` still accept `ext-path` today
+  - query/projection surfaces still expose `ext-path` for provenance and prompt-component selection still uses owner allowlisting by extension path
+- Updated `design.md` to make the surface-by-surface contract explicit: canonical identity is `id` alone, extension-facing helpers remain single-id-only, lower-level seams may only retain temporary `ext-path` acceptance as provenance/ownership metadata, and query/projection surfaces may expose owner provenance without making it identity.
+- Rewrote `plan.md` to focus on this ambiguity follow-up, marked the new `design-steps.md` item done, and kept `steps.md` aligned without executing implementation work from it.

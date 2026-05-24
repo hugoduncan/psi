@@ -2,10 +2,10 @@
 
 Design alignment:
 
-- [ ] Finalize the single-id prompt contribution contract in `design.md`, including canonical `id` normalization and nil/blank handling.
-- [ ] Specify same-owner duplicate registration behavior and cross-owner duplicate conflict behavior in `design.md`.
-- [ ] Specify post-change lookup/update/unregister targeting, ownership/provenance retention, ordering, and any narrow compatibility handling in `design.md`.
-- [ ] Ensure `plan.md`, `steps.md`, and `design.md` describe the same actual task scope and acceptance path.
+- [x] Finalize the single-id prompt contribution contract in `design.md`, including canonical `id` normalization and nil/blank handling.
+- [x] Specify same-owner duplicate registration behavior and cross-owner duplicate conflict behavior in `design.md`.
+- [x] Specify post-change lookup/update/unregister targeting, ownership/provenance retention, ordering, and any narrow compatibility handling in `design.md`.
+- [x] Ensure `plan.md`, `steps.md`, and `design.md` describe the same actual task scope and acceptance path.
 
 Implementation later:
 
