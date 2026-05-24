@@ -118,10 +118,12 @@ Bootstrapped on 2026-04-02.
 Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused structured-output/model tests ✅ (`clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions). 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
 
 ## Suggested next step
-- Judge/review task 171 after executed code-shaper follow-up: focused Anthropic/model/user tests are green with the new 400 fallback retry invariant coverage.
+- Judge/review task 170 after executing task-test-review follow-up: all task steps are checked; focused turn-runtime/workflow structured-output/session-step/judge tests are green (`30 tests, 157 assertions`).
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
+
+- 2026-05-24: Task 170 task-test-review follow-up complete: added end-to-end session-step and LLM-judge tests for `:fallback :none` unsupported structured output with `:require-provider-native?` omitted, proving both paths use the stable `:unsupported-structured-output` blocked/fail surfaces and pass fallback-forbidden opts; focused tests and clj-kondo green.
 
 - 2026-05-24: Task 170 implementation pass completed remaining persisted/replay metadata behavior coverage. Provider-native structured-output envelopes are now proven preserved exactly in accepted result state, latest attempt result envelope, and workflow history; all implementation steps checked; focused workflow tests green (`31 tests, 148 assertions`).
 

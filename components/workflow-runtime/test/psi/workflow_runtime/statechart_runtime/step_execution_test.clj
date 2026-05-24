@@ -143,6 +143,54 @@
                (get-in payload [:blocked :details :structured-output])))
         (is (= :actor/blocked (:event (first @event-queue*))))))))
 
+(deftest execute-session-step-fallback-none-unsupported-structured-output-blocks-test
+  ;; Tests :fallback :none reaches the same workflow failure surface as
+  ;; required-native when the AI layer reports unsupported structured output.
+  (testing "fallback none unsupported structured output records a blocked actor result"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])
+          turn-opts* (atom nil)]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx _session-id _prompt opts]
+                      (reset! turn-opts* opts)
+                      {:status :error
+                       :assistant-text ""
+                       :structured-output {:strategy :unsupported
+                                           :reason :unsupported-structured-output
+                                           :resolved-model {:provider "local" :id "unsupported"}}
+                       :failure {:reason :unsupported-structured-output
+                                 :message "Resolved model cannot provide structured output without fallback"}})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "classify"
+          :type :session
+          :outputs {:classification {:source :session/structured-output
+                                     :mode :structured
+                                     :schema-id :psi.workflow/test-classification
+                                     :schema-version 1
+                                     :schema [:map [:decision [:enum :pass :fail]]]
+                                     :json-schema {:type "object"}
+                                     :fallback :none}}}
+         "classify"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Classify"))
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)]
+        (is (= :blocked (:kind pending)))
+        (is (= :blocked (:outcome payload)))
+        (is (= :unsupported-structured-output (get-in payload [:blocked :reason])))
+        (is (= :classification (get-in payload [:blocked :details :output-key])))
+        (is (= {:strategy :unsupported
+                :reason :unsupported-structured-output
+                :resolved-model {:provider "local" :id "unsupported"}}
+               (get-in payload [:blocked :details :structured-output])))
+        (is (false? (get-in @turn-opts* [:structured-output :fallback-allowed?])))
+        (is (not (get-in @turn-opts* [:structured-output :require-provider-native?])))
+        (is (= :actor/blocked (:event (first @event-queue*))))))))
+
 (deftest execute-session-step-ranked-fallback-preserves-structured-output-opts-test
   ;; Tests ranked model fallback reuses the exact provider-neutral structured
   ;; output opts for each candidate instead of rebuilding or dropping policy.
