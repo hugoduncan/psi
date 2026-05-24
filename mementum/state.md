@@ -15,7 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- Registry unification arc through task 173 is complete:
+- Registry unification arc through task 176 is complete in implementation/review terms:
   - 164: registry semantics audit is the migration-rules source of truth and now includes post-migration guidance from 169–173
   - 165: root-registry target architecture captured
   - 166: standalone `root-registry` component built
@@ -26,6 +26,8 @@ Bootstrapped on 2026-04-02.
   - 171: deterministic-operation-registry migrated to shared root-registry storage; canonical operations live in root-registry, while invoke-miss throwing, duplicate-throw translation, and extension projection synchronization remain adapter-owned
   - 172: deterministic-operation registration-order semantics removed; public operation listing now preserves unordered membership/count coherence rather than insertion order
   - 173: skill registration-order semantics removed; registry/projection/model-visible skill-list surfaces use canonical exact skill-name ordering while duplicate-ignore and `:added?` / `:changed?` remain preserved
+  - 174: skill-registry migrated to adapter-backed root-registry storage; canonical skill definitions now live in `root-registry` while sessions own membership through `:skill-ids`
+  - 176: prompt-registry simplified toward root-registry semantics — canonical identity is now string-coerced `id` alone, cross-owner same-id coexistence is disallowed via explicit ownership conflict, and higher prompt-contribution projections were aligned to shared canonical ordering
 - Bootstrap simplification arc (159–163) complete:
   - 159: in-process bootstrap simplification
   - 160: removed mutation-mediated bootstrap resource loading
@@ -42,16 +44,23 @@ Bootstrapped on 2026-04-02.
 
 - `bb test` was green after closing task 173.
 - Focused registry/projection tests passed during tasks 169–173.
+- Task 176 recorded focused prompt-registry / projection verification passing:
+  - `clojure -M:test --focus psi.prompt-registry.contributions-test --focus psi.agent-session.query-graph-tools-test --focus psi.agent-session.model-dispatch-test`
+  - `clj-kondo --lint components/prompt-registry/src components/prompt-registry/test components/agent-session/src components/agent-session/test components/extension-test-helpers/src`
+- Task 176 review loops (implementation review, test review, test-shaper, code-shaper) recorded no new actionable feedback.
 - Focused structured-output/model tests passed during tasks 169 and 171.
 - Task 170 follow-up verification recorded focused workflow tests green for structured-output envelope propagation and failure-surface behavior.
 - Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback).
 
 ## Suggested next step
-- Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes from 169–173 to choose the next cleanup target.
+- Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `176` to choose the next cleanup target.
 - Likely next registry cleanup candidates:
+  - close or move task `176-prompt-registry-single-id-identity` once its Munera state matches the completed implementation/review outcome
+  - create the follow-on prompt-registry root-registry migration task now that prompt identity matches single-id ownership semantics more closely
   - `skill-registry` shared-substrate/helper cleanup, now that insertion order is no longer semantic
   - prompt-registry normalization/shared collection-helper audit
-  - remaining root-registry adopter polish if 164 identifies unresolved seams
+  - remaining root-registry adopter polish if `164` identifies unresolved seams
+  - decide whether out-of-scope registries (`model-registry`, memory provider registry, extension handler registry) need a separate audit rather than direct adoption
 - Structured-output arc: task 170 remains the active adjacent workflow adoption slice; its test-shaper follow-up is complete and the remaining work is within that task.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
@@ -196,3 +205,7 @@ Bootstrapped on 2026-04-02.
 - 2026-05-22: task 173 code-shaper follow-up execution replaced TUI-local skill sorting in banner/autocomplete with shared `skill-registry/all-skills`, added the TUI dependency, verified focused TUI tests + TUI lint, and committed `7fe60e11`.
 - 2026-05-22: task 173 closed after review loops completed and full `bb test` passed; skill registration order is no longer semantic, canonical skill-name ordering now owns registry/projection/model-visible skill-list surfaces while duplicate-ignore and change reporting remain preserved.
 - 2026-05-22: task 174 ambiguity follow-up execution completed both newly added `design-steps.md` items: root-registry-backed skill adapter ownership/API boundary now lives in `components/skill-registry`, and lifecycle hydration timing is synchronous inside agent-session root-state updates for new/resume/fork/child paths.
+- 2026-05-24: task 176 created to simplify prompt-registry identity before any root-registry migration: remove composite `ext-path + id` identity and disallow cross-owner same-id coexistence.
+- 2026-05-24: task 176 design/review loops converged on the refined contract: canonical prompt contribution identity is string-coerced `id` alone; nil/blank ids remain accepted in this pass; same-owner duplicate registration replaces; cross-owner duplicate registration becomes explicit ownership conflict; lower-level seams may temporarily accept `ext-path` only as ownership/provenance metadata rather than as identity.
+- 2026-05-24: task 176 implementation completed and review loops recorded no actionable follow-up: prompt-registry helpers, lower dispatch/mutation seams, test helpers, and higher prompt-contribution projections now align to the single-id contract and shared canonical ordering. Focused prompt-registry / projection tests and targeted lint passed.
+- 2026-05-24: task 177 follow-up execution used the preloaded review result and found no newly added unchecked actionable `steps.md` items; recorded a no-op execution pass in the task `implementation.md` and left task steps unchanged.
