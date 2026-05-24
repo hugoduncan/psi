@@ -277,6 +277,55 @@ Schema intent:
 
 The judge review result is preferred over bug reproduction classification because review loops are already common and currently rely on prose-shaped actionable/no-action judgments. A bug reproduction classification schema remains a follow-on candidate, not part of this first slice.
 
+## Structured output cardinality and extraction semantics
+
+This slice supports **at most one structured output key per session step** and **at most one structured output key per LLM judge**. A step or judge may still expose ordinary text/debug outputs where existing runtime contracts support them, but only one `:source :session/structured-output` or `:source :judge/structured-output` entry may be present in the same local `:outputs` map.
+
+Rationale: one model/judge response is one structured contract boundary. Allowing several structured keys from the same response would require either splitting one JSON object across schemas, asking the provider for multiple independent schema outputs, or inventing key-level extraction rules. Those choices are useful later, but ambiguous for the first implementation.
+
+For prompted JSON fallback, the model-facing response must therefore be a single JSON object representing the value for the one declared structured output key. The runtime parses that object, coerces it through the declared schema, validates it, and records the canonical envelope behind that output key. It must not infer additional structured outputs from sibling JSON fields.
+
+For provider-native structured output, the runtime requests one schema-constrained object for the one declared structured output key, then normalizes the provider result through the same canonical envelope and Malli validation boundary. Provider APIs that support only one response-format/schema per request map naturally to this rule.
+
+If an authored session step or LLM judge declares more than one structured output entry in its local `:outputs` map, the IR/compiler validation must reject it with a clear error. Authors who need multiple machine-facing values should group them into fields of one Malli `[:map ...]` schema and use downstream `:path` references into that validated value.
+
+## Reusable schema ownership and export surface
+
+Reusable workflow structured-output schemas are owned by the workflow runtime, not individual workflow files or documentation examples. The first implementation should introduce a small code namespace dedicated to reusable structured-output schemas, for example:
+
+```clojure
+psi.workflow-runtime.structured-output-schemas
+```
+
+That namespace should export the first standard schema as ordinary data plus lookup metadata:
+
+```clojure
+(def judge-review-result-schema-id :psi.workflow/judge-review-result)
+(def judge-review-result-schema-version 1)
+(def judge-review-result-schema
+  [:map
+   [:decision [:enum :clear :needs-work :unclear]]
+   [:issues
+    [:vector
+     [:map
+      [:severity [:enum :blocking :minor]]
+      [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
+      [:description :string]
+      [:evidence :string]
+      [:suggested-change :string]]]]
+   [:confidence [:double {:min 0.0 :max 1.0}]])
+```
+
+Runtime, docs, and tests should refer to this schema by `:schema-id :psi.workflow/judge-review-result` and `:schema-version 1`. The inline Malli schema in an authored workflow or normalized IR must match the exported schema when it claims that id/version. The first slice may enforce this with direct equality for known reusable schemas or with a registry lookup that returns the schema for id/version before validation.
+
+Schema ownership rules:
+
+- `psi.workflow-runtime.structured-output-schemas` owns reusable schema ids and versioned Malli schema values.
+- Workflow IR owns the declaration shape (`:schema-id`, `:schema-version`, `:schema`).
+- Structured-output parsing/validation owns coercion and canonical envelopes.
+- Documentation examples may inline schemas for readability, but must identify the same id/version and stay synchronized with the exported code schema.
+- Future schema versions add new id/version entries; they do not mutate the meaning of version `1` in persisted workflow runs.
+
 ## Relationship to delegated handoffs
 
 This task complements, but does not replace, delegated workflow handoff contracts.

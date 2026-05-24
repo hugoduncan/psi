@@ -314,9 +314,11 @@ Interpretation:
   exported workflow data without parsing markdown heuristically downstream
 - session structured `:outputs` are the stable downstream-reference surface for
   machine control flow to consume model-generated data through validated fields
-  instead of prose parsing
+  instead of prose parsing; each session step may declare at most one structured
+  output key, with multiple values grouped as fields of one map schema
 - LLM-judge structured `:outputs` are judge-local data for transition evaluation;
-  they are not automatically exported as parent step `:output` refs
+  they are not automatically exported as parent step `:output` refs, and each
+  judge may declare at most one structured output key
 - `:context` on a delegate step carries forwarded material without changing the
   delegated workflow's prompt string
 
@@ -341,6 +343,8 @@ This guide intentionally teaches the currently migrated example-led surfaces:
   machine-facing data
 - LLM-judge structured entries in judge-local `:outputs` for validated transition
   evaluation data
+- one structured-output key per session step or LLM judge; use one map schema
+  plus `:path` references for multiple fields
 - shared reference syntax for `:workflow-input`, `:workflow-original`, prior
   step yields, delegated handoffs, structured output fields, and projected
   transcript context

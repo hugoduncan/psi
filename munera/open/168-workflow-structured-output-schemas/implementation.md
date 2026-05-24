@@ -48,3 +48,8 @@ Completed the newly added inconsistency follow-up: specified judge-local structu
 ## 2026-05-23 — ambiguity review repeat 3
 
 Found new actionable ambiguity feedback: the task allows one or more structured `:outputs`, but does not define how a single model/judge response maps to multiple structured output keys in prompted JSON/provider-native modes; it also names the first reusable schema without specifying its code ownership/export surface for `:schema-id` reuse.
+
+
+## 2026-05-23 — ambiguity follow-up repeat 3
+
+Completed newly added ambiguity follow-ups only: specified one structured-output key per session step or LLM judge, with one raw response mapping to one prompted-JSON/provider-native structured envelope; specified workflow-runtime ownership for reusable schema ids, including `psi.workflow-runtime.structured-output-schemas` and `:psi.workflow/judge-review-result` version 1. Aligned design and workflow docs. Marked both design-steps done. Did not execute `steps.md` implementation items.

@@ -163,9 +163,10 @@ Illustrative shape:
 
 ### Session structured outputs
 
-A session step may declare one or more structured output entries under its
+A session step may declare at most one structured output entry under its
 step-local `:outputs` map. The output key is the logical machine-facing value
-that downstream references address.
+that downstream references address. Authors who need multiple machine-facing
+fields should model them as fields inside that one structured value.
 
 Illustrative normalized shape:
 
@@ -268,6 +269,16 @@ The first implementation's minimum invalid policy is fail-fast. If `:on-invalid`
 is omitted, runtime treats it as `{:action :fail-fast}`. Bounded retry/repair may
 be added only when explicit in `:on-invalid` and proven by tests.
 
+Cardinality is constrained in the normalized IR: a session step must not contain
+more than one `:source :session/structured-output` entry, and an LLM judge must
+not contain more than one `:source :judge/structured-output` entry. Compiler or
+IR validation should reject multiple structured entries clearly. One raw
+model/judge response maps to one structured envelope for the one declared key.
+For `:prompted-json`, the response is parsed as a single JSON object. For
+`:provider-native`, the provider is asked for a single schema-constrained object.
+Sibling JSON fields are not promoted into additional output keys; use a map
+schema plus downstream `:path` references instead.
+
 ### Structured output runtime envelope
 
 Execution records the resolved value behind a structured output key as a
@@ -318,6 +329,12 @@ keywords when the schema expects map keys, and enum strings may become keyword
 enum values when the declared enum contains the corresponding keyword. Coercion,
 parse, or validation failure records `:status :invalid`, `:errors`, and
 `:parsed-value` when a parsed value exists; it must not expose `:value`.
+
+Reusable schemas are owned by workflow-runtime code. The first standard reusable
+schema should live in `psi.workflow-runtime.structured-output-schemas` with id
+`:psi.workflow/judge-review-result` and version `1`. Runtime/docs/tests should
+refer to the id/version pair, and known reusable schema declarations should match
+the exported Malli schema for that id/version.
 
 ## Yielded value
 

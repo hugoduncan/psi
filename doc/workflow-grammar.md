@@ -194,7 +194,11 @@ for handoff data; `outputs` is no longer delegate-only.
 Structured outputs use `:source :session/structured-output` for ordinary
 session step output and `:source :judge/structured-output` for LLM judge
 output. Both forms require `:mode :structured` plus a Malli-compatible schema
-contract (`:schema-id`, `:schema-version`, and `:schema`).
+contract (`:schema-id`, `:schema-version`, and `:schema`). A session step may
+have at most one session structured-output entry, and an LLM judge may have at
+most one judge structured-output entry. Authors who need multiple machine-facing
+values should group them as fields inside one structured map schema and address
+fields with `:path`.
 
 Downstream references to session structured outputs use the normal source-spec shape:
 
@@ -213,6 +217,9 @@ the parent step's `{:step ... :output ...}` namespace. A later step that needs
 the same data must consume an explicitly declared session structured output or a
 future explicit promotion/export contract, not a hidden judge-output ref.
 
-Prompted fallback asks models for JSON and then schema-guided coercion maps JSON
-object keys and enum strings into the declared Malli-domain values before
-validation. Raw text is retained even when coercion and validation succeed.
+Prompted fallback asks models for one JSON object for the one declared
+structured-output key. Schema-guided coercion maps JSON object keys and enum
+strings into the declared Malli-domain values before validation. Raw text is
+retained even when coercion and validation succeed. Provider-native structured
+output likewise requests one schema-constrained object and records it behind the
+single declared structured-output key.
