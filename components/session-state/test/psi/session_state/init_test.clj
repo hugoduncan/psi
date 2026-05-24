@@ -10,6 +10,8 @@
                           :model {:provider "p" :id "m"}
                           :thinking-level :high
                           :skill-ids ["s"]
+                          :prompt-contribution-ids ["p2" "p1"]
+                          :prompt-contributions [{:id "stale" :content "stale"}]
                           :tool-defs [{:name "bash"}])
         state0     {}
         state1     (init/initialize-new-session-state
@@ -29,6 +31,8 @@
       (is (= {:provider "p" :id "m"} (:model sd1)))
       (is (= :high (:thinking-level sd1)))
       (is (= ["s"] (:skill-ids sd1)))
+      (is (= ["p2" "p1"] (:prompt-contribution-ids sd1)))
+      (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
       (is (nil? (:skills sd1)))
       (is (= [{:name "bash"}] (:tool-defs sd1))))
     (testing "journal, telemetry, and flush slots are initialized"
@@ -51,7 +55,9 @@
 
 (deftest initialize-resumed-session-state-test
   (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/source"})
-                          :skill-ids ["keep"])
+                          :skill-ids ["keep"]
+                          :prompt-contribution-ids ["from-current"]
+                          :prompt-contributions [{:id "stale" :content "stale"}])
         entries    [{:kind :session-info :data {:name "resumed name"}}
                     {:kind :message :data {:message {:role "user" :content "hi"}}}]
         state1     (init/initialize-resumed-session-state
@@ -70,6 +76,9 @@
     (is (= "/tmp/parent.ndedn" (:parent-session-path sd1)))
     (is (= {:provider "prov" :id "m"} (:model sd1)))
     (is (= :medium (:thinking-level sd1)))
+    (is (= ["keep"] (:skill-ids sd1)))
+    (is (= ["from-current"] (:prompt-contribution-ids sd1)))
+    (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
     (is (= entries (get-in state1 (state/session-journal-path "sid-r"))))
     (let [persistence (get-in state1 [:agent-session :sessions "sid-r" :persistence])]
       (is (true? (get-in persistence [:flush-state :flushed?])))
@@ -81,7 +90,9 @@
                    :session-file "/tmp/parent.ndedn"
                    :worktree-path "/tmp/ws"
                    :model {:provider "prov" :id "m"}
-                   :thinking-level :low}
+                   :thinking-level :low
+                   :prompt-contribution-ids ["p2" "p1"]
+                   :prompt-contributions [{:id "stale" :content "stale"}]}
         branch-entries [{:kind :message :data {:message {:role "user" :content "hi"}}}]
         state0 {:agent-session {:sessions {"parent" {:agent-ctx ::agent :sc-session-id ::sc}}}}
         state1 (init/initialize-forked-session-state
@@ -95,6 +106,8 @@
     (is (= "parent" (:parent-session-id sd1)))
     (is (= "/tmp/parent.ndedn" (:parent-session-path sd1)))
     (is (= :fork-head (:spawn-mode sd1)))
+    (is (= ["p2" "p1"] (:prompt-contribution-ids sd1)))
+    (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
     (is (= branch-entries (get-in state1 (state/session-journal-path "fork-1"))))
     (let [persistence (get-in state1 [:agent-session :sessions "fork-1" :persistence])]
       (is (true? (get-in persistence [:flush-state :flushed?])))
