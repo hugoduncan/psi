@@ -12,3 +12,4 @@
 - [x] Run focused structured-output/model tests and record results in implementation notes.
 - [x] Add focused Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output, asserting `:parse-error? true`, preserved `:raw-payload`, and no `:payload`.
 - [x] Add focused Anthropic JSON Schema native beta-header composition coverage proving `structured-outputs-2025-11-13` composes with OAuth, prompt-caching, and thinking beta tokens without dropping or duplicating existing betas.
+- [ ] Add a focused Anthropic JSON Schema native non-streaming `:execute` test assertion that captures the outbound request body and proves `:stream` is absent/false while returning top-level `:structured-output`.
