@@ -31,6 +31,11 @@
 - Used the preloaded review result plus current task artifacts to execute any newly added actionable unchecked `steps.md` items.
 - Found no unchecked follow-up implementation items to execute; this pass was a no-op.
 
+## 2026-05-24 ambiguity review pass
+- Re-read `design.md`, `plan.md`, `steps.md`, `implementation.md`, the prompt-registry contribution owner, lower-level dispatch/mutation seams, extension prompt-contribution query surface, extension API helper docs, nullable extension API helper state, and focused prompt-registry / agent-session tests.
+- Found one new actionable ambiguity: `design.md` leaves the externally visible cross-owner duplicate contract open as either thrown error or structured failure, but `plan.md`/`steps.md` treat the contract as fully settled and do not say whether preserving the thrown conflict shape in the Pathom mutation / dispatch surfaces is required behavior or merely one implementation choice.
+- Added one unchecked `design-steps.md` follow-up item; `steps.md` unchanged because this pass found design ambiguity, not implementation/test work.
+
 ## 2026-05-24 follow-up execution pass
 - Re-read the preloaded review notes plus current `steps.md`, `implementation.md`, `design.md`, and `plan.md` to execute any newly added actionable unchecked follow-up work.
 - `steps.md` still contains no unchecked items, so there was no newly added actionable work to perform in this pass.
