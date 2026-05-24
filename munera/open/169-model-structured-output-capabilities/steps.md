@@ -1,7 +1,7 @@
 # Implementation steps
 
 - [ ] Add structured-output capability schemas and model registry support, including explicit `:supported?` semantics for native-capable, fallback-only, unsupported, and omitted-capability models; omitted data must normalize to effective unsupported while preserving load compatibility.
-- [ ] Make runtime model resolution authoritative for structured-output capability after auth/transport overrides; OAuth-backed `openai/gpt-5.5` resolved to `:openai-codex-responses` must clear or replace any platform Chat Completions native capability so Codex cannot inherit native support accidentally.
+- [ ] Make runtime model resolution authoritative for structured-output capability after auth/transport overrides; OAuth-backed `openai/gpt-5.5` resolved to `:openai-codex-responses` must clear or replace any platform Chat Completions native capability so Codex cannot inherit native support accidentally, without adding a runtime-only `:auth` field to the closed model schema.
 - [ ] Add request structured-output contract helpers and strategy selection that combines the resolved runtime model capability with request fallback policy.
 - [ ] Add prompted-JSON fallback request shaping that injects deterministic schema-guided JSON-only instructions when fallback is selected, avoids provider-native fields, and reports `:fallback-used? true`; unsupported/no-fallback requests must not inject fallback instructions.
 - [ ] Implement OpenAI Chat Completions JSON Schema `response_format` request construction for explicitly capable models.

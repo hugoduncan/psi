@@ -108,7 +108,6 @@ For a fallback-only or unknown transport:
 {:id "openai/gpt-5.5"
  :provider :openai
  :api :openai-codex-responses
- :auth :chatgpt-oauth
  :capabilities
  {:structured-output
   {:supported? true
@@ -117,7 +116,7 @@ For a fallback-only or unknown transport:
    :notes "Do not assume public OpenAI Responses API fields are supported."}}}
 ```
 
-If the same user-visible model id can run through different auth paths/transports, each resolved runtime model has its own effective structured-output capability. For example, a platform-auth `openai/gpt-5.5` catalog entry may later declare Chat Completions native support, but the OAuth-backed runtime override to `:openai-codex-responses` must clear or replace that native capability with the Codex fallback-only/unsupported capability shown above.
+If the same user-visible model id can run through different auth paths/transports, each resolved runtime model has its own effective structured-output capability. The auth path is resolver context that determines the resolved model's final transport and capability; it is not stored as a new `:auth` key on the model map in this task. For example, a platform-auth `openai/gpt-5.5` catalog entry may later declare Chat Completions native support, but the OAuth-backed runtime override to `:openai-codex-responses` must clear or replace that native capability with the Codex fallback-only/unsupported capability shown above.
 
 For a model or transport that should not accept structured-output requests at all:
 
@@ -158,7 +157,7 @@ Request-time support is therefore the combination of the normalized model capabi
 - fallback-only + fallback disallowed => `:unsupported`;
 - unsupported capability, including omitted capability data normalized to unsupported => `:unsupported`.
 
-Runtime auth-path or transport resolution happens before structured-output strategy selection. The effective capability used by strategy selection must be derived from the resolved runtime model, including its final `:api`, `:auth`, `:base-url`, and any capability replacement/defaulting performed by the resolver. If a resolver changes a model from a public OpenAI platform transport to `:openai-codex-responses`, as `resolve-runtime-model` does for OAuth-backed `openai/gpt-5.5`, the resolved model must not retain platform Chat Completions native structured-output capability. It should either replace `[:capabilities :structured-output]` with an explicit Codex-safe fallback-only capability when prompted fallback is intentionally supported, or leave/normalize it to unsupported. Strategy selection must not infer native capability from the catalog entry that existed before runtime auth/transport override.
+Runtime auth-path or transport resolution happens before structured-output strategy selection. The effective capability used by strategy selection must be derived from the resolved runtime model, including its final `:api`, `:base-url`, and any capability replacement/defaulting performed by the resolver. Auth-path-specific decisions, such as ChatGPT OAuth routing, are applied by the resolver while producing that model; this task does not add or require a runtime-only `:auth` marker in the model schema. If a resolver changes a model from a public OpenAI platform transport to `:openai-codex-responses`, as `resolve-runtime-model` does for OAuth-backed `openai/gpt-5.5`, the resolved model must not retain platform Chat Completions native structured-output capability. It should either replace `[:capabilities :structured-output]` with an explicit Codex-safe fallback-only capability when prompted fallback is intentionally supported, or leave/normalize it to unsupported. Strategy selection must consume the resolved capability map rather than infer native capability from the catalog entry that existed before runtime auth/transport override or from an `:auth` field.
 
 ## Request contract
 

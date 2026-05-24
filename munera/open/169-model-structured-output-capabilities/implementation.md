@@ -127,3 +127,7 @@ Completed the newly added ambiguity follow-up without executing implementation `
 ## 2026-05-23 — inconsistency review repeat 7
 
 Found one new actionable inconsistency: `design.md` makes auth path part of the effective resolved structured-output capability and shows a fallback-only `openai/gpt-5.5` runtime model with `:auth :chatgpt-oauth`, but current/target model schemas are closed and `plan.md`/`steps.md` do not say to allow or populate an auth marker on resolved runtime models. As written, implementation could either make the design example/schema invalid or leave auth-path capability selection unobservable despite the design requiring final `:auth` to participate in resolution.
+
+## 2026-05-23 — executed inconsistency follow-up repeat 7
+
+Completed the newly added inconsistency follow-up without executing implementation `steps.md` work. Resolved the auth-path representation inconsistency by keeping model maps/schema closed and not adding a runtime-only `:auth` marker. Updated `design.md` so ChatGPT OAuth capability selection is resolver-context-derived and materialized as the resolved model's final `:api`, `:base-url`, and structured-output capability map; strategy selection consumes that resolved capability and does not depend on an `:auth` field. Updated `plan.md` and `steps.md` with the same constraint and marked the design-step done.
