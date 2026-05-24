@@ -1,6 +1,7 @@
 (ns psi.session-state.init-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.prompt-registry.root-storage :as prompt-storage]
    [psi.session-state.init :as init]
    [psi.session-state.model :as model]
    [psi.session-state.state :as state]))
@@ -13,7 +14,12 @@
                           :prompt-contribution-ids ["p2" "p1"]
                           :prompt-contributions [{:id "stale" :content "stale"}]
                           :tool-defs [{:name "bash"}])
-        state0     {}
+        state0     {:root-registries {:prompt-contributions {:entries-by-id {"p1" {:id "p1"
+                                                                                   :extension-id "/ext/a"
+                                                                                   :value {:id "p1" :ext-path "/ext/a" :section "A" :content "First" :enabled true}}
+                                                                             "p2" {:id "p2"
+                                                                                   :extension-id "/ext/b"
+                                                                                   :value {:id "p2" :ext-path "/ext/b" :section "B" :content "Second" :enabled true}}}}}}
         state1     (init/initialize-new-session-state
                     state0 current-sd
                     {:new-session-id "child-1"
@@ -33,6 +39,9 @@
       (is (= ["s"] (:skill-ids sd1)))
       (is (= ["p2" "p1"] (:prompt-contribution-ids sd1)))
       (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
+      (is (= [{:id "p1" :ext-path "/ext/a" :section "A" :content "First" :enabled true}
+              {:id "p2" :ext-path "/ext/b" :section "B" :content "Second" :enabled true}]
+             (prompt-storage/list-contributions state1 sd1)))
       (is (nil? (:skills sd1)))
       (is (= [{:name "bash"}] (:tool-defs sd1))))
     (testing "journal, telemetry, and flush slots are initialized"
@@ -60,8 +69,11 @@
                           :prompt-contributions [{:id "stale" :content "stale"}])
         entries    [{:kind :session-info :data {:name "resumed name"}}
                     {:kind :message :data {:message {:role "user" :content "hi"}}}]
+        state0     {:root-registries {:prompt-contributions {:entries-by-id {"from-current" {:id "from-current"
+                                                                                             :extension-id "/ext/current"
+                                                                                             :value {:id "from-current" :ext-path "/ext/current" :section "Resume" :content "Current" :enabled true}}}}}}
         state1     (init/initialize-resumed-session-state
-                    {}
+                    state0
                     current-sd
                     {:session-id "sid-r"
                      :session-path "/tmp/resume.ndedn"
@@ -79,6 +91,8 @@
     (is (= ["keep"] (:skill-ids sd1)))
     (is (= ["from-current"] (:prompt-contribution-ids sd1)))
     (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
+    (is (= [{:id "from-current" :ext-path "/ext/current" :section "Resume" :content "Current" :enabled true}]
+           (prompt-storage/list-contributions state1 sd1)))
     (is (= entries (get-in state1 (state/session-journal-path "sid-r"))))
     (let [persistence (get-in state1 [:agent-session :sessions "sid-r" :persistence])]
       (is (true? (get-in persistence [:flush-state :flushed?])))
@@ -94,7 +108,13 @@
                    :prompt-contribution-ids ["p2" "p1"]
                    :prompt-contributions [{:id "stale" :content "stale"}]}
         branch-entries [{:kind :message :data {:message {:role "user" :content "hi"}}}]
-        state0 {:agent-session {:sessions {"parent" {:agent-ctx ::agent :sc-session-id ::sc}}}}
+        state0 {:agent-session {:sessions {"parent" {:agent-ctx ::agent :sc-session-id ::sc}}}
+                :root-registries {:prompt-contributions {:entries-by-id {"p1" {:id "p1"
+                                                                               :extension-id "/ext/a"
+                                                                               :value {:id "p1" :ext-path "/ext/a" :section "A" :content "First" :enabled true}}
+                                                                         "p2" {:id "p2"
+                                                                               :extension-id "/ext/b"
+                                                                               :value {:id "p2" :ext-path "/ext/b" :section "B" :content "Second" :enabled true}}}}}}
         state1 (init/initialize-forked-session-state
                 state0 parent-sd
                 {:new-session-id "fork-1"
@@ -108,6 +128,9 @@
     (is (= :fork-head (:spawn-mode sd1)))
     (is (= ["p2" "p1"] (:prompt-contribution-ids sd1)))
     (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
+    (is (= [{:id "p1" :ext-path "/ext/a" :section "A" :content "First" :enabled true}
+            {:id "p2" :ext-path "/ext/b" :section "B" :content "Second" :enabled true}]
+           (prompt-storage/list-contributions state1 sd1)))
     (is (= branch-entries (get-in state1 (state/session-journal-path "fork-1"))))
     (let [persistence (get-in state1 [:agent-session :sessions "fork-1" :persistence])]
       (is (true? (get-in persistence [:flush-state :flushed?])))
