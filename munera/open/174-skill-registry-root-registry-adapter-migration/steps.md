@@ -49,6 +49,6 @@
   - [x] Correct bootstrap startup skill hydration so it writes canonical session `:skill-ids` membership while registering root definitions, instead of accidentally replacing startup session membership with `[]`.
 - [ ] Re-run or update representative task `173` higher-surface tests for prompt/display/TUI/command/workflow canonical ordering and child-session inheritance via `:skill-ids`.
 - [x] Update task `164-registry-semantics-unification-audit` to record the new `skill-registry` classification, session-owned `:skill-ids`, removal of embedded session `:skills` storage, and direct bootstrap definition hydration.
-- [ ] Run full `bb test` before close.
+- [x] Run full `bb test` before close.
   - [x] Representative focused verification across skill-registry, session-mutation, resolver, prompt-request, workflow step-session-config, command, and TUI skill surfaces passes after the migration.
-  - [ ] Full-suite verification is currently blocked by an unrelated pre-existing failure in `psi.agent-session.dispatch-test/startup-bootstrap-summary-dispatch-test`; do not close task 174 until the suite is green or that blocker is resolved/triaged separately.
+  - [x] Full-suite verification now passes; the previously observed `psi.agent-session.dispatch-test/startup-bootstrap-summary-dispatch-test` failure did not reproduce on re-run and is no longer blocking task closure.
