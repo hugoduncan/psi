@@ -7,12 +7,12 @@ Implement Anthropic JSON Schema structured output as a separate native mechanism
 1. Extend structured-output capability vocabulary to accept `:anthropic/json-schema-output`.
 2. Update built-in Anthropic model capability assignment so only documented catalog keys use JSON Schema native output by default; older Claude 3.5 entries keep the forced-tool native compatibility path.
 3. Update Anthropic request construction so selected mechanism controls request shape:
-   - `:anthropic/json-schema-output` adds `output_format` and the structured-output beta header, with `:output_format :strict` reflecting normalized `[:structured-output :strict?]` and defaulting true only when omitted;
+   - `:anthropic/json-schema-output` adds `output_format {:type "json_schema" :schema ...}` and the structured-output beta header; live verification showed `output_format.name` and `output_format.strict` are rejected by the beta API, so those remain Psi metadata only;
    - `:anthropic/forced-tool-use` keeps the existing synthetic tool plus `tool_choice` path;
    - `:prompted-json` keeps prompt injection only.
 4. Add Anthropic provider non-streaming execution for Messages so `psi.ai.core/execute-response` can return top-level `:structured-output` for JSON Schema output.
 5. Update Anthropic streaming extraction so JSON Schema output text is accumulated and emitted as first-class `:structured-output-result` metadata with source `:anthropic/json-schema-output`.
-6. Add or update focused provider/model tests before broad verification, including Anthropic JSON Schema request assertions for omitted `:strict?` producing `:strict true` and explicit `:strict? false` producing `:strict false`.
+6. Add or update focused provider/model tests before broad verification, including Anthropic JSON Schema request assertions that unsupported `output_format.name` and `output_format.strict` fields are omitted while Psi retains schema name/strictness as request metadata.
 7. Update the named docs/task dependency targets from `design.md`: `components/ai/README.md`, `doc/custom-providers.md`, and `munera/open/170-workflow-provider-native-structured-output/design.md`.
 8. Add a guarded live smoke helper/test that uses the Anthropic provider `:api-key`/`ANTHROPIC_API_KEY` seam, skips without credentials, treats OAuth only as a token supplied through that seam, and records only non-secret outcome metadata.
 

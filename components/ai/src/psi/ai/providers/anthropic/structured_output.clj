@@ -17,9 +17,7 @@
 (defn output-format
   [request]
   {:type "json_schema"
-   :name (structured-output/structured-output-name request)
-   :schema (:json-schema request)
-   :strict (:strict? request)})
+   :schema (:json-schema request)})
 
 (defn structured-tool-name
   [request tools]

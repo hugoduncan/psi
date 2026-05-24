@@ -50,9 +50,7 @@
         body  (json/parse-string (:body req) true)
         beta  (get-in req [:headers "anthropic-beta"])]
     (is (= {:type "json_schema"
-            :name "judge_review_result"
-            :schema judge-json-schema
-            :strict true}
+            :schema judge-json-schema}
            (:output_format body)))
     (is (re-find #"structured-outputs-2025-11-13" beta))
     (is (= "ordinary_tool" (get-in body [:tools 0 :name])))
@@ -62,9 +60,10 @@
     (is (= :anthropic/json-schema-output
            (:native-mechanism (structured-output/select-strategy model judge-structured-output-request))))))
 
-(deftest anthropic-json-schema-output-request-honors-explicit-non-strict-test
-  ;; Tests explicit :strict? false is sent as :strict false for Anthropic JSON
-  ;; Schema output instead of being coerced back to true.
+(deftest anthropic-json-schema-output-request-omits-unsupported-strict-field-test
+  ;; Live Anthropic verification rejects output_format.strict for the beta JSON
+  ;; Schema output API; strictness remains Psi request metadata, not an outbound
+  ;; Anthropic JSON Schema output_format field.
   (let [model (models/get-model :sonnet-4.6)
         convo (-> (conv/create "sys")
                   (conv/add-user-message "Review this"))
@@ -72,7 +71,7 @@
                                                       :structured-output (assoc judge-structured-output-request
                                                                                 :strict? false)})
         body  (json/parse-string (:body req) true)]
-    (is (false? (get-in body [:output_format :strict])))))
+    (is (not (contains? (:output_format body) :strict)))))
 
 (deftest anthropic-structured-output-forced-tool-request-shaping-test
   ;; Tests Anthropic provider-native structured output as a synthetic forced tool

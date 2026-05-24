@@ -100,9 +100,7 @@
 (def ^:private anthropic-output-format-schema
   [:map {:closed true}
    [:type [:= "json_schema"]]
-   [:name [:re "^[a-zA-Z0-9_-]{1,128}$"]]
-   [:schema map?]
-   [:strict boolean?]])
+   [:schema map?]])
 
 (def ^:private anthropic-request-body-schema
   [:map {:closed true}

@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Task 171 live Anthropic OAuth smoke passed after correcting the beta JSON Schema request shape: Anthropic rejects `output_format.name` and `output_format.strict`, so Psi now sends only `{:type "json_schema" :schema ...}` plus the structured-output beta header; focused Anthropic/model/user tests and live smoke are green.
+
 - 2026-05-24: Implemented task 171 Anthropic JSON Schema native structured output: capability enum/helper, Claude 4.5+ catalog assignment, request `output_format` + beta/header, strict semantics, forced-tool separation, Anthropic non-streaming execute, streaming/non-streaming extraction, docs/task-170 wording, guarded live skip path, and focused verification green.
 
 - 2026-05-24: Executed task 171 inconsistency follow-up repeat 4 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the pass.

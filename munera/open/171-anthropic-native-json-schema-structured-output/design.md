@@ -112,12 +112,10 @@ For a structured-output request against an Anthropic model whose resolved capabi
    ```edn
    :output_format
    {:type "json_schema"
-    :name (structured-output-name request)
-    :schema (:json-schema request)
-    :strict (normalized-structured-output-strict? request)}
+    :schema (:json-schema request)}
    ```
 
-   `:strict` must reflect the normalized request `[:structured-output :strict?]` value, defaulting to `true` only when the caller omits `:strict?`. If the caller supplies `:strict? false`, the Anthropic request must send `:strict false`; tests must cover both the default-true and explicit-false cases.
+   Live Anthropic verification showed `output_format.name` and `output_format.strict` are rejected as extra inputs for the `structured-outputs-2025-11-13` API, so the schema name and strictness remain Psi metadata only and are not sent inside `:output_format`.
 3. Add `structured-outputs-2025-11-13` to the comma-separated `anthropic-beta` header. Preserve existing beta values for OAuth, prompt caching, and thinking; do not duplicate beta tokens.
 4. Do not add the synthetic forced structured-output tool unless the selected mechanism is `:anthropic/forced-tool-use`.
 5. Do not inject prompted-JSON fallback instructions unless strategy selection chooses `:prompted-json`.
