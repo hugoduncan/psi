@@ -61,3 +61,7 @@ Found one new actionable inconsistency: `doc/workflow-ir.md` documents LLM judge
 ## 2026-05-23 — inconsistency follow-up repeat 3
 
 Completed the newly added inconsistency follow-up: aligned `doc/workflow-ir.md` suggested documentation grammar with the documented judge-local structured `:outputs` contract by adding `outputs?` to the `llm-judge` production. Marked the design-step done. Did not execute `steps.md` implementation items.
+
+## 2026-05-23 — implementation slice
+
+Implemented the first runtime structured-output slice: runtime-owned reusable `:psi.workflow/judge-review-result` schema, canonical prompted-JSON parse/coerce/validate envelopes, IR schema/semantic validation for session and judge `:outputs`, session-step fail-fast blocked result on invalid structured output, judge-local structured output routing via validated `:decision`, and downstream source refs that expose only valid structured `:value` fields. Added focused structured-output, source-resolution, and structured judge tests. Focused verification green: `clojure -M:test --focus psi.workflow-runtime.ir-test --focus psi.workflow-runtime.structured-output-test --focus psi.workflow-step-materialization.structured-source-resolution-test --focus psi.agent-session.workflow-judge-test`.

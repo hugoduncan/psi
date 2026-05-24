@@ -18,7 +18,9 @@
    Broader execution/compiler semantics remain out of scope for this slice."
   (:require
    [clojure.string :as str]
-   [malli.core :as m]))
+   [malli.core :as m]
+   [psi.workflow-runtime.structured-output :as structured-output]
+   [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]))
 
 ;(def ids)
 (def workflow-ir-version-schema [:= :workflow-ir/v1])
@@ -75,10 +77,26 @@
      (fn [{:keys [path projection]}]
        (not (and path projection)))]]])
 
-(def output-spec-schema
+(def structured-output-source-schema
+  [:enum :session/structured-output :judge/structured-output])
+
+(def text-output-spec-schema
   [:map
    [:source :keyword]
    [:metadata {:optional true} [:maybe :map]]])
+
+(def structured-output-spec-schema
+  [:map
+   [:source structured-output-source-schema]
+   [:mode [:= :structured]]
+   [:schema-id :keyword]
+   [:schema-version pos-int?]
+   [:schema :any]
+   [:strategy {:optional true} [:enum :provider-native :prompted-json :repair-parse :unsupported]]
+   [:metadata {:optional true} [:maybe :map]]])
+
+(def output-spec-schema
+  [:or structured-output-spec-schema text-output-spec-schema])
 
 (def terminal-contract-schema
   [:map
@@ -175,6 +193,7 @@
   [:map
    [:type [:= :llm]]
    [:session session-spec-schema]
+   [:outputs {:optional true} outputs-schema]
    [:projection {:optional true} [:maybe projection-schema]]])
 
 (def invoke-judge-schema
@@ -278,6 +297,39 @@
         [{:type :skills-without-read-tool
           :step (:name step)
           :skills skills}]))))
+
+(defn- structured-output-cardinality-errors
+  [step]
+  (let [step-entries (structured-output/structured-output-entries (:outputs step))
+        judge-entries (structured-output/structured-output-entries (get-in step [:judge :outputs]))]
+    (concat
+     (when (> (count step-entries) 1)
+       [{:type :multiple-structured-outputs
+         :step (:name step)
+         :scope :step
+         :output-keys (mapv first step-entries)}])
+     (when (> (count judge-entries) 1)
+       [{:type :multiple-structured-outputs
+         :step (:name step)
+         :scope :judge
+         :output-keys (mapv first judge-entries)}]))))
+
+(defn- reusable-schema-errors
+  [step]
+  (letfn [(schema-error [scope [output-key output-spec]]
+            (when-let [known-schema (structured-output-schemas/schema-for (:schema-id output-spec)
+                                                                          (:schema-version output-spec))]
+              (when (not= known-schema (:schema output-spec))
+                {:type :reusable-structured-output-schema-mismatch
+                 :step (:name step)
+                 :scope scope
+                 :output-key output-key
+                 :schema-id (:schema-id output-spec)
+                 :schema-version (:schema-version output-spec)})))]
+    (keep identity
+          (concat
+           (map #(schema-error :step %) (structured-output/structured-output-entries (:outputs step)))
+           (map #(schema-error :judge %) (structured-output/structured-output-entries (get-in step [:judge :outputs])))))))
 
 (defn- ref-errors [step-index current-step source-ref]
   (when (map? source-ref)
@@ -401,6 +453,8 @@
                                        :output-key output-key
                                        :available-outputs (vec (keys (:outputs step)))}]))
               skills-read-errors (skills-without-read-errors step)
+              structured-cardinality-errors (structured-output-cardinality-errors step)
+              reusable-schema-errors* (reusable-schema-errors step)
               ref-errors* (mapcat #(ref-errors step-idx step-name %)
                                   (step-source-refs step))]
           (concat on-without-judge
@@ -408,6 +462,8 @@
                   missing-yields
                   local-yield-errors
                   skills-read-errors
+                  structured-cardinality-errors
+                  reusable-schema-errors*
                   ref-errors*)))
       steps))))
 
@@ -444,14 +500,24 @@
    - session steps still tolerate legacy stored `:text` output as a fallback for
      canonical `:final-llm-reply` during compatibility migration
    - `:result` denotes the whole accepted-result envelope when declared locally"
-  [_step accepted-result output-key]
-  (let [raw-outputs (:outputs accepted-result)]
-    (case output-key
-      :result accepted-result
-      :final-llm-reply (or (get raw-outputs :final-llm-reply)
-                           (get raw-outputs :text))
-      :handoff (get raw-outputs :handoff)
-      (get raw-outputs output-key))))
+  [step accepted-result output-key]
+  (let [raw-outputs (:outputs accepted-result)
+        value (case output-key
+                :result accepted-result
+                :final-llm-reply (or (get raw-outputs :final-llm-reply)
+                                     (get raw-outputs :text))
+                :handoff (get raw-outputs :handoff)
+                (get raw-outputs output-key))
+        output-spec (get-in step [:outputs output-key])]
+    (if (structured-output/structured-output-spec? output-spec)
+      (if (structured-output/valid-output-result? value)
+        (get-in value [:structured-output :value])
+        (throw (ex-info "Workflow structured output is not valid"
+                        {:type :invalid-structured-output
+                         :step (:name step)
+                         :output output-key
+                         :structured-output (:structured-output value)})))
+      value)))
 
 (defn step-output-surfaces
   "Return the normalized logical output-surface map for a canonical IR `step`
@@ -520,7 +586,7 @@
 
 (defn- format-semantic-error
   "Format a single semantic error map into a human-readable line."
-  [{:keys [type step ref output-key available-outputs available-yield-fields] :as err}]
+  [{:keys [type step ref output-key available-outputs available-yield-fields scope output-keys schema-id schema-version] :as err}]
   (case type
     :routing-without-judge
     (str "Step '" step "': routing table (:on) requires a judge")
@@ -554,6 +620,15 @@
 
     :skills-without-read-tool
     (str "Step '" step "': skills require the 'read' tool to be present in :tools")
+
+    :multiple-structured-outputs
+    (str "Step '" step "': " (name scope) " declares multiple structured outputs "
+         (pr-str output-keys) "; declare one structured output and group fields in its schema")
+
+    :reusable-structured-output-schema-mismatch
+    (str "Step '" step "': " (name scope) " output " output-key
+         " declares schema-id/version " schema-id " v" schema-version
+         " but its inline schema does not match the reusable workflow schema")
 
     ;; fallback for unknown types
     (str "Step '" step "': " type " (raw: " (pr-str err) ")")))

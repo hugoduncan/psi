@@ -85,11 +85,14 @@
     :within-limit))
 
 (defn match-signal
-  "Match a signal string against a routing table.
-   Returns the matched directive map or nil. Exact match after trim."
+  "Match a signal against a routing table.
+   String signals match after trim; keyword/data signals match exactly."
   [signal routing-table]
   (when (and signal routing-table)
-    (get routing-table (str/trim signal))))
+    (get routing-table
+         (if (string? signal)
+           (str/trim signal)
+           signal))))
 
 (defn resolve-goto-target
   "Resolve a :goto value to a concrete action.

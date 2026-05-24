@@ -46,7 +46,7 @@
     (let [step-id (:step source-ref)
           output-key (:output source-ref)
           accepted (get-in workflow-run [:step-runs step-id :accepted-result])]
-      (semantics/step-output-value accepted output-key))
+      (semantics/step-output-value (semantics/effective-step-def workflow-run step-id) accepted output-key))
 
     (and (map? source-ref) (:yield source-ref))
     (let [step-id (:step source-ref)
@@ -159,7 +159,7 @@
       (if (keyword? k2)
         (let [value (cond
                       (contains? (set (keys (:outputs step-def))) k2)
-                      (semantics/step-output-value accepted-result k2)
+                      (semantics/step-output-value step-def accepted-result k2)
 
                       :else
                       (get-path* accepted-result path))]

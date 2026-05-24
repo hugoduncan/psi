@@ -5,7 +5,8 @@
    used by workflow step materialization and source-resolution surfaces without
    re-expanding workflow-runtime ownership."
   (:require
-   [psi.workflow-judge :as workflow-judge]))
+   [psi.workflow-judge :as workflow-judge]
+   [psi.workflow-step-materialization.structured-output :as structured-output]))
 
 (defn effective-steps
   [definition]
@@ -20,26 +21,38 @@
   (get (effective-steps (:effective-definition workflow-run)) step-id))
 
 (defn step-output-value
-  [accepted-result output-key]
-  (let [raw-outputs (:outputs accepted-result)]
-    (case output-key
-      :result accepted-result
-      :final-llm-reply (or (get raw-outputs :final-llm-reply)
-                           (get raw-outputs :text))
-      :handoff (get raw-outputs :handoff)
-      (get raw-outputs output-key))))
+  ([accepted-result output-key]
+   (step-output-value nil accepted-result output-key))
+  ([step accepted-result output-key]
+   (let [raw-outputs (:outputs accepted-result)
+         value (case output-key
+                 :result accepted-result
+                 :final-llm-reply (or (get raw-outputs :final-llm-reply)
+                                      (get raw-outputs :text))
+                 :handoff (get raw-outputs :handoff)
+                 (get raw-outputs output-key))
+         output-spec (get-in step [:outputs output-key])]
+     (if (structured-output/structured-output-spec? output-spec)
+       (if (structured-output/valid-output-result? value)
+         (get-in value [:structured-output :value])
+         (throw (ex-info "Workflow structured output is not valid"
+                         {:type :invalid-structured-output
+                          :step (:name step)
+                          :output output-key
+                          :structured-output (:structured-output value)})))
+       value))))
 
 (defn step-yield-field-value
   [step accepted-result yield-field]
   (let [yield-spec (:yields step)]
     (case (:type yield-spec)
       :data (when (= :data yield-field)
-              (step-output-value accepted-result (:data yield-spec)))
+              (step-output-value step accepted-result (:data yield-spec)))
       :text (when (= :text yield-field)
-              (step-output-value accepted-result (:text yield-spec)))
+              (step-output-value step accepted-result (:text yield-spec)))
       :error (get-in accepted-result [:blocked yield-field])
       :delegated (when (= :text yield-field)
-                   (step-output-value accepted-result :final-llm-reply))
+                   (step-output-value step accepted-result :final-llm-reply))
       nil)))
 
 (defn project-source-value

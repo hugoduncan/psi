@@ -9,6 +9,7 @@
    [psi.workflow-judge :as workflow-judge]
    [psi.workflow-runtime.child-session-contract :as child-session-contract]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
+   [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
 
 ;;; Judge session execution — impure
@@ -66,21 +67,39 @@
         (child-session-contract/assert-valid-result!
          :psi.agent-session.workflow-judge/execute-judge!))
     ;; First attempt
-    (let [initial-result (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec))]
+    (let [initial-result (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec))
+          structured-entry (structured-output/single-structured-output-entry (:outputs judge-spec))]
       (loop [attempt 0
              last-output (str/trim (:assistant-text initial-result))]
-        (let [routing-result (workflow-judge/evaluate-routing last-output routing-table
-                                                              current-step-id step-order step-runs)]
-          (if (and (= :no-match (:action routing-result))
-                   (< attempt max-judge-retries))
-            ;; Retry: inject feedback into the same judge session
-            (let [retry-result (turn-execution/execute-judge-turn! ctx judge-sid
-                                                                   (judge-retry-feedback last-output expected-sigs))]
-              (recur (inc attempt)
-                     (str/trim (:assistant-text retry-result))))
-            ;; Matched, or retries exhausted
-            {:judge-session-id judge-sid
-             :judge-output     last-output
-             :judge-event      (when (not= :no-match (:action routing-result))
-                                 last-output)
-             :routing-result   routing-result}))))))
+        (if-let [[output-key output-spec] structured-entry]
+          (let [structured-result (structured-output/output-result output-spec last-output)
+                judge-output {output-key structured-result}]
+            (if (structured-output/valid-output-result? structured-result)
+              (let [judge-event (get-in structured-result [:structured-output :value :decision])
+                    routing-result (workflow-judge/evaluate-routing judge-event routing-table
+                                                                    current-step-id step-order step-runs)]
+                {:judge-session-id judge-sid
+                 :judge-output judge-output
+                 :judge-event judge-event
+                 :routing-result routing-result})
+              {:judge-session-id judge-sid
+               :judge-output judge-output
+               :judge-event nil
+               :routing-result {:action :fail
+                                :reason :invalid-structured-output
+                                :output-key output-key}}))
+          (let [routing-result (workflow-judge/evaluate-routing last-output routing-table
+                                                                current-step-id step-order step-runs)]
+            (if (and (= :no-match (:action routing-result))
+                     (< attempt max-judge-retries))
+              ;; Retry: inject feedback into the same judge session
+              (let [retry-result (turn-execution/execute-judge-turn! ctx judge-sid
+                                                                     (judge-retry-feedback last-output expected-sigs))]
+                (recur (inc attempt)
+                       (str/trim (:assistant-text retry-result))))
+              ;; Matched, or retries exhausted
+              {:judge-session-id judge-sid
+               :judge-output     last-output
+               :judge-event      (when (not= :no-match (:action routing-result))
+                                   last-output)
+               :routing-result   routing-result})))))))

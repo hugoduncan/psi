@@ -6,6 +6,7 @@
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.attempts :as attempts]
    [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.statechart-runtime.queue :as queue]
    [psi.workflow-runtime.statechart-runtime.state :as state]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
@@ -149,12 +150,26 @@
                          :transcript (when assistant-message [assistant-message])
                          :logprobs logprobs
                          :session-id (:session-id execution-session)}
+            structured-entry (structured-output/single-structured-output-entry (:outputs step-def))
+            raw-outputs (if-let [[output-key output-spec] structured-entry]
+                          (assoc raw-outputs output-key
+                                 (structured-output/output-result output-spec assistant-text))
+                          raw-outputs)
+            structured-result (some-> structured-entry first raw-outputs)
             normalized-outputs (workflow-ir/step-output-surfaces
                                 step-def
                                 {:outcome :ok
                                  :outputs raw-outputs})
-            envelope {:outcome :ok
-                      :outputs (merge raw-outputs normalized-outputs)}]
+            envelope (if (and structured-entry
+                              (not (structured-output/valid-output-result? structured-result)))
+                       {:outcome :blocked
+                        :blocked {:reason :invalid-structured-output
+                                  :message "Workflow structured output failed validation"
+                                  :details {:output-key (first structured-entry)
+                                            :structured-output (:structured-output structured-result)}}
+                        :outputs (merge raw-outputs normalized-outputs)}
+                       {:outcome :ok
+                        :outputs (merge raw-outputs normalized-outputs)})]
         (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
                                                             :payload envelope
                                                             :step-id step-id
