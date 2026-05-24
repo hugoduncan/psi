@@ -76,65 +76,80 @@ In scope:
 - Avoid compatibility shims that silently reinterpret old prose contracts as structured contracts.
 - Prefer explicit references to structured data over path strings embedded in prompts.
 
-## Proposed authoring shape
+## Concrete authored and IR contract shape
 
-The exact syntax may be adjusted to match current workflow IR conventions, but the design should converge on this conceptual shape:
+Workflow IR already uses step `:name` and step-local `:outputs` maps as the canonical machine-facing output surface. This task must therefore extend `:outputs`; it must not introduce a competing singular top-level `:output` key.
+
+Authored workflow definitions declare structured output by adding an output entry under `:outputs` whose source is the execution-specific structured result. The normalized IR preserves the same logical output key and normalizes the schema contract into that output entry.
+
+For session steps, the canonical first implementation shape is:
 
 ```edn
-{:id :classify-reproduction
+{:name "classify-reproduction"
  :type :session
- :prompt "Classify the reproduction result."
- :output
- {:mode :structured
-  :schema-id :psi.workflow/bug-reproduction-classification
-  :schema-version 1
-  :schema
-  [:map
-   [:status [:enum :reproducible :not-reproducible :unclear]]
-   [:summary :string]
-   [:evidence [:vector :string]]
-   [:commands-run [:vector :string]]
-   [:next-action [:enum :request-more-info :handoff-to-fix :stop]]]}}
+ :contributions [{:type :template
+                  :text "Classify the reproduction result."}]
+ :outputs {:classification
+           {:source :session/structured-output
+            :mode :structured
+            :schema-id :psi.workflow/bug-reproduction-classification
+            :schema-version 1
+            :schema
+            [:map
+             [:status [:enum :reproducible :not-reproducible :unclear]]
+             [:summary :string]
+             [:evidence [:vector :string]]
+             [:commands-run [:vector :string]]
+             [:next-action [:enum :request-more-info :handoff-to-fix :stop]]]}}
+ :yields {:type :data
+          :data :classification}}
 ```
 
-A judge step should use the same output contract surface rather than a separate ad hoc mechanism:
+An LLM judge declares the same structured contract under its judge-local `:outputs` map. Judge output keys are local to the judge result and may be used by the step's transition evaluation; they are not a separate prose-parsing mechanism:
 
 ```edn
-{:id :review-design
- :type :judge
- :prompt "Review the task design for ambiguities."
- :output
- {:mode :structured
-  :schema-id :psi.workflow/design-review
-  :schema-version 1
-  :schema
-  [:map
-   [:decision [:enum :clear :needs-work :unclear]]
-   [:issues
-    [:vector
-     [:map
-      [:severity [:enum :blocking :minor]]
-      [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
-      [:description :string]
-      [:evidence :string]
-      [:suggested-change :string]]]]
-   [:confidence [:double {:min 0.0 :max 1.0}]]]}}
-```
-
-A human-facing text-only step remains valid:
-
-```edn
-{:id :summarize
+{:name "review-design"
  :type :session
- :prompt "Write a concise human summary."
- :output {:mode :text}}
+ :contributions [...]
+ :judge {:type :llm
+         :contributions [{:type :template
+                          :text "Review the task design for ambiguities."}]
+         :outputs {:review
+                   {:source :judge/structured-output
+                    :mode :structured
+                    :schema-id :psi.workflow/judge-review-result
+                    :schema-version 1
+                    :schema
+                    [:map
+                     [:decision [:enum :clear :needs-work :unclear]]
+                     [:issues
+                      [:vector
+                       [:map
+                        [:severity [:enum :blocking :minor]]
+                        [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
+                        [:description :string]
+                        [:evidence :string]
+                        [:suggested-change :string]]]]
+                     [:confidence [:double {:min 0.0 :max 1.0}]]]}}}}
 ```
 
-If `:output` is omitted, existing text behavior should remain the default for compatibility unless current workflow IR already requires explicit outputs.
+A human-facing text-only step remains valid by omitting structured output entries and using the existing text output surface:
+
+```edn
+{:name "summarize"
+ :type :session
+ :contributions [{:type :template
+                  :text "Write a concise human summary."}]
+ :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+ :yields {:type :text
+          :text :final-llm-reply}}
+```
+
+If structured `:outputs` are omitted, existing text behavior remains the default for compatibility. `:output {:mode :text}` is not part of the chosen contract.
 
 ## Runtime result shape
 
-Each schema-constrained step should produce a canonical result shape equivalent to:
+Each schema-constrained output key should produce a canonical result shape equivalent to the value behind that step-local output key. For example, `{:from {:step "classify-reproduction" :output :classification}}` returns:
 
 ```edn
 {:raw-output "..."
@@ -169,22 +184,17 @@ Downstream control flow must only consume `:value` when `:status` is `:valid`.
 
 ## Downstream reference contract
 
-The design should provide one explicit way to reference validated structured output fields. Conceptually:
+The chosen reference form is the existing workflow source-spec shape: `{:from {:step step-name :output output-key} :path path}`. Structured output is addressed by the logical output key declared in `:outputs`; fields are addressed by `:path` into the validated structured `:value`.
+
+Example:
 
 ```edn
-{:from {:step :classify-reproduction
-        :structured [:next-action]}}
+{:from {:step "classify-reproduction"
+        :output :classification}
+ :path [:next-action]}
 ```
 
-or, if current IR has an established output-ref shape, the equivalent should be:
-
-```edn
-{:from {:step :classify-reproduction
-        :output :structured
-        :path [:next-action]}}
-```
-
-The final implementation should choose the form that best aligns with current workflow IR, but it must satisfy these rules:
+The reference resolver must satisfy these rules:
 
 - references are to validated structured values, not raw text;
 - references fail clearly if the source step did not declare structured output;
@@ -218,30 +228,27 @@ The minimum acceptable policy is fail-fast:
 A bounded retry/repair policy is acceptable only if explicit in the step contract, for example:
 
 ```edn
-:output {:mode :structured
-         :schema ...
-         :on-invalid {:action :retry
-                      :max-attempts 2}}
+:outputs {:classification
+          {:source :session/structured-output
+           :mode :structured
+           :schema ...
+           :on-invalid {:action :retry
+                        :max-attempts 2}}}
 ```
 
 If retry/repair is included, tests must prove that attempts are bounded and that final failure is explicit.
 
-## Standard first schemas
+## Standard first schema
 
-This task should introduce at least one realistic standard schema used by a test or migrated example. Good first candidates are:
+The first standard schema for this slice is **workflow judge review result**. It is introduced as a reusable schema plus focused runtime tests and documentation examples. Existing workflows are not migrated in this slice; migration is explicit future work after the runtime surface is proven.
 
-1. **Workflow judge review result**
-   - decision: `:clear`, `:needs-work`, or `:unclear`
-   - findings/issues with severity, kind, evidence, and suggested change
-   - confidence
+Schema intent:
 
-2. **Bug reproduction classification**
-   - status: `:reproducible`, `:not-reproducible`, or `:unclear`
-   - evidence
-   - commands run
-   - next action
+- `:decision` — `:clear`, `:needs-work`, or `:unclear`;
+- `:issues` — vector of findings with `:severity`, `:kind`, `:description`, `:evidence`, and `:suggested-change`;
+- `:confidence` — bounded double between `0.0` and `1.0`.
 
-The judge review result is the preferred first standard schema because many existing workflows use judge-like control loops where prose-shaped actionable/no-action output is especially brittle.
+The judge review result is preferred over bug reproduction classification because review loops are already common and currently rely on prose-shaped actionable/no-action judgments. A bug reproduction classification schema remains a follow-on candidate, not part of this first slice.
 
 ## Relationship to delegated handoffs
 
@@ -267,7 +274,7 @@ Focused tests should cover:
 
 Update workflow authoring documentation to explain:
 
-- when to use `:output {:mode :structured ...}`;
+- when to use structured entries in `:outputs`;
 - when to leave a step as text;
 - how raw output, parsed output, and validation errors are stored;
 - how downstream steps reference structured fields;
