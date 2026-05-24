@@ -35,3 +35,7 @@ Found one new actionable ambiguity: `doc/workflow-ir.md` remains generic about `
 ## 2026-05-23 — ambiguity follow-up repeat 2
 
 Completed the newly added ambiguity follow-up: aligned `doc/workflow-ir.md` with the structured-output contract by documenting normalized session-step structured `:outputs`, judge-local structured `:outputs`, canonical structured-output runtime envelopes, provider strategy/coercion metadata, and downstream reference failure semantics. Marked the design-step done. Did not execute `steps.md` implementation items.
+
+## 2026-05-23 — inconsistency review repeat 2
+
+Found one new actionable inconsistency: judge structured outputs are described as judge-local data for transition evaluation, but the task docs also imply downstream `{:from {:step ... :output ...}}` references can read those judge-local fields. The source-ref grammar only has step output refs, and the task does not specify whether judge-local outputs are transition-context-only or promoted onto the parent step output surface.
