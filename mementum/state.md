@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 169 test-review follow-up: Anthropic provider now loads, focused Anthropic structured-output test passes, combined OpenAI/Anthropic structured-output + model/user-model focused run passes; marked the verification follow-up done and committed 15b4b0ad.
+
 - 2026-05-23: Reviewed task 169 implementation with task-implementation-review; found Anthropic fallback-only structured-output strategy is selected but not request-shaped with adapter-owned prompted-JSON instructions; added implementation follow-up.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 14 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 
@@ -23,7 +25,7 @@ Bootstrapped on 2026-04-02.
 - 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 12; found no new actionable inconsistency feedback after rechecking task artifacts, workflow docs, and current AI model/provider/schema/user-model/provider files.
 
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 13; found no new actionable ambiguity feedback after rechecking task artifacts, workflow docs, and current AI model/provider/schema/user-model files.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 11 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated. Commit 31fc49d4.
+- 2026-05-23: Executed task 169 inconsistency follow-up repeat 11 after no-action review; no newly added unchecked design-steps existed, so implementation.md records the pass and commit 31fc49d4 captures it.
 - 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 11; found no new actionable inconsistency feedback after JSON Schema source, built-in capability assignment, and docs/code alignment checks.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 12 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 10 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
@@ -35,8 +37,8 @@ Bootstrapped on 2026-04-02.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 9; found JSON Schema source contract ambiguity: request contract still allows supplied `:json-schema`, adapter-derived conversion, or subset conversion/failure, but provider-native construction requires one concrete behavior; added design-step and committed e5fbabe1.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 8 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 8: non-streaming structured-output metadata/payload is authoritative at top-level provider result `:structured-output`, sibling to `:assistant-message`/`:logprobs`, not nested or capture-only.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 8; found non-streaming structured-output metadata root ambiguity: design says provider execution returns/associates `:structured-output`, but current `execute-response` returns `{:assistant-message ... :logprobs ...}` with no exact root; added design-step and committed 08e6446d.
-- 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 7; found auth-path representation inconsistency: design requires final `:auth` in effective capability resolution and examples show `:auth :chatgpt-oauth`, but closed model schemas/plan/steps do not allow or populate it; added design-step and committed c1ff047a.
+- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 8; found non-streaming structured-output metadata root ambiguity: design says provider execution returns/associates `:structured-output`, but current `execute-response` returns `{:assistant-message ... :logprobs ...}` with no exact root; added design-step and committed 6ab439b9.
+- 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 7; found auth-path representation inconsistency: design requires final `:auth` in effective capability resolution and examples show `:auth :chatgpt-oauth`, but closed model schemas/plan/steps do not allow or populate it; added design-step.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 7: runtime auth/transport resolution is authoritative for structured-output capability; OAuth-backed `openai/gpt-5.5` mapped to Codex must clear/replace platform-native capability so strategy selection cannot inherit Chat Completions native support.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 7; found auth-path/runtime transport override ambiguity for OAuth-backed `openai/gpt-5.5` inheriting platform Chat Completions native capability after `resolve-runtime-model` changes it to Codex; added design-step and committed 6ab439b9.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 6: omitted structured-output capability data remains load-valid but normalizes to effective unsupported; prompted-JSON fallback is explicit opt-in, preventing surprise fallback prompt injection for legacy/custom models.
@@ -49,78 +51,22 @@ Bootstrapped on 2026-04-02.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 3 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 3: clarified structured-output capability `:supported?` semantics as any declared path, distinguished provider-native by strategy/native mechanism, and specified fallback-only vs unsupported request-time behavior.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 3; found capability `:supported?` ambiguity for fallback-only vs unsupported/provider-native semantics; added design-step and implementation note.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 2 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
+- 2026-05-23: Executed task 169 inconsistency follow-up repeat 2 after no-action review; no newly added design-steps existed, no implementation steps were executed, and implementation.md records the pass.
 - 2026-05-23: Re-reviewed task 169 design/plan/steps for inconsistencies after validation-boundary clarification; found no new actionable inconsistency feedback; appended implementation note and committed 35a4a62d.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 2: resolved validation-test ambiguity by specifying task 169 proves extracted/raw payload + strategy metadata handoff preservation for workflow/runtime validation, without adding an AI-level Malli validation seam.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated. Commit 5c48d582.
+- 2026-05-23: Executed task 169 inconsistency follow-up repeat after no-action review; no new design-steps existed, so only implementation.md was updated. Commit 5c48d582.
 - 2026-05-23: Executed task 169 ambiguity follow-ups repeat: specified provider-extracted structured payload surface (`[:structured-output :payload]` and streaming `:structured-output-result`/equivalent capture), hid Anthropic synthetic tool input from ordinary tool calls, and clarified AI adapters extract/report payload metadata while workflow/runtime validation remains authoritative.
-- 2026-05-23: Reviewed task 168 code with code-shaper; added follow-up to consolidate duplicate structured-output predicate/source helper logic between workflow-runtime and workflow-step-materialization.
-- 2026-05-23: Executed task 168 test-shaper follow-up: added focused boundary coverage that syntactically valid non-object JSON (array/scalars) is rejected as an invalid single-object structured envelope with parsed value/errors retained and no exposed `:value`.
-- 2026-05-23: Reviewed task 168 tests with task-test-review; added follow-ups for text-mode compatibility, IR structured-output semantic rejection, invalid/negative judge routing, and structured source-ref failure coverage.
-- 2026-05-23: Executed task 168 implementation-review follow-up: invalid session structured-output fail-fast now preserves raw output and invalid structured envelope by blocking before output-surface normalization; focused workflow tests green.
-- 2026-05-23: Completed task 168 broader verification pass: marked final implementation step done after `bb clojure:test:unit` passed across the unit suite; no deviations discovered.
-- 2026-05-23: Implemented task 168 first runtime structured-output slice: reusable judge-review schema, prompted-JSON canonical envelopes, IR validation, session fail-fast, structured judge routing, downstream valid-value refs; focused workflow tests green.
-- 2026-05-23: Executed task 168 inconsistency follow-up repeat 3: aligned `doc/workflow-ir.md` compact suggested grammar so `llm-judge` includes `outputs?`, matching documented judge-local structured outputs; design-steps all checked.
-- 2026-05-23: Executed task 168 ambiguity follow-up repeat 3: specified one structured-output key per session step or LLM judge, one raw response -> one structured envelope for prompted/provider-native strategies, and workflow-runtime ownership/export for `:psi.workflow/judge-review-result`; design-steps all checked.
-- 2026-05-23: Executed task 168 inconsistency follow-up repeat 2: specified judge-local structured outputs as transition-evaluation-only data, not implicit parent step outputs; aligned design, grammar, IR, and user guide; design-steps all checked.
-- 2026-05-23: Executed task 168 ambiguity follow-up repeat 2: aligned `doc/workflow-ir.md` with normalized session/judge structured output IR shape, canonical envelope metadata, provider strategy/coercion notes, and downstream reference semantics; design-steps all checked.
-- 2026-05-23: Executed task 168 inconsistency follow-up repeat: aligned `doc/workflows.md` with session/judge structured `:outputs`, representative structured field refs, and grammar/IR pointers; design-steps all checked.
-- 2026-05-23: Executed task 168 ambiguity follow-ups repeat: aligned workflow grammar docs for session/judge structured `:outputs` and specified prompted JSON fallback with schema-guided Malli coercion; design-steps all checked.
-- 2026-05-23: Created follow-on Munera task designs 169 and 170: model/provider structured-output capabilities for OpenAI/Anthropic native enforcement first, then workflow wiring to request provider-native structured outputs with explicit fallback/required-native policy.
-- 2026-05-23: Created Munera task 168 design for workflow structured output schemas: optional step/judge schemas, raw+validated result storage, explicit downstream structured references, provider strategy visibility, and fail-fast validation semantics. Commit 3106da5f.
-- 2026-05-23: Wired `bb emacs:tool-details:e2e` into CI/release Emacs jobs as an explicit step; local e2e green.
-- 2026-05-23: Added dedicated task 167 Emacs tool-details e2e harness (`bb emacs:tool-details:e2e`) using a deterministic rpc-edn fake backend; e2e and focused Emacs tests green.
-- 2026-05-23: Executed task 167 code-shaper follow-up: Emacs parsed/raw tool-call equivalence now canonicalizes argument maps across string/symbol/keyword keys; equivalent complete raw+parsed args suppress `Raw arguments:`, projected/lossy parsed args still include it. Focused Emacs suite green; committed 2660283c.
-- 2026-05-23: Reviewed task 167 implementation with code-shaper; added a follow-up to canonicalize parsed/raw argument equivalence before suppressing Emacs raw fallback.
-- 2026-05-23: Executed task 167 repeated test-shaper follow-up after no-action review; no unchecked implementation steps remained, so implementation.md records the pass.
-- 2026-05-23: Executed task 167 test-shaper follow-up after no-action review; no unchecked implementation steps remained, so implementation.md records the pass.
-- 2026-05-23: Reviewed task 167 tests with test-shaper; found no new actionable test-shaping feedback after existing Emacs full-call, raw fallback, nil/empty, invalid raw, and toggle coverage.
-- 2026-05-23: Reviewed task 167 tests with task-test-review; added follow-ups for missing Emacs coverage of explicit nil/empty argument markers and invalid raw argument fallback in expanded `Call` details.
-- 2026-05-23: Executed task 167 implementation-review follow-up: Emacs expanded `Call` details now include raw `arguments` when `parsed-args` cannot be proven equivalent; projected `psi-tool` coverage added; focused Emacs suite green.
-- 2026-05-23: Scoped task 167 back to Emacs-only full tool-call details; TUI equivalence and TUI extension-renderer gaps are out of scope.
-- 2026-05-23: Executed task 167 inconsistency follow-up repeat 2 after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
-- 2026-05-23: Re-reviewed task 167 design/plan/steps for inconsistencies (repeat 2); found no new actionable inconsistency feedback and appended the implementation note.
-- 2026-05-23: Executed task 167 ambiguity follow-up repeat 2 after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
-- 2026-05-23: Re-reviewed task 167 design/plan/steps for ambiguities (repeat 2); found no new actionable ambiguity feedback and appended the implementation note.
-- 2026-05-23: Executed task 167 inconsistency follow-up repeat after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
-- 2026-05-23: Re-reviewed task 167 design/plan/steps for inconsistencies after spec alignment; found no new actionable inconsistency feedback and appended implementation note.
-- 2026-05-23: Executed task 167 ambiguity follow-up repeat after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
-- 2026-05-23: Executed task 167 ambiguity follow-up after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
-- 2026-05-23: Executed task 167 inconsistency follow-up after no-action review; no unchecked design-steps remained, no implementation steps were executed, and implementation.md records the pass.
-- 2026-05-23: Executed task 167 ambiguity follow-up: design now preserves existing global Emacs `C-c C-t` and TUI `ctrl+o` tools-expanded semantics; no row-local expansion is required.
-- 2026-05-23: Reviewed task 167 design/plan/steps for inconsistencies; found TUI verification gap versus close-toggle acceptance (TUI supports ctrl+o close but plan/steps only mention collapsed+expanded coverage); added design-step and implementation note.
-- 2026-05-22: Created task 167 for Emacs `C-c C-t` tool details to include full tool call details alongside responses; TUI equivalence later dropped from scope.
-- 2026-05-22: Fixed Emacs prompt-completion cursor fallback so finalization places point in the editable input area instead of the input divider line; added regression coverage; `bb emacs:test --focus psi-streaming-transcript-test` ran 308/308 green.
-- 2026-05-22: Executed task 166 code-shaper follow-up: extracted shared assistant streaming optimization instrumentation helper while preserving distinct behavior assertions; focused streaming suite 36/36 and `bb emacs:test` 307/307 green.
-- 2026-05-22: Executed task 166 test-shaper follow-up: split the combined assistant append optimization proof into separate incremental-delta, cumulative-snapshot, and divergent-merge tests; focused streaming suite 36/36 and `bb emacs:test` 307/307 green.
-- 2026-05-22: Executed task 166 repeated test-review follow-up after no-action review; no new unchecked steps existed, so only implementation.md was updated.
-- 2026-05-22: Executed task 166 test-review follow-up after no-action test review; no new unchecked steps existed, so only implementation.md was updated and committed (6f0a3822).
-- 2026-05-22: Executed task 166 implementation-review follow-up: added `psi-streaming-render-optimization-test.el` to `bb emacs:test`, marked the step done, and verified focused streaming + full Emacs suites green (34/305 tests).
-- 2026-05-22: Executed task 166 inconsistency follow-up after no-action inconsistency review; no new design-steps existed, so only implementation.md was updated.
-- 2026-05-22: Executed task 166 ambiguity follow-up clarifying thinking append-only proof: assistant property ranges are suffix-only, while thinking proof uses inserted suffix mutation range plus no redraw/overlay recreation.
-- 2026-05-21: Fixed OpenAI OAuth `gpt-5.5` routing (commit 009aed51).
-  - Root cause: `gpt-5.5` used platform chat-completions while active OpenAI auth was ChatGPT OAuth; platform path returned `insufficient_quota`.
-  - Runtime resolution now maps OAuth-backed `openai/gpt-5.5` to `:openai-codex-responses` / `https://chatgpt.com/backend-api`, preserving visible id `gpt-5.5`.
-  - Updated prompt-request, app-runtime, RPC, TUI action, and `/model` command resolution seams.
-  - Focused tests green: `clojure -M:test --focus psi.provider-auth.core-test --focus psi.ai.model-registry-test --focus psi.agent-session.runtime-test --focus psi.agent-session.prompt-request-test` => 32 tests, 162 assertions, 0 failures.
-  - Live reload/eval verified and user successfully switched `/model openai gpt-5.5`.
-- Bootstrap simplification arc (159–163) complete:
-  - 159: in-process bootstrap simplification
-  - 160: removed mutation-mediated bootstrap resource loading
-  - 161: single-pass startup, `bootstrap-in!` and `refresh-active-tools-in!` removed
-  - 162: `bootstrap-runtime-session!` collapsed to single `(ctx ai-model opts)` arity
-  - 163: `start-tui-runtime!` refactored — dead `ai-ctx` removed
-- Tasks 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 also complete and closed
 
 ## Test health
 
-Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
+Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused structured-output/model tests ✅ (`clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions). 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
 
 ## Suggested next step
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
 
+- 2026-05-23: Task 169 test-review follow-up complete: no code change needed; current Anthropic provider compile/load path is healthy, focused structured-output/model verification is refreshed, and task step is checked.
 - 2026-05-23: Task 169 implementation slice 3 completed remaining streaming result surfaces: OpenAI emits `:structured-output-result` from accumulated assistant JSON; Anthropic suppresses synthetic forced-tool ordinary toolcall events and emits `:structured-output-result` from tool input. Focused and full unit verification green; commit 6e673424.
 - 2026-05-23: Task 169 implementation slice 2 added structured-output request strategy helpers, OpenAI Chat Completions native response_format, Codex prompted-JSON fallback shaping, Anthropic synthetic forced-tool request composition, streaming strategy events, OpenAI non-streaming structured-output metadata/payload handoff, docs, and focused provider tests.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 13 after no-action review; design-steps already fully checked, so implementation.md records the no-op pass and no implementation steps were executed. Commit 0e83b280.
