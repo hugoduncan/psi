@@ -8,6 +8,7 @@
             [psi.ai.proxy :as proxy]
             [psi.ai.providers.anthropic.request-schema :as request-schema]
             [psi.ai.providers.anthropic.request-support :as request-support]
+            [psi.ai.providers.anthropic.structured-output :as anthropic-structured-output]
             [psi.ai.providers.anthropic.tool-id :as tool-id]
             [psi.ai.structured-output :as structured-output])
   (:import [java.io InputStream]))
@@ -192,23 +193,6 @@
               (:cache-control tool)))
           (:tools conversation))))
 
-(defn- anthropic-structured-tool-name
-  [request tools]
-  (let [base     (str "psi_structured_output__"
-                      (structured-output/structured-output-name request))
-        occupied (set (keep :name tools))]
-    (loop [candidate base
-           n         2]
-      (if (contains? occupied candidate)
-        (recur (str base "_" n) (inc n))
-        candidate))))
-
-(defn- anthropic-structured-tool
-  [request tools]
-  {:name (anthropic-structured-tool-name request tools)
-   :description "Return the requested structured output."
-   :input_schema (:json-schema request)})
-
 (defn- oauth-api-key?
   [api-key]
   (and api-key (str/includes? api-key "sk-ant-oat")))
@@ -317,7 +301,7 @@
         api-key         (resolve-api-key options)
         tool-defs       (tool-definitions conversation)
         structured-tool (when (= :provider-native (:strategy strategy))
-                          (anthropic-structured-tool structured-request tool-defs))
+                          (anthropic-structured-output/structured-tool structured-request tool-defs))
         tool-defs       (cond-> (vec (or tool-defs []))
                           structured-tool (conj structured-tool))
         system-body     (system-prompt-body conversation)
@@ -712,8 +696,9 @@
         strategy           (structured-output/select-strategy model structured-request)
         request            (build-request conversation model options)
         request-body       (request-support/parse-json-body-safe (:body request))
-        structured-tool-name (when (= :provider-native (:strategy strategy))
-                               (get-in request-body [:tool_choice :name]))
+        structured-tool-name (anthropic-structured-output/structured-tool-name-from-request
+                              strategy
+                              request-body)
         block-types        (atom {})
         structured-buffers (atom {})
         usage-acc   (atom {:input-tokens       0
@@ -742,16 +727,18 @@
                               block (:content_block event-data)]
                           (swap! block-types assoc idx {:type (:type block)
                                                         :name (:name block)})
-                          (when-not (and (= "tool_use" (:type block))
-                                         (= structured-tool-name (:name block)))
+                          (when-not (anthropic-structured-output/structured-tool-block?
+                                     structured-tool-name
+                                     {:type (:type block) :name (:name block)})
                             (consume-fn (content-block-start-event idx block))))
 
                         "content_block_delta"
                         (let [idx (:index event-data)
                               block-info (get @block-types idx)
                               delta (:delta event-data)]
-                          (if (and (= "tool_use" (:type block-info))
-                                   (= structured-tool-name (:name block-info)))
+                          (if (anthropic-structured-output/structured-tool-block?
+                               structured-tool-name
+                               block-info)
                             (when-let [json-delta (:partial_json delta)]
                               (swap! structured-buffers update idx str json-delta))
                             (consume-event! consume-fn
@@ -762,15 +749,13 @@
                         "content_block_stop"
                         (let [idx (:index event-data)
                               block-info (get @block-types idx)]
-                          (if (and (= "tool_use" (:type block-info))
-                                   (= structured-tool-name (:name block-info)))
-                            (let [raw-payload (get @structured-buffers idx)
-                                  payload     (structured-output/parse-json-object raw-payload)]
-                              (consume-fn {:type :structured-output-result
-                                           :structured-output (cond-> (assoc strategy
-                                                                             :source :anthropic/tool-use
-                                                                             :raw-payload raw-payload)
-                                                                payload (assoc :payload payload))}))
+                          (if (anthropic-structured-output/structured-tool-block?
+                               structured-tool-name
+                               block-info)
+                            (anthropic-structured-output/maybe-emit-structured-result!
+                             consume-fn
+                             strategy
+                             (get @structured-buffers idx))
                             (consume-fn (content-block-stop-event (:type block-info)
                                                                   idx))))
 
