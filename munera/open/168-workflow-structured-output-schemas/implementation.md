@@ -44,3 +44,7 @@ Found one new actionable inconsistency: judge structured outputs are described a
 ## 2026-05-23 — inconsistency follow-up repeat 2
 
 Completed the newly added inconsistency follow-up: specified judge-local structured outputs as transition-evaluation data only, not implicitly promoted through the parent step `{:step ... :output ...}` surface; aligned `design.md`, `doc/workflow-grammar.md`, `doc/workflow-ir.md`, and `doc/workflows.md`; marked the design-step done. Did not execute `steps.md` implementation items.
+
+## 2026-05-23 — ambiguity review repeat 3
+
+Found new actionable ambiguity feedback: the task allows one or more structured `:outputs`, but does not define how a single model/judge response maps to multiple structured output keys in prompted JSON/provider-native modes; it also names the first reusable schema without specifying its code ownership/export surface for `:schema-id` reuse.
