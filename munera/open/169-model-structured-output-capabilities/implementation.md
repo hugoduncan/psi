@@ -180,3 +180,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed ambiguity follow-up repeat 11
 
 No newly added unchecked `design-steps.md` items existed after the preloaded ambiguity review, so there were no actionable ambiguity design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — inconsistency review repeat 10
+
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementation notes, referenced workflow docs, and current AI model/provider/schema/user-model files for cross-artifact inconsistency after the JSON Schema source and built-in capability assignment clarifications. Found no new actionable inconsistency feedback. The task artifacts consistently require explicit caller-supplied `:json-schema`, do not add AI-side Malli/domain schema conversion, treat omitted capability data as load-valid but effectively unsupported, derive auth/transport-specific capability from the resolved runtime model without an `:auth` field, use top-level non-streaming `:structured-output` plus first-class streaming structured-output events, keep OpenAI native support scoped to explicit `:openai-completions` Chat Completions `response_format`, keep Codex fallback-only/unsupported behavior, use Anthropic hidden synthetic forced-tool extraction, and preserve workflow/runtime as final validation authority.

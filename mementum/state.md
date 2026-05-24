@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 10; found no new actionable inconsistency feedback after JSON Schema source and built-in capability assignment clarifications.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 9: design acceptance/constraints now require caller-supplied `:json-schema`; AI adapters do not convert Malli/domain `:schema` in task 169.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 10: concrete built-in structured-output capability assignment is now explicit: Anthropic Messages native, named modern OpenAI Chat Completions native, Codex Responses fallback-only, unverified OpenAI entries omitted/unsupported.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 10; found built-in capability assignment ambiguity: examples reference non-current model ids and artifacts do not say which existing built-ins should declare native/fallback/unsupported structured-output capability; added design-step and committed 60ad4361.
