@@ -49,9 +49,10 @@
   (all-skills @(:state* ctx) (session-state/get-session-data-in ctx session-id)))
 
 (defn find-skill
-  [root-state _session-data skill-id]
-  (some-> (lookup-definition root-state skill-id)
-          skill-registry/ensure-valid-skill!))
+  [root-state session-data skill-id]
+  (when (some #(= skill-id %) (skill-ids session-data))
+    (some-> (lookup-definition root-state skill-id)
+            skill-registry/ensure-valid-skill!)))
 
 (defn find-skill-in
   [ctx session-id skill-name]

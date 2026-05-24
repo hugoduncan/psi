@@ -206,7 +206,9 @@
    :resume-and-execute-workflow-run-fn #'workflow-execution/resume-and-execute-run!
    :get-session-data-fn #'ss/get-session-data-in
    :list-context-sessions-fn #'ss/list-context-sessions-in
-   :find-skill-fn #'skill-storage/find-skill
+   :find-skill-fn (fn [ctx skills skill-name]
+                    (let [session-data {:skill-ids (mapv :name (or skills []))}]
+                      (skill-storage/find-skill @(:state* ctx) session-data skill-name)))
    :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
