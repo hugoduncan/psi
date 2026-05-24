@@ -160,3 +160,7 @@ Completed the newly added ambiguity follow-up without executing implementation `
 ## 2026-05-23 — ambiguity review repeat 10
 
 Found one new actionable ambiguity: the task specifies capability shapes and provider-native request behavior, but does not identify which current built-in model descriptions should actually declare structured-output capability in this slice. The OpenAI example uses `openai/gpt-4.1`, which is not a current built-in model, and the Anthropic example names a conceptual Sonnet 4 id while current built-ins include several Anthropic Messages models. Implementation and tests need one rule: mark all current `:openai-completions` / `:anthropic-messages` built-ins that support the chosen mechanisms, mark only a named subset, or use test-only synthetic models while documenting built-ins as omitted/unsupported.
+
+## 2026-05-23 — executed ambiguity follow-up repeat 10
+
+Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Added a concrete built-in capability assignment to `design.md`: all current Anthropic Messages built-ins are forced-tool native-capable; named modern OpenAI Chat Completions built-ins are JSON Schema response-format native-capable; OpenAI Codex Responses built-ins are prompted-JSON fallback-only; unverified OpenAI Chat Completions entries such as `:o1-preview` and `:codex-mini-latest` remain omitted/unsupported unless verified during implementation. Updated `plan.md` and `steps.md` to carry the assignment target, and marked the ambiguity design-step done.

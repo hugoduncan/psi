@@ -129,6 +129,20 @@ For a model or transport that should not accept structured-output requests at al
    :notes "Structured-output requests are not supported for this model/transport."}}}
 ```
 
+
+## Built-in model capability assignment
+
+Implementation and tests should use the current built-in model ids in `components/ai/src/psi/ai/models.clj`, not conceptual or future ids. For this slice, built-in structured-output capability assignment is transport-family based with explicit conservative exclusions:
+
+- Every built-in Anthropic model whose final resolved `:api` is `:anthropic-messages` declares provider-native structured output through `:native-mechanism :anthropic/forced-tool-use` and may also list `:prompted-json` as an allowed fallback strategy. This includes the current Claude 3.5, Sonnet 4/4.5/4.6, Opus 4/4.5/4.6/4.7, and Haiku 4.5 entries.
+- Built-in OpenAI platform Chat Completions models that are currently intended to use modern platform chat-completions behavior declare provider-native structured output through `:native-mechanism :openai/chat-completions-json-schema-response-format` and may also list `:prompted-json`. This includes `:gpt-4o`, `:gpt-5`, `:gpt-5-chat-latest`, `:gpt-5-mini`, `:gpt-5-nano`, `:gpt-5-pro`, `:gpt-5.1`, `:gpt-5.1-chat-latest`, `:gpt-5.2`, `:gpt-5.2-chat-latest`, `:gpt-5.2-pro`, `:gpt-5.4-mini`, and platform-auth `:gpt-5.5` while it remains resolved to `:openai-completions`.
+- Built-in OpenAI entries `:o1-preview` and `:codex-mini-latest` do not receive native structured-output capability in this task unless implementation verifies their Chat Completions `response_format` support while coding. If left unverified, omit their structured-output capability data so they normalize to unsupported.
+- Every built-in OpenAI model whose final resolved `:api` is `:openai-codex-responses` declares prompted-JSON fallback-only support, not provider-native support. This includes `:gpt-5-codex`, `:gpt-5.1-codex`, `:gpt-5.1-codex-max`, `:gpt-5.1-codex-mini`, `:gpt-5.2-codex`, `:gpt-5.3-codex`, `:gpt-5.3-codex-spark`, and `:gpt-5.4`.
+- If runtime resolution changes a platform-auth OpenAI entry such as `:gpt-5.5` from `:openai-completions` to `:openai-codex-responses` for ChatGPT OAuth, the resolved model uses the Codex fallback-only assignment and must not retain the platform Chat Completions native capability.
+- Test-only synthetic models may still be used for boundary cases, but tests for built-in defaults should assert at least one current built-in from each assigned family: a native OpenAI Chat Completions model, a fallback-only OpenAI Codex model, a native Anthropic Messages model, and an omitted/normalized unsupported model such as `:o1-preview` if it remains unverified.
+
+These assignments are initial declarative defaults, not live capability discovery. If provider documentation or live tests later prove a listed model lacks the chosen mechanism, adjust the built-in declaration rather than weakening strategy selection heuristics.
+
 ## Capability semantics
 
 `:supported?` means the model description declares at least one structured-output request path that Psi may intentionally use for this model/transport. It is not synonymous with provider-native enforcement. Provider-native support is present only when `:strategies` contains `:provider-native` and `:native-mechanism` names the concrete provider mechanism.
