@@ -121,3 +121,7 @@
 - Marked the follow-up checklist item complete in `steps.md`.
 - Focused proof passed: `clojure -M:test --focus psi.agent-session.scheduler-handlers-test` => 7 tests, 56 assertions, 0 failures.
 - Full scheduler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.psi-tool-scheduler-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-effects-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.scheduler-tools-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.scheduler-dispatch-test` => 33 tests, 344 assertions, 0 failures.
+
+## 2026-05-24 test review
+- Reviewed task-test-review skill, task artifacts, scheduler tests, and scheduler time-source acceptance coverage.
+- New actionable test feedback: delivery/drain tests cover explicit `:delivered-at` and missing time-source failures, but do not positively prove omitted `:delivered-at` message timestamps come from a deterministic supplied `:scheduler-time-source`.
