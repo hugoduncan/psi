@@ -243,7 +243,7 @@
   (testing "skill expansion resolves from root-registry-backed session skill ids"
     (let [skill {:name "lambda-compiler"
                  :description "Compile lambda expressions"
-                 :file-path "/tmp/SKILL.md"
+                 :file-path "components/agent-session/test/psi/agent_session/prompt_request_test.clj"
                  :base-dir "/tmp"
                  :source :project
                  :disable-model-invocation false}
