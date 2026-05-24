@@ -123,3 +123,7 @@ Found one new actionable ambiguity: the artifacts require capability selection t
 ## 2026-05-23 — executed ambiguity follow-up repeat 7
 
 Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Updated `design.md` to make the resolved runtime model the authoritative source for structured-output capability after auth/transport overrides. If `resolve-runtime-model` maps OAuth-backed `openai/gpt-5.5` to `:openai-codex-responses`, it must clear or replace any platform Chat Completions native capability with Codex fallback-only or unsupported capability; strategy selection must consume the resolved capability and cannot inherit pre-override native support. Updated `plan.md` and `steps.md` with the runtime-resolution requirement and marked the ambiguity design-step done.
+
+## 2026-05-23 — inconsistency review repeat 7
+
+Found one new actionable inconsistency: `design.md` makes auth path part of the effective resolved structured-output capability and shows a fallback-only `openai/gpt-5.5` runtime model with `:auth :chatgpt-oauth`, but current/target model schemas are closed and `plan.md`/`steps.md` do not say to allow or populate an auth marker on resolved runtime models. As written, implementation could either make the design example/schema invalid or leave auth-path capability selection unobservable despite the design requiring final `:auth` to participate in resolution.
