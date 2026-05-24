@@ -11,3 +11,4 @@
 - [x] Update AI documentation and task 170 dependency wording for Anthropic JSON Schema native, forced-tool native, and prompted JSON fallback paths.
 - [x] Run focused structured-output/model tests and record results in implementation notes.
 - [x] Add focused Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output, asserting `:parse-error? true`, preserved `:raw-payload`, and no `:payload`.
+- [ ] Add focused Anthropic JSON Schema native beta-header composition coverage proving `structured-outputs-2025-11-13` composes with OAuth, prompt-caching, and thinking beta tokens without dropping or duplicating existing betas.
