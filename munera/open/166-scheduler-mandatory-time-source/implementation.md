@@ -43,3 +43,9 @@
 ## 2026-05-24 ambiguity review pass 3
 - Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, and sampled referenced scheduler source/tests for current wall-clock, dispatch, timer, delivery, drain, and test-helper seams.
 - No new actionable ambiguities found; the task already specifies the mandatory scheduler time-source boundary, explicit create instants, delivery/drain timestamp handling, scheduler-owned wall-clock scan boundary, test helper shape, and focused proof set.
+
+## 2026-05-24 ambiguity follow-up execution pass 3
+- Used the preloaded ambiguity-review result: no new actionable ambiguities were added in the preceding review pass.
+- Checked `design-steps.md`; all ambiguity follow-up items were already complete.
+- Did not execute `steps.md` items, per instruction.
+- No design-step was blocked or left newly unchecked by this pass.
