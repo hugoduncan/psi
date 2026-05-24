@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 6; found absent structured-output capability semantics ambiguity for model descriptions that omit `:capabilities :structured-output` (current built-ins/custom schema omit it); added design-step and committed 54e1803c.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 5: chose first-class AI stream events `:structured-output-strategy` and `:structured-output-result` as the authoritative streaming metadata/result surface; provider captures are diagnostics only.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 5; found streaming structured-output metadata/result surface ambiguity (new stream events vs callback/capture while AI stream schemas lack event types); added design-step.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 4: aligned workflow structured-output docs so prompted-JSON fallback is AI-adapter-owned JSON-only/schema prompt injection, while workflow runtime owns parse/coerce/validate and trusted value exposure.
