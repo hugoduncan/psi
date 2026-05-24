@@ -164,3 +164,7 @@ Found one new actionable ambiguity: the task specifies capability shapes and pro
 ## 2026-05-23 — executed ambiguity follow-up repeat 10
 
 Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Added a concrete built-in capability assignment to `design.md`: all current Anthropic Messages built-ins are forced-tool native-capable; named modern OpenAI Chat Completions built-ins are JSON Schema response-format native-capable; OpenAI Codex Responses built-ins are prompted-JSON fallback-only; unverified OpenAI Chat Completions entries such as `:o1-preview` and `:codex-mini-latest` remain omitted/unsupported unless verified during implementation. Updated `plan.md` and `steps.md` to carry the assignment target, and marked the ambiguity design-step done.
+
+## 2026-05-23 — inconsistency review repeat 9
+
+Found one new actionable inconsistency: the finalized request contract and plan require explicit request `:json-schema` and say AI adapters do not convert Malli/domain `:schema` in task 169, but `design.md` still says request options may carry a JSON-Schema payload "or converted schema" and the design constraints still say to convert Malli/domain schemas to provider-compatible JSON Schema at the API boundary. Align those older acceptance/constraint statements with the explicit-`:json-schema` source contract.
