@@ -131,3 +131,7 @@ Found one new actionable inconsistency: `design.md` makes auth path part of the 
 ## 2026-05-23 — executed inconsistency follow-up repeat 7
 
 Completed the newly added inconsistency follow-up without executing implementation `steps.md` work. Resolved the auth-path representation inconsistency by keeping model maps/schema closed and not adding a runtime-only `:auth` marker. Updated `design.md` so ChatGPT OAuth capability selection is resolver-context-derived and materialized as the resolved model's final `:api`, `:base-url`, and structured-output capability map; strategy selection consumes that resolved capability and does not depend on an `:auth` field. Updated `plan.md` and `steps.md` with the same constraint and marked the design-step done.
+
+## 2026-05-23 — ambiguity review repeat 8
+
+Found one new actionable ambiguity: the non-streaming structured-output metadata/payload surface is still not anchored to the current `execute-response` return shape. The design says provider execution "returns or associates" `:structured-output` and examples show `[:structured-output :payload]`, but current OpenAI execution returns a top-level map like `{:assistant-message ... :logprobs ...}`. The task should specify whether non-streaming `:structured-output` is a top-level provider result key, nested on `:assistant-message`, only present in captures, or exposed through another exact field so implementation and tests do not choose different roots.
