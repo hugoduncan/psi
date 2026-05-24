@@ -95,7 +95,7 @@
   (count (:prompt-contributions @state)))
 
 (defn- prompt-contribution-key [params]
-  [(:ext-path params) (str (:id params))])
+  (str (:id params)))
 
 (defn- register-command! [state params]
   (let [name (:name params)

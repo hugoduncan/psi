@@ -4,10 +4,11 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extension-installs :as installs]
    [psi.agent-session.extensions :as ext]
-   [psi.command-registry.registry :as command-registry]
-   [psi.tool-registry.registry :as tool-registry]
-   [psi.agent-session.resolvers.support :as support]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
+   [psi.agent-session.resolvers.support :as support]
+   [psi.command-registry.registry :as command-registry]
+   [psi.prompt-registry.contributions :as prompt-contributions]
+   [psi.tool-registry.registry :as tool-registry]
    [psi.ui.state :as ui-state]))
 
 ;; ── Projection helpers ──────────────────────────────────
@@ -164,12 +165,8 @@
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
    ::pco/output [:psi.extension/prompt-contributions
                  :psi.extension/prompt-contribution-count]}
-  (let [contribs (->> (or (:prompt-contributions (support/session-data agent-session-ctx session-id)) [])
-                      (filter map?)
-                      (sort-by (fn [{:keys [priority ext-path id]}]
-                                 [(or priority 1000)
-                                  (or ext-path "")
-                                  (or id "")]))
+  (let [contribs (->> (:prompt-contributions (support/session-data agent-session-ctx session-id))
+                      prompt-contributions/sort-contributions
                       (mapv support/contribution->attrs))]
     {:psi.extension/prompt-contributions contribs
      :psi.extension/prompt-contribution-count (count contribs)}))

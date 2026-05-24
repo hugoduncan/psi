@@ -10,6 +10,6 @@ Design alignment:
 Implementation later:
 
 - [x] Inventory only the remaining lower-level seams, projections, tests/helpers, and callers that still model or depend on composite `ext-path + id` identity; keep already-single-id extension-facing helpers/docs out of that inventory.
-- [ ] Implement the chosen single-id identity semantics in `prompt-registry` and affected lower-level seams plus higher projections.
-- [ ] Add or update tests covering normalization, duplicate/conflict behavior, lower-level targeting, ordering, and affected caller-visible surfaces.
-- [ ] Run focused verification and any broader verification needed to close the task.
+- [x] Implement the chosen single-id identity semantics in `prompt-registry` and affected lower-level seams plus higher projections.
+- [x] Add or update tests covering normalization, duplicate/conflict behavior, lower-level targeting, ordering, and affected caller-visible surfaces.
+- [x] Run focused verification and any broader verification needed to close the task.

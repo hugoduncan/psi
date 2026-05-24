@@ -1,16 +1,18 @@
 # Plan
 
-Execute the newly added inconsistency follow-up by narrowing the remaining implementation inventory so the task artifacts match the refined design split.
+Implement the next concrete task-176 slice: move prompt-registry and its lower-level seams from composite `ext-path + id` identity to canonical single-id identity, then prove the new contract with focused tests.
 
-1. Re-read the preloaded inconsistency-review result and current task artifacts to isolate the exact wording mismatch added in `design-steps.md`.
-2. Re-check the concrete prompt-contribution caller split so the artifact update stays grounded in actual surfaces:
-   - extension-facing helpers/docs that already stay single-id-only
-   - built-in workflow registration that supplies owner provenance internally
-   - lower-level dispatch and Pathom mutation seams that still carry `ext-path`
-3. Update `steps.md` so the remaining implementation inventory/work targets only lower-level seams, projections, tests/helpers, and other callers that still depend on composite `ext-path + id` identity.
-4. Record the follow-up execution in `implementation.md` and mark the `design-steps.md` item done.
+1. Change `components/prompt-registry` pure contribution ownership so canonical identity is string-coerced `id` alone, cross-owner duplicate registration becomes an explicit ownership conflict, same-owner duplicate registration replaces, and canonical ordering becomes `[priority id]`.
+2. Update affected lower-level session seams to treat `ext-path` only as owner/provenance metadata and ownership assertion:
+   - dispatch handlers in `dispatch_handlers/prompt_handlers.clj`
+   - Pathom prompt mutations in `mutations/prompts.clj`
+   - prompt contribution projection ordering in resolvers/session surfaces that still sort locally
+3. Update nullable/test-helper infrastructure and focused lower-level tests so they model the new single-id contract rather than composite coexistence.
+4. Run focused verification for the affected prompt-registry and agent-session areas; broaden verification if focused results expose wider coupling.
+5. Synchronize task artifacts (`steps.md`, `implementation.md`) with the implementation outcomes and commit this pass.
 
 Approach notes:
-- This pass executes only newly added unchecked `design-steps.md` items.
-- Do not execute implementation items from `steps.md`.
-- Keep extension-facing helper/doc surfaces explicitly out of the composite-identity implementation inventory.
+- Preserve nil/blank `id` acceptance via existing string coercion in this pass.
+- Keep extension-facing helper APIs single-id-only; do not expand them to owner-qualified targeting.
+- Allow lower-level seams to continue accepting `ext-path` only as ownership metadata/check input, not as a second identity coordinate.
+- Prefer narrow, state-based tests without mocks; exercise real pure helpers and real dispatch/mutation seams.
