@@ -33,16 +33,17 @@ Likely tests:
 ## Sequence
 
 1. Add declarative structured-output capability schemas, model/user-model validation, and normalization for omitted capability data. Missing `[:capabilities :structured-output]` remains valid for compatibility but normalizes to effective unsupported, not fallback-only.
-2. Add request option validation/helpers for `:structured-output` and JSON-Schema-compatible payloads.
-3. Add strategy selection helper that consumes normalized model capability plus request fallback policy and returns one of `:provider-native`, `:prompted-json`, or `:unsupported` with a reason. Treat `:supported?` as "at least one declared structured-output path exists," not as provider-native support; fallback-only models are supported only when the request allows fallback, while `:supported? false` or omitted/defaulted capability data always selects `:unsupported`.
-4. Add deterministic prompted-JSON fallback request shaping: when `:prompted-json` is selected, inject provider-neutral JSON-only/schema instructions at the AI adapter boundary, preserve caller text, avoid all provider-native schema fields, and report `:fallback-used? true`; when fallback is disallowed, report/fail `:unsupported` without injecting fallback instructions.
-5. Wire OpenAI Chat Completions provider-native request construction via `response_format` JSON Schema only when model capability declares `:openai/chat-completions-json-schema-response-format`.
-6. Preserve Codex Responses fallback-only behavior: no unverified public OpenAI schema fields on `:openai-codex-responses`.
-7. Wire Anthropic forced synthetic tool use via `tools` + `tool_choice`, then extract the synthetic tool input as `[:structured-output :payload]` while excluding it from ordinary assistant tool calls.
-8. Emit/store strategy metadata for non-streaming calls, and for streaming calls emit first-class `:structured-output-strategy` and `:structured-output-result` events added to `psi.ai.schemas/StreamEventType`; provider-capture callbacks may duplicate metadata for diagnostics but are not the caller contract.
-9. Keep local parse/coerce/validate in the caller/runtime after provider extraction; AI adapters return raw/extracted payload metadata, not final trusted workflow values, and this task does not add an AI-level Malli validation invocation seam.
-10. Update docs for capabilities, caveats, and fallback semantics.
-11. Run focused tests, then broader AI component tests if focused changes pass.
+2. Ensure runtime model resolution produces the authoritative effective structured-output capability for the final transport/auth path. When `resolve-runtime-model` changes OAuth-backed `openai/gpt-5.5` to `:openai-codex-responses`, it must clear or replace any catalog platform-native capability so Codex strategy selection is fallback-only or unsupported, never inherited Chat Completions native support.
+3. Add request option validation/helpers for `:structured-output` and JSON-Schema-compatible payloads.
+4. Add strategy selection helper that consumes the resolved runtime model's normalized capability plus request fallback policy and returns one of `:provider-native`, `:prompted-json`, or `:unsupported` with a reason. Treat `:supported?` as "at least one declared structured-output path exists," not as provider-native support; fallback-only models are supported only when the request allows fallback, while `:supported? false` or omitted/defaulted capability data always selects `:unsupported`.
+5. Add deterministic prompted-JSON fallback request shaping: when `:prompted-json` is selected, inject provider-neutral JSON-only/schema instructions at the AI adapter boundary, preserve caller text, avoid all provider-native schema fields, and report `:fallback-used? true`; when fallback is disallowed, report/fail `:unsupported` without injecting fallback instructions.
+6. Wire OpenAI Chat Completions provider-native request construction via `response_format` JSON Schema only when the resolved runtime model capability declares `:openai/chat-completions-json-schema-response-format`.
+7. Preserve Codex Responses fallback-only behavior: no unverified public OpenAI schema fields on `:openai-codex-responses`.
+8. Wire Anthropic forced synthetic tool use via `tools` + `tool_choice`, then extract the synthetic tool input as `[:structured-output :payload]` while excluding it from ordinary assistant tool calls.
+9. Emit/store strategy metadata for non-streaming calls, and for streaming calls emit first-class `:structured-output-strategy` and `:structured-output-result` events added to `psi.ai.schemas/StreamEventType`; provider-capture callbacks may duplicate metadata for diagnostics but are not the caller contract.
+10. Keep local parse/coerce/validate in the caller/runtime after provider extraction; AI adapters return raw/extracted payload metadata, not final trusted workflow values, and this task does not add an AI-level Malli validation invocation seam.
+11. Update docs for capabilities, caveats, and fallback semantics.
+12. Run focused tests, then broader AI component tests if focused changes pass.
 
 ## Verification commands
 
